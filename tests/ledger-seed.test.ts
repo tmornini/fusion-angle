@@ -532,6 +532,33 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'a wave\'s statements are recorded in call order',
+    async () => {
+        const slow = await Promise.all(
+            [fresh(), fresh(), fresh(), fresh()].map(
+                (idea) => ideaPairAt(idea, 'PUT', 'Fresh', true),
+            ),
+        );
+        const quick = await ideaPairAt(
+            fresh(), 'PUT', 'Fresh', true,
+        );
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await Promise.all([
+                    runWrite(db, attemptFor(slow), slow),
+                    write(db, quick),
+                ]);
+            },
+        );
+        assertEquals(
+            statements.map((s) => s.rows.map((r) => r.id)),
+            [slow.map((pair) => pair.id), [quick.id]],
+        );
+    },
+);
+
 function adapterOver(
     backend: MemoryStorageBackend,
 ): BackedDbAdapter {

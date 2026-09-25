@@ -144,10 +144,13 @@ export function withoutRequestIdLine(
 // overlap as a transaction's do. It keeps openClient's
 // verdict beneath the adapter: a matched, stale, or
 // refused row fails the seed. A conflict must not reach
-// runWrite, which would retry and answer refused.
+// runWrite, which would retry and answer refused. A wave's
+// statements finish in any order, so each takes its place
+// when called, and they are returned in call order.
 export class RehearsalBackend implements StorageBackend {
     readonly #scratch: StorageBackend;
-    readonly #statements: RehearsedStatement[] = [];
+    readonly #recorded = new Map<number, RehearsedStatement>();
+    #calls = 0;
     #open: Tx | undefined;
 
     constructor(scratch: StorageBackend) {
@@ -156,7 +159,9 @@ export class RehearsalBackend implements StorageBackend {
     }
 
     statements(): readonly RehearsedStatement[] {
-        return this.#statements;
+        return [...this.#recorded]
+            .sort(([a], [b]) => a - b)
+            .map(([, statement]) => statement);
     }
 
     // Hold `tx`, the scratch's one open transaction, for
@@ -209,6 +214,7 @@ export class RehearsalBackend implements StorageBackend {
         now: string | undefined,
         tx: Tx | undefined,
     ): Promise<StatementAnswer[]> {
+        const position = this.#calls++;
         const handle = tx === undefined ? this.#handle() : tx;
         let answers: StatementAnswer[];
         try {
@@ -231,7 +237,7 @@ export class RehearsalBackend implements StorageBackend {
                 );
             }
         }
-        this.#statements.push({
+        this.#recorded.set(position, {
             rows: [...rows],
             supersedes: answers.map(
                 (answer) => answer.supersedes,
@@ -276,9 +282,9 @@ export class RehearsalBackend implements StorageBackend {
 
 // Run the seed's live ops in one transaction on a scratch
 // backend and return every statement they executed, in
-// order. The scratch root is the scratch's own statement,
-// not the seed's, and lands before the transaction copies
-// the table.
+// the order they were called. The scratch root is the
+// scratch's own statement, not the seed's, and lands
+// before the transaction copies the table.
 export async function rehearse(
     scratch: StorageBackend,
     run: (db: BackedDbAdapter) => Promise<void>,
