@@ -278,18 +278,27 @@ function ideaPair(
     title: string,
     genesis: boolean,
 ): Promise<MessagePair> {
+    return ideaPairAt(IDEA, method, title, genesis);
+}
+
+function ideaPairAt(
+    idea: string,
+    method: 'PUT' | 'DELETE',
+    title: string,
+    genesis: boolean,
+): Promise<MessagePair> {
     const operationId = generateIdentifier();
     const body = method === 'DELETE' ? undefined : { title };
     return formWriteMessagePair({
         method,
         pathname: '/organizations/' + ORGANIZATION
-            + '/ideas/' + IDEA,
+            + '/ideas/' + idea,
         routePattern: 'organizations/:id/ideas/:id',
         routeSegments: [
             'organizations', ':id', 'ideas', ':id',
         ],
         pathSegments: [
-            'organizations', ORGANIZATION, 'ideas', IDEA,
+            'organizations', ORGANIZATION, 'ideas', idea,
         ],
         headerFields: [],
         body,
