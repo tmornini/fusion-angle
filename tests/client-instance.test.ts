@@ -21,7 +21,7 @@ import {
 import {
     getDbAdapter,
     initAdapter,
-} from '../web-app/app/adapters/init.ts';
+} from './client-init.ts';
 import {
     inPageClient,
     wrapInPageAdapter,

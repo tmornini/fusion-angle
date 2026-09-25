@@ -90,11 +90,8 @@ Deno.test(
         const gate = { held: Promise.resolve() };
         let release = (): void => {};
         try {
-            await import('./in-page-facade.ts');
             const { initAdapter } =
-                await import(
-                    '../web-app/app/adapters/init.ts'
-                );
+                await import('./client-init.ts');
             const db = new BackedDbAdapter(
                 new MemoryStorageBackend(),
                 () => gate.held,

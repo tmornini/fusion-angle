@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { postSessionSeed } from '../web-app/app/adapters/init.ts';
+import { postSessionSeed } from './client-init.ts';
 import { putClient } from '../web-app/app/client.ts';
 import { inPageClient } from './in-page-facade.ts';
 import {

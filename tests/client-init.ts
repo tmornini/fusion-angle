@@ -1,24 +1,24 @@
 import type {
     ClientFacadeAdapter,
-} from '../../../api/api.ts';
+} from '../api/api.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
     ANONYMOUS_ID,
-} from '../../../api/access-token.ts';
+} from '../api/access-token.ts';
 import {
     generateIdentifier,
-} from '../../../shared/identifier.ts';
+} from '../shared/identifier.ts';
 import {
     nowEpochSeconds,
-} from '../../../shared/types.ts';
+} from '../shared/types.ts';
 import {
     createAppClient,
     getClient,
     putClient,
-} from '../client.ts';
+} from '../web-app/app/client.ts';
 import { wrapInPageAdapter } from
-    '../../../tests/in-page-facade.ts';
+    './in-page-facade.ts';
 
 let adapter: ClientFacadeAdapter | undefined;
 

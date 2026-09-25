@@ -118,7 +118,7 @@ Deno.test(
         try {
             const { initAdapter } =
                 await import(
-                    '../web-app/app/adapters/init.ts'
+                    './client-init.ts'
                 );
             const {
                 getClient, putClient,

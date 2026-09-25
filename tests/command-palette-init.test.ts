@@ -24,7 +24,7 @@ Deno.test(
         installGlobals();
         try {
             const { initAdapter } = await import(
-                '../web-app/app/adapters/init.ts'
+                './client-init.ts'
             );
             const { initCommandPalette } =
                 await import(
