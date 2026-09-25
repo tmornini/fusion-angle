@@ -30,11 +30,12 @@ const client = createAppClient(
     ),
 );
 
-// The single-flight mutex opens ONE refresh channel per
-// process, lazily, and a test process has no unload to
-// reclaim it. Release after each test, so the handle never
-// outlives the test that opened it; the next refresh
-// reopens it.
+// The single-flight mutex opens one refresh channel per
+// client, lazily, but its fixed name still reaches every
+// test file's worker in the process, and a test process
+// has no unload to reclaim it. Release after each test, so
+// the handle never outlives the test that opened it; the
+// next refresh reopens it.
 Deno.test.afterEach(() => {
     client.deleteRefreshChannel();
 });

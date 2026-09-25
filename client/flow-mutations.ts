@@ -421,8 +421,9 @@ export function buildRevivals(
 // revivals diffed against that SAME fresh baseline (empty for
 // every ordinary edit; performRedo is the one caller that
 // supplies a revivalTarget — see putFlow below). ONE GET
-// (ctx.GETWithEtag, never getFlowGraph — that helper also
-// applies withRenderableLayout, a presentation concern, and
+// (ctx.GETWithEtag, never getFlowGraph — the split moved
+// layout to the app's getRenderableFlowGraph, so this
+// helper returns the parsed, unlaid graph and still
 // hides the ETag this builder also needs) serves BOTH the
 // baseline diff source AND the echo to carry as If-Match —
 // calling getFlowGraph plus a separate header read would

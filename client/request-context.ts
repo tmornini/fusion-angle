@@ -393,7 +393,7 @@ export async function jitteredBackoff(
 
 // Wrap one verb call with single-shot 401 recovery. The first
 // attempt runs on the request's own vessel token — never the
-// live module global, so identity and wire credential cannot
+// session's live token, so identity and wire credential cannot
 // diverge mid-request (one vessel truth). A non-401 fault
 // surfaces untouched. A 401 drives one refresh + re-scope; the
 // call is retried exactly once against the recovered token. A
