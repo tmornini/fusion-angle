@@ -2919,6 +2919,24 @@ Off the critical path; each with its oracle.
   Oracle: `./test` measured before and after this change
   alone, three runs each, and every test that mutates
   its seeded database still gets its own backend
+- The app still reads the server after the packageable
+  client. With the contract in `shared/`, four modules
+  outside the client import `api/`: the documentation
+  generator (`web-app/app/generate-api-documentation.ts`)
+  reads the route table and its surface
+  (`api/routes.ts`, `api/route-surface.ts`,
+  `api/http-status-documents.ts`, `api/request-auth.ts`,
+  `api/family-registry.ts`, `api/path-segments.ts`) under
+  `deno run`, never in a page; two presenters
+  (`web-app/app/presenters/ai-member-detail.ts`,
+  `presenters/member.ts`) read the provider-model
+  catalog (`api/provider-models.ts`); and the records
+  detail page (`web-app/records/detail.ts`) derives
+  claim roles (`api/authorization.ts`). The catalog and
+  the claim-role derivation are both sides' and belong
+  in `shared/`; the generator is a tool and may read
+  the server. Oracle: an import-graph walk from every
+  `PAGE_REGISTRY` entry finds no module under `api/`
 
 ## Sequencing
 
