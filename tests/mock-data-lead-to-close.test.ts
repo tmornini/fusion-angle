@@ -5,7 +5,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import {
     getFlowStats,
-} from '../web-app/app/adapters/flow-stats.ts';
+} from '../web-app/app/flow-stats.ts';
 import { now } from '../api/mock-data/seed-kit.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';

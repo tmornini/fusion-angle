@@ -32,7 +32,7 @@ export * from '../flow-export.ts';
 export * from './flow-publish.ts';
 export * from '../../../client/project-publish.ts';
 export * from '../../../client/work-orders-queries.ts';
-export * from './flow-stats.ts';
+export * from '../flow-stats.ts';
 export * from '../../../client/work-orders-mutations.ts';
 export * from '../../../client/work-orders-deletions.ts';
 export * from '../../../client/records.ts';

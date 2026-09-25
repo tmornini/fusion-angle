@@ -4,7 +4,7 @@ import {
 } from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { getFlowStats } from
-    '../web-app/app/adapters/flow-stats.ts';
+    '../web-app/app/flow-stats.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 

@@ -13,7 +13,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getFlowStats,
-} from '../web-app/app/adapters/flow-stats.ts';
+} from '../web-app/app/flow-stats.ts';
 import {
     postFlowCreation,
     putFlow,
