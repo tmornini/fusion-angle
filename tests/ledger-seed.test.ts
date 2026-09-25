@@ -500,6 +500,38 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'the scratch\'s schema calls are refused mid-rehearsal',
+    async () => {
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await assertRejects(
+                    () => db.backend.ensureTable(),
+                    Error,
+                    'ensureTable called during the open seed'
+                        + ' rehearsal',
+                );
+                await assertRejects(
+                    () => db.backend.seedTransaction(
+                        async () => {},
+                    ),
+                    Error,
+                    'seedTransaction called during the open'
+                        + ' seed rehearsal',
+                );
+                await assertRejects(
+                    () => db.backend.postSchemaCreation(),
+                    Error,
+                    'postSchemaCreation called during the open'
+                        + ' seed rehearsal',
+                );
+            },
+        );
+        assertStrictEquals(statements.length, 0);
+    },
+);
+
 function adapterOver(
     backend: MemoryStorageBackend,
 ): BackedDbAdapter {

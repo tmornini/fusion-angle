@@ -189,13 +189,15 @@ export class RehearsalBackend implements StorageBackend {
         return fn(this.#handle());
     }
 
-    seedTransaction<R>(
+    async seedTransaction<R>(
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
+        this.#refuseWhileOpen('seedTransaction');
         return this.#scratch.seedTransaction(fn);
     }
 
-    ensureTable(): Promise<void> {
+    async ensureTable(): Promise<void> {
+        this.#refuseWhileOpen('ensureTable');
         return this.#scratch.ensureTable();
     }
 
@@ -242,12 +244,25 @@ export class RehearsalBackend implements StorageBackend {
         return this.#scratch.hasSchema();
     }
 
-    postSchemaCreation(): Promise<void> {
+    async postSchemaCreation(): Promise<void> {
+        this.#refuseWhileOpen('postSchemaCreation');
         return this.#scratch.postSchemaCreation();
     }
 
     deleteSchema(): Promise<void> {
         return this.#scratch.deleteSchema();
+    }
+
+    // Each of the three takes the scratch's serializer,
+    // which the open run holds until it ends: a crash in
+    // place of a hang.
+    #refuseWhileOpen(method: string): void {
+        if (this.#open !== undefined) {
+            throw new Error(
+                method + ' called during the open seed'
+                    + ' rehearsal',
+            );
+        }
     }
 
     // Nothing reaches the scratch's rows outside a run.
