@@ -1,6 +1,6 @@
 import { decodeAccessToken } from
     '../shared/access-token-decode.ts';
-import { STORAGE_KEY_AUTHORIZATION } from '../web-app/app/storage-keys.ts';
+import { STORAGE_KEY_AUTHORIZATION } from './session-storage-keys.ts';
 import {
     deleteSessionToken,
     putSessionToken,

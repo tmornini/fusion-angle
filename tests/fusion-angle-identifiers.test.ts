@@ -2,13 +2,15 @@ import { assertNotStrictEquals, assertStrictEquals } from '@std/assert';
 import { TOKEN_AUDIENCE } from
     '../api/access-token.ts';
 import {
-    STORAGE_KEY_AUTHORIZATION,
-    STORAGE_KEY_ACTIVE_ORGANIZATION_ID,
     STORAGE_KEY_THEME,
     STORAGE_KEY_SIDEBAR,
     STORAGE_KEY_LOG_LEVEL,
     STORAGE_KEY_PENDING_TOAST,
 } from '../web-app/app/storage-keys.ts';
+import {
+    STORAGE_KEY_AUTHORIZATION,
+    STORAGE_KEY_ACTIVE_ORGANIZATION_ID,
+} from '../client/session-storage-keys.ts';
 
 Deno.test('JWT audience is fusion-angle', () => {
     assertStrictEquals(TOKEN_AUDIENCE, 'fusion-angle');

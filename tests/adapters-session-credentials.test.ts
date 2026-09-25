@@ -14,8 +14,7 @@ import {
     getSessionToken,
     putSessionToken,
 } from '../client/session-token.ts';
-import { STORAGE_KEY_AUTHORIZATION } from
-    '../web-app/app/storage-keys.ts';
+import { STORAGE_KEY_AUTHORIZATION } from '../client/session-storage-keys.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 
 const KEY = STORAGE_KEY_AUTHORIZATION;

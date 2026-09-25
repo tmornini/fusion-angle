@@ -1,6 +1,7 @@
 import type { RequestContext } from './shared.ts';
-import { STORAGE_KEY_ACTIVE_ORGANIZATION_ID } from
-    '../web-app/app/storage-keys.ts';
+import {
+    STORAGE_KEY_ACTIVE_ORGANIZATION_ID,
+} from './session-storage-keys.ts';
 import {
     authParam,
     refusedDoor,

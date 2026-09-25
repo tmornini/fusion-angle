@@ -31,8 +31,7 @@ import {
     getSessionCredentials,
     putSessionCredentials,
 } from '../client/session-credentials.ts';
-import { STORAGE_KEY_AUTHORIZATION } from
-    '../web-app/app/storage-keys.ts';
+import { STORAGE_KEY_AUTHORIZATION } from '../client/session-storage-keys.ts';
 import {
     ideaBody, organizationRow, seedAdminSchema,
     seedOrganizationDocument as seedOrganizationDocumentMessagePair,
