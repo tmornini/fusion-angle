@@ -18,7 +18,7 @@ import {
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 
 // Surface the domain class and PII shapes through the
 // adapter barrel so presenters speak one tongue (mirrors

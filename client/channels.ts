@@ -2,18 +2,18 @@ import {
     postNotificationEvent,
     subscribeNamedNotificationEvents,
     subscribeNotificationEvents,
-} from '../../client/broadcast-channel.ts';
+} from './broadcast-channel.ts';
 import {
     getSessionToken,
     sessionIsAuthenticated,
     sessionTokenIsSeeded,
-} from '../../client/session-token.ts';
+} from './session-token.ts';
 import {
     principalFromToken,
-} from '../../shared/access-token-decode.ts';
+} from '../shared/access-token-decode.ts';
 import type {
     NotificationEvent,
-} from '../../shared/notifications.ts';
+} from '../shared/notifications.ts';
 
 type Listener<T> = (value: T) => void;
 

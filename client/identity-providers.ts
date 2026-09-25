@@ -11,7 +11,7 @@ import {
 } from '../shared/ledger-reduction.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 
 const providerChanges =
     createSubscriptionChannel();

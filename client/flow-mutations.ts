@@ -37,7 +37,7 @@ import {
 } from '../shared/identifier.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,

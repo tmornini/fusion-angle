@@ -21,7 +21,7 @@ import {
 } from './work-orders-queries.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 import type {
     RequestContext,
 } from './shared.ts';

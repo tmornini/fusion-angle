@@ -11,7 +11,7 @@ import {
 import {
     bindCrossTab,
     subscribeOnce,
-} from '../app/channels.ts';
+} from '../../client/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import {
     ICON_SIZE,

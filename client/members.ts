@@ -15,7 +15,7 @@ import type { RequestContext } from './shared.ts';
 import { getMemberPii } from './identities.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 export {
     HumanMember,
     isDimensionKey,

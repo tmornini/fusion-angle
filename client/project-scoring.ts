@@ -32,7 +32,7 @@ import {
 } from '../web-app/app/scoring-format.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';

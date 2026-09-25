@@ -34,7 +34,7 @@ import {
 } from '../shared/identifier.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 
 const ideaChanges =
     createSubscriptionChannel();

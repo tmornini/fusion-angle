@@ -8,7 +8,7 @@ import {
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 
 const tokenChanges =
     createSubscriptionChannel();

@@ -7,7 +7,7 @@ import { AIMember } from '../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 
 export {
     AIMember,

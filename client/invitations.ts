@@ -16,7 +16,7 @@ import {
 } from '../shared/http-errors.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 import {
     getSessionCredentials,
     isCookieSession,

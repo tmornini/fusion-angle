@@ -12,7 +12,7 @@ import {
     createChannel,
     createSubscriptionChannel,
     subscribeOnce,
-} from '../web-app/app/channels.ts';
+} from '../client/channels.ts';
 import {
     putSessionToken,
     deleteSessionToken,

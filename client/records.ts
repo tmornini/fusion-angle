@@ -16,7 +16,7 @@ import {
 } from './shared.ts';
 import {
     createSubscriptionChannel,
-} from '../web-app/app/channels.ts';
+} from './channels.ts';
 import { getFlowEntities } from './flows.ts';
 
 // The flow↔record bindings across EVERY flow the caller's org

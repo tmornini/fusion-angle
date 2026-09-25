@@ -6,7 +6,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { subscribeOnce } from '../app/channels.ts';
+import { subscribeOnce } from '../../client/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import {
     ICON_SIZE,

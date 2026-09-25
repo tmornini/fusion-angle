@@ -35,7 +35,7 @@ Deno.test(
                 '../web-app/app/adapters/index.ts'
             ) as Record<string, unknown>;
             const { subscribeOnce } = await import(
-                '../web-app/app/channels.ts'
+                '../client/channels.ts'
             );
             const names = Object.keys(adapters)
                 .filter(name => /^subscribe\w+Changes$/.test(name))
