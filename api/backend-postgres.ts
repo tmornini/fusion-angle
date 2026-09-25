@@ -120,7 +120,7 @@ export class PostgresBackend implements StorageBackend {
             `;
             if (root.length > 0) return;
             await this.executeLedger(
-                'genesis',
+                'blind',
                 [mintRootBind()],
                 undefined,
                 undefined,
@@ -639,6 +639,7 @@ type StatementResult = {
     name: string,
     method: string,
     outcome: string,
+    raw_outcome: string,
     stamp: string,
     response: unknown,
     head_id: string | null,
@@ -704,12 +705,23 @@ async function queryStatement(
             );
         }
         const inserted = outcome === 'land';
+        const rawOutcome = row.raw_outcome;
+        if (
+            rawOutcome !== 'land'
+            && rawOutcome !== 'matched'
+            && rawOutcome !== 'stale'
+        ) {
+            throw new Error(
+                'ledger statement outcome ' + rawOutcome,
+            );
+        }
         return {
             id: source.id,
             path: row.path,
             name: row.name,
             method: row.method,
             outcome,
+            rawOutcome,
             stamp: row.stamp,
             response: bytesOfBytea(row.response),
             headId: row.head_id === null

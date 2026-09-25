@@ -931,7 +931,7 @@ async function dispatched(
                 operationId: ctx.operationId,
                 requestId: ctx.requestId,
                 ...(isDocumentPut && head === null
-                    ? { genesis: true as const }
+                    ? { genesis: 'handler' as const }
                     : {}),
                 responseBody: method === 'PUT'
                     && body === undefined

@@ -308,7 +308,7 @@ function ideaPairAt(
         responseBody: body,
         operationId,
         requestId: operationId,
-        ...(genesis ? { genesis: true as const } : {}),
+        ...(genesis ? { genesis: 'handler' as const } : {}),
     });
 }
 

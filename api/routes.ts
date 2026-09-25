@@ -2109,7 +2109,7 @@ export async function postWorkOrderClaimOp(
         // so the attempt latch has to land on it.
         if (claimRead.headId === null) {
             Object.assign(messagePair, {
-                genesis: true as const,
+                genesis: 'handler' as const,
             });
         } else {
             Object.assign(messagePair, {

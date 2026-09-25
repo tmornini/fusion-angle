@@ -326,14 +326,38 @@ Deno.test(
 );
 
 Deno.test(
-    'genesis lands on the nil predecessor',
+    'a nil latch with no head lands on the nil predecessor',
     async () => {
         const rows = await classifyStatement(
-            'genesis',
+            'in-order',
             [statementRow({
                 id: identifierAt(3),
                 operationId: identifierAt(4),
-                ifMatch: identifierAt(2),
+                ifMatch: NIL_IDENTIFIER,
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nhello'),
+            })],
+            [],
+            EARLY,
+        );
+        const row = rows[0]!;
+        assertEquals(row.outcome, 'land');
+        assertEquals(row.rawOutcome, 'land');
+        assertEquals(row.supersedes, NIL_IDENTIFIER);
+        assertEquals(row.inserted, true);
+        assertEquals(row.stamp, EARLY);
+    },
+);
+
+Deno.test(
+    'a nil latch over a live put head is stale',
+    async () => {
+        const rows = await classifyStatement(
+            'in-order',
+            [statementRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                ifMatch: NIL_IDENTIFIER,
                 responsePrefix: PREFIX,
                 responseSuffix: textBytes('\r\n\r\nhello'),
             })],
@@ -343,18 +367,105 @@ Deno.test(
                 id: identifierAt(1),
                 responseAt: HEAD_STAMP,
                 response: message(
-                    imfFixdate(HEAD_STAMP),
-                    'hello',
+                    imfFixdate(HEAD_STAMP), 'hello',
                 ),
                 method: 'PUT',
             }],
             EARLY,
         );
+        assertEquals(rows[0]!.outcome, 'stale');
+        assertEquals(rows[0]!.rawOutcome, 'stale');
+        assertEquals(rows[0]!.inserted, false);
+    },
+);
+
+Deno.test(
+    'a nil latch over a tombstone lands and supersedes it',
+    async () => {
+        const rows = await classifyStatement(
+            'in-order',
+            [statementRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                ifMatch: NIL_IDENTIFIER,
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nagain'),
+            })],
+            [{
+                path: PATH,
+                name: NAME,
+                id: identifierAt(1),
+                responseAt: HEAD_STAMP,
+                response: textBytes(
+                    'HTTP/1.1 204 \r\ndate: '
+                        + imfFixdate(HEAD_STAMP)
+                        + '\r\n\r\n',
+                ),
+                method: 'DELETE',
+            }],
+            EARLY,
+        );
         const row = rows[0]!;
         assertEquals(row.outcome, 'land');
-        assertEquals(row.supersedes, NIL_IDENTIFIER);
-        assertEquals(row.inserted, true);
-        assertEquals(row.stamp, EARLY);
+        assertEquals(row.supersedes, identifierAt(1));
+        assertEquals(
+            row.stamp, '2026-09-23T00:00:00.000006Z',
+        );
+        assertEquals(
+            new TextDecoder().decode(
+                row.response.subarray(0, 13),
+            ),
+            'HTTP/1.1 201 ',
+        );
+    },
+);
+
+Deno.test(
+    'each answer row carries its own outcome',
+    async () => {
+        const rows = await classifyStatement(
+            'composed',
+            [
+                statementRow({
+                    id: identifierAt(3),
+                    operationId: identifierAt(4),
+                    ifMatch: identifierAt(2),
+                    responsePrefix: PREFIX,
+                    responseSuffix: textBytes('\r\n\r\nx'),
+                }),
+                {
+                    ...statementRow({
+                        id: identifierAt(5),
+                        operationId: identifierAt(4),
+                        ifMatch: null,
+                        responsePrefix: PREFIX,
+                        responseSuffix: textBytes(
+                            '\r\n\r\ny',
+                        ),
+                    }),
+                    name: 'other',
+                },
+            ],
+            [{
+                path: PATH,
+                name: NAME,
+                id: identifierAt(1),
+                responseAt: HEAD_STAMP,
+                response: message(
+                    imfFixdate(HEAD_STAMP), 'old',
+                ),
+                method: 'PUT',
+            }],
+            EARLY,
+        );
+        assertEquals(
+            rows.map((row) => row.outcome),
+            ['stale', 'stale'],
+        );
+        assertEquals(
+            rows.map((row) => row.rawOutcome),
+            ['stale', 'land'],
+        );
     },
 );
 
@@ -560,18 +671,12 @@ Deno.test(
 );
 
 Deno.test('a refusal names the document', () => {
-    const exists = 'Document already exists at '
-        + '/migrations/0001-example';
     const contended =
         'Document remained contended at '
         + '/migrations/0001-example';
     const mismatch =
         'If-Match does not match the current'
         + ' document at /migrations/0001-example';
-    assertEquals(
-        refusalOf('genesis', 1, PATH, NAME),
-        { status: 409, error: exists },
-    );
     assertEquals(
         refusalOf('blind', 1, PATH, NAME),
         'retry',
@@ -762,32 +867,32 @@ Deno.test(
 );
 
 Deno.test(
-    'a second genesis answers 409 and keeps the head',
+    'a second declared genesis answers 412 and keeps the'
+        + ' head',
     async () => {
         const { db } = openLedger();
         await db.ensureTable();
         const headId = identifierAt(1);
-        await runWrite(db, 'genesis', [
+        await runWrite(db, 'in-order', [
             writeRow({
                 id: headId,
                 operationId: identifierAt(2),
                 body: 'rootish',
-                ifMatch: null,
+                ifMatch: NIL_IDENTIFIER,
             }),
         ], HEAD_STAMP);
-        const answer = await runWrite(db, 'genesis', [
+        const answer = await runWrite(db, 'in-order', [
             writeRow({
                 id: identifierAt(3),
                 operationId: identifierAt(4),
                 body: 'again',
-                ifMatch: null,
+                ifMatch: NIL_IDENTIFIER,
             }),
         ], LATER);
-        assertStrictEquals(answer.response.status, 409);
+        assertStrictEquals(answer.response.status, 412);
         assertEquals(
             await errorOf(answer.response),
-            'Document already exists at '
-                + PATH + NAME,
+            'Document already exists at ' + PATH + NAME,
         );
         assertStrictEquals(
             (await db.messagePairs.getHeadPair(PATH, NAME))
@@ -878,7 +983,7 @@ Deno.test(
 );
 
 Deno.test(
-    'an in-order conflict answers 412 once',
+    'an in-order conflict runs once more and lands',
     async () => {
         const { backend, db } = openLedger();
         await db.ensureTable();
@@ -901,6 +1006,43 @@ Deno.test(
                 ifMatch: headId,
             }),
         ], LATER);
+        assertStrictEquals(answer.outcome, 'land');
+        assertStrictEquals(
+            backend.statementExecutions(),
+            before + 2,
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(PATH, NAME))
+                ?.id,
+            identifierAt(3),
+        );
+    },
+);
+
+Deno.test(
+    'two in-order conflicts answer 412 naming the row',
+    async () => {
+        const { backend, db } = openLedger();
+        await db.ensureTable();
+        const headId = identifierAt(1);
+        await runWrite(db, 'blind', [
+            writeRow({
+                id: headId,
+                operationId: identifierAt(2),
+                body: 'hello',
+                ifMatch: null,
+            }),
+        ], HEAD_STAMP);
+        const before = backend.statementExecutions();
+        backend.refuseNextSuccessions(2);
+        const answer = await runWrite(db, 'in-order', [
+            writeRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                body: 'next',
+                ifMatch: headId,
+            }),
+        ], LATER);
         assertStrictEquals(answer.response.status, 412);
         assertEquals(
             await errorOf(answer.response),
@@ -909,12 +1051,7 @@ Deno.test(
         );
         assertStrictEquals(
             backend.statementExecutions(),
-            before + 1,
-        );
-        assertStrictEquals(
-            (await db.messagePairs.getHeadPair(PATH, NAME))
-                ?.id,
-            headId,
+            before + 2,
         );
     },
 );

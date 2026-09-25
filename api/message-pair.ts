@@ -3,6 +3,7 @@ import type {
     Id, IdentityTokenEntity, MessagePairEntity,
 } from '../shared/types.ts';
 import {
+    NIL_IDENTIFIER,
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
@@ -33,6 +34,7 @@ import {
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
+    HTTP_CONFLICT, HTTP_PRECONDITION_FAILED,
     errorJson,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from
@@ -56,6 +58,12 @@ import {
 } from './ledger-statement.ts';
 import { DATE_PLACEHOLDER } from './ledger-root.ts';
 import { notifyPayload } from './advisory-lock.ts';
+
+// Who declared a genesis: the client, by If-None-Match: *,
+// or the handler, for a document it names itself. The
+// statement judges both the same way; the refusal says
+// which (409 for the handler's, 412 for the client's).
+export type GenesisDeclarer = 'client' | 'handler';
 
 // The shadow-ledger message pair: one `message_pairs` put. Formed
 // pre-tx — crypto, hashing, and timers never run
@@ -85,9 +93,8 @@ export interface MessagePair {
     readonly method: string;
     readonly operationId: string;
     readonly requestId: string;
-    // A document create: no head, so the statement is
-    // genesis rather than blind.
-    readonly genesis?: true;
+    // A document create: no head, so the row latches nil.
+    readonly genesis?: GenesisDeclarer;
     // Pre-tx lock-head pair id, latched when If-Match
     // matches the advertised ETag. In-tx re-query only.
     readonly latchedHeadMessagePairId?: string;
@@ -166,7 +173,7 @@ export interface WriteMessagePairInput {
     readonly operationId: string;
     // The id the server minted for this request. Missing throws.
     readonly requestId: string;
-    readonly genesis?: true;
+    readonly genesis?: GenesisDeclarer;
     // The stored request is zero bytes. buildRequestModel
     // is not called. Callers that received a request leave
     // this unset.
@@ -363,8 +370,8 @@ export async function formWriteMessagePair(
         method: input.method,
         operationId: input.operationId,
         requestId: input.requestId,
-        ...(input.genesis === true
-            ? { genesis: true as const }
+        ...(input.genesis !== undefined
+            ? { genesis: input.genesis }
             : {}),
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
@@ -773,7 +780,7 @@ export function attemptFor(
 ): Attempt {
     if (pairs.length !== 1) return 'composed';
     const pair = pairs[0]!;
-    if (pair.genesis === true) return 'genesis';
+    if (pair.genesis !== undefined) return 'in-order';
     if (pair.latchedHeadMessagePairId !== undefined) {
         return 'in-order';
     }
@@ -802,52 +809,117 @@ export async function runWrite(
         (row): row is MessagePair =>
             'requestMessage' in row,
     );
+    const ran = await runStatement(
+        adapter, attempt, binds, now,
+    );
+    if (ran.kind === 'refused') {
+        const answer = refusedAnswer(rows, binds, attempt);
+        for (const pair of pairs) {
+            answers.set(pair, answer);
+            ownWires.set(pair, answer.response);
+        }
+        return answer;
+    }
+    const answer = answerOf(rows, binds, ran.stated);
+    for (const pair of pairs) {
+        answers.set(pair, answer);
+        ownWires.set(
+            pair,
+            wireForPair(pair, ran.stated, answer),
+        );
+    }
+    return answer;
+}
+
+export type StatementRun =
+    | {
+        readonly kind: 'stated',
+        readonly stated: readonly StatementAnswer[],
+    }
+    | { readonly kind: 'refused' };
+
+// Runs past a refusal only to learn which row lost.
+const NON_BLIND_RUNS = 2;
+
+// A blind refusal runs the statement again, up to three
+// times. Any other refusal runs it once more with the same
+// binds: the re-run classifies against the row that won, so
+// the answer can name the row it refused.
+export async function runStatement(
+    adapter: DbAdapter,
+    attempt: Attempt,
+    binds: readonly StatementBind[],
+    now: string | undefined,
+): Promise<StatementRun> {
     let conflicts = 0;
-    const document = refusalDocument(rows);
     for (;;) {
         try {
             const stated = await runLedgerStatement(
                 adapter, attempt, binds, now,
             );
-            const answer = answerOf(
-                rows, stated, document,
-            );
-            for (const pair of pairs) {
-                answers.set(pair, answer);
-                ownWires.set(
-                    pair,
-                    wireForPair(pair, stated, answer),
-                );
-            }
-            return answer;
+            return { kind: 'stated', stated };
         } catch (error) {
             if (!(error instanceof SuccessionConflict)) {
                 throw error;
             }
             conflicts += 1;
-            const refusal = refusalOf(
-                attempt,
-                conflicts,
-                document.path,
-                document.name,
-            );
-            if (refusal === 'retry') continue;
-            const answer: WriteAnswer = {
-                response: errorJson(
-                    refusal.error, refusal.status,
-                ),
-                outcome: 'refused',
-                answeredId: null,
-                bells: [],
-                rows: [],
-            };
-            for (const pair of pairs) {
-                answers.set(pair, answer);
-                ownWires.set(pair, answer.response);
+            const again = attempt === 'blind'
+                ? refusalOf(attempt, conflicts, '', '')
+                    === 'retry'
+                : conflicts < NON_BLIND_RUNS;
+            if (!again) {
+                return { kind: 'refused' };
             }
-            return answer;
         }
     }
+}
+
+// The refused row names its document and the fact.
+export function refusalOfRow(
+    row: WriteRow | MessagePair,
+    bind: StatementBind,
+): Response {
+    const document = bind.path + bind.name;
+    if (bind.ifMatch === NIL_IDENTIFIER) {
+        const handler = 'requestMessage' in row
+            && row.genesis === 'handler';
+        return errorJson(
+            'Document already exists at ' + document,
+            handler ? HTTP_CONFLICT : HTTP_PRECONDITION_FAILED,
+        );
+    }
+    return errorJson(
+        'If-Match does not match the current document at '
+            + document,
+        HTTP_PRECONDITION_FAILED,
+    );
+}
+
+function refusedAnswer(
+    rows: readonly (WriteRow | MessagePair)[],
+    binds: readonly StatementBind[],
+    attempt: Attempt,
+): WriteAnswer {
+    const latched = binds.findIndex(
+        (bind) => bind.ifMatch !== null,
+    );
+    const document = refusalDocument(rows);
+    // A statement no row latched names no header: it was
+    // contended, as a blind one is after three attempts.
+    const response = attempt !== 'blind' && latched >= 0
+        ? refusalOfRow(rows[latched]!, binds[latched]!)
+        : errorJson(
+            'Document remained contended at '
+                + document.path + document.name,
+            HTTP_CONFLICT,
+        );
+    return {
+        response,
+        outcome: 'refused',
+        answeredId: null,
+        bells: [],
+        rows: [],
+    };
 }
 
 function wireForPair(
@@ -923,18 +995,16 @@ function currentRequestId(
 
 function answerOf(
     rows: readonly (WriteRow | MessagePair)[],
+    binds: readonly StatementBind[],
     stated: readonly StatementAnswer[],
-    document: { path: string, name: string },
 ): WriteAnswer {
     const outcome = stated[0]!.outcome;
     if (outcome === 'stale') {
+        const at = stated.findIndex(
+            (row) => row.rawOutcome === 'stale',
+        );
         return {
-            response: errorJson(
-                'If-Match does not match the current'
-                    + ' document at '
-                    + document.path + document.name,
-                412,
-            ),
+            response: refusalOfRow(rows[at]!, binds[at]!),
             outcome,
             answeredId: null,
             bells: [],
@@ -1070,7 +1140,7 @@ function ifMatchOf(
     attempt: Attempt,
     row: WriteRow | MessagePair,
 ): string | null {
-    if (attempt === 'blind' || attempt === 'genesis') {
+    if (attempt === 'blind') {
         return null;
     }
     if ('requestMessage' in row) {
@@ -1083,6 +1153,9 @@ function ifMatchOf(
             && pair.method === 'POST'
         ) {
             return null;
+        }
+        if (pair.genesis !== undefined) {
+            return NIL_IDENTIFIER;
         }
         if (pair.latchedHeadMessagePairId !== undefined) {
             return pair.latchedHeadMessagePairId;

@@ -1764,7 +1764,7 @@ async function authorizePassword(
         responseBody: codeBody,
         operationId: messagePair.operationId,
         requestId: messagePair.requestId,
-        genesis: true,
+        genesis: 'handler',
         emptyRequest: true,
     });
     let rehashMessagePair: MessagePair | undefined;

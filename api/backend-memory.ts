@@ -120,7 +120,7 @@ export class MemoryStorageBackend
         }
         if (hasRoot(this.#rows)) return;
         await this.executeLedger(
-            'genesis',
+            'blind',
             [mintRootBind()],
             undefined,
             undefined,
@@ -178,6 +178,7 @@ export class MemoryStorageBackend
                 name: row.name,
                 method: row.method,
                 outcome: item.outcome,
+                rawOutcome: item.rawOutcome,
                 stamp: item.stamp,
                 response: item.response,
                 headId: item.headId,

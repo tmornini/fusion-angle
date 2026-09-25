@@ -96,6 +96,7 @@ function fakeClient(): {
                     name: '0000-root',
                     method: 'PUT',
                     outcome: 'land',
+                    raw_outcome: 'land',
                     stamp: '2026-01-01T00:00:00.000000Z',
                     response: new Uint8Array(),
                     head_id: null,
