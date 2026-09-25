@@ -13,9 +13,7 @@ import {
     handlePageLoadError,
 } from './page-loader.ts';
 import { log } from './logger.ts';
-import {
-    UnauthorizedError,
-} from './adapters/index.ts';
+import { UnauthorizedError } from '../../shared/http-errors.ts';
 import {
     RequestError,
     HTTP_FORBIDDEN,

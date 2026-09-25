@@ -29,14 +29,14 @@ import {
     getFlowsForCreation,
     putWorkOrder,
     sessionContext,
-    generateIdentifier,
     subscribeWorkOrderChanges,
     type NotReadyFlowEntry,
     type RequestContext,
     type WorkOrder,
     type TransitionEvent,
-    type Member,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { type Member } from '../../shared/types.ts';
 import {
     createWorkOrderFromFlow,
 } from '../app/work-order-creation.ts';

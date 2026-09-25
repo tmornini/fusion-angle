@@ -22,7 +22,6 @@ import {
     postRecordChange,
     postRecordStateChange,
     subscribeRecordChanges,
-    generateIdentifier,
     getRecordInstances,
     getRecordInstance,
     putRecordInstance,
@@ -30,6 +29,7 @@ import {
     deleteRecordInstance,
     activeOrganization,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import { getFlowEntities } from '../../client/flows.ts';
 import {
     RecordDetailPresenter,

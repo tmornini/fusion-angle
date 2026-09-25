@@ -31,7 +31,7 @@ import {
     type ProjectState,
     COST_DIVISOR,
     MS_PER_DAY,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import {
     formatSigned, toneForScore,
 } from '../scoring-format.ts';

@@ -1,7 +1,7 @@
 import type {
     FlowGraph,
-    GraphNode,
 } from '../../client/flows.ts';
+import type { GraphNode } from '../../shared/types.ts';
 import { decodeIdentifier } from
     '../../shared/identifier.ts';
 

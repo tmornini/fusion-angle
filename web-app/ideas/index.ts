@@ -22,10 +22,10 @@ import {
     getIdeas,
     putIdea,
     subscribeIdeaChanges,
-    isIdeaState,
     sessionContext,
     type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
+import { isIdeaState } from '../../shared/types.ts';
 import {
     IdeaListPresenter,
     buildInitialIdeaListState,

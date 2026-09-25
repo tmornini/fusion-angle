@@ -28,7 +28,6 @@ import {
     handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    Project,
     getProjectEntity,
     projectStateOf,
     putProjectFields,
@@ -36,7 +35,6 @@ import {
     getFlowsByProject,
     postFlowCreation,
     subscribeProjectChanges,
-    generateIdentifier,
     sessionContext,
     type RequestContext,
     getProjectScoring,
@@ -54,12 +52,16 @@ import {
     validateProjectForApproval,
     validateProjectForArchival,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { Project } from '../../shared/types.ts';
 import { ProjectView } from '../app/project-view.ts';
 import type {
     FlowListItem,
+} from '../app/adapters/index.ts';
+import type {
     ProjectEntity,
     ProjectState,
-} from '../app/adapters/index.ts';
+} from '../../shared/types.ts';
 import {
     getMemberMap,
     memberName,

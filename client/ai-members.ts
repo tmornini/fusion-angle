@@ -9,13 +9,6 @@ import {
     createSubscriptionChannel,
 } from './channels.ts';
 
-export {
-    AIMember,
-} from '../shared/types.ts';
-export type {
-    AIMemberEntity,
-} from '../shared/types.ts';
-
 const aiMemberChanges =
     createSubscriptionChannel();
 

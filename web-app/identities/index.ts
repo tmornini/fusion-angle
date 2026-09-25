@@ -22,11 +22,11 @@ import {
     getIdentityRoster,
     postIdentityCreation,
     subscribeIdentityChanges,
-    generateIdentifier,
     IdentityPiiIntakeFailedError,
     type IdentityRosterRow,
     type RequestContext,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     IdentityRosterPresenter,
 } from '../app/presenters/index.ts';

@@ -4,9 +4,7 @@ import type {
     ProjectFlowEntity,
     GraphNode,
     GraphEdge,
-    NodeAttribute,
     StoredGraph,
-    AttributeType,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import { asBoolean } from '../shared/json-assert.ts';
@@ -16,11 +14,6 @@ import {
     organizationItem,
 } from './shared.ts';
 import { getProjectEntities } from './projects.ts';
-
-export type {
-    GraphNode, GraphEdge, NodeAttribute,
-    AttributeType,
-};
 
 export interface FlowGraph {
     id: string;
@@ -139,10 +132,6 @@ getFlowsWithProjectNames(
         };
     });
 }
-
-export type {
-    ProjectFlowEntity,
-} from '../shared/types.ts';
 
 export async function getFlowsByProject(
     ctx: RequestContext,

@@ -26,16 +26,6 @@ import {
     HTTP_FORBIDDEN,
 } from '../shared/http-errors.ts';
 
-export {
-    SystemMember,
-    isHumanMember,
-    isAIMember,
-    isSystemMember,
-} from '../shared/types.ts';
-export type {
-    Member,
-} from '../shared/types.ts';
-
 function getSystemMembers(): SystemMember[] {
     return [
         new SystemMember(

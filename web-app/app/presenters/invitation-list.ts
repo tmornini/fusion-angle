@@ -6,10 +6,10 @@ import {
     INVITATION_STATE_CONFIG,
 } from './state-display.ts';
 import {
-    type InvitationState,
     type InvitationView,
     type SentInvitation,
 } from '../adapters/index.ts';
+import { type InvitationState } from '../../../shared/types.ts';
 
 function stateBadge(state: InvitationState): SafeHtml {
     const cfg = INVITATION_STATE_CONFIG[state];

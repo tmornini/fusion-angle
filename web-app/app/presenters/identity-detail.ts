@@ -13,16 +13,18 @@ import {
     iconShield,
 } from '../icons.ts';
 import {
-    Identity,
     IDENTITY_WITHOUT_PII_NAME,
     UNNAMED_SERVICE_NAME,
-    type MemberPii,
     type ServiceFacet,
+    type ClientRegistration,
+} from '../adapters/index.ts';
+import {
+    Identity,
+    type MemberPii,
     type IdentityCredentialKind,
     type IdentityKind,
-    type ClientRegistration,
     type ClientStatus,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import { buildReadonlyField } from './detail-field.ts';
 
 const KIND_LABEL: Readonly<

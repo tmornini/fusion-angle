@@ -6,7 +6,6 @@ import {
     type ClientStatus,
     type Id,
     type IdentityEntity,
-    type IdentityKind,
     type IdentityPiiEntity,
     type MemberPii,
 } from '../shared/types.ts';
@@ -19,18 +18,6 @@ import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
-
-// Surface the domain class and PII shapes through the
-// adapter barrel so presenters speak one tongue (mirrors
-// members.ts re-exporting HumanMember).
-export { Identity };
-export type {
-    Id,
-    IdentityKind,
-    IdentityPiiEntity,
-    MemberPii,
-    ClientStatus,
-};
 
 // The identity surfaces derive from these stores: roster
 // and detail read identities + PII + the AI facet; the

@@ -21,9 +21,9 @@ import {
     postIdeaConversion,
     createRequestContext,
     sessionContext,
-    generateIdentifier,
-    type IdeaEntity,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { type IdeaEntity } from '../../shared/types.ts';
 import {
     getActiveObjectives,
     getCurrentObjectiveDefinitions,

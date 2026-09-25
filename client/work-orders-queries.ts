@@ -21,15 +21,6 @@ import {
 import { compareIdentifiers } from
     '../shared/identifier.ts';
 
-export type {
-    WorkOrderEntity,
-    WorkOrderFlowGraph,
-    WorkOrderHistoryEventEntity,
-    GraphNode,
-    GraphEdge,
-    NodeAttribute,
-} from '../shared/types.ts';
-
 /* ── Types ───────────────── */
 
 export interface HistoryFieldValue {

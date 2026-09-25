@@ -33,9 +33,9 @@ import {
     getBackupFromZip,
     computeFlowBackupResolution,
     postFlowFromBackup,
-    generateIdentifier,
     subscribeFlowChanges,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import type {
     Backup,
     ImportResolution,

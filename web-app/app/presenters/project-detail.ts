@@ -23,8 +23,8 @@ import {
 } from '../format.ts';
 import type {
     ProjectFieldsPatch,
-    ProjectState,
 } from '../adapters/index.ts';
+import type { ProjectState } from '../../../shared/types.ts';
 import type { ProjectView } from '../project-view.ts';
 import {
     PROJECT_STATE_CONFIG,
@@ -32,7 +32,7 @@ import {
 import {
     COST_DIVISOR,
     isProjectState,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import type {
     FlowListItem,
 } from '../../../client/flows.ts';

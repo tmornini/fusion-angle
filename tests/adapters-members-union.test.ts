@@ -18,11 +18,13 @@ import {
     getMembers,
     getMemberMap,
     memberName,
-    isHumanMember,
-    isAIMember,
     MEMBER_WITHOUT_PII_NAME,
     fillHumanMemberProfile,
 } from '../client/members-union.ts';
+import {
+    isHumanMember,
+    isAIMember,
+} from '../shared/types.ts';
 import type {
     MemberId,
     Member,

@@ -7,13 +7,15 @@ import {
     iconBrain,
 } from '../icons.ts';
 import {
+    MEMBER_WITHOUT_PII_NAME,
+} from '../adapters/index.ts';
+import {
     HumanMember,
     AIMember,
     type Member,
     isHumanMember,
     isAIMember,
-    MEMBER_WITHOUT_PII_NAME,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {

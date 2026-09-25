@@ -32,11 +32,13 @@ import {
     iconX,
 } from '../icons.ts';
 import type {
+    IdeaWithSubmitter,
+} from '../adapters/index.ts';
+import type {
     Idea,
     IdeaState,
     IdeaEntity,
-    IdeaWithSubmitter,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import {
     IDEA_STATE_CONFIG,
 } from './state-display.ts';

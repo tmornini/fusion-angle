@@ -20,9 +20,9 @@ import {
     getRecord,
     putRecord,
     subscribeRecordChanges,
-    isRecordState,
     type RecordWithCounts,
 } from '../app/adapters/index.ts';
+import { isRecordState } from '../../shared/types.ts';
 import {
     RecordListPresenter,
     buildInitialRecordListState,

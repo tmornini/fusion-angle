@@ -37,18 +37,6 @@ async function getAllFlowRecords(
     return perFlow.flat();
 }
 
-export {
-    RecordModel,
-    RECORD_STATES,
-    isRecordState,
-    assertRecordState,
-} from '../shared/types.ts';
-export type {
-    RecordEntity,
-    RecordId,
-    RecordState,
-} from '../shared/types.ts';
-
 export interface RecordWithCounts {
     readonly record: RecordModel;
     readonly attributeCount: number;

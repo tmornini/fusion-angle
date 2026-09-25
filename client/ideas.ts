@@ -45,16 +45,6 @@ export function subscribeIdeaChanges(
     return ideaChanges.subscribe(fn);
 }
 
-export {
-    Idea,
-    type IdeaState,
-    type IdeaEntity,
-    type IdeaReadiness,
-    isIdeaState,
-    IDEA_STATES,
-    IDEA_READINESS,
-} from '../shared/types.ts';
-
 export async function getIdeaEntities(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
@@ -112,10 +102,6 @@ async function getIdeaSubmissionEntity(
     }
     return found;
 }
-
-export type {
-    IdeaSubmissionEntity,
-} from '../shared/types.ts';
 
 export interface IdeaWithSubmitter {
     readonly idea: Idea;

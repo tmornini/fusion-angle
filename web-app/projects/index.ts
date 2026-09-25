@@ -15,12 +15,14 @@ import {
     sessionContext,
     getProjects,
     putProjectPosition,
-    isProjectState,
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
-    type Project,
 } from '../app/adapters/index.ts';
+import {
+    isProjectState,
+    type Project,
+} from '../../shared/types.ts';
 import { getProjectsScoreColumn } from '../app/scoring-aggregate.ts';
 import {
     ProjectListPresenter,

@@ -1,7 +1,7 @@
 import {
     SECONDS_PER_DAY,
     formatCompactCurrency,
-} from './adapters/index.ts';
+} from '../../shared/types.ts';
 
 const DISPLAY_ABSENT = '—';
 

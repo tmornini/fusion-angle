@@ -15,9 +15,9 @@ import {
     iconBrain,
 } from '../icons.ts';
 import {
-    AIMember,
     type AIMemberDraft,
 } from '../adapters/index.ts';
+import { AIMember } from '../../../shared/types.ts';
 import {
     findProviderModel,
     getModelsByProvider,

@@ -24,11 +24,6 @@ import {
 } from '../shared/identifier.ts';
 import { nowUtc } from '../shared/types.ts';
 
-export type {
-    FlowRecordEntity,
-    FlowRecordId,
-} from '../shared/types.ts';
-
 // The bindings for ONE flow — the server filters the nested
 // collection to the parent flow, so no client filter is needed.
 async function getFlowRecordsForFlow(

@@ -19,9 +19,9 @@ import {
     getAdminSeatIds,
     getHumanMemberProfile,
     postHumanMemberCreation,
-    type HumanMember,
     type HumanMemberDraft,
 } from '../client/members.ts';
+import { type HumanMember } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {

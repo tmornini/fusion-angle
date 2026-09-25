@@ -7,17 +7,21 @@ import {
     type WorkOrder,
     type TransitionEvent,
     type StateFieldValue,
-    type WorkOrderFlowGraph,
-    type GraphNode,
-    type GraphEdge,
-    type NodeAttribute,
     type RecordAttribute,
     type HistoryEntry,
     type HistoryFieldValue,
     type ClaimStatus,
-    type ConstraintViolation,
 } from '../adapters/index.ts';
-import type { Member } from '../adapters/index.ts';
+import {
+    type ConstraintViolation,
+} from '../../../shared/record-constraints.ts';
+import {
+    type WorkOrderFlowGraph,
+    type GraphNode,
+    type GraphEdge,
+    type NodeAttribute,
+} from '../../../shared/types.ts';
+import type { Member } from '../../../shared/types.ts';
 import type { Id } from '../../../shared/types.ts';
 import {
     ICON_SIZE,

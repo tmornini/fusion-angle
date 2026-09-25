@@ -29,14 +29,6 @@ export function notifyProjectChange(): void {
     projectChanges.notify();
 }
 
-export {
-    Project,
-    type ProjectState,
-    type ProjectEntity,
-    isProjectState,
-    COST_DIVISOR,
-} from '../shared/types.ts';
-
 export async function getProjectEntities(
     ctx: RequestContext,
 ): Promise<ProjectEntity[]> {

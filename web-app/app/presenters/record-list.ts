@@ -16,10 +16,12 @@ import {
 } from '../icons.ts';
 import { buildPageUrl } from '../navigation.ts';
 import type {
-    RecordModel,
-    RecordState,
     RecordWithCounts,
 } from '../adapters/index.ts';
+import type {
+    RecordModel,
+    RecordState,
+} from '../../../shared/types.ts';
 import {
     RECORD_STATE_CONFIG,
 } from './state-display.ts';

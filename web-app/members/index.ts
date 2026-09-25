@@ -34,11 +34,11 @@ import {
     postAIMemberCreation,
     postInvitationGrant,
     type InvitationGrantOutcome,
-    generateIdentifier,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
     HumanMemberPiiIntakeFailedError,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     ManagedMembersPresenter,
     buildInitialManagedMembersState,

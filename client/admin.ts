@@ -16,10 +16,6 @@ import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
 import { getHumanMembers } from './members.ts';
 
-export type {
-    OrganizationEntity,
-} from '../shared/types.ts';
-
 export async function getOrganizationEntity(
     ctx: RequestContext,
 ): Promise<OrganizationEntity> {

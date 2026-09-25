@@ -21,10 +21,10 @@ import {
     iconTrash,
 } from '../icons.ts';
 import {
-    HumanMember,
     type HumanMemberDraft,
     MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
+import { HumanMember } from '../../../shared/types.ts';
 import {
     WorkingStylesPresenter,
 } from './working-styles.ts';

@@ -16,16 +16,6 @@ import { getMemberPii } from './identities.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
-export {
-    HumanMember,
-    isDimensionKey,
-} from '../shared/types.ts';
-export type {
-    MemberId,
-    HumanMemberEntity,
-    HumanProfile,
-    DimensionKey,
-} from '../shared/types.ts';
 
 const humanMemberChanges =
     createSubscriptionChannel();

@@ -26,10 +26,6 @@ import type {
     ConstraintViolation,
 } from '../shared/record-constraints.ts';
 
-export type {
-    ConstraintViolation,
-} from '../shared/record-constraints.ts';
-
 export class RecordTransitionViolations
     extends Error {
     readonly violations:

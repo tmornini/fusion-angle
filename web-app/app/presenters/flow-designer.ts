@@ -8,19 +8,23 @@ import {
     sessionContext,
     putFlow,
     enqueueFlowSave,
+} from '../adapters/index.ts';
+import {
     HumanMember,
     AIMember,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import type {
     RequestContext,
 } from '../../../client/shared.ts';
 import { reportFault } from '../error-helpers.ts';
 import type {
-    GraphNode,
-    GraphEdge,
     FlowGraph,
     FlowSaveShape,
 } from '../../../client/flows.ts';
+import type {
+    GraphNode,
+    GraphEdge,
+} from '../../../shared/types.ts';
 import type {
     MemberId,
 } from '../../../shared/types.ts';

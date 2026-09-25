@@ -20,12 +20,14 @@ import {
     putClientRegistration,
     deleteClientRegistration,
     subscribeIdentityChanges,
-    Identity,
-    type MemberPii,
     type ServiceFacet,
-    type IdentityCredentialKind,
     type ClientRegistration,
 } from '../app/adapters/index.ts';
+import {
+    Identity,
+    type MemberPii,
+    type IdentityCredentialKind,
+} from '../../shared/types.ts';
 import {
     IdentityDetailPresenter,
     type IdentityDetailView,

@@ -15,7 +15,7 @@ import {
     iconCheckCircle2,
     iconTrendingUp,
 } from '../icons.ts';
-import { type Idea } from '../adapters/index.ts';
+import { type Idea } from '../../../shared/types.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,

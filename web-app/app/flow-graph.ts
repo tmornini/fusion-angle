@@ -1,8 +1,9 @@
 import type { SafeHtml } from './safe-html.ts';
 import { trusted, escapeForHtml } from './safe-html.ts';
 import type {
-    GraphNode, GraphEdge,
-} from '../../client/flows.ts';
+    GraphNode,
+    GraphEdge,
+} from '../../shared/types.ts';
 import type {
     Selection,
     ConnectMode,

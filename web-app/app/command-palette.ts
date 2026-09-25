@@ -27,10 +27,12 @@ import {
     subscribeProjectChanges,
     subscribeHumanMemberChanges,
     type IdeaWithSubmitter,
-    Project,
-    HumanMember,
     MEMBER_WITHOUT_PII_NAME,
 } from './adapters/index.ts';
+import {
+    Project,
+    HumanMember,
+} from '../../shared/types.ts';
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
 import {

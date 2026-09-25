@@ -43,8 +43,8 @@ import {
     getSentInvitations,
     postInvitationRevocation,
     subscribeInvitationChanges,
-    generateIdentifier,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     getOrganization,
     Organization,

@@ -13,10 +13,6 @@ import {
     type RequestContext,
 } from './shared.ts';
 
-export type {
-    RecordAttributeId,
-} from '../shared/types.ts';
-
 // Domain twin of the attribute document: above the storage
 // seam the fields speak camelCase — snake_case stays below.
 // options/constraints arrive native from the gate. Nested

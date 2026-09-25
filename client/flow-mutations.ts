@@ -20,15 +20,6 @@ import type {
     GraphRevival,
 } from '../shared/flow-graph-body.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
-export type {
-    FlowGraphDelta,
-    FlowNodeRowBody,
-    FlowEdgeRowBody,
-    GraphDeletion,
-    FlowNodeMemberRowBody,
-    FlowNodeAttributeRowBody,
-    GraphRevival,
-};
 import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';

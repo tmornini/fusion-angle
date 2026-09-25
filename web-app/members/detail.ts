@@ -48,11 +48,13 @@ import {
     subscribeAIMemberChanges,
     getAdminSeatIds,
     deleteHumanMemberSeat,
+} from '../app/adapters/index.ts';
+import {
     HumanMember,
     AIMember,
     type MemberPii,
     type IdentityPiiEntity,
-} from '../app/adapters/index.ts';
+} from '../../shared/types.ts';
 
 const { signal } = createPageAbort();
 

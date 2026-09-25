@@ -8,8 +8,8 @@ import {
     sessionContext,
     getRecordEntities,
     postRecordChange,
-    generateIdentifier,
 } from '../app/adapters/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     nextPosition,
 } from '../app/drag-reorder-positions.ts';

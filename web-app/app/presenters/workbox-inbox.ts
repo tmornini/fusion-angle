@@ -10,7 +10,7 @@ import {
     type WorkOrder,
     type TransitionEvent,
 } from '../adapters/index.ts';
-import type { Member } from '../adapters/index.ts';
+import type { Member } from '../../../shared/types.ts';
 import {
     SECONDS_PER_DAY,
     MS_PER_SECOND,

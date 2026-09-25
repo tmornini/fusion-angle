@@ -30,10 +30,6 @@ import { putSessionToken } from './session-token.ts';
 import {
     principalFromToken,
 } from '../shared/access-token-decode.ts';
-export {
-    isInvitationState,
-} from '../shared/types.ts';
-export type { InvitationState } from '../shared/types.ts';
 
 // The invitations surface refreshes whenever an invitation, its
 // lifecycle event, or a membership (written on accept) changes —

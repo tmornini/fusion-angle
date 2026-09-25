@@ -5,9 +5,7 @@
 // animate filters, or aria-current).
 import type { SafeHtml } from './safe-html.ts';
 import { trusted, escapeForHtml } from './safe-html.ts';
-import type {
-    GraphEdge,
-} from '../../client/flows.ts';
+import type { GraphEdge } from '../../shared/types.ts';
 import {
     NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';

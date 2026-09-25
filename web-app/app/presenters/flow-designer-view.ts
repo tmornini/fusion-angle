@@ -16,16 +16,20 @@ import {
     iconDownload,
 } from '../icons.ts';
 import type {
+    RecordAttribute,
+} from '../adapters/index.ts';
+import type {
     GraphNode,
     GraphEdge,
     NodeAttribute,
-    RecordAttribute,
+} from '../../../shared/types.ts';
+import {
+    MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 import {
     HumanMember,
     AIMember,
-    MEMBER_WITHOUT_PII_NAME,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import type {
     RecordEntity,
     RecordId,
