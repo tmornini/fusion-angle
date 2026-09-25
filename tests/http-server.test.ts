@@ -28,6 +28,11 @@ import { withPerformanceNow } from
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
+// The Office of Time: RFC-3339 zulu at the fullest
+// resolution the environment provides — six digits here.
+const ZULU_6 =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
 async function gzipBytes(
     text: string,
 ): Promise<Uint8Array> {
@@ -224,6 +229,21 @@ Deno.test(
                 assertStrictEquals(last['latencyMs'], 0.095);
             }),
         );
+    },
+);
+
+Deno.test(
+    'the request log stamps RFC-3339 zulu microseconds',
+    async () => {
+        await withServer({}, undefined, async (base, logs) => {
+            const res = await fetchDiscardingBody(
+                base + '/missing.html',
+            );
+            assertStrictEquals(res.status, HTTP_NOT_FOUND);
+            const last = logs[logs.length - 1];
+            assert(last !== undefined);
+            assertMatch(String(last['at']), ZULU_6);
+        });
     },
 );
 
