@@ -371,6 +371,135 @@ Deno.test('a refused row fails the rehearsal', async () => {
     );
 });
 
+Deno.test(
+    'a wave of concurrent writes records each predecessor',
+    async () => {
+        const ideas = [fresh(), fresh(), fresh()];
+        const geneses = await Promise.all(ideas.map(
+            (idea) => ideaPairAt(idea, 'PUT', 'Fresh', true),
+        ));
+        const successors = await Promise.all(ideas.map(
+            (idea) => ideaPairAt(idea, 'PUT', 'Again', false),
+        ));
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await Promise.all(
+                    geneses.map((pair) => write(db, pair)),
+                );
+                await Promise.all(
+                    successors.map((pair) => write(db, pair)),
+                );
+            },
+        );
+        const depths = depthsOf(statements);
+        const recorded = new Map(statements.map(
+            (statement, index) => [
+                statement.rows[0]!.id,
+                {
+                    supersedes: statement.supersedes[0],
+                    depth: depths[index],
+                },
+            ],
+        ));
+        assertStrictEquals(statements.length, 6);
+        assertStrictEquals(recorded.size, 6);
+        geneses.forEach((genesis, index) => {
+            assertEquals(
+                recorded.get(genesis.id),
+                { supersedes: NIL, depth: 1 },
+            );
+            assertEquals(
+                recorded.get(successors[index]!.id),
+                { supersedes: genesis.id, depth: 2 },
+            );
+        });
+        const backend = new MemoryStorageBackend();
+        await postSeedLanding(
+            backend, { seedRunId: fresh(), statements },
+        );
+        assertStrictEquals(backend.statementExecutions(), 2);
+    },
+);
+
+Deno.test(
+    'a write inside an op\'s own transaction is recorded',
+    async () => {
+        const pair = await ideaPair('PUT', 'Fresh', true);
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            (db) => db.backend.transaction(
+                'readwrite',
+                (tx) => write(db.clientOn(tx), pair),
+            ),
+        );
+        assertEquals(
+            statements.map((s) => s.rows.map((r) => r.id)),
+            [[pair.id]],
+        );
+    },
+);
+
+Deno.test(
+    'a read inside the rehearsal sees the run\'s writes',
+    async () => {
+        const pair = await ideaPair('PUT', 'Fresh', true);
+        await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await write(db, pair);
+                const head = await db.messagePairs.getHeadPair(
+                    '/organizations/' + ORGANIZATION
+                        + '/ideas/',
+                    IDEA,
+                );
+                assertStrictEquals(head?.id, pair.id);
+            },
+        );
+    },
+);
+
+Deno.test(
+    'two writers of one document in a wave fail the seed',
+    async () => {
+        const first = await ideaPair('PUT', 'Fresh', true);
+        const second = await ideaPair('PUT', 'Again', false);
+        await assertRejects(
+            () => rehearse(
+                new MemoryStorageBackend(),
+                async (db) => {
+                    await Promise.all([
+                        write(db, first),
+                        write(db, second),
+                    ]);
+                },
+            ),
+            Error,
+            'seed statement returned refused',
+        );
+    },
+);
+
+Deno.test(
+    'a failed rehearsal adopts nothing on its scratch',
+    async () => {
+        const scratch = new MemoryStorageBackend();
+        const pair = await ideaPair('PUT', 'Fresh', true);
+        await assertRejects(
+            () => rehearse(scratch, async (db) => {
+                await write(db, pair);
+                throw new Error('stop the rehearsal');
+            }),
+            Error,
+            'stop the rehearsal',
+        );
+        assertStrictEquals(
+            (await scratch.read((tx) => tx.getAll())).length,
+            1,
+        );
+    },
+);
+
 function adapterOver(
     backend: MemoryStorageBackend,
 ): BackedDbAdapter {
