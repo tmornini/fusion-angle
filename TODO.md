@@ -1552,6 +1552,23 @@ Off the critical path; each with its oracle.
   reads (`client/work-orders-queries.ts:175`, `:292`), and
   the generated API documentation. Oracle: no route in
   `api/routes.ts` that returns a list lacks the slash.
+- The refresh lock `fusion-refresh`, the peer channel
+  `fusion-angle:refresh`
+  (`client/session-refresh-mutex.ts:8-9`), and the
+  credential key `STORAGE_KEY_AUTHORIZATION`
+  (`client/session-storage-keys.ts`) are per page
+  origin, not per client. Two clients in one realm
+  refreshing at once wait on one lock and adopt each
+  other's broadcast token, across API origins too — the
+  spec's "two origins or two sessions cannot coexist" is
+  met for the token, flight, cookie flag, and recovery,
+  but not for cross-tab coordination; no product path
+  builds two clients in one document today. Fix: scope
+  the lock name, channel name, and credential key by a
+  key the client is built with (the transport origin).
+  Oracle: two clients over different origins refresh
+  concurrently in one realm and each keeps its own
+  token.
 - Stamp parameters stay text until Postgres parses
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
