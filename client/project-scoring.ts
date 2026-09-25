@@ -110,7 +110,7 @@ export async function getActualScoresForProject(
 // The baseline scores across EVERY project the caller's org can
 // see — reassembled from the nested per-project collections.
 // Callers pass the projects list they already hold.
-async function getAllBaselineScores(
+export async function getAllBaselineScores(
     ctx: RequestContext,
     projects: readonly { readonly id: Id }[],
 ): Promise<ObjectiveScore[]> {
@@ -123,7 +123,7 @@ async function getAllBaselineScores(
 
 // The actual scores across EVERY project — same per-project
 // reassembly as the baselines above.
-async function getAllActualScores(
+export async function getAllActualScores(
     ctx: RequestContext,
     projects: readonly { readonly id: Id }[],
 ): Promise<ObjectiveScore[]> {
