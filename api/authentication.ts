@@ -47,8 +47,8 @@ import {
     latestActionForJti,
     revocationAppends,
     jtiSetsEqual,
-} from './identity-tokens.ts';
-import type { RotationPlan } from './identity-tokens.ts';
+} from '../shared/identity-tokens.ts';
+import type { RotationPlan } from '../shared/identity-tokens.ts';
 import {
     hashPassword,
     verifyPassword,

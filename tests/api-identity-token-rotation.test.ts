@@ -17,7 +17,7 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     latestActionForJti,
-} from '../api/identity-tokens.ts';
+} from '../shared/identity-tokens.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';

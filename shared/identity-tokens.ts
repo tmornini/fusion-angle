@@ -2,13 +2,13 @@ import type {
     Id,
     IdentityTokenAction,
     IdentityTokenEntity,
-} from '../shared/types.ts';
+} from './types.ts';
 import {
     latestByKey,
     findFirstByKey,
-} from '../shared/ledger-reduction.ts';
+} from './ledger-reduction.ts';
 import { compareIdentifiers } from
-    '../shared/identifier.ts';
+    './identifier.ts';
 
 // Pure reductions over the append-only identity_tokens ledger.
 // The store is a dumb log; current validity is derived here.

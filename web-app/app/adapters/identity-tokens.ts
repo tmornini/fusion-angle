@@ -4,7 +4,7 @@ import {
 } from '../../../shared/types.ts';
 import {
     parentJtiByJti,
-} from '../../../api/identity-tokens.ts';
+} from '../../../shared/identity-tokens.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,

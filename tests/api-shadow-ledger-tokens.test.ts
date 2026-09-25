@@ -15,7 +15,7 @@ import { requestHashOfStored } from './ledger-row.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
-import { latestActionForJti } from '../api/identity-tokens.ts';
+import { latestActionForJti } from '../shared/identity-tokens.ts';
 import {
     runWrite,
     attemptFor,
