@@ -21,14 +21,14 @@ import {
 } from './record-attributes.ts';
 import {
     validateAttributeValue,
-} from '../../../api/record-constraints.ts';
+} from '../../../shared/record-constraints.ts';
 import type {
     ConstraintViolation,
-} from '../../../api/record-constraints.ts';
+} from '../../../shared/record-constraints.ts';
 
 export type {
     ConstraintViolation,
-} from '../../../api/record-constraints.ts';
+} from '../../../shared/record-constraints.ts';
 
 export class RecordTransitionViolations
     extends Error {

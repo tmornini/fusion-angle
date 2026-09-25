@@ -1,5 +1,5 @@
 import type { AttributeSchemaRow } from
-    './record-constraints.ts';
+    '../shared/record-constraints.ts';
 import { ValidationError } from '../shared/types.ts';
 import {
     ApiError,

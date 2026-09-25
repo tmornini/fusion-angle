@@ -11,7 +11,7 @@ import {
     HTTP_FORBIDDEN,
 } from '../shared/http-errors.ts';
 import type { AttributeSchemaRow } from
-    '../api/record-constraints.ts';
+    '../shared/record-constraints.ts';
 import {
     assertWritableAttributeIds,
     projectReadableValues,

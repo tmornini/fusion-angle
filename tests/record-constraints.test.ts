@@ -7,7 +7,7 @@ import {
     type AttributeSchemaRow,
     validateAttributeValue,
     formatViolation,
-} from '../api/record-constraints.ts';
+} from '../shared/record-constraints.ts';
 
 function makeAttribute(
     attributeType: AttributeType,

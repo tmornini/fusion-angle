@@ -201,7 +201,7 @@ import {
 import {
     validateInstanceValues,
     type AttributeSchemaRow,
-} from './record-constraints.ts';
+} from '../shared/record-constraints.ts';
 import {
     flowEntityOf,
     deriveFlow,
