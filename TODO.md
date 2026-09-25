@@ -2831,10 +2831,16 @@ Off the critical path; each with its oracle.
   AI-member gate checks `model` against it, but it is not
   yet the only list: the seeded roster
   (`api/mock-data/ai-members.ts`) spells four of its names
-  again as agent names, and TEST-PLAN AA7a enumerates
-  them. Make the catalog the one list first: the roster
-  takes each agent's name from its `model` id, and AA7a
-  names the catalog rather than copying it. Then JEV
+  again as agent names, and TEST-PLAN.md spells catalog
+  names in prose: AA7a lists the four and picks "Claude
+  Haiku 4.5" (`:605-609`), AA8a's example names "Claude
+  Sonnet 4.6" (`:639`), and two pin notes quote a
+  fixture's 'Claude Opus 4.8' (`:650`, `:5361`). Make the
+  catalog the one list first: the roster takes each
+  agent's name from its `model` id, and TEST-PLAN.md
+  names models by their place in the catalog (the
+  seeded AIs, an Anthropic model not seeded), never by
+  spelling. Then JEV
   lands as one entry there: `provider` `TypeSafe AI`,
   `name` `JEV` (no catalog name carries its provider;
   "Claude", "GPT", and "Grok" are families, and the
@@ -2844,7 +2850,8 @@ Off the critical path; each with its oracle.
   Oracle: JEV appears in `PROVIDER_MODELS` under
   `TypeSafe AI` and in the AI form's Model picker, and
   no model name is spelled outside
-  `api/provider-models.ts` but in test fixtures
+  `api/provider-models.ts` but in test fixtures;
+  TEST-PLAN.md prose counts as a spelling
 - The seed's rehearsal runs its statements one at a
   time. It opens no transaction (the ledger seed plan's
   Interpretation (C): the instance PATCH create opens its
