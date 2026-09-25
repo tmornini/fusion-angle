@@ -1,8 +1,7 @@
 import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
 import { Project } from '../shared/types.ts';
 import type { ProjectState } from '../shared/types.ts';
-import { ProjectView } from
-    '../client/projects.ts';
+import { ProjectView } from '../web-app/app/project-view.ts';
 import {
     ProjectDetailPresenter,
 } from '../web-app/app/presenters/project-detail.ts';

@@ -18,8 +18,8 @@ import {
     putProject,
     putProjectFields,
     putProjectPosition,
-    ProjectView,
 } from '../client/projects.ts';
+import { ProjectView } from '../web-app/app/project-view.ts';
 import {
     Project,
     COST_DIVISOR,

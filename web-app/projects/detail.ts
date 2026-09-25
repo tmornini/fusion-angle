@@ -31,7 +31,6 @@ import {
     Project,
     getProjectEntity,
     projectStateOf,
-    ProjectView,
     putProjectFields,
     postProjectStateChange,
     getFlowsByProject,
@@ -55,6 +54,7 @@ import {
     validateProjectForApproval,
     validateProjectForArchival,
 } from '../app/adapters/index.ts';
+import { ProjectView } from '../app/project-view.ts';
 import type {
     FlowListItem,
     ProjectEntity,

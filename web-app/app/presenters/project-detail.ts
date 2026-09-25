@@ -22,10 +22,10 @@ import {
     DISPLAY_ABSENT,
 } from '../format.ts';
 import type {
-    ProjectView,
     ProjectFieldsPatch,
     ProjectState,
 } from '../adapters/index.ts';
+import type { ProjectView } from '../project-view.ts';
 import {
     PROJECT_STATE_CONFIG,
 } from './state-display.ts';
