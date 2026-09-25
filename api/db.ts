@@ -4,7 +4,7 @@ import type {
 import type {
     NotificationEvent,
     NotificationPost,
-} from './notifications.ts';
+} from '../shared/notifications.ts';
 import type {
     Attempt,
     StatementAnswer,

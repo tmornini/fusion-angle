@@ -11,10 +11,10 @@ import {
 } from './event-listener.ts';
 import type {
     NotificationEvent,
-} from '../../../api/notifications.ts';
+} from '../../../shared/notifications.ts';
 import {
     notificationEventFromWire,
-} from '../../../api/notifications.ts';
+} from '../../../shared/notifications.ts';
 
 const CHANNEL_NAME = 'fusion-angle:data';
 

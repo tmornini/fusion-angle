@@ -13,7 +13,7 @@ import {
 } from '../../shared/access-token-decode.ts';
 import type {
     NotificationEvent,
-} from '../../api/notifications.ts';
+} from '../../shared/notifications.ts';
 
 type Listener<T> = (value: T) => void;
 

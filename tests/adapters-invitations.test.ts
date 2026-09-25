@@ -21,7 +21,7 @@ import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
-import type { NotificationEvent } from '../api/notifications.ts';
+import type { NotificationEvent } from '../shared/notifications.ts';
 import {
     validateInvitationEntity,
 } from '../api/validators.ts';

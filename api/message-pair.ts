@@ -36,7 +36,7 @@ import {
     errorJson,
 } from '../shared/http-errors.ts';
 import type { NotificationEvent } from
-    './notifications.ts';
+    '../shared/notifications.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
 import type {

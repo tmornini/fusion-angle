@@ -75,7 +75,7 @@ import {
 } from './access-token.ts';
 import {
     identityTargetsFor,
-} from './notifications.ts';
+} from '../shared/notifications.ts';
 import {
     resolveGlobalOwner,
     missedReadError,
