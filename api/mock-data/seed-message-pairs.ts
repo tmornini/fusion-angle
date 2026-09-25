@@ -140,9 +140,9 @@ import {
 import {
     formWriteMessagePair,
     IF_MATCH_HEADER,
-    OPERATION_ID_HEADER,
     strongEtagOf,
 } from '../message-pair.ts';
+import { OPERATION_ID_HEADER } from '../../shared/message-id-fields.ts';
 import type {
     MessagePair,
     ReceivedRequest,

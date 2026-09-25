@@ -57,8 +57,8 @@ import {
     attemptFor,
     formAuthMessagePair,
     formWriteMessagePair,
-    OPERATION_ID_HEADER,
 } from '../api/message-pair.ts';
+import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { HttpFacade } from
     '../web-app/app/adapters/http-facade.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';

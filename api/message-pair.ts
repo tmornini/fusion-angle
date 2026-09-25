@@ -35,6 +35,8 @@ import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
     errorJson,
 } from '../shared/http-errors.ts';
+import { OPERATION_ID_HEADER } from
+    '../shared/message-id-fields.ts';
 import type { NotificationEvent } from
     '../shared/notifications.ts';
 import { Octets } from
@@ -201,8 +203,6 @@ export function canonicalPath(
     }
     return flatPrefix;
 }
-
-export const OPERATION_ID_HEADER = 'operation-id';
 
 function headerFieldsWithOperationId(
     fields: readonly FieldLine[],

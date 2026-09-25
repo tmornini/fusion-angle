@@ -35,7 +35,7 @@ import {
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { OPERATION_ID_HEADER } from '../api/message-pair.ts';
+import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 
 const NODE_A = generateIdentifier();
 const NODE_B = generateIdentifier();

@@ -35,10 +35,10 @@ import {
     streamGetFromStored,
     parseIfMatch,
     LATCHED_OPERATION_ROUTE_PATTERNS,
-    OPERATION_ID_HEADER,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
+import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { ReceivedRequest } from './message-pair.ts';
 import {
     bodyOctetsOf,
@@ -130,10 +130,10 @@ import {
 import {
     framingRefusal,
     incomingContext,
-    REQUEST_ID_HEADER,
     type FramedContext,
     type IncomingContext,
 } from './request-context.ts';
+import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import {
     isIdentifier,
 } from '../shared/identifier.ts';

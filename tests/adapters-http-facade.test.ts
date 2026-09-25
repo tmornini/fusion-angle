@@ -13,8 +13,7 @@ import {
     createRecoveringRequestContext,
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { OPERATION_ID_HEADER } from
-    '../api/message-pair.ts';
+import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { UnauthorizedError } from
     '../shared/http-errors.ts';
 import {

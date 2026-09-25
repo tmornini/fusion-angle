@@ -9,8 +9,8 @@ import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     incomingContext,
-    REQUEST_ID_HEADER,
 } from '../api/request-context.ts';
+import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import {
     mergeSecret,
     REQUEST_CREDENTIAL_NAMES,

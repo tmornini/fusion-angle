@@ -23,7 +23,6 @@ import {
 
 // The server mints request-id. A carried header is refused
 // at the gate; this step does not read one.
-export const REQUEST_ID_HEADER = 'request-id';
 
 const BODY_NEEDS_LENGTH =
     'A request body requires Content-Length';
