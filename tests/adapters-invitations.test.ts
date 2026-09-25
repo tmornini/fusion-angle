@@ -19,7 +19,10 @@ import {
 } from '../api/db-memory.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
-import { handleRequest } from '../api/api.ts';
+import {
+    handleRequest,
+    type ClientFacadeAdapter,
+} from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { NotificationEvent } from '../shared/notifications.ts';
 import {
@@ -31,9 +34,9 @@ import {
     UnauthorizedError,
 } from '../shared/http-errors.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import type { ClientSession } from '../client/client-session.ts';
 import { inPageContext } from './in-page-facade.ts';
 import {
     organizationToken,
@@ -50,14 +53,6 @@ import {
     getSentInvitations,
     SessionRemintFailedError,
 } from '../client/invitations.ts';
-import {
-    setCookieSession,
-} from '../client/session-credentials.ts';
-import {
-    getSessionToken,
-    deleteSessionToken,
-    putSessionToken,
-} from '../client/session-token.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
@@ -67,10 +62,6 @@ import { deriveDocumentsAt } from
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import {
-    runSingleFlightRefresh,
-    deleteRefreshChannel,
-} from '../client/session-refresh-mutex.ts';
 import { framedRequest } from './http-fixtures.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -264,8 +255,12 @@ async function ctxFor(sub: string, organization: string) {
 }
 
 // A context bound to an existing db (for two actors in one test).
-async function ctxOn(db: DbAdapter, sub: string, organization: string) {
-    return createRequestContext(
+async function ctxOn(
+    db: ClientFacadeAdapter,
+    sub: string,
+    organization: string,
+) {
+    return inPageContext(
         db, await organizationToken(sub, organization),
     );
 }
@@ -893,7 +888,7 @@ Deno.test('a repeated revoke posts no notification',
 
 Deno.test('cookie-session accept remints via refresh POST',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    setCookieSession(true);
+    let session: ClientSession | undefined;
     try {
         const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -903,6 +898,8 @@ Deno.test('cookie-session accept remints via refresh POST',
         const inv = (await deriveInvitations(db))[0]!;
         const toccYYkLEABmlbpHJalgtQ = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        session = toccYYkLEABmlbpHJalgtQ.session;
+        session.setCookieSession(true);
         const minted = await reachableToken(
             'toccYYkLEABmlbpHJalgtQ',
             ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
@@ -932,17 +929,15 @@ Deno.test('cookie-session accept remints via refresh POST',
         assertEquals(refreshBodies[0], {
             grant_type: 'refresh',
         });
-        assertStrictEquals(getSessionToken(), minted);
+        assertStrictEquals(session.getSessionToken(), minted);
     } finally {
-        setCookieSession(false);
-        deleteSessionToken();
-        deleteRefreshChannel();
+        session?.deleteRefreshChannel();
     }
 }));
 
 Deno.test('a failed re-mint after accept surfaces, seat kept',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    setCookieSession(true);
+    let session: ClientSession | undefined;
     try {
         const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -952,7 +947,9 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
         const inv = (await deriveInvitations(db))[0]!;
         const sarah = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
-        putSessionToken('pre-accept');
+        session = sarah.session;
+        session.setCookieSession(true);
+        session.putSessionToken('pre-accept');
         const refused = new UnauthorizedError(
             'invalid_grant',
         );
@@ -988,11 +985,9 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
             'AjdvjuECVZEgZoFajaIEkg',
             'BBjWJsjYIDkTRKIIPrzWRw',
         ]);
-        assertStrictEquals(getSessionToken(), 'pre-accept');
+        assertStrictEquals(session.getSessionToken(), 'pre-accept');
     } finally {
-        setCookieSession(false);
-        deleteSessionToken();
-        deleteRefreshChannel();
+        session?.deleteRefreshChannel();
     }
 }));
 
@@ -1002,7 +997,7 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
 // while the flight is open; settle, and it runs once.
 Deno.test('the remint waits for an in-flight facade refresh',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    setCookieSession(true);
+    let session: ClientSession | undefined;
     let releaseFlight = (): void => {};
     try {
         const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
@@ -1013,6 +1008,8 @@ Deno.test('the remint waits for an in-flight facade refresh',
         const inv = (await deriveInvitations(db))[0]!;
         const sarah = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        session = sarah.session;
+        session.setCookieSession(true);
         const minted = await reachableToken(
             'toccYYkLEABmlbpHJalgtQ',
             ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
@@ -1026,7 +1023,7 @@ Deno.test('the remint waits for an in-flight facade refresh',
                 releaseFlight = () => resolve(minted);
             },
         );
-        const facadeFlight = runSingleFlightRefresh(
+        const facadeFlight = session.runSingleFlightRefresh(
             () => gate,
         );
         const refreshBodies: unknown[] = [];
@@ -1063,12 +1060,10 @@ Deno.test('the remint waits for an in-flight facade refresh',
         await facadeFlight;
         await accepting;
         assertStrictEquals(refreshBodies.length, 1);
-        assertStrictEquals(getSessionToken(), minted);
+        assertStrictEquals(session.getSessionToken(), minted);
     } finally {
         releaseFlight();
-        setCookieSession(false);
-        deleteSessionToken();
-        deleteRefreshChannel();
+        session?.deleteRefreshChannel();
     }
 }));
 
@@ -1077,7 +1072,7 @@ Deno.test('the remint waits for an in-flight facade refresh',
 Deno.test('a re-minted token without the seat earns one more'
 + ' attempt',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    setCookieSession(true);
+    let session: ClientSession | undefined;
     try {
         const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -1087,6 +1082,8 @@ Deno.test('a re-minted token without the seat earns one more'
         const inv = (await deriveInvitations(db))[0]!;
         const sarah = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        session = sarah.session;
+        session.setCookieSession(true);
         const stale = await reachableToken(
             'toccYYkLEABmlbpHJalgtQ', ['AjdvjuECVZEgZoFajaIEkg'],
         );
@@ -1121,18 +1118,16 @@ Deno.test('a re-minted token without the seat earns one more'
             recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
         );
         assertStrictEquals(refreshBodies.length, 2);
-        assertStrictEquals(getSessionToken(), fresh);
+        assertStrictEquals(session.getSessionToken(), fresh);
     } finally {
-        setCookieSession(false);
-        deleteSessionToken();
-        deleteRefreshChannel();
+        session?.deleteRefreshChannel();
     }
 }));
 
 Deno.test('two re-minted tokens without the seat surface a'
 + ' named failure',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    setCookieSession(true);
+    let session: ClientSession | undefined;
     try {
         const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -1142,6 +1137,8 @@ Deno.test('two re-minted tokens without the seat surface a'
         const inv = (await deriveInvitations(db))[0]!;
         const sarah = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        session = sarah.session;
+        session.setCookieSession(true);
         const stale = await reachableToken(
             'toccYYkLEABmlbpHJalgtQ', ['AjdvjuECVZEgZoFajaIEkg'],
         );
@@ -1172,8 +1169,6 @@ Deno.test('two re-minted tokens without the seat surface a'
         assertInstanceOf(err, SessionRemintFailedError);
         assertStrictEquals(refreshBodies.length, 2);
     } finally {
-        setCookieSession(false);
-        deleteSessionToken();
-        deleteRefreshChannel();
+        session?.deleteRefreshChannel();
     }
 }));

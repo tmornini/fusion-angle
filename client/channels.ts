@@ -3,11 +3,7 @@ import {
     subscribeNamedNotificationEvents,
     subscribeNotificationEvents,
 } from './broadcast-channel.ts';
-import {
-    getSessionToken,
-    sessionIsAuthenticated,
-    sessionTokenIsSeeded,
-} from './session-token.ts';
+import type { ClientSession } from './client-session.ts';
 import {
     principalFromToken,
 } from '../shared/access-token-decode.ts';
@@ -16,6 +12,29 @@ import type {
 } from '../shared/notifications.ts';
 
 type Listener<T> = (value: T) => void;
+
+// This tab's session as the bell reads it: another tab's
+// scoped event is matched against it, and a notify names
+// it. The bell is per tab, so the app puts its one client
+// here; an empty slot reads as unseeded, as before boot.
+export type BellSession = Pick<
+    ClientSession,
+    | 'sessionTokenIsSeeded'
+    | 'getSessionToken'
+    | 'sessionIsAuthenticated'
+>;
+
+let bellSession: BellSession | undefined;
+
+export function putBellSession(session: BellSession): void {
+    bellSession = session;
+}
+
+// A test process has no unload; the divorce point offers
+// the release explicitly, as deleteNotificationChannel does.
+export function deleteBellSession(): void {
+    bellSession = undefined;
+}
 
 export interface Channel<T> {
     send(value: T): void;
@@ -52,17 +71,18 @@ export interface SubscriptionChannel {
 }
 
 function eventForThisTab(): NotificationEvent {
-    if (!sessionTokenIsSeeded()) {
+    const session = bellSession;
+    if (session === undefined || !session.sessionTokenIsSeeded()) {
         return { kind: 'full' };
     }
     try {
         const principal =
-            principalFromToken(getSessionToken());
+            principalFromToken(session.getSessionToken());
         const organizationIds =
             principal.organization !== undefined
                 ? [principal.organization]
                 : [...(principal.organizations ?? [])];
-        const identityIds = sessionIsAuthenticated()
+        const identityIds = session.sessionIsAuthenticated()
             ? [principal.id]
             : [];
         return {
@@ -84,10 +104,13 @@ function notificationMatchesSession(
     event: NotificationEvent,
 ): boolean {
     if (event.kind === 'full') return true;
-    if (!sessionTokenIsSeeded()) return false;
+    const session = bellSession;
+    if (session === undefined || !session.sessionTokenIsSeeded()) {
+        return false;
+    }
     try {
         const principal =
-            principalFromToken(getSessionToken());
+            principalFromToken(session.getSessionToken());
         // Active org claim wins when present
         // (post-exchange). A flat login token has only
         // `organizations`; the message-plane fence still
@@ -98,13 +121,13 @@ function notificationMatchesSession(
                 ? event.organizationIds.includes(
                     principal.organization,
                 )
-                : sessionIsAuthenticated()
+                : session.sessionIsAuthenticated()
                     && (principal.organizations ?? [])
                         .some(id =>
                             event.organizationIds
                                 .includes(id));
         const identityHit =
-            sessionIsAuthenticated()
+            session.sessionIsAuthenticated()
             && event.identityIds.includes(
                 principal.id,
             );

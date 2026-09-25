@@ -2,7 +2,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import './in-page-facade.ts';
 import {
     type RequestContext,
 } from '../client/shared.ts';

@@ -1,8 +1,6 @@
 import { PAGE_REGISTRY } from './page-registry.ts';
 import { createHttpFacade } from '../../client/http-facade.ts';
-import { putClientFacade } from '../../client/facade-holder.ts';
-import { setCookieSession } from
-    '../../client/session-credentials.ts';
+import { createAppClient, putClient } from './client.ts';
 import { bootApp } from './app-boot.ts';
 
 // Server-ZIP esbuild entry. Imports pages (via
@@ -21,10 +19,11 @@ void PAGE_REGISTRY;
 document.addEventListener(
     'DOMContentLoaded',
     async () => {
-        setCookieSession(true);
-        putClientFacade(
+        const client = createAppClient(
             createHttpFacade(serverOrigin()),
         );
+        client.setCookieSession(true);
+        putClient(client);
         await bootApp();
     },
 );

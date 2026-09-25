@@ -51,12 +51,12 @@ import {
     type FlowSnapshot,
 } from '../web-app/app/presenters/flow-designer.ts';
 import { performUndo } from '../web-app/app/flow-operations.ts';
-import { wrapInPageAdapter } from
+import { inPageClient } from
     './in-page-facade.ts';
-import { putClientFacade } from
-    '../client/facade-holder.ts';
-import { putSessionToken } from
-    '../client/session-token.ts';
+import {
+    getClient,
+    putClient,
+} from '../web-app/app/client.ts';
 import type { GraphNode } from '../shared/types.ts';
 import {
     apiRequest,
@@ -752,8 +752,8 @@ Deno.test(
 // flags is carried, not restored, not counted. The earlier
 // "content-invisible save consumes a step" covenant was
 // the old cursor rule; this is the retarget, not a weaken.
-// putClientFacade(wrapInPageAdapter(db)) plus
-// putSessionToken(DEV_TOKEN) makes sessionContext() live
+// putClient(inPageClient(db)) plus
+// getClient().putSessionToken(DEV_TOKEN) makes sessionContext() live
 // under Deno.test — the seam earlier comments called
 // unreachable.
 Deno.test(
@@ -840,8 +840,8 @@ Deno.test(
         const token = await organizationToken();
         const flowId = generateIdentifier();
         await createFlow(db, token, flowId);
-        putClientFacade(wrapInPageAdapter(db));
-        putSessionToken(DEV_TOKEN);
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
 
         const livePresenter = async (
             migrateToCenter = false,

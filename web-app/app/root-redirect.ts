@@ -9,8 +9,7 @@
 import { putLocation } from './adapters/location.ts';
 import { createHttpFacade } from
     '../../client/http-facade.ts';
-import { putClientFacade } from
-    '../../client/facade-holder.ts';
+import { createAppClient, putClient } from './client.ts';
 import {
     probeRefreshSession,
     resolveApexLocation,
@@ -22,9 +21,9 @@ function probeOrigin(): string {
 }
 
 void (async function redirectRoot(): Promise<void> {
-    putClientFacade(
+    putClient(createAppClient(
         createHttpFacade(probeOrigin()),
-    );
+    ));
     const dest = await resolveApexLocation(
         probeRefreshSession,
     );

@@ -91,7 +91,7 @@ Deno.test(
         let release = (): void => {};
         try {
             await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
                     '../web-app/app/adapters/init.ts'
                 );
@@ -106,7 +106,12 @@ Deno.test(
             assertStrictEquals(
                 await initAdapter(() => db), true,
             );
-            putSessionToken(await organizationToken());
+            const { getClient } = await import(
+                '../web-app/app/client.ts'
+            );
+            getClient().putSessionToken(
+                await organizationToken(),
+            );
             const { init } = await import(
                 '../web-app/members/index.ts'
             );

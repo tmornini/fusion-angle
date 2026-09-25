@@ -39,12 +39,12 @@ import {
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { wrapInPageAdapter } from
+import { inPageClient } from
     './in-page-facade.ts';
-import { putClientFacade } from
-    '../client/facade-holder.ts';
-import { putSessionToken } from
-    '../client/session-token.ts';
+import {
+    getClient,
+    putClient,
+} from '../web-app/app/client.ts';
 import { performUndo } from
     '../web-app/app/flow-operations.ts';
 import { withLocalStorageAsync } from
@@ -158,8 +158,8 @@ Deno.test(
     'opening a flow does not append pairs',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
-        putClientFacade(wrapInPageAdapter(db));
-        putSessionToken(DEV_TOKEN);
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
         const ctx = inPageContext(
@@ -225,8 +225,8 @@ Deno.test(
     'a rename with no target appends no pair',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
-        putClientFacade(wrapInPageAdapter(db));
-        putSessionToken(DEV_TOKEN);
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
         const ctx = inPageContext(db, DEV_TOKEN);

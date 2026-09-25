@@ -1,6 +1,5 @@
 import { assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
-import './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { inPageContext } from './in-page-facade.ts';
 import {

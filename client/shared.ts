@@ -9,19 +9,7 @@ import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
-import {
-    getSessionToken,
-    putSessionToken,
-    sessionTokenIsSeeded,
-} from './session-token.ts';
-import {
-    type ClientSession,
-    MODULE_SESSION,
-} from './client-session.ts';
-import {
-    getClientFacade,
-    wrapClientAdapter,
-} from './facade-holder.ts';
+import type { ClientSession } from './client-session.ts';
 import {
     type Principal,
     principalFromToken,
@@ -29,34 +17,65 @@ import {
 import {
     resolveCredentialDecision,
 } from './credential-resolution.ts';
-import {
-    type SessionCredentials,
-    getSessionCredentials,
-    putSessionCredentials,
-    deleteSessionCredentials,
-} from './session-credentials.ts';
+import type { SessionCredentials } from './session-credentials.ts';
 import { postSessionRefresh } from './session-refresh.ts';
-import { isCookieSession } from './session-credentials.ts';
-import { runSingleFlightRefresh } from
-    './session-refresh-mutex.ts';
-import { redirectToLogin } from '../web-app/app/auth-redirect.ts';
 import { getOrganizations } from './organizations.ts';
 import {
     getIdentityDefaultOrganization,
 } from './identity-default-organization.ts';
-import { log } from '../web-app/app/logger.ts';
 import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
 } from './organization-session.ts';
-import {
-    recordApiRequest,
-} from '../web-app/app/page-request-profile.ts';
 import type { HttpFacade } from './http-facade.ts';
 
-// Either the in-page handleRequest adapter or the fetch
-// facade. RequestContext verbs are the same on both.
-type ClientFacade = HttpFacade | object;
+// The app's hands, given to a client at construction.
+export interface ClientNavigation {
+    redirectToLogin(): void;
+    navigateToAuth(): void;
+}
+
+export interface ClientLog {
+    warn(message: string, context?: string, ...data: unknown[]): void;
+}
+
+export type RequestRecorder = (
+    method: string,
+    resource: string,
+) => void;
+
+// All concurrent 401s share ONE recovery: the first failure
+// starts it, the rest await the same promise — a burst of
+// parallel reads over an expired token spends the refresh jti
+// exactly once. A second spend would be branded reuse by the
+// grant, revoking the winner's fresh chain and force-logging
+// the user out. Cleared on settle so the NEXT 401 starts a
+// fresh recovery.
+export type SharedRecovery = (
+    start: () => Promise<string | null>,
+) => Promise<string | null>;
+
+export function createSharedRecovery(): SharedRecovery {
+    let recoveryInFlight: Promise<string | null> | null = null;
+    return (start) => {
+        recoveryInFlight ??= start().finally(() => {
+            recoveryInFlight = null;
+        });
+        return recoveryInFlight;
+    };
+}
+
+// What one client's contexts close over: its bound
+// transport, its session, the app's hands, and its one
+// recovery in flight.
+export interface ClientCore {
+    readonly facade: HttpFacade;
+    readonly session: ClientSession;
+    readonly navigation: ClientNavigation;
+    readonly log: ClientLog;
+    readonly recordRequest: RequestRecorder;
+    readonly recovery: SharedRecovery;
+}
 
 // Rows whose `field` equals `value` — the single-field
 // equality filter the adapters repeat. Type-safe: `field`
@@ -152,20 +171,20 @@ export interface RequestContext {
 // captured token. The recovering sibling below is the
 // sessionContext path.
 export function createRequestContext(
-    adapter: ClientFacade,
+    core: ClientCore,
     token: string,
 ): RequestContext {
-    return makeRequestContext(adapter, token, false);
+    return makeRequestContext(core, token, false);
 }
 
 // The recovery-enabled context: a 401 refreshes the session
 // via withAuthRecovery and retries against the live token
 // once.
 export function createRecoveringRequestContext(
-    adapter: ClientFacade,
+    core: ClientCore,
     token: string,
 ): RequestContext {
-    return makeRequestContext(adapter, token, true);
+    return makeRequestContext(core, token, true);
 }
 
 function guestPrincipal(): Principal {
@@ -177,19 +196,19 @@ function guestPrincipal(): Principal {
 }
 
 function makeRequestContext(
-    adapter: ClientFacade,
+    core: ClientCore,
     token: string,
     recover: boolean,
 ): RequestContext {
     // One id for this operation. Recovery reuses it;
     // no other site mints one.
     return openRequestContext(
-        adapter, token, recover, generateIdentifier(),
+        core, token, recover, generateIdentifier(),
     );
 }
 
 function openRequestContext(
-    adapter: ClientFacade,
+    core: ClientCore,
     token: string,
     recover: boolean,
     operationId: string,
@@ -197,14 +216,14 @@ function openRequestContext(
     const identity = token === ''
         ? guestPrincipal()
         : principalFromToken(token);
-    const verbs = wrapClientAdapter(adapter);
+    const verbs = core.facade;
 
     function run<T>(
         make: (tok: string) => Promise<T>,
     ): Promise<T> {
         return recover
             ? withAuthRecovery(
-                adapter, token, identity.organization,
+                core, token, identity.organization,
                 operationId, make)
             : make(token);
     }
@@ -226,16 +245,16 @@ function openRequestContext(
     const ctx: RequestContext = {
         operationId,
         identity,
-        session: MODULE_SESSION,
+        session: core.session,
         GET: <T>(resource: string) => {
-            recordApiRequest('GET', resource);
+            core.recordRequest('GET', resource);
             const headers = writeHeaders();
             return run<T>(tok => verbs.GET<T>(
                 resource, tok, headers,
             ));
         },
         GETWithEtag: <T>(resource: string) => {
-            recordApiRequest('GET', resource);
+            core.recordRequest('GET', resource);
             const headers = writeHeaders();
             return run<{
                 body: T;
@@ -252,7 +271,7 @@ function openRequestContext(
             headerFields?:
                 readonly (readonly [string, string])[],
         ) => {
-            recordApiRequest('PUT', resource);
+            core.recordRequest('PUT', resource);
             const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.PUT<T>(
@@ -265,7 +284,7 @@ function openRequestContext(
             headerFields?:
                 readonly (readonly [string, string])[],
         ) => {
-            recordApiRequest('PUT', resource);
+            core.recordRequest('PUT', resource);
             const headers = writeHeaders(headerFields);
             return run<{
                 body: T;
@@ -282,7 +301,7 @@ function openRequestContext(
             headerFields?:
                 readonly (readonly [string, string])[],
         ) => {
-            recordApiRequest('PATCH', resource);
+            core.recordRequest('PATCH', resource);
             const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.PATCH<T>(
@@ -295,7 +314,7 @@ function openRequestContext(
             headerFields?:
                 readonly (readonly [string, string])[],
         ) => {
-            recordApiRequest('PATCH', resource);
+            core.recordRequest('PATCH', resource);
             const headers = writeHeaders(headerFields);
             return run<{
                 body: T;
@@ -307,7 +326,7 @@ function openRequestContext(
             );
         },
         DELETE: (resource: string) => {
-            recordApiRequest('DELETE', resource);
+            core.recordRequest('DELETE', resource);
             const headers = writeHeaders();
             return run<void>(
                 tok => verbs.DELETE(
@@ -318,7 +337,7 @@ function openRequestContext(
             resource: string,
             body: Record<string, unknown>,
         ) => {
-            recordApiRequest('POST', resource);
+            core.recordRequest('POST', resource);
             const headers = writeHeaders();
             return run<T>(
                 tok => verbs.POST<T>(
@@ -331,7 +350,7 @@ function openRequestContext(
             headerFields:
                 readonly (readonly [string, string])[],
         ) => {
-            recordApiRequest('POST', resource);
+            core.recordRequest('POST', resource);
             const headers = writeHeaders(headerFields);
             return run<T>(
                 tok => verbs.POST<T>(
@@ -344,7 +363,7 @@ function openRequestContext(
             headerFields?:
                 readonly (readonly [string, string])[],
         ) => {
-            recordApiRequest('POST', resource);
+            core.recordRequest('POST', resource);
             const headers = writeHeaders(headerFields);
             return verbs.postForHeaders(
                 resource, body, '', headers,
@@ -372,35 +391,6 @@ export async function jitteredBackoff(
     );
 }
 
-export function sessionContext(): RequestContext {
-    return createRecoveringRequestContext(
-        getClientFacade(), getSessionToken(),
-    );
-}
-
-// All concurrent 401s share ONE recovery: the first failure
-// starts it, the rest await the same promise — a burst of
-// parallel reads over an expired token spends the refresh jti
-// exactly once. A second spend would be branded reuse by the
-// grant, revoking the winner's fresh chain and force-logging
-// the user out. Cleared on settle so the NEXT 401 starts a
-// fresh recovery.
-let recoveryInFlight: Promise<string | null> | null = null;
-
-function sharedRecovery(
-    adapter: ClientFacade,
-    requestOrganization: Id | undefined,
-    operationId: string,
-): Promise<string | null> {
-    recoveryInFlight ??= recoverSession(
-        adapter, requestOrganization, operationId,
-    )
-        .finally(() => {
-            recoveryInFlight = null;
-        });
-    return recoveryInFlight;
-}
-
 // Wrap one verb call with single-shot 401 recovery. The first
 // attempt runs on the request's own vessel token — never the
 // live module global, so identity and wire credential cannot
@@ -410,7 +400,7 @@ function sharedRecovery(
 // second 401 (or no refreshable credential) clears the session
 // and bounces to login — there is no third attempt.
 async function withAuthRecovery<T>(
-    adapter: ClientFacade,
+    core: ClientCore,
     token: string,
     requestOrganization: Id | undefined,
     operationId: string,
@@ -422,8 +412,10 @@ async function withAuthRecovery<T>(
         if (!(err instanceof UnauthorizedError)) {
             throw err;
         }
-        const recovered = await sharedRecovery(
-            adapter, requestOrganization, operationId,
+        const recovered = await core.recovery(
+            () => recoverSession(
+                core, requestOrganization, operationId,
+            ),
         );
         if (recovered === null) {
             throw err;   // unrefreshable — already redirected
@@ -432,8 +424,8 @@ async function withAuthRecovery<T>(
             return await make(recovered);
         } catch (retryErr) {
             if (retryErr instanceof UnauthorizedError) {
-                deleteSessionCredentials();
-                redirectToLogin();
+                core.session.deleteSessionCredentials();
+                core.navigation.redirectToLogin();
             }
             throw retryErr;
         }
@@ -446,22 +438,22 @@ async function withAuthRecovery<T>(
 // 401 with no refreshable credential never makes a pointless
 // refresh round-trip.
 async function recoverSession(
-    adapter: ClientFacade,
+    core: ClientCore,
     requestOrganization: Id | undefined,
     operationId: string,
 ): Promise<string | null> {
     let creds: SessionCredentials | null;
     try {
-        creds = getSessionCredentials();
+        creds = core.session.getSessionCredentials();
     } catch (err) {
         // a corrupt blob is unrecoverable — scrub and bounce
-        log.warn(
+        core.log.warn(
             'corrupt session credential',
             'shared',
             err,
         );
-        deleteSessionCredentials();
-        redirectToLogin();
+        core.session.deleteSessionCredentials();
+        core.navigation.redirectToLogin();
         return null;
     }
     const now = nowEpochSeconds();
@@ -475,28 +467,28 @@ async function recoverSession(
     // recoverable unscoped read.
     if (decision.kind === 'install') {
         return installAndScope(
-            adapter, decision.accessToken,
+            core, decision.accessToken,
             requestOrganization, operationId);
     }
-    if (isCookieSession()) {
+    if (core.session.isCookieSession()) {
         // HttpFacade already single-flights the cookie
         // refresh. A second POST here is reuse.
-        deleteSessionCredentials();
-        redirectToLogin();
+        core.session.deleteSessionCredentials();
+        core.navigation.redirectToLogin();
         return null;
     }
     if (decision.kind !== 'refresh') {
-        deleteSessionCredentials();
-        redirectToLogin();
+        core.session.deleteSessionCredentials();
+        core.navigation.redirectToLogin();
         return null;
     }
     const access = await refreshCredentials(
-        adapter, decision.refreshToken, operationId);
+        core, decision.refreshToken, operationId);
     if (access === null) {
         return null;
     }
     return installAndScope(
-        adapter, access, requestOrganization, operationId);
+        core, access, requestOrganization, operationId);
 }
 
 // Install a flat token as the session and re-scope it to the active
@@ -509,25 +501,25 @@ async function recoverSession(
 // recovery branches: re-install a known-live token (install), and
 // refresh-then-install (refresh).
 async function installAndScope(
-    adapter: ClientFacade,
+    core: ClientCore,
     flatToken: string,
     requestOrganization: Id | undefined,
     operationId: string,
 ): Promise<string | null> {
-    putSessionToken(flatToken);
+    core.session.putSessionToken(flatToken);
     try {
         await rescopeToActiveOrganization(
-            adapter, flatToken, requestOrganization,
+            core, flatToken, requestOrganization,
             operationId);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
-            deleteSessionCredentials();
-            redirectToLogin();
+            core.session.deleteSessionCredentials();
+            core.navigation.redirectToLogin();
             return null;
         }
         throw err;
     }
-    return getSessionToken();
+    return core.session.getSessionToken();
 }
 
 // Run the refresh grant on a recovery-FREE context: a refresh
@@ -536,23 +528,23 @@ async function installAndScope(
 // rather than minting another. A dead refresh scrubs the
 // session and bounces.
 async function refreshCredentials(
-    adapter: ClientFacade,
+    core: ClientCore,
     refreshToken: string,
     operationId: string,
 ): Promise<string | null> {
-    const token = sessionTokenIsSeeded()
-        ? getSessionToken()
+    const token = core.session.sessionTokenIsSeeded()
+        ? core.session.getSessionToken()
         : '';
     const free = openRequestContext(
-        adapter, token, false, operationId,
+        core, token, false, operationId,
     );
     try {
-        const access = await runSingleFlightRefresh(
+        const access = await core.session.runSingleFlightRefresh(
             async () => {
                 try {
                     const creds = await postSessionRefresh(
                         free, refreshToken);
-                    putSessionCredentials(creds);
+                    core.session.putSessionCredentials(creds);
                     return creds.accessToken;
                 } catch (err) {
                     if (err instanceof UnauthorizedError) {
@@ -563,15 +555,15 @@ async function refreshCredentials(
             },
         );
         if (access === null) {
-            deleteSessionCredentials();
-            redirectToLogin();
+            core.session.deleteSessionCredentials();
+            core.navigation.redirectToLogin();
             return null;
         }
         return access;
     } catch (err) {
         if (err instanceof UnauthorizedError) {
-            deleteSessionCredentials();
-            redirectToLogin();
+            core.session.deleteSessionCredentials();
+            core.navigation.redirectToLogin();
             return null;
         }
         throw err;
@@ -589,13 +581,13 @@ async function refreshCredentials(
 // (no claim) falls back to the identity default, then the first
 // reachable.
 async function rescopeToActiveOrganization(
-    adapter: ClientFacade,
+    core: ClientCore,
     flatToken: string,
     requestOrganization: Id | undefined,
     operationId: string,
 ): Promise<void> {
     const ctx = openRequestContext(
-        adapter, flatToken, false, operationId,
+        core, flatToken, false, operationId,
     );
     // Overlap independent rescope reads. Named delta: the
     // default-organization read now fires (and can surface
@@ -616,7 +608,7 @@ async function rescopeToActiveOrganization(
         requestOrganization ?? null,
         defaultOrganization,
     );
-    putSessionToken(
+    core.session.putSessionToken(
         await postOrganizationSessionExchange(ctx, flatToken, active));
 }
 

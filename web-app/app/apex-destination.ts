@@ -3,14 +3,9 @@
 // see it. The existing refresh grant is the
 // probe — not a new door.
 
-import { createRequestContext } from
-    '../../client/shared.ts';
 import { authParam } from
     '../../client/authentication.ts';
-import { getClientFacade } from
-    '../../client/facade-holder.ts';
-import { runSingleFlightRefresh } from
-    '../../client/session-refresh-mutex.ts';
+import { getClient } from './client.ts';
 
 export const APEX_SIGNED_IN = 'dashboard/index.html';
 export const APEX_SIGNED_OUT = 'landing/index.html';
@@ -30,10 +25,9 @@ export async function resolveApexLocation(
 
 export async function probeRefreshSession(
 ): Promise<boolean> {
-    const ctx = createRequestContext(
-        getClientFacade(), '',
-    );
-    const access = await runSingleFlightRefresh(
+    const client = getClient();
+    const ctx = client.requestContext('');
+    const access = await client.runSingleFlightRefresh(
         async () => {
             const answered = await ctx.postForHeaders(
                 'authentication/token',

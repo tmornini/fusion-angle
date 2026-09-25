@@ -7,19 +7,7 @@ import {
 import {
     createHttpFacade,
 } from '../client/http-facade.ts';
-import {
-    createRecoveringRequestContext,
-} from '../client/shared.ts';
-import {
-    setCookieSession,
-} from '../client/session-credentials.ts';
-import {
-    putSessionToken,
-    getSessionToken,
-    sessionIsOrganizationScoped,
-} from '../client/session-token.ts';
-import { runSingleFlightRefresh } from
-    '../client/session-refresh-mutex.ts';
+import { createAppClient } from '../web-app/app/client.ts';
 import { UnauthorizedError } from
     '../shared/http-errors.ts';
 import {
@@ -30,8 +18,12 @@ import {
 } from './token-fixtures.ts';
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
-import { deleteRefreshChannel } from
-    '../client/session-refresh-mutex.ts';
+
+// The tab's one client: each test's transport binds it, as
+// the client binds its own.
+const client = createAppClient(
+    createHttpFacade('http://example.test'),
+);
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to
@@ -39,8 +31,8 @@ import { deleteRefreshChannel } from
 // outlives the test that opened it; the next refresh
 // reopens it.
 Deno.test.afterEach(() => {
-    setCookieSession(false);
-    deleteRefreshChannel();
+    client.setCookieSession(false);
+    client.deleteRefreshChannel();
 });
 
 async function withMockFetch(
@@ -58,8 +50,8 @@ async function withMockFetch(
 
 Deno.test('two concurrent 401s cause one refresh POST',
 async () => {
-    setCookieSession(true);
-    putSessionToken('dead-access');
+    client.setCookieSession(true);
+    client.putSessionToken('dead-access');
     let refreshPosts = 0;
     let nextAccess = 0;
     await withMockFetch(async (input, init) => {
@@ -94,7 +86,7 @@ async () => {
     }, async () => {
         const facade = createHttpFacade(
             'http://example.test',
-        );
+        )(client);
         const [a, b] = await Promise.all([
             facade.GET('members', 'dead-access'),
             facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -116,9 +108,9 @@ async () => {
     } as unknown as Document;
     // @ts-expect-error — Node stub for navigateTo
     globalThis.window = { location: { href: '', search: '' } };
-    setCookieSession(true);
+    client.setCookieSession(true);
     const deadAccess = await expiredToken();
-    putSessionToken(deadAccess);
+    client.putSessionToken(deadAccess);
     let refreshPosts = 0;
     await withMockFetch(async (input) => {
         const url = String(input);
@@ -134,11 +126,8 @@ async () => {
             { status: 401 },
         );
     }, async () => {
-        const facade = createHttpFacade(
-            'http://example.test',
-        );
-        const ctx = createRecoveringRequestContext(
-            facade, deadAccess);
+        const ctx = client.recoveringRequestContext(
+            deadAccess);
         await assertRejects(
             () => ctx.GET('members'),
             UnauthorizedError,
@@ -150,7 +139,7 @@ async () => {
 Deno.test('idle tab ignores a peer refresh broadcast',
 async () => {
     let posts = 0;
-    await runSingleFlightRefresh(async () => {
+    await client.runSingleFlightRefresh(async () => {
         posts += 1;
         return 'first';
     });
@@ -160,7 +149,7 @@ async () => {
         await new Promise(r => setImmediate(r));
     }
     peer.close();
-    const result = await runSingleFlightRefresh(async () => {
+    const result = await client.runSingleFlightRefresh(async () => {
         posts += 1;
         return 'second';
     });
@@ -171,7 +160,7 @@ async () => {
 Deno.test('cookie refresh re-scopes the session to the'
 + ' dead token org',
 async () => {
-    setCookieSession(true);
+    client.setCookieSession(true);
     const org = 'AjdvjuECVZEgZoFajaIEkg';
     const scoped = await organizationToken();
     const flat = await reachableToken();
@@ -181,7 +170,7 @@ async () => {
         roles: ['admin:' + org],
         jti: 'rescoped-after-refresh',
     });
-    putSessionToken(scoped);
+    client.putSessionToken(scoped);
     const grants: string[] = [];
     await withMockFetch(async (input, init) => {
         const url = String(input);
@@ -266,7 +255,7 @@ async () => {
     }, async () => {
         const facade = createHttpFacade(
             'http://example.test',
-        );
+        )(client);
         const rows = await facade.GET(
             'organizations/' + org + '/flows/x',
             scoped,
@@ -277,10 +266,10 @@ async () => {
         grants, ['refresh', 'token-exchange'],
     );
     assertStrictEquals(
-        sessionIsOrganizationScoped(), true,
+        client.sessionIsOrganizationScoped(), true,
     );
     assertStrictEquals(
-        principalFromToken(getSessionToken())
+        principalFromToken(client.getSessionToken())
             .organization,
         org,
     );

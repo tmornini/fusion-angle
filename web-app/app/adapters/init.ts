@@ -12,35 +12,26 @@ import {
 import {
     nowEpochSeconds,
 } from '../../../shared/types.ts';
-import { wrapClientAdapter } from '../../../client/facade-holder.ts';
-import { putClientFacade } from '../../../client/facade-holder.ts';
 import {
-    putSessionToken,
-    sessionTokenIsSeeded,
-} from '../../../client/session-token.ts';
-
-export {
-    getSessionToken,
-    putSessionToken,
-    deleteSessionToken,
-    sessionTokenIsSeeded,
-    sessionIsOrganizationScoped,
-    sessionHasReachableOrganization,
-    sessionIsAuthenticated,
-} from '../../../client/session-token.ts';
+    createAppClient,
+    getClient,
+    putClient,
+} from '../client.ts';
+import { wrapInPageAdapter } from
+    '../../../tests/in-page-facade.ts';
 
 let adapter: ClientFacadeAdapter | undefined;
 
 // Test composition root: an injected adapter (memory)
-// wrapped as HttpFacade. Product boot uses server-core
-// and the fetch facade.
+// behind the in-page transport, as the app's one client.
+// Product boot uses server-core and the fetch transport.
 export async function initAdapter(
     makeAdapter: () => ClientFacadeAdapter,
 ): Promise<boolean> {
-    await postSessionSeed();
     adapter = makeAdapter();
     await adapter.initialize();
-    putClientFacade(wrapClientAdapter(adapter));
+    putClient(createAppClient(wrapInPageAdapter(adapter)));
+    await postSessionSeed();
     return adapter.hasSchema();
 }
 
@@ -76,8 +67,8 @@ async function mintSessionToken(
 // getSessionToken() call. Idempotent: a holder already set
 // (anonymous or an established subject) is left untouched.
 export async function postSessionSeed(): Promise<void> {
-    if (!sessionTokenIsSeeded()) {
-        putSessionToken(await mintSessionToken(
+    if (!getClient().sessionTokenIsSeeded()) {
+        getClient().putSessionToken(await mintSessionToken(
             ANONYMOUS_ID, 'Anonymous',
         ));
     }

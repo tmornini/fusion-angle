@@ -4,9 +4,6 @@ import {
     HTTP_UNAUTHORIZED,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
-import { putSessionToken } from './session-token.ts';
-import { runSingleFlightRefresh } from
-    './session-refresh-mutex.ts';
 import { navigateTo } from '../web-app/app/navigation.ts';
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
@@ -166,238 +163,257 @@ function requestHeaders(
     return headers;
 }
 
+// What the transport's own 401 layer asks of the client
+// that binds it: the client's refresh flight and its
+// bearer.
+export interface TransportClient {
+    runSingleFlightRefresh(
+        refresh: () => Promise<string | null>,
+    ): Promise<string | null>;
+    putSessionToken(token: string): void;
+}
+
+// A transport before its client binds it. The client hands
+// in its session once, at construction; the facade it gets
+// back belongs to that client alone.
+export type HttpTransport = (
+    client: TransportClient,
+) => HttpFacade;
+
 export function createHttpFacade(
     origin: string,
-): HttpFacade {
-    function exchange(
-        method: string,
-        resource: string,
-        token: string,
-        payload: Record<string, unknown> | undefined,
-        extra: readonly (readonly [string, string])[]
-            | undefined,
-    ): Promise<Response> {
-        return fetch(origin + '/api/' + resource, {
-            method,
-            credentials: 'same-origin',
-            headers: requestHeaders(
-                token,
-                payload !== undefined,
-                extra,
-            ),
-            ...(payload !== undefined
-                ? { body: JSON.stringify(payload) }
-                : {}),
-        });
-    }
-
-    async function postCookieRefresh(
-        operationId: string | undefined,
-    ): Promise<string | null> {
-        const headers = new Headers();
-        headers.set('Content-Type', 'application/json');
-        if (operationId !== undefined) {
-            headers.set(OPERATION_ID_HEADER, operationId);
-        }
-        const response = await fetch(
-            origin + '/api/authentication/token', {
-                method: 'POST',
+): HttpTransport {
+    return (client) => {
+        function exchange(
+            method: string,
+            resource: string,
+            token: string,
+            payload: Record<string, unknown> | undefined,
+            extra: readonly (readonly [string, string])[]
+                | undefined,
+        ): Promise<Response> {
+            return fetch(origin + '/api/' + resource, {
+                method,
                 credentials: 'same-origin',
-                headers,
-                body: JSON.stringify({
-                    grant_type: 'refresh',
-                }),
-            },
-        );
-        await response.text();
-        if (!response.ok) return null;
-        return authParam(
-            response.headers.get('authentication-info'),
-            'access_token',
-        );
-    }
+                headers: requestHeaders(
+                    token,
+                    payload !== undefined,
+                    extra,
+                ),
+                ...(payload !== undefined
+                    ? { body: JSON.stringify(payload) }
+                    : {}),
+            });
+        }
 
-    async function postOrganizationExchange(
-        flat: string,
-        organization: string,
-        operationId: string | undefined,
-    ): Promise<string | null> {
-        const headers = new Headers();
-        headers.set(
-            'Content-Type', 'application/json',
-        );
-        headers.set(
-            'Authorization', 'Bearer ' + flat,
-        );
-        if (operationId !== undefined) {
-            headers.set(OPERATION_ID_HEADER, operationId);
+        async function postCookieRefresh(
+            operationId: string | undefined,
+        ): Promise<string | null> {
+            const headers = new Headers();
+            headers.set('Content-Type', 'application/json');
+            if (operationId !== undefined) {
+                headers.set(OPERATION_ID_HEADER, operationId);
+            }
+            const response = await fetch(
+                origin + '/api/authentication/token', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers,
+                    body: JSON.stringify({
+                        grant_type: 'refresh',
+                    }),
+                },
+            );
+            await response.text();
+            if (!response.ok) return null;
+            return authParam(
+                response.headers.get('authentication-info'),
+                'access_token',
+            );
         }
-        const response = await fetch(
-            origin + '/api/authentication/token', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers,
-                body: JSON.stringify({
-                    grant_type: 'token-exchange',
-                    organization,
-                }),
-            },
-        );
-        await response.text();
-        if (!response.ok) return null;
-        return authParam(
-            response.headers.get('authentication-info'),
-            'access_token',
-        );
-    }
 
-    async function refreshAndScope(
-        deadToken: string,
-        operationId: string | undefined,
-    ): Promise<string | null> {
-        const flat = await postCookieRefresh(operationId);
-        if (flat === null) return null;
-        const organization =
-            organizationToRestore(deadToken);
-        if (organization === undefined) {
-            return flat;
+        async function postOrganizationExchange(
+            flat: string,
+            organization: string,
+            operationId: string | undefined,
+        ): Promise<string | null> {
+            const headers = new Headers();
+            headers.set(
+                'Content-Type', 'application/json',
+            );
+            headers.set(
+                'Authorization', 'Bearer ' + flat,
+            );
+            if (operationId !== undefined) {
+                headers.set(OPERATION_ID_HEADER, operationId);
+            }
+            const response = await fetch(
+                origin + '/api/authentication/token', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers,
+                    body: JSON.stringify({
+                        grant_type: 'token-exchange',
+                        organization,
+                    }),
+                },
+            );
+            await response.text();
+            if (!response.ok) return null;
+            return authParam(
+                response.headers.get('authentication-info'),
+                'access_token',
+            );
         }
-        return await postOrganizationExchange(
-            flat, organization, operationId,
-        ) ?? flat;
-    }
 
-    async function exchangeOnce(
-        method: string,
-        resource: string,
-        token: string,
-        payload: Record<string, unknown> | undefined,
-        extra: readonly (readonly [string, string])[]
-            | undefined,
-    ): Promise<Response> {
-        const first = await exchange(
-            method, resource, token, payload, extra,
-        );
-        if (first.status !== HTTP_UNAUTHORIZED) {
-            return first;
+        async function refreshAndScope(
+            deadToken: string,
+            operationId: string | undefined,
+        ): Promise<string | null> {
+            const flat = await postCookieRefresh(operationId);
+            if (flat === null) return null;
+            const organization =
+                organizationToRestore(deadToken);
+            if (organization === undefined) {
+                return flat;
+            }
+            return await postOrganizationExchange(
+                flat, organization, operationId,
+            ) ?? flat;
         }
-        if (isCredentialDoor(resource)) {
-            return first;
-        }
-        let operationId: string | undefined;
-        if (extra !== undefined) {
-            for (const [name, value] of extra) {
-                if (name.toLowerCase()
-                    === OPERATION_ID_HEADER) {
-                    operationId = value;
-                    break;
+
+        async function exchangeOnce(
+            method: string,
+            resource: string,
+            token: string,
+            payload: Record<string, unknown> | undefined,
+            extra: readonly (readonly [string, string])[]
+                | undefined,
+        ): Promise<Response> {
+            const first = await exchange(
+                method, resource, token, payload, extra,
+            );
+            if (first.status !== HTTP_UNAUTHORIZED) {
+                return first;
+            }
+            if (isCredentialDoor(resource)) {
+                return first;
+            }
+            let operationId: string | undefined;
+            if (extra !== undefined) {
+                for (const [name, value] of extra) {
+                    if (name.toLowerCase()
+                        === OPERATION_ID_HEADER) {
+                        operationId = value;
+                        break;
+                    }
                 }
             }
+            const access = await client.runSingleFlightRefresh(
+                () => refreshAndScope(token, operationId),
+            );
+            if (access === null) {
+                navigateTo('auth');
+                return first;
+            }
+            client.putSessionToken(access);
+            return exchange(
+                method, resource, access, payload, extra,
+            );
         }
-        const access = await runSingleFlightRefresh(
-            () => refreshAndScope(token, operationId),
-        );
-        if (access === null) {
-            navigateTo('auth');
-            return first;
-        }
-        putSessionToken(access);
-        return exchange(
-            method, resource, access, payload, extra,
-        );
-    }
 
-    const facade: HttpFacade = {
-        GET: async (resource, token, headerFields) =>
-            unwrapResponse(
-                await exchangeOnce(
+        const facade: HttpFacade = {
+            GET: async (resource, token, headerFields) =>
+                unwrapResponse(
+                    await exchangeOnce(
+                        'GET', resource, token,
+                        undefined, headerFields,
+                    ),
+                ),
+            GETWithEtag: async (
+                resource, token, headerFields,
+            ) => {
+                const response = await exchangeOnce(
                     'GET', resource, token,
                     undefined, headerFields,
-                ),
-            ),
-        GETWithEtag: async (
-            resource, token, headerFields,
-        ) => {
-            const response = await exchangeOnce(
-                'GET', resource, token,
-                undefined, headerFields,
-            );
-            return {
-                body: await unwrapResponse(response),
-                etag: etagFromHeader(response),
-            };
-        },
-        PUT: async (
-            resource, payload, token, headerFields,
-        ) => unwrapResponse(
-            await exchangeOnce(
-                'PUT', resource, token,
-                payload, headerFields,
-            ),
-        ),
-        PUTWithEtag: async (
-            resource, payload, token, headerFields,
-        ) => {
-            const response = await exchangeOnce(
-                'PUT', resource, token,
-                payload, headerFields,
-            );
-            return {
-                body: await unwrapResponse(response),
-                etag: etagFromHeader(response),
-            };
-        },
-        PATCH: async (
-            resource, payload, token, headerFields,
-        ) => unwrapResponse(
-            await exchangeOnce(
-                'PATCH', resource, token,
-                payload, headerFields,
-            ),
-        ),
-        PATCHWithEtag: async (
-            resource, payload, token, headerFields,
-        ) => {
-            const response = await exchangeOnce(
-                'PATCH', resource, token,
-                payload, headerFields,
-            );
-            return {
-                body: await unwrapResponse(response),
-                etag: etagFromHeader(response),
-            };
-        },
-        DELETE: async (
-            resource, token, headerFields,
-        ) => {
-            await unwrapResponse(
+                );
+                return {
+                    body: await unwrapResponse(response),
+                    etag: etagFromHeader(response),
+                };
+            },
+            PUT: async (
+                resource, payload, token, headerFields,
+            ) => unwrapResponse(
                 await exchangeOnce(
-                    'DELETE', resource, token,
-                    undefined, headerFields,
+                    'PUT', resource, token,
+                    payload, headerFields,
                 ),
-            );
-        },
-        POST: async (
-            resource, payload, token, headerFields,
-        ) => unwrapResponse(
-            await exchangeOnce(
-                'POST', resource, token,
-                payload, headerFields,
             ),
-        ),
-        postForHeaders: async (
-            resource, payload, token, headerFields,
-        ) => {
-            const response = await exchange(
-                'POST', resource, token,
-                payload, headerFields,
-            );
-            return {
-                status: response.status,
-                headers: response.headers,
-                body: await response.text(),
-            };
-        },
+            PUTWithEtag: async (
+                resource, payload, token, headerFields,
+            ) => {
+                const response = await exchangeOnce(
+                    'PUT', resource, token,
+                    payload, headerFields,
+                );
+                return {
+                    body: await unwrapResponse(response),
+                    etag: etagFromHeader(response),
+                };
+            },
+            PATCH: async (
+                resource, payload, token, headerFields,
+            ) => unwrapResponse(
+                await exchangeOnce(
+                    'PATCH', resource, token,
+                    payload, headerFields,
+                ),
+            ),
+            PATCHWithEtag: async (
+                resource, payload, token, headerFields,
+            ) => {
+                const response = await exchangeOnce(
+                    'PATCH', resource, token,
+                    payload, headerFields,
+                );
+                return {
+                    body: await unwrapResponse(response),
+                    etag: etagFromHeader(response),
+                };
+            },
+            DELETE: async (
+                resource, token, headerFields,
+            ) => {
+                await unwrapResponse(
+                    await exchangeOnce(
+                        'DELETE', resource, token,
+                        undefined, headerFields,
+                    ),
+                );
+            },
+            POST: async (
+                resource, payload, token, headerFields,
+            ) => unwrapResponse(
+                await exchangeOnce(
+                    'POST', resource, token,
+                    payload, headerFields,
+                ),
+            ),
+            postForHeaders: async (
+                resource, payload, token, headerFields,
+            ) => {
+                const response = await exchange(
+                    'POST', resource, token,
+                    payload, headerFields,
+                );
+                return {
+                    status: response.status,
+                    headers: response.headers,
+                    body: await response.text(),
+                };
+            },
+        };
+        return facade;
     };
-    return facade;
 }

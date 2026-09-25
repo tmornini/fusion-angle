@@ -10,13 +10,17 @@ import {
 } from '../web-app/app/apex-destination.ts';
 import { createHttpFacade } from
     '../client/http-facade.ts';
-import { putClientFacade } from
-    '../client/facade-holder.ts';
-import { deleteRefreshChannel } from
-    '../client/session-refresh-mutex.ts';
+import type { Client } from '../client/create-client.ts';
+import {
+    createAppClient,
+    putClient,
+} from '../web-app/app/client.ts';
+
+let probeClient: Client | undefined;
 
 function installProbeFacade(): void {
-    putClientFacade(createHttpFacade(''));
+    probeClient = createAppClient(createHttpFacade(''));
+    putClient(probeClient);
 }
 
 const originalFetch = globalThis.fetch;
@@ -28,7 +32,7 @@ const originalFetch = globalThis.fetch;
 // it.
 Deno.test.afterEach(() => {
     globalThis.fetch = originalFetch;
-    deleteRefreshChannel();
+    probeClient?.deleteRefreshChannel();
 });
 
 Deno.test('a live session hops to dashboard', async () => {

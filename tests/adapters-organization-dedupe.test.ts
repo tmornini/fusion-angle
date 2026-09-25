@@ -96,8 +96,9 @@ Deno.test(
             },
         };
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { wrapInPageAdapter } =
+                await import('./in-page-facade.ts');
+            const { initAdapter } =
                 await import(
                     '../web-app/app/adapters/init.ts'
                 );
@@ -110,16 +111,16 @@ Deno.test(
                 () => db,
             );
             assertStrictEquals(hasSchema, true);
-            putSessionToken(await organizationToken());
             const {
-                getClientFacade,
-                putClientFacade,
+                createAppClient,
+                getClient,
+                putClient,
             } = await import(
-                '../client/facade-holder.ts'
+                '../web-app/app/client.ts'
             );
-            const inner = getClientFacade();
+            const inner = wrapInPageAdapter(db)(getClient());
             const paths: string[] = [];
-            putClientFacade({
+            const client = createAppClient(() => ({
                 ...inner,
                 GET: async (
                     resource,
@@ -131,7 +132,9 @@ Deno.test(
                         resource, token, requestId,
                     );
                 },
-            });
+            }));
+            client.putSessionToken(await organizationToken());
+            putClient(client);
             const { init } = await import(
                 '../web-app/organization/index.ts'
             );

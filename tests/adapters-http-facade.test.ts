@@ -9,10 +9,6 @@ import {
 import {
     createHttpFacade,
 } from '../client/http-facade.ts';
-import {
-    createRecoveringRequestContext,
-    createRequestContext,
-} from '../client/shared.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { UnauthorizedError } from
     '../shared/http-errors.ts';
@@ -23,8 +19,13 @@ import {
 import { isIdentifier } from '../shared/identifier.ts';
 import { postPasswordLogin } from
     '../client/authentication.ts';
-import { deleteRefreshChannel } from
-    '../client/session-refresh-mutex.ts';
+import { createAppClient } from '../web-app/app/client.ts';
+
+// The tab's one client: each test's transport binds it, as
+// the client binds its own.
+const client = createAppClient(
+    createHttpFacade('http://example.test'),
+);
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to
@@ -32,7 +33,7 @@ import { deleteRefreshChannel } from
 // outlives the test that opened it; the next refresh
 // reopens it.
 Deno.test.afterEach(() => {
-    deleteRefreshChannel();
+    client.deleteRefreshChannel();
 });
 
 async function withMockFetch(
@@ -66,7 +67,7 @@ Deno.test(
         }, async () => {
             const facade = createHttpFacade(
                 'http://example.test',
-            );
+            )(client);
             await facade.PUT(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' },
@@ -133,12 +134,7 @@ Deno.test(
             return new Response('[]', { status: 200 });
         }, async () => {
             const ctx =
-                createRecoveringRequestContext(
-                    createHttpFacade(
-                        'http://example.test',
-                    ),
-                    '',
-                );
+                client.recoveringRequestContext('');
             await ctx.GET(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
@@ -232,12 +228,7 @@ Deno.test(
             return new Response('[]', { status: 200 });
         }, async () => {
             const ctx =
-                createRecoveringRequestContext(
-                    createHttpFacade(
-                        'http://example.test',
-                    ),
-                    token,
-                );
+                client.recoveringRequestContext(token);
             await ctx.GET(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
@@ -274,10 +265,7 @@ Deno.test(
             requestIds.push(headers.get('request-id'));
             return new Response('{}', { status: 200 });
         }, async () => {
-            const ctx = createRequestContext(
-                createHttpFacade('http://example.test'),
-                DEV_TOKEN,
-            );
+            const ctx = client.requestContext(DEV_TOKEN);
             const idea = 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'AjdvjuECVZEgZoFajaIEkg';
@@ -326,7 +314,7 @@ Deno.test(
         ), async () => {
             const facade = createHttpFacade(
                 'http://example.test',
-            );
+            )(client);
             const err = await assertRejects(
                 () => facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'members/', 'tok'),
@@ -361,7 +349,7 @@ Deno.test(
         }, async () => {
             const facade = createHttpFacade(
                 'http://example.test',
-            );
+            )(client);
             await assertRejects(
                 () => facade.POST(
                     'authentication/authorize',
@@ -407,12 +395,7 @@ Deno.test(
                 { status: 401 },
             );
         }, async () => {
-            const ctx = createRequestContext(
-                createHttpFacade(
-                    'http://example.test',
-                ),
-                DEV_TOKEN,
-            );
+            const ctx = client.requestContext(DEV_TOKEN);
             assertStrictEquals(
                 await postPasswordLogin(
                     ctx, 'a@b.c', 'WRONG',

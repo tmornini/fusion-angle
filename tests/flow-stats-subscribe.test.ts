@@ -100,11 +100,13 @@ Deno.test(
                 sel === '#flow-stats' ? host : null,
         };
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
                     '../web-app/app/adapters/init.ts'
                 );
+            const { getClient } = await import(
+                '../web-app/app/client.ts'
+            );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
             await seedHumanMember(
@@ -114,7 +116,7 @@ Deno.test(
                 () => db,
             );
             assertStrictEquals(hasSchema, true);
-            putSessionToken(
+            getClient().putSessionToken(
                 await organizationToken(),
             );
             const { inPageContext } = await import(

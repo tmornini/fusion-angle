@@ -1,25 +1,9 @@
 import {
-    deleteSessionToken,
-    getSessionToken,
-    putSessionToken,
-    sessionHasReachableOrganization,
-    sessionIsAuthenticated,
-    sessionIsOrganizationScoped,
-    sessionTokenIsSeeded,
-} from './session-token.ts';
-import {
-    deleteSessionCredentials,
-    getSessionCredentials,
-    isCookieSession,
-    putSessionCredentials,
-    setCookieSession,
+    createSessionCredentialStore,
     type SessionCredentials,
 } from './session-credentials.ts';
-import {
-    deleteRefreshChannel,
-    runRefreshAfterInFlight,
-    runSingleFlightRefresh,
-} from './session-refresh-mutex.ts';
+import { createRefreshMutex } from './session-refresh-mutex.ts';
+import { createSessionTokenHolder } from './session-token.ts';
 
 // One client's session: its bearer, its credential store,
 // and its refresh single-flight. A verb reaches it through
@@ -46,22 +30,13 @@ export interface ClientSession {
     deleteRefreshChannel(): void;
 }
 
-// The session every context shares while it lives in
-// module state.
-export const MODULE_SESSION: ClientSession = {
-    putSessionToken,
-    deleteSessionToken,
-    sessionTokenIsSeeded,
-    getSessionToken,
-    sessionIsOrganizationScoped,
-    sessionHasReachableOrganization,
-    sessionIsAuthenticated,
-    setCookieSession,
-    isCookieSession,
-    getSessionCredentials,
-    putSessionCredentials,
-    deleteSessionCredentials,
-    runSingleFlightRefresh,
-    runRefreshAfterInFlight,
-    deleteRefreshChannel,
-};
+// A fresh session: an empty bearer, a credential store over
+// it, and an idle refresh flight with its own peer channel.
+export function createClientSession(): ClientSession {
+    const tokens = createSessionTokenHolder();
+    return {
+        ...tokens,
+        ...createSessionCredentialStore(tokens),
+        ...createRefreshMutex(),
+    };
+}

@@ -25,14 +25,10 @@ import {
     mutateInvitationsBell,
 } from './invitations-indicator.ts';
 import { navigateTo } from './navigation.ts';
-import { sessionContext } from './client.ts';
+import { getClient, sessionContext } from './client.ts';
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
-import {
-    sessionIsOrganizationScoped,
-    sessionIsAuthenticated,
-} from '../../client/session-token.ts';
 import {
     postSessionLogout,
 } from '../../client/session-logout.ts';
@@ -107,7 +103,7 @@ async function initSidebarLayout(
     // an auth-exempt page with no logged-in visitor the holder is
     // the anonymous seed, so we skip every read rather than fire one
     // that 401s 'anonymous principal' or throws 'no active org'.
-    if (sessionIsAuthenticated()) {
+    if (getClient().sessionIsAuthenticated()) {
         // Each widget settles independently: a member with no admin
         // role is forbidden the org reads the chip and header strip
         // make, and a zero-membership identity is forbidden them
@@ -119,7 +115,7 @@ async function initSidebarLayout(
             mutateSidebarMember(bootOrganizations),
             mutateInvitationsBell(),
         ];
-        if (sessionIsOrganizationScoped()) {
+        if (getClient().sessionIsOrganizationScoped()) {
             widgets.push(mutateHeaderInfo());
         }
         const results = await Promise.allSettled(widgets);

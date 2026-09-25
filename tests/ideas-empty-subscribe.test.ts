@@ -116,15 +116,14 @@ Deno.test(
         };
         g['document'] = doc;
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
                     '../web-app/app/adapters/init.ts'
                 );
             const {
-                getClientFacade, putClientFacade,
+                getClient, putClient,
             } = await import(
-                '../client/facade-holder.ts'
+                '../web-app/app/client.ts'
             );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
@@ -136,13 +135,13 @@ Deno.test(
             );
             assertStrictEquals(hasSchema, true);
             const token = await organizationToken();
-            putSessionToken(token);
-            const facade = getClientFacade();
+            const client = getClient();
+            client.putSessionToken(token);
             const reclaim = (): void => {
                 g['window'] = win;
                 g['document'] = doc;
-                putClientFacade(facade);
-                putSessionToken(token);
+                putClient(client);
+                client.putSessionToken(token);
             };
             const { init } = await import(
                 '../web-app/ideas/index.ts'

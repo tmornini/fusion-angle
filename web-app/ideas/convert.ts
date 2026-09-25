@@ -19,9 +19,9 @@ import {
     getIdea,
     getProjectEntities,
     postIdeaConversion,
-    createRequestContext,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
+import type { RequestContext } from '../../client/shared.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { type IdeaEntity } from '../../shared/types.ts';
 import {
@@ -573,7 +573,7 @@ function isoDateOnly(ms: number): string {
 }
 
 async function performConversion(
-    ctx: ReturnType<typeof createRequestContext>,
+    ctx: RequestContext,
     ideaId: string,
     projectId: string,
     draft: ConversionDraft,

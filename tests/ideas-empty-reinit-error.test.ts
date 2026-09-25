@@ -122,18 +122,20 @@ Deno.test(
             'unhandledrejection', onRejection,
         );
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
                     '../web-app/app/adapters/init.ts'
                 );
+            const { getClient } = await import(
+                '../web-app/app/client.ts'
+            );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
             await seedHumanMember(db, MEMBER_ID, 'Demo Test');
             assertStrictEquals(
                 await initAdapter(() => db), true,
             );
-            putSessionToken(await organizationToken());
+            getClient().putSessionToken(await organizationToken());
             const { init } = await import(
                 '../web-app/ideas/index.ts'
             );

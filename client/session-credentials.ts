@@ -1,22 +1,7 @@
 import { decodeAccessToken } from
     '../shared/access-token-decode.ts';
 import { STORAGE_KEY_AUTHORIZATION } from './session-storage-keys.ts';
-import {
-    deleteSessionToken,
-    putSessionToken,
-} from './session-token.ts';
-
-// Cookie-session mode. Default is the localStorage
-// pair for tests. server-core.ts enables this.
-let cookieSession = false;
-
-export function setCookieSession(enabled: boolean): void {
-    cookieSession = enabled;
-}
-
-export function isCookieSession(): boolean {
-    return cookieSession;
-}
+import type { SessionTokenHolder } from './session-token.ts';
 
 // The persisted session credential: the OAuth token pair the
 // web tier holds so a login survives the navigateTo() reload.
@@ -45,54 +30,89 @@ export class SessionCredentialsCorruptError extends Error {
     }
 }
 
-// Parse + validate at the gate. null ONLY for honest absence
-// (logged out / first run); a present-but-broken blob throws
-// Corrupt and is never null-masked.
-export function getSessionCredentials():
-    SessionCredentials | null {
-    if (isCookieSession()) {
-        return null;
+export interface SessionCredentialStore {
+    setCookieSession(enabled: boolean): void;
+    isCookieSession(): boolean;
+    // Parse + validate at the gate. null ONLY for honest absence
+    // (logged out / first run); a present-but-broken blob throws
+    // Corrupt and is never null-masked.
+    getSessionCredentials(): SessionCredentials | null;
+    // One setItem, one JSON object. Does NOT swallow a write
+    // failure into a boolean (the deliberate divergence from
+    // preferences.ts): a credential that cannot persist is a
+    // login that cannot stick — let it crash.
+    putSessionCredentials(creds: SessionCredentials): void;
+    // Idempotent: removing an absent credential is a no-op.
+    deleteSessionCredentials(): void;
+}
+
+export function createSessionCredentialStore(
+    tokens: Pick<
+        SessionTokenHolder,
+        'putSessionToken' | 'deleteSessionToken'
+    >,
+): SessionCredentialStore {
+    // Cookie-session mode. Default is the localStorage
+    // pair for tests. server-core.ts enables this.
+    let cookieSession = false;
+
+    function setCookieSession(enabled: boolean): void {
+        cookieSession = enabled;
     }
-    const raw = localStorage.getItem(
-        STORAGE_KEY_AUTHORIZATION,
-    );
-    if (raw === null) {
-        return null;
+
+    function isCookieSession(): boolean {
+        return cookieSession;
     }
-    const blob = parseBlob(raw);
+
+    function getSessionCredentials():
+        SessionCredentials | null {
+        if (isCookieSession()) {
+            return null;
+        }
+        const raw = localStorage.getItem(
+            STORAGE_KEY_AUTHORIZATION,
+        );
+        if (raw === null) {
+            return null;
+        }
+        const blob = parseBlob(raw);
+        return {
+            accessToken: tokenField(blob, 'access_token'),
+            refreshToken: tokenField(blob, 'refresh_token'),
+        };
+    }
+
+    function putSessionCredentials(
+        creds: SessionCredentials,
+    ): void {
+        if (isCookieSession()) {
+            tokens.putSessionToken(creds.accessToken);
+            return;
+        }
+        localStorage.setItem(
+            STORAGE_KEY_AUTHORIZATION,
+            JSON.stringify({
+                access_token: creds.accessToken,
+                refresh_token: creds.refreshToken,
+            }),
+        );
+    }
+
+    function deleteSessionCredentials(): void {
+        if (isCookieSession()) {
+            tokens.deleteSessionToken();
+            return;
+        }
+        localStorage.removeItem(STORAGE_KEY_AUTHORIZATION);
+    }
+
     return {
-        accessToken: tokenField(blob, 'access_token'),
-        refreshToken: tokenField(blob, 'refresh_token'),
+        setCookieSession,
+        isCookieSession,
+        getSessionCredentials,
+        putSessionCredentials,
+        deleteSessionCredentials,
     };
-}
-
-// One setItem, one JSON object. Does NOT swallow a write
-// failure into a boolean (the deliberate divergence from
-// preferences.ts): a credential that cannot persist is a login
-// that cannot stick — let it crash.
-export function putSessionCredentials(
-    creds: SessionCredentials,
-): void {
-    if (isCookieSession()) {
-        putSessionToken(creds.accessToken);
-        return;
-    }
-    localStorage.setItem(
-        STORAGE_KEY_AUTHORIZATION,
-        JSON.stringify({
-            access_token: creds.accessToken,
-            refresh_token: creds.refreshToken,
-        }),
-    );
-}
-
-// Idempotent: removing an absent credential is a no-op.
-export function deleteSessionCredentials(): void {
-    if (isCookieSession()) {
-        deleteSessionToken();
-        return;
-    }
-    localStorage.removeItem(STORAGE_KEY_AUTHORIZATION);
 }
 
 function parseBlob(raw: string): Record<string, unknown> {

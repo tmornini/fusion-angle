@@ -19,18 +19,13 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest, UnauthorizedError } from '../api/api.ts';
-import {
-    createRecoveringRequestContext,
-} from '../client/shared.ts';
+import type { Client } from '../client/create-client.ts';
+import { createAppClient } from '../web-app/app/client.ts';
+import { inPageClient } from './in-page-facade.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
-import { putSessionToken } from '../web-app/app/adapters/init.ts';
-import {
-    getSessionCredentials,
-    putSessionCredentials,
-} from '../client/session-credentials.ts';
 import { STORAGE_KEY_AUTHORIZATION } from '../client/session-storage-keys.ts';
 import {
     ideaBody, organizationRow, seedAdminSchema,
@@ -48,9 +43,6 @@ import {
 import {
     ACTIVE_ORGANIZATION_ID,
 } from '../client/organization-session.ts';
-import {
-    getSessionToken,
-} from '../web-app/app/adapters/init.ts';
 import {
     runWrite,
     attemptFor,
@@ -81,10 +73,11 @@ import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { sha256Hex } from '../shared/digest.ts';
-import { deleteRefreshChannel } from
-    '../client/session-refresh-mutex.ts';
 import { deleteNotificationChannel } from
     '../client/broadcast-channel.ts';
+
+// Every client a test builds, so afterEach can release it.
+const clients: Client[] = [];
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to
@@ -92,7 +85,9 @@ import { deleteNotificationChannel } from
 // outlives the test that opened it; the next refresh
 // reopens it.
 Deno.test.afterEach(() => {
-    deleteRefreshChannel();
+    for (const client of clients.splice(0)) {
+        client.deleteRefreshChannel();
+    }
     deleteNotificationChannel();
 });
 
@@ -316,16 +311,18 @@ async function expiredOrganizationToken(
 Deno.test('a recover context silently refreshes a dead access token',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     const pair = await issuePair(db);
     const deadAccess = await expiredToken();
     // the session holds a dead access token but a live refresh
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: deadAccess,
         refreshToken: pair.refresh_token,
     });
-    putSessionToken(deadAccess);
-    const ctx = createRecoveringRequestContext(
-        db, deadAccess);
+    client.putSessionToken(deadAccess);
+    const ctx = client.recoveringRequestContext(
+        deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
     const members = await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
         + 'members/');
@@ -335,15 +332,17 @@ Deno.test('a recover context silently refreshes a dead access token',
 Deno.test('concurrent 401s share exactly one refresh grant',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     const pair = await issuePair(db);
     const deadAccess = await expiredToken();
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: deadAccess,
         refreshToken: pair.refresh_token,
     });
-    putSessionToken(deadAccess);
-    const ctx = createRecoveringRequestContext(
-        db, deadAccess);
+    client.putSessionToken(deadAccess);
+    const ctx = client.recoveringRequestContext(
+        deadAccess);
     // both reads 401 in parallel; a second refresh would be
     // branded reuse and revoke the fresh chain
     const [members, organizations] = await Promise.all([
@@ -358,7 +357,7 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     )).filter(row => row.action === 'rotated');
     assertStrictEquals(rotations.length, 1);
     // the session survived (nothing was branded reuse)
-    assertNotStrictEquals(getSessionCredentials(), null);
+    assertNotStrictEquals(client.getSessionCredentials(), null);
 }));
 
 Deno.test('a live credential with an anonymous-seed holder re-scopes'
@@ -366,45 +365,49 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
 () => withLocalStorageAsync(freshStorage(), async () => {
     window.location.href = '';
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     const pair = await issuePair(db);
     // the persisted credential is live, but the per-tab holder is
     // still the anonymous seed (an org-bound read ran before boot
     // scoped the session) — the read 401s 'anonymous principal'
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: pair.access_token,
         refreshToken: pair.refresh_token,
     });
     const seed = await devToken(ANONYMOUS_ID);
-    putSessionToken(seed);
-    const ctx = createRecoveringRequestContext(
-        db, seed);
+    client.putSessionToken(seed);
+    const ctx = client.recoveringRequestContext(
+        seed);
     // recovery re-installs the live token, re-scopes, and retries
     const members = await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
         + 'members/');
     assert(Array.isArray(members));
     // the live session is preserved (not scrubbed) and now scoped
-    assertNotStrictEquals(getSessionCredentials(), null);
-    assertNotStrictEquals(getSessionToken(), seed);
+    assertNotStrictEquals(client.getSessionCredentials(), null);
+    assertNotStrictEquals(client.getSessionToken(), seed);
 }));
 
 Deno.test('recovery with both tokens dead scrubs and bounces',
 () => withLocalStorageAsync(freshStorage(), async () => {
     window.location.href = '';
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     // both tokens dead → the resolver says login, not refresh
     const dead = await expiredToken();
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: dead, refreshToken: dead,
     });
-    putSessionToken(dead);
-    const ctx = createRecoveringRequestContext(
-        db, dead);
+    client.putSessionToken(dead);
+    const ctx = client.recoveringRequestContext(
+        dead);
     // the 401 is unrecoverable: the original error propagates
     await assertRejects(
         () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
             , UnauthorizedError);
     // the dead credential was scrubbed...
-    assertStrictEquals(getSessionCredentials(), null);
+    assertStrictEquals(client.getSessionCredentials(), null);
     // ...and the tab was redirected to the login page
     assertMatch(
         window.location.href, /auth.*return=dashboard/);
@@ -417,15 +420,17 @@ Deno.test('recovery with a corrupt credential scrubs, bounces,'
 () => withLocalStorageAsync(freshStorage(), async () => {
     window.location.href = '';
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     localStorage.setItem(
         STORAGE_KEY_AUTHORIZATION, 'not json at all');
     const dead = await expiredToken();
-    putSessionToken(dead);
+    client.putSessionToken(dead);
     const { calls: warns } = await captureConsole(
         'warn',
         async () => {
-            const ctx = createRecoveringRequestContext(
-                db, dead);
+            const ctx = client.recoveringRequestContext(
+                dead);
             await assertRejects(
                 () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
                     + ''), UnauthorizedError);
@@ -447,12 +452,14 @@ Deno.test('a recovering context reads through the vessel token,'
 + ' not a concurrently-moved global',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     await seedOrganizationAdmin(db, ORGANIZATION_A);
     await seedOrganizationAdmin(db, ORGANIZATION_B);
     const aToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
     );
-    const ctx = createRecoveringRequestContext(db, aToken);
+    const ctx = client.recoveringRequestContext(aToken);
     // Seeded through the live document PUT so UQTJZvCoKlFjEoDlDUwekw's
     // message
     // pair exists — GET ideas derives from the ledger. No
@@ -468,7 +475,7 @@ Deno.test('a recovering context reads through the vessel token,'
         state: 'active',
     });
     // another tab moves the shared session holder to org B
-    putSessionToken(await organizationToken(
+    client.putSessionToken(await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_B,
     ));
     const rows = await ctx.GET<{ id: string }[]>(
@@ -482,6 +489,8 @@ Deno.test('recovery re-scopes to the vessel org claim, not the'
 + ' cross-tab preference',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     await seedOrganizationAdmin(db, ORGANIZATION_A);
     await seedOrganizationAdmin(db, ORGANIZATION_B);
     // the enumerate joins derived org documents to memberships,
@@ -493,18 +502,18 @@ Deno.test('recovery re-scopes to the vessel org claim, not the'
     // the dying request was scoped to org A: its access token
     // has expired but the refresh is still live
     const deadA = await expiredOrganizationToken(ORGANIZATION_A);
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: deadA, refreshToken: pair.refresh_token,
     });
-    putSessionToken(deadA);
+    client.putSessionToken(deadA);
     // another tab last selected org B (the cross-tab preference)
     localStorage.setItem(ACTIVE_ORGANIZATION_ID, ORGANIZATION_B);
-    const ctx = createRecoveringRequestContext(db, deadA);
+    const ctx = client.recoveringRequestContext(deadA);
     // the 401 drives refresh + re-scope; recovery must honor the
     // vessel's own org A, never the preference another tab wrote
     await ctx.GET('organizations/' + ORGANIZATION_A + '/ideas/');
     const scoped =
-        principalFromToken(getSessionToken()).organization;
+        principalFromToken(client.getSessionToken()).organization;
     // one vessel truth: the recovered session matches the
     // identity the request carried, and that is org A
     assertStrictEquals(scoped, ctx.identity.organization);
@@ -514,23 +523,26 @@ Deno.test('recovery re-scopes to the vessel org claim, not the'
 Deno.test('recovery leaves the cross-tab active-org preference'
 + ' untouched', () => withLocalStorageAsync(freshStorage(), async () => {
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     await seedOrganizationAdmin(db, ORGANIZATION_A);
     await seedOrganizationAdmin(db, ORGANIZATION_B);
     await seedOrganizationDocument(db, ORGANIZATION_A);
     await seedOrganizationDocument(db, ORGANIZATION_B);
     const pair = await issuePair(db);
     const deadA = await expiredOrganizationToken(ORGANIZATION_A);
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: deadA, refreshToken: pair.refresh_token,
     });
-    putSessionToken(deadA);
+    client.putSessionToken(deadA);
     // the foreground tab is viewing org B
     localStorage.setItem(ACTIVE_ORGANIZATION_ID, ORGANIZATION_B);
-    const ctx = createRecoveringRequestContext(db, deadA);
+    const ctx = client.recoveringRequestContext(deadA);
     await ctx.GET('organizations/' + ORGANIZATION_A + '/ideas/');
     // the background recovery scopes ITS session to vessel org A...
     assertStrictEquals(
-        principalFromToken(getSessionToken()).organization, ORGANIZATION_A);
+        principalFromToken(client.getSessionToken()).organization,
+        ORGANIZATION_A);
     // ...but never clobbers the foreground tab's chosen org
     assertStrictEquals(
         localStorage.getItem(ACTIVE_ORGANIZATION_ID), ORGANIZATION_B,
@@ -546,6 +558,8 @@ Deno.test('a concurrent facade refresh and remint present'
 + ' one jti each',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const db = await freshDb();
+    const client = inPageClient(db);
+    clients.push(client);
     const wayneAdmin = 'toccYYkLEABmlbpHJalgtQ';
     await seedOrganizationDocumentMessagePair(
         db, ORGANIZATION_B, ORGANIZATION_B,
@@ -578,15 +592,14 @@ Deno.test('a concurrent facade refresh and remint present'
     }));
     assertStrictEquals(granted.status, 200);
     const pair = await issuePair(db);
-    putSessionCredentials({
+    client.putSessionCredentials({
         accessToken: pair.access_token,
         refreshToken: pair.refresh_token,
     });
     const deadA = await expiredOrganizationToken(ORGANIZATION_A);
-    putSessionToken(deadA);
-    const reader = createRecoveringRequestContext(db, deadA);
-    const acceptor = createRecoveringRequestContext(
-        db,
+    client.putSessionToken(deadA);
+    const reader = client.recoveringRequestContext(deadA);
+    const acceptor = client.recoveringRequestContext(
         await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
         ),
@@ -605,7 +618,7 @@ Deno.test('a concurrent facade refresh and remint present'
         db, 'XXZruirZyAOoRpNxaDnpSA',
     )).filter(row => row.action === 'revoked');
     assertStrictEquals(revoked.length, 0);
-    assertNotStrictEquals(getSessionCredentials(), null);
+    assertNotStrictEquals(client.getSessionCredentials(), null);
 }));
 
 Deno.test(
@@ -619,11 +632,6 @@ Deno.test(
             const flat = await devToken();
             const scoped = await organizationToken();
             const refresh = await devToken();
-            putSessionCredentials({
-                accessToken: dead,
-                refreshToken: refresh,
-            });
-            putSessionToken(dead);
             const seen: {
                 kind: string;
                 operationId: string | null;
@@ -728,8 +736,15 @@ Deno.test(
                     });
                 },
             };
-            const ctx = createRecoveringRequestContext(
-                facade, dead,
+            const client = createAppClient(() => facade);
+            clients.push(client);
+            client.putSessionCredentials({
+                accessToken: dead,
+                refreshToken: refresh,
+            });
+            client.putSessionToken(dead);
+            const ctx = client.recoveringRequestContext(
+                dead,
             );
             const rows = await ctx.GET(
                 'organizations/' + organization

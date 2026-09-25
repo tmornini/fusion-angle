@@ -11,12 +11,12 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     createChannel,
     createSubscriptionChannel,
+    deleteBellSession,
+    putBellSession,
     subscribeOnce,
 } from '../client/channels.ts';
-import {
-    putSessionToken,
-    deleteSessionToken,
-} from '../web-app/app/adapters/init.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
+import { inPageClient } from './in-page-facade.ts';
 import {
     organizationToken,
     reachableToken,
@@ -31,7 +31,12 @@ import { deleteNotificationChannel } from
 // getChannel re-registers dispatch on the new handle.
 Deno.test.afterEach(() => {
     deleteNotificationChannel();
+    deleteBellSession();
 });
+
+// The bell reads this tab's session from the client the app
+// puts; each test below puts this one, holding its token.
+const client = inPageClient(memoryDbAdapter());
 
 Deno.test('subscribe receives subsequent send', () => {
     const ch = createChannel<number>();
@@ -175,11 +180,33 @@ Deno.test('a full event fires regardless of session', async () => {
 });
 
 Deno.test(
+    'before this tab has a client, a scoped event is silent',
+    async () => {
+        deleteBellSession();
+        const ch = createSubscriptionChannel();
+        let fired = 0;
+        ch.subscribe(() => { fired += 1; });
+        const poster = new BroadcastChannel(CHANNEL_NAME);
+        poster.postMessage({
+            kind: 'scoped',
+            organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
+            identityIds: ['XXZruirZyAOoRpNxaDnpSA'],
+        });
+        await deliver();
+        assertStrictEquals(fired, 0);
+        poster.postMessage({ kind: 'full' });
+        await deliver();
+        poster.close();
+        assertStrictEquals(fired, 1);
+    },
+);
+
+Deno.test(
     'a full event fires during an unseeded session',
     async () => {
         // Mirrors the boot-time race: another tab posts before
         // this tab's postSessionSeed() has run.
-        deleteSessionToken();
+        deleteBellSession();
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });
@@ -195,7 +222,7 @@ Deno.test(
     'a scoped event during an unseeded session does not throw'
     + ' and does not fire',
     async () => {
-        deleteSessionToken();
+        deleteBellSession();
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });
@@ -214,10 +241,11 @@ Deno.test(
 Deno.test(
     'a scoped event naming the active organization fires',
     async () => {
-        putSessionToken(
+        client.putSessionToken(
             await organizationToken('XXZruirZyAOoRpNxaDnpSA'
                 , 'AjdvjuECVZEgZoFajaIEkg'),
         );
+        putBellSession(client);
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });
@@ -234,7 +262,10 @@ Deno.test(
 );
 
 Deno.test('a scoped event naming this identity fires', async () => {
-    putSessionToken(await reachableToken('XXZruirZyAOoRpNxaDnpSA', []));
+    client.putSessionToken(
+        await reachableToken('XXZruirZyAOoRpNxaDnpSA', []),
+    );
+    putBellSession(client);
     const ch = createSubscriptionChannel();
     let fired = 0;
     ch.subscribe(() => { fired += 1; });
@@ -256,10 +287,11 @@ Deno.test(
     'a scoped event naming a reachable org fires'
     + ' on a flat session',
     async () => {
-        putSessionToken(
+        client.putSessionToken(
             await reachableToken('XXZruirZyAOoRpNxaDnpSA'
                 , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']),
         );
+        putBellSession(client);
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });
@@ -278,10 +310,11 @@ Deno.test(
 Deno.test(
     'a scoped event naming neither is a miss',
     async () => {
-        putSessionToken(
+        client.putSessionToken(
             await organizationToken('XXZruirZyAOoRpNxaDnpSA'
                 , 'AjdvjuECVZEgZoFajaIEkg'),
         );
+        putBellSession(client);
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });
@@ -299,10 +332,11 @@ Deno.test(
 
 Deno.test('notify posts a scoped event other tabs hear',
 async () => {
-    putSessionToken(
+    client.putSessionToken(
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg'),
     );
+    putBellSession(client);
     const seen: unknown[] = [];
     const listener = new BroadcastChannel(
         CHANNEL_NAME,
@@ -328,10 +362,11 @@ async () => {
 
 Deno.test('notify on a flat session names reachable orgs',
 async () => {
-    putSessionToken(
+    client.putSessionToken(
         await reachableToken('XXZruirZyAOoRpNxaDnpSA'
             , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']),
     );
+    putBellSession(client);
     const seen: unknown[] = [];
     const listener = new BroadcastChannel(
         CHANNEL_NAME,
@@ -351,7 +386,8 @@ async () => {
 
 Deno.test('notify with a non-jwt seed posts full',
 async () => {
-    putSessionToken('reminted-access');
+    client.putSessionToken('reminted-access');
+    putBellSession(client);
     const seen: unknown[] = [];
     const listener = new BroadcastChannel(
         CHANNEL_NAME,
@@ -368,7 +404,8 @@ async () => {
 Deno.test('a scoped event with a non-jwt seed does not throw'
     + ' and does not fire',
 async () => {
-    putSessionToken('reminted-access');
+    client.putSessionToken('reminted-access');
+    putBellSession(client);
     const ch = createSubscriptionChannel();
     let fired = 0;
     ch.subscribe(() => { fired += 1; });
