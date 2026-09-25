@@ -90,7 +90,7 @@ async () => {
         const facade = createHttpFacade(
             'http://example.test',
             (input, init) => globalThis.fetch(input, init),
-        )(client);
+        )({ ...client, navigateToAuth: () => {} });
         const [a, b] = await Promise.all([
             facade.GET('members', 'dead-access'),
             facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -260,7 +260,7 @@ async () => {
         const facade = createHttpFacade(
             'http://example.test',
             (input, init) => globalThis.fetch(input, init),
-        )(client);
+        )({ ...client, navigateToAuth: () => {} });
         const rows = await facade.GET(
             'organizations/' + org + '/flows/x',
             scoped,

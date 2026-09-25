@@ -4,7 +4,6 @@ import {
     HTTP_UNAUTHORIZED,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
-import { navigateTo } from '../web-app/app/navigation.ts';
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
 import { authParam } from './authentication.ts';
@@ -171,6 +170,7 @@ export interface TransportClient {
         refresh: () => Promise<string | null>,
     ): Promise<string | null>;
     putSessionToken(token: string): void;
+    navigateToAuth(): void;
 }
 
 // A transport before its client binds it. The client hands
@@ -298,7 +298,7 @@ export function createHttpFacade(
                 () => refreshAndScope(token, operationId),
             );
             if (access === null) {
-                navigateTo('auth');
+                client.navigateToAuth();
                 return first;
             }
             client.putSessionToken(access);

@@ -71,7 +71,7 @@ Deno.test(
             const facade = createHttpFacade(
                 'http://example.test',
                 (input, init) => globalThis.fetch(input, init),
-            )(client);
+            )({ ...client, navigateToAuth: () => {} });
             await facade.PUT(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + 'AjdvjuECVZEgZoFajaIEkg', { name: 'x' },
@@ -319,7 +319,7 @@ Deno.test(
             const facade = createHttpFacade(
                 'http://example.test',
                 (input, init) => globalThis.fetch(input, init),
-            )(client);
+            )({ ...client, navigateToAuth: () => {} });
             const err = await assertRejects(
                 () => facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
                     + 'members/', 'tok'),
@@ -355,7 +355,7 @@ Deno.test(
             const facade = createHttpFacade(
                 'http://example.test',
                 (input, init) => globalThis.fetch(input, init),
-            )(client);
+            )({ ...client, navigateToAuth: () => {} });
             await assertRejects(
                 () => facade.POST(
                     'authentication/authorize',

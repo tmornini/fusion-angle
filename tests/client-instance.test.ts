@@ -301,6 +301,43 @@ Deno.test(
     },
 );
 
+Deno.test('a failed cookie refresh calls the injected navigation',
+async () => {
+    const calls: string[] = [];
+    const client = createClient({
+        facade: createHttpFacade('', (_input, init) =>
+            Promise.resolve(
+                String(init?.body ?? '').includes('"refresh"')
+                    ? new Response('', { status: 401 })
+                    : new Response(
+                        JSON.stringify({ error: 'expired' }),
+                        { status: 401 },
+                    ),
+            )),
+        navigation: {
+            redirectToLogin: () => {
+                calls.push('redirectToLogin');
+            },
+            navigateToAuth: () => {
+                calls.push('navigateToAuth');
+            },
+        },
+        ...quiet,
+    });
+    const ctx = client.requestContext(
+        await reachableToken('XXZruirZyAOoRpNxaDnpSA', []),
+    );
+    try {
+        await assertRejects(
+            () => ctx.GET('organizations/'),
+            UnauthorizedError,
+        );
+    } finally {
+        client.deleteRefreshChannel();
+    }
+    assertEquals(calls, ['navigateToAuth']);
+});
+
 Deno.test('a cookie refresh on one client leaves another',
 async () => {
     const other = inPageClient(memoryDbAdapter());

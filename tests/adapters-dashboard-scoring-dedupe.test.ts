@@ -165,7 +165,10 @@ Deno.test(
             } = await import(
                 '../web-app/app/client.ts'
             );
-            const inner = wrapInPageAdapter(db)(getClient());
+            const inner = wrapInPageAdapter(db)({
+                ...getClient(),
+                navigateToAuth: () => {},
+            });
             const paths: string[] = [];
             const holdObjectives =
                 Promise.withResolvers<void>();

@@ -47,7 +47,11 @@ export function createClient(deps: ClientDeps): Client {
     const navigation = assertNavigation(deps.navigation);
     const session = createClientSession();
     const core: ClientCore = {
-        facade: deps.facade(session),
+        facade: deps.facade({
+            runSingleFlightRefresh: session.runSingleFlightRefresh,
+            putSessionToken: session.putSessionToken,
+            navigateToAuth: navigation.navigateToAuth,
+        }),
         session,
         navigation,
         log: deps.log,
