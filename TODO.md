@@ -2845,6 +2845,30 @@ Off the critical path; each with its oracle.
   `TypeSafe AI` and in the AI form's Model picker, and
   no model name is spelled outside
   `api/provider-models.ts` but in test fixtures
+- The seed's rehearsal runs its statements one at a
+  time. It opens no transaction (the ledger seed plan's
+  Interpretation (C): the instance PATCH create opens its
+  own), so each of its 1,416 statements queues through
+  `MemoryStorageBackend`'s serializer, and their async
+  digest work never overlaps. Measured on the ledger seed
+  branch (medians): replaying the rehearsal's own
+  statements takes 1,072 ms serialized against 146 ms run
+  concurrently inside one transaction, the base's pass-2
+  shape. A memory seed went from 692 ms to 1,398 ms, and
+  `./test` from 36.57 s to 62.51 s. On local Postgres the
+  seed is already faster than the base, because its
+  1,418 round trips became three statements (test hasher
+  2.44–2.55 s to 1.44–1.47 s; the verb with serial scrypt
+  4.97 s to 3.97–4.02 s); the rehearsal is 1.25 s of the
+  1.45 s. The scratch backend has one writer, the seed,
+  so its serializer guards nothing there: let the
+  rehearsal's statements overlap as a transaction's do,
+  keeping the verdict (every row lands, or the seed
+  fails) and the instance create's own transaction.
+  Oracle: the rehearsal's replay measures near the
+  concurrent 146 ms, a memory seed is back at or under
+  the base's 692 ms, and `./test` and the Postgres seed
+  are re-measured
 
 ## Sequencing
 
