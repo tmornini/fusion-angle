@@ -5,20 +5,20 @@ import {
     assertIdeaState,
     assertProjectState,
     MS_PER_DAY,
-} from '../../../shared/types.ts';
+} from '../../shared/types.ts';
 import {
     formatCompactCurrency,
     DISPLAY_ABSENT,
-} from '../format.ts';
-import { formatSigned } from '../scoring-format.ts';
-import type { RequestContext } from '../../../client/shared.ts';
-import { getIdeaEntities } from '../../../client/ideas.ts';
-import { getProjectEntities } from '../../../client/projects.ts';
-import { getFlowEntities } from '../../../client/flows.ts';
+} from './format.ts';
+import { formatSigned } from './scoring-format.ts';
+import type { RequestContext } from '../../client/shared.ts';
+import { getIdeaEntities } from '../../client/ideas.ts';
+import { getProjectEntities } from '../../client/projects.ts';
+import { getFlowEntities } from '../../client/flows.ts';
 import {
     getPortfolioImpactSummary,
     type DashboardScoringBundle,
-} from '../../../client/project-scoring.ts';
+} from '../../client/project-scoring.ts';
 
 export type GaugeIcon =
     | 'clock'

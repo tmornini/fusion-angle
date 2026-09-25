@@ -3,7 +3,7 @@ import { createRequestContext } from
     '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
-    '../web-app/app/adapters/dashboard.ts';
+    '../web-app/app/dashboard.ts';
 import {
     getDashboardScoringBundle,
     getObjectiveScoringInputs,

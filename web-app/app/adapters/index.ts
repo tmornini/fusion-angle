@@ -11,7 +11,7 @@ export {
     UnauthorizedError,
 } from '../../../shared/http-errors.ts';
 export * from '../../../client/shared.ts';
-export * from './dashboard.ts';
+export * from '../dashboard.ts';
 export * from '../../../client/ideas.ts';
 export * from '../../../client/projects.ts';
 export * from '../../../client/project-scoring.ts';

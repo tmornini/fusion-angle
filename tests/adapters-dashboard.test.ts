@@ -6,7 +6,7 @@ import type { RequestContext } from
 import {
     getDashboardStats,
     getDashboardGauges,
-} from '../web-app/app/adapters/dashboard.ts';
+} from '../web-app/app/dashboard.ts';
 import {
     getDashboardScoringBundle,
 } from '../client/project-scoring.ts';

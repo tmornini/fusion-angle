@@ -12,7 +12,7 @@ import type {
     GaugeData,
     RatioGauge,
     BipolarGauge,
-} from '../web-app/app/adapters/dashboard.ts';
+} from '../web-app/app/dashboard.ts';
 import { FlowPresenter } from
     '../web-app/app/presenters/flow.ts';
 import type { FlowSummary } from
