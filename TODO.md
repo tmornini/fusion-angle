@@ -1299,14 +1299,18 @@ Off the critical path; each with its oracle.
   `--parallel`, each green on re-run, three failures in
   ten `./test` runs on 2026-09-24:
   `tests/adapters-shared-recovery.test.ts:546`
-  ("malformed token: expected 3 segments");
+  ("malformed token: expected 3 segments") and its
+  `recovery re-scopes to the vessel org claim, not the
+  cross-tab preference`;
   `tests/apex-destination.test.ts:65`
   (`probeRefreshSession posts a cookie refresh grant`,
   one expected and none seen at `:102`) and its 401
   probe; `tests/adapters-invitations.test.ts:1076` (`a
   re-minted token without the seat earns one more
   attempt`: the re-minted token did not list the
-  organization) and `:1131`; and (the next bullet)
+  organization), `:1131`, `the remint waits for an
+  in-flight facade refresh`, and `a failed re-mint after
+  accept surfaces, seat kept`; and (the next bullet)
   `tests/api-shadow-ledger-tokens.test.ts:860`. The
   first three are session and token races, not drains,
   and share a confirmed cause: under `--parallel` every
