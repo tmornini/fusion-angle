@@ -233,7 +233,10 @@ Subagents never run `./deploy --render`.
   recording stub for one body), `local-storage.ts`
   (swap `globalThis.localStorage` for one body via
   `defineProperty`, sync or async, restoring the
-  previous value in a `finally`), and
+  previous value in a `finally`),
+  `performance-now.ts` (swap `performance.now` for a
+  stub the test advances, for one body, deleting the
+  own property in a `finally`), and
   `fetch-discarding-body.ts` (a `fetch` that cancels
   the response body so the resource sanitizer does not
   see it as a leak, for tests that assert only status

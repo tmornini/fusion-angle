@@ -23,6 +23,8 @@ import {
 } from '../server/http-server.ts';
 import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
+import { withPerformanceNow } from
+    './fixtures/performance-now.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -204,6 +206,26 @@ async () => {
         );
     });
 });
+
+Deno.test(
+    'the request log keeps sub-millisecond latency',
+    async () => {
+        let nowMs = 2.286459;
+        const handle: RequestHandler = async () => {
+            nowMs = 2.381417;
+            return new Response('handled', { status: 200 });
+        };
+        await withPerformanceNow(() => nowMs, () =>
+            withServer({}, handle, async (base, logs) => {
+                const res = await fetch(base + '/api/ideas');
+                assertStrictEquals(await res.text(), 'handled');
+                const last = logs[logs.length - 1];
+                assert(last !== undefined);
+                assertStrictEquals(last['latencyMs'], 0.095);
+            }),
+        );
+    },
+);
 
 Deno.test('HTML is no-store and hashed assets are immutable',
 async () => {

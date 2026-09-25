@@ -405,6 +405,20 @@ export function msSinceUtc(
         - new Date(iso).getTime();
 }
 
+const MICROS_PER_MS = 1000;
+
+// A duration from a performance.now() reading, never a
+// wall-clock age: the monotonic clock cannot step back, and
+// it resolves to microseconds, so the result rounds there —
+// raw float subtraction carries noise past the last digit.
+export function msSinceMonotonic(
+    startedMs: number,
+): number {
+    const elapsedMs = performance.now() - startedMs;
+    return Math.round(elapsedMs * MICROS_PER_MS)
+        / MICROS_PER_MS;
+}
+
 export interface StateEntity {
     id: Id;
     entity_id: Id;

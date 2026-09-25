@@ -19,6 +19,7 @@ import {
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
+import { msSinceMonotonic } from '../shared/types.ts';
 import {
     createAuthThrottle,
     isAuthThrottlePath,
@@ -490,7 +491,7 @@ function logRequest(
         method,
         path: new URL(request.url).pathname,
         status,
-        latencyMs: Math.max(0, Date.now() - started),
+        latencyMs: msSinceMonotonic(started),
     };
     const operationId = operationIdOf(request);
     if (operationId !== undefined) {
@@ -525,7 +526,7 @@ async function dispatch(
     log: RequestLog,
     throttle: AuthThrottle,
 ): Promise<Response> {
-    const started = Date.now();
+    const started = performance.now();
     let status = HTTP_INTERNAL_ERROR;
     let response: Response | undefined;
     try {
