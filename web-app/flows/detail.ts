@@ -15,7 +15,6 @@ import {
 } from '../app/navigation.ts';
 import {
     sessionContext,
-    getFlowGraph,
     getFlowMermaid,
     getFlowZip,
     getHumanMembers,
@@ -32,6 +31,7 @@ import {
     putLocation,
     type RequestContext,
 } from '../app/adapters/index.ts';
+import { getRenderableFlowGraph } from '../app/flow-graph-layout.ts';
 import type {
     GraphEdge,
     GraphNode,
@@ -281,7 +281,7 @@ async function reportOpFailure(
     flowId: string,
 ): Promise<void> {
     showToast(toast, toastVariant);
-    const g = await getFlowGraph(ctx, flowId);
+    const g = await getRenderableFlowGraph(ctx, flowId);
     const current = pageState.presenter().snapshot();
     commit({
         ...current,
@@ -1651,7 +1651,7 @@ async function loadFlowDesignerBundle(
         humanMembers, aiMembers,
         records, boundRecordId,
     ] = await Promise.all([
-        getFlowGraph(ctx, flowId),
+        getRenderableFlowGraph(ctx, flowId),
         getHumanMembers(ctx),
         getAIMembers(ctx),
         getRecordEntities(ctx),
@@ -1791,7 +1791,7 @@ function onFlowLoaded(
 // live snapshot — own putFlow echo, or a no-op notify.
 function serverGraphMatchesLive(
     graph: Awaited<
-        ReturnType<typeof getFlowGraph>
+        ReturnType<typeof getRenderableFlowGraph>
     >,
     live: FlowSnapshot,
 ): boolean {
@@ -1864,10 +1864,10 @@ async function refreshFlowFromServer(
     }
     const ctx = sessionContext();
     let graph: Awaited<
-        ReturnType<typeof getFlowGraph>
+        ReturnType<typeof getRenderableFlowGraph>
     >;
     try {
-        graph = await getFlowGraph(ctx, flowId);
+        graph = await getRenderableFlowGraph(ctx, flowId);
     } catch (err) {
         log.error(
             'flow detail refresh failed',

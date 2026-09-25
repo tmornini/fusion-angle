@@ -20,10 +20,10 @@ import {
     putFlow,
     enqueueFlowSave,
     notifyFlowChange,
-    getFlowGraph,
     generateIdentifier,
     nowUtc,
 } from './adapters/index.ts';
+import { getRenderableFlowGraph } from './flow-graph-layout.ts';
 import type {
     FlowSaveShape,
 } from '../../client/flow-mutations.ts';
@@ -820,7 +820,7 @@ export async function performUndo(
         return failOp('Undo failed', 'error');
     }
     notifyFlowChange();
-    const graph = await getFlowGraph(
+    const graph = await getRenderableFlowGraph(
         ctx, snap.flowId,
     );
     const newHistory = recordUndoHistoryMark(
@@ -893,7 +893,7 @@ export async function performRedo(
         return failOp('Redo failed', 'error');
     }
     notifyFlowChange();
-    const graph = await getFlowGraph(
+    const graph = await getRenderableFlowGraph(
         ctx, snap.flowId,
     );
     const newHistory = recordUndoHistoryMark(

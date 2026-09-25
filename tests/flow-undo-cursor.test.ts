@@ -40,8 +40,8 @@ import {
     putFlow,
     enqueueFlowSave,
 } from '../client/flow-mutations.ts';
-import { getFlowGraph } from
-    '../client/flow-queries.ts';
+import { getRenderableFlowGraph } from
+    '../web-app/app/flow-graph-layout.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -846,7 +846,7 @@ Deno.test(
         const livePresenter = async (
             migrateToCenter = false,
         ): Promise<FlowDesignerPresenter> => {
-            const graph = await getFlowGraph(
+            const graph = await getRenderableFlowGraph(
                 sessionContext(), flowId,
             );
             const snap = buildInitialFlowSnapshot(
@@ -881,7 +881,7 @@ Deno.test(
             flowId, async () => undefined,
         );
 
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             sessionContext(), flowId,
         );
         const op = await performUndo(

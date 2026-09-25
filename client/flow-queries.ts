@@ -16,7 +16,6 @@ import {
     organizationItem,
 } from './shared.ts';
 import { getProjectEntities } from './projects.ts';
-import { withRenderableLayout } from '../web-app/app/flow-graph-layout.ts';
 
 export type {
     GraphNode, GraphEdge, NodeAttribute,
@@ -205,12 +204,9 @@ export async function getFlowGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowGraph> {
-    const flow =
-        await ctx.GET<FlowWithGraph>(
-            organizationItem(ctx, 'flows', flowId),
-        );
+    const flow = await getFlowWithGraph(ctx, flowId);
     const g = parseGraph(flow.graph);
-    return withRenderableLayout({
+    return {
         id: flow.id,
         name: flow.name,
         isLocked: asBoolean(
@@ -229,5 +225,5 @@ export async function getFlowGraph(
         nodes: g.nodes,
         edges: g.edges,
         hasUndoHistory: flow.hasUndoHistory,
-    });
+    };
 }

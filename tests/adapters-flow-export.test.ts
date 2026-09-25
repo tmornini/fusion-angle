@@ -34,8 +34,8 @@ import {
     putFlow,
 } from '../client/flow-mutations.ts';
 import {
-    getFlowGraph,
-} from '../client/flow-queries.ts';
+    getRenderableFlowGraph,
+} from '../web-app/app/flow-graph-layout.ts';
 import {
     generateMermaid,
     mermaidIdOf,
@@ -529,7 +529,7 @@ Deno.test(
             ctx, importedId, backup,
             generateIdentifier(),
         );
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             ctx, importedId,
         );
         assertStrictEquals(graph.isAutoLayout, false);
@@ -633,7 +633,7 @@ Deno.test(
             ctx, importedId, zip.data,
             generateIdentifier(),
         );
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             ctx, importedId,
         );
         assertStrictEquals(graph.isAutoLayout, false);

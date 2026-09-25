@@ -28,11 +28,18 @@ import type {
     GraphNode,
     GraphEdge,
     ProjectFlowEntity,
+    FlowWithGraph,
 } from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
 import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
+import {
+    areNodePositionsDegenerate,
+    getRenderableFlowGraph,
+} from '../web-app/app/flow-graph-layout.ts';
+import { buildStartAndCompleteNodes } from
+    '../client/flow-defaults.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -171,7 +178,7 @@ Deno.test(
                 , 'aEsGMmBEFaVdWihhHXwCbw',
             [start, mid, end], [YiJPbufDpkyrZcZCYbUJpg, e2],
         );
-        const g: FlowGraph = await getFlowGraph(
+        const g: FlowGraph = await getRenderableFlowGraph(
             createRequestContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
         );
@@ -216,7 +223,7 @@ Deno.test(
                 edges: [],
             },
         );
-        const g = await getFlowGraph(
+        const g = await getRenderableFlowGraph(
             createRequestContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
         );
@@ -496,7 +503,7 @@ Deno.test(
     + ' stored positions are placeholders',
     async () => {
         const db = await seededMockDb();
-        const g = await getFlowGraph(
+        const g = await getRenderableFlowGraph(
             createRequestContext(db, await organizationToken()),
             LAYOUT_TEST_FLOW_ID,
         );
@@ -524,7 +531,7 @@ Deno.test(
     + ' Create min x, Archive max x, inside the y range',
     async () => {
         const db = await seededMockDb();
-        const g = await getFlowGraph(
+        const g = await getRenderableFlowGraph(
             createRequestContext(
                 db, await organizationToken(),
             ),
@@ -551,6 +558,48 @@ Deno.test(
             || end.positionY < Math.max(...ys),
             'on a fan the pair sits inside the y range,'
             + ' not pinned to the corners',
+        );
+    },
+);
+
+Deno.test(
+    'the client reads a flow graph; the app lays it out',
+    async () => {
+        const { start, complete } = buildStartAndCompleteNodes();
+        const stacked = [
+            { ...start, positionX: 0, positionY: 0 },
+            { ...complete, positionX: 0, positionY: 0 },
+        ];
+        const flow: FlowWithGraph = {
+            id: 'ZOousbbnzpqlxJExVAruYQ',
+            organization_id: 'XXZruirZyAOoRpNxaDnpSB',
+            name: 'Stacked',
+            is_locked: false,
+            is_auto_layout: false,
+            is_auto_fit: false,
+            lock_timeout: 0,
+            graph: { nodes: stacked, edges: [] },
+            hasUndoHistory: false,
+        };
+        const ctx = {
+            identity: {
+                id: 'XXZruirZyAOoRpNxaDnpSA',
+                roles: [],
+                name: 'Reader',
+                organization: 'XXZruirZyAOoRpNxaDnpSB',
+            },
+            GET: <T>() => Promise.resolve(
+                flow as unknown as T,
+            ),
+        } as unknown as RequestContext;
+        const read = await getFlowGraph(ctx, flow.id);
+        assertEquals(
+            read.nodes.map((n) => [n.positionX, n.positionY]),
+            [[0, 0], [0, 0]],
+        );
+        const drawn = await getRenderableFlowGraph(ctx, flow.id);
+        assertStrictEquals(
+            areNodePositionsDegenerate(drawn.nodes), false,
         );
     },
 );

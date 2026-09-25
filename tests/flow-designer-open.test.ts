@@ -25,8 +25,8 @@ import {
     enqueueFlowSave,
 } from '../client/flow-mutations.ts';
 import {
-    getFlowGraph,
-} from '../client/flow-queries.ts';
+    getRenderableFlowGraph,
+} from '../web-app/app/flow-graph-layout.ts';
 import {
     buildStartAndCompleteNodes,
 } from '../client/flow-defaults.ts';
@@ -181,7 +181,7 @@ Deno.test(
         const n = await flowDocumentPairCount(
             db, flowId,
         );
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             ctx, flowId,
         );
         const snap = buildInitialFlowSnapshot(
@@ -232,7 +232,7 @@ Deno.test(
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
         const ctx = createRequestContext(db, DEV_TOKEN);
-        const graph = await getFlowGraph(ctx, flowId);
+        const graph = await getRenderableFlowGraph(ctx, flowId);
         const snap = buildInitialFlowSnapshot(
             graph, CANVAS_W, CANVAS_H, [], [], [],
         );

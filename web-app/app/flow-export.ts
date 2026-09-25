@@ -29,7 +29,6 @@ import {
     asBoolean,
 } from '../../shared/json-assert.ts';
 import {
-    getFlowGraph,
     getFlowWithGraph,
     getProjectFlowEntities,
 } from '../../client/flow-queries.ts';
@@ -56,6 +55,7 @@ import {
 import type { LayoutInput } from './flow-layout.ts';
 import {
     runLayoutFromInputs,
+    getRenderableFlowGraph,
 } from './flow-graph-layout.ts';
 
 /* ── Mermaid export ──────────────── */
@@ -65,7 +65,7 @@ export async function getFlowMermaid(
     flowId: string,
 ): Promise<string> {
     const graph =
-        await getFlowGraph(ctx, flowId);
+        await getRenderableFlowGraph(ctx, flowId);
     return generateMermaid(graph);
 }
 

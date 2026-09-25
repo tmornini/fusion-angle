@@ -6,7 +6,7 @@ import {
     type FlowStatsInput,
     type FlowStatsModel,
 } from './flow-stats-aggregate.ts';
-import { getFlowGraph } from '../../client/flow-queries.ts';
+import { getRenderableFlowGraph } from './flow-graph-layout.ts';
 import {
     getFlowWorkOrderEntities,
     getWorkOrderHistories,
@@ -31,7 +31,7 @@ export async function getFlowStats(
         fwoRows,
         memberMap,
     ] = await Promise.all([
-        getFlowGraph(ctx, flowId),
+        getRenderableFlowGraph(ctx, flowId),
         getFlowWorkOrderEntities(ctx, flowId),
         getMemberMap(ctx),
     ]);
