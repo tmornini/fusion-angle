@@ -18,6 +18,7 @@ import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
 } from '../client/authentication.ts';
+import { MODULE_SESSION } from '../client/client-session.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     seedIdentityCredential,
@@ -133,6 +134,7 @@ async () => {
     // An upstream 500 / network fault is a BUG, not a wrong
     // password — it must surface, not collapse to null.
     const ctx = {
+        session: MODULE_SESSION,
         postForHeaders: async () => {
             throw new Error('upstream 500');
         },
@@ -151,6 +153,7 @@ async () => {
         headers?: readonly (readonly [string, string])[];
     }[] = [];
     const ctx = {
+        session: MODULE_SESSION,
         postForHeaders: async (
             _path: string,
             body: Record<string, unknown>,

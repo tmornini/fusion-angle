@@ -1,4 +1,8 @@
-import { assertRejects, assertStrictEquals } from '@std/assert';
+import {
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
@@ -12,6 +16,7 @@ import {
     getSessionCredentials,
     putSessionCredentials,
 } from '../client/session-credentials.ts';
+import { MODULE_SESSION } from '../client/client-session.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import { deriveTokenRevocationsFor } from
@@ -68,6 +73,7 @@ Deno.test('logout scrubs locally even when the revoke fails',
     // identity is read from the vessel; the server PUT throws.
     const ctx = {
         identity: { id: 'XXZruirZyAOoRpNxaDnpSA' },
+        session: MODULE_SESSION,
         PUT: async () => {
             throw new Error('revoke endpoint down');
         },
@@ -80,3 +86,22 @@ Deno.test('logout scrubs locally even when the revoke fails',
     // teardown ran in finally despite the server fault
     assertStrictEquals(getSessionCredentials(), null);
 }));
+
+Deno.test('logout scrubs the session its context carries',
+async () => {
+    const scrubbed: string[] = [];
+    const { ctx } = await adminContext();
+    await postSessionLogout({
+        ...ctx,
+        session: {
+            ...ctx.session,
+            deleteSessionCredentials: () => {
+                scrubbed.push('credentials');
+            },
+            deleteSessionToken: () => {
+                scrubbed.push('token');
+            },
+        },
+    });
+    assertEquals(scrubbed, ['credentials', 'token']);
+});

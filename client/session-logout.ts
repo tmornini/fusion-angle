@@ -2,10 +2,6 @@ import type { RequestContext } from './shared.ts';
 import {
     postIdentityLogoutEverywhere,
 } from './identity-token-revocations.ts';
-import {
-    deleteSessionCredentials,
-} from './session-credentials.ts';
-import { deleteSessionToken } from './session-token.ts';
 
 // Sign out: a coarse server-side revoke of every token for this
 // identity, then UNCONDITIONAL local teardown. The identity is
@@ -21,7 +17,7 @@ export async function postSessionLogout(
         await postIdentityLogoutEverywhere(
             ctx, ctx.identity.id);
     } finally {
-        deleteSessionCredentials();
-        deleteSessionToken();
+        ctx.session.deleteSessionCredentials();
+        ctx.session.deleteSessionToken();
     }
 }

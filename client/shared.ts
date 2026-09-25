@@ -15,6 +15,10 @@ import {
     sessionTokenIsSeeded,
 } from './session-token.ts';
 import {
+    type ClientSession,
+    MODULE_SESSION,
+} from './client-session.ts';
+import {
     getClientFacade,
     wrapClientAdapter,
 } from './facade-holder.ts';
@@ -88,6 +92,9 @@ export function organizationItem(
 export interface RequestContext {
     readonly operationId: string;
     readonly identity: Principal;
+    // This context's client session. A verb that reads or
+    // replaces the session goes through it.
+    readonly session: ClientSession;
     GET<T>(resource: string): Promise<T>;
     // Body plus strong ETag (quotes stripped) for If-Match.
     GETWithEtag<T>(
@@ -219,6 +226,7 @@ function openRequestContext(
     const ctx: RequestContext = {
         operationId,
         identity,
+        session: MODULE_SESSION,
         GET: <T>(resource: string) => {
             recordApiRequest('GET', resource);
             const headers = writeHeaders();

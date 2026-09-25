@@ -17,16 +17,8 @@ import {
 import {
     createSubscriptionChannel,
 } from './channels.ts';
-import {
-    getSessionCredentials,
-    isCookieSession,
-    putSessionCredentials,
-} from './session-credentials.ts';
 import { postSessionRefresh } from './session-refresh.ts';
-import {
-    runRefreshAfterInFlight,
-} from './session-refresh-mutex.ts';
-import { putSessionToken } from './session-token.ts';
+import type { ClientSession } from './client-session.ts';
 import {
     principalFromToken,
 } from '../shared/access-token-decode.ts';
@@ -231,7 +223,10 @@ async function remintSessionClaims(
     ctx: RequestContext,
     organizationId: Id,
 ): Promise<void> {
-    if (!isCookieSession() && getSessionCredentials() === null) {
+    if (
+        !ctx.session.isCookieSession()
+        && ctx.session.getSessionCredentials() === null
+    ) {
         return;
     }
     const first = await postRemintRefresh(ctx);
@@ -267,13 +262,15 @@ async function postRemintRefresh(
 ): Promise<string> {
     let access: string | null;
     try {
-        access = await runRefreshAfterInFlight(async () => {
-            const creds = await postSessionRefresh(
-                ctx, storedRefreshToken(),
-            );
-            putSessionCredentials(creds);
-            return creds.accessToken;
-        });
+        access = await ctx.session.runRefreshAfterInFlight(
+            async () => {
+                const creds = await postSessionRefresh(
+                    ctx, storedRefreshToken(ctx.session),
+                );
+                ctx.session.putSessionCredentials(creds);
+                return creds.accessToken;
+            },
+        );
     } catch (err) {
         throw new SessionRemintFailedError(err);
     }
@@ -282,15 +279,15 @@ async function postRemintRefresh(
             'the refresh grant yielded no access token',
         ));
     }
-    putSessionToken(access);
+    ctx.session.putSessionToken(access);
     return access;
 }
 
-function storedRefreshToken(): string {
-    if (isCookieSession()) {
+function storedRefreshToken(session: ClientSession): string {
+    if (session.isCookieSession()) {
         return '';
     }
-    const stored = getSessionCredentials();
+    const stored = session.getSessionCredentials();
     if (stored === null) {
         throw new Error('no session credentials to re-mint');
     }

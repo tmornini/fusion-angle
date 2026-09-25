@@ -3,6 +3,7 @@ export * from './ai-members.ts';
 export * from './authentication.ts';
 export * from './broadcast-channel.ts';
 export * from './channels.ts';
+export * from './client-session.ts';
 export * from './credential-resolution.ts';
 export * from './event-listener.ts';
 export * from './facade-holder.ts';

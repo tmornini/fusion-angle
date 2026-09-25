@@ -6,7 +6,6 @@ import {
 import type {
     SessionCredentials,
 } from './session-credentials.ts';
-import { isCookieSession } from './session-credentials.ts';
 import { generateSecret } from
     '../shared/secret.ts';
 import { sha256Bytes } from '../shared/digest.ts';
@@ -166,7 +165,7 @@ export async function postPasswordLogin(
     }
     return {
         accessToken,
-        refreshToken: isCookieSession()
+        refreshToken: ctx.session.isCookieSession()
             ? ''
             : refreshFromHeaders(granted.headers),
     };
