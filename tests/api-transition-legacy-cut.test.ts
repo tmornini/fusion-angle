@@ -235,6 +235,7 @@ Deno.test('G7: fieldValues hits equal named exceptions',
         join(repoRoot, 'api'),
         join(repoRoot, 'web-app', 'app'),
         join(repoRoot, 'client'),
+        join(repoRoot, 'shared'),
     ]) {
         for (const full of walkTs(root)) {
             const text = Deno.readTextFileSync(full);
