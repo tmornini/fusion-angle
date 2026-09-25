@@ -1544,6 +1544,14 @@ Off the critical path; each with its oracle.
   per-route figures to `measurements/`; `--visualize` draws
   the three charts; `--check` gates per-route p90 against
   `measurements/budgets.json`.
+- The work-order history list ends in a slash:
+  `organizations/:id/work-orders/:id/history` becomes
+  `…/history/`, as every other list route does
+  (`identities/:id/invitations/:id/versions/`). A wire
+  change: the route (`api/routes.ts:5232`), its two client
+  reads (`client/work-orders-queries.ts:175`, `:292`), and
+  the generated API documentation. Oracle: no route in
+  `api/routes.ts` that returns a list lacks the slash.
 - Stamp parameters stay text until Postgres parses
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
