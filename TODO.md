@@ -1821,10 +1821,30 @@ Off the critical path; each with its oracle.
   (`revokeTokenChain racing a concurrent
   rotateRefreshJti`: a rotated jti read `issued` where
   every jti should read `revoked`). These are session
-  and token races, not drains; the seed cycle's
-  hypothesis is that heavier seeding widened their
-  timing windows, and the last asserts a product
-  invariant, so it may be a real race and not a test's.
+  and token races, not drains. Three of the four —
+  `adapters-shared-recovery`, `apex-destination`, and
+  `adapters-invitations` — share a confirmed cause:
+  under `--parallel` every test file is a worker in one
+  process, and `navigator.locks` and `BroadcastChannel`
+  are shared across those workers, so a refresh in one
+  file waits on another file's `fusion-refresh` lock
+  and adopts its `fusion-angle:refresh` broadcast
+  (signatures: a missing seat after remint, refresh
+  counts below expected, "malformed token"); the
+  harness fix is a `--preload` that gives lock and
+  channel names a per-worker prefix, as
+  `subscribeNamedNotificationEvents` gives the bell a
+  private bus. The fourth, `api-shadow-ledger-tokens`,
+  is a separate, unexplained mechanism: its test
+  ("revokeTokenChain racing a concurrent
+  rotateRefreshJti on the chain's live successor…",
+  `:860`) deliberately races two server-side ledger
+  operations; nothing it runs touches `navigator.locks`
+  or `BroadcastChannel` (none under `api/`), and it
+  fails under `--parallel` load with "revoked" expected,
+  "issued" got (at `:901`) — an interleaving the test
+  does not pin; it needs its own investigation, and the
+  per-worker prefix preload will not fix it.
   Oracle: each check reads after a signal that the
   delivery was processed — a render count on the host
   stub for the two page tests, a second listener on
