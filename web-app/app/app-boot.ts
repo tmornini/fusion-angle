@@ -26,15 +26,15 @@ import {
     getSessionToken,
     putSessionToken,
     sessionTokenIsSeeded,
-} from './adapters/session-token.ts';
-import { getClientFacade } from './adapters/facade-holder.ts';
+} from '../../client/session-token.ts';
+import { getClientFacade } from '../../client/facade-holder.ts';
 import {
     sessionContext,
     createRequestContext,
-} from './adapters/shared.ts';
+} from '../../client/shared.ts';
 import {
     getOrganizations,
-} from './adapters/organizations.ts';
+} from '../../client/organizations.ts';
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
@@ -42,10 +42,10 @@ import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
     ACTIVE_ORGANIZATION_ID,
-} from './adapters/organization-session.ts';
+} from '../../client/organization-session.ts';
 import {
     getIdentityDefaultOrganization,
-} from './adapters/identity-default-organization.ts';
+} from '../../client/identity-default-organization.ts';
 import {
     nowEpochSeconds,
 } from '../../shared/types.ts';
@@ -60,9 +60,9 @@ import {
     putSessionCredentials,
     deleteSessionCredentials,
     isCookieSession,
-} from './adapters/session-credentials.ts';
+} from '../../client/session-credentials.ts';
 import { runSingleFlightRefresh } from
-    './adapters/session-refresh-mutex.ts';
+    '../../client/session-refresh-mutex.ts';
 import {
     resolveCredentialDecision,
     resolveOrganizationGate,
@@ -70,7 +70,7 @@ import {
 } from './credential-resolution.ts';
 import {
     postSessionRefresh,
-} from './adapters/session-refresh.ts';
+} from '../../client/session-refresh.ts';
 import { initErrorSurfacing } from './error-helpers.ts';
 import { replayPendingToast } from './toast.ts';
 import { redirectToLogin } from './auth-redirect.ts';

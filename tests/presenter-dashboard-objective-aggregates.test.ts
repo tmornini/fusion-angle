@@ -2,7 +2,7 @@ import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { DashboardObjectiveAggregatesPresenter } from
     '../web-app/app/presenters/dashboard-objective-aggregates.ts';
 import type { TrendPoint } from
-    '../web-app/app/adapters/project-scoring.ts';
+    '../client/project-scoring.ts';
 import type { ObjectiveEntity } from '../shared/types.ts';
 
 const ORGANIZATION_ID = 'AjdvjuECVZEgZoFajaIEkg';

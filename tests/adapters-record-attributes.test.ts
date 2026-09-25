@@ -3,7 +3,7 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedCurrentMember,
@@ -13,11 +13,11 @@ import {
 } from './test-fixtures.ts';
 import {
     postRecordChange,
-} from '../web-app/app/adapters/records.ts';
+} from '../client/records.ts';
 import {
     getRecordAttributesByRecord,
 } from
-'../web-app/app/adapters/record-attributes.ts';
+'../client/record-attributes.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

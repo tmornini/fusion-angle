@@ -1,7 +1,7 @@
 import type { FlowSnapshot } from
     './presenters/flow-designer.ts';
 import type { RequestContext } from
-    './adapters/shared.ts';
+    '../../client/shared.ts';
 import type {
     GraphEdge,
     GraphNode,
@@ -26,11 +26,11 @@ import {
 } from './adapters/index.ts';
 import type {
     FlowSaveShape,
-} from './adapters/flow-mutations.ts';
+} from '../../client/flow-mutations.ts';
 import {
     jitteredBackoff,
     organizationItem,
-} from './adapters/shared.ts';
+} from '../../client/shared.ts';
 import {
     NODE_WIDTH,
     NODE_HEIGHT,

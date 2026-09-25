@@ -2,7 +2,7 @@ import { assertStrictEquals } from '@std/assert';
 import {
     Project,
     ProjectView,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
 import type {
     ObjectiveEntity,
 } from '../shared/types.ts';

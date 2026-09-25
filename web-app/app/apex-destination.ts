@@ -4,13 +4,13 @@
 // probe — not a new door.
 
 import { createRequestContext } from
-    './adapters/shared.ts';
+    '../../client/shared.ts';
 import { authParam } from
-    './adapters/authentication.ts';
+    '../../client/authentication.ts';
 import { getClientFacade } from
-    './adapters/facade-holder.ts';
+    '../../client/facade-holder.ts';
 import { runSingleFlightRefresh } from
-    './adapters/session-refresh-mutex.ts';
+    '../../client/session-refresh-mutex.ts';
 
 export const APEX_SIGNED_IN = 'dashboard/index.html';
 export const APEX_SIGNED_OUT = 'landing/index.html';

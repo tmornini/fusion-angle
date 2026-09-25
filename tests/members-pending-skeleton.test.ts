@@ -135,7 +135,7 @@ Deno.test(
             release();
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

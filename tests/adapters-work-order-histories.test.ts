@@ -4,9 +4,9 @@ import {
 } from '@std/assert';
 import {
     getWorkOrderHistories,
-} from '../web-app/app/adapters/work-orders-queries.ts';
+} from '../client/work-orders-queries.ts';
 import type { RequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 
 Deno.test(
     'getWorkOrderHistories does not GET work-orders/',

@@ -16,7 +16,7 @@ import type {
 import { FlowPresenter } from
     '../web-app/app/presenters/flow.ts';
 import type { FlowSummary } from
-    '../web-app/app/adapters/flows.ts';
+    '../client/flows.ts';
 import { WorkingStylesPresenter } from
     '../web-app/app/presenters/working-styles.ts';
 import {

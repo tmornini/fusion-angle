@@ -2,13 +2,13 @@ import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postAIMemberCreation,
     putAIMember,
     getAIMemberEntity,
-} from '../web-app/app/adapters/ai-members.ts';
+} from '../client/ai-members.ts';
 import {
     seedHumanMember,
     seedAIMember,

@@ -9,11 +9,11 @@ import {
     deleteSessionCredentials,
     SessionCredentialsCorruptError,
     setCookieSession,
-} from '../web-app/app/adapters/session-credentials.ts';
+} from '../client/session-credentials.ts';
 import {
     getSessionToken,
     putSessionToken,
-} from '../web-app/app/adapters/session-token.ts';
+} from '../client/session-token.ts';
 import { STORAGE_KEY_AUTHORIZATION } from
     '../web-app/app/storage-keys.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';

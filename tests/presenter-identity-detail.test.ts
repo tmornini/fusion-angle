@@ -3,7 +3,7 @@ import { Identity } from '../shared/types.ts';
 import {
     IDENTITY_WITHOUT_PII_NAME,
     UNNAMED_SERVICE_NAME,
-} from '../web-app/app/adapters/identities.ts';
+} from '../client/identities.ts';
 import {
     IdentityDetailPresenter,
 } from '../web-app/app/presenters/identity-detail.ts';

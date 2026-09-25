@@ -2,12 +2,12 @@ import {
     postNotificationEvent,
     subscribeNamedNotificationEvents,
     subscribeNotificationEvents,
-} from './adapters/broadcast-channel.ts';
+} from '../../client/broadcast-channel.ts';
 import {
     getSessionToken,
     sessionIsAuthenticated,
     sessionTokenIsSeeded,
-} from './adapters/session-token.ts';
+} from '../../client/session-token.ts';
 import {
     principalFromToken,
 } from '../../shared/access-token-decode.ts';

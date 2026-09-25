@@ -5,18 +5,18 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     validateProjectForApproval,
     validateProjectForArchival,
     postProjectApproval,
     postProjectArchival,
-} from '../web-app/app/adapters/project-publish.ts';
+} from '../client/project-publish.ts';
 import {
     getProjectEntity,
     putProject,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
 import {
     seedCurrentMember,
 } from './member-fixtures.ts';

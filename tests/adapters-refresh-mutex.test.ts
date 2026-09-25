@@ -6,20 +6,20 @@ import {
 } from '@std/assert';
 import {
     createHttpFacade,
-} from '../web-app/app/adapters/http-facade.ts';
+} from '../client/http-facade.ts';
 import {
     createRecoveringRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     setCookieSession,
-} from '../web-app/app/adapters/session-credentials.ts';
+} from '../client/session-credentials.ts';
 import {
     putSessionToken,
     getSessionToken,
     sessionIsOrganizationScoped,
-} from '../web-app/app/adapters/session-token.ts';
+} from '../client/session-token.ts';
 import { runSingleFlightRefresh } from
-    '../web-app/app/adapters/session-refresh-mutex.ts';
+    '../client/session-refresh-mutex.ts';
 import { UnauthorizedError } from
     '../shared/http-errors.ts';
 import {
@@ -31,7 +31,7 @@ import {
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
 import { deleteRefreshChannel } from
-    '../web-app/app/adapters/session-refresh-mutex.ts';
+    '../client/session-refresh-mutex.ts';
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to

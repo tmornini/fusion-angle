@@ -4,14 +4,14 @@ import {
 } from './fixtures/local-storage.ts';
 import {
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     postSessionLogout,
-} from '../web-app/app/adapters/session-logout.ts';
+} from '../client/session-logout.ts';
 import {
     getSessionCredentials,
     putSessionCredentials,
-} from '../web-app/app/adapters/session-credentials.ts';
+} from '../client/session-credentials.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import { deriveTokenRevocationsFor } from

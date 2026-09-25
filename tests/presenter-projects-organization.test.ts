@@ -2,9 +2,9 @@ import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { Project } from '../shared/types.ts';
 import { DISPLAY_ABSENT } from '../web-app/app/format.ts';
 import { ProjectView } from
-    '../web-app/app/adapters/projects.ts';
+    '../client/projects.ts';
 import { Organization } from
-    '../web-app/app/adapters/admin.ts';
+    '../client/admin.ts';
 import { ProjectPresenter } from
     '../web-app/app/presenters/project.ts';
 import {

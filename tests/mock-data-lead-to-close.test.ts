@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getFlowStats,

@@ -34,14 +34,14 @@ import {
     createRequestContext,
     sessionContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     postFlowCreation,
     putFlow,
     enqueueFlowSave,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import { getFlowGraph } from
-    '../web-app/app/adapters/flow-queries.ts';
+    '../client/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -54,9 +54,9 @@ import { performUndo } from '../web-app/app/flow-operations.ts';
 import { wrapInPageAdapter } from
     './in-page-facade.ts';
 import { putClientFacade } from
-    '../web-app/app/adapters/facade-holder.ts';
+    '../client/facade-holder.ts';
 import { putSessionToken } from
-    '../web-app/app/adapters/session-token.ts';
+    '../client/session-token.ts';
 import type { GraphNode } from '../shared/types.ts';
 import {
     apiRequest,

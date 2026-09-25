@@ -17,7 +17,7 @@
 
 import type {
     GraphNode, GraphEdge,
-} from './adapters/flows.ts';
+} from '../../client/flows.ts';
 import type {
     InteractionState,
     ViewBox,

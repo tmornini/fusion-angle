@@ -20,7 +20,7 @@ import {
 import {
     notifyFlowChange,
     buildSaveEvents,
-} from './flow-mutations.ts';
+} from '../../../client/flow-mutations.ts';
 import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
 import {
     parseOrThrow,
@@ -33,13 +33,13 @@ import {
 import {
     getFlowGraph,
     getProjectFlowEntities,
-} from './flow-queries.ts';
-import type { FlowGraph } from './flow-queries.ts';
-import type { RequestContext } from './shared.ts';
+} from '../../../client/flow-queries.ts';
+import type { FlowGraph } from '../../../client/flow-queries.ts';
+import type { RequestContext } from '../../../client/shared.ts';
 import {
     organizationCollection,
     organizationItem,
-} from './shared.ts';
+} from '../../../client/shared.ts';
 import {
     generateMermaid,
     mermaidIdOf,
@@ -55,7 +55,7 @@ import {
 } from '../zip.ts';
 import {
     buildStartAndCompleteNodes,
-} from './flow-defaults.ts';
+} from '../../../client/flow-defaults.ts';
 import type { LayoutInput } from '../flow-layout.ts';
 import {
     runLayoutFromInputs,

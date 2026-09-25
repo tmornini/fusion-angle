@@ -7,12 +7,12 @@ import {
 } from './identity-fixtures.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     getClientRegistration,
     putClientRegistration,
     deleteClientRegistration,
-} from '../web-app/app/adapters/identities.ts';
+} from '../client/identities.ts';
 
 const FIELDS = {
     grantTypes: 'client_credentials',

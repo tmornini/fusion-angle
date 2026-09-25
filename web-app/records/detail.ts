@@ -30,7 +30,7 @@ import {
     deleteRecordInstance,
     activeOrganization,
 } from '../app/adapters/index.ts';
-import { getFlowEntities } from '../app/adapters/flows.ts';
+import { getFlowEntities } from '../../client/flows.ts';
 import {
     RecordDetailPresenter,
     RecordDetailEditPresenter,

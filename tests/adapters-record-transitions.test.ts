@@ -10,7 +10,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -18,16 +18,16 @@ import {
 import {
     validateRecordTransition,
 } from
-'../web-app/app/adapters/record-transitions.ts';
+'../client/record-transitions.ts';
 import {
     postFlowCreation,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     putWorkOrder,
-} from '../web-app/app/adapters/work-orders-mutations.ts';
+} from '../client/work-orders-mutations.ts';
 import {
     postRecordChange,
-} from '../web-app/app/adapters/records.ts';
+} from '../client/records.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,

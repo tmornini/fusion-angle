@@ -18,25 +18,25 @@ import { log } from '../app/logger.ts';
 import { getViewportWidth } from '../app/adapters/index.ts';
 import {
     getClientFacade,
-} from '../app/adapters/facade-holder.ts';
+} from '../../client/facade-holder.ts';
 import {
     getSessionToken,
     putSessionToken,
     sessionHasReachableOrganization,
     sessionTokenIsSeeded,
-} from '../app/adapters/session-token.ts';
+} from '../../client/session-token.ts';
 import {
     createRequestContext,
-} from '../app/adapters/shared.ts';
+} from '../../client/shared.ts';
 import {
     postPasswordLogin,
-} from '../app/adapters/authentication.ts';
+} from '../../client/authentication.ts';
 import {
     putSessionCredentials,
-} from '../app/adapters/session-credentials.ts';
+} from '../../client/session-credentials.ts';
 import type {
     SessionCredentials,
-} from '../app/adapters/session-credentials.ts';
+} from '../../client/session-credentials.ts';
 import { decodeReturnTarget } from '../app/auth-redirect.ts';
 import { getUrlParam } from '../app/adapters/url-params.ts';
 

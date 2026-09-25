@@ -6,12 +6,12 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import type {
     StateEntity,
     FlowWithGraph,
@@ -20,7 +20,7 @@ import type {
 import {
     buildStartAndCompleteNodes,
 } from
-'../web-app/app/adapters/flow-defaults.ts';
+'../client/flow-defaults.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     seedHumanMember,

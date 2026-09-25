@@ -8,9 +8,9 @@
 
 import { putLocation } from './adapters/location.ts';
 import { createHttpFacade } from
-    './adapters/http-facade.ts';
+    '../../client/http-facade.ts';
 import { putClientFacade } from
-    './adapters/facade-holder.ts';
+    '../../client/facade-holder.ts';
 import {
     probeRefreshSession,
     resolveApexLocation,

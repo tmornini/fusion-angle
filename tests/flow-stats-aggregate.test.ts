@@ -12,7 +12,7 @@ import type {
 import type {
     TransitionEvent,
     StepTransition,
-} from '../web-app/app/adapters/work-orders-queries.ts';
+} from '../client/work-orders-queries.ts';
 
 export function makeFixture(): FlowStatsInput {
     return {

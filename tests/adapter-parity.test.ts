@@ -1,7 +1,7 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext }
-    from '../web-app/app/adapters/shared.ts';
+    from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postObjectiveCreation,
@@ -9,7 +9,7 @@ import {
     postObjectiveReactivation,
     getActiveObjectives,
     getArchivedObjectiveIds,
-} from '../web-app/app/adapters/objectives.ts';
+} from '../client/objectives.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 

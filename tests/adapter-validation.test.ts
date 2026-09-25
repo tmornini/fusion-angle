@@ -1,6 +1,6 @@
 import { assertStrictEquals } from '@std/assert';
 import type { ValidationResult } from
-    '../web-app/app/adapters/validation.ts';
+    '../client/validation.ts';
 
 Deno.test('ValidationResult shape compiles', () => {
     type P = { kind: 'x'; id: string };

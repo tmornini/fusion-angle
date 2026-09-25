@@ -19,17 +19,17 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     putFlow,
     enqueueFlowSave,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     getFlowGraph,
-} from '../web-app/app/adapters/flow-queries.ts';
+} from '../client/flow-queries.ts';
 import {
     buildStartAndCompleteNodes,
-} from '../web-app/app/adapters/flow-defaults.ts';
+} from '../client/flow-defaults.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -44,9 +44,9 @@ import {
 import { wrapInPageAdapter } from
     './in-page-facade.ts';
 import { putClientFacade } from
-    '../web-app/app/adapters/facade-holder.ts';
+    '../client/facade-holder.ts';
 import { putSessionToken } from
-    '../web-app/app/adapters/session-token.ts';
+    '../client/session-token.ts';
 import { performUndo } from
     '../web-app/app/flow-operations.ts';
 import { withLocalStorageAsync } from

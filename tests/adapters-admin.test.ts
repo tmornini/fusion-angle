@@ -6,15 +6,15 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getOrganization,
     getOrganizationStats,
-} from '../web-app/app/adapters/admin.ts';
-import { putIdea } from '../web-app/app/adapters/ideas.ts';
-import { putProject } from '../web-app/app/adapters/projects.ts';
+} from '../client/admin.ts';
+import { putIdea } from '../client/ideas.ts';
+import { putProject } from '../client/projects.ts';
 import {
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
@@ -28,7 +28,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
+    '../client/members.ts';
 
 function buildProject(
     id: string,

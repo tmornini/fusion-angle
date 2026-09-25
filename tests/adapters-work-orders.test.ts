@@ -15,7 +15,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -26,13 +26,13 @@ import {
     putWorkOrderClaim,
     putWorkOrder,
 } from
-'../web-app/app/adapters/work-orders-mutations.ts';
+'../client/work-orders-mutations.ts';
 import {
     putRecordInstance,
     getRecordInstance,
     patchRecordInstance,
 } from
-'../web-app/app/adapters/record-instances.ts';
+'../client/record-instances.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
@@ -40,7 +40,7 @@ import {
 import {
     postRecordChange,
 } from
-'../web-app/app/adapters/records.ts';
+'../client/records.ts';
 import {
     getWorkOrder,
     getWorkOrderActiveClaim,
@@ -48,12 +48,12 @@ import {
     getWorkOrderTransitionEvents,
     getActiveClaimsByWorkOrder,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     generateIdentifier,
 } from
@@ -61,7 +61,7 @@ import {
 import {
     deleteWorkOrderClaim,
 } from
-'../web-app/app/adapters/work-orders-deletions.ts';
+'../client/work-orders-deletions.ts';
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
@@ -899,7 +899,7 @@ Deno.test(
 import {
     getFlowWorkOrderEntities,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 
 Deno.test(
     'getFlowWorkOrderEntities returns the seeded '

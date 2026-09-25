@@ -6,7 +6,7 @@ import type {
 import { ICON_SIZE, iconTrendingUp } from '../icons.ts';
 import { buildBipolarGaugeSvg } from './gauge.ts';
 import type { TrendPoint } from
-    '../adapters/project-scoring.ts';
+    '../../../client/project-scoring.ts';
 import { formatDate } from '../format.ts';
 import {
     formatSigned,

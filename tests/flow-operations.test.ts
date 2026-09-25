@@ -16,14 +16,14 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     buildInitialFlowSnapshot,
     type FlowSnapshot,
@@ -62,7 +62,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import type {
     FlowGraph,
-} from '../web-app/app/adapters/flow-queries.ts';
+} from '../client/flow-queries.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';

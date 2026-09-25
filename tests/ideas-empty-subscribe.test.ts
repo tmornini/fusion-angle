@@ -124,7 +124,7 @@ Deno.test(
             const {
                 getClientFacade, putClientFacade,
             } = await import(
-                '../web-app/app/adapters/facade-holder.ts'
+                '../client/facade-holder.ts'
             );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
@@ -175,7 +175,7 @@ Deno.test(
                 createRequestContext,
                 organizationItem,
             } = await import(
-                '../web-app/app/adapters/shared.ts'
+                '../client/shared.ts'
             );
             const ctx = createRequestContext(
                 db, await organizationToken(),
@@ -266,7 +266,7 @@ Deno.test(
                 deleteNamedNotificationChannel,
                 deleteNotificationChannel,
             } = await import(
-                '../web-app/app/adapters/broadcast-channel.ts'
+                '../client/broadcast-channel.ts'
             );
             deleteNamedNotificationChannel(CHANNEL_NAME);
             deleteNotificationChannel();

@@ -6,16 +6,16 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     putProject,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
 import {
     getFlowsByProject,
     getFlowGraph,
@@ -23,7 +23,7 @@ import {
     getProjectFlowEntities,
     type FlowGraph,
 } from
-'../web-app/app/adapters/flow-queries.ts';
+'../client/flow-queries.ts';
 import type {
     GraphNode,
     GraphEdge,

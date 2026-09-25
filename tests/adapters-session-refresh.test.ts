@@ -8,10 +8,10 @@ import {
 } from '../api/api.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     postSessionRefresh,
-} from '../web-app/app/adapters/session-refresh.ts';
+} from '../client/session-refresh.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
 import {

@@ -4,7 +4,7 @@ import {
 } from './flow-layout.ts';
 import type { LayoutInput, LayoutResult } from './flow-layout.ts';
 import { computeEdgeLabelWidth } from './flow-graph.ts';
-import type { FlowGraph } from './adapters/flow-queries.ts';
+import type { FlowGraph } from '../../client/flow-queries.ts';
 
 // The minimal edge shape a layout needs: who connects to whom,
 // and the label whose width reserves horizontal room.

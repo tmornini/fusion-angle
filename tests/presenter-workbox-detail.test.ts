@@ -22,10 +22,10 @@ import type {
     StateFieldValue,
     WorkOrder,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 import type {
     RecordAttribute,
-} from '../web-app/app/adapters/record-attributes.ts';
+} from '../client/record-attributes.ts';
 import type {
     ConstraintViolation,
 } from '../shared/record-constraints.ts';

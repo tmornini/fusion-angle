@@ -4,7 +4,7 @@ import './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,

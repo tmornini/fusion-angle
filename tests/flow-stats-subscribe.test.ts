@@ -121,10 +121,10 @@ Deno.test(
                 createRequestContext,
                 organizationItem,
             } = await import(
-                '../web-app/app/adapters/shared.ts'
+                '../client/shared.ts'
             );
             const { postFlowCreation } = await import(
-                '../web-app/app/adapters/flow-mutations.ts'
+                '../client/flow-mutations.ts'
             );
             const ctx = createRequestContext(
                 db, await organizationToken(),
@@ -224,7 +224,7 @@ Deno.test(
             // here — after the assertion above.
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

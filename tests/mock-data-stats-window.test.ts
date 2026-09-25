@@ -1,7 +1,7 @@
 import { assert } from '@std/assert';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { getFlowStats } from
     '../web-app/app/adapters/flow-stats.ts';

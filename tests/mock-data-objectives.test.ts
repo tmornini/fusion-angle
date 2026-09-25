@@ -7,22 +7,22 @@ import {
     validateObjectiveRevisionEntity,
 } from '../api/validators.ts';
 import { createRequestContext }
-    from '../web-app/app/adapters/shared.ts';
+    from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getArchivedObjectiveIds,
     getObjectives,
-} from '../web-app/app/adapters/objectives.ts';
+} from '../client/objectives.ts';
 import { getProjectEntities } from
-    '../web-app/app/adapters/projects.ts';
+    '../client/projects.ts';
 import type { Id, ProjectState } from
     '../shared/types.ts';
 import type { RequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import {
     getBaselineScoresForProject,
     getActualScoresForProject,
-} from '../web-app/app/adapters/project-scoring.ts';
+} from '../client/project-scoring.ts';
 import {
     deriveObjectiveRevisions,
 } from '../api/derive-objective-revisions.ts';

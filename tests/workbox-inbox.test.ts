@@ -12,17 +12,17 @@ import {
     createRequestContext,
     organizationItem,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postWorkOrderCreation,
 } from
-'../web-app/app/adapters/work-orders-mutations.ts';
+'../client/work-orders-mutations.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     getMemberMap,
     getTransitionEventsByWorkOrder,
@@ -60,7 +60,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
+    '../client/members.ts';
 
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();

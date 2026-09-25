@@ -6,7 +6,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -17,9 +17,9 @@ import {
     postIdeaCreation,
     postIdeaStateChange,
     postIdeaConversion,
-} from '../web-app/app/adapters/ideas.ts';
+} from '../client/ideas.ts';
 import { getProjectEntity } from
-    '../web-app/app/adapters/projects.ts';
+    '../client/projects.ts';
 import {
     type IdeaEntity,
     type IdeaState,
@@ -33,7 +33,7 @@ import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
+    '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';

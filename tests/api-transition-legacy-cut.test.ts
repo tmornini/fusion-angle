@@ -67,7 +67,7 @@ const NAMED_EXCEPTIONS: ReadonlySet<string> = new Set([
     'api/derive-states.ts',
     'api/mock-data/seed-message-pairs.ts',
     'api/routes.ts',
-    'web-app/app/adapters/work-orders-queries.ts',
+    'client/work-orders-queries.ts',
     'web-app/app/presenters/workbox-detail.ts',
 ]);
 
@@ -234,6 +234,7 @@ Deno.test('G7: fieldValues hits equal named exceptions',
     for (const root of [
         join(repoRoot, 'api'),
         join(repoRoot, 'web-app', 'app'),
+        join(repoRoot, 'client'),
     ]) {
         for (const full of walkTs(root)) {
             const text = Deno.readTextFileSync(full);

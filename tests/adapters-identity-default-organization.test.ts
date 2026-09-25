@@ -5,12 +5,12 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     putIdentityDefaultOrganization,
     getIdentityDefaultOrganization,
-} from '../web-app/app/adapters/identity-default-organization.ts';
+} from '../client/identity-default-organization.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 

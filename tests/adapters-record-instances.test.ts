@@ -9,7 +9,7 @@ import {
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedCurrentMember,
@@ -19,7 +19,7 @@ import {
 } from './test-fixtures.ts';
 import {
     postRecordChange,
-} from '../web-app/app/adapters/records.ts';
+} from '../client/records.ts';
 import {
     getRecordInstances,
     getRecordInstance,
@@ -27,7 +27,7 @@ import {
     patchRecordInstance,
     deleteRecordInstance,
     getRecordInstanceHistory,
-} from '../web-app/app/adapters/record-instances.ts';
+} from '../client/record-instances.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
@@ -200,7 +200,7 @@ Deno.test(
     + ' not 64-hex',
     () => {
         const src = Deno.readTextFileSync(
-            'web-app/app/adapters/record-instances.ts',
+            'client/record-instances.ts',
         );
         const start = src.indexOf(
             'interface InstanceHistoryWire',

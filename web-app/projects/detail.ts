@@ -63,7 +63,7 @@ import type {
 import {
     getMemberMap,
     memberName,
-} from '../app/adapters/members-union.ts';
+} from '../../client/members-union.ts';
 import { latestPerPair } from '../app/scoring-format.ts';
 import {
     ProjectDetailPresenter,

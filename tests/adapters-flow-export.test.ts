@@ -13,7 +13,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -32,10 +32,10 @@ import {
 import {
     postFlowCreation,
     putFlow,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     getFlowGraph,
-} from '../web-app/app/adapters/flow-queries.ts';
+} from '../client/flow-queries.ts';
 import {
     generateMermaid,
     mermaidIdOf,

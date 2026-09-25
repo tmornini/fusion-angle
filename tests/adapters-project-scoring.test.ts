@@ -11,7 +11,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getBaselineScoresForProject,
@@ -25,12 +25,12 @@ import {
     getProjectsScoreColumn,
     postProjectBaselineScoring,
     postProjectActualMeasurement,
-} from '../web-app/app/adapters/project-scoring.ts';
+} from '../client/project-scoring.ts';
 import {
     getProjectEntity,
     postProjectStateChange,
     putProject,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
 import { latestPerPair } from '../web-app/app/scoring-format.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';

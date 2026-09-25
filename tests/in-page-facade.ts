@@ -11,9 +11,9 @@ import {
     type ClientFacadeAdapter,
 } from '../api/api.ts';
 import type { HttpFacade } from
-    '../web-app/app/adapters/http-facade.ts';
+    '../client/http-facade.ts';
 import { registerInPageWrap } from
-    '../web-app/app/adapters/facade-holder.ts';
+    '../client/facade-holder.ts';
 
 // Test wrap: in-process handleRequest verbs as HttpFacade.
 // Product boot uses the fetch facade; this stays off the

@@ -2,7 +2,7 @@ import { log } from './logger.ts';
 import { showToast } from './toast.ts';
 import type {
     RequestContext,
-} from './adapters/shared.ts';
+} from '../../client/shared.ts';
 
 // The human-readable message of a thrown value: an Error's
 // `message`, else the optional `fallback`, else String(value).

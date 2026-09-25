@@ -1,22 +1,22 @@
 import type { Id } from '../../../shared/types.ts';
-import type { FlowGraph } from './flow-queries.ts';
-import type { RequestContext } from './shared.ts';
+import type { FlowGraph } from '../../../client/flow-queries.ts';
+import type { RequestContext } from '../../../client/shared.ts';
 import {
     buildFlowStats,
     type FlowStatsInput,
     type FlowStatsModel,
 } from '../flow-stats-aggregate.ts';
-import { getFlowGraph } from './flow-queries.ts';
+import { getFlowGraph } from '../../../client/flow-queries.ts';
 import {
     getFlowWorkOrderEntities,
     getWorkOrderHistories,
     projectTransitions,
     type TransitionEvent,
-} from './work-orders-queries.ts';
+} from '../../../client/work-orders-queries.ts';
 import {
     getMemberMap,
     memberName,
-} from './members-union.ts';
+} from '../../../client/members-union.ts';
 
 export async function getFlowStats(
     ctx: RequestContext,

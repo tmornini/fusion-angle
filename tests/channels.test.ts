@@ -22,7 +22,7 @@ import {
     reachableToken,
 } from './token-fixtures.ts';
 import { deleteNotificationChannel } from
-    '../web-app/app/adapters/broadcast-channel.ts';
+    '../client/broadcast-channel.ts';
 
 // The divorce point opens ONE channel per process, lazily,
 // and a test process has no unload to reclaim it. Release

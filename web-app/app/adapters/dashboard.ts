@@ -11,14 +11,14 @@ import {
     DISPLAY_ABSENT,
 } from '../format.ts';
 import { formatSigned } from '../scoring-format.ts';
-import type { RequestContext } from './shared.ts';
-import { getIdeaEntities } from './ideas.ts';
-import { getProjectEntities } from './projects.ts';
-import { getFlowEntities } from './flows.ts';
+import type { RequestContext } from '../../../client/shared.ts';
+import { getIdeaEntities } from '../../../client/ideas.ts';
+import { getProjectEntities } from '../../../client/projects.ts';
+import { getFlowEntities } from '../../../client/flows.ts';
 import {
     getPortfolioImpactSummary,
     type DashboardScoringBundle,
-} from './project-scoring.ts';
+} from '../../../client/project-scoring.ts';
 
 export type GaugeIcon =
     | 'clock'

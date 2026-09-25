@@ -6,21 +6,21 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     postWorkOrderCreation,
 } from
-'../web-app/app/adapters/work-orders-mutations.ts';
+'../client/work-orders-mutations.ts';
 import {
     getWorkOrder,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 import type {
     FlowWithGraph,
     GraphNode,

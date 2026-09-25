@@ -116,10 +116,10 @@ Deno.test(
             putSessionToken(token);
             const { createRequestContext } =
                 await import(
-                    '../web-app/app/adapters/shared.ts'
+                    '../client/shared.ts'
                 );
             const { putProject } = await import(
-                '../web-app/app/adapters/projects.ts'
+                '../client/projects.ts'
             );
             const seedCtx = createRequestContext(
                 db, token,
@@ -164,7 +164,7 @@ Deno.test(
                 getClientFacade,
                 putClientFacade,
             } = await import(
-                '../web-app/app/adapters/facade-holder.ts'
+                '../client/facade-holder.ts'
             );
             const inner = getClientFacade();
             const paths: string[] = [];
@@ -260,7 +260,7 @@ Deno.test(
         } finally {
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

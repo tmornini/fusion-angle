@@ -3,7 +3,7 @@ import { sharedMockDb } from './mock-seed.ts';
 import { organizationToken } from
     './token-fixtures.ts';
 import { createRequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import { getFlowsForCreation } from
     '../web-app/app/adapters/flow-publish.ts';
 

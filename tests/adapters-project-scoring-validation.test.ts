@@ -1,7 +1,7 @@
 import { assertRejects, assertStrictEquals, assertThrows } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -9,7 +9,7 @@ import {
     postProjectActualMeasurement,
     getBaselineScoresForProject,
 } from
-    '../web-app/app/adapters/project-scoring.ts';
+    '../client/project-scoring.ts';
 import {
     validateBaselineScoreEntity,
     validateActualScoreEntity,

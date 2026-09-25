@@ -33,7 +33,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     organizationToken,
     reachableToken,
@@ -48,15 +48,15 @@ import {
     getInvitations,
     getSentInvitations,
     SessionRemintFailedError,
-} from '../web-app/app/adapters/invitations.ts';
+} from '../client/invitations.ts';
 import {
     setCookieSession,
-} from '../web-app/app/adapters/session-credentials.ts';
+} from '../client/session-credentials.ts';
 import {
     getSessionToken,
     deleteSessionToken,
     putSessionToken,
-} from '../web-app/app/adapters/session-token.ts';
+} from '../client/session-token.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
@@ -69,7 +69,7 @@ import { generateIdentifier } from
 import {
     runSingleFlightRefresh,
     deleteRefreshChannel,
-} from '../web-app/app/adapters/session-refresh-mutex.ts';
+} from '../client/session-refresh-mutex.ts';
 import { framedRequest } from './http-fixtures.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';

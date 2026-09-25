@@ -1,6 +1,6 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { createRequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
@@ -9,7 +9,7 @@ import {
     getObjectiveScoringInputs,
     buildObjectiveAggregates,
 } from
-    '../web-app/app/adapters/project-scoring.ts';
+    '../client/project-scoring.ts';
 import { sharedMockDb } from './mock-seed.ts';
 
 // The mock seeder is deterministic; these values

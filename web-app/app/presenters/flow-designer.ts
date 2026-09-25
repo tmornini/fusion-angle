@@ -13,14 +13,14 @@ import {
 } from '../adapters/index.ts';
 import type {
     RequestContext,
-} from '../adapters/shared.ts';
+} from '../../../client/shared.ts';
 import { reportFault } from '../error-helpers.ts';
 import type {
     GraphNode,
     GraphEdge,
     FlowGraph,
     FlowSaveShape,
-} from '../adapters/flows.ts';
+} from '../../../client/flows.ts';
 import type {
     MemberId,
 } from '../../../shared/types.ts';

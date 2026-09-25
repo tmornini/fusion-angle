@@ -8,7 +8,7 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -17,7 +17,7 @@ import {
 import {
     postFlowCreation,
     putFlow,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';

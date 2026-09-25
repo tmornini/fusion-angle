@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import {
     buildSaveEvents,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import type {
     StoredGraph,
     GraphNode,

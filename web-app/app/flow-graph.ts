@@ -2,7 +2,7 @@ import type { SafeHtml } from './safe-html.ts';
 import { trusted, escapeForHtml } from './safe-html.ts';
 import type {
     GraphNode, GraphEdge,
-} from './adapters/flows.ts';
+} from '../../client/flows.ts';
 import type {
     Selection,
     ConnectMode,

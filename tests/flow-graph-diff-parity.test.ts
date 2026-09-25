@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     buildSaveEvents,
     buildRevivals,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     buildFlowGraphDelta,
     buildFlowGraphRevivals,

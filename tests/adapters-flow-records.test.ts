@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
 import { createRequestContext } from
-'../web-app/app/adapters/shared.ts';
+'../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
@@ -11,14 +11,14 @@ import {
     getRecordForWorkOrder,
     getFlowSummariesForRecord,
     getWorkOrdersForRecord,
-} from '../web-app/app/adapters/flow-records.ts';
+} from '../client/flow-records.ts';
 import {
     postFlowCreation,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     putWorkOrder,
-} from '../web-app/app/adapters/work-orders-mutations.ts';
-import { putRecord } from '../web-app/app/adapters/records.ts';
+} from '../client/work-orders-mutations.ts';
+import { putRecord } from '../client/records.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,

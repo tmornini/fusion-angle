@@ -2,19 +2,19 @@ import { assert, assertStrictEquals, fail } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getIdentityRoster,
     postIdentityCreation,
-} from '../web-app/app/adapters/identities.ts';
+} from '../client/identities.ts';
 import {
     getProviderEvents,
-} from '../web-app/app/adapters/identity-providers.ts';
+} from '../client/identity-providers.ts';
 import {
     getTokenChainsFor,
-} from '../web-app/app/adapters/identity-tokens.ts';
+} from '../client/identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

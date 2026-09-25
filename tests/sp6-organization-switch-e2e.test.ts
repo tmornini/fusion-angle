@@ -3,13 +3,13 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import {
     getOrganizations,
-} from '../web-app/app/adapters/organizations.ts';
+} from '../client/organizations.ts';
 import {
     postOrganizationSessionExchange,
-} from '../web-app/app/adapters/organization-session.ts';
+} from '../client/organization-session.ts';
 import {
     devToken,
     reachableToken,

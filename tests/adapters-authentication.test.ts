@@ -13,11 +13,11 @@ import { decodeAccessToken } from '../api/access-token.ts';
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
-} from '../web-app/app/adapters/authentication.ts';
+} from '../client/authentication.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     seedIdentityCredential,

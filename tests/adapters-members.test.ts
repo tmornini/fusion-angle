@@ -21,7 +21,7 @@ import {
     postHumanMemberCreation,
     type HumanMember,
     type HumanMemberDraft,
-} from '../web-app/app/adapters/members.ts';
+} from '../client/members.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -83,7 +83,7 @@ Deno.test(
         await seedCurrentMember(db);
         await seedHumanMember(db, 'xdaJyuuPyHfffCGLhqDrOQ', 'Original Name');
         const { putHumanMember } = await import(
-            '../web-app/app/adapters/members.ts'
+            '../client/members.ts'
         );
         await putHumanMember(
             ctx, 'xdaJyuuPyHfffCGLhqDrOQ', {

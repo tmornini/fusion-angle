@@ -8,11 +8,11 @@ import {
 } from '@std/assert';
 import {
     createHttpFacade,
-} from '../web-app/app/adapters/http-facade.ts';
+} from '../client/http-facade.ts';
 import {
     createRecoveringRequestContext,
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { UnauthorizedError } from
     '../shared/http-errors.ts';
@@ -22,9 +22,9 @@ import {
 } from './token-fixtures.ts';
 import { isIdentifier } from '../shared/identifier.ts';
 import { postPasswordLogin } from
-    '../web-app/app/adapters/authentication.ts';
+    '../client/authentication.ts';
 import { deleteRefreshChannel } from
-    '../web-app/app/adapters/session-refresh-mutex.ts';
+    '../client/session-refresh-mutex.ts';
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to

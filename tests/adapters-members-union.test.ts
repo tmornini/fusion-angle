@@ -11,7 +11,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -22,7 +22,7 @@ import {
     isAIMember,
     MEMBER_WITHOUT_PII_NAME,
     fillHumanMemberProfile,
-} from '../web-app/app/adapters/members-union.ts';
+} from '../client/members-union.ts';
 import type {
     MemberId,
     Member,
@@ -48,7 +48,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
+    '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 

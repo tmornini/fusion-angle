@@ -6,7 +6,7 @@ import {
 } from './organization-switcher.ts';
 import {
     shouldShowOrganizationSwitcher,
-} from './adapters/organization-session.ts';
+} from '../../client/organization-session.ts';
 import {
     RequestError, HTTP_FORBIDDEN,
 } from '../../shared/http-errors.ts';
@@ -61,7 +61,7 @@ async function getSidebarMember(
         try {
             const { getOrganizations } =
                 await import(
-                    './adapters/organizations.ts'
+                    '../../client/organizations.ts'
                 );
             organizations = await getOrganizations(ctx);
         } catch (err) {

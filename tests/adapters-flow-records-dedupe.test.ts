@@ -1,11 +1,11 @@
 import { assertEquals } from '@std/assert';
 import type { RequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import { getFlowEntities } from
-    '../web-app/app/adapters/flows.ts';
+    '../client/flows.ts';
 import {
     loadRecordFlowJoins,
-} from '../web-app/app/adapters/flow-records.ts';
+} from '../client/flow-records.ts';
 
 Deno.test(
     'record-detail load GETs flows/ once and each'

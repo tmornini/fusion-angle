@@ -1,0 +1,294 @@
+import type {
+    FlowRecordEntity,
+    RecordAttributeEntity,
+    RecordEntity,
+    RecordId,
+    RecordState,
+} from '../shared/types.ts';
+import {
+    RecordModel,
+    assertRecordState,
+} from '../shared/types.ts';
+import {
+    activeOrganization,
+    organizationItem,
+    type RequestContext,
+} from './shared.ts';
+import {
+    createSubscriptionChannel,
+} from '../web-app/app/channels.ts';
+import { getFlowEntities } from './flows.ts';
+
+// The flow↔record bindings across EVERY flow the caller's org
+// can see — reassembled from the per-flow nested collections,
+// since a record may be bound by flows beyond any single one.
+// The flows list is org-scoped; each flow's records are fetched
+// in parallel and concatenated.
+async function getAllFlowRecords(
+    ctx: RequestContext,
+): Promise<FlowRecordEntity[]> {
+    const flows = await getFlowEntities(ctx);
+    const perFlow = await Promise.all(
+        flows.map(f => ctx.GET<FlowRecordEntity[]>(
+            organizationItem(ctx, 'flows', f.id)
+                + '/records/',
+        )),
+    );
+    return perFlow.flat();
+}
+
+export {
+    RecordModel,
+    RECORD_STATES,
+    isRecordState,
+    assertRecordState,
+} from '../shared/types.ts';
+export type {
+    RecordEntity,
+    RecordId,
+    RecordState,
+} from '../shared/types.ts';
+
+export interface RecordWithCounts {
+    readonly record: RecordModel;
+    readonly attributeCount: number;
+    readonly boundFlowCount: number;
+}
+
+const recordChanges = createSubscriptionChannel();
+
+export function subscribeRecordChanges(
+    fn: () => void,
+): () => void {
+    return recordChanges.subscribe(fn);
+}
+
+export function notifyRecordChange(): void {
+    recordChanges.notify();
+}
+
+// Org-nested record-types wire (Task 21). Schema mutations
+// stay admin-tier on the nested surface; members GET only.
+function recordTypesPath(ctx: RequestContext): string {
+    return 'organizations/'
+        + activeOrganization(ctx)
+        + '/record-types/';
+}
+
+function recordTypePath(
+    ctx: RequestContext,
+    id: RecordId,
+): string {
+    return recordTypesPath(ctx) + id;
+}
+
+export async function getRecordEntities(
+    ctx: RequestContext,
+): Promise<RecordEntity[]> {
+    return ctx.GET<RecordEntity[]>(
+        recordTypesPath(ctx),
+    );
+}
+
+export async function getRecord(
+    ctx: RequestContext,
+    id: RecordId,
+): Promise<RecordEntity> {
+    return ctx.GET<RecordEntity>(
+        recordTypePath(ctx, id),
+    );
+}
+
+// Domain state rides the RecordEntity GET row; narrow it
+// once, at the wire.
+function recordStateOf(row: RecordEntity): RecordState {
+    return assertRecordState(
+        row.state, 'record ' + row.id,
+    );
+}
+
+// The record detail page's read: one domain facet
+// carrying identity, content, and lifecycle state —
+// the raw row and its separate state never cross the
+// seam, so a plain field edit (the detail page's
+// no-attribute-change save) can echo the GET-stamped state
+// without minting a fresh event.
+export async function getRecordModel(
+    ctx: RequestContext,
+    id: RecordId,
+): Promise<RecordModel> {
+    const row = await getRecord(ctx, id);
+    return new RecordModel(
+        row, recordStateOf(row),
+    );
+}
+
+export async function getRecords(
+    ctx: RequestContext,
+): Promise<RecordWithCounts[]> {
+    const [rows, flowRecords] = await Promise.all([
+        getRecordEntities(ctx),
+        getAllFlowRecords(ctx),
+    ]);
+    // Per-type nested attributes collection — server-side
+    // filter replaces the retired flat bulk + client filter.
+    const attrLists = await Promise.all(
+        rows.map(row => ctx.GET<
+            RecordAttributeEntity[]
+        >(
+            recordTypePath(ctx, row.id)
+            + '/attributes/',
+        )),
+    );
+    const attrCountByRecord = new Map<
+        string, number
+    >();
+    for (let i = 0; i < rows.length; i++) {
+        attrCountByRecord.set(
+            rows[i]!.id,
+            attrLists[i]!.length,
+        );
+    }
+    const flowCountByRecord = new Map<
+        string, number
+    >();
+    for (const fr of flowRecords) {
+        flowCountByRecord.set(
+            fr.record_id,
+            (flowCountByRecord
+                .get(fr.record_id) ?? 0) + 1,
+        );
+    }
+    return rows.map(row => ({
+        record: new RecordModel(
+            row, recordStateOf(row),
+        ),
+        attributeCount:
+            attrCountByRecord.get(row.id)
+            ?? 0,
+        boundFlowCount:
+            flowCountByRecord.get(row.id)
+            ?? 0,
+    }));
+}
+
+// The wire document PUT /records/:id now takes today's entity
+// fields plus state, camelCase on this side of the adapter
+// seam. organization_id is EXCLUDED too — the client never
+// supplies it (the org fence stamps it downstream). A
+// state-UNCHANGED save (name/description/position edited,
+// state echoed back unchanged) converges to a no-op event
+// write at the op; a genuine transition
+// (postRecordStateChange below) sends a new state.
+export type RecordDocumentFields =
+    Omit<
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+    >;
+
+export async function putRecord(
+    ctx: RequestContext,
+    id: RecordId,
+    document: RecordDocumentFields,
+): Promise<void> {
+    const { state, ...entity } = document;
+    await ctx.PUT(recordTypePath(ctx, id), {
+        ...entity,
+        state,
+    });
+    recordChanges.notify();
+}
+
+export interface RecordChangeCreate {
+    readonly kind: 'create';
+    readonly record: Omit<
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+    >;
+    readonly attributes: readonly Omit<
+        RecordAttributeEntity, 'organization_id'
+    >[];
+    readonly initialState: RecordState;
+}
+
+export interface RecordChangeEdit {
+    readonly kind: 'edit';
+    readonly record: Omit<
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+    >;
+    readonly attributes: readonly Omit<
+        RecordAttributeEntity, 'organization_id'
+    >[];
+    readonly removedAttributeIds: readonly string[];
+    readonly state: RecordState;
+}
+
+export type RecordChange =
+    | RecordChangeCreate
+    | RecordChangeEdit;
+
+export async function postRecordChange(
+    ctx: RequestContext,
+    id: RecordId,
+    change: RecordChange,
+): Promise<void> {
+    // The server stamps organization_id from the verified
+    // token; this present-and-valid value only satisfies the
+    // record-write body validator, which requires the column.
+    const organization = activeOrganization(ctx);
+    const record = {
+        ...change.record, organization_id: organization,
+    };
+    const attributes = change.attributes.map(a => ({
+        ...a, organization_id: organization,
+    }));
+    if (change.kind === 'create') {
+        await ctx.POST(recordTypesPath(ctx), {
+            kind: 'create',
+            id,
+            record,
+            attributes,
+            initialState: change.initialState,
+        });
+    } else {
+        await ctx.POST(recordTypesPath(ctx), {
+            kind: 'edit',
+            id,
+            record,
+            attributes,
+            state: change.state,
+            removedAttributeIds:
+                change.removedAttributeIds,
+        });
+    }
+    recordChanges.notify();
+}
+
+// A transition: composes the document PUT with a FRESH state
+// (mint-once-reuse — a retry of the SAME transition resends
+// this same pinned pair, converging at the op) over the
+// record's CURRENT entity fields — hop count 1 -> 1 (one
+// ctx.PUT, via putRecord). Strip the GET-stamped state so the
+// new state is the only lifecycle value in the PUT body.
+export async function postRecordStateChange(
+    ctx: RequestContext,
+    record: RecordEntity,
+    state: RecordState,
+): Promise<void> {
+    const {
+        id,
+        state: _priorState,
+        ...entity
+    } = record;
+    void _priorState;
+    await putRecord(ctx, id, {
+        ...entity,
+        state,
+    });
+}

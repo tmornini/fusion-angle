@@ -7,7 +7,7 @@ import {
 import {
     createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -19,7 +19,7 @@ import {
     putProjectFields,
     putProjectPosition,
     ProjectView,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
 import {
     Project,
     COST_DIVISOR,

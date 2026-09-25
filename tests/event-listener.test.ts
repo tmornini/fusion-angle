@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import {
     subscribeEventListener,
-} from '../web-app/app/adapters/event-listener.ts';
+} from '../client/event-listener.ts';
 
 Deno.test('subscribeEventListener adds; the returned fn removes',
     () => {

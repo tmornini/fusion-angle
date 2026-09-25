@@ -75,7 +75,7 @@ Deno.test('named service shows its name and detail, not the id',
 Deno.test('unnamed service redacts to a label, not the id',
 async () => {
     const { UNNAMED_SERVICE_NAME } = await import(
-        '../web-app/app/adapters/identities.ts'
+        '../client/identities.ts'
     );
     const rec = record();
     new IdentityRosterPresenter([
@@ -95,7 +95,7 @@ async () => {
 Deno.test('erased person falls back to the named constant',
 async () => {
     const { IDENTITY_WITHOUT_PII_NAME } = await import(
-        '../web-app/app/adapters/identities.ts'
+        '../client/identities.ts'
     );
     const rec = record();
     new IdentityRosterPresenter([

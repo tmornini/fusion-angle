@@ -21,7 +21,7 @@ import {
 import { handleRequest, UnauthorizedError } from '../api/api.ts';
 import {
     createRecoveringRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
     withLocalStorageAsync,
@@ -30,7 +30,7 @@ import { putSessionToken } from '../web-app/app/adapters/init.ts';
 import {
     getSessionCredentials,
     putSessionCredentials,
-} from '../web-app/app/adapters/session-credentials.ts';
+} from '../client/session-credentials.ts';
 import { STORAGE_KEY_AUTHORIZATION } from
     '../web-app/app/storage-keys.ts';
 import {
@@ -48,7 +48,7 @@ import {
 } from '../api/access-token.ts';
 import {
     ACTIVE_ORGANIZATION_ID,
-} from '../web-app/app/adapters/organization-session.ts';
+} from '../client/organization-session.ts';
 import {
     getSessionToken,
 } from '../web-app/app/adapters/init.ts';
@@ -60,7 +60,7 @@ import {
 } from '../api/message-pair.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { HttpFacade } from
-    '../web-app/app/adapters/http-facade.ts';
+    '../client/http-facade.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
@@ -77,15 +77,15 @@ import { basicAuthorization } from
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationAcceptance,
-} from '../web-app/app/adapters/invitations.ts';
+} from '../client/invitations.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { sha256Hex } from '../shared/digest.ts';
 import { deleteRefreshChannel } from
-    '../web-app/app/adapters/session-refresh-mutex.ts';
+    '../client/session-refresh-mutex.ts';
 import { deleteNotificationChannel } from
-    '../web-app/app/adapters/broadcast-channel.ts';
+    '../client/broadcast-channel.ts';
 
 // The single-flight mutex opens ONE refresh channel per
 // process, lazily, and a test process has no unload to

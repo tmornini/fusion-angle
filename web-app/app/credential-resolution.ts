@@ -2,7 +2,7 @@ import { decodeAccessToken } from
     '../../shared/access-token-decode.ts';
 import type {
     SessionCredentials,
-} from './adapters/session-credentials.ts';
+} from '../../client/session-credentials.ts';
 
 // The branch the boot gate and runtime recovery both act on,
 // decided from token expiry alone — one pure voice for two

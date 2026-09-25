@@ -35,7 +35,7 @@ import {
 } from '../adapters/index.ts';
 import type {
     FlowListItem,
-} from '../adapters/flows.ts';
+} from '../../../client/flows.ts';
 
 export interface ProjectDraftFields {
     title: string;

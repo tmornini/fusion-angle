@@ -2,24 +2,24 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import type { RequestContext } from
-    '../web-app/app/adapters/shared.ts';
+    '../client/shared.ts';
 import {
     getDashboardStats,
     getDashboardGauges,
 } from '../web-app/app/adapters/dashboard.ts';
 import {
     getDashboardScoringBundle,
-} from '../web-app/app/adapters/project-scoring.ts';
+} from '../client/project-scoring.ts';
 import { postIdeaCreation } from
-    '../web-app/app/adapters/ideas.ts';
+    '../client/ideas.ts';
 import {
     putProject,
     postProjectStateChange,
     getProjectEntity,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
 import {
     postFlowCreation,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';

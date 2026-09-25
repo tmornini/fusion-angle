@@ -9,11 +9,11 @@ import {
     probeRefreshSession,
 } from '../web-app/app/apex-destination.ts';
 import { createHttpFacade } from
-    '../web-app/app/adapters/http-facade.ts';
+    '../client/http-facade.ts';
 import { putClientFacade } from
-    '../web-app/app/adapters/facade-holder.ts';
+    '../client/facade-holder.ts';
 import { deleteRefreshChannel } from
-    '../web-app/app/adapters/session-refresh-mutex.ts';
+    '../client/session-refresh-mutex.ts';
 
 function installProbeFacade(): void {
     putClientFacade(createHttpFacade(''));

@@ -7,7 +7,7 @@ import {
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getRecord,
@@ -16,7 +16,7 @@ import {
     putRecord,
     postRecordChange,
     postRecordStateChange,
-} from '../web-app/app/adapters/records.ts';
+} from '../client/records.ts';
 import {
     seedCurrentMember,
 } from './member-fixtures.ts';

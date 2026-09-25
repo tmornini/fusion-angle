@@ -115,7 +115,7 @@ Deno.test(
                 getClientFacade,
                 putClientFacade,
             } = await import(
-                '../web-app/app/adapters/facade-holder.ts'
+                '../client/facade-holder.ts'
             );
             const inner = getClientFacade();
             const paths: string[] = [];
@@ -147,7 +147,7 @@ Deno.test(
         } finally {
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

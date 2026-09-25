@@ -12,12 +12,12 @@ import {
 import {
     nowEpochSeconds,
 } from '../../../shared/types.ts';
-import { wrapClientAdapter } from './facade-holder.ts';
-import { putClientFacade } from './facade-holder.ts';
+import { wrapClientAdapter } from '../../../client/facade-holder.ts';
+import { putClientFacade } from '../../../client/facade-holder.ts';
 import {
     putSessionToken,
     sessionTokenIsSeeded,
-} from './session-token.ts';
+} from '../../../client/session-token.ts';
 
 export {
     getSessionToken,
@@ -27,7 +27,7 @@ export {
     sessionIsOrganizationScoped,
     sessionHasReachableOrganization,
     sessionIsAuthenticated,
-} from './session-token.ts';
+} from '../../../client/session-token.ts';
 
 let adapter: ClientFacadeAdapter | undefined;
 

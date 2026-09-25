@@ -14,7 +14,7 @@ import {
     createRequestContext,
     organizationItem,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getObjectives,
@@ -28,7 +28,7 @@ import {
     postObjectiveArchival,
     postObjectiveReactivation,
     putObjectivePosition,
-} from '../web-app/app/adapters/objectives.ts';
+} from '../client/objectives.ts';
 import {
     computeNewPosition,
 } from '../web-app/app/drag-reorder-positions.ts';

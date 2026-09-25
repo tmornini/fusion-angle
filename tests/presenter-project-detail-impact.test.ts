@@ -8,7 +8,7 @@ import type {
     ObjectiveEntity,
 } from '../shared/types.ts';
 import { ProjectView } from
-    '../web-app/app/adapters/projects.ts';
+    '../client/projects.ts';
 import {
     ProjectDetailPresenter,
 } from '../web-app/app/presenters/project-detail.ts';

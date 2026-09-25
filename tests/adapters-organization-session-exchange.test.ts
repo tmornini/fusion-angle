@@ -5,14 +5,14 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { principalFromToken } from '../api/access-token.ts';
 import {
     postOrganizationSessionExchange,
     shouldShowOrganizationSwitcher,
     resolveActiveOrganization,
-} from '../web-app/app/adapters/organization-session.ts';
+} from '../client/organization-session.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 

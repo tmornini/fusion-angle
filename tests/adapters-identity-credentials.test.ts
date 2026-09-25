@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedIdentityCredential } from './identity-fixtures.ts';
@@ -10,7 +10,7 @@ import {
     postIdentityCredentialRevocation,
     getIdentityCredentialState,
 } from
-    '../web-app/app/adapters/identity-credentials.ts';
+    '../client/identity-credentials.ts';
 import { deriveCredentialsFor } from
     '../api/derive-identity-spine.ts';
 

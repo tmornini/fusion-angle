@@ -25,17 +25,17 @@ import {
     mutateInvitationsBell,
 } from './invitations-indicator.ts';
 import { navigateTo } from './navigation.ts';
-import { sessionContext } from './adapters/shared.ts';
+import { sessionContext } from '../../client/shared.ts';
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
 import {
     sessionIsOrganizationScoped,
     sessionIsAuthenticated,
-} from './adapters/session-token.ts';
+} from '../../client/session-token.ts';
 import {
     postSessionLogout,
-} from './adapters/session-logout.ts';
+} from '../../client/session-logout.ts';
 
 function initSidebar(): void {
     function toggleSidebar(): void {

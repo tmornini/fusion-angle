@@ -12,12 +12,12 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getProvidersFor,
-} from '../web-app/app/adapters/identity-providers.ts';
+} from '../client/identity-providers.ts';
 import { seedIdentityProvider } from './identity-fixtures.ts';
 import {
     deriveIdentityProvider,

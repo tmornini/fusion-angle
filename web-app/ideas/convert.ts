@@ -27,7 +27,7 @@ import {
 import {
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
-} from '../app/adapters/objectives.ts';
+} from '../../client/objectives.ts';
 import { MS_PER_DAY } from '../../shared/types.ts';
 import type {
     ObjectiveEntity,

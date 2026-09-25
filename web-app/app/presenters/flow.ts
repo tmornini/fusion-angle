@@ -12,7 +12,7 @@ import {
 } from '../icons.ts';
 import type {
     FlowSummary,
-} from '../adapters/flows.ts';
+} from '../../../client/flows.ts';
 import { buildPageUrl } from '../navigation.ts';
 
 export class FlowPresenter {

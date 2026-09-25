@@ -1,8 +1,8 @@
 import { PAGE_REGISTRY } from './page-registry.ts';
-import { createHttpFacade } from './adapters/http-facade.ts';
-import { putClientFacade } from './adapters/facade-holder.ts';
+import { createHttpFacade } from '../../client/http-facade.ts';
+import { putClientFacade } from '../../client/facade-holder.ts';
 import { setCookieSession } from
-    './adapters/session-credentials.ts';
+    '../../client/session-credentials.ts';
 import { bootApp } from './app-boot.ts';
 
 // Server-ZIP esbuild entry. Imports pages (via

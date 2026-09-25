@@ -7,15 +7,15 @@ import {
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getHumanMemberMap,
     getCurrentHumanMember,
-} from '../web-app/app/adapters/members.ts';
+} from '../client/members.ts';
 import {
     memberName,
-} from '../web-app/app/adapters/members-union.ts';
+} from '../client/members-union.ts';
 import {
     type Member,
     type MemberId,
