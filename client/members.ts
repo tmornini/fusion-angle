@@ -11,7 +11,7 @@ import {
     HumanMember,
     nowUtc,
 } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import { getMemberPii } from './identities.ts';
 import {
     createSubscriptionChannel,

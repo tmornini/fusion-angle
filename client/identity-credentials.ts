@@ -11,7 +11,7 @@ import {
 import {
     latestByKey,
 } from '../shared/ledger-reduction.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 
 async function appendCredentialEvent(
     ctx: RequestContext,

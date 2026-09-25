@@ -3,7 +3,7 @@ import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
 import { formatCalendarDate } from './format.ts';
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 import {
     getOrganizationEntity,
     getOrganizationSeats,

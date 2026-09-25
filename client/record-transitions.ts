@@ -5,8 +5,8 @@ import type {
     WorkOrderFlowGraph,
     WorkOrderHistoryEventEntity,
 } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
-import { organizationItem } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
+import { organizationItem } from './request-context.ts';
 import {
     validateWorkOrderFlowGraph,
     getWorkOrderHistory,

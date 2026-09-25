@@ -4,7 +4,7 @@ import type {
     AIAgentEntity,
 } from '../shared/types.ts';
 import { AIMember } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';

@@ -10,7 +10,7 @@ import {
     filterByField,
     organizationItem,
     type RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     notifyRecordChange,
 } from './records.ts';

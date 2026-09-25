@@ -2,7 +2,7 @@ import { assertEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     type RequestContext,
-} from '../client/shared.ts';
+} from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {

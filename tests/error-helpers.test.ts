@@ -10,7 +10,7 @@ import {
     initErrorSurfacing,
 } from '../web-app/app/error-helpers.ts';
 import type { RequestContext } from
-    '../client/shared.ts';
+    '../client/request-context.ts';
 import { captureConsole } from
     './fixtures/console-capture.ts';
 

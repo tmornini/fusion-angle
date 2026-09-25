@@ -3,7 +3,7 @@ import type {
     ObjectiveEntity,
     ObjectiveId,
 } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import { getProjectEntity } from './projects.ts';
 import type { ValidationResult } from './validation.ts';
 import { getActiveObjectives } from './objectives.ts';

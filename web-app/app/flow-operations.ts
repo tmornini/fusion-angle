@@ -1,7 +1,7 @@
 import type { FlowSnapshot } from
     './presenters/flow-designer.ts';
 import type { RequestContext } from
-    '../../client/shared.ts';
+    '../../client/request-context.ts';
 import type {
     GraphEdge,
     GraphNode,
@@ -30,7 +30,7 @@ import type {
 import {
     jitteredBackoff,
     organizationItem,
-} from '../../client/shared.ts';
+} from '../../client/request-context.ts';
 import {
     NODE_WIDTH,
     NODE_HEIGHT,

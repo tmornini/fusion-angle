@@ -15,7 +15,7 @@ import {
 } from '../../../shared/types.ts';
 import type {
     RequestContext,
-} from '../../../client/shared.ts';
+} from '../../../client/request-context.ts';
 import { reportFault } from '../error-helpers.ts';
 import type {
     FlowGraph,

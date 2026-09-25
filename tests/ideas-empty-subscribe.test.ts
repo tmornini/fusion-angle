@@ -174,7 +174,7 @@ Deno.test(
                 './in-page-facade.ts'
             );
             const { organizationItem } = await import(
-                '../client/shared.ts'
+                '../client/request-context.ts'
             );
             const ctx = inPageContext(
                 db, await organizationToken(),

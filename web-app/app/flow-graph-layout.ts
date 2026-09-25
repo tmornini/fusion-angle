@@ -8,7 +8,7 @@ import {
     getFlowGraph,
     type FlowGraph,
 } from '../../client/flow-queries.ts';
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 
 // The minimal edge shape a layout needs: who connects to whom,
 // and the label whose width reserves horizontal room.

@@ -11,7 +11,7 @@ import {
 import {
     activeOrganization,
     type RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 
 // Domain twin of the attribute document: above the storage
 // seam the fields speak camelCase — snake_case stays below.

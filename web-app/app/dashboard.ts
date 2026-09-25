@@ -11,7 +11,7 @@ import {
     DISPLAY_ABSENT,
 } from './format.ts';
 import { formatSigned } from './scoring-format.ts';
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 import { getIdeaEntities } from '../../client/ideas.ts';
 import { getProjectEntities } from '../../client/projects.ts';
 import { getFlowEntities } from '../../client/flows.ts';

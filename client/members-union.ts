@@ -11,7 +11,7 @@ import {
     FormerMember,
     SYSTEM_MEMBER_ID,
 } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     buildHumanMemberMap,
     getHumanMemberProfile,

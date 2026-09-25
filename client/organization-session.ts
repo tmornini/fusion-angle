@@ -1,4 +1,4 @@
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     STORAGE_KEY_ACTIVE_ORGANIZATION_ID,
 } from './session-storage-keys.ts';

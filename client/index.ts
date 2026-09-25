@@ -39,7 +39,7 @@ export * from './session-refresh-mutex.ts';
 export * from './session-refresh.ts';
 export * from './session-storage-keys.ts';
 export * from './session-token.ts';
-export * from './shared.ts';
+export * from './request-context.ts';
 export * from './validation.ts';
 export * from './work-orders-deletions.ts';
 export * from './work-orders-mutations.ts';

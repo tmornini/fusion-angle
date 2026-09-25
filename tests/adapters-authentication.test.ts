@@ -12,7 +12,7 @@ import { testHashPassword } from './mock-seed.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
     type RequestContext,
-} from '../client/shared.ts';
+} from '../client/request-context.ts';
 import {
     inPageClient,
     inPageContext,

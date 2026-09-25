@@ -18,7 +18,7 @@ import {
     subscribeObjectiveChanges,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 import {
     isProjectState,
     type Project,

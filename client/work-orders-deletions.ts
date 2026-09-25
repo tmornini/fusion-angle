@@ -1,5 +1,5 @@
-import type { RequestContext } from './shared.ts';
-import { organizationItem } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
+import { organizationItem } from './request-context.ts';
 import {
     notifyWorkOrderChanges,
 } from './work-orders-mutations.ts';

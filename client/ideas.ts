@@ -11,11 +11,11 @@ import {
     ideaIsVisible,
     assertIdeaState,
 } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     organizationCollection,
     organizationItem,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     getCurrentHumanMember,
 } from './members.ts';

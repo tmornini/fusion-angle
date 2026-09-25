@@ -1,6 +1,6 @@
 import type { Id } from '../../shared/types.ts';
 import type { FlowGraph } from '../../client/flow-queries.ts';
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 import {
     buildFlowStats,
     type FlowStatsInput,

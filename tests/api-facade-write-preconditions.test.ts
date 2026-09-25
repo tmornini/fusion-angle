@@ -7,7 +7,7 @@ import {
 } from '../api/db-memory.ts';
 import { GET, GETWithEtag, PUT } from '../api/api.ts';
 import { jitteredBackoff } from
-    '../client/shared.ts';
+    '../client/request-context.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {

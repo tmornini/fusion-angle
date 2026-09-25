@@ -14,7 +14,7 @@ import {
 import {
     organizationItem,
     type RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     getObjectives,
 } from './objectives.ts';

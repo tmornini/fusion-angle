@@ -6,7 +6,7 @@ import {
     getWorkOrderHistories,
 } from '../client/work-orders-queries.ts';
 import type { RequestContext } from
-    '../client/shared.ts';
+    '../client/request-context.ts';
 
 Deno.test(
     'getWorkOrderHistories does not GET work-orders/',

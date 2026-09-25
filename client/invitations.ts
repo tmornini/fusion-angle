@@ -8,7 +8,7 @@ import {
 import {
     activeOrganization,
     type RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,

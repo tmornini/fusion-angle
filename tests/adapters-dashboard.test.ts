@@ -2,7 +2,7 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import type { RequestContext } from
-    '../client/shared.ts';
+    '../client/request-context.ts';
 import {
     getDashboardStats,
     getDashboardGauges,

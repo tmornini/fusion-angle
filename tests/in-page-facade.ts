@@ -13,7 +13,7 @@ import {
 import type { HttpTransport } from
     '../client/http-facade.ts';
 import type { Client } from '../client/create-client.ts';
-import type { RequestContext } from '../client/shared.ts';
+import type { RequestContext } from '../client/request-context.ts';
 import { createAppClient } from '../web-app/app/client.ts';
 
 // Test wrap: in-process handleRequest verbs as HttpFacade.

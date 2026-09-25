@@ -32,7 +32,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     type RequestContext,
-} from '../client/shared.ts';
+} from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { sessionContext } from '../web-app/app/client.ts';
 import {

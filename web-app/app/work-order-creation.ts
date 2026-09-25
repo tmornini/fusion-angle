@@ -1,4 +1,4 @@
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 import { getFlowWithGraph } from
     '../../client/flow-queries.ts';
 import { getWorkOrderEntities } from

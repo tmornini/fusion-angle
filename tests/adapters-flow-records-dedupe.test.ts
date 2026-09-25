@@ -1,6 +1,6 @@
 import { assertEquals } from '@std/assert';
 import type { RequestContext } from
-    '../client/shared.ts';
+    '../client/request-context.ts';
 import { getFlowEntities } from
     '../client/flows.ts';
 import {

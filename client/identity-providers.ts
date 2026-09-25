@@ -5,7 +5,7 @@ import {
 } from '../shared/types.ts';
 import {
     type RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     latestByKey,
 } from '../shared/ledger-reduction.ts';

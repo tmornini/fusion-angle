@@ -6,7 +6,7 @@ import {
 import {
     filterByField,
     type RequestContext,
-} from '../../client/shared.ts';
+} from '../../client/request-context.ts';
 import {
     getAllActualScores,
     getAllBaselineScores,

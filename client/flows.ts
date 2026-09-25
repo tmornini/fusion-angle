@@ -1,6 +1,6 @@
 import type { FlowEntity } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
-import { organizationCollection } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
+import { organizationCollection } from './request-context.ts';
 
 export async function getFlowEntities(
     ctx: RequestContext,

@@ -1,7 +1,7 @@
 import type {
     OrganizationEntity,
 } from '../shared/types.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 
 // The organization vessel adapter — RequestContext is the sole
 // argument, HTTP-verb naming. `getOrganizations` lists the

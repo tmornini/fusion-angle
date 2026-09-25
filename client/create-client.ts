@@ -12,7 +12,7 @@ import {
     type ClientNavigation,
     type RequestContext,
     type RequestRecorder,
-} from './shared.ts';
+} from './request-context.ts';
 
 export interface ClientDeps {
     readonly facade: HttpTransport;

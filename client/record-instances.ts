@@ -1,5 +1,5 @@
-import type { RequestContext } from './shared.ts';
-import { activeOrganization } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
+import { activeOrganization } from './request-context.ts';
 
 // Domain face of a record instance: values as a map keyed
 // by attribute id. etag is the unquoted pair id for

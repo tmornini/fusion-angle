@@ -11,7 +11,7 @@ import {
 import {
     activeOrganization,
     type RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
 import { getHumanMembers } from './members.ts';

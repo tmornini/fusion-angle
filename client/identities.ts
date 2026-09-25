@@ -14,7 +14,7 @@ import {
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
 } from '../shared/http-errors.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';

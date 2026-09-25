@@ -33,7 +33,7 @@ import {
     getProjectFlowEntities,
 } from '../../client/flow-queries.ts';
 import type { FlowGraph } from '../../client/flow-queries.ts';
-import type { RequestContext } from '../../client/shared.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 import { getFlowEntities } from '../../client/flows.ts';
 import { getProjectEntities } from '../../client/projects.ts';
 import {

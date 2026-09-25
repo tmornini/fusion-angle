@@ -1,4 +1,4 @@
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     RequestError,
     UnauthorizedError,

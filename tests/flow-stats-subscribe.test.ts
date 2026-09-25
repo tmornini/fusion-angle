@@ -123,7 +123,7 @@ Deno.test(
                 './in-page-facade.ts'
             );
             const { organizationItem } = await import(
-                '../client/shared.ts'
+                '../client/request-context.ts'
             );
             const { postFlowCreation } = await import(
                 '../client/flow-mutations.ts'

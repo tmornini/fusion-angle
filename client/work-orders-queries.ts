@@ -13,11 +13,11 @@ import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     isClaimState,
 } from '../shared/work-order-claims.ts';
-import type { RequestContext } from './shared.ts';
+import type { RequestContext } from './request-context.ts';
 import {
     organizationCollection,
     organizationItem,
-} from './shared.ts';
+} from './request-context.ts';
 import { compareIdentifiers } from
     '../shared/identifier.ts';
 

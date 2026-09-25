@@ -13,7 +13,7 @@ import {
     type RequestContext,
     organizationCollection,
     organizationItem,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';

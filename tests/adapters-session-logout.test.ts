@@ -8,7 +8,7 @@ import {
 } from './fixtures/local-storage.ts';
 import {
     type RequestContext,
-} from '../client/shared.ts';
+} from '../client/request-context.ts';
 import {
     postSessionLogout,
 } from '../client/session-logout.ts';

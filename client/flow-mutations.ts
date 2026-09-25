@@ -35,12 +35,12 @@ import {
 } from '../shared/http-errors.ts';
 import type {
     RequestContext,
-} from './shared.ts';
+} from './request-context.ts';
 import {
     jitteredBackoff,
     organizationCollection,
     organizationItem,
-} from './shared.ts';
+} from './request-context.ts';
 
 const flowChanges =
     createSubscriptionChannel();

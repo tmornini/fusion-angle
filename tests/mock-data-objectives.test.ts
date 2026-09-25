@@ -17,7 +17,7 @@ import { getProjectEntities } from
 import type { Id, ProjectState } from
     '../shared/types.ts';
 import type { RequestContext } from
-    '../client/shared.ts';
+    '../client/request-context.ts';
 import {
     getBaselineScoresForProject,
     getActualScoresForProject,
