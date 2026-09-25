@@ -10,9 +10,9 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
-    getOrganization,
     getOrganizationStats,
 } from '../client/admin.ts';
+import { getOrganization } from '../web-app/app/organization-view.ts';
 import { putIdea } from '../client/ideas.ts';
 import { putProject } from '../client/projects.ts';
 import {

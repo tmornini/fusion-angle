@@ -10,10 +10,10 @@ import {
     iconEdit, iconSave, iconX,
 } from '../icons.ts';
 import type {
-    Organization,
     OrganizationStats,
     GeneralInfoDraft,
 } from '../adapters/index.ts';
+import type { Organization } from '../organization-view.ts';
 
 export type GeneralInfoFieldKey =
     | 'name' | 'domain';

@@ -23,12 +23,10 @@ import {
     handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    getOrganization,
     getOrganizationSeats,
     getOrganizationStats,
     putOrganizationGeneralInfo,
     sessionContext,
-    Organization,
     type OrganizationStats,
     type GeneralInfoDraft,
     getObjectives,
@@ -47,6 +45,10 @@ import {
     subscribeInvitationChanges,
     generateIdentifier,
 } from '../app/adapters/index.ts';
+import {
+    getOrganization,
+    Organization,
+} from '../app/organization-view.ts';
 import {
     fetchMeasureName,
     markEnd,

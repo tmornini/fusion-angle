@@ -3,8 +3,7 @@ import { Project } from '../shared/types.ts';
 import { DISPLAY_ABSENT } from '../web-app/app/format.ts';
 import { ProjectView } from
     '../client/projects.ts';
-import { Organization } from
-    '../client/admin.ts';
+import { Organization } from '../web-app/app/organization-view.ts';
 import { ProjectPresenter } from
     '../web-app/app/presenters/project.ts';
 import {
