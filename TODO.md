@@ -1757,11 +1757,35 @@ Off the critical path; each with its oracle.
   fixed count still proves less than it reads as proving;
   the ideas comment still says its drain matches the
   post-bell assert, which 90f5c722 turned into a deadline
-  wait. Oracle: each check reads after a signal that the
+  wait.
+  The ledger arc saw four more suites fail under
+  `--parallel`, each green on re-run, three failures in
+  ten `./test` runs on 2026-09-24:
+  `tests/adapters-shared-recovery.test.ts:546`
+  ("malformed token: expected 3 segments");
+  `tests/apex-destination.test.ts:65`
+  (`probeRefreshSession posts a cookie refresh grant`,
+  one expected and none seen at `:102`) and its 401
+  probe; `tests/adapters-invitations.test.ts:1076` (`a
+  re-minted token without the seat earns one more
+  attempt`: the re-minted token did not list the
+  organization) and `:1131`; and
+  `tests/api-shadow-ledger-tokens.test.ts:860`
+  (`revokeTokenChain racing a concurrent
+  rotateRefreshJti`: a rotated jti read `issued` where
+  every jti should read `revoked`). These are session
+  and token races, not drains; the seed cycle's
+  hypothesis is that heavier seeding widened their
+  timing windows, and the last asserts a product
+  invariant, so it may be a real race and not a test's.
+  Oracle: each check reads after a signal that the
   delivery was processed — a render count on the host
   stub for the two page tests, a second listener on
   `fusion-angle:refresh` for the mutex test — and no
-  fixed-count drain remains at those three sites.
+  fixed-count drain remains at those three sites;
+  and each of the four suites above passes ten
+  consecutive `./test` runs, or its failure has a named
+  cause and a fix
 - Objective lifecycle history compares two clocks:
   `revision.at` is client-minted while the lifecycle `at`
   is the server-stamped pair fact. A browser clock ahead of
