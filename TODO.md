@@ -1522,6 +1522,28 @@ Off the critical path; each with its oracle.
   insert-threshold behavior on the insert-only table. Oracle:
   numbers in the sweep's JSON and a backup-size line item 6
   can plan against.
+- Request statistics in `./bin/measure`, with
+  visualizations. `handleRequest` (`api/api.ts`) is the one
+  seam: the in-page transport and `server/http-server.ts`
+  both route through it, and `simulateLatency()` runs before
+  it, so a timer there measures the handler alone. Record
+  per request: method, route family (ids folded to `:id`),
+  status, handler ms, wall stamp. A throwaway probe on
+  `packageable-client` (`ffa73bf4`, memory suite,
+  `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
+  peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
+  p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
+  `work-orders/:id/history` clusters at 100-102 ms (p90
+  100.7, max 102.3), unexplained. The probe's synchronous
+  per-request append cost ~1.3 s on a 45 s suite. Suite
+  throughput through the memory backend is not a load test;
+  the Postgres origin (`--base-url`) is where a rate means
+  something. Visualize beside readyMs in `measure-viz`: a
+  log-bucket latency histogram, per-route p50/p90/p99, and a
+  requests-per-second timeline. Oracle: `--record` writes the
+  per-route figures to `measurements/`; `--visualize` draws
+  the three charts; `--check` gates per-route p90 against
+  `measurements/budgets.json`.
 - Stamp parameters stay text until Postgres parses
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
