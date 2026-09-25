@@ -75,7 +75,7 @@ defaults.
 
 ## Gates
 
-`./test validate` composes `deno check --frozen api shared
+`./test validate` composes `deno check --frozen api client shared
 server tests web-app`, then `./test` — `Deno.test`
 suites written against `@std/assert`, run as `deno
 test --frozen --parallel --no-check
@@ -84,7 +84,7 @@ preloads, in two TZ passes: `TZ=UTC` on
 `tests/*.test.ts`, then `TZ=Pacific/Honolulu` on
 `tests/tz/*.test.ts` — then 78-character lint of code
 and scripts (not `.md`), the `org` identifier ban
-under `api/`, `web-app/`, `tests/`, and `shared/`,
+under `api/`, `client/`, `web-app/`, `tests/`, and `shared/`,
 then `generate-schema-svg --check` and
 `generate-api-documentation --check`, both `deno run`.
 Clean tree for `./bin/build`, `./deploy`, and
@@ -204,7 +204,7 @@ cannot know:
 - **Commandments touched by the task.** Name them.
 - **Abominations the task specifically risks.** Name them.
 - **Existing codebase patterns to match.** RequestContext
-  as the first argument to adapter methods, SafeHtml from
+  as the first argument to client verbs, SafeHtml from
   presenters, snake_case storage / camelCase domain,
   HTTP-verb adapter naming (`getNoun`/`putNoun`/`deleteNoun`/
   `postNounOperation`), validators at the gate not
@@ -220,6 +220,9 @@ Subagents never run `./deploy --render`.
 ## Where things live
 
 - `api/` — REST, derives, validators, auth/tenancy
+- `client/` — the API client: transport, request
+  context, session, bell, verbs; imports only itself and
+  `shared/`; entry `client/index.ts`
 - `docs/` — superpowers specs and plans
 - `measurements/` — budgets, history, measure-viz
 - `server/` — boot, HTTP adapter, seed/wipe, throttle
@@ -234,8 +237,11 @@ Subagents never run `./deploy --render`.
   `fetch-discarding-body.ts` (a `fetch` that cancels
   the response body so the resource sanitizer does not
   see it as a leak, for tests that assert only status
-  and headers)
-- `web-app/` — pages, adapters, presenters, CSS
+  and headers); `client-init.ts` (the test composition
+  root) and `in-page-facade.ts` (the in-process
+  transport)
+- `web-app/` — pages, presenters, browser adapters, app
+  logic, CSS
 
 Run `ls`.
 
@@ -328,7 +334,7 @@ returns `T | undefined`, requiring a `!` or a guard.
 
 `deno.json` is the only project: `strict`, DOM plus
 `deno.ns`, `verbatimModuleSyntax`, `erasableSyntaxOnly`.
-The `deno check --frozen api shared server tests
+The `deno check --frozen api client shared server tests
 web-app` roots succeed the root project's `include`. The
 browser project's `exclude` registry has no successor,
 and neither does the fence it served.
@@ -344,7 +350,7 @@ own — the Deno port took the last one — but the gate
 checks it in one invocation with `server` and `tests`,
 and either alone suffices: `server/scrypt-hash.ts`'s
 `node:crypto` unlocks it even with `tests` excluded. So
-`deno check --frozen api shared server tests web-app`
+`deno check --frozen api client shared server tests web-app`
 passes a file under `web-app/app/` whose only line is
 `process.env.HOME`. Nothing under `web-app/` is
 type-fenced against `process` today, and `Deno.*` never
