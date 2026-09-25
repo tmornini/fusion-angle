@@ -1,6 +1,6 @@
 import type {
     OrganizationEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 
 // The organization vessel adapter — RequestContext is the sole

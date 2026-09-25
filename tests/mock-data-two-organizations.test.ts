@@ -36,7 +36,7 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     ObjectiveEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { handleRequest } from '../api/api.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
@@ -48,7 +48,7 @@ import { deriveDocumentsAt } from
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';

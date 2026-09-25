@@ -32,10 +32,10 @@ import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     asStoredGraph,
 } from '../api/validators.ts';

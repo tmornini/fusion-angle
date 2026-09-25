@@ -43,11 +43,11 @@ import type {
     RecordWriteMessagePairs,
     ObjectiveCreationMessagePairs,
 } from './routes.ts';
-import type { Id } from './types.ts';
+import type { Id } from '../shared/types.ts';
 import {
     SYSTEM_MEMBER_ID,
     nowUtc,
-} from './types.ts';
+} from '../shared/types.ts';
 import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';

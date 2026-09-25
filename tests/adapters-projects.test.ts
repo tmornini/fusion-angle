@@ -23,11 +23,11 @@ import {
 import {
     Project,
     COST_DIVISOR,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     ProjectEntity,
     ProjectState,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedCurrentMember,
 } from './member-fixtures.ts';

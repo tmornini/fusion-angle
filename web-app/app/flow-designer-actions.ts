@@ -3,13 +3,13 @@ import type {
     GraphEdge,
     NodeAttribute,
     RecordAttributeId,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_AGENT_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     edgeWaypointKey,
     NODE_WIDTH,

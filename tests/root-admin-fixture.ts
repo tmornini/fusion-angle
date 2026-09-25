@@ -2,7 +2,7 @@ import type { DbAdapter } from '../api/db.ts';
 import {
     nowUtc, SYSTEM_MEMBER_ID, type Id,
     type OrganizationEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,

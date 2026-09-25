@@ -30,7 +30,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     instancesUriPrefix,
     deriveInstanceHead,

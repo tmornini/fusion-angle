@@ -3,8 +3,8 @@
 // preserving — the per-entity seed modules thread the same rng
 // through them so two seeds on one day are byte-for-byte alike.
 
-import type { Id } from '../types.ts';
-import { SYSTEM_MEMBER_ID } from '../types.ts';
+import type { Id } from '../../shared/types.ts';
+import { SYSTEM_MEMBER_ID } from '../../shared/types.ts';
 import {
     encodeIdentifier,
     NIL_IDENTIFIER,

@@ -20,12 +20,12 @@ import {
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';

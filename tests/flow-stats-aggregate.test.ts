@@ -8,7 +8,7 @@ import {
     type FlowPath,
 } from '../web-app/app/flow-stats-aggregate.ts';
 import type {
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     TransitionEvent,
     StepTransition,

@@ -1,5 +1,5 @@
 import { NIL_IDENTIFIER } from
-    '../shared/identifier.ts';
+    './identifier.ts';
 
 export type Id = string;
 

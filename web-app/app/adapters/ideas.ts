@@ -5,12 +5,12 @@ import type {
     ObjectiveId,
     ProjectEntity,
     ProjectState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     Idea, nowUtc,
     ideaIsVisible,
     assertIdeaState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,
@@ -53,7 +53,7 @@ export {
     isIdeaState,
     IDEA_STATES,
     IDEA_READINESS,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export async function getIdeaEntities(
     ctx: RequestContext,
@@ -115,7 +115,7 @@ async function getIdeaSubmissionEntity(
 
 export type {
     IdeaSubmissionEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export interface IdeaWithSubmitter {
     readonly idea: Idea;

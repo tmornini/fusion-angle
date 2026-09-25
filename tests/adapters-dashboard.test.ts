@@ -30,7 +30,7 @@ import {
     type ProjectState,
     type FlowWithGraph,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 async function gaugesOf(
     ctx: RequestContext,

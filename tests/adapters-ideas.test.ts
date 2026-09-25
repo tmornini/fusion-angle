@@ -25,7 +25,7 @@ import {
     type IdeaState,
     type ProjectEntity,
     type ProjectObjectiveBaselineScoreEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -34,7 +34,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
     '../web-app/app/adapters/members.ts';
-import { FORMER_MEMBER_NAME } from '../api/types.ts';
+import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 

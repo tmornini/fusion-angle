@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, ObjectiveRevisionEntity } from './types.ts';
+import type { Id, ObjectiveRevisionEntity } from '../shared/types.ts';
 import { validateObjectiveRevisionEntity } from
     './validators.ts';
 import { canonicalPath } from './message-pair.ts';

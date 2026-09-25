@@ -14,8 +14,8 @@ import {
     ValidationError,
     msSinceUtc,
     nowUtc,
-} from './types.ts';
-import type { Id } from './types.ts';
+} from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {

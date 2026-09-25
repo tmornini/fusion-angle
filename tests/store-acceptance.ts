@@ -13,8 +13,8 @@ import {
 import {
     compareIdentifiers, generateIdentifier,
 } from '../shared/identifier.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
-import type { MessagePairEntity } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
+import type { MessagePairEntity } from '../shared/types.ts';
 import { ledgerFields } from './ledger-row.ts';
 
 // Parameterized store acceptance. ./test-postgres will

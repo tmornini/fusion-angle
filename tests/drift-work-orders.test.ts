@@ -18,11 +18,11 @@ import type {
     WorkOrderEntity,
     MessagePairEntity,
     StateEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import {
     documentMessagePairsAt,

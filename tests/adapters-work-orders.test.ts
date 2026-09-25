@@ -65,13 +65,13 @@ import {
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
     StateEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';

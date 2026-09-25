@@ -29,7 +29,7 @@ import {
 import type {
     RecordEntity,
     RecordId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export function buildAttributeRefRow(
     ref: NodeAttribute,

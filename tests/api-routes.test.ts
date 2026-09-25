@@ -6,7 +6,7 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
-import type { OrganizationEntity } from '../api/types.ts';
+import type { OrganizationEntity } from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';

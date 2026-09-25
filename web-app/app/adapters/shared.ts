@@ -1,7 +1,7 @@
 import {
     nowEpochSeconds,
     type Id,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     UnauthorizedError,
 } from '../../../api/http-errors.ts';

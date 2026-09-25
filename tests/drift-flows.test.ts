@@ -18,9 +18,9 @@ import {
 } from '../api/db.ts';
 import type {
     FlowWithGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { DEFAULT_LOCK_TIMEOUT } from
-    '../api/types.ts';
+    '../shared/types.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { l2cProjectId } from '../api/mock-data/projects.ts';
 import {

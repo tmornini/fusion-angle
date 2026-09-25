@@ -1,7 +1,7 @@
 import {
     type Id,
     type IdentityTokenEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     parentJtiByJti,
 } from '../../../api/identity-tokens.ts';

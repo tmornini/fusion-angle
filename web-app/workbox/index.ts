@@ -38,7 +38,7 @@ import {
     type TransitionEvent,
     type Member,
 } from '../app/adapters/index.ts';
-import type { Id } from '../../api/types.ts';
+import type { Id } from '../../shared/types.ts';
 import {
     WorkboxInboxPresenter,
     buildInboxItems,

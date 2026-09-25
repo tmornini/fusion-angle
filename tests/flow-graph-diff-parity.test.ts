@@ -11,7 +11,7 @@ import type {
     StoredGraph,
     GraphNode,
     GraphEdge,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 // Cross-consistency pin: api/flow-graph-diff.ts is the
 // sanctioned server twin of buildSaveEvents/buildRevivals

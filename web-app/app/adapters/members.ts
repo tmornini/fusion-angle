@@ -6,11 +6,11 @@ import type {
     HumanProfile,
     IdentityPiiEntity,
     MembershipEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     HumanMember,
     nowUtc,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import { getMemberPii } from './identities.ts';
 import {
@@ -19,13 +19,13 @@ import {
 export {
     HumanMember,
     isDimensionKey,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 export type {
     MemberId,
     HumanMemberEntity,
     HumanProfile,
     DimensionKey,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 const humanMemberChanges =
     createSubscriptionChannel();

@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { Id } from './types.ts';
+import type { Id } from '../shared/types.ts';
 import {
     deriveDocumentsAt,
     documentMessagePairsAt,

@@ -2,7 +2,7 @@ import type {
     Id,
     IdentityTokenAction,
     IdentityTokenEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     latestByKey,
     findFirstByKey,

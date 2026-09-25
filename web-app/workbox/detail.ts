@@ -45,7 +45,7 @@ import {
 } from '../app/adapters/index.ts';
 import type {
     NodeAttribute,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import type {
     RecordAttribute,
     RequestContext,

@@ -2,7 +2,7 @@ import { assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
-import type { Id } from '../api/types.ts';
+import type { Id } from '../shared/types.ts';
 import {
     documentCollectionGetHandler,
     documentFamilyWiring,

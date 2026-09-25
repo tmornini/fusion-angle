@@ -6,7 +6,7 @@ import type {
     StoredGraph,
     GraphNode,
     NodeAttribute,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const FLOW_ID = 'aEsGMmBEFaVdWihhHXwCbw';

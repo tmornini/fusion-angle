@@ -2,7 +2,7 @@ import {
     type Id,
     type IdentityProviderAction,
     type IdentityProviderEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     type RequestContext,
 } from './shared.ts';

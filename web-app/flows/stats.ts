@@ -18,7 +18,7 @@ import {
 import {
     NODE_WIDTH, NODE_HEIGHT,
 } from '../app/flow-layout.ts';
-import type { GraphNode } from '../../api/types.ts';
+import type { GraphNode } from '../../shared/types.ts';
 
 // Empty canvas fallback when no nodes exist.
 const EMPTY_W = 200;

@@ -1,5 +1,5 @@
 import type { DbAdapter } from '../api/db.ts';
-import type { IdeaEntity } from '../api/types.ts';
+import type { IdeaEntity } from '../shared/types.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 // organizationRow/seedOrganizationDocument now LIVE in
 // root-admin-fixture.ts (Phase 13 Task 3's fixture prerequisite

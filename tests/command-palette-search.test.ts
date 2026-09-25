@@ -11,7 +11,7 @@ import type {
 import {
     Idea, Project, HumanMember,
     type IdeaState,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 function buildIdea(
     id: string, title: string,

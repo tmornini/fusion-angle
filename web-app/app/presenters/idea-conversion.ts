@@ -19,7 +19,7 @@ import { type Idea } from '../adapters/index.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     formatSigned,
 } from '../scoring-format.ts';

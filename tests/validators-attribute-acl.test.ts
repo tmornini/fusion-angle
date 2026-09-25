@@ -7,7 +7,7 @@ import {
 } from '@std/assert';
 import {
     ValidationError,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     validateAttributeDocument,
 } from '../api/validators.ts';

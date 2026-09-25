@@ -5,7 +5,7 @@ import {
     assertIdeaState,
     assertProjectState,
     MS_PER_DAY,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     formatCompactCurrency,
     DISPLAY_ABSENT,

@@ -44,11 +44,11 @@ import type {
     MemberEntity,
     AttributeType,
     Constraint,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
-} from './types.ts';
+} from '../shared/types.ts';
 import { hashPassword } from
     '../shared/password-hash.ts';
 import {
@@ -148,7 +148,7 @@ import {
 } from './flow-graph-relations.ts';
 import {
     storedGraph,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     deriveIdeaSubmissions,
     ideaEntityOf,

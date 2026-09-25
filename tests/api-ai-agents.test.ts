@@ -8,7 +8,7 @@ import { firstProviderModel } from './member-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { operationIdHeader } from

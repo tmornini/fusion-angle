@@ -1,5 +1,5 @@
 import { assertStrictEquals, assertThrows } from '@std/assert';
-import { Project, COST_DIVISOR } from '../api/types.ts';
+import { Project, COST_DIVISOR } from '../shared/types.ts';
 import { ProjectView } from
     '../web-app/app/adapters/projects.ts';
 import {

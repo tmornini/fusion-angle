@@ -23,7 +23,7 @@ import type {
 } from '../adapters/flows.ts';
 import type {
     MemberId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     type RecordAttribute,
 } from '../adapters/index.ts';

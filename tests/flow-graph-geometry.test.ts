@@ -11,7 +11,7 @@ import {
 import type {
     GraphEdge,
     GraphNode,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 function node(
     id: string,

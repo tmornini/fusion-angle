@@ -20,7 +20,7 @@ import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';

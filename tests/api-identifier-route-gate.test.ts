@@ -23,7 +23,7 @@ import {
 } from '../api/request-context.ts';
 import { validateWorkOrderTransitionBody } from
     '../api/validators.ts';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 
 const SKIP_PARAMS = new Set(['name']);
 

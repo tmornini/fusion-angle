@@ -5,13 +5,13 @@ import type {
     GraphNode,
     GraphEdge,
     Id,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     MS_PER_DAY,
     SECONDS_PER_HOUR,
     MS_PER_SECOND,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     mulberry32,
     b62Id,

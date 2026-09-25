@@ -9,7 +9,7 @@ import {
     type IdeaEntity,
     type IdeaState,
     type ObjectiveEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DISPLAY_ABSENT,
 } from '../web-app/app/format.ts';

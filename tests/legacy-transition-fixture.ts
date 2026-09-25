@@ -7,7 +7,7 @@ import {
 } from '../api/message-pair.ts';
 import {
     SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

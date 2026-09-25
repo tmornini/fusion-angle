@@ -7,11 +7,11 @@ import type {
     GraphNode,
     NodeAttribute,
     RecordAttributeId,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,

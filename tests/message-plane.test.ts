@@ -48,7 +48,7 @@ import {
     nowUtc,
     resetClock,
     setClockForTest,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     sha256Bytes,
     sha256Hex,

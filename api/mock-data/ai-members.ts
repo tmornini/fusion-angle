@@ -1,4 +1,4 @@
-import type { AIMemberEntity } from '../types.ts';
+import type { AIMemberEntity } from '../../shared/types.ts';
 
 // The seeded AI members — the demo's model roster. Fixed
 // data; the composition root writes each one's member,

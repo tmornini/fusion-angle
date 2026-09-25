@@ -10,7 +10,7 @@ import type {
     FlowNodeMemberEntity,
     FlowNodeAttributeEntity,
     FlowNodeRelationAction,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const memberRow = (
     id: string, nodeId: string, memberId: string,

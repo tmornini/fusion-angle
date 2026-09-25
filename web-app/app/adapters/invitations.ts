@@ -1,7 +1,7 @@
-import type { Id, InvitationState } from '../../../api/types.ts';
+import type { Id, InvitationState } from '../../../shared/types.ts';
 import {
     nowUtc,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     generateIdentifier,
 } from '../../../shared/identifier.ts';
@@ -32,8 +32,8 @@ import {
 } from '../../../shared/access-token-decode.ts';
 export {
     isInvitationState,
-} from '../../../api/types.ts';
-export type { InvitationState } from '../../../api/types.ts';
+} from '../../../shared/types.ts';
+export type { InvitationState } from '../../../shared/types.ts';
 
 // The invitations surface refreshes whenever an invitation, its
 // lifecycle event, or a membership (written on accept) changes —

@@ -22,7 +22,7 @@ import {
 import { TABLE_NAMES } from '../api/db.ts';
 import type {
     GraphEdge,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type { AttributeReferrers } from
     '../api/record-attribute-refs.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';

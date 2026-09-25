@@ -4,7 +4,7 @@ import {
     storedGraph,
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     asStoredGraph,
     asWorkOrderFlowGraph,

@@ -131,12 +131,12 @@ import type {
     FlowRecordEntity,
     IdentityCredentialKind,
     OrganizationEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     SYSTEM_MEMBER_ID,
     storedGraph,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     formWriteMessagePair,
     IF_MATCH_HEADER,

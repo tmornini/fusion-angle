@@ -7,7 +7,7 @@ import type {
     NodeAttribute,
     StoredGraph,
     AttributeType,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     asBoolean,
     asStoredGraph,
@@ -145,7 +145,7 @@ getFlowsWithProjectNames(
 
 export type {
     ProjectFlowEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export async function getFlowsByProject(
     ctx: RequestContext,

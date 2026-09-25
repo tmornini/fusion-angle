@@ -1,6 +1,6 @@
 import type {
     StoredGraph,
-} from './types.ts';
+} from '../shared/types.ts';
 import type {
     FlowGraphDelta,
     FlowNodeRowBody,

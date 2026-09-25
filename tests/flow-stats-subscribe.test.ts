@@ -12,7 +12,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
     type FlowWithGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const CHANNEL_NAME = 'fusion-angle:data';
 const BELL_DEADLINE_MS = 5000;

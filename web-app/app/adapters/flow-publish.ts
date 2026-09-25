@@ -1,7 +1,7 @@
 import type {
     FlowWithGraph,
     Id,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     asBoolean,
     asStoredGraph,

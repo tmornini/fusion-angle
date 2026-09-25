@@ -3,7 +3,7 @@ import type {
     Id,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';

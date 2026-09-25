@@ -28,11 +28,11 @@ import {
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
 } from '../app/adapters/objectives.ts';
-import { MS_PER_DAY } from '../../api/types.ts';
+import { MS_PER_DAY } from '../../shared/types.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     nextPosition,
 } from '../app/drag-reorder-positions.ts';

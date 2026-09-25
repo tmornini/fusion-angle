@@ -3,7 +3,7 @@ import {
     MS_PER_SECOND,
     type Id,
     type StateEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // The closed claim vocabulary. Three strings: a claim

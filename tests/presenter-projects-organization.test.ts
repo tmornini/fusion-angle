@@ -1,5 +1,5 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
-import { Project } from '../api/types.ts';
+import { Project } from '../shared/types.ts';
 import { DISPLAY_ABSENT } from '../web-app/app/format.ts';
 import { ProjectView } from
     '../web-app/app/adapters/projects.ts';

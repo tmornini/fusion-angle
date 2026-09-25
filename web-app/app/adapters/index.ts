@@ -3,7 +3,7 @@ export {
     SECONDS_PER_DAY,
     MS_PER_DAY,
     formatCompactCurrency,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 export {
     MissingTableError,
 } from '../../../api/db.ts';

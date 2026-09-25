@@ -12,7 +12,7 @@ import {
 } from '../../api/http-errors.ts';
 import type {
     OrganizationEntity,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 
 const SIDEBAR_MEMBER_NAME_IDS = [
     'sidebar-member-name',

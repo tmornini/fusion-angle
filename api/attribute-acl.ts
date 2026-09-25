@@ -1,6 +1,6 @@
 import type { AttributeSchemaRow } from
     './record-constraints.ts';
-import { ValidationError } from './types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     ApiError,
     HTTP_FORBIDDEN,

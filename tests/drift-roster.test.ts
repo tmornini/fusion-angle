@@ -12,9 +12,9 @@ import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
     MembershipEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { nowUtc } from
-    '../api/types.ts';
+    '../shared/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {

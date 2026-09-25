@@ -19,7 +19,7 @@ import {
 import {
     type Member,
     type MemberId,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     makeHumanMember,
     seedHumanMember,

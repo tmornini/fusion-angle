@@ -6,7 +6,7 @@ import {
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import type {
     MessagePairEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';

@@ -2,8 +2,8 @@ import type {
     MemberId,
     MemberEntity,
     AIAgentEntity,
-} from '../../../api/types.ts';
-import { AIMember } from '../../../api/types.ts';
+} from '../../../shared/types.ts';
+import { AIMember } from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -11,10 +11,10 @@ import {
 
 export {
     AIMember,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 export type {
     AIMemberEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 const aiMemberChanges =
     createSubscriptionChannel();

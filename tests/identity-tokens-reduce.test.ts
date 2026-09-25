@@ -8,7 +8,7 @@ import {
     parentJtiByJti,
     planRotation,
 } from '../api/identity-tokens.ts';
-import type { IdentityTokenAction } from '../api/types.ts';
+import type { IdentityTokenAction } from '../shared/types.ts';
 
 const ev = (
     jti: string, action: IdentityTokenAction,

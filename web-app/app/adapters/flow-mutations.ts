@@ -4,12 +4,12 @@ import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
     storedGraph,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type {
     FlowGraphDelta,
     FlowNodeRowBody,

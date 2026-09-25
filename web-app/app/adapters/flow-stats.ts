@@ -1,4 +1,4 @@
-import type { Id } from '../../../api/types.ts';
+import type { Id } from '../../../shared/types.ts';
 import type { FlowGraph } from './flow-queries.ts';
 import type { RequestContext } from './shared.ts';
 import {

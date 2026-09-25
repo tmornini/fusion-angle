@@ -16,7 +16,7 @@ import {
 import { getProjectEntities } from
     '../web-app/app/adapters/projects.ts';
 import type { Id, ProjectState } from
-    '../api/types.ts';
+    '../shared/types.ts';
 import type { RequestContext } from
     '../web-app/app/adapters/shared.ts';
 import {

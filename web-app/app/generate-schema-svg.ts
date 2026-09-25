@@ -2,7 +2,7 @@
 // SCHEMA.svg. Picture logic lives in schema-svg.ts.
 import { renderSchemaSvg } from './schema-svg.ts';
 
-const TYPES_PATH = 'api/types.ts';
+const TYPES_PATH = 'shared/types.ts';
 const DB_PATH = 'api/db.ts';
 const SCHEMA_PATH = 'api/schema-postgres.ts';
 const SVG_PATH = 'SCHEMA.svg';

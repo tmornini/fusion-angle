@@ -4,7 +4,7 @@ import {
 import {
     nowUtc,
     type Id,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 
 export async function postIdentityLogoutEverywhere(

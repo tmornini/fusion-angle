@@ -3,7 +3,7 @@ import {
     assertIdeaState,
     type OrganizationEntity,
     type MembershipEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     getOrganization as fetchOrganization,
     putOrganization,
@@ -19,7 +19,7 @@ import { getHumanMembers } from './members.ts';
 
 export type {
     OrganizationEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 async function getOrganizationEntity(
     ctx: RequestContext,

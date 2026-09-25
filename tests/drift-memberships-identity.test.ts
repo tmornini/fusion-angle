@@ -1,8 +1,8 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import type { Id, MembershipEntity } from '../api/types.ts';
-import { SYSTEM_MEMBER_ID } from '../api/types.ts';
+import type { Id, MembershipEntity } from '../shared/types.ts';
+import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import {
     deriveMembershipsForIdentity,
     membershipExistsFor,

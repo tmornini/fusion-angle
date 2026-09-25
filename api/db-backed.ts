@@ -11,7 +11,7 @@ import type {
 } from './db.ts';
 import type {
     MessagePairEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import type {
     Attempt,
     StatementAnswer,

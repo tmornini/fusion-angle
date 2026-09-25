@@ -1,7 +1,7 @@
 import type {
     IdeaEntity,
     IdeaSubmissionEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import { daysFromNow } from './seed-kit.ts';
 
 // The seeded ideas. Fixed data; the composition root sets

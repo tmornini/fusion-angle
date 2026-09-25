@@ -18,7 +18,7 @@ import {
     decodeIdentifier,
     generateIdentifier,
 } from '../shared/identifier.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     advisoryKey,
     POOL_MAX,

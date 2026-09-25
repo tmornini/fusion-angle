@@ -1,10 +1,10 @@
-import type { GraphNode } from '../../../api/types.ts';
+import type { GraphNode } from '../../../shared/types.ts';
 import {
     DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_AGENT_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     generateIdentifier,
 } from '../../../shared/identifier.ts';

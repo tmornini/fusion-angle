@@ -1,7 +1,7 @@
 import { assertMatch } from '@std/assert';
 import { buildGraphSvg } from
     '../web-app/app/flow-graph.ts';
-import type { GraphNode } from '../api/types.ts';
+import type { GraphNode } from '../shared/types.ts';
 
 function node(id: string): GraphNode {
     return {

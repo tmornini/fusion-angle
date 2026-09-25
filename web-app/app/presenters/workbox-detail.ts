@@ -18,7 +18,7 @@ import {
     type ConstraintViolation,
 } from '../adapters/index.ts';
 import type { Member } from '../adapters/index.ts';
-import type { Id } from '../../../api/types.ts';
+import type { Id } from '../../../shared/types.ts';
 import {
     ICON_SIZE,
     iconArrowLeft,

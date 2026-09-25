@@ -1,6 +1,6 @@
 import type {
     MessagePairEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import type {
     NotificationEvent,
     NotificationPost,

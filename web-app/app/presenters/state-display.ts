@@ -3,7 +3,7 @@ import type {
     RecordState,
     ProjectState,
     InvitationState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 // The badge vocabulary for entity states: what each state is
 // called on screen and which design-system badge class it

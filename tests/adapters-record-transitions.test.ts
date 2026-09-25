@@ -35,7 +35,7 @@ import {
     type GraphEdge,
     type NodeAttribute,
     type WorkOrderFlowGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

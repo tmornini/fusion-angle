@@ -2,8 +2,8 @@ import type {
     AttributeType,
     Constraint,
     RecordAttributeId,
-} from './types.ts';
-import { ValidationError } from './types.ts';
+} from '../shared/types.ts';
+import { ValidationError } from '../shared/types.ts';
 
 // Schema-side attribute row for the value engine and
 // attribute ACL (Task 13). Structural twin of nested

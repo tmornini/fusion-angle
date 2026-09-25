@@ -19,7 +19,7 @@ import {
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
     type ProjectState,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
     seedAdminSchema,

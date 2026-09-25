@@ -34,11 +34,11 @@ import { orderedKeys } from
     '../web-app/app/presenters/ordered-keys.ts';
 import {
     HumanMember, AIMember,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode, GraphEdge, RecordEntity,
     NodeAttribute,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type { RecordAttribute } from
     '../web-app/app/adapters/index.ts';
 import {

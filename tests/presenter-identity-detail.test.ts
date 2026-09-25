@@ -1,5 +1,5 @@
 import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
-import { Identity } from '../api/types.ts';
+import { Identity } from '../shared/types.ts';
 import {
     IDENTITY_WITHOUT_PII_NAME,
     UNNAMED_SERVICE_NAME,

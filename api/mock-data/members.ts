@@ -1,6 +1,6 @@
 import type {
     HumanMemberEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 
 export type SeedHumanMember = Omit<
     HumanMemberEntity,

@@ -28,7 +28,7 @@ import { navigateTo } from './navigation.ts';
 import { sessionContext } from './adapters/shared.ts';
 import type {
     OrganizationEntity,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     sessionIsOrganizationScoped,
     sessionIsAuthenticated,

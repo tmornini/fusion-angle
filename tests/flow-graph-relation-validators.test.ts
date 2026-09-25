@@ -5,7 +5,7 @@ import {
     validateFlowNodeMemberEntity,
     validateFlowNodeAttributeEntity,
 } from '../api/validators.ts';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

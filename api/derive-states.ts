@@ -8,8 +8,8 @@ import type {
     TransitionFieldValueEntity,
     WorkOrderEntity,
     WorkOrderHistoryEventEntity,
-} from './types.ts';
-import { MS_PER_SECOND } from './types.ts';
+} from '../shared/types.ts';
+import { MS_PER_SECOND } from '../shared/types.ts';
 import {
     pickString, pickNumber, asObject,
     asWorkOrderFlowGraph,

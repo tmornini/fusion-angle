@@ -4,8 +4,8 @@ import {
 import type {
     AttributeType,
     Constraint,
-} from '../api/types.ts';
-import { ValidationError } from '../api/types.ts';
+} from '../shared/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     type AttributeSchemaRow,
     validateInstanceValues,

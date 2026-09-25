@@ -1,4 +1,4 @@
-import type { ObjectiveId } from '../../api/types.ts';
+import type { ObjectiveId } from '../../shared/types.ts';
 import { latestByKey } from '../../shared/ledger-reduction.ts';
 
 export type Tone = 'success' | 'error' | 'muted';

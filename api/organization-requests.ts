@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, OrganizationEntity } from './types.ts';
+import type { Id, OrganizationEntity } from '../shared/types.ts';
 import {
     attemptFor,
     runWrite,

@@ -14,7 +14,7 @@ import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,

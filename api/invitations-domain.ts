@@ -4,7 +4,7 @@ import {
     assertInvitationState,
     type Id,
     type InvitationState,
-} from './types.ts';
+} from '../shared/types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     ApiError,

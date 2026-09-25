@@ -21,7 +21,7 @@ import {
 } from '../api/validators.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     firstProviderModel,
 } from './member-fixtures.ts';

@@ -3,11 +3,11 @@ import type {
     WorkOrderEntity,
     WorkOrderFlowGraph,
     StoredGraph,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     nowUtc,
     storedWorkOrderFlowGraph,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     asStoredGraph,
 } from '../../../api/validators.ts';

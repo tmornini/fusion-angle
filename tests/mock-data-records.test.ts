@@ -28,7 +28,7 @@ import { deriveFlows } from '../api/derive-flows.ts';
 import type {
     RecordEntity,
     RecordAttributeEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,

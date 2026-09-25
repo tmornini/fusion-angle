@@ -39,7 +39,7 @@ import type {
     RecordAttributeId,
     RecordEntity,
     RecordId,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     postBlobDownload,
 } from '../app/adapters/blob-download.ts';

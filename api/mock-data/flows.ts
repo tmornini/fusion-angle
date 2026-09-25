@@ -4,10 +4,10 @@ import type {
     FlowEdgeEntity,
     FlowNodeMemberEntity,
     FlowNodeAttributeEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     asStoredGraph,
 } from '../validators.ts';

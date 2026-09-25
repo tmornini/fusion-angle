@@ -6,8 +6,8 @@ import {
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { ValidationError } from '../api/types.ts';
-import type { RecordAttributeEntity } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
+import type { RecordAttributeEntity } from '../shared/types.ts';
 import {
     validateRecordAttributeDocumentBody,
 } from '../api/validators.ts';

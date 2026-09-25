@@ -11,7 +11,7 @@ import {
 } from '../../../shared/identifier.ts';
 import {
     nowEpochSeconds,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import { wrapClientAdapter } from './facade-holder.ts';
 import { putClientFacade } from './facade-holder.ts';
 import {

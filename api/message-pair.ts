@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type {
     Id, IdentityTokenEntity, MessagePairEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     generateIdentifier,
     isIdentifier,

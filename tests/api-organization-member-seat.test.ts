@@ -18,7 +18,7 @@ import {
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     nowUtc, SYSTEM_MEMBER_ID, type FormerSeatEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { organizationToken, devToken } from
     './token-fixtures.ts';
 import {

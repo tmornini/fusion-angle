@@ -4,13 +4,13 @@ import type {
     MembershipEntity,
     AIAgentEntity,
     FormerSeatEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     HumanMember,
     SystemMember,
     FormerMember,
     SYSTEM_MEMBER_ID,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     buildHumanMemberMap,
@@ -31,10 +31,10 @@ export {
     isHumanMember,
     isAIMember,
     isSystemMember,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 export type {
     Member,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 function getSystemMembers(): SystemMember[] {
     return [

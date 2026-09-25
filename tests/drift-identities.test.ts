@@ -17,9 +17,9 @@ import type {
     IdentityCredentialEntity,
     IdentityPiiEntity,
     MembershipEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { nowUtc } from
-    '../api/types.ts';
+    '../shared/types.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,

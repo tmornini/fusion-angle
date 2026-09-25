@@ -14,8 +14,8 @@ import type { Member } from '../adapters/index.ts';
 import {
     SECONDS_PER_DAY,
     MS_PER_SECOND,
-} from '../../../api/types.ts';
-import type { Id } from '../../../api/types.ts';
+} from '../../../shared/types.ts';
+import type { Id } from '../../../shared/types.ts';
 
 const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;
 

@@ -20,7 +20,7 @@ import {
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { messageStore } from '../api/message-store.ts';
-import { setClockForTest, resetClock } from '../api/types.ts';
+import { setClockForTest, resetClock } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

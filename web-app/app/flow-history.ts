@@ -1,7 +1,7 @@
 import type {
     GraphNode,
     GraphEdge,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 
 // Client redo-stack snapshot shape. Relocated here from
 // adapters/flow-versions.ts (Phase 15 Task 7): the type is LIVE

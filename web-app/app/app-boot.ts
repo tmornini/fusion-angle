@@ -37,7 +37,7 @@ import {
 } from './adapters/organizations.ts';
 import type {
     OrganizationEntity,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
@@ -48,7 +48,7 @@ import {
 } from './adapters/identity-default-organization.ts';
 import {
     nowEpochSeconds,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     getPreference,
     putPreference,

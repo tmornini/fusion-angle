@@ -1,4 +1,4 @@
-import type { Id, ProjectEntity } from './types.ts';
+import type { Id, ProjectEntity } from '../shared/types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import type { DerivedDocument } from './derive-documents.ts';
 

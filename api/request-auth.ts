@@ -1,7 +1,7 @@
 import {
     nowEpochSeconds,
     type Id,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     verifyAccessToken,
     principalFromClaims,

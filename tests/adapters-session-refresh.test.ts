@@ -21,7 +21,7 @@ import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { sha256Hex } from '../shared/digest.ts';

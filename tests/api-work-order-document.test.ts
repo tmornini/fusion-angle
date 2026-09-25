@@ -13,12 +13,12 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     WorkOrderFlowGraph,
     MessagePairEntity,
-} from '../api/types.ts';
-import { ValidationError } from '../api/types.ts';
+} from '../shared/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     validateWorkOrderDocumentBody,
 } from '../api/validators.ts';

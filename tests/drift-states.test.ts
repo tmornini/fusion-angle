@@ -4,11 +4,11 @@ import { generateIdentifier } from
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
-import type { Id, StateEntity } from '../api/types.ts';
+import type { Id, StateEntity } from '../shared/types.ts';
 import {
     nowUtc, DEFAULT_LOCK_TIMEOUT, MS_PER_SECOND,
     setClockForTest, resetClock,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     deriveInvitationStates,
     workOrderLifecycleStatesFor,

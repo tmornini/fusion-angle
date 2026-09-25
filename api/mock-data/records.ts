@@ -2,7 +2,7 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     Constraint,
-} from '../types.ts';
+} from '../../shared/types.ts';
 
 // Seed attribute rows may carry an explicit ACL. Where the
 // arrays are absent, recordAttributeDocumentBodyOf

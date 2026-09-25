@@ -28,10 +28,10 @@ import type {
     GraphNode,
     GraphEdge,
     ProjectFlowEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
 import {
     seedHumanMember,

@@ -10,7 +10,7 @@ import type { DbAdapter } from '../api/db.ts';
 import {
     EntityNotFoundError,
 } from '../api/db.ts';
-import type { Id } from '../api/types.ts';
+import type { Id } from '../shared/types.ts';
 import {
     documentFamilyWiring,
     documentGetHandler,

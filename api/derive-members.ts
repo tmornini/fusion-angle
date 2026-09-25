@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, MemberEntity } from './types.ts';
+import type { Id, MemberEntity } from '../shared/types.ts';
 import { pickString } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import {

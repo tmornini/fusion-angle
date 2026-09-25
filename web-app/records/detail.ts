@@ -49,7 +49,7 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     Constraint,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import type {
     RecordAttribute,
     RecordInstance,

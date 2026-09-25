@@ -46,7 +46,7 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     apiRequest,
     pairIdOf,

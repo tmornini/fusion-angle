@@ -20,7 +20,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 // Instance DELETE RESTRICT (W5 / Task 5): 409 when any org
 // WO currently binds the instance AND that WO's current

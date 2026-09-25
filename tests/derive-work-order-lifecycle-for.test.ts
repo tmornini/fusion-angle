@@ -7,7 +7,7 @@ import {
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     workOrderLifecycleStatesFor,
     workOrderClaimHistoryFor,

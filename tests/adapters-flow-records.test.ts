@@ -22,7 +22,7 @@ import { putRecord } from '../web-app/app/adapters/records.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

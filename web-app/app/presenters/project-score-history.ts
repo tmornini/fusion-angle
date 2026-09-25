@@ -2,7 +2,7 @@ import { html, type SafeHtml } from '../safe-html.ts';
 import type {
     Id,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type {
     ObjectiveLifecycleEvent,
     ObjectiveRevision,

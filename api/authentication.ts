@@ -33,7 +33,7 @@ import {
     type ClientRegistrationEntity,
     type IdentityCredentialEntity,
     type IdentityPiiEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     pickString,
     validateIdentityCredentialEntity,

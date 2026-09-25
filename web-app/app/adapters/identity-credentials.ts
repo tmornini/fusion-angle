@@ -7,7 +7,7 @@ import {
     type IdentityCredentialEntity,
     type IdentityCredentialKind,
     type IdentityCredentialStatus,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     latestByKey,
 } from '../../../shared/ledger-reduction.ts';

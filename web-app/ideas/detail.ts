@@ -34,7 +34,7 @@ import {
     sessionContext,
     type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
-import type { IdeaEntity } from '../../api/types.ts';
+import type { IdeaEntity } from '../../shared/types.ts';
 
 const { signal } = createPageAbort();
 

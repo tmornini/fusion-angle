@@ -2,7 +2,7 @@ import type {
     Id,
     MembershipType,
     IdentityDefaultOrganizationEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // Claim role shape: `{type}:{organization_id}` (e.g. admin:1).

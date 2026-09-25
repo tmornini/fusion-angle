@@ -5,7 +5,7 @@ import type {
     Id,
     RecordId,
     FlowWorkOrderEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     filterByField,
     organizationItem,
@@ -22,12 +22,12 @@ import { getFlowEntities } from './flows.ts';
 import {
     generateIdentifier,
 } from '../../../shared/identifier.ts';
-import { nowUtc } from '../../../api/types.ts';
+import { nowUtc } from '../../../shared/types.ts';
 
 export type {
     FlowRecordEntity,
     FlowRecordId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 // The bindings for ONE flow — the server filters the nested
 // collection to the parent flow, so no client filter is needed.

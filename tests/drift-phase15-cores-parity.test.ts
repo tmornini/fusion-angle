@@ -10,7 +10,7 @@ import {
     EntityNotFoundError,
     TABLE_NAMES,
 } from '../api/db.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     workOrderDocumentHeadFor,
     workOrderClaimHistoryFor,
@@ -31,7 +31,7 @@ import { latestByKey } from
     '../shared/ledger-reduction.ts';
 import type {
     GraphEdge, WorkOrderEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     collectAttributeReferrers,
     type AttributeReferrers,

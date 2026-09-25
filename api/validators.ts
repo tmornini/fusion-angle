@@ -52,7 +52,7 @@ import type {
     ProjectObjectiveActualScoreEntity,
     MessagePairEntity,
     StateEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     assertAttributeType,
     assertConstraintAppliesTo,
@@ -63,12 +63,12 @@ import {
     assertProjectState,
     assertRecordState,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     isProviderModelId,
 } from './provider-models.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
-import { ValidationError } from './types.ts';
+import { ValidationError } from '../shared/types.ts';
 import { isIdentifier } from
     '../shared/identifier.ts';
 

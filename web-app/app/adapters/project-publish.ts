@@ -2,7 +2,7 @@ import type {
     Id,
     ObjectiveEntity,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import { getProjectEntity } from './projects.ts';
 import type { ValidationResult } from './validation.ts';

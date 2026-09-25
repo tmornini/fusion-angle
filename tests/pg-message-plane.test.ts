@@ -15,7 +15,7 @@ import {
 } from '../api/message-pair.ts';
 import { connectPostgres } from
     '../api/postgres-client.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
 import { generateIdentifier } from

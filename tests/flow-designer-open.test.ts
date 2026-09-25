@@ -16,7 +16,7 @@ import {
     DEV_TOKEN,
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';

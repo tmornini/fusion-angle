@@ -4,7 +4,7 @@ import type {
     WorkOrderEntity,
     WorkOrderFlowGraph,
     WorkOrderHistoryEventEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import { organizationItem } from './shared.ts';
 import {

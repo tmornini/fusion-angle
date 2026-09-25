@@ -62,7 +62,7 @@ import {
 import type { HttpFacade } from
     '../web-app/app/adapters/http-facade.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';

@@ -4,10 +4,10 @@ import type {
     Id,
     RecordAttributeId,
     RecordId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     activeOrganization,
     type RequestContext,
@@ -15,7 +15,7 @@ import {
 
 export type {
     RecordAttributeId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 // Domain twin of the attribute document: above the storage
 // seam the fields speak camelCase — snake_case stays below.

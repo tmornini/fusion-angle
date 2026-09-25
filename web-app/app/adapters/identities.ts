@@ -9,7 +9,7 @@ import {
     type IdentityKind,
     type IdentityPiiEntity,
     type MemberPii,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,

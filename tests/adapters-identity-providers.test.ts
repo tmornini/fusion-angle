@@ -29,7 +29,7 @@ import {
     attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import {
     apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';

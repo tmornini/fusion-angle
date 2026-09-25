@@ -42,7 +42,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     FORMER_MEMBER_NAME,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode,
     GraphEdge,
@@ -50,7 +50,7 @@ import type {
     Member,
     MemberId,
     Id,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';

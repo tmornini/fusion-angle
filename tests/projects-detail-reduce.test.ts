@@ -1,6 +1,6 @@
 import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
-import { Project } from '../api/types.ts';
-import type { ProjectState } from '../api/types.ts';
+import { Project } from '../shared/types.ts';
+import type { ProjectState } from '../shared/types.ts';
 import { ProjectView } from
     '../web-app/app/adapters/projects.ts';
 import {

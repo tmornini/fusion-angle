@@ -12,7 +12,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
-import type { Id, OrganizationEntity } from '../api/types.ts';
+import type { Id, OrganizationEntity } from '../shared/types.ts';
 import { postBootstrap } from
     '../api/mock-data.ts';
 import {

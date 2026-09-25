@@ -4,11 +4,11 @@ import type {
     ObjectiveId,
     ObjectiveRevisionEntity,
     ObjectiveState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     assertObjectiveState,
     nowUtc,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     type RequestContext,
     organizationCollection,

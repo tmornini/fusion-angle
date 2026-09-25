@@ -1,5 +1,5 @@
 import type { GuardedDbAdapter } from './db.ts';
-import { nowUtc, type Id } from './types.ts';
+import { nowUtc, type Id } from '../shared/types.ts';
 import type { Principal } from './access-token.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';

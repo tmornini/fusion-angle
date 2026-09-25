@@ -1,4 +1,4 @@
-import type { ProjectEntity } from '../types.ts';
+import type { ProjectEntity } from '../../shared/types.ts';
 import { dateOnly } from './seed-kit.ts';
 
 // The seeded Projects. l2cProjectId is shared with the

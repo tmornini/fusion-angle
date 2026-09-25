@@ -25,7 +25,7 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
     ValidationError,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';

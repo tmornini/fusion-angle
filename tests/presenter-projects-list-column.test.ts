@@ -1,5 +1,5 @@
 import { assert, assertStrictEquals } from '@std/assert';
-import { Project } from '../api/types.ts';
+import { Project } from '../shared/types.ts';
 import {
     ProjectListPresenter,
     buildInitialProjectListState,

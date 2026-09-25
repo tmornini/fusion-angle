@@ -1,4 +1,4 @@
-import type { GraphNode, GraphEdge } from '../../api/types.ts';
+import type { GraphNode, GraphEdge } from '../../shared/types.ts';
 import {
     computeLayout, NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';

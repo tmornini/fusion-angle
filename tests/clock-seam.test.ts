@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import {
     msSinceUtc, setClockForTest, resetClock,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 Deno.test('msSinceUtc reads the injected test clock', () => {
     const base = '2026-07-11T00:00:00.000000Z';

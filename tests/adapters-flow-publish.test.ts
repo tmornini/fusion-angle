@@ -20,7 +20,7 @@ import {
 import {
     storedGraph,
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { asStoredGraph } from '../api/validators.ts';
 import {
     seedAdminSchema,
@@ -30,7 +30,7 @@ import type {
     GraphEdge,
     GraphNode,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

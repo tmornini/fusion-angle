@@ -4,11 +4,11 @@ import type {
     WorkOrderFlowGraph,
     WorkOrderHistoryEventEntity,
     Id,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     msSinceUtc,
     MS_PER_SECOND,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     asWorkOrderFlowGraph,
 } from '../../../api/validators.ts';
@@ -30,7 +30,7 @@ export type {
     GraphNode,
     GraphEdge,
     NodeAttribute,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 /* ── Types ───────────────── */
 

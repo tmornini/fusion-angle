@@ -5,12 +5,12 @@ import type {
     ProjectEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     nowUtc,
     projectStateIsApproved,
     assertProjectState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     filterByField,
     organizationItem,

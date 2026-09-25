@@ -16,7 +16,7 @@ import type {
     StateEntity,
     FlowWithGraph,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     buildStartAndCompleteNodes,
 } from

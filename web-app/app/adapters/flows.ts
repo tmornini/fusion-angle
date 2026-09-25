@@ -1,4 +1,4 @@
-import type { FlowEntity } from '../../../api/types.ts';
+import type { FlowEntity } from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import { organizationCollection } from './shared.ts';
 

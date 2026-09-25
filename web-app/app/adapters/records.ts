@@ -4,11 +4,11 @@ import type {
     RecordEntity,
     RecordId,
     RecordState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     RecordModel,
     assertRecordState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     activeOrganization,
     organizationItem,
@@ -42,12 +42,12 @@ export {
     RECORD_STATES,
     isRecordState,
     assertRecordState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 export type {
     RecordEntity,
     RecordId,
     RecordState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export interface RecordWithCounts {
     readonly record: RecordModel;

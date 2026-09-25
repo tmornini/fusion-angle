@@ -31,7 +31,7 @@ import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     basicAuthorization,

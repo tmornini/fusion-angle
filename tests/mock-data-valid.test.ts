@@ -76,7 +76,7 @@ import {
     type Id,
     type WorkOrderEntity,
     type StateEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra

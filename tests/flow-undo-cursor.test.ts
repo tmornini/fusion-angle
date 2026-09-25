@@ -29,7 +29,7 @@ import {
     organizationToken, DEV_TOKEN,
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     createRequestContext,
     sessionContext,
@@ -57,7 +57,7 @@ import { putClientFacade } from
     '../web-app/app/adapters/facade-holder.ts';
 import { putSessionToken } from
     '../web-app/app/adapters/session-token.ts';
-import type { GraphNode } from '../api/types.ts';
+import type { GraphNode } from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';

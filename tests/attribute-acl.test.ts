@@ -5,7 +5,7 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     ApiError,
     HTTP_FORBIDDEN,

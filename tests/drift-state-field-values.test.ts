@@ -15,7 +15,7 @@ import {
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { workOrderHistoryFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from

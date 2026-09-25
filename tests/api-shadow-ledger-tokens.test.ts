@@ -42,7 +42,7 @@ import {
 } from './client-assertion-fixtures.ts';
 import {
     nowUtc, type IdentityTokenEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     deriveIdentityToken,
     deriveIdentityTokensFor,

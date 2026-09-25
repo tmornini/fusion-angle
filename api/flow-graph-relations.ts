@@ -13,8 +13,8 @@ import type {
     StoredGraph,
     MemberId,
     NodeAttribute,
-} from './types.ts';
-import { storedGraph } from './types.ts';
+} from '../shared/types.ts';
+import { storedGraph } from '../shared/types.ts';
 import {
     type FlowGraphDelta,
     asStoredGraph,

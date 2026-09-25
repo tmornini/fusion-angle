@@ -26,12 +26,12 @@ import {
 import type {
     MemberId,
     Member,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     SYSTEM_MEMBER_NAME,
     SYSTEM_MEMBER_ID,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
     seedAIMember,
@@ -49,7 +49,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
     '../web-app/app/adapters/members.ts';
-import { FORMER_MEMBER_NAME } from '../api/types.ts';
+import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 const NULL_STORAGE: Partial<Storage> = {

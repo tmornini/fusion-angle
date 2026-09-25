@@ -3,7 +3,7 @@ import {
     assertMatch,
     assertStrictEquals,
 } from '@std/assert';
-import { HumanMember, AIMember } from '../api/types.ts';
+import { HumanMember, AIMember } from '../shared/types.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
     HumanMemberDetailPresenter,

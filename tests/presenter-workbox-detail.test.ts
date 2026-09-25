@@ -14,7 +14,7 @@ import {
     type AttributeType,
     type Id,
     type Member,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     CreationTransition,
     StepTransition,

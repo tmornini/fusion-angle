@@ -3,7 +3,7 @@ import type {
     ProjectState,
     ObjectiveEntity,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     Project,
     projectStateIsNotDeleted,
@@ -11,7 +11,7 @@ import {
     msSinceUtc,
     COST_DIVISOR,
     MS_PER_DAY,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,
@@ -47,7 +47,7 @@ export {
     type ProjectEntity,
     isProjectState,
     COST_DIVISOR,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export async function getProjectEntities(
     ctx: RequestContext,

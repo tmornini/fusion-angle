@@ -6,14 +6,14 @@ import {
     DEFAULT_NODE_TASK_INSTRUCTIONS,
     projectStateIsNotDeleted,
     assertProjectState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type {
     FlowWithGraph,
     ProjectEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     generateIdentifier,
 } from '../../../shared/identifier.ts';
