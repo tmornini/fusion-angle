@@ -15,7 +15,7 @@ import {
     latestClaimEvent,
     isClaimEventExpired,
     addUtcSeconds,
-} from '../../../api/work-order-claims.ts';
+} from '../../../shared/work-order-claims.ts';
 import {
     validateWorkOrderFlowGraph,
     getWorkOrderHistory,

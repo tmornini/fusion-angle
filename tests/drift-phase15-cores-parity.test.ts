@@ -47,7 +47,7 @@ import {
 import {
     latestClaimEvent,
     isClaimEventExpired,
-} from '../api/work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';

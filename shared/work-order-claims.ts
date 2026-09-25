@@ -3,8 +3,8 @@ import {
     MS_PER_SECOND,
     type Id,
     type StateEntity,
-} from '../shared/types.ts';
-import { latestByKey } from '../shared/ledger-reduction.ts';
+} from './types.ts';
+import { latestByKey } from './ledger-reduction.ts';
 
 // The closed claim vocabulary. Three strings: a claim
 // either exists ('claimed'), is voluntarily relinquished

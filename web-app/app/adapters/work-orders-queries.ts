@@ -14,7 +14,7 @@ import {
 } from '../../../api/validators.ts';
 import {
     isClaimState,
-} from '../../../api/work-order-claims.ts';
+} from '../../../shared/work-order-claims.ts';
 import type { RequestContext } from './shared.ts';
 import {
     organizationCollection,

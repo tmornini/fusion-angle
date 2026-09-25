@@ -118,7 +118,7 @@ import {
     isClaimState,
     isExpiresAtPassed,
     addUtcSeconds,
-} from './work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,

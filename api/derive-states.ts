@@ -28,7 +28,7 @@ import { deriveOrganizations } from './derive-organizations.ts';
 import {
     latestClaimEvent,
     addUtcSeconds,
-} from './work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 

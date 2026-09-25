@@ -41,7 +41,7 @@ import {
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
 import {
     latestClaimEvent,
-} from '../api/work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import {
     appendLegacyTransition,
 } from './legacy-transition-fixture.ts';
