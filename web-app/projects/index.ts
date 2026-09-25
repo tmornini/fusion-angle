@@ -14,7 +14,6 @@ import {
     createRequestContext,
     sessionContext,
     getProjects,
-    getProjectsScoreColumn,
     putProjectPosition,
     isProjectState,
     subscribeProjectChanges,
@@ -22,6 +21,7 @@ import {
     subscribeObjectiveChanges,
     type Project,
 } from '../app/adapters/index.ts';
+import { getProjectsScoreColumn } from '../app/scoring-aggregate.ts';
 import {
     ProjectListPresenter,
     buildInitialProjectListState,

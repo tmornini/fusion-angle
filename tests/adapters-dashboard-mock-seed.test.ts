@@ -7,9 +7,11 @@ import { getDashboardGauges } from
 import {
     getDashboardScoringBundle,
     getObjectiveScoringInputs,
-    buildObjectiveAggregates,
 } from
     '../client/project-scoring.ts';
+import {
+    buildObjectiveAggregates,
+} from '../web-app/app/scoring-aggregate.ts';
 import { sharedMockDb } from './mock-seed.ts';
 
 // The mock seeder is deterministic; these values

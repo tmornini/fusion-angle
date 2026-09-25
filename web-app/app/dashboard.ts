@@ -16,9 +16,9 @@ import { getIdeaEntities } from '../../client/ideas.ts';
 import { getProjectEntities } from '../../client/projects.ts';
 import { getFlowEntities } from '../../client/flows.ts';
 import {
-    getPortfolioImpactSummary,
     type DashboardScoringBundle,
 } from '../../client/project-scoring.ts';
+import { getPortfolioImpactSummary } from './scoring-aggregate.ts';
 
 export type GaugeIcon =
     | 'clock'

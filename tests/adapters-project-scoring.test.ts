@@ -18,14 +18,16 @@ import {
     getActualScoresForProject,
     getProjectScoring,
     getDashboardScoringBundle,
-    getPortfolioImpactSummary,
     getObjectiveScoringInputs,
-    buildObjectiveAggregates,
-    buildObjectiveTrendlines,
-    getProjectsScoreColumn,
     postProjectBaselineScoring,
     postProjectActualMeasurement,
 } from '../client/project-scoring.ts';
+import {
+    getPortfolioImpactSummary,
+    buildObjectiveAggregates,
+    buildObjectiveTrendlines,
+    getProjectsScoreColumn,
+} from '../web-app/app/scoring-aggregate.ts';
 import {
     getProjectEntity,
     postProjectStateChange,

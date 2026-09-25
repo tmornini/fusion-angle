@@ -12,14 +12,16 @@ import {
     getDashboardGauges,
     startDashboardScoringReads,
     getObjectiveScoringInputs,
-    buildObjectiveAggregates,
-    buildObjectiveTrendlines,
     subscribeProjectScoreChanges,
     getCurrentObjectiveDefinitions,
     subscribeObjectiveChanges,
     subscribeProjectChanges,
     type DashboardScoringBundle,
 } from '../app/adapters/index.ts';
+import {
+    buildObjectiveAggregates,
+    buildObjectiveTrendlines,
+} from '../app/scoring-aggregate.ts';
 import {
     GaugePresenter,
     DashboardObjectiveAggregatesPresenter,
