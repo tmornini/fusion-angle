@@ -1,6 +1,6 @@
-// Client-side localStorage keys — UI preferences and the
-// test session mode's credential slot. All share the
-// `fusion-angle:` prefix. No data lives in localStorage.
+// Client-side localStorage keys for UI preferences. All
+// share the `fusion-angle:` prefix. No data lives in
+// localStorage.
 
 export const STORAGE_KEY_THEME = 'fusion-angle:theme';
 
