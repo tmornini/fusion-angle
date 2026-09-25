@@ -3,9 +3,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     putIdentityDefaultOrganization,
@@ -67,7 +65,7 @@ async function memberOf(organizations: string[]) {
 Deno.test('putIdentityDefaultOrganization sets the caller default org',
 async () => {
     const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = inPageContext(db, await devToken());
     await putIdentityDefaultOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg');
     assertStrictEquals(await getIdentityDefaultOrganization(ctx)
         , 'AjdvjuECVZEgZoFajaIEkg');
@@ -76,14 +74,14 @@ async () => {
 Deno.test('getIdentityDefaultOrganization is null when never SET',
 async () => {
     const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = inPageContext(db, await devToken());
     assertStrictEquals(await getIdentityDefaultOrganization(ctx), null);
 });
 
 Deno.test('putIdentityDefaultOrganization rejects a non-member org',
 async () => {
     const db = await memberOf(['AjdvjuECVZEgZoFajaIEkg']);
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = inPageContext(db, await devToken());
     await assertRejects(
         () => putIdentityDefaultOrganization(ctx, 'BBjWJsjYIDkTRKIIPrzWRw'));
 });

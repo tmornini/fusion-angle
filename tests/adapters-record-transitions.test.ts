@@ -8,9 +8,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -113,7 +113,7 @@ async function seedWorkOrder(
     flowGraph: WorkOrderFlowGraph,
     currentNodeId: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await putWorkOrder(ctx, id, {
         displayId: 'WO-1',
         flowGraph,
@@ -171,7 +171,7 @@ async function seedBinding(
     flowId: string,
     recordId: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     // The binding PUT probes the bound record's own
     // existence, so it must be seeded first.
     await ensureRecord(ctx, recordId);
@@ -202,7 +202,7 @@ async function seedFlowLink(
     // The flow↔work-order join nests under its parent flow now,
     // so the parent flow must exist to be enumerated — the
     // record lookup walks flows → work-orders → records.
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
         linkId: generateIdentifier(),
@@ -240,7 +240,7 @@ async function seedAttribute(
         constraints?: unknown[];
     } = {},
 ): Promise<void> {
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     await ensureRecord(ctx, recordId);
@@ -281,7 +281,7 @@ Deno.test(
         await seedWorkOrder(
             db, WO_ID, flowGraph, CREATE_NODE,
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), new Map(),
         );
@@ -327,7 +327,7 @@ Deno.test(
             , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), new Map(),
         );
@@ -373,7 +373,7 @@ Deno.test(
             , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         const out = await validateRecordTransition(
@@ -420,7 +420,7 @@ Deno.test(
             , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, WO_ID, new Map(), new Map(),
         );
@@ -467,7 +467,7 @@ Deno.test(
             , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Email',
         });
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         // Instance head is the SoT — pass storedValues
@@ -515,7 +515,7 @@ Deno.test(
             , 'rbfHGatkwQzGZJVXKJEeyw', {
             name: 'Code',
         });
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, WO_ID,
             new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'ABC']]),
@@ -565,7 +565,7 @@ Deno.test(
                     '^[^@]+@[^@]+\\.[^@]+$',
             }],
         });
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, WO_ID,
             new Map([['UQBiHFcwJeCDSnmkPBoYRA', 'not-an-email']]),
@@ -598,7 +598,7 @@ Deno.test(
         await seedWorkOrder(
             db, WO_ID, flowGraph, GHOST_NODE,
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await assertRejects(
             () => validateRecordTransition(
                 ctx, WO_ID, new Map(), new Map(),

@@ -3,9 +3,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { principalFromToken } from '../api/access-token.ts';
 import {
@@ -68,7 +66,7 @@ Deno.test('exchanges a member token for an org-scoped token',
 async () => {
     const db = await memberOf(['A']);
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
-    const ctx = createRequestContext(db, token);
+    const ctx = inPageContext(db, token);
     const scoped = await postOrganizationSessionExchange(
         ctx, token, 'A');
     const principal = principalFromToken(scoped);
@@ -79,7 +77,7 @@ async () => {
 Deno.test('a non-member org exchange is rejected', async () => {
     const db = await memberOf(['A']);
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
-    const ctx = createRequestContext(db, token);
+    const ctx = inPageContext(db, token);
     await assertRejects(
         () => postOrganizationSessionExchange(ctx, token, 'B'));
 });

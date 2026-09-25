@@ -6,9 +6,9 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -257,7 +257,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
 
         // Flow ZOousbbnzpqlxJExVAruYQ with an Onboarding graph, seeded
         // through the
@@ -389,7 +389,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         // seedFlow saves is_auto_layout true; buildTestGraph
         // seeds c→a→z all at (0,0).
         const autoGraph = buildTestGraph();

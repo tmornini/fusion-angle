@@ -6,8 +6,7 @@ import {
     validateObjectiveEntity,
     validateObjectiveRevisionEntity,
 } from '../api/validators.ts';
-import { createRequestContext }
-    from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getArchivedObjectiveIds,
@@ -81,7 +80,7 @@ async function projectIdsByState(
 Deno.test('seeds every objective seed plus the org-2 objective',
 async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const rows = await getObjectives(ctx);
     // getObjectives is org-scoped to the token's org (Stark).
     assertStrictEquals(rows.length, OBJECTIVE_SEEDS.length);
@@ -139,7 +138,7 @@ Deno.test('postMockDataLoad seeds one revision per objective',
 Deno.test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const ids = await getArchivedObjectiveIds(ctx);
         assertStrictEquals(ids.size, 0);
     });
@@ -147,7 +146,7 @@ Deno.test('postMockDataLoad seeds zero archived objectives',
 Deno.test('approved projects have full baseline coverage',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -193,7 +192,7 @@ Deno.test('approved projects have full baseline coverage',
 Deno.test('completed projects have at least one actual per pair',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const completed = await projectIdsByState(
             ctx, 'archived',
         );
@@ -227,7 +226,7 @@ Deno.test('completed projects have at least one actual per pair',
 Deno.test('approved projects have an actual for every pair',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -260,7 +259,7 @@ Deno.test('approved projects have an actual for every pair',
 
 Deno.test('submitted projects have zero scores', async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const submitted = await projectIdsByState(
         ctx, 'submitted',
     );
@@ -283,7 +282,7 @@ Deno.test('submitted projects have zero scores', async () => {
 Deno.test('a seeded baseline score\'s author matches the pinned'
 + ' pre-hoist pick', async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const baselines = await getBaselineScoresForProject(
         ctx, 'wqGTTFdYUGnmBxWCppmkOQ',
     );
@@ -297,7 +296,7 @@ Deno.test('a seeded baseline score\'s author matches the pinned'
 Deno.test('a seeded actual-score triple\'s per-index authors match'
 + ' the pinned pre-hoist picks', async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const actuals = await getActualScoresForProject(
         ctx, 'kAxUZTXdcMCAttuoyCdSYA',
     );

@@ -9,9 +9,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -86,7 +84,7 @@ Deno.test(
         await seedHumanMember(
             db, generateIdentifier(), 'Sarah Chen',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const roster = await getMembers(ctx);
         assert(
             !roster.some(
@@ -107,7 +105,7 @@ Deno.test(
     + ' with correct kind discriminator',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const members = await getMembers(ctx);
         assertStrictEquals(members.length, 3);
         const human = members.find(
@@ -132,7 +130,7 @@ Deno.test(
     'getMembers spans kinds and excludes an idea',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -162,7 +160,7 @@ Deno.test(
     + ' present',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assertStrictEquals(map.size, 4);
         const human = map.get(humanId)!;
@@ -179,7 +177,7 @@ Deno.test(
     + ' both human and AI kinds',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assertStrictEquals(
             memberName(map, humanId),
@@ -197,7 +195,7 @@ Deno.test(
     + ' and AI kinds',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, humanId, aiId } = await setupSeeded();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assertStrictEquals(
             memberName(map, humanId),
@@ -299,7 +297,7 @@ Deno.test(
         await seedSeat(
             db, 'AjdvjuECVZEgZoFajaIEkg', memberId, 'member',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assertStrictEquals(
             memberName(map, memberId),

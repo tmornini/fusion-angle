@@ -1,8 +1,7 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
-import { createRequestContext } from
-'../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
@@ -41,7 +40,7 @@ async function seedFlow(
     id: string,
     name: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId: id,
         linkId: generateIdentifier(),
@@ -60,7 +59,7 @@ async function seedWorkOrder(
     // The flow↔work-order join now nests under its parent flow,
     // so the parent flow must exist to be enumerated.
     await seedFlow(db, flowId, flowId);
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const flowGraph: WorkOrderFlowGraph = {
         name: 'Flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
@@ -100,7 +99,7 @@ async function seedRecord(
     db: MemoryDbAdapter,
     id: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await putRecord(ctx, id, {
         name: 'Record', description: '', position: 1,
         state: 'active',

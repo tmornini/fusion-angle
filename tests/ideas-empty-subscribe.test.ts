@@ -171,13 +171,13 @@ Deno.test(
             // same-tab notify, so only the
             // BroadcastChannel below can wake this
             // page.
-            const {
-                createRequestContext,
-                organizationItem,
-            } = await import(
+            const { inPageContext } = await import(
+                './in-page-facade.ts'
+            );
+            const { organizationItem } = await import(
                 '../client/shared.ts'
             );
-            const ctx = createRequestContext(
+            const ctx = inPageContext(
                 db, await organizationToken(),
             );
             const ideaId = generateIdentifier();

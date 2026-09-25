@@ -14,9 +14,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
@@ -228,7 +228,7 @@ async function setupFlow(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-    const ctx = createRequestContext(db, DEV_TOKEN);
+    const ctx = inPageContext(db, DEV_TOKEN);
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
         linkId: LINK_ID,
@@ -253,7 +253,7 @@ async function setupNoFlow(): Promise<MemoryDbAdapter> {
 async function persistedGraph(
     db: MemoryDbAdapter,
 ): Promise<StoredGraph> {
-    const flow = await createRequestContext(db, DEV_TOKEN)
+    const flow = await inPageContext(db, DEV_TOKEN)
         .GET<{ graph: Record<string, unknown> }>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID,
         );
@@ -303,7 +303,7 @@ Deno.test(
             buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
+            inPageContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -335,7 +335,7 @@ Deno.test(
             buildNode(NODE_A),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_S, NODE_A,
+            inPageContext(db, DEV_TOKEN), snap, NODE_S, NODE_A,
         );
         assertStrictEquals(op.kind, 'ok');
     }),
@@ -349,7 +349,7 @@ Deno.test(
             buildNode(NODE_A), buildNode(NODE_B),
         ])));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
+            inPageContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -366,7 +366,7 @@ Deno.test(
         ]));
         const err = await assertRejects(
             () => performAddEdge(
-                createRequestContext(db, DEV_TOKEN), snap, MISSING_ID, NODE_B,
+                inPageContext(db, DEV_TOKEN), snap, MISSING_ID, NODE_B,
             ),
         ) as Error;
         assertInstanceOf(err, Error);
@@ -385,7 +385,7 @@ Deno.test(
         ]));
         const err = await assertRejects(
             () => performAddEdge(
-                createRequestContext(db, DEV_TOKEN), snap, NODE_A, MISSING_ID,
+                inPageContext(db, DEV_TOKEN), snap, NODE_A, MISSING_ID,
             ),
         ) as Error;
         assertInstanceOf(err, Error);
@@ -404,7 +404,7 @@ Deno.test(
             buildNode(NODE_A),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_E, NODE_A,
+            inPageContext(db, DEV_TOKEN), snap, NODE_E, NODE_A,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -421,7 +421,7 @@ Deno.test(
             buildNode(NODE_S, { isCreate: true }),
         ]));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_S,
+            inPageContext(db, DEV_TOKEN), snap, NODE_A, NODE_S,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -438,7 +438,7 @@ Deno.test(
             [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_A, NODE_B)],
         ));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
+            inPageContext(db, DEV_TOKEN), snap, NODE_A, NODE_B,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -459,7 +459,7 @@ Deno.test(
             [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_S, NODE_A)],
         ));
         const op = await performAddEdge(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_S, NODE_B,
+            inPageContext(db, DEV_TOKEN), snap, NODE_S, NODE_B,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -480,7 +480,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performAddEdge(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 snap, NODE_A, NODE_B,
             ),
         );
@@ -506,7 +506,7 @@ Deno.test(
             buildNode(NODE_A),
         ]));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_A, 300, 200,
+            inPageContext(db, DEV_TOKEN), snap, NODE_A, 300, 200,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -538,7 +538,7 @@ Deno.test(
             buildNode(NODE_A),
         ])));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_A, 0, 0,
+            inPageContext(db, DEV_TOKEN), snap, NODE_A, 0, 0,
         );
         assertStrictEquals(op.kind, 'fail');
     }),
@@ -552,7 +552,7 @@ Deno.test(
         const snap = snapFrom(buildGraph([]));
         const err = await assertRejects(
             () => performAddNodeAtPosition(
-                createRequestContext(db, DEV_TOKEN), snap, MISSING_ID, 0, 0,
+                inPageContext(db, DEV_TOKEN), snap, MISSING_ID, 0, 0,
             ),
         ) as Error;
         assertInstanceOf(err, Error);
@@ -571,7 +571,7 @@ Deno.test(
             buildNode(NODE_E, { isArchive: true }),
         ]));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_E, 0, 0,
+            inPageContext(db, DEV_TOKEN), snap, NODE_E, 0, 0,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -592,7 +592,7 @@ Deno.test(
             [buildEdge('YiJPbufDpkyrZcZCYbUJpg', NODE_S, NODE_A)],
         ));
         const op = await performAddNodeAtPosition(
-            createRequestContext(db, DEV_TOKEN), snap, NODE_S, 0, 0,
+            inPageContext(db, DEV_TOKEN), snap, NODE_S, 0, 0,
         );
         assertStrictEquals(op.kind, 'fail');
         if (op.kind !== 'fail') return;
@@ -613,7 +613,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performAddNodeAtPosition(
-                createRequestContext(db, DEV_TOKEN), snap, NODE_A, 0, 0,
+                inPageContext(db, DEV_TOKEN), snap, NODE_A, 0, 0,
             ),
         );
         const settled = await op;
@@ -639,7 +639,7 @@ Deno.test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_A),
             );
         assertStrictEquals(op.kind, 'ok');
@@ -667,7 +667,7 @@ Deno.test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(
                     base, NODE_S, NODE_A, NODE_E,
                 ),
@@ -689,7 +689,7 @@ Deno.test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 locked(
                     withNodeSelection(base, NODE_A),
                 ),
@@ -709,7 +709,7 @@ Deno.test(
         ));
         const op =
             await performDeleteSelectedNodes(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
             );
         assertStrictEquals(op.kind, 'noop');
@@ -727,7 +727,7 @@ Deno.test(
         ]));
         const op =
             await performDeleteSelectedNodes(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_S, NODE_E),
             );
         assertStrictEquals(op.kind, 'noop');
@@ -745,7 +745,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performDeleteSelectedNodes(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_A),
             ),
         );
@@ -771,7 +771,7 @@ Deno.test(
         ));
         const op =
             await performDeleteSelectedEdge(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
             );
         assertStrictEquals(op.kind, 'ok');
@@ -794,7 +794,7 @@ Deno.test(
         ));
         const op =
             await performDeleteSelectedEdge(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 locked(
                     withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
                 ),
@@ -813,7 +813,7 @@ Deno.test(
         ]));
         const op =
             await performDeleteSelectedEdge(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_A),
             );
         assertStrictEquals(op.kind, 'noop');
@@ -832,7 +832,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performDeleteSelectedEdge(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withEdgeSelection(base, 'YiJPbufDpkyrZcZCYbUJpg'),
             ),
         );
@@ -857,7 +857,7 @@ Deno.test(
             buildNode(NODE_A),
         ]));
         const op = await performAddAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             withNodeSelection(base, NODE_A),
             'VPckAwjJsTGCEkKaOOGRGw', 'editable', true,
         );
@@ -881,7 +881,7 @@ Deno.test(
             buildNode(NODE_A),
         ]));
         const op = await performAddAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             locked(withNodeSelection(base, NODE_A)),
             'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
@@ -898,12 +898,12 @@ Deno.test(
             buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const noneOp = await performAddAttributeRef(
-            createRequestContext(db, DEV_TOKEN), withNoSelection(base),
+            inPageContext(db, DEV_TOKEN), withNoSelection(base),
             'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
         assertStrictEquals(noneOp.kind, 'noop');
         const manyOp = await performAddAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             withNodeSelection(base, NODE_A, NODE_B),
             'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
@@ -920,7 +920,7 @@ Deno.test(
             buildNode(NODE_A),
         ]));
         const op = await performAddAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             withNodeSelection(base, 'ghost'),
             'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
         );
@@ -939,7 +939,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performAddAttributeRef(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_A),
                 'VPckAwjJsTGCEkKaOOGRGw', 'editable', false,
             ),
@@ -969,7 +969,7 @@ Deno.test(
             }),
         ]));
         const op = await performRemoveAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             withNodeSelection(base, NODE_A),
             'VPckAwjJsTGCEkKaOOGRGw',
         );
@@ -993,7 +993,7 @@ Deno.test(
             }),
         ]));
         const op = await performRemoveAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             locked(withNodeSelection(base, NODE_A)),
             'VPckAwjJsTGCEkKaOOGRGw',
         );
@@ -1014,7 +1014,7 @@ Deno.test(
             }),
         ]));
         const op = await performRemoveAttributeRef(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             withNoSelection(base), 'VPckAwjJsTGCEkKaOOGRGw',
         );
         assertStrictEquals(op.kind, 'noop');
@@ -1036,7 +1036,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performRemoveAttributeRef(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_A),
                 'VPckAwjJsTGCEkKaOOGRGw',
             ),
@@ -1068,7 +1068,7 @@ Deno.test(
             }),
         ]));
         const op = await performUpdateAttributeMode(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             withNodeSelection(base, NODE_A),
             'VPckAwjJsTGCEkKaOOGRGw', 'readonly',
         );
@@ -1093,7 +1093,7 @@ Deno.test(
             }),
         ]));
         const op = await performUpdateAttributeMode(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
             locked(withNodeSelection(base, NODE_A)),
             'VPckAwjJsTGCEkKaOOGRGw', 'readonly',
         );
@@ -1114,7 +1114,7 @@ Deno.test(
             }),
         ]));
         const op = await performUpdateAttributeMode(
-            createRequestContext(db, DEV_TOKEN), withNoSelection(base),
+            inPageContext(db, DEV_TOKEN), withNoSelection(base),
             'VPckAwjJsTGCEkKaOOGRGw', 'readonly',
         );
         assertStrictEquals(op.kind, 'noop');
@@ -1139,7 +1139,7 @@ Deno.test(
         ]));
         const op =
             await performUpdateAttributeRequired(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 withNodeSelection(base, NODE_A),
                 'VPckAwjJsTGCEkKaOOGRGw', true,
             );
@@ -1166,7 +1166,7 @@ Deno.test(
         ]));
         const op =
             await performUpdateAttributeRequired(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 locked(
                     withNodeSelection(base, NODE_A),
                 ),
@@ -1190,7 +1190,7 @@ Deno.test(
         ]));
         const op =
             await performUpdateAttributeRequired(
-                createRequestContext(db, DEV_TOKEN), withNoSelection(base),
+                inPageContext(db, DEV_TOKEN), withNoSelection(base),
                 'VPckAwjJsTGCEkKaOOGRGw', true,
             );
         assertStrictEquals(op.kind, 'noop');
@@ -1214,7 +1214,7 @@ Deno.test(
             buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performUndo(
-            createRequestContext(db, DEV_TOKEN), snap,
+            inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(false),
         );
         assertStrictEquals(op.kind, 'ok');
@@ -1234,7 +1234,7 @@ Deno.test(
             buildNode(NODE_A),
         ])));
         const op = await performUndo(
-            createRequestContext(db, DEV_TOKEN), snap,
+            inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(true),
         );
         assertStrictEquals(op.kind, 'fail');
@@ -1268,7 +1268,7 @@ Deno.test(
         await seedCurrentGraph(ctx, currentNodes);
         const snap = snapFrom(buildGraph(currentNodes));
         const op = await performUndo(
-            createRequestContext(db, DEV_TOKEN), snap,
+            inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(true),
         );
         assertStrictEquals(op.kind, 'ok');
@@ -1334,7 +1334,7 @@ Deno.test(
             isPanelOpen: true,
         };
         const op = await performUndo(
-            createRequestContext(
+            inPageContext(
                 db, DEV_TOKEN,
             ),
             snap,
@@ -1389,7 +1389,7 @@ Deno.test(
             isPanelOpen: true,
         };
         const op = await performUndo(
-            createRequestContext(
+            inPageContext(
                 db, DEV_TOKEN,
             ),
             snap,
@@ -1419,7 +1419,7 @@ Deno.test(
             buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performRedo(
-            createRequestContext(db, DEV_TOKEN), snap,
+            inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(false),
         );
         assertStrictEquals(op.kind, 'ok');
@@ -1436,7 +1436,7 @@ Deno.test(
             buildNode(NODE_A),
         ])));
         const op = await performRedo(
-            createRequestContext(db, DEV_TOKEN), snap,
+            inPageContext(db, DEV_TOKEN), snap,
             appendToRedoStack(
                 buildFlowHistorySnapshot(false),
                 buildFlowVersion(),
@@ -1469,7 +1469,7 @@ Deno.test(
             }),
         );
         const op = await performRedo(
-            createRequestContext(db, DEV_TOKEN), snap, history,
+            inPageContext(db, DEV_TOKEN), snap, history,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1521,7 +1521,7 @@ Deno.test(
         const { result: op } = await captureConsole(
             'error',
             () => performRedo(
-                createRequestContext(db, DEV_TOKEN),
+                inPageContext(db, DEV_TOKEN),
                 snap, history,
             ),
         );

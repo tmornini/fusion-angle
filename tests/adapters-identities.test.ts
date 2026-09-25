@@ -1,8 +1,6 @@
 import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     getIdentity,
@@ -17,7 +15,7 @@ import {
 async function setup() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    return { db, ctx: createRequestContext(db, await devToken()) };
+    return { db, ctx: inPageContext(db, await devToken()) };
 }
 
 Deno.test('getIdentity reads kind', async () => {

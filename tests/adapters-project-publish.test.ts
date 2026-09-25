@@ -4,8 +4,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { createRequestContext } from
-    '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     validateProjectForApproval,
@@ -99,7 +98,7 @@ Deno.test('postProjectApproval moves state to approved',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         // Seeded through the live document PUT (not a raw
         // db.projects.put + db.states.postEvent) so pnXmXrxOWayANgDLdCjuBw's
         // message pair exists — postProjectApproval /
@@ -142,7 +141,7 @@ Deno.test('postProjectApproval throws when not ready',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         // A synthesized state (this fixture never carried
         // one) — the state itself is irrelevant to this test.
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
@@ -165,7 +164,7 @@ Deno.test('postProjectArchival moves state to archived',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'approved',

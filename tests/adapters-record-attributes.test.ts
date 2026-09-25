@@ -1,9 +1,9 @@
 import { assertEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedCurrentMember,
@@ -30,7 +30,7 @@ async function seededCtx() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     return { db, ctx };

@@ -9,10 +9,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     organizationItem,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     createWorkOrderFromFlow,
@@ -137,7 +137,7 @@ async function seedFlow(
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
         linkId: generateIdentifier(),
@@ -166,7 +166,7 @@ interface WoTables {
 async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const workOrders = await getWorkOrders(ctx);
     const transitionsByWo =
         await getTransitionEventsByWorkOrder(ctx);
@@ -197,7 +197,7 @@ async function setupOneWorkOrder(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
     const woId = generateIdentifier();
     await createWorkOrderFromFlow(ctx, {
@@ -358,7 +358,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
         for (let i = 0; i < 3; i++) {
             await createWorkOrderFromFlow(ctx, {
@@ -431,7 +431,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', {
             nodes: [
                 buildNode(N_START, 'Start', {
@@ -600,7 +600,7 @@ Deno.test(
                 buildEdge(E2, N_MIDDLE, N_FINISH),
             ],
         });
-        const leaverCtx = createRequestContext(
+        const leaverCtx = inPageContext(
             db, await organizationToken(leaverId),
         );
         await createWorkOrderFromFlow(leaverCtx, {
@@ -608,7 +608,7 @@ Deno.test(
             flowLinkId: generateIdentifier(),
             flowId,
         });
-        const admin = createRequestContext(
+        const admin = inPageContext(
             db, await organizationToken(),
         );
         await deleteHumanMemberSeat(admin, leaverId);

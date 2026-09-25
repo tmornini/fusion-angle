@@ -1,7 +1,6 @@
 import { assertRejects, assertStrictEquals, assertThrows } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { createRequestContext } from
-    '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -153,7 +152,7 @@ Deno.test('postProjectBaselineScoring rejects bad scores',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         for (const score of INVALID) {
             await assertRejects(
                 () => postProjectBaselineScoring(
@@ -174,7 +173,7 @@ Deno.test('postProjectActualMeasurement rejects bad scores',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         for (const score of INVALID) {
             await assertRejects(
                 () => postProjectActualMeasurement(
@@ -191,7 +190,7 @@ Deno.test('postProjectBaselineScoring accepts valid scores',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postProjectBaselineScoring(
             ctx, PROJECT_ID, VALID.map(score => ({
                 objectiveId: generateIdentifier(), score,

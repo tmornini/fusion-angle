@@ -11,9 +11,9 @@ import { GET } from '../api/api.ts';
 import { testHashPassword } from './mock-seed.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
@@ -83,7 +83,7 @@ async function passwordUserCtx() {
         secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
     });
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await devToken('anonymous'));
     return { db, ctx };
 }

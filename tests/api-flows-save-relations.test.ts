@@ -4,9 +4,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
@@ -60,7 +60,7 @@ async function setupMemDb(): Promise<{
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
     await seedHumanMember(db, MEMBER_TWO, 'Member Two');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return { db, ctx };
 }
 

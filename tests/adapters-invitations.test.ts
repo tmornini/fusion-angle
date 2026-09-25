@@ -34,6 +34,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     organizationToken,
     reachableToken,
@@ -256,7 +257,7 @@ async function deriveMembershipsAll(db: DbAdapter) {
 
 async function ctxFor(sub: string, organization: string) {
     const { db, daveId } = await seed();
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(sub, organization),
     );
     return { db, ctx, daveId };

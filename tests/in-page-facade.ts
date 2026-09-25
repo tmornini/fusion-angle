@@ -14,6 +14,10 @@ import type { HttpFacade } from
     '../client/http-facade.ts';
 import { registerInPageWrap } from
     '../client/facade-holder.ts';
+import {
+    createRequestContext,
+    type RequestContext,
+} from '../client/shared.ts';
 
 // Test wrap: in-process handleRequest verbs as HttpFacade.
 // Product boot uses the fetch facade; this stays off the
@@ -77,3 +81,12 @@ export function wrapInPageAdapter(
 registerInPageWrap(adapter => wrapInPageAdapter(
     adapter as ClientFacadeAdapter,
 ));
+
+// A context over the in-process handler, for a test that
+// holds a memory adapter and a token.
+export function inPageContext(
+    adapter: ClientFacadeAdapter,
+    token: string,
+): RequestContext {
+    return createRequestContext(adapter, token);
+}

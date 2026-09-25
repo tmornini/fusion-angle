@@ -17,9 +17,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     putFlow,
     enqueueFlowSave,
@@ -164,7 +162,7 @@ Deno.test(
         putSessionToken(DEV_TOKEN);
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, DEV_TOKEN,
         );
         const { start, complete } =
@@ -231,7 +229,7 @@ Deno.test(
         putSessionToken(DEV_TOKEN);
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
-        const ctx = createRequestContext(db, DEV_TOKEN);
+        const ctx = inPageContext(db, DEV_TOKEN);
         const graph = await getRenderableFlowGraph(ctx, flowId);
         const snap = buildInitialFlowSnapshot(
             graph, CANVAS_W, CANVAS_H, [], [], [],

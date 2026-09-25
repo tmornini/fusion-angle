@@ -5,9 +5,9 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -250,7 +250,7 @@ Deno.test(
             ...entity,
             state: STATE,
         });
-        const fresh = createRequestContext(db, await organizationToken());
+        const fresh = inPageContext(db, await organizationToken());
         const row = await getProjectEntity(fresh, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(row.title, 'Persisted');
     },

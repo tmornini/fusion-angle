@@ -4,9 +4,9 @@ import {
 } from '../api/db-memory.ts';
 import './in-page-facade.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -20,7 +20,7 @@ export async function adminContext(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     return { db, ctx };

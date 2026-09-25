@@ -2,15 +2,14 @@ import { assertEquals } from '@std/assert';
 import { sharedMockDb } from './mock-seed.ts';
 import { organizationToken } from
     './token-fixtures.ts';
-import { createRequestContext } from
-    '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { getFlowsForCreation } from
     '../web-app/app/flow-publish.ts';
 
 Deno.test('mock admin sees Customer Onboarding and Lead-to-Close',
 async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     const { ready, notReady } =

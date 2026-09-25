@@ -4,9 +4,9 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -109,7 +109,7 @@ async () => {
         ctx, generateIdentifier(), ideaId, aliceId,
         '2026-04-01T00:00:00.000000Z',
     );
-    const memberCtx = createRequestContext(
+    const memberCtx = inPageContext(
         db, await organizationToken(aliceId),
     );
     const result = await getIdeas(memberCtx);
@@ -438,7 +438,7 @@ Deno.test('getIdeas resolves every seeded submitter in'
     const db = await seededMockDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken('XXZruirZyAOoRpNxaDnpSA'
                 , organization));
         const ideas = await getIdeas(ctx);
@@ -477,7 +477,7 @@ Deno.test(
     'getIdeas survives B28 removing a seeded submitter (D1)',
     async () => {
         const db = await seededMockDb();
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db,
             await organizationToken(
                 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,

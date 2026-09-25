@@ -13,9 +13,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -200,7 +200,7 @@ async function seedFlow(
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const save = {
         name: 'Test flow',
         isLocked: false,
@@ -235,7 +235,7 @@ async function setupDb(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -643,7 +643,7 @@ async function setupScopedDb(): Promise<{
     await seedHumanMember(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
     );
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     return { db, ctx };
@@ -939,7 +939,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         // NAMED re-pin (Task 7, the organizations/:id/projects/:id/flows
         // precedent in tests/adapters-flow-queries.test.ts): the
         // flipped GET organizations/:id/flows/:id/work-orders derives from
@@ -996,7 +996,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const woId = generateIdentifier();
         await seedBareWorkOrder(ctx, woId);
         // Backdate ten seconds; lockTimeout=1s
@@ -1022,7 +1022,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const woId = generateIdentifier();
         await seedBareWorkOrder(ctx, woId);
         await seedClaim(ctx, woId, nowUtc());
@@ -1046,7 +1046,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const fresh1 = generateIdentifier();
         const fresh2 = generateIdentifier();
         const stale = generateIdentifier();

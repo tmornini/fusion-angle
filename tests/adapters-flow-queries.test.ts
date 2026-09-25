@@ -4,9 +4,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
@@ -57,7 +57,7 @@ async function setupMemDb(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -153,7 +153,7 @@ Deno.test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw',
         );
         const startId = generateIdentifier();
@@ -174,12 +174,12 @@ Deno.test(
             edge2Id, midId, endId,
         );
         await saveGraph(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
             [start, mid, end], [YiJPbufDpkyrZcZCYbUJpg, e2],
         );
         const g: FlowGraph = await getRenderableFlowGraph(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
         );
         assertStrictEquals(g.id, 'aEsGMmBEFaVdWihhHXwCbw');
@@ -207,11 +207,11 @@ Deno.test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw',
         );
         await putFlow(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
             {
                 name: 'Locked Flow',
@@ -224,7 +224,7 @@ Deno.test(
             },
         );
         const g = await getRenderableFlowGraph(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
         );
         assertStrictEquals(g.name, 'Locked Flow');
@@ -240,7 +240,7 @@ Deno.test(
     + ' linked to the given project',
     async () => {
         const { db } = await setupMemDb();
-        const WeXjAaAxGSpLpamfEuvcww = createRequestContext(db
+        const WeXjAaAxGSpLpamfEuvcww = inPageContext(db
             , await organizationToken());
         await seedProject(WeXjAaAxGSpLpamfEuvcww, 'pnXmXrxOWayANgDLdCjuBw'
             , 'Project One');
@@ -255,11 +255,11 @@ Deno.test(
         await createBaseFlow(WeXjAaAxGSpLpamfEuvcww, flow3
             , 'prBESZPjJDiuXCeZLmbiVw');
         const p1Flows = await getFlowsByProject(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'pnXmXrxOWayANgDLdCjuBw',
         );
         const p2Flows = await getFlowsByProject(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'prBESZPjJDiuXCeZLmbiVw',
         );
         const p1Ids = p1Flows
@@ -281,11 +281,11 @@ Deno.test(
         const { db, ctx } = await setupMemDb();
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Project One');
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw',
         );
         const rows = await getFlowsByProject(
-            createRequestContext(
+            inPageContext(
                 db, await organizationToken(),
             ), generateIdentifier(),
         );
@@ -300,19 +300,19 @@ Deno.test(
         const { db, ctx } = await setupMemDb();
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Project One');
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw',
         );
         const a = generateIdentifier();
         const b = generateIdentifier();
         await saveGraph(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
             [buildNode(a), buildNode(b)],
             [buildEdge(generateIdentifier(), a, b)],
         );
         const rows = await getFlowsByProject(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'pnXmXrxOWayANgDLdCjuBw',
         );
         assertStrictEquals(rows.length, 1);
@@ -326,7 +326,7 @@ Deno.test(
     + ' flow with its project name',
     async () => {
         const { db } = await setupMemDb();
-        const WeXjAaAxGSpLpamfEuvcww = createRequestContext(db
+        const WeXjAaAxGSpLpamfEuvcww = inPageContext(db
             , await organizationToken());
         await seedProject(WeXjAaAxGSpLpamfEuvcww, 'pnXmXrxOWayANgDLdCjuBw'
             , 'Project One');
@@ -338,7 +338,7 @@ Deno.test(
         await createBaseFlow(WeXjAaAxGSpLpamfEuvcww, flow2
             , 'prBESZPjJDiuXCeZLmbiVw');
         const pairs = await getFlowsWithProjectNames(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
         );
         assertStrictEquals(pairs.length, 2);
         const byFlow = new Map(
@@ -361,11 +361,11 @@ Deno.test(
     async () => {
         const { db } = await setupMemDb();
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', generateIdentifier(),
         );
         const pairs = await getFlowsWithProjectNames(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
         );
         assertStrictEquals(pairs.length, 1);
         assertStrictEquals(pairs[0]!.summary.id, 'aEsGMmBEFaVdWihhHXwCbw');
@@ -382,14 +382,14 @@ Deno.test(
         const { db, ctx } = await setupMemDb();
         await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Project One');
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw',
         );
         const a = generateIdentifier();
         const b = generateIdentifier();
         const c = generateIdentifier();
         await saveGraph(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'aEsGMmBEFaVdWihhHXwCbw',
             [
                 buildNode(a), buildNode(b),
@@ -401,7 +401,7 @@ Deno.test(
             ],
         );
         const pairs = await getFlowsWithProjectNames(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
         );
         assertStrictEquals(pairs.length, 1);
         assertStrictEquals(
@@ -417,7 +417,7 @@ Deno.test(
     'getProjectFlowEntities returns the link rows',
     async () => {
         const { db } = await setupMemDb();
-        const WeXjAaAxGSpLpamfEuvcww = createRequestContext(db
+        const WeXjAaAxGSpLpamfEuvcww = inPageContext(db
             , await organizationToken());
         // The nested per-project reassembly enumerates the org's
         // projects, so the parent rows must exist for their flow
@@ -433,7 +433,7 @@ Deno.test(
             , 'prBESZPjJDiuXCeZLmbiVw');
         const rows: ProjectFlowEntity[] =
             await getProjectFlowEntities(
-                createRequestContext(db, await organizationToken()),
+                inPageContext(db, await organizationToken()),
             );
         assertStrictEquals(rows.length, 2);
         const link1 = rows.find(
@@ -453,7 +453,7 @@ Deno.test(
     async () => {
         const { db } = await setupMemDb();
         const rows = await getProjectFlowEntities(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
         );
         assertEquals(rows, []);
     },
@@ -466,7 +466,7 @@ Deno.test(
         const { db, ctx } = await setupMemDb();
         await seedProject(ctx, 'psZcIMMgiSomMHzDxcUnYQ', 'Project Nine');
         await createBaseFlow(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw',
         );
         // NAMED re-pin (Phase 4 Task 8, Phase 3 Step 2b
@@ -484,7 +484,7 @@ Deno.test(
             at: '2026-01-01T00:00:00.000000Z',
         });
         const rows = await getFlowsByProject(
-            createRequestContext(db, await organizationToken())
+            inPageContext(db, await organizationToken())
                 , 'psZcIMMgiSomMHzDxcUnYQ',
         );
         assertStrictEquals(rows.length, 1);
@@ -504,7 +504,7 @@ Deno.test(
     async () => {
         const db = await seededMockDb();
         const g = await getRenderableFlowGraph(
-            createRequestContext(db, await organizationToken()),
+            inPageContext(db, await organizationToken()),
             LAYOUT_TEST_FLOW_ID,
         );
         const xs = g.nodes.map(n => n.positionX);
@@ -532,7 +532,7 @@ Deno.test(
     async () => {
         const db = await seededMockDb();
         const g = await getRenderableFlowGraph(
-            createRequestContext(
+            inPageContext(
                 db, await organizationToken(),
             ),
             LAYOUT_TEST_FLOW_ID,

@@ -8,9 +8,7 @@ import {
     validateIdentityTokenRevocationEntity,
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -54,7 +52,7 @@ Deno.test('rejects an unparseable timestamp', () => {
 async function setup() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    return { db, ctx: createRequestContext(db, await devToken()) };
+    return { db, ctx: inPageContext(db, await devToken()) };
 }
 
 // Phase Final Task 2: identity_token_revocations ROW half

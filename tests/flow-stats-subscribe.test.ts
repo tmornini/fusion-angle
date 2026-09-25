@@ -117,16 +117,16 @@ Deno.test(
             putSessionToken(
                 await organizationToken(),
             );
-            const {
-                createRequestContext,
-                organizationItem,
-            } = await import(
+            const { inPageContext } = await import(
+                './in-page-facade.ts'
+            );
+            const { organizationItem } = await import(
                 '../client/shared.ts'
             );
             const { postFlowCreation } = await import(
                 '../client/flow-mutations.ts'
             );
-            const ctx = createRequestContext(
+            const ctx = inPageContext(
                 db, await organizationToken(),
             );
             const flowId = generateIdentifier();

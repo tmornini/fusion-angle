@@ -5,9 +5,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getRecord,
@@ -33,7 +31,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
@@ -58,7 +56,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
@@ -97,7 +95,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
@@ -127,7 +125,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const oldAttrId = generateIdentifier();
         const newAttrId = generateIdentifier();
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
@@ -191,7 +189,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
@@ -231,7 +229,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
             kind: 'create',
             record: {
@@ -269,7 +267,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await assertRejects(
             () => getRecordModel(ctx, generateIdentifier()),
             Error,
@@ -287,7 +285,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         await postRecordChange(ctx, 'rOEPOcVMQdJiiiMuiiEhlg', {

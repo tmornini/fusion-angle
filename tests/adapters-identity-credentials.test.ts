@@ -1,8 +1,6 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedIdentityCredential } from './identity-fixtures.ts';
@@ -17,7 +15,7 @@ import { deriveCredentialsFor } from
 async function setup() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    return { db, ctx: createRequestContext(db, await devToken()) };
+    return { db, ctx: inPageContext(db, await devToken()) };
 }
 
 // Phase Final Task 2: identity_credentials ROW half stripped —

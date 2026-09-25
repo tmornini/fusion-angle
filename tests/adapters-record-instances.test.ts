@@ -7,9 +7,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedCurrentMember,
@@ -51,7 +49,7 @@ async function seededCtx() {
     // One context is one operation. The instance
     // revision join still keys a write's sibling by
     // operation-id, so each call mints its own.
-    const ctx = () => createRequestContext(db, token);
+    const ctx = () => inPageContext(db, token);
     await postRecordChange(ctx(), TYPE_ID, {
         kind: 'create',
         record: {

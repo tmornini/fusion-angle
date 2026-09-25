@@ -1,7 +1,6 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { createRequestContext }
-    from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postObjectiveCreation,
@@ -18,7 +17,7 @@ Deno.test('K5 reactivation on the memory adapter',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         await postObjectiveCreation(

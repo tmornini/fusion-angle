@@ -1,7 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getFlowStats,
@@ -41,7 +39,7 @@ async function seededLeadToClose() {
         flow,
         `flow "${FLOW_NAME}" not seeded`,
     );
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return await getFlowStats(ctx, flow!.id, now.getTime());
 }
 

@@ -1,9 +1,7 @@
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     getOrganizations,
 } from '../client/organizations.ts';
@@ -38,7 +36,7 @@ async () => {
     // A multi-org admin token carries both demo orgs.
     const flat = await reachableToken('XXZruirZyAOoRpNxaDnpSA'
         , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']);
-    const ctx = createRequestContext(db, flat);
+    const ctx = inPageContext(db, flat);
     const organizations = await getOrganizations(ctx);
     assertEquals(
         [...organizations.map(o => o.id)].sort(), ['AjdvjuECVZEgZoFajaIEkg'
@@ -50,7 +48,7 @@ async () => {
     const db = await seeded();
     const flat = await reachableToken('XXZruirZyAOoRpNxaDnpSA'
         , ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw']);
-    const ctx = createRequestContext(db, flat);
+    const ctx = inPageContext(db, flat);
     const tokA = await postOrganizationSessionExchange(ctx, flat
         , 'AjdvjuECVZEgZoFajaIEkg');
     const tokB = await postOrganizationSessionExchange(ctx, flat
@@ -98,7 +96,7 @@ async () => {
         await GET<{ id: string }[]>(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', flat,
                 operationIdHeader()));
-    const ctx = createRequestContext(db, flat);
+    const ctx = inPageContext(db, flat);
     const tokA = await postOrganizationSessionExchange(ctx, flat
         , 'AjdvjuECVZEgZoFajaIEkg');
     const organization1Ideas = idsOf(

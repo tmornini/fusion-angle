@@ -1,6 +1,5 @@
 import { assert, assertStrictEquals } from '@std/assert';
-import { createRequestContext } from
-    '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
     '../web-app/app/dashboard.ts';
@@ -23,7 +22,7 @@ import { sharedMockDb } from './mock-seed.ts';
 Deno.test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const gauges = getDashboardGauges(
             await getDashboardScoringBundle(ctx),
         );
@@ -38,7 +37,7 @@ Deno.test('mock seed produces portfolio Impact baseline +50',
 Deno.test('mock seed produces per-objective baseline means',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const aggs = buildObjectiveAggregates(
             getObjectiveScoringInputs(
                 await getDashboardScoringBundle(ctx),

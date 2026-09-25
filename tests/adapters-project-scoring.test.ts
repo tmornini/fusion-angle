@@ -9,9 +9,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getBaselineScoresForProject,
@@ -44,7 +44,7 @@ Deno.test('getBaselineScoresForProject returns project rows',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/'
@@ -80,7 +80,7 @@ Deno.test('getActualScoresForProject returns project rows',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-actual-scores/'
@@ -104,7 +104,7 @@ Deno.test('getProjectScoring returns both lists',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/'
@@ -212,7 +212,7 @@ Deno.test('getPortfolioImpactSummary averages project averages',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         const r = getPortfolioImpactSummary(
             await getDashboardScoringBundle(ctx),
@@ -225,7 +225,7 @@ Deno.test('buildObjectiveAggregates returns per-objective rows',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         const rows = buildObjectiveAggregates(
             getObjectiveScoringInputs(
@@ -242,7 +242,7 @@ Deno.test('getProjectsScoreColumn returns per-project rollup',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         const rows = await getProjectsScoreColumn(ctx);
         const byId = new Map(
@@ -261,7 +261,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
@@ -318,7 +318,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
@@ -353,7 +353,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedTwoApprovedProjects(db, ctx);
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
@@ -400,7 +400,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
@@ -428,7 +428,7 @@ Deno.test('postProjectBaselineScoring appends via GET scores',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postProjectBaselineScoring(ctx, 'pnXmXrxOWayANgDLdCjuBw', [
             { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50 },
             { objectiveId: generateIdentifier(), score: -30 },
@@ -456,7 +456,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User',
         );
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         await postProjectBaselineScoring(ctx, 'pnXmXrxOWayANgDLdCjuBw', [
@@ -480,7 +480,7 @@ Deno.test('postProjectActualMeasurement appends via GET scores',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await postProjectActualMeasurement(ctx, 'pnXmXrxOWayANgDLdCjuBw', [
             { objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 33 },
         ]);
@@ -512,7 +512,7 @@ Deno.test(
     + ' objective aggregate and its trendline (K29)',
     async () => {
         const db = await seededMockDb();
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         await postProjectBaselineScoring(

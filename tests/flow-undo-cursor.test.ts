@@ -31,9 +31,9 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { sessionContext } from '../web-app/app/client.ts';
 import {
     postFlowCreation,
@@ -433,7 +433,7 @@ Deno.test(
         await seedAdminSchema(db);
         const flowId = generateIdentifier();
         const nodeId = generateIdentifier();
-        const ctx = createRequestContext(db, DEV_TOKEN);
+        const ctx = inPageContext(db, DEV_TOKEN);
         await postFlowCreation(ctx, {
             flowId,
             linkId: FLOWID_LINK,

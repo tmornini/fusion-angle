@@ -1,7 +1,5 @@
 import { assert } from '@std/assert';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { getFlowStats } from
     '../web-app/app/flow-stats.ts';
@@ -28,7 +26,7 @@ Deno.test(
             await deriveFlows(db, 'AjdvjuECVZEgZoFajaIEkg')
         ).find(f => f.name === FLOW_NAME);
         assert(flow !== undefined, FLOW_NAME + ' not seeded');
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         const { model } = await getFlowStats(

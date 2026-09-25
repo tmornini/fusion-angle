@@ -114,14 +114,14 @@ Deno.test(
             assertStrictEquals(hasSchema, true);
             const token = await organizationToken();
             putSessionToken(token);
-            const { createRequestContext } =
+            const { inPageContext } =
                 await import(
-                    '../client/shared.ts'
+                    './in-page-facade.ts'
                 );
             const { putProject } = await import(
                 '../client/projects.ts'
             );
-            const seedCtx = createRequestContext(
+            const seedCtx = inPageContext(
                 db, token,
             );
             await putProject(seedCtx, PROJECT_ID, {

@@ -5,9 +5,9 @@ import {
 } from './fixtures/local-storage.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
 } from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     validateFlowForCreation,
@@ -295,7 +295,7 @@ Deno.test(
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const goodId = generateIdentifier();
         const badId = generateIdentifier();
         const goodGraph = readyGraph(
@@ -352,7 +352,7 @@ Deno.test(
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const lockedId = generateIdentifier();
         const openId = generateIdentifier();
         const memberId = generateIdentifier();

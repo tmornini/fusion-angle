@@ -2,9 +2,7 @@ import { assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
 import './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
@@ -21,7 +19,7 @@ async function tokenFor(sub: string): Promise<string> {
 }
 
 Deno.test('identity is resolved once from the token', async () => {
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         memoryDbAdapter(), await tokenFor('XXZruirZyAOoRpNxaDnpSA'));
     assertStrictEquals(ctx.identity.id, 'XXZruirZyAOoRpNxaDnpSA');
     assertStrictEquals(ctx.identity, ctx.identity);
@@ -29,7 +27,7 @@ Deno.test('identity is resolved once from the token', async () => {
 
 Deno.test('an anonymous token yields the anonymous principal',
 async () => {
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         memoryDbAdapter(), await tokenFor(ANONYMOUS_ID));
     assertStrictEquals(ctx.identity.id, ANONYMOUS_ID);
 });

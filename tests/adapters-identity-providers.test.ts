@@ -10,9 +10,7 @@ import {
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import {
-    createRequestContext,
-} from '../client/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -40,7 +38,7 @@ async function adminCtx() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return {
-        db, ctx: createRequestContext(db, await devToken()),
+        db, ctx: inPageContext(db, await devToken()),
     };
 }
 
@@ -78,7 +76,7 @@ Deno.test('an anonymous principal cannot read providers',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const anon = createRequestContext(
+    const anon = inPageContext(
         db, await devToken('anonymous'));
     await assertRejects(() => getProvidersFor(anon
         , 'prBESZPjJDiuXCeZLmbiVw'));
