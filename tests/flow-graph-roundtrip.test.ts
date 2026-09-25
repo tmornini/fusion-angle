@@ -8,7 +8,7 @@ import {
 import {
     asStoredGraph,
     asWorkOrderFlowGraph,
-} from '../api/validators.ts';
+} from '../shared/flow-graph-body.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

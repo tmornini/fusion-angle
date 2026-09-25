@@ -41,9 +41,7 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
-import {
-    asWorkOrderFlowGraph,
-} from '../api/validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     latestClaimEvent,
     isClaimEventExpired,

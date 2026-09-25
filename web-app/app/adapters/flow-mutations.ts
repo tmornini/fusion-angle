@@ -18,10 +18,8 @@ import type {
     FlowNodeMemberRowBody,
     FlowNodeAttributeRowBody,
     GraphRevival,
-} from '../../../api/validators.ts';
-import {
-    asStoredGraph,
-} from '../../../api/validators.ts';
+} from '../../../shared/flow-graph-body.ts';
+import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
 export type {
     FlowGraphDelta,
     FlowNodeRowBody,

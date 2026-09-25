@@ -12,8 +12,8 @@ import type {
 import { MS_PER_SECOND } from '../shared/types.ts';
 import {
     pickString, pickNumber,
-    asWorkOrderFlowGraph,
 } from './validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import { asObject } from '../shared/json-assert.ts';
 import { canonicalPath } from './message-pair.ts';
 import {

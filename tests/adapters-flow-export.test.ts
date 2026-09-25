@@ -55,9 +55,7 @@ import type {
     FlowWithGraph,
     StoredGraph,
 } from '../shared/types.ts';
-import {
-    asStoredGraph,
-} from '../api/validators.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,

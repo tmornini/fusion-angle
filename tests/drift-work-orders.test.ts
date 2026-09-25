@@ -36,8 +36,8 @@ import {
 import {
     pickString,
     validateWorkOrderDocumentBody,
-    asWorkOrderFlowGraph,
 } from '../api/validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
 import {
     latestClaimEvent,

@@ -18,7 +18,7 @@ import { storedGraph } from '../shared/types.ts';
 import {
     type FlowGraphDelta,
     asStoredGraph,
-} from './validators.ts';
+} from '../shared/flow-graph-body.ts';
 import { byIdAscending } from './derive-documents.ts';
 
 // On an equal-`at` tie a 'removed' outranks an 'added'

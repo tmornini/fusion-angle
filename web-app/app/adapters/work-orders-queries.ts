@@ -9,9 +9,7 @@ import {
     msSinceUtc,
     MS_PER_SECOND,
 } from '../../../shared/types.ts';
-import {
-    asWorkOrderFlowGraph,
-} from '../../../api/validators.ts';
+import { asWorkOrderFlowGraph } from '../../../shared/flow-graph-body.ts';
 import {
     isClaimState,
 } from '../../../shared/work-order-claims.ts';

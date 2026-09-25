@@ -8,9 +8,7 @@ import {
     nowUtc,
     storedWorkOrderFlowGraph,
 } from '../../../shared/types.ts';
-import {
-    asStoredGraph,
-} from '../../../api/validators.ts';
+import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
 import {
     latestClaimEvent,
     isClaimEventExpired,

@@ -8,9 +8,7 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../../shared/types.ts';
-import {
-    asStoredGraph,
-} from '../validators.ts';
+import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import {
     l2cFlowId,
     buildLeadToCloseNodes,

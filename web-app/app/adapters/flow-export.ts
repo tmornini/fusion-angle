@@ -21,9 +21,7 @@ import {
     notifyFlowChange,
     buildSaveEvents,
 } from './flow-mutations.ts';
-import {
-    asStoredGraph,
-} from '../../../api/validators.ts';
+import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
 import {
     parseOrThrow,
     asObject,

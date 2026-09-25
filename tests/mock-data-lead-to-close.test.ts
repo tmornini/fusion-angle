@@ -8,7 +8,7 @@ import {
 } from '../web-app/app/adapters/flow-stats.ts';
 import { now } from '../api/mock-data/seed-kit.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
-import { asStoredGraph } from '../api/validators.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import {

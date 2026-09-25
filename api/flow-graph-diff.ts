@@ -9,7 +9,7 @@ import type {
     FlowNodeMemberRowBody,
     FlowNodeAttributeRowBody,
     GraphRevival,
-} from './validators.ts';
+} from '../shared/flow-graph-body.ts';
 
 // The undo route's OWN diff — a server-side port of
 // web-app/app/adapters/flow-mutations.ts's buildSaveEvents/

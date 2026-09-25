@@ -31,9 +31,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
 } from '../shared/types.ts';
-import {
-    asStoredGraph,
-} from '../api/validators.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';

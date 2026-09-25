@@ -2,9 +2,7 @@ import type {
     FlowWithGraph,
     Id,
 } from '../../../shared/types.ts';
-import {
-    asStoredGraph,
-} from '../../../api/validators.ts';
+import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
 import { asBoolean } from '../../../shared/json-assert.ts';
 import type { RequestContext } from './shared.ts';
 import { organizationCollection } from './shared.ts';

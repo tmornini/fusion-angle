@@ -164,11 +164,11 @@ import {
     identityDocumentBodyOf,
 } from '../routes.ts';
 import {
-    asStoredGraph,
     validateFlowCreateBody,
     validateRecordWriteBody,
     validateObjectiveCreateBody,
 } from '../validators.ts';
+import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,

@@ -21,7 +21,7 @@ import {
     storedGraph,
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
-import { asStoredGraph } from '../api/validators.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';

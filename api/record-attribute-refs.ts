@@ -1,7 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import {
-    asWorkOrderFlowGraph,
-} from './validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     ApiError,
     HTTP_CONFLICT,

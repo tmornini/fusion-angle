@@ -83,13 +83,15 @@ import {
     validateWorkOrderCreateBody,
     validateWorkOrderDocumentBody,
     validateWorkOrderTransitionBody,
-    asWorkOrderFlowGraph,
     pickString,
     pickStringArray,
     pickBoolean,
     pickNumber,
-    asStoredGraph,
 } from './validators.ts';
+import {
+    asWorkOrderFlowGraph,
+    asStoredGraph,
+} from '../shared/flow-graph-body.ts';
 import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
