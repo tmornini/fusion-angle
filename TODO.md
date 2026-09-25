@@ -18,12 +18,12 @@ skew tests, which went with item 8's trio.
 
 0. The table, right — what a pair stores and what the
    store guarantees, before anything reads it differently.
-   The store is brainstormed:
-   `docs/superpowers/specs/2026-09-23-ledger-store-design.md`.
-   The message plane and the seed are not yet.
-   It ships as three specs in order, each its own
-   worktree, master green at Layer 1 between them and
-   deployed with items 1–3: the store — the final DDL,
+   The store, the message plane, and the seed are implemented:
+   `docs/superpowers/specs/2026-09-23-ledger-store-design.md`,
+   `docs/superpowers/specs/2026-09-23-message-plane-design.md`,
+   `docs/superpowers/specs/2026-09-23-ledger-seed-design.md`.
+   Its three specs, executed in order, deploy with
+   items 1–3: the store — the final DDL,
    its table `fa_message_pairs` and its indexes named
    after it under the naming bullet's prefix,
    the root, succession, the hash tree, one statement per
