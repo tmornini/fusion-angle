@@ -28,7 +28,7 @@ import {
     getBackupFromZip,
     getFlowZip,
     type Backup,
-} from '../web-app/app/adapters/flow-export.ts';
+} from '../web-app/app/flow-export.ts';
 import {
     postFlowCreation,
     putFlow,

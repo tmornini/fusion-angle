@@ -28,7 +28,7 @@ export * from '../../../client/identity-credentials.ts';
 export * from '../../../client/admin.ts';
 export * from '../../../client/flow-queries.ts';
 export * from '../../../client/flow-mutations.ts';
-export * from './flow-export.ts';
+export * from '../flow-export.ts';
 export * from './flow-publish.ts';
 export * from '../../../client/project-publish.ts';
 export * from '../../../client/work-orders-queries.ts';

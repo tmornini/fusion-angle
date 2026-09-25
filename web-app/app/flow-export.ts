@@ -6,22 +6,22 @@ import {
     DEFAULT_NODE_TASK_INSTRUCTIONS,
     projectStateIsNotDeleted,
     assertProjectState,
-} from '../../../shared/types.ts';
+} from '../../shared/types.ts';
 import type {
     FlowWithGraph,
     ProjectEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../../../shared/types.ts';
+} from '../../shared/types.ts';
 import {
     generateIdentifier,
-} from '../../../shared/identifier.ts';
+} from '../../shared/identifier.ts';
 import {
     notifyFlowChange,
     buildSaveEvents,
-} from '../../../client/flow-mutations.ts';
-import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
+} from '../../client/flow-mutations.ts';
+import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import {
     parseOrThrow,
     asObject,
@@ -29,37 +29,37 @@ import {
     asString,
     asNumber,
     asBoolean,
-} from '../../../shared/json-assert.ts';
+} from '../../shared/json-assert.ts';
 import {
     getFlowGraph,
     getProjectFlowEntities,
-} from '../../../client/flow-queries.ts';
-import type { FlowGraph } from '../../../client/flow-queries.ts';
-import type { RequestContext } from '../../../client/shared.ts';
+} from '../../client/flow-queries.ts';
+import type { FlowGraph } from '../../client/flow-queries.ts';
+import type { RequestContext } from '../../client/shared.ts';
 import {
     organizationCollection,
     organizationItem,
-} from '../../../client/shared.ts';
+} from '../../client/shared.ts';
 import {
     generateMermaid,
     mermaidIdOf,
-} from '../mermaid-generate.ts';
-import { parseMermaid } from '../mermaid-parse.ts';
+} from './mermaid-generate.ts';
+import { parseMermaid } from './mermaid-parse.ts';
 import type {
     ParsedNode,
     ParsedEdge,
-} from '../mermaid-parse.ts';
+} from './mermaid-parse.ts';
 import {
     DEFAULT_ZIP_LIMITS,
     buildZip, getZipEntries,
-} from '../zip.ts';
+} from './zip.ts';
 import {
     buildStartAndCompleteNodes,
-} from '../../../client/flow-defaults.ts';
-import type { LayoutInput } from '../flow-layout.ts';
+} from '../../client/flow-defaults.ts';
+import type { LayoutInput } from './flow-layout.ts';
 import {
     runLayoutFromInputs,
-} from '../flow-graph-layout.ts';
+} from './flow-graph-layout.ts';
 
 /* ── Mermaid export ──────────────── */
 

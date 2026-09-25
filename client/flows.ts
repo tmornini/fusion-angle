@@ -12,4 +12,4 @@ export async function getFlowEntities(
 
 export * from './flow-queries.ts';
 export * from './flow-mutations.ts';
-export * from '../web-app/app/adapters/flow-export.ts';
+export * from '../web-app/app/flow-export.ts';
