@@ -2937,6 +2937,16 @@ Off the critical path; each with its oracle.
   in `shared/`; the generator is a tool and may read
   the server. Oracle: an import-graph walk from every
   `PAGE_REGISTRY` entry finds no module under `api/`
+- Eleven comments name the retired appenders.
+  `appendMessagePairOnce` and `appendMessagePairAlways`
+  left with the store's one statement, and the comments
+  citing them stayed: `api/routes.ts` (six),
+  `api/api.ts` (two), `api/message-pair.ts` (two), and
+  `api/derive-documents.ts` (one), several explaining
+  stamp order by "appendMessagePairOnce's nowUtc()".
+  Reword each to the statement that writes today, or
+  delete it where the code now says it. Oracle:
+  `grep -rn appendMessagePair api/` finds nothing
 
 ## Sequencing
 
