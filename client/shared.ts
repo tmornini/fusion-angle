@@ -24,7 +24,7 @@ import {
 } from '../shared/access-token-decode.ts';
 import {
     resolveCredentialDecision,
-} from '../web-app/app/credential-resolution.ts';
+} from './credential-resolution.ts';
 import {
     type SessionCredentials,
     getSessionCredentials,

@@ -67,7 +67,7 @@ import {
     resolveCredentialDecision,
     resolveOrganizationGate,
     resolveBootOrganizationBranch,
-} from './credential-resolution.ts';
+} from '../../client/credential-resolution.ts';
 import {
     postSessionRefresh,
 } from '../../client/session-refresh.ts';

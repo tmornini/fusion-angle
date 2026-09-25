@@ -2,7 +2,7 @@ import { assertEquals } from '@std/assert';
 import './hmac-test-key.ts';
 import {
     resolveCredentialDecision,
-} from '../web-app/app/credential-resolution.ts';
+} from '../client/credential-resolution.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,

@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     resolveBootOrganizationBranch,
     resolveOrganizationGate,
-} from '../web-app/app/credential-resolution.ts';
+} from '../client/credential-resolution.ts';
 
 Deno.test(
     'invitations page keeps an empty organization'
