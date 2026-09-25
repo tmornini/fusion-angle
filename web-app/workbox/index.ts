@@ -27,7 +27,6 @@ import {
     activeClaimFromHistory,
     getMemberMap,
     getFlowsForCreation,
-    postWorkOrderCreation,
     putWorkOrder,
     sessionContext,
     generateIdentifier,
@@ -38,6 +37,9 @@ import {
     type TransitionEvent,
     type Member,
 } from '../app/adapters/index.ts';
+import {
+    createWorkOrderFromFlow,
+} from '../app/work-order-creation.ts';
 import type { Id } from '../../shared/types.ts';
 import {
     WorkboxInboxPresenter,
@@ -387,7 +389,7 @@ async function createWorkOrderForFlow(
     const flowLinkId =
         generateIdentifier();
     try {
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId,
             flowLinkId,
             flowId,

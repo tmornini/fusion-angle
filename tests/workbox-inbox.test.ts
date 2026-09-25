@@ -15,9 +15,9 @@ import {
 } from '../client/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    postWorkOrderCreation,
+    createWorkOrderFromFlow,
 } from
-'../client/work-orders-mutations.ts';
+'../web-app/app/work-order-creation.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -200,7 +200,7 @@ async function setupOneWorkOrder(): Promise<{
     const ctx = createRequestContext(db, await organizationToken());
     await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
     const woId = generateIdentifier();
-    await postWorkOrderCreation(ctx, {
+    await createWorkOrderFromFlow(ctx, {
         workOrderId: woId,
         flowLinkId: generateIdentifier(),
         flowId: 'ZOousbbnzpqlxJExVAruYQ',
@@ -361,7 +361,7 @@ Deno.test(
         const ctx = createRequestContext(db, await organizationToken());
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
         for (let i = 0; i < 3; i++) {
-            await postWorkOrderCreation(ctx, {
+            await createWorkOrderFromFlow(ctx, {
                 workOrderId:
                     generateIdentifier(),
                 flowLinkId:
@@ -457,7 +457,7 @@ Deno.test(
                 ),
             ],
         });
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId:
                 generateIdentifier(),
             flowLinkId:
@@ -546,7 +546,7 @@ Deno.test(
         );
         // A work order born AFTER the restore —
         // WB5a's most damning witness.
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId: generateIdentifier(),
             flowLinkId: generateIdentifier(),
             flowId: 'ZOousbbnzpqlxJExVAruYQ',
@@ -603,7 +603,7 @@ Deno.test(
         const leaverCtx = createRequestContext(
             db, await organizationToken(leaverId),
         );
-        await postWorkOrderCreation(leaverCtx, {
+        await createWorkOrderFromFlow(leaverCtx, {
             workOrderId: generateIdentifier(),
             flowLinkId: generateIdentifier(),
             flowId,

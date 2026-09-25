@@ -385,7 +385,7 @@ export async function getWorkOrderTransitionEvents(
 
 /* ── Reads ───────────────── */
 
-async function getWorkOrderEntities(
+export async function getWorkOrderEntities(
     ctx: RequestContext,
 ): Promise<WorkOrderEntity[]> {
     return ctx.GET<WorkOrderEntity[]>(

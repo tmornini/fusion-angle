@@ -14,9 +14,9 @@ import {
 } from
 '../client/flow-mutations.ts';
 import {
-    postWorkOrderCreation,
+    createWorkOrderFromFlow,
 } from
-'../client/work-orders-mutations.ts';
+'../web-app/app/work-order-creation.ts';
 import {
     getWorkOrder,
 } from
@@ -206,7 +206,7 @@ Deno.test(
         // Work-order creation reads the message-plane graph
         // via GET /organizations/:id/flows/:id.
         const woId = generateIdentifier();
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId: woId,
             flowLinkId: generateIdentifier(),
             flowId,

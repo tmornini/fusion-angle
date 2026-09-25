@@ -28,6 +28,10 @@ import {
 } from
 '../client/work-orders-mutations.ts';
 import {
+    createWorkOrderFromFlow,
+} from
+'../web-app/app/work-order-creation.ts';
+import {
     putRecordInstance,
     getRecordInstance,
     patchRecordInstance,
@@ -49,6 +53,10 @@ import {
     getActiveClaimsByWorkOrder,
 } from
 '../client/work-orders-queries.ts';
+import {
+    getFlowWithGraph,
+} from
+'../client/flow-queries.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -101,7 +109,7 @@ async function createWorkOrder(
     flowId: string,
 ): Promise<string> {
     const ids = mintCreateIds();
-    await postWorkOrderCreation(ctx, {
+    await createWorkOrderFromFlow(ctx, {
         ...ids, flowId,
     });
     return ids.workOrderId;
@@ -458,6 +466,30 @@ Deno.test(
         ].sort();
         assertEquals(
             positions, [1, 2],
+        );
+    },
+);
+
+Deno.test(
+    'postWorkOrderCreation posts the position it'
+    + ' is handed',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+        );
+        const ids = mintCreateIds();
+        await postWorkOrderCreation(ctx, {
+            ...ids,
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+            flow: await getFlowWithGraph(
+                ctx, 'ZOousbbnzpqlxJExVAruYQ',
+            ),
+            position: 42,
+        });
+        assertStrictEquals(
+            (await getWorkOrder(ctx, ids.workOrderId)).position,
+            42,
         );
     },
 );

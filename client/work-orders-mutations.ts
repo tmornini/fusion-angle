@@ -31,16 +31,9 @@ import {
     organizationItem,
 } from './shared.ts';
 import {
-    validateFlowForCreation,
-    formatFlowProblem,
-} from '../web-app/app/flow-publish.ts';
-import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import { sha256Bytes } from '../shared/digest.ts';
-import {
-    nextPosition,
-} from '../web-app/app/drag-reorder-positions.ts';
 import {
     recordTransitionViolationsFrom,
     RecordTransitionViolations,
@@ -90,35 +83,24 @@ export interface WorkOrderCreationInput {
     flowId: string;
 }
 
+// A creation the app has judged ready, at the position it
+// chose: the flow as read is frozen into the work order.
+export interface WorkOrderCreation
+    extends WorkOrderCreationInput {
+    readonly flow: FlowWithGraph;
+    readonly position: number;
+}
+
 export async function postWorkOrderCreation(
     ctx: RequestContext,
-    input: WorkOrderCreationInput,
+    creation: WorkOrderCreation,
 ): Promise<void> {
-    // Wave 1: flow + display id + existing list.
-    const [flow, displayId, existing] =
-        await Promise.all([
-            ctx.GET<FlowWithGraph>(
-                organizationItem(
-                    ctx, 'flows', input.flowId,
-                ),
-            ),
-            generateDisplayId(input.workOrderId),
-            ctx.GET<WorkOrderEntity[]>(
-                organizationCollection(ctx, 'work-orders'),
-            ),
-        ]);
-    const readiness = validateFlowForCreation(flow);
-    if (!readiness.ready) {
-        throw new Error(
-            'flow not ready: '
-            + readiness.problems
-                .map(formatFlowProblem)
-                .join('; '),
-        );
-    }
+    const displayId = await generateDisplayId(
+        creation.workOrderId,
+    );
     const graph: StoredGraph =
         asStoredGraph(
-            flow.graph, 'flow.graph',
+            creation.flow.graph, 'flow.graph',
         );
 
     const startNode = graph.nodes.find(
@@ -147,15 +129,12 @@ export async function postWorkOrderCreation(
     const postStartNodeId =
         postStartEdge.toNodeId;
 
-    const position = nextPosition(
-        existing.map(w => w.position),
-    );
     const now = nowUtc();
 
     const flowGraph: WorkOrderFlowGraph =
         {
-            name: flow.name,
-            lockTimeout: flow.lock_timeout,
+            name: creation.flow.name,
+            lockTimeout: creation.flow.lock_timeout,
             nodes: graph.nodes,
             edges: graph.edges,
         };
@@ -173,16 +152,16 @@ export async function postWorkOrderCreation(
     await ctx.POST(
         organizationCollection(ctx, 'work-orders'),
         {
-        id: input.workOrderId,
+        id: creation.workOrderId,
         workOrder: {
             display_id: displayId,
             flow_graph: flowGraphField,
-            position,
+            position: creation.position,
         },
-        flowWorkOrderId: input.flowLinkId,
+        flowWorkOrderId: creation.flowLinkId,
         flowWorkOrder: {
-            flow_id: input.flowId,
-            work_order_id: input.workOrderId,
+            flow_id: creation.flowId,
+            work_order_id: creation.workOrderId,
             at: now,
         },
         stateEventIds: [
