@@ -20,6 +20,7 @@ import {
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import { msSinceMonotonic } from '../shared/types.ts';
+import { logStampUtc } from './log-stamp.ts';
 import {
     createAuthThrottle,
     isAuthThrottlePath,
@@ -486,12 +487,7 @@ function logRequest(
 ): void {
     const method = request.method;
     const fields: Record<string, unknown> = {
-        // Date resolves only to milliseconds; Temporal reads
-        // the wall clock finer, so the stamp keeps the
-        // microseconds the Office of Time asks for.
-        at: Temporal.Now.instant().toString({
-            fractionalSecondDigits: 6,
-        }),
+        at: logStampUtc(),
         level: levelFor(status),
         method,
         path: new URL(request.url).pathname,
