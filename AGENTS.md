@@ -391,6 +391,10 @@ Every `transaction(…)` body awaits ONLY row ops —
 validators, crypto, hash, `serializeWire`, and scrypt
 run OUTSIDE the tx. Sync compute between row ops is
 fine. Nested `view.transaction` re-enters the same tx.
+The seed's rehearsal is the one exception: it holds a
+transaction on its scratch memory backend for its
+whole run, on an instance nothing else uses, so the
+ops' validators and hashes run inside it.
 A transaction holds its pooled connection and its
 advisory locks for its whole body; the memory backend
 serializes whole transactions, so a long body stalls
