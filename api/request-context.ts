@@ -41,6 +41,11 @@ export interface IncomingContext {
     // row keeps it verbatim (api/message-pair.ts). nowUtc() is
     // synchronous, so minting it here costs nothing async.
     readonly requestAt: string;
+    // performance.now() at arrival: a monotonic reading for
+    // durations, never a stamp — it names no instant, and
+    // only another performance.now() can be subtracted from
+    // it (msSinceMonotonic).
+    readonly arrivalMs: number;
     // Read once, here. Later steps decode these bytes.
     readonly bodyBytes: Uint8Array;
 }
@@ -83,6 +88,7 @@ export async function incomingContext(
         pathname: new URL(request.url).pathname,
         base,
         requestAt: nowUtc(),
+        arrivalMs: performance.now(),
         bodyBytes,
     };
 }

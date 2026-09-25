@@ -12,7 +12,7 @@ import {
 import type { LatencySimulation } from './latency.ts';
 import {
     ValidationError,
-    msSinceUtc,
+    msSinceMonotonic,
     nowUtc,
 } from '../shared/types.ts';
 import type { Id } from '../shared/types.ts';
@@ -321,7 +321,7 @@ function redactedFenceFailure(
         requestId: ctx.requestId,
         operationId: ctx.operationId,
         requestAt: ctx.requestAt,
-        latencyMs: msSinceUtc(ctx.requestAt),
+        latencyMs: msSinceMonotonic(ctx.arrivalMs),
         method: ctx.method,
         pathname: ctx.pathname,
     }, error);
@@ -1885,7 +1885,7 @@ async function dispatched(
             requestId: ctx.requestId,
             operationId: ctx.operationId,
             requestAt: ctx.requestAt,
-            latencyMs: msSinceUtc(ctx.requestAt),
+            latencyMs: msSinceMonotonic(ctx.arrivalMs),
             method,
             pathname,
         }, error);
