@@ -180,6 +180,17 @@ export async function getFlowsByProject(
     return result;
 }
 
+// The flow document as stored: its scalar fields, its graph
+// as the wire carries it, and the undo signal.
+export async function getFlowWithGraph(
+    ctx: RequestContext,
+    flowId: string,
+): Promise<FlowWithGraph> {
+    return ctx.GET<FlowWithGraph>(
+        organizationItem(ctx, 'flows', flowId),
+    );
+}
+
 export async function getFlowGraph(
     ctx: RequestContext,
     flowId: string,

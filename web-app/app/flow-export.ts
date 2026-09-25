@@ -9,7 +9,6 @@ import {
 } from '../../shared/types.ts';
 import type {
     FlowWithGraph,
-    ProjectEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
@@ -18,8 +17,7 @@ import {
     generateIdentifier,
 } from '../../shared/identifier.ts';
 import {
-    notifyFlowChange,
-    buildSaveEvents,
+    postFlowImport,
 } from '../../client/flow-mutations.ts';
 import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import {
@@ -32,14 +30,13 @@ import {
 } from '../../shared/json-assert.ts';
 import {
     getFlowGraph,
+    getFlowWithGraph,
     getProjectFlowEntities,
 } from '../../client/flow-queries.ts';
 import type { FlowGraph } from '../../client/flow-queries.ts';
 import type { RequestContext } from '../../client/shared.ts';
-import {
-    organizationCollection,
-    organizationItem,
-} from '../../client/shared.ts';
+import { getFlowEntities } from '../../client/flows.ts';
+import { getProjectEntities } from '../../client/projects.ts';
 import {
     generateMermaid,
     mermaidIdOf,
@@ -241,9 +238,7 @@ async function getFlowBackupData(
 }> {
     const [flow, projectFlows] =
         await Promise.all([
-            ctx.GET<FlowWithGraph>(
-                organizationItem(ctx, 'flows', flowId),
-            ),
+            getFlowWithGraph(ctx, flowId),
             getProjectFlowEntities(ctx),
         ]);
     const pf = projectFlows.find(
@@ -459,12 +454,8 @@ export async function computeFlowBackupResolution(
     // no second hop to the states log.
     const [flows, projects] =
         await Promise.all([
-            ctx.GET<FlowWithGraph[]>(
-                organizationCollection(ctx, 'flows'),
-            ),
-            ctx.GET<ProjectEntity[]>(
-                organizationCollection(ctx, 'projects'),
-            ),
+            getFlowEntities(ctx),
+            getProjectEntities(ctx),
         ]);
     const flowExists = flows.some(
         f => f.id === backup.flow.id,
@@ -543,42 +534,17 @@ export async function postFlowFromBackup(
             };
         });
 
-    // The graph lands in the relation tables via the delta —
-    // the flow row carries no blob. The baseline is empty (a
-    // fresh flow), so the delta is pure upserts for every
-    // imported node/edge.
-    const graphDelta = buildSaveEvents(
-        { nodes: [], edges: [] },
-        { nodes, edges },
+    await postFlowImport(ctx, {
         flowId,
-        generateIdentifier,
+        projectId,
+        name: backup.flow.name,
+        isLocked: backup.flow.isLocked,
+        isAutoLayout: backup.flow.isAutoLayout,
+        isAutoFit: backup.flow.isAutoFit,
+        lockTimeout: backup.flow.lockTimeout,
+        graph: { nodes, edges },
         now,
-    );
-    const linkId = generateIdentifier();
-    await ctx.POST(
-        organizationCollection(ctx, 'flows'),
-        {
-        id: flowId,
-        flow: {
-            name: backup.flow.name,
-            is_locked: backup.flow.isLocked,
-            is_auto_layout: backup.flow.isAutoLayout,
-            is_auto_fit: backup.flow.isAutoFit,
-            lock_timeout: backup.flow.lockTimeout,
-        },
-        projectFlowId: linkId,
-        projectFlow: {
-            project_id: projectId,
-            flow_id: flowId,
-            at: now,
-        },
-        initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: nowUtc(),
-        graphDelta,
     });
-
-    notifyFlowChange();
     return flowId;
 }
 
@@ -855,41 +821,17 @@ export async function postFlowFromMermaid(
                 + ' intermediate state',
         );
     }
-    // The graph lands in the relation tables via the delta —
-    // the flow row carries no blob. Empty baseline: pure
-    // upserts for every imported node/edge.
-    const graphDelta = buildSaveEvents(
-        { nodes: [], edges: [] },
-        graph,
+    await postFlowImport(ctx, {
         flowId,
-        generateIdentifier,
+        projectId,
+        name: firstNode.name + ' (import)',
+        isLocked: false,
+        isAutoLayout: true,
+        isAutoFit: true,
+        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        graph,
         now,
-    );
-    const linkId = generateIdentifier();
-    await ctx.POST(
-        organizationCollection(ctx, 'flows'),
-        {
-        id: flowId,
-        flow: {
-            name: firstNode.name + ' (import)',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        },
-        projectFlowId: linkId,
-        projectFlow: {
-            project_id: projectId,
-            flow_id: flowId,
-            at: now,
-        },
-        initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: nowUtc(),
-        graphDelta,
     });
-
-    notifyFlowChange();
     return {
         flowId,
         warnings: parsed.warnings,
@@ -1204,44 +1146,17 @@ export async function postFlowFromZip(
         ? sidecar.name
         : firstNode!.name + ' (import)';
 
-    // Same graphDelta posture as mermaid/backup create —
-    // relation upserts, no graph blob on the flow row.
-    const graphDelta = buildSaveEvents(
-        { nodes: [], edges: [] },
-        graph,
+    await postFlowImport(ctx, {
         flowId,
-        generateIdentifier,
+        projectId,
+        name: flowName,
+        isLocked: false,
+        isAutoLayout: sidecar ? false : true,
+        isAutoFit: sidecar ? false : true,
+        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        graph,
         now,
-    );
-    const linkId = generateIdentifier();
-    await ctx.POST(
-        organizationCollection(ctx, 'flows'),
-        {
-        id: flowId,
-        flow: {
-            name: flowName,
-            is_locked: false,
-            is_auto_layout: sidecar
-                ? false
-                : true,
-            is_auto_fit: sidecar
-                ? false
-                : true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        },
-        projectFlowId: linkId,
-        projectFlow: {
-            project_id: projectId,
-            flow_id: flowId,
-            at: now,
-        },
-        initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: nowUtc(),
-        graphDelta,
     });
-
-    notifyFlowChange();
     return {
         flowId,
         warnings: parsed.warnings,

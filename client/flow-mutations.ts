@@ -116,6 +116,59 @@ export async function postFlowCreation(
     flowChanges.notify();
 }
 
+// A flow built outside the canvas — a backup, a Mermaid
+// file, a ZIP — created whole: its scalar fields, its
+// project link, and every node and edge as one graph
+// delta, in one named operation.
+export interface FlowImportInput {
+    readonly flowId: string;
+    readonly projectId: string;
+    readonly name: string;
+    readonly isLocked: boolean;
+    readonly isAutoLayout: boolean;
+    readonly isAutoFit: boolean;
+    readonly lockTimeout: number;
+    readonly graph: StoredGraph;
+    readonly now: string;
+}
+
+export async function postFlowImport(
+    ctx: RequestContext,
+    input: FlowImportInput,
+): Promise<void> {
+    const graphDelta = buildSaveEvents(
+        { nodes: [], edges: [] },
+        input.graph,
+        input.flowId,
+        generateIdentifier,
+        input.now,
+    );
+    const linkId = generateIdentifier();
+    await ctx.POST(
+        organizationCollection(ctx, 'flows'),
+        {
+        id: input.flowId,
+        flow: {
+            name: input.name,
+            is_locked: input.isLocked,
+            is_auto_layout: input.isAutoLayout,
+            is_auto_fit: input.isAutoFit,
+            lock_timeout: input.lockTimeout,
+        },
+        projectFlowId: linkId,
+        projectFlow: {
+            project_id: input.projectId,
+            flow_id: input.flowId,
+            at: input.now,
+        },
+        initialState: 'active',
+        initialStateEventId: generateIdentifier(),
+        initialStateAt: nowUtc(),
+        graphDelta,
+    });
+    flowChanges.notify();
+}
+
 export interface FlowSaveShape {
     name: string;
     isLocked: boolean;
