@@ -12,7 +12,7 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     validateFlowForCreation,
     getFlowsForCreation,
-} from '../web-app/app/adapters/flow-publish.ts';
+} from '../web-app/app/flow-publish.ts';
 import {
     postFlowCreation,
     putFlow,

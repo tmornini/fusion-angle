@@ -33,7 +33,7 @@ import {
 import {
     validateFlowForCreation,
     formatFlowProblem,
-} from '../web-app/app/adapters/flow-publish.ts';
+} from '../web-app/app/flow-publish.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';

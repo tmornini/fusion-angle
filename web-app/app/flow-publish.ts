@@ -1,13 +1,13 @@
 import type {
     FlowWithGraph,
     Id,
-} from '../../../shared/types.ts';
-import { asStoredGraph } from '../../../shared/flow-graph-body.ts';
-import { asBoolean } from '../../../shared/json-assert.ts';
-import type { RequestContext } from '../../../client/shared.ts';
-import { organizationCollection } from '../../../client/shared.ts';
-import { shouldShowMemberHazard } from '../flow-graph.ts';
-import type { ValidationResult } from '../../../client/validation.ts';
+} from '../../shared/types.ts';
+import { asStoredGraph } from '../../shared/flow-graph-body.ts';
+import { asBoolean } from '../../shared/json-assert.ts';
+import type { RequestContext } from '../../client/shared.ts';
+import { organizationCollection } from '../../client/shared.ts';
+import { shouldShowMemberHazard } from './flow-graph.ts';
+import type { ValidationResult } from '../../client/validation.ts';
 
 export type FlowProblem =
     | { kind: 'zero_members'; nodeId: Id }
