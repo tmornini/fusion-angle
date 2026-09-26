@@ -700,6 +700,30 @@ skew tests, which went with item 8's trio.
    by its jti, from `## Later work`, whose oracle — one
    head per jti on every chain kind — the token document
    keeps. Follows item 0.
+   Work-order events become a sub-collection of an
+   immutable document type. State by PUT keeps each
+   version's own lifecycle events inside the work-order
+   head (`events`, `api/work-order-version.ts`), a
+   collection embedded in a document. Each event is its
+   own document, written once at
+   `…/work-orders/:id/events/:eventId` by a sibling PUT
+   with a handler genesis in the operation's statement;
+   the work-order head keeps its fields, node, binding,
+   and claim, and history reads the events collection.
+   Immutable document types make that a rule, not a
+   habit: a family declares itself immutable where it
+   declares its conditional, and then every write to it
+   is a genesis landed with the never-written latch, so
+   the statement refuses a second write at a written name
+   (412 for a client's declaration, 409 for a handler's)
+   and at a retired one (410); its DELETE route answers
+   405, and only erasure removes its pairs (the erasure
+   bullet), leaving the tombstone. Oracle: no work-order
+   version carries `events`; every event is a head with
+   exactly one version; a second write at an event's
+   name stores nothing; the history route answers
+   `tests/fixtures/work-order-histories.json`'s rows from
+   the collection, one statement per operation.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
