@@ -3104,6 +3104,28 @@ Off the critical path; each with its oracle.
   dependent reads it gone; each RESTRICT refuses a
   racing delete under one statement; no reference is
   unlisted.
+- An RFC 7009 revocation endpoint for OAuth clients.
+  Revocation today is
+  `identities/:id/tokens/:jti/revocation`: the identity
+  names its own token by `jti`, revokes the whole chain,
+  and an unknown jti answers 404, which reveals nothing
+  the identity cannot already list. A third-party client
+  holding only a token string has no standard way to
+  revoke it. Add `POST authentication/revocation`
+  (`application/x-www-form-urlencoded`: `token`, and the
+  optional `token_type_hint`), which authenticates the
+  client as `authentication/token` does, checks the token
+  was issued to that client, and revokes through the same
+  chain revocation. It answers 200 for a revoked or an
+  unknown token (RFC 7009 §2.2), so a guessed string
+  learns nothing; `unsupported_token_type` for a kind it
+  does not revoke; and 503 with `Retry-After` while
+  revocation is unavailable. Oracle: a client revokes its
+  refresh token and every jti in that chain then reads
+  revoked; an unknown or already-revoked token answers
+  200 and stores nothing; a token issued to another
+  client is refused; a real and a guessed token of the
+  same length answer byte-identical responses.
 
 ## Sequencing
 
