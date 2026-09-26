@@ -284,6 +284,98 @@ Deno.test(
 );
 
 Deno.test(
+    'a never-written sibling over a tombstone answers 409',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const headId = await born(db, { id: IDEA, title: 'A' });
+        await runStateWrite(db, {
+            kind: 'siblings',
+            received: await received(undefined),
+            siblings: [
+                {
+                    method: 'PUT',
+                    path: IDEA_PATH,
+                    name: 'second',
+                    state: { id: 'second' },
+                    condition: HANDLER_GENESIS,
+                },
+                {
+                    method: 'DELETE',
+                    path: IDEA_PATH,
+                    name: IDEA,
+                    condition: { kind: 'in-order', head: headId },
+                },
+            ],
+            project: unprojected,
+            answer: { kind: 'parent' },
+        });
+        const tombstone = await db.messagePairs.getHeadPair(
+            IDEA_PATH, IDEA,
+        );
+        assert(tombstone !== null);
+        assertStrictEquals(tombstone.method, 'DELETE');
+        const before = (await db.messagePairs.getAll())
+            .length;
+        const answer = await runStateWrite(db, {
+            kind: 'siblings',
+            received: await received(undefined),
+            siblings: [idea(
+                { id: IDEA, title: 'Again' },
+                { kind: 'never-written', declarer: 'client' },
+            )],
+            project: unprojected,
+            answer: { kind: 'parent' },
+        });
+        assertStrictEquals(answer.outcome, 'stale');
+        assertStrictEquals(answer.response.status, 409);
+        assertEquals(
+            await answer.response.json(),
+            {
+                error: 'Document already exists at '
+                    + IDEA_PATH + IDEA,
+            },
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+    },
+);
+
+Deno.test(
+    'a never-written sibling over a live head answers 412'
+        + ' for a client',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        await born(db, { id: IDEA, title: 'A' });
+        const before = (await db.messagePairs.getAll())
+            .length;
+        const answer = await runStateWrite(db, {
+            kind: 'siblings',
+            received: await received(undefined),
+            siblings: [idea(
+                { id: IDEA, title: 'A' },
+                { kind: 'never-written', declarer: 'client' },
+            )],
+            project: unprojected,
+            answer: { kind: 'parent' },
+        });
+        assertStrictEquals(answer.response.status, 412);
+        assertEquals(
+            await answer.response.json(),
+            {
+                error: 'Document already exists at '
+                    + IDEA_PATH + IDEA,
+            },
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+    },
+);
+
+Deno.test(
     'an unchanged parent answers its head, storing nothing',
     async () => {
         const { db } = openLedger();

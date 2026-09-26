@@ -101,6 +101,7 @@ function fakeClient(): {
                     response: new Uint8Array(),
                     head_id: null,
                     head_response: null,
+                    head_method: null,
                     supersedes: '00000000-0000-0000-0000-'
                         + '000000000000',
                     request_hash: '00'.repeat(32),

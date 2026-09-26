@@ -2,6 +2,7 @@
 // Heads and the clock are arguments. No row is written.
 
 import {
+    NEVER_WRITTEN_IDENTIFIER,
     NIL_IDENTIFIER,
     uuidTextOfIdentifier,
 } from './identifier.ts';
@@ -51,6 +52,7 @@ export type StatementAnswer = {
     response: Uint8Array,
     headId: string | null,
     headResponse: Uint8Array | null,
+    headMethod: string | null,
     inserted: boolean,
     supersedes: string,
     requestHashHex: string,
@@ -77,6 +79,7 @@ export type ClassifiedRow = {
     response: Uint8Array,
     headId: string | null,
     headResponse: Uint8Array | null,
+    headMethod: string | null,
     requestHashHex: string,
     secretHashHex: string,
     responseHashHex: string,
@@ -200,12 +203,17 @@ function supersedesOf(head: Head | null): string {
 }
 
 // A nil latch is a declared genesis: it may not land over
-// a live document, and it never matches one.
+// a live document, and it never matches one. A
+// never-written latch may not land over a tombstone either:
+// the name is spent.
 function rawOutcome(
     row: StatementRow,
     head: Head | null,
     response: Uint8Array,
 ): Outcome {
+    if (row.ifMatch === NEVER_WRITTEN_IDENTIFIER) {
+        return head === null ? 'land' : 'stale';
+    }
     if (row.ifMatch === NIL_IDENTIFIER) {
         return head !== null && head.method === 'PUT'
             ? 'stale'
@@ -346,6 +354,9 @@ async function hashedRow(
         headResponse: item.head === null
             ? null
             : item.head.response.slice(),
+        headMethod: item.head === null
+            ? null
+            : item.head.method,
         requestHashHex,
         secretHashHex: secretHash,
         responseHashHex,

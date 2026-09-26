@@ -14,8 +14,10 @@ import { DATE_PLACEHOLDER } from '../api/ledger-root.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
 import {
+    NEVER_WRITTEN_IDENTIFIER,
     NIL_IDENTIFIER,
     encodeIdentifier,
+    isIdentifier,
     uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
 import {
@@ -417,6 +419,96 @@ Deno.test(
             ),
             'HTTP/1.1 201 ',
         );
+    },
+);
+
+Deno.test(
+    'a never-written latch with no head lands',
+    async () => {
+        assert(isIdentifier(NEVER_WRITTEN_IDENTIFIER));
+        const rows = await classifyStatement(
+            'in-order',
+            [statementRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nhello'),
+            })],
+            [],
+            EARLY,
+        );
+        const row = rows[0]!;
+        assertEquals(row.outcome, 'land');
+        assertEquals(row.rawOutcome, 'land');
+        assertEquals(row.supersedes, NIL_IDENTIFIER);
+        assertEquals(row.inserted, true);
+        assertEquals(row.headMethod, null);
+    },
+);
+
+Deno.test(
+    'a never-written latch over a live put head is stale',
+    async () => {
+        const rows = await classifyStatement(
+            'in-order',
+            [statementRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nhello'),
+            })],
+            [{
+                path: PATH,
+                name: NAME,
+                id: identifierAt(1),
+                responseAt: HEAD_STAMP,
+                response: message(
+                    imfFixdate(HEAD_STAMP), 'hello',
+                ),
+                method: 'PUT',
+            }],
+            EARLY,
+        );
+        assertEquals(rows[0]!.outcome, 'stale');
+        assertEquals(rows[0]!.rawOutcome, 'stale');
+        assertEquals(rows[0]!.inserted, false);
+        assertEquals(rows[0]!.headMethod, 'PUT');
+    },
+);
+
+Deno.test(
+    'a never-written latch over a tombstone is stale',
+    async () => {
+        const rows = await classifyStatement(
+            'in-order',
+            [statementRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nagain'),
+            })],
+            [{
+                path: PATH,
+                name: NAME,
+                id: identifierAt(1),
+                responseAt: HEAD_STAMP,
+                response: textBytes(
+                    'HTTP/1.1 204 \r\ndate: '
+                        + imfFixdate(HEAD_STAMP)
+                        + '\r\n\r\n',
+                ),
+                method: 'DELETE',
+            }],
+            EARLY,
+        );
+        const row = rows[0]!;
+        assertEquals(row.outcome, 'stale');
+        assertEquals(row.rawOutcome, 'stale');
+        assertEquals(row.inserted, false);
+        assertEquals(row.headMethod, 'DELETE');
     },
 );
 

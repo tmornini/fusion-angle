@@ -3,6 +3,7 @@ import type {
     Id, IdentityTokenEntity, MessagePairEntity,
 } from '../shared/types.ts';
 import {
+    NEVER_WRITTEN_IDENTIFIER,
     NIL_IDENTIFIER,
     generateIdentifier,
     isIdentifier,
@@ -63,8 +64,9 @@ import { sortJsonKeys } from
 
 // Who declared a genesis: the client, by If-None-Match: *,
 // or the handler, for a document it names itself. The
-// statement judges both the same way; the refusal says
-// which (409 for the handler's, 412 for the client's).
+// statement judges both the same way. Over a live head the
+// refusal says which (409 for the handler's, 412 for the
+// client's); over a spent name it is 409 for either.
 export type GenesisDeclarer = 'client' | 'handler';
 
 // The shadow-ledger message pair: one `message_pairs` put. Formed
@@ -95,8 +97,12 @@ export interface MessagePair {
     readonly method: string;
     readonly operationId: string;
     readonly requestId: string;
-    // A document create: no head, so the row latches nil.
+    // A document create: it may not land over a live head,
+    // so the row latches nil unless neverWritten is set.
     readonly genesis?: GenesisDeclarer;
+    // Only beside genesis: the create may not land over a
+    // tombstone either, so the row latches never-written.
+    readonly neverWritten?: true;
     // Pre-tx lock-head pair id, latched when If-Match
     // matches the advertised ETag. In-tx re-query only.
     readonly latchedHeadMessagePairId?: string;
@@ -914,18 +920,28 @@ export async function runStatement(
     }
 }
 
-// The refused row names its document and the fact.
+// The refused row names its document and the fact. A
+// statement refused twice states no row, so its head is
+// unknown (null). A tombstone is not a current
+// representation (RFC 9110 §13.1.2): a create over one is a
+// conflict, whoever declared it, not a failed precondition.
 export function refusalOfRow(
     row: WriteRow | MessagePair,
     bind: StatementBind,
+    stated: StatementAnswer | null,
 ): Response {
     const document = bind.path + bind.name;
-    if (bind.ifMatch === NIL_IDENTIFIER) {
+    const neverWritten = bind.ifMatch === NEVER_WRITTEN_IDENTIFIER;
+    if (neverWritten || bind.ifMatch === NIL_IDENTIFIER) {
+        const spent = neverWritten
+            && (stated === null || stated.headMethod === 'DELETE');
         const handler = 'requestMessage' in row
             && row.genesis === 'handler';
         return errorJson(
             'Document already exists at ' + document,
-            handler ? HTTP_CONFLICT : HTTP_PRECONDITION_FAILED,
+            spent || handler
+                ? HTTP_CONFLICT
+                : HTTP_PRECONDITION_FAILED,
         );
     }
     return errorJson(
@@ -947,7 +963,7 @@ function refusedAnswer(
     // A statement no row latched names no header: it was
     // contended, as a blind one is after three attempts.
     const response = attempt !== 'blind' && latched >= 0
-        ? refusalOfRow(rows[latched]!, binds[latched]!)
+        ? refusalOfRow(rows[latched]!, binds[latched]!, null)
         : errorJson(
             'Document remained contended at '
                 + document.path + document.name,
@@ -966,6 +982,10 @@ export type SiblingCondition =
     | { readonly kind: 'in-order', readonly head: Id }
     | {
         readonly kind: 'genesis',
+        readonly declarer: GenesisDeclarer,
+    }
+    | {
+        readonly kind: 'never-written',
         readonly declarer: GenesisDeclarer,
     };
 
@@ -1065,9 +1085,9 @@ async function siblingsAnswer(
     const received = write.answer.kind === 'received'
         ? write.received
         : await completedPair(write.received, {
-            status: parent.condition.kind === 'genesis'
-                ? HTTP_CREATED
-                : HTTP_OK,
+            status: parent.condition.kind === 'in-order'
+                ? HTTP_OK
+                : HTTP_CREATED,
             etag: parentPair.id,
             fields: write.answer.kind === 'created'
                 ? [{
@@ -1094,7 +1114,9 @@ async function siblingsAnswer(
             (row) => row.rawOutcome === 'stale',
         );
         return {
-            response: refusalOfRow(rows[at]!, binds[at]!),
+            response: refusalOfRow(
+                rows[at]!, binds[at]!, stated[at]!,
+            ),
             outcome,
             answeredId: null,
             bells: [],
@@ -1190,12 +1212,15 @@ async function formSiblingPair(
         method: sibling.method,
         operationId: received.operationId,
         requestId: received.requestId,
-        ...(sibling.condition.kind === 'genesis'
-            ? { genesis: sibling.condition.declarer }
-            : {
+        ...(sibling.condition.kind === 'in-order'
+            ? {
                 latchedHeadMessagePairId:
                     sibling.condition.head,
-            }),
+            }
+            : { genesis: sibling.condition.declarer }),
+        ...(sibling.condition.kind === 'never-written'
+            ? { neverWritten: true as const }
+            : {}),
     };
 }
 
@@ -1366,7 +1391,9 @@ function answerOf(
             (row) => row.rawOutcome === 'stale',
         );
         return {
-            response: refusalOfRow(rows[at]!, binds[at]!),
+            response: refusalOfRow(
+                rows[at]!, binds[at]!, stated[at]!,
+            ),
             outcome,
             answeredId: null,
             bells: [],
@@ -1506,6 +1533,9 @@ function ifMatchOf(
             && pair.method === 'POST'
         ) {
             return null;
+        }
+        if (pair.neverWritten !== undefined) {
+            return NEVER_WRITTEN_IDENTIFIER;
         }
         if (pair.genesis !== undefined) {
             return NIL_IDENTIFIER;

@@ -23,6 +23,7 @@ import {
     POSTGRES_FA_REQUEST_ID_OF_FUNCTION,
 } from '../api/schema-postgres.ts';
 import {
+    NEVER_WRITTEN_IDENTIFIER,
     NIL_IDENTIFIER,
     generateIdentifier,
     uuidTextOfIdentifier,
@@ -1155,6 +1156,100 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 rows.map((row) => row.rawOutcome),
                 ['stale', 'land'],
             );
+        },
+    );
+
+    Deno.test(
+        'a never-written latch lands, then is stale over'
+            + ' its head',
+        async () => {
+            const name = 'never-' + generateIdentifier();
+            const born = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'born',
+                        notify: schema + '-never-born',
+                    }),
+                    ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                }],
+            ));
+            assertEquals(
+                [born.outcome, born.rawOutcome,
+                    born.supersedes, born.headMethod],
+                ['land', 'land', NIL_IDENTIFIER, null],
+            );
+            const again = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'born',
+                        notify: schema + '-never-again',
+                    }),
+                    ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                }],
+            ));
+            assertEquals(
+                [again.outcome, again.rawOutcome,
+                    again.headMethod],
+                ['stale', 'stale', 'PUT'],
+            );
+        },
+    );
+
+    Deno.test(
+        'a never-written latch over a tombstone is stale',
+        async () => {
+            const name = 'spent-' + generateIdentifier();
+            await runLedgerStatement(adapter, 'blind', [
+                bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'PUT',
+                    body: 'live',
+                    notify: schema + '-spent-live',
+                }),
+            ]);
+            const gone = only(await runLedgerStatement(
+                adapter, 'blind', [bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'DELETE',
+                    body: '',
+                    notify: schema + '-spent-gone',
+                })],
+            ));
+            const refused = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'reborn',
+                        notify: schema + '-spent-reborn',
+                    }),
+                    ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                }],
+            ));
+            assertEquals(refused.rawOutcome, 'stale');
+            assertEquals(refused.outcome, 'stale');
+            assertEquals(refused.inserted, false);
+            assertEquals(refused.headId, gone.id);
+            assertEquals(refused.headMethod, 'DELETE');
         },
     );
 

@@ -9,6 +9,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import type { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -536,7 +538,7 @@ async () => {
     ));
     assertStrictEquals(res.status, 409);
     assertEquals(await res.json(), {
-        error: 'instance already exists at '
+        error: 'Document already exists at '
             + INSTANCE_DETAIL,
     });
 });
@@ -782,15 +784,20 @@ async () => {
         'DELETE', INSTANCES + instanceId, adminToken,
     ));
     assertStrictEquals(deleted.status, 204);
+    const backend = db.backend as MemoryStorageBackend;
+    const before = backend.statementExecutions();
     const again = await handleRequest(db, req(
         'PATCH', INSTANCES + instanceId, memberToken,
         { set: [] }, DECLARED,
     ));
     assertStrictEquals(again.status, 409);
     assertEquals(await again.json(), {
-        error: 'instance already exists at '
+        error: 'Document already exists at '
             + INSTANCES + instanceId,
     });
+    assertStrictEquals(
+        backend.statementExecutions(), before + 1,
+    );
 });
 
 Deno.test('a PATCH naming a never-written instance is 412',

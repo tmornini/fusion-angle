@@ -297,7 +297,7 @@ async () => {
     ));
     assertStrictEquals(putAgain.status, 409);
     assertEquals(await putAgain.json(), {
-        error: 'instance already exists at '
+        error: 'Document already exists at '
             + INSTANCE_DETAIL,
     });
 

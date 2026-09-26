@@ -183,6 +183,7 @@ export class MemoryStorageBackend
                 response: item.response,
                 headId: item.headId,
                 headResponse: item.headResponse,
+                headMethod: item.headMethod,
                 inserted: item.inserted,
                 supersedes: item.supersedes,
                 requestHashHex: item.requestHashHex,

@@ -4,6 +4,8 @@
 
 const NIL_UUID =
     "'00000000-0000-0000-0000-000000000000'::uuid";
+const NEVER_WRITTEN_UUID =
+    "'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid";
 
 const CAST = [
     'uuid', 'uuid', 'text', 'text', 'text', 'text',
@@ -137,6 +139,11 @@ export function statementText(rowCount: number): string {
         'classed AS (',
         '    SELECT r.*,',
         '        CASE',
+        '            WHEN r.if_match = ' + NEVER_WRITTEN_UUID,
+        '                AND r.head_id IS NOT NULL',
+        "            THEN 'stale'",
+        '            WHEN r.if_match = ' + NEVER_WRITTEN_UUID,
+        "            THEN 'land'",
         '            WHEN r.if_match = ' + NIL_UUID,
         "                AND r.head_method = 'PUT'",
         "            THEN 'stale'",
@@ -220,6 +227,7 @@ export function statementText(rowCount: number): string {
         '    rep.response,',
         '    rep.head_id,',
         '    rep.head_response,',
+        '    rep.head_method,',
         '    rep.supersedes,',
         "    encode(rep.request_hash, 'hex')",
         '        AS request_hash,',

@@ -644,6 +644,7 @@ type StatementResult = {
     response: unknown,
     head_id: string | null,
     head_response: unknown,
+    head_method: string | null,
     supersedes: string,
     request_hash: string,
     secret_hash: string,
@@ -715,6 +716,16 @@ async function queryStatement(
                 'ledger statement outcome ' + rawOutcome,
             );
         }
+        const headMethod = row.head_method;
+        if (
+            headMethod !== null
+            && headMethod !== 'PUT'
+            && headMethod !== 'DELETE'
+        ) {
+            throw new Error(
+                'ledger statement head method ' + headMethod,
+            );
+        }
         return {
             id: source.id,
             path: row.path,
@@ -730,6 +741,7 @@ async function queryStatement(
             headResponse: row.head_response === null
                 ? null
                 : bytesOfBytea(row.head_response),
+            headMethod,
             inserted,
             supersedes: identifierOfUuidText(
                 row.supersedes,

@@ -3870,7 +3870,8 @@ export function instanceProjection(
 // Instance create: PATCH with If-None-Match: * (§3). The
 // client declares the genesis; the statement judges it.
 // Tombstone-wins is this family's rule, not the ledger's:
-// a retired name never comes back.
+// the statement refuses a never-written create over a
+// tombstone, so a retired name never comes back.
 async function postInstanceCreateOp(
     db: DbAdapter,
     p: string[],
@@ -3894,15 +3895,6 @@ async function postInstanceCreateOp(
     );
     validateInstanceValues(validated.set, attributesById);
     const prefix = instancesUriPrefix(org, typeId);
-    const head = await documentHeadAt(db, prefix, instanceId);
-    if (head?.method === 'DELETE') {
-        throw new ApiError(
-            'instance already exists at /organizations/'
-                + org + '/record-types/' + typeId
-                + '/instances/' + instanceId,
-            HTTP_CONFLICT,
-        );
-    }
     await runStateWrite(db, {
         kind: 'siblings',
         received: messagePair,
@@ -3914,7 +3906,9 @@ async function postInstanceCreateOp(
                 org, typeId, instanceId,
                 mergeInstanceValues([], { set: validated.set }),
             ),
-            condition: { kind: 'genesis', declarer: 'client' },
+            condition: {
+                kind: 'never-written', declarer: 'client',
+            },
         }],
         project: instanceProjection(attributesById, roles),
         answer: { kind: 'parent' },
