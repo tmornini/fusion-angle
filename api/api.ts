@@ -433,6 +433,16 @@ function rejectMalformedIdentifierParams(
     return undefined;
 }
 
+// WP8 self-only token-chain guard (below): the route-and-
+// method pairs it covers — the token revocation document's
+// PUT and both token operations' POSTs. `:id` in each pattern
+// names the identity whose chain the route acts on.
+const SELF_ONLY_TOKEN_ROUTES: ReadonlySet<string> = new Set([
+    'PUT identities/:id/token-revocations/:rid',
+    'POST identities/:id/tokens/:jti/rotation',
+    'POST identities/:id/tokens/:jti/revocation',
+]);
+
 function finish(
     ctx: IncomingContext,
     response: Response,
@@ -515,9 +525,10 @@ async function dispatched(
     let organization: Id | undefined;
     // Whether the caller holds the admin role in the fenced
     // organization — threaded out of Region A (below) alongside
-    // effective/actor/organization for WP8's self-only revocation
-    // guard (Region B, below): MEMBER_VERBS widens PUT
-    // /identities/:id/token-revocations to the member tier, but
+    // effective/actor/organization for WP8's self-only token-
+    // chain guard (Region B, below, SELF_ONLY_TOKEN_ROUTES):
+    // MEMBER_VERBS widens the token revocation document's PUT
+    // and both token operations' POSTs to the member tier, but
     // an admin may still name any identity. False for a bearer-
     // exempt route (no fence ran, so no role to hold) — the
     // guard below only ever runs on an authenticated route.
@@ -772,7 +783,8 @@ async function dispatched(
     }
 
     // Region B of the pre-dispatch write authorizer (Phase 12
-    // Task 1, joined by WP8's self-only revocation guard below):
+    // Task 1, joined by WP8's self-only token-chain guard
+    // below):
     // the one UNCONDITIONAL write guard below runs after body-
     // parse regardless of bearerExempt, mirroring Region A above.
     // The states/:id ownership authorizer RETIRED with the route
@@ -780,18 +792,19 @@ async function dispatched(
     // write authorizer RETIRED with the leaf routes (Phase 15
     // Task 7).
     try {
-        // WP8 self-only revocation guard. MEMBER_VERBS widens
-        // PUT /identities/:id/token-revocations to the member
-        // tier (Region A's route-policy check already cleared
-        // it). The path identity IS the document — compare it
-        // to the actor. A member may revoke only its OWN
-        // chain; an admin may name any identity. The 403 body
-        // reuses authorizeRequest's OWN wording
-        // (request-auth.ts).
+        // WP8 self-only token-chain guard. MEMBER_VERBS widens
+        // the token revocation document's PUT and both token
+        // operations' POSTs to the member tier (Region A's
+        // route-policy check already cleared each). The path
+        // identity IS the document, or owns the chain the
+        // operation acts on — compare it to the actor. A
+        // member may act only on its OWN chain; an admin may
+        // name any identity. The 403 body reuses
+        // authorizeRequest's OWN wording (request-auth.ts).
         if (
-            method === 'PUT'
-            && routePattern
-                === 'identities/:id/token-revocations/:rid'
+            SELF_ONLY_TOKEN_ROUTES.has(
+                method + ' ' + routePattern,
+            )
         ) {
             const targetIdentityId = params[0];
             if (

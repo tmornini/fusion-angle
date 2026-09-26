@@ -63,10 +63,12 @@ import { generateIdentifier } from
 // /identity-tokens is RETIRED (router 404). POST
 // /identities/:id/tokens/:jti/rotation and .../revocation
 // DO match MEMBER_VERBS' POST entry (segment-boundary
-// prefix) — a member-tier token clears authz and reaches
-// the route handler, which then answers on its own domain
-// terms (409 reuse for an unknown rotation jti; 404 for an
-// unknown revocation jti) rather than 403. Flat POST
+// prefix) — a member-tier token clears that coarse policy
+// check, but api/api.ts's Region B self-only guard (Task
+// 12a) then 403s BEFORE any read when the path identity is
+// not the actor. Naming its OWN identity still answers on
+// domain terms (409 reuse for an unknown rotation jti; 404
+// for an unknown revocation jti). Flat POST
 // /identity-tokens/:jti/rotation is RETIRED (router 404).
 // Path identity must match the jti's identity or 403; an
 // absent jti GET 404s.
@@ -752,9 +754,10 @@ async () => {
 });
 
 Deno.test('POST /identities/:id/tokens/:jti/rotation clears'
-+ ' authz for a member-tier token (MEMBER_VERBS widens'
-+ ' /identities/:id/tokens POST) and 409s on domain terms'
-+ ' for an unknown jti', async () => {
++ ' the coarse policy check for a member-tier token'
++ ' (MEMBER_VERBS widens /identities/:id/tokens POST), and'
++ " Region B's self-only guard 403s naming another identity,"
++ ' even an unknown jti', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'nkgaOHZISTQrILTfPThWCA');
     const token = await organizationToken('nkgaOHZISTQrILTfPThWCA');
@@ -767,7 +770,7 @@ Deno.test('POST /identities/:id/tokens/:jti/rotation clears'
             token, {},
         ),
     );
-    assertStrictEquals(res.status, 409);
+    assertStrictEquals(res.status, 403);
 });
 
 Deno.test('POST /identity-tokens/:jti/rotation is retired'
@@ -785,9 +788,10 @@ Deno.test('POST /identity-tokens/:jti/rotation is retired'
 });
 
 Deno.test('POST /identities/:id/tokens/:jti/revocation clears'
-+ ' authz for a member-tier token (MEMBER_VERBS widens'
-+ ' /identities/:id/tokens POST) and 404s on domain terms'
-+ ' for an unknown jti', async () => {
++ ' the coarse policy check for a member-tier token'
++ ' (MEMBER_VERBS widens /identities/:id/tokens POST), and'
++ " Region B's self-only guard 403s naming another identity,"
++ ' even an unknown jti', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'nkgaOHZISTQrILTfPThWCA');
     const token = await organizationToken('nkgaOHZISTQrILTfPThWCA');
@@ -800,7 +804,7 @@ Deno.test('POST /identities/:id/tokens/:jti/revocation clears'
             token, {},
         ),
     );
-    assertStrictEquals(res.status, 404);
+    assertStrictEquals(res.status, 403);
 });
 
 Deno.test('POST /identity-tokens/:jti/revocation is retired'

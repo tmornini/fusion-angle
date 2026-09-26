@@ -112,8 +112,9 @@ Deno.test('GET /identities/:id/tokens 403s for a member'
     assertStrictEquals(res.status, 403);
 });
 
-Deno.test('POST /identities/:id/tokens/:jti/rotation 409s for a'
-+ ' member on an unknown jti', async () => {
+Deno.test('POST /identities/:id/tokens/:jti/rotation 403s for a'
++ ' member naming another identity, even an unknown jti',
+async () => {
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const res = await handleRequest(db, req(
@@ -122,7 +123,7 @@ Deno.test('POST /identities/:id/tokens/:jti/rotation 409s for a'
             + 'rotation',
         token, {},
     ));
-    assertStrictEquals(res.status, 409);
+    assertStrictEquals(res.status, 403);
 });
 
 Deno.test('POST /identity-tokens/:jti/rotation is retired'

@@ -19,8 +19,11 @@ import {
 import type { MemoryStorageBackend } from
     '../api/backend-memory.ts';
 import { apiRequest } from './http-fixtures.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import { DEV_TOKEN, organizationToken } from
+    './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { seedOrganizationMember } from
+    './root-admin-fixture.ts';
 import {
     latestActionForJti,
 } from '../shared/identity-tokens.ts';
@@ -299,3 +302,91 @@ async () => {
     assertStrictEquals(body['jti'], ROOT_JTI);
     assertStrictEquals(body['action'], 'revoked');
 });
+
+// WP8 self-only token-chain guard (Task 12a): a member may
+// rotate or revoke only its OWN identity's chain; naming
+// another identity 403s before any read, whether the jti is
+// known or not. An admin still names any identity.
+const MEMBER_ID = 'nkgaOHZISTQrILTfPThWCA';
+
+async function memberSeededDb(): Promise<MemoryDbAdapter> {
+    const db = await seededDb();
+    await seedOrganizationMember(db, MEMBER_ID);
+    return db;
+}
+
+function memberTokenPath(
+    jti: string,
+    operation: 'rotation' | 'revocation',
+): string {
+    return '/identities/' + IDENTITY + '/tokens/' + jti
+        + '/' + operation;
+}
+
+Deno.test(
+    "a member rotating another identity's jti is 403,"
+        + " byte-pinned to the PUT guard's wording, and stores"
+        + ' no pair, leaving the victim\'s jti head issued',
+    async () => {
+        const db = await memberSeededDb();
+        const member = await organizationToken(MEMBER_ID);
+        const before = (await db.messagePairs.getAll()).length;
+        const path = memberTokenPath(ROOT_JTI, 'rotation');
+        const res = await handleRequest(db, apiRequest({
+            method: 'POST', path, token: member, body: {},
+        }));
+        assertStrictEquals(res.status, 403);
+        assertEquals(await res.json(), {
+            error: 'forbidden: POST ' + path
+                + ' requires a role this principal lacks',
+        });
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+        const head = await tokenHeadFor(db, IDENTITY, ROOT_JTI);
+        assert(head !== null);
+        assertStrictEquals(head.entity.action, 'issued');
+    },
+);
+
+Deno.test(
+    "a member revoking another identity's jti is 403,"
+        + " byte-pinned to the PUT guard's wording, and stores"
+        + ' no pair, leaving the victim\'s jti head issued',
+    async () => {
+        const db = await memberSeededDb();
+        const member = await organizationToken(MEMBER_ID);
+        const before = (await db.messagePairs.getAll()).length;
+        const path = memberTokenPath(ROOT_JTI, 'revocation');
+        const res = await handleRequest(db, apiRequest({
+            method: 'POST', path, token: member, body: {},
+        }));
+        assertStrictEquals(res.status, 403);
+        assertEquals(await res.json(), {
+            error: 'forbidden: POST ' + path
+                + ' requires a role this principal lacks',
+        });
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+        const head = await tokenHeadFor(db, IDENTITY, ROOT_JTI);
+        assert(head !== null);
+        assertStrictEquals(head.entity.action, 'issued');
+    },
+);
+
+Deno.test(
+    'a member revoking an unknown jti under another identity'
+        + ' is 403, not 404',
+    async () => {
+        const db = await memberSeededDb();
+        const member = await organizationToken(MEMBER_ID);
+        const path = memberTokenPath(
+            generateIdentifier(), 'revocation',
+        );
+        const res = await handleRequest(db, apiRequest({
+            method: 'POST', path, token: member, body: {},
+        }));
+        assertStrictEquals(res.status, 403);
+    },
+);
