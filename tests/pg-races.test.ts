@@ -378,7 +378,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    Deno.test('a second genesis keeps one pair',
+    Deno.test('a racing blind PUT matches the first and keeps one pair',
     async () => {
         const token = await organizationToken();
         const body = ideaDocument('Dedup');
@@ -401,7 +401,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             1,
         );
         assertStrictEquals(
-            statuses.filter((s) => s === 409).length,
+            statuses.filter((s) => s === 200).length,
             1,
         );
         assertStrictEquals(
