@@ -19,10 +19,11 @@ import { generateIdentifier } from
 // The flows sibling of tests/derive-ideas.test.ts/derive-
 // projects.test.ts: unit-level lifecycle-reduction guarantees
 // that tests/drift-flows.test.ts (parity-against-old-plane
-// only) does not exercise. MECHANISM: flows are the LOCKED
-// class (Decision 7) — a SECOND PUT to an existing flow is
-// non-genesis and must thread If-Match via a header-
-// capable req helper (echo the first PUT's pair-id ETag),
+// only) does not exercise. MECHANISM: a flow PUT's
+// conditional is 'required' — a SECOND PUT to an existing
+// flow is a conditional PUT and must thread If-Match via a
+// header-capable req helper (echo the first PUT's pair-id
+// ETag),
 // unlike the bare-req idiom the
 // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew tests
 // use.

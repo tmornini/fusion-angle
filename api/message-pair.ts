@@ -106,12 +106,6 @@ export interface MessagePair {
     // The head pair id a handler read; this row latches it
     // and the statement judges the latch.
     readonly latchedHeadMessagePairId?: string;
-    // A latched OPERATION's pin: the head of the PARENT
-    // document this operation acts on, not of this pair's
-    // own document. The row latch never reads it — that
-    // latch is same-document by definition — the handler
-    // re-verifies it in-tx against the document.
-    readonly pinnedDocumentMessagePairId?: string;
 }
 
 // The gate's seed for the two /authentication/* grant routes
@@ -174,7 +168,6 @@ export interface WriteMessagePairInput {
     // stores 201. Auth doors pass 200.
     readonly responseStatus?: number;
     readonly latchedHeadMessagePairId?: string;
-    readonly pinnedDocumentMessagePairId?: string;
     // Required on every formed pair. Public writes supply
     // the hoisted Operation-ID; seed and inner PUTs pass
     // the envelope id here. Never minted for a public write.
@@ -405,12 +398,6 @@ export async function formWriteMessagePair(
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
             : {}),
-        ...(input.pinnedDocumentMessagePairId !== undefined
-            ? {
-                pinnedDocumentMessagePairId:
-                    input.pinnedDocumentMessagePairId,
-            }
-            : {}),
     };
 }
 
@@ -565,6 +552,67 @@ export function parseEntityTags(
         tags.push(tag);
     }
     return tags;
+}
+
+// The strong validators the client's If-Match named, after
+// the gate checked their form; none when absent.
+export function entityTagsOf(
+    pair: MessagePair,
+): readonly string[] {
+    const raw = rawIfMatchFromMessagePair(pair);
+    if (raw === undefined) {
+        return [];
+    }
+    const tags = parseEntityTags(raw);
+    if (tags === undefined) {
+        throw new Error(
+            'the gate admitted a malformed If-Match',
+        );
+    }
+    return tags;
+}
+
+export type Latches =
+    | { readonly kind: 'latched', readonly heads: readonly Id[] }
+    | {
+        readonly kind: 'missing',
+        readonly documents: readonly number[],
+    }
+    | { readonly kind: 'extra' };
+
+// Interpretation J: match a class C operation's tags to
+// the documents it derives from, parent first.
+export function latchesOf(
+    tags: readonly string[],
+    heads: readonly (Id | null)[],
+): Latches {
+    if (tags.length > heads.length) {
+        return { kind: 'extra' };
+    }
+    const assigned: (Id | undefined)[] = heads.map(
+        (head) => head !== null && tags.includes(head)
+            ? head
+            : undefined,
+    );
+    const spare = tags.filter(
+        (tag) => !assigned.includes(tag),
+    );
+    const missing: number[] = [];
+    const latched = assigned.map((head, index) => {
+        if (head !== undefined) return head;
+        const next = spare.shift();
+        if (next === undefined) missing.push(index);
+        return next;
+    });
+    if (missing.length > 0) {
+        return { kind: 'missing', documents: missing };
+    }
+    return {
+        kind: 'latched',
+        heads: latched.filter(
+            (head): head is Id => head !== undefined,
+        ),
+    };
 }
 
 // Recover the client's If-Match target from a formed wire
@@ -829,9 +877,6 @@ export function attemptFor(
     if (pair.genesis !== undefined) return 'in-order';
     if (pair.latchedHeadMessagePairId !== undefined) {
         return 'in-order';
-    }
-    if (pair.pinnedDocumentMessagePairId !== undefined) {
-        return 'blind';
     }
     if (ifMatchFromMessagePair(pair) !== undefined) {
         return 'in-order';
@@ -1553,9 +1598,6 @@ function ifMatchOf(
         if (pair.latchedHeadMessagePairId !== undefined) {
             return pair.latchedHeadMessagePairId;
         }
-        if (pair.pinnedDocumentMessagePairId !== undefined) {
-            return null;
-        }
         // A zero-byte request has no If-Match line.
         if (pair.requestMessage === '') return null;
         return ifMatchFromMessagePair(pair) ?? null;
@@ -1692,20 +1734,6 @@ export function createdEntityName(
     return typeof value === 'string' && value !== ''
         ? value : undefined;
 }
-
-// A latched operation is a sub-resource write that REVERTS or
-// REPLACES the document it hangs off — it names the head it
-// intends to act on, exactly as a conditional PUT names the
-// head it intends to overwrite. Without the echo the server would act
-// on whatever its own pre-transaction resolution happened to
-// read, so the same request would 412 or succeed by scheduling
-// alone — a verdict the caller can neither predict nor retry
-// into. The latch target is the PARENT document: the
-// route's segments minus its trailing literal.
-export const LATCHED_OPERATION_ROUTE_PATTERNS:
-    Set<string> = new Set([
-        'organizations/:id/flows/:id/undo',
-    ]);
 
 // The coverage gate: pairs, wire headers, and the idempotency
 // fast-path fire ONLY for wired route patterns. Seeded with the

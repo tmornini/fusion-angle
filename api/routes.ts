@@ -97,6 +97,9 @@ import {
     attemptFor,
     runWrite,
     runStateWrite,
+    unprojected,
+    entityTagsOf,
+    latchesOf,
     canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
@@ -206,6 +209,7 @@ import {
 } from '../shared/record-constraints.ts';
 import {
     flowEntityOf,
+    flowStoredEntityOf,
     deriveFlow,
     deriveFlows,
     resolveFlowUndoTarget,
@@ -318,7 +322,9 @@ import {
     getInvitationVersionsOnIdentityNest,
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
-import type { DerivedDocument } from './derive-documents.ts';
+import type {
+    DerivedDocument, DocumentMessagePair,
+} from './derive-documents.ts';
 // Re-exported: param/requireOrganization/withoutId moved to
 // document-family.ts (see the import above and its own
 // comment), but api.ts and existing tests still import them
@@ -1569,40 +1575,66 @@ export async function postFlowDocumentOp(
     return { id, ...entity };
 }
 
-// Undo-as-replay (Phase 14 Task 8): given a resolution
-// ALREADY produced by resolveFlowUndoTarget, perform the
-// restore write. Phase Final Task 2: flows + graph ROW
-// halves stripped — the 'updated' state event, revivals
-// states events, and the operation + synthesized document
-// message pairs (graphDelta/revivals SIDECAR-KEEP on the document
-// body) commit as ONE transaction. Exhaustion appends only
-// the operation message pair. `current.id` is the in-tx latch so a
-// racing save 412s when the lock head has moved.
+// Undo-as-replay through the former (§1 C): the flow's
+// restored state lands in-order on the client's tag. At
+// exhaustion the flow's current state is the sibling, so
+// the statement answers the head and stores nothing.
 export async function postFlowUndoOp(
     db: DbAdapter,
     id: Id,
-    actor: Id,
     organization: Id,
     messagePair: MessagePair,
     resolution: FlowUndoResolution,
     b: FlowUndoBody,
-): Promise<unknown> {
+): Promise<void> {
     const { current, target } = resolution;
-    if (target === undefined) {
-        // Exhaustion: the gate still requires this wired write's
-        // own operation message pair to land (api.ts's post-dispatch
-        // "wired write stored no pair" guard, true for every
-        // pair-wired route), so it is appended ALONE — no
-        // document message pair, no domain writes — a genuine no-op a
-        // LATER resolution walk correctly ignores (it carries no
-        // correlated document message pair to displace anything).
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
+    const latches = latchesOf(
+        entityTagsOf(messagePair), [current.id],
+    );
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for /flows/' + id,
+            HTTP_PRECONDITION_REQUIRED,
         );
-        return;
     }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const body = target === undefined
+        ? current.body
+        : undoneFlowBody(id, current, target, b);
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: canonicalPath(organization, '/flows/'),
+            name: id,
+            state: flowStoredEntityOf({
+                name: id,
+                messagePairId: current.id,
+                method: 'PUT',
+                body,
+            }, organization),
+            condition: {
+                kind: 'in-order', head: latches.heads[0]!,
+            },
+        }],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
+}
+
+function undoneFlowBody(
+    id: Id,
+    current: DocumentMessagePair,
+    target: DocumentMessagePair,
+    b: FlowUndoBody,
+): Record<string, unknown> {
     const currentGraph = asStoredGraph(
         current.body['graph'],
         'flows/:id/undo current.graph',
@@ -1650,45 +1682,7 @@ export async function postFlowUndoOp(
         revivals,
     };
     validateFlowDocumentBody(documentBody);
-    const documentMessagePair = await formDocumentMessagePairFor({
-        routePattern: 'organizations/:id/flows/:id',
-        params: [organization, id],
-        body: documentBody,
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization,
-        latchedHeadMessagePairId: current.id,
-    });
-    // Phase Final Task 2: flows + graph ROW halves stripped.
-    const latest = await db.readTransaction(
-        async (view) =>
-            (await messageStore(view).getDocumentHead(
-                documentMessagePair.path,
-                documentMessagePair.name,
-            ))?.id,
-    );
-    // The CLIENT's pin, not this walk's own read:
-    // the gate proved it matched the head before
-    // dispatch, so a mismatch here means a racer
-    // committed in between — a real conflict, never
-    // a scheduling artifact of our own resolution.
-    const pinned =
-        messagePair.pinnedDocumentMessagePairId
-            ?? current.id;
-    if (latest !== pinned) {
-        throw new ApiError(
-            'If-Match does not match the current'
-            + ' document at /flows/' + id,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const pairs = [
-        messagePair, documentMessagePair,
-    ];
-    await runWrite(db, attemptFor(pairs), pairs);
-    return;
+    return documentBody;
 }
 
 // The three pairs a live POST /objectives forms (Task 3): the
@@ -4863,18 +4857,14 @@ export const routes: Route[] = [
     // flow document. Do not change the flow payload.
     documentVersionListRoute(FLOWS_WIRING),
     documentVersionRoute(FLOWS_WIRING),
-    // Undo-as-replay (Phase 14 Task 8). Phase Final Task 2:
-    // flows + graph ROW halves stripped; restore writes the
-    // 'updated' state event, revival states events, and the
-    // operation + document message pairs. graphDelta/revivals are
-    // server-computed into the document message pair body
-    // (SIDECAR-KEEP → deriveFlowGraphStates). No flow_versions
-    // row is read or written. Exhaustion appends only the
-    // operation message pair. A moved lock head → 412 via the
-    // in-tx head re-read.
+    // Undo-as-replay (Phase 14 Task 8): the restored state,
+    // graphDelta/revivals server-computed into it
+    // (SIDECAR-KEEP → deriveFlowGraphStates), lands through
+    // the former on the client's tag. No flow_versions row
+    // is read or written.
     route('organizations/:id/flows/:id/undo', {
         post: async (
-            db, p, body, actor, messagePair, organization,
+            db, p, body, _actor, messagePair, organization,
         ) => {
             const id = param(p, 1);
             const b = validateFlowUndoBody(body);
@@ -4894,9 +4884,10 @@ export const routes: Route[] = [
                     db, id, organization, 'flows',
                 );
             }
-            return postFlowUndoOp(
-                db, id, actor, organization, messagePair, resolution, b,
+            await postFlowUndoOp(
+                db, id, organization, messagePair, resolution, b,
             );
+            return undefined;
         },
     }),
     // Pair-chain GET flows/:id/versions[/]:etag is

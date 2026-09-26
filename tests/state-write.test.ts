@@ -9,6 +9,7 @@ import { MemoryStorageBackend } from
     '../api/backend-memory.ts';
 import {
     formWriteMessagePair,
+    latchesOf,
     responseRecordOf,
     runStateWrite,
     sameAsHead,
@@ -607,3 +608,28 @@ Deno.test(
         );
     },
 );
+
+Deno.test('latches pair tags with the heads read', () => {
+    const [a, b] = [generateIdentifier(), generateIdentifier()];
+    assertEquals(
+        latchesOf([b, a], [a, b]),
+        { kind: 'latched', heads: [a, b] },
+    );
+    const stale = generateIdentifier();
+    assertEquals(
+        latchesOf([stale, b], [a, b]),
+        { kind: 'latched', heads: [stale, b] },
+    );
+    assertEquals(
+        latchesOf([a], [a, b]),
+        { kind: 'missing', documents: [1] },
+    );
+    assertEquals(
+        latchesOf([a, b, stale], [a, b]),
+        { kind: 'extra' },
+    );
+    assertEquals(
+        latchesOf([a], [null]),
+        { kind: 'latched', heads: [a] },
+    );
+});

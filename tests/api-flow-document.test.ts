@@ -987,7 +987,7 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
             db, token, 'cvdqOxjRwvTEYzWTrFDNFw',
         ) },
     ));
-    assertStrictEquals(undone.status, 201);
+    assertStrictEquals(undone.status, 200);
 
     const requestsAfterUndo = await db.messagePairs.getAll();
     const responsesAfterUndo = await db.messagePairs.getAll();
@@ -1147,7 +1147,7 @@ async () => {
         ) },
     ));
 
-    assertStrictEquals(undone.status, 201);
+    assertStrictEquals(undone.status, 200);
 });
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): no
@@ -1383,7 +1383,7 @@ async () => {
         },
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(undone.status, 201);
+    assertStrictEquals(undone.status, 200);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 3);
     await assertStoredPutOmitsUndoHistory(
         db, flowId, 3, token,

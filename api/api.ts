@@ -17,7 +17,6 @@ import {
     nowUtc,
 } from '../shared/types.ts';
 import type { Id } from '../shared/types.ts';
-import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
@@ -32,9 +31,7 @@ import {
     attachEtag,
     attachDate,
     streamGetFromStored,
-    parseIfMatch,
     parseEntityTags,
-    LATCHED_OPERATION_ROUTE_PATTERNS,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
     IF_NONE_MATCH_HEADER,
@@ -895,34 +892,6 @@ async function dispatched(
                 && head.method === 'PUT'
                 ? head.id
                 : undefined;
-            // The latched operation arm: a sub-resource
-            // write that acts ON the parent document (undo).
-            // Its precondition target is that parent's head —
-            // the route's segments minus the trailing literal
-            // — so the caller pins what it saw, not what the
-            // server's own resolution walk later reads.
-            const isLatchedOperation =
-                LATCHED_OPERATION_ROUTE_PATTERNS
-                    .has(routePattern);
-            const latchPathAndName = isLatchedOperation
-                ? pathAndNameOf(
-                    matched.segments.slice(0, -1),
-                    pathSegments.slice(0, -1),
-                )
-                : undefined;
-            const latchHead = latchPathAndName === undefined
-                ? undefined
-                : await documentHeadMessagePairId(
-                    effective,
-                    canonicalPath(
-                        organization,
-                        latchPathAndName.path,
-                    ),
-                    latchPathAndName.name,
-                );
-            const latchEcho = isLatchedOperation
-                ? request.headers.get(IF_MATCH_HEADER)
-                : null;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
             // (message-pair.ts resolution: DELETEs join their
@@ -1001,63 +970,7 @@ async function dispatched(
                         }],
                     }
                     : {}),
-                ...(isLatchedOperation
-                    && latchEcho !== null
-                    ? {
-                        pinnedDocumentMessagePairId:
-                            parseIfMatch(latchEcho)
-                                ?? latchEcho,
-                    }
-                    : {}),
             });
-            // The latched-operation table for sub-resource
-            // writes: absent → 428; malformed → 400; ≠ parent head
-            // → 412; == head → proceed with the echo latched
-            // onto the operation pair, re-verified in-tx by
-            // the handler. Returns BEFORE dispatch, so a
-            // rejected operation stores nothing.
-            // Absence is NOT a precondition failure: with no
-            // parent head there is nothing to pin, so the
-            // gate stands aside and the handler's own
-            // missedReadError speaks the 404 (AGENTS.md
-            // "Genuine absence still 404s"). Gating first
-            // would answer a foreign or never-written id
-            // with 428/412 and bury the real verdict.
-            if (isLatchedOperation && latchHead !== undefined) {
-                if (latchEcho === null) {
-                    return Response.json(
-                        {
-                            error: 'If-Match is required to '
-                                + 'POST ' + pathname,
-                        },
-                        {
-                            status:
-                                HTTP_PRECONDITION_REQUIRED,
-                        },
-                    );
-                }
-                const parsed = parseIfMatch(latchEcho);
-                if (parsed === undefined) {
-                    return Response.json(
-                        {
-                            error: 'If-Match must carry '
-                                + 'exactly one strong '
-                                + 'validator',
-                        },
-                        { status: HTTP_BAD_REQUEST },
-                    );
-                }
-                if (parsed !== latchHead) {
-                    return Response.json(
-                        {
-                            error: 'If-Match does not '
-                                + 'match the current document '
-                                + 'at ' + pathname,
-                        },
-                        { status: HTTP_PRECONDITION_FAILED },
-                    );
-                }
-            }
             // Same-body as live PUT head → 200, no append.
             // Body equality is octets, not ETag. The no-op
             // still takes the in-tx latch so it cannot

@@ -996,7 +996,7 @@ async () => {
         { 'if-match': '"'
             + await headResponseId(db, token, flowId) + '"' },
     ));
-    assertStrictEquals(undone.status, 201);
+    assertStrictEquals(undone.status, 200);
 
     const prefix = canonicalPath(
         STARK_ORGANIZATION, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',

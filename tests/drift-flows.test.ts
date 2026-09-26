@@ -653,7 +653,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         },
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(undone.status, 201);
+    assertStrictEquals(undone.status, 200);
     await headResponseId(db, token, flowId);
     derived = await assertStep();
     assertStrictEquals(
