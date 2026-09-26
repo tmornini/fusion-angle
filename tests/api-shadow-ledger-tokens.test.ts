@@ -227,8 +227,8 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
 // of silently replaying the first success.
 
 Deno.test('a rotation appends its pair at an operation path:'
-+ ' name stays empty, and the wire {jti} equals the pair\'s'
-+ ' own stored response body', async () => {
++ ' name stays empty, and the wire, the successor\'s state,'
++ ' equals the pair\'s own stored response body', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
         'POST', tokenOpPath('rotation'),
@@ -249,6 +249,9 @@ Deno.test('a rotation appends its pair at an operation path:'
     const storedBody = await responseFromStored(stored).json();
     assertEquals(storedBody, wireBody);
     const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
+    const successor = rows.find((r) => r.action === 'issued');
+    assert(successor);
+    assertStrictEquals(wireBody.jti, successor.jti);
     assertStrictEquals(
         latestActionForJti(rows, wireBody.jti), 'issued');
 });
@@ -312,7 +315,7 @@ Deno.test('a revocation appends its pair at an operation path:'
         'POST', tokenOpPath('revocation'),
         DEV_TOKEN, {},
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.path
@@ -324,25 +327,25 @@ Deno.test('a revocation appends its pair at an operation path:'
     assertStrictEquals(latestActionForJti(rows, ROOT_JTI), 'revoked');
 });
 
-Deno.test('revoking an unknown jti is an idempotent 2xx no-op that'
-+ ' STILL appends its own pair (the claim-op precedent)',
-async () => {
+Deno.test('revoking an unknown jti answers 404 and stores no'
++ ' operation pair', async () => {
     const db = await seededDb();
+    const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(db, req(
         'POST', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             + UNKNOWN_JTI + '/revocation',
         DEV_TOKEN, {},
     ));
-    assertStrictEquals(res.status, 201);
+    await res.body?.cancel();
+    assertStrictEquals(res.status, 404);
     const requests = await db.messagePairs.getAll();
+    assertStrictEquals(requests.length, before);
     const row = requests.find(
         r => r.path
             === '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
                 + UNKNOWN_JTI + '/revocation/',
     );
-    assert(row);
-    // The domain ledger stays untouched by the no-op — only
-    // the shadow pair records that the request happened.
+    assertStrictEquals(row, undefined);
     const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(rows.length, 1);
 });
@@ -355,7 +358,7 @@ async () => {
         'POST', tokenOpPath('revocation'),
         DEV_TOKEN, {},
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     // A distinguishing body keeps this a genuinely NEW request
     // rather than the byte-identical resend covered elsewhere
     // (the route ignores the body either way).
@@ -363,7 +366,7 @@ async () => {
         'POST', tokenOpPath('revocation'),
         DEV_TOKEN, { attempt: 2 },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const requests = await db.messagePairs.getAll();
 
     const rows = requests.filter(
@@ -747,7 +750,7 @@ async () => {
         'POST', tokenOpPath('revocation'),
         DEV_TOKEN, {},
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const revoked = rows.find(
         r => r.jti === ROOT_JTI && r.action === 'revoked',
@@ -756,8 +759,8 @@ async () => {
     await assertEventMessagePairForRow(db, revoked!.id);
 });
 
-Deno.test('revoking an unknown jti appends NO event pair — only its'
-+ ' own operation message pair (the no-op precedent)', async () => {
+Deno.test('revoking an unknown jti answers 404 and appends NO'
++ ' pair, event or operation', async () => {
     const db = await seededDb();
     const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(db, req(
@@ -765,11 +768,10 @@ Deno.test('revoking an unknown jti appends NO event pair — only its'
             + UNKNOWN_JTI + '/revocation',
         DEV_TOKEN, {},
     ));
-    assertStrictEquals(res.status, 201);
+    await res.body?.cancel();
+    assertStrictEquals(res.status, 404);
     const requests = await db.messagePairs.getAll();
-    // +1: only the operation message pair — no row written, so
-    // no event pair to match it.
-    assertStrictEquals(requests.length, before + 1);
+    assertStrictEquals(requests.length, before);
     const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(rows.length, 1);   // the seeded root, untouched
 });
@@ -885,9 +887,10 @@ Deno.test('revokeTokenChain racing a concurrent rotateRefreshJti on'
             DEV_TOKEN, {},
         )),
     ]);
-    // revokeTokenChain never fails (the claim-op 2xx precedent)
-    // — this holds regardless of which side of the race wins.
-    assertStrictEquals(revoke.status, 201);
+    // The chain is known, and a rotation that wins the race
+    // only moves heads the revocation's next attempt re-reads,
+    // so the revocation lands (200) whichever side wins.
+    assertStrictEquals(revoke.status, 200);
     assert([201, 409].includes(rotate.status));
     const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const chainId = rows.find(r => r.jti === ROOT_JTI)!.chain_id;

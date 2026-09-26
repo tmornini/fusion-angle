@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    Id, IdentityTokenEntity, MessagePairEntity,
+    Id, MessagePairEntity,
 } from '../shared/types.ts';
 import {
     NEVER_WRITTEN_IDENTIFIER,
@@ -16,7 +16,6 @@ import {
     storedWire,
     requestMessageHash,
 } from './message-form.ts';
-import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
@@ -432,64 +431,6 @@ export async function formAuthMessagePair(
     });
 }
 
-// The literal 'identities/:id/tokens/:jti' route pattern: the
-// wired PUT's own document family and response spec (routes.ts,
-// WRITE_RESPONSE_SPECS['identities/:id/tokens/:jti']), reused
-// byte-for-byte by every synthesized identity_tokens row-write
-// pair (Phase 13 Task 5, Gate 7) — one derivation later serves
-// fixture pairs, real PUT pairs, and these synthesized
-// grant/rotation/revocation pairs uniformly. Kept as a literal
-// here rather than imported from routes.ts: routes.ts imports
-// FROM message-pair.ts (formWriteMessagePair), never the
-// reverse — the import graph stays acyclic (see
-// formDocumentMessagePairFor's own comment, routes.ts).
-const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:jti';
-const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
-    TOKEN_EVENT_ROUTE_PATTERN.split('/');
-
-// Synthesizes ONE token event pair at the jti's own
-// document — `name` is always the jti. The SAME document,
-// method, and response shape a real PUT
-// identities/:id/tokens/:jti stores; the response `id` is
-// the name (identityTokenEntityOf: GET wins). Formed PRE-TX
-// — crypto, hashing, and timers never run inside an open
-// transaction. requesterIdentityId is the event's OWN
-// identity_id — the named convention for a write with no
-// authenticated actor in view at this depth. A jti is an
-// identifier, not a bearer secret.
-export async function formTokenEventMessagePair(
-    name: Id,
-    event: Omit<IdentityTokenEntity, 'id'>,
-    operationId: string,
-    requestId: string,
-): Promise<MessagePair> {
-    const pathSegments = [
-        TOKEN_EVENT_ROUTE_SEGMENTS[0]!,
-        event.identity_id,
-        TOKEN_EVENT_ROUTE_SEGMENTS[2]!,
-        name,
-    ];
-    const body = event as unknown as Record<string, unknown>;
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: TOKEN_EVENT_ROUTE_PATTERN,
-        routeSegments: TOKEN_EVENT_ROUTE_SEGMENTS,
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: event.identity_id,
-        requestAt: event.at,
-        organization: undefined,
-        responseBody: {
-            id: name,
-            ...validateIdentityTokenEntity(body),
-        },
-        operationId,
-        requestId,
-    });
-}
-
 // The head of a document: its latest PUT or DELETE, or
 // null. A DELETE head is a gone document, not a miss.
 export async function documentHeadAt(
@@ -799,17 +740,6 @@ export function streamGetFromStored(
     return attachEtag(response, stored.id);
 }
 
-// The pre-store body of a just-formed pair's own response
-// message — a handler that must act on a value the gate's
-// successBody resolver already minted (token rotation's
-// pre-minted jti) reads it back HERE rather than deriving a
-// second, possibly divergent, value. The pair IS the response.
-export function messagePairResponseBody(
-    messagePair: MessagePair,
-): Record<string, unknown> | undefined {
-    return responseRecordOf(messagePair.responseMessage);
-}
-
 export function responseBodyText(
     message: string,
 ): string {
@@ -1070,6 +1000,15 @@ export type StateAnswerKind =
     | { readonly kind: 'created', readonly location: string }
     | { readonly kind: 'received' };
 
+// The request, author, and stamp every sibling of one
+// write shares.
+export type SiblingContext = {
+    readonly operationId: string,
+    readonly requestId: string,
+    readonly requesterIdentityId: Id,
+    readonly requestAt: string,
+};
+
 export type StateWrite =
     | {
         readonly kind: 'siblings',
@@ -1084,7 +1023,24 @@ export type StateWrite =
         readonly kind: 'own',
         readonly received: MessagePair,
         readonly state: Record<string, unknown>,
+    }
+    | {
+        readonly kind: 'events',
+        readonly context: SiblingContext,
+        readonly siblings: readonly [
+            StateSibling, ...StateSibling[],
+        ],
     };
+
+// A write formed outside a transaction, so its body awaits
+// only the statement (AGENTS.md).
+export type FormedStateWrite = {
+    readonly write: StateWrite,
+    readonly attempt: Attempt,
+    readonly rows: readonly (WriteRow | MessagePair)[],
+    readonly binds: readonly StatementBind[],
+    readonly parentId: Id,
+};
 
 export const unprojected: StateProjection = (state) => state;
 
@@ -1105,22 +1061,93 @@ export async function runStateWrite(
     adapter: DbAdapter,
     write: StateWrite,
 ): Promise<WriteAnswer> {
+    return landStateWrite(adapter, await formStateWrite(write));
+}
+
+// Hashes and salts: everything before the statement.
+export async function formStateWrite(
+    write: StateWrite,
+): Promise<FormedStateWrite> {
+    if (write.kind === 'own') {
+        const pair = await ownPair(write);
+        return formedOf(
+            write, attemptFor([pair]), [pair], pair.id,
+        );
+    }
+    const pairs = await Promise.all(write.siblings.map(
+        (sibling) => formSiblingPair(
+            write.kind === 'events'
+                ? write.context
+                : write.received,
+            sibling,
+        ),
+    ));
+    if (write.kind === 'events') {
+        return formedOf(write, 'composed', pairs, pairs[0]!.id);
+    }
+    const received = write.answer.kind === 'received'
+        ? write.received
+        : await completedPair(write.received, {
+            status: write.siblings[0].condition.kind
+                    === 'in-order'
+                ? HTTP_OK
+                : HTTP_CREATED,
+            etag: pairs[0]!.id,
+            fields: write.answer.kind === 'created'
+                ? [{
+                    name: 'location',
+                    value: write.answer.location,
+                }]
+                : [],
+            state: write.siblings[0].state,
+        });
+    return formedOf(
+        write,
+        'composed',
+        [writeRowOf(received, null), ...pairs],
+        pairs[0]!.id,
+    );
+}
+
+// Row ops only: safe inside a transaction's body.
+export async function landStateWrite(
+    adapter: DbAdapter,
+    formed: FormedStateWrite,
+): Promise<WriteAnswer> {
+    const write = formed.write;
+    if (write.kind === 'events') {
+        return statedAnswer(adapter, formed);
+    }
     const answer = write.kind === 'own'
-        ? await ownAnswer(adapter, write)
-        : await siblingsAnswer(adapter, write);
+        ? await statedAnswer(adapter, formed)
+        : await siblingsAnswer(adapter, write, formed);
     answers.set(write.received, answer);
     ownWires.set(write.received, answer.response);
     return answer;
 }
 
+function formedOf(
+    write: StateWrite,
+    attempt: Attempt,
+    rows: readonly (WriteRow | MessagePair)[],
+    parentId: Id,
+): FormedStateWrite {
+    return {
+        write,
+        attempt,
+        rows,
+        binds: rows.map((row) => bindOf(attempt, row)),
+        parentId,
+    };
+}
+
 // A PUT naming the head it replaces is its successor, 200,
 // as an in-order parent is below; any other lands a new
 // document, 201.
-async function ownAnswer(
-    adapter: DbAdapter,
+function ownPair(
     write: Extract<StateWrite, { kind: 'own' }>,
-): Promise<WriteAnswer> {
-    const completed = await completedPair(write.received, {
+): Promise<MessagePair> {
+    return completedPair(write.received, {
         status: ifMatchFromMessagePair(write.received)
                 === undefined
             ? HTTP_CREATED
@@ -1129,39 +1156,26 @@ async function ownAnswer(
         fields: [],
         state: write.state,
     });
-    return runWrite(
-        adapter, attemptFor([completed]), [completed],
+}
+
+async function statedAnswer(
+    adapter: DbAdapter,
+    formed: FormedStateWrite,
+): Promise<WriteAnswer> {
+    const ran = await runStatement(
+        adapter, formed.attempt, formed.binds, undefined,
     );
+    return ran.kind === 'refused'
+        ? refusedAnswer(formed.rows, formed.binds, formed.attempt)
+        : answerOf(formed.rows, formed.binds, ran.stated);
 }
 
 async function siblingsAnswer(
     adapter: DbAdapter,
     write: Extract<StateWrite, { kind: 'siblings' }>,
+    formed: FormedStateWrite,
 ): Promise<WriteAnswer> {
-    const parent = write.siblings[0];
-    const pairs = await Promise.all(write.siblings.map(
-        (sibling) => formSiblingPair(write.received, sibling),
-    ));
-    const parentPair = pairs[0]!;
-    const received = write.answer.kind === 'received'
-        ? write.received
-        : await completedPair(write.received, {
-            status: parent.condition.kind === 'in-order'
-                ? HTTP_OK
-                : HTTP_CREATED,
-            etag: parentPair.id,
-            fields: write.answer.kind === 'created'
-                ? [{
-                    name: 'location',
-                    value: write.answer.location,
-                }]
-                : [],
-            state: parent.state,
-        });
-    const rows: readonly (WriteRow | MessagePair)[] = [
-        writeRowOf(received, null), ...pairs,
-    ];
-    const binds = rows.map((row) => bindOf('composed', row));
+    const { rows, binds } = formed;
     const ran = await runStatement(
         adapter, 'composed', binds, undefined,
     );
@@ -1198,7 +1212,7 @@ async function siblingsAnswer(
         const stored = latin1(head.headResponse);
         return {
             response: projectedResponse(
-                responseFromHead(stored, received.requestId),
+                responseFromHead(stored, write.received.requestId),
                 stored,
                 write.project,
             ),
@@ -1219,7 +1233,7 @@ async function siblingsAnswer(
                 own, latin1(stated[0]!.response), write.project,
             ),
         outcome,
-        answeredId: parentPair.id,
+        answeredId: formed.parentId,
         bells: bellsOf(rows, stated),
         rows: stated,
     };
@@ -1229,7 +1243,7 @@ async function siblingsAnswer(
 // Task 16 empties every synthesized request
 // (Interpretation W).
 async function formSiblingPair(
-    received: MessagePair,
+    context: SiblingContext,
     sibling: StateSibling,
 ): Promise<MessagePair> {
     const id = generateIdentifier();
@@ -1244,24 +1258,24 @@ async function formSiblingPair(
         target: sibling.path + sibling.name,
         fields: [{
             name: OPERATION_ID_HEADER,
-            value: received.operationId,
+            value: context.operationId,
         }],
         body,
     }));
     const response = formedResponse({
         status,
         etag: id,
-        operationId: received.operationId,
-        requestId: received.requestId,
+        operationId: context.operationId,
+        requestId: context.requestId,
         fields: [],
         body,
     });
     return {
         id,
-        requestAt: received.requestAt,
+        requestAt: context.requestAt,
         path: sibling.path,
         name: sibling.name,
-        requesterIdentityId: received.requesterIdentityId,
+        requesterIdentityId: context.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
         secret: secretOfLines(response.hoisted),
@@ -1271,8 +1285,8 @@ async function formSiblingPair(
             response.message,
         ),
         method: sibling.method,
-        operationId: received.operationId,
-        requestId: received.requestId,
+        operationId: context.operationId,
+        requestId: context.requestId,
         ...(sibling.condition.kind === 'in-order'
             ? {
                 latchedHeadMessagePairId:

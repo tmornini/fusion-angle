@@ -704,12 +704,17 @@ const IDENTITY_TOKEN_BODY_KEYS: readonly string[] = [
     'jti', 'identity_id', 'action', 'chain_id', 'at',
 ];
 
+// A root token has no parent.
+const IDENTITY_TOKEN_OPTIONAL_KEYS: readonly string[] = [
+    'parent_jti',
+];
+
 export function validateIdentityTokenEntity(
     body: Record<string, unknown>,
 ): Omit<IdentityTokenEntity, 'id'> {
     assertOnlyKeys(
         body, IDENTITY_TOKEN_BODY_KEYS,
-        'IdentityTokenEntity',
+        'IdentityTokenEntity', IDENTITY_TOKEN_OPTIONAL_KEYS,
     );
     const action = validateEnumField(
         body, 'action', ['issued', 'rotated', 'revoked'],
@@ -724,6 +729,9 @@ export function validateIdentityTokenEntity(
         action,
         chain_id: pickIdentifier(body, 'chain_id'),
         at,
+        ...(body['parent_jti'] === undefined
+            ? {}
+            : { parent_jti: pickIdentifier(body, 'parent_jti') }),
     };
 }
 

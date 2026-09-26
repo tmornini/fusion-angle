@@ -34,11 +34,11 @@ import { HttpMessageError } from
 import {
     attemptFor,
     documentHeadAt,
-    formTokenEventMessagePair,
     formWriteMessagePair,
     IF_NONE_MATCH_HEADER,
     responseRecordOf,
     IF_MATCH_HEADER,
+    runStateWrite,
     runWrite,
     writeAnswerOf,
 } from '../api/message-pair.ts';
@@ -1083,6 +1083,20 @@ Deno.test(
         const id = generateIdentifier();
         const raw =
             '{"n":9007199254740993,"z":1,"a":2}';
+        const seeded = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+                + id,
+            token,
+            body: {
+                jti: id,
+                identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+                action: 'issued',
+                chain_id: generateIdentifier(),
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        }));
+        await seeded.text();
         const target = '/identities/'
             + 'XXZruirZyAOoRpNxaDnpSA/tokens/'
             + id + '/revocation?kept=1';
@@ -1099,9 +1113,11 @@ Deno.test(
         const requestId = response.headers.get(
             'request-id',
         );
-        assertStrictEquals(response.status, 201);
+        assertStrictEquals(response.status, 200);
         const stored = (await db.messagePairs.getAll())
-            .find((row) => row.request.includes(id));
+            .find((row) => row.request.includes(
+                'POST ' + target,
+            ));
         if (stored === undefined) {
             throw new Error('revocation was not stored');
         }
@@ -1214,23 +1230,44 @@ Deno.test(
 Deno.test(
     'a token event stores the ids it was given',
     async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
         const operationId = generateIdentifier();
         const requestId = generateIdentifier();
         const name = generateIdentifier();
-        const messagePair =
-            await formTokenEventMessagePair(
+        const answer = await runStateWrite(db, {
+            kind: 'events',
+            context: {
+                operationId,
+                requestId,
+                requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+                requestAt: '2026-01-01T00:00:00.000000Z',
+            },
+            siblings: [{
+                method: 'PUT',
+                path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
                 name,
-                {
+                state: {
+                    id: name,
                     jti: name,
                     identity_id: 'XXZruirZyAOoRpNxaDnpSA',
                     action: 'issued',
                     chain_id: generateIdentifier(),
                     at: '2026-01-01T00:00:00.000000Z',
                 },
-                operationId,
-                requestId,
-            );
-        const wire = messagePair.responseMessage;
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            }],
+        });
+        assertStrictEquals(answer.outcome, 'land');
+        const stored = (await db.messagePairs.getAll()).find(
+            (row) => row.name === name,
+        );
+        if (stored === undefined) {
+            throw new Error('token event not stored');
+        }
+        const wire = stored.response;
         assertStrictEquals(
             wire.includes(
                 'operation-id: ' + operationId,

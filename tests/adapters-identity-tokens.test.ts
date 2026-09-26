@@ -18,11 +18,14 @@ Deno.test('validates an issued token event', () => {
         validateIdentityTokenEntity(goodRow), goodRow);
 });
 
-Deno.test('rejects the retired parent_jti key', () => {
-    assertThrows(() =>
-        validateIdentityTokenEntity({
-            ...goodRow, parent_jti: generateIdentifier(),
-        }));
+Deno.test('admits parent_jti on a token', () => {
+    const successor = {
+        ...goodRow,
+        action: 'issued' as const,
+        parent_jti: generateIdentifier(),
+    };
+    assertEquals(
+        validateIdentityTokenEntity(successor), successor);
 });
 
 Deno.test('rejects an unknown action', () => {

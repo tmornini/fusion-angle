@@ -33,12 +33,10 @@ import {
 } from './http-fixtures.ts';
 import {
     deriveIdentityToken,
-    deriveIdentityTokenEventsForJti,
     identityTokenEntityOf,
+    tokenHeadFor,
 } from '../api/derive-identity-tokens.ts';
-import {
-    formTokenEventMessagePair,
-} from '../api/message-pair.ts';
+import { formStateWrite } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
@@ -62,10 +60,9 @@ const GHOST_JTI = generateIdentifier();
 const JTI_OMIT = generateIdentifier();
 const CHAIN_OMIT = generateIdentifier();
 
-// The by-jti fold (deriveIdentityTokenEventsForJti,
-// tokenRevocationReason's second read) is the jti
-// document's PUT history. One head per jti: the issued
-// event is named by its jti.
+// The jti's head (tokenHeadFor, tokenRevocationReason's
+// second read) is its whole state. One head per jti: the
+// issued event is named by its jti.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -219,19 +216,33 @@ async () => {
     assertEquals(stored, wire);
 });
 
-Deno.test('formTokenEventMessagePair stored body equals '
+Deno.test('a token event\'s stored body equals '
 + 'identityTokenEntityOf id-first', async () => {
     const event = {
         jti: JTI_G4_SYNTH, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued' as const,
         chain_id: CHAIN_G4_SYNTH, at: AT,
     };
-    const messagePair = await formTokenEventMessagePair(
-        JTI_G4_SYNTH, event, generateIdentifier(),
-        generateIdentifier(),
-    );
+    const formed = await formStateWrite({
+        kind: 'events',
+        context: {
+            operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
+            requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+            requestAt: AT,
+        },
+        siblings: [{
+            method: 'PUT',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
+            name: JTI_G4_SYNTH,
+            state: { id: JTI_G4_SYNTH, ...event },
+            condition: { kind: 'genesis', declarer: 'handler' },
+        }],
+    });
+    const row = formed.rows[0];
+    assert(row !== undefined && 'responseMessage' in row);
     const stored = JSON.parse(
-        storedMessageBodyText(messagePair.responseMessage),
+        storedMessageBodyText(row.responseMessage),
     );
     const expected = identityTokenEntityOf({
         name: JTI_G4_SYNTH,
@@ -362,12 +373,12 @@ async () => {
     );
 });
 
-// -- 3: deriveIdentityTokenEventsForJti — pre-tx vs in-tx -------
+// -- 3: tokenHeadFor — pre-tx vs in-tx -------------------------
 // -- PARITY (the membershipExistsFor precedent, api/derive- -----
 // -- memberships.ts's own leg-5 shape) -------------------------------
 
-Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
-+ ' (the plain adapter) vs in-tx (an open db.transaction view'
+Deno.test('tokenHeadFor: the later event is the head, identical'
++ ' pre-tx (the plain adapter) vs in-tx (an open db.transaction view'
 + ' sharing rotateRefreshJti/revokeTokenChain\'s own table'
 + ' list) — the membershipExistsFor precedent', async () => {
     const db = await freshDb();
@@ -384,29 +395,29 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
     }, DEV_TOKEN,
         operationIdHeader());
 
-    const preTx = await deriveIdentityTokenEventsForJti(
-        db, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
+    const preTx = await tokenHeadFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA', JTI_TX,
     );
     const inTx = await db.readTransaction(
-        (view) => deriveIdentityTokenEventsForJti(
-            view, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
+        (view) => tokenHeadFor(
+            view, 'XXZruirZyAOoRpNxaDnpSA', JTI_TX,
         ),
     );
     assertEquals(inTx, preTx);
-    assertStrictEquals(preTx.length, 2);
-    assertStrictEquals(preTx[0]!.action, 'issued');
-    assertStrictEquals(preTx[1]!.action, 'rotated');
+    assert(preTx !== null);
+    assertStrictEquals(preTx.entity.action, 'rotated');
+    assertStrictEquals(preTx.entity.at, AT2);
 
-    const preTxMissing = await deriveIdentityTokenEventsForJti(
-        db, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
+    const preTxMissing = await tokenHeadFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA', GHOST_JTI,
     );
     const inTxMissing = await db.readTransaction(
-        (view) => deriveIdentityTokenEventsForJti(
-            view, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
+        (view) => tokenHeadFor(
+            view, 'XXZruirZyAOoRpNxaDnpSA', GHOST_JTI,
         ),
     );
     assertEquals(inTxMissing, preTxMissing);
-    assertEquals(preTxMissing, []);
+    assertStrictEquals(preTxMissing, null);
 });
 
 // -- 4: THE SECURITY PIN — mint via a real grant, revoke the ----
@@ -473,7 +484,7 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         `/identities/XXZruirZyAOoRpNxaDnpSA/tokens/${rootJti}/revocation`,
         accessToken, {},
     ));
-    assertStrictEquals(revokeRes.status, 201);
+    assertStrictEquals(revokeRes.status, 200);
 
     // ACCESS still passes the gate (≤15-min staleness covenant).
     const afterAccess = await handleRequest(

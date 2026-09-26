@@ -366,7 +366,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             + 'revocation',
         org1Token, {},
     ));
-    assertStrictEquals(revoked.status, 201);
+    assertStrictEquals(revoked.status, 200);
 
     // Genesis document PUT (flows, org 1) — a fresh id
     // declares its genesis.

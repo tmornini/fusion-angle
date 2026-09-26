@@ -15,6 +15,7 @@ import {
 } from '../client/identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import type { IdentityTokenEntity } from '../shared/types.ts';
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -178,4 +179,38 @@ async () => {
     const second = chains.find(c => c.chainId === chain2);
     assert(second, 'second chain present');
     assertStrictEquals(second.events.length, 1);
+});
+
+Deno.test('a revoked chain shows every successor\'s parent',
+async () => {
+    const { ctx } = await setup();
+    const identity = 'pnXmXrxOWayANgDLdCjuBw';
+    const root = generateIdentifier();
+    const tokens = 'identities/' + identity + '/tokens/';
+    await ctx.PUT(tokens + root, {
+        jti: root, identity_id: identity, action: 'issued',
+        chain_id: generateIdentifier(),
+        at: '2026-01-01T00:00:00.000000Z',
+    });
+    const a = await ctx.POST<IdentityTokenEntity>(
+        tokens + root + '/rotation', {},
+    );
+    const b = await ctx.POST<IdentityTokenEntity>(
+        tokens + a.jti + '/rotation', {},
+    );
+    await ctx.POST(tokens + b.jti + '/revocation', {});
+    const heads = await ctx.GET<IdentityTokenEntity[]>(tokens);
+    const headA = heads.find((head) => head.jti === a.jti);
+    const headB = heads.find((head) => head.jti === b.jti);
+    assert(headA && headB, 'both successors listed');
+    assertStrictEquals(headA.action, 'revoked');
+    assertStrictEquals(headA.parent_jti, root);
+    assertStrictEquals(headB.action, 'revoked');
+    assertStrictEquals(headB.parent_jti, a.jti);
+    const [chain] = await getTokenChainsFor(ctx, identity);
+    assert(chain, 'the chain is listed');
+    const eventA = chain.events.find((e) => e.jti === a.jti);
+    const eventB = chain.events.find((e) => e.jti === b.jti);
+    assertStrictEquals(eventA?.parentJti, root);
+    assertStrictEquals(eventB?.parentJti, a.jti);
 });

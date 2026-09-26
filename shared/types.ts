@@ -583,14 +583,13 @@ export interface RoleGrantEntity {
 export type IdentityTokenAction =
     'issued' | 'rotated' | 'revoked';
 
-// Append-only token-lifecycle ledger. One row per jti event; a
-// token's current validity = the latest action for its jti.
+// A token's whole state: the head of its jti's document.
 // `chain_id` groups a refresh-rotation lineage: each rotation
-// appends 'rotated' for the old jti and 'issued' for the new at
-// one shared `at`, both carrying the chain_id. A token's
-// predecessor is DERIVED, not stored — the jti 'rotated' at its
-// 'issued' instant (parentJtiByJti); a root has none. Presenting
-// a rotated-away (or revoked) jti is replay → the whole chain is
+// writes 'rotated' for the old jti and 'issued' for the new at
+// one shared `at`, both carrying the chain_id. A successor
+// stores its predecessor as `parent_jti`, which every later
+// version of it keeps; a root has none. Presenting a
+// rotated-away (or revoked) jti is replay → the whole chain is
 // revoked. Distinct from identity_token_revocations (coarse
 // per-identity log-out-everywhere); this is per-jti / per-chain.
 export interface IdentityTokenEntity {
@@ -600,6 +599,7 @@ export interface IdentityTokenEntity {
     action: IdentityTokenAction;
     chain_id: string;
     at: string;
+    parent_jti?: string;
 }
 
 export type ClientStatus = 'active' | 'disabled';

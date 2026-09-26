@@ -105,7 +105,6 @@ import {
     canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
-    messagePairResponseBody,
     ifMatchFromMessagePair,
 } from './message-pair.ts';
 import type {
@@ -3421,15 +3420,8 @@ export const WRITE_RESPONSE_SPECS:
                 },
             }),
     },
-    // The gate PRE-MINTS the successor jti here — the ONE
-    // mint site for a fresh write. The route handler reads this
-    // exact value back off the formed pair (messagePairResponseBody)
-    // rather than minting a second one.
     'identities/:id/tokens/:jti/rotation': {
         conditional: 'none',
-        successBody: () => ({
-            jti: generateIdentifier(),
-        }),
     },
     'identities/:id/tokens/:jti/revocation': {
         conditional: 'none',
@@ -4403,54 +4395,50 @@ export const routes: Route[] = [
     // Rotate a refresh jti. The path identity's own tokens
     // collection is the only ledger this reads: a jti outside
     // it is unknown — 409, the same status as reuse (spec
-    // 2026-09-15 § 1). The ledger read, the
-    // rotation plan, and its appends ride ONE transaction
-    // (rotateRefreshJti — the same body the refresh grant
-    // runs), so two concurrent rotations of one chain
-    // cannot both observe the live jti (the lost-rotation
-    // TOCTOU). A live jti returns its successor; a
-    // known-but-not-live jti is reuse — the whole chain's
-    // revocation has already landed atomically — then 409.
-    // Operation path (name ''). The gate never serves
-    // a stored response for a byte-identical resend of this
-    // route, so this handler always re-enters and re-checks
-    // the reuse guard for real. The gate's successBody
-    // resolver PRE-MINTS the successor jti so the pair IS the
-    // response; this handler reads that SAME value back off
-    // the pair (messagePairResponseBody) and threads it into
-    // rotateRefreshJti, which appends the pair as the LAST act
-    // of its own transaction — only on the 'rotate' branch, so
-    // a 409 (reuse or unknown) stores no pair even though the
-    // reuse branch still revokes the chain for real. When pair
-    // is undefined (unreachable for this wired, fenced route)
-    // a fresh jti is minted here instead — crash-free.
+    // 2026-09-15 § 1). The heads are re-read and the
+    // rotation lands in ONE transaction (rotateRefreshJti —
+    // the same body the refresh grant runs), so two
+    // concurrent rotations of one chain cannot both observe
+    // the live jti (the lost-rotation TOCTOU). A live jti
+    // answers its successor's state; a known-but-not-live
+    // jti is reuse — the whole chain's revocation has already
+    // landed atomically — then 409. Operation path (name
+    // ''). The gate never serves a stored response for a
+    // byte-identical resend of this route, so this handler
+    // always re-enters and re-checks the reuse guard for
+    // real. The received pair lands only on the 'rotate'
+    // branch, so a 409 (reuse, unknown, or contention)
+    // stores no pair even though the reuse branch still
+    // revokes the chain for real.
     route('identities/:id/tokens/:jti/rotation', {
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
-            const newJti = messagePair === undefined
-                ? generateIdentifier()
-                : (messagePairResponseBody(messagePair)?.['jti'] as
-                    string | undefined)
-                    ?? generateIdentifier();
             const outcome = await rotateRefreshJti(
-                db, identityId, presented, newJti, messagePair,
+                db, identityId, presented, generateIdentifier(),
+                messagePair === undefined
+                    ? undefined
+                    : {
+                        received: messagePair,
+                        answer: { kind: 'parent' },
+                    },
             );
-            if (outcome.kind === 'rotate') {
-                return { jti: outcome.newJti };
-            }
+            if (outcome.kind === 'rotate') return;
             throw new ApiError(
-                'refresh token is not live (reuse): '
-                    + presented,
+                outcome.kind === 'contended'
+                    ? 'refresh token rotation remained'
+                        + ' contended: ' + presented
+                    : 'refresh token is not live (reuse): '
+                        + presented,
                 HTTP_CONFLICT,
             );
         },
     }),
     // Revoke the whole chain a jti belongs to (log out one
-    // session). A jti outside the path identity's own
-    // collection is unknown: an idempotent no-op that still
-    // appends its pair. Read and appends ride one
-    // transaction (revokeTokenChain guards both exit paths).
+    // session), answering the presented token's state. A jti
+    // outside the path identity's own collection is unknown:
+    // 404, and nothing lands. The re-read and the revocation
+    // ride one transaction (revokeTokenChain).
     route('identities/:id/tokens/:jti/revocation', {
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);

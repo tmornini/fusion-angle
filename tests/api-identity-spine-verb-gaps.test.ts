@@ -65,11 +65,11 @@ import { generateIdentifier } from
 // DO match MEMBER_VERBS' POST entry (segment-boundary
 // prefix) — a member-tier token clears authz and reaches
 // the route handler, which then answers on its own domain
-// terms (409 reuse for an unknown rotation jti; 204
-// idempotent no-op for an unknown revocation jti) rather
-// than 403. Flat POST /identity-tokens/:jti/rotation is
-// RETIRED (router 404). Path identity must match the
-// jti's identity or 403; an absent jti GET 404s.
+// terms (409 reuse for an unknown rotation jti; 404 for an
+// unknown revocation jti) rather than 403. Flat POST
+// /identity-tokens/:jti/rotation is RETIRED (router 404).
+// Path identity must match the jti's identity or 403; an
+// absent jti GET 404s.
 //
 // (4) the identity-token-revocations authz-tier regime —
 // 1 combo: GET identities/:id/token-revocations/:rid stays
@@ -786,8 +786,8 @@ Deno.test('POST /identity-tokens/:jti/rotation is retired'
 
 Deno.test('POST /identities/:id/tokens/:jti/revocation clears'
 + ' authz for a member-tier token (MEMBER_VERBS widens'
-+ ' /identities/:id/tokens POST) and no-ops 204 for an'
-+ ' unknown jti', async () => {
++ ' /identities/:id/tokens POST) and 404s on domain terms'
++ ' for an unknown jti', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'nkgaOHZISTQrILTfPThWCA');
     const token = await organizationToken('nkgaOHZISTQrILTfPThWCA');
@@ -800,7 +800,7 @@ Deno.test('POST /identities/:id/tokens/:jti/revocation clears'
             token, {},
         ),
     );
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 404);
 });
 
 Deno.test('POST /identity-tokens/:jti/revocation is retired'
