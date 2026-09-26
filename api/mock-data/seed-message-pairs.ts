@@ -2201,7 +2201,10 @@ export async function formDefaultOrganizationSeedMessagePair(
         requesterIdentityId: identityId,
         requestAt,
         organization: undefined,
-        responseBody: undefined,
+        responseBody: {
+            id: identityId,
+            organization_id: organizationId,
+        },
         operationId,
         requestId: operationId,
     });

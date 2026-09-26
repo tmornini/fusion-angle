@@ -1,4 +1,6 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert, assertEquals, assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -14,6 +16,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { framedRequest } from './http-fixtures.ts';
+import { responseRecordOf } from '../api/message-pair.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -248,3 +251,89 @@ Deno.test('GET identities/:id/default-organization'
     assertStrictEquals(typeof match.route.get, 'function');
     assertStrictEquals(typeof match.route.put, 'function');
 });
+
+const MEMBER = 'XXZruirZyAOoRpNxaDnpSA';
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const OTHER = 'BBjWJsjYIDkTRKIIPrzWRw';
+
+Deno.test(
+    'a default organization naming another one lands',
+    async () => {
+        const db = await freshDb();
+        await seedMembership(db, MEMBER, STARK);
+        await seedMembership(db, MEMBER, OTHER);
+        const token = await devToken();
+        const first = await handleRequest(
+            db, putDefaultOrganization(token, MEMBER, STARK),
+        );
+        assertStrictEquals(first.status, 201);
+        const second = await handleRequest(
+            db, putDefaultOrganization(token, MEMBER, OTHER),
+        );
+        assertStrictEquals(second.status, 200);
+        assert(
+            second.headers.get('etag')
+                !== first.headers.get('etag'),
+        );
+        const got = await handleRequest(
+            db, getDefaultOrganization(token, MEMBER),
+        );
+        assertEquals(
+            await got.json(), { organization_id: OTHER },
+        );
+    },
+);
+
+Deno.test(
+    'the default organization stores its state',
+    async () => {
+        const db = await freshDb();
+        await seedMembership(db, MEMBER, STARK);
+        const token = await devToken();
+        const put = await handleRequest(
+            db, putDefaultOrganization(token, MEMBER, STARK),
+        );
+        await put.body?.cancel();
+        const head = await db.messagePairs.getHeadPair(
+            '/identities/' + MEMBER
+                + '/default-organization/',
+            '',
+        );
+        assert(head !== null);
+        assertEquals(
+            responseRecordOf(head.response),
+            { id: MEMBER, organization_id: STARK },
+        );
+    },
+);
+
+Deno.test(
+    'a default organization body with another key is 400',
+    async () => {
+        const db = await freshDb();
+        await seedMembership(db, MEMBER, STARK);
+        const token = await devToken();
+        const before = (await db.messagePairs.getAll())
+            .length;
+        const res = await handleRequest(db, framedRequest(
+            BASE + '/identities/' + MEMBER
+                + '/default-organization',
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'operation-id': generateIdentifier(),
+                },
+                body: JSON.stringify({
+                    organization_id: STARK, extra: 1,
+                }),
+            },
+        ));
+        assertStrictEquals(res.status, 400);
+        await res.body?.cancel();
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+    },
+);

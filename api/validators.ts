@@ -1,4 +1,5 @@
 import type {
+    Id,
     StoredGraph,
     AttributeType,
     Constraint,
@@ -642,6 +643,26 @@ export function validateIdentityDefaultOrganizationEntity(
         identity_id: pickIdentifier(body, 'identity_id'),
         organization_id: pickIdentifier(body, 'organization_id'),
         at,
+    };
+}
+
+const DEFAULT_ORGANIZATION_BODY_KEYS: readonly string[] = [
+    'organization_id',
+];
+
+// The wire body of PUT identities/:id/default-organization.
+export function validateDefaultOrganizationBody(
+    body: Record<string, unknown>,
+): { readonly organization_id: Id } {
+    assertOnlyKeys(
+        body,
+        DEFAULT_ORGANIZATION_BODY_KEYS,
+        'DefaultOrganizationBody',
+    );
+    return {
+        organization_id: pickIdentifier(
+            body, 'organization_id',
+        ),
     };
 }
 

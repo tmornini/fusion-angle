@@ -83,6 +83,7 @@ import {
     validateWorkOrderCreateBody,
     validateWorkOrderDocumentBody,
     validateWorkOrderTransitionBody,
+    validateDefaultOrganizationBody,
     pickString,
     pickStringArray,
     pickBoolean,
@@ -3461,10 +3462,15 @@ export const WRITE_RESPONSE_SPECS:
                 body: withoutId(body ?? {}),
             }),
     },
-    // Stored 204 empty; sendWriteResponse maps an
-    // appended PUT to 201.
+    // The default organization's state: the identity's id
+    // and the organization it names (§4), the singleton
+    // shape pii and registration use.
     'identities/:id/default-organization': {
         conditional: 'optional',
+        successBody: (params, body) => ({
+            id: param(params, 0),
+            ...validateDefaultOrganizationBody(body ?? {}),
+        }),
     },
     // Seat document: path is the relationship. Body is
     // type + at. organization_id / identity_id are

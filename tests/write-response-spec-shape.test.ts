@@ -132,6 +132,7 @@ const DUMMY_BODIES: Readonly<
         redirect_uris: '', jwks: '', aud: 'a',
         status: 'active',
     },
+    'identities/:id/default-organization': { organization_id: ID },
     [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
         type: 'member', at: AT,
     },
