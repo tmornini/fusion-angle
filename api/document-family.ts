@@ -133,17 +133,10 @@ export interface DocumentFamilyWiring {
 // The per-family wiring table — grown family by family (ideas,
 // projects, flows, work-orders, records, record-attributes) —
 // never consulted through anything but documentFamilyWiring: the
-// gate's locked/simple keying (api.ts) treats membership here,
-// ANDed with a 'locked' registration, as "this route is served
-// via documentPutHandler" — never a blanket family-registry
-// consult, so an unregistered-here
-// family never rides the locked arm no matter what
-// family-registry.ts declares. Exported (a mutable table, like
-// FAMILY_REGISTRY) so the locked-arm's own tests can register a
-// SYNTHETIC family for the duration of a test — flows is the
-// live family that rides the locked arm today (registered here
-// AND 'locked' in family-registry.ts); every other registered
-// family is 'simple'.
+// gate (api.ts) treats membership here as "this route is
+// served via documentPutHandler". Exported (a mutable table,
+// like FAMILY_REGISTRY) so tests can register a SYNTHETIC
+// family for the duration of a test.
 export const DOCUMENT_FAMILY_WIRINGS:
     Record<string, DocumentFamilyWiring> = {};
 
@@ -297,12 +290,11 @@ export async function documentHeadMessagePairId(
     return stored?.id;
 }
 
-// The route body is UNCHANGED dispatch to the documentOp for
-// BOTH concurrency classes — the locked/simple divide is
-// resolved entirely upstream, at the gate (api.ts's four-outcome
-// table decides genesis/412 BEFORE this handler ever
-// runs), so documentPutHandler carries no concurrency branch of
-// its own.
+// The route body is plain dispatch to the documentOp for
+// every conditional: the gate refuses by form before this
+// handler runs, and the statement judges the latch, so
+// documentPutHandler carries no conditional branch of its
+// own.
 export function documentPutHandler(
     wiring: DocumentFamilyWiring,
 ): PutHandler {

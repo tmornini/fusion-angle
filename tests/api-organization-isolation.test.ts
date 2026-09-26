@@ -392,12 +392,13 @@ async function seedChain(
         organization_id: _flowOrganizationId,
         ...flowFields
     } = flowBody(organization);
-    const flowWrite = await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + organization
+    const flowWrite = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + organization
             + '/flows/' + ids.flow,
-        await organizationToken(identity, organization),
-        {
+        token: await organizationToken(identity, organization),
+        headers: { 'if-none-match': '*' },
+        body: {
             ...flowFields,
             state: 'active',
             state_at: T8_AT,
@@ -412,7 +413,7 @@ async function seedChain(
                 attributeEvents: [],
             },
         },
-    ));
+    }));
     assertStrictEquals(flowWrite.status, 201);
     // Phase Final Task 2: objectives row half stripped — seed
     // through the live document PUT (states-document

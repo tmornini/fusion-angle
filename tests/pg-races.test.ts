@@ -263,7 +263,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
                         flowDocument('A', generateIdentifier()),
-                        undefined,
+                        { 'if-none-match': '*' },
                         generateIdentifier(),
                     )),
                     handleRequest(db, req(
@@ -271,7 +271,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
                         flowDocument('B', generateIdentifier()),
-                        undefined,
+                        { 'if-none-match': '*' },
                         generateIdentifier(),
                     )),
                 ]);
@@ -285,7 +285,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 1,
             );
             assertStrictEquals(
-                statuses.filter((s) => s === 409).length,
+                statuses.filter((s) => s === 412).length,
                 1,
             );
             assertStrictEquals(

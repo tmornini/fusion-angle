@@ -57,8 +57,14 @@ async () => {
     const token = await organizationToken();
     const put = await handleRequest(
         db,
-        req('PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'cyLfilTEOVYoZqXJMakKAQ', token, flowBody()),
+        apiRequest({
+            method: 'PUT',
+            path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'cyLfilTEOVYoZqXJMakKAQ',
+            token,
+            body: flowBody(),
+            headers: { 'if-none-match': '*' },
+        }),
     );
     assertStrictEquals(put.status, 201);
 

@@ -49,7 +49,6 @@ import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
 import {
-    familyRegistration,
     INSTANCE_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
 } from './family-registry.ts';
@@ -873,21 +872,10 @@ async function dispatched(
                     organization,
                     body,
                 });
-            // The locked/simple divide (spec §The two PUT classes): keyed by
-            // the route's family registration THROUGH THE WIRING CONSULT —
-            // never a blanket family-registry read — so a family whose
-            // registration says 'locked' but has no row in
-            // document-family.ts's wiring table never rides this arm; only a
-            // route actually served via documentPutHandler can — flows is
-            // the live family that rides the locked arm today (registered in
-            // document-family.ts's wiring table AND 'locked' in
-            // family-registry.ts). The routePattern check (not merely the
-            // first segment) matters once a family's OTHER routes share its
-            // prefix (e.g. a future locked family's own :id/sub-resource PUT
-            // must never inherit the entity route's four-outcome table) —
-            // documentEntityRoute's own pattern is always exactly
-            // `${family}/:id`. PUT-only: the two PUT classes govern PUT,
-            // never POST/DELETE.
+            // Keyed through the wiring consult and the exact
+            // entity pattern, so a family's sub-resource PUT
+            // under the same prefix never reads the entity's
+            // head.
             const wiring = wiringForSegments(
                 matched.segments,
             );
@@ -895,15 +883,9 @@ async function dispatched(
                 && wiring !== undefined
                 && routePattern
                     === documentEntityPattern(wiring);
-            const isLockedWrite = isDocumentPut
-                && wiring !== undefined
-                && familyRegistration(wiring.family)
-                    ?.concurrency === 'locked';
-            // Advertised ETag is the live PUT pair id.
-            // A DELETE head is not live, so If-Match is
-            // not required, and the PUT is not genesis.
-            // Same-body no-append uses livePut for both
-            // PUT kinds (simple and locked).
+            // Advertised ETag is the live PUT pair id. A
+            // DELETE head is not live, so the same-body
+            // no-append never answers over one.
             const head = isDocumentPut
                 ? await documentHeadAt(
                     effective, canonicalPrefix, name,
@@ -913,21 +895,6 @@ async function dispatched(
                 && head.method === 'PUT'
                 ? head.id
                 : undefined;
-            const advertised = livePut;
-            // The hoisted echo: read If-Match directly so
-            // the gate can compare the parsed validator
-            // against the advertised ETag BEFORE dispatch.
-            const rawIfMatch = isLockedWrite
-                ? request.headers.get(IF_MATCH_HEADER)
-                : null;
-            const echo = rawIfMatch === null
-                ? null
-                : parseIfMatch(rawIfMatch);
-            const echoMatchesHead = isLockedWrite
-                && echo !== undefined
-                && echo !== null
-                && advertised !== undefined
-                && echo === advertised;
             // The latched operation arm: a sub-resource
             // write that acts ON the parent document (undo).
             // Its precondition target is that parent's head —
@@ -1019,9 +986,7 @@ async function dispatched(
                 ...(request.headers.get(IF_NONE_MATCH_HEADER)
                     !== null
                     ? { genesis: 'client' as const }
-                    : isLockedWrite && head === null
-                        ? { genesis: 'handler' as const }
-                        : {}),
+                    : {}),
                 responseBody: spec?.successBody?.(
                     params, body, actor, organization,
                 ),
@@ -1036,14 +1001,6 @@ async function dispatched(
                         }],
                     }
                     : {}),
-                ...(echoMatchesHead
-                    && echo !== null
-                    && echo !== undefined
-                    && livePut !== undefined
-                    ? {
-                        latchedHeadMessagePairId: echo,
-                    }
-                    : {}),
                 ...(isLatchedOperation
                     && latchEcho !== null
                     ? {
@@ -1053,9 +1010,8 @@ async function dispatched(
                     }
                     : {}),
             });
-            // The latched-operation table, the locked
-            // table's sibling for sub-resource writes:
-            // absent → 428; malformed → 400; ≠ parent head
+            // The latched-operation table for sub-resource
+            // writes: absent → 428; malformed → 400; ≠ parent head
             // → 412; == head → proceed with the echo latched
             // onto the operation pair, re-verified in-tx by
             // the handler. Returns BEFORE dispatch, so a
@@ -1092,57 +1048,6 @@ async function dispatched(
                     );
                 }
                 if (parsed !== latchHead) {
-                    return Response.json(
-                        {
-                            error: 'If-Match does not '
-                                + 'match the current document '
-                                + 'at ' + pathname,
-                        },
-                        { status: HTTP_PRECONDITION_FAILED },
-                    );
-                }
-            }
-            // The locked six-outcome table, applied ONLY after
-            // the replay fast-path MISSES: live + absent → 428;
-            // live + malformed → 400; live + ≠ head → 412; live
-            // + == head → echoMatchesHead, proceed;
-            // none + absent → genesis; none + present → 412.
-            // A 412 here returns BEFORE dispatch, and
-            // appendMessagePairOnce only ever runs inside the op's
-            // own tx, so NOTHING is stored.
-            if (isLockedWrite) {
-                if (
-                    livePut !== undefined
-                    && rawIfMatch === null
-                ) {
-                    return Response.json(
-                        {
-                            error: 'If-Match is required to PUT '
-                                + pathname,
-                        },
-                        {
-                            status:
-                                HTTP_PRECONDITION_REQUIRED,
-                        },
-                    );
-                }
-                if (
-                    livePut !== undefined
-                    && echo === undefined
-                ) {
-                    return Response.json(
-                        {
-                            error: 'If-Match must carry '
-                                + 'exactly one strong '
-                                + 'validator',
-                        },
-                        { status: HTTP_BAD_REQUEST },
-                    );
-                }
-                if (
-                    rawIfMatch !== null
-                    && !echoMatchesHead
-                ) {
                     return Response.json(
                         {
                             error: 'If-Match does not '
@@ -1261,18 +1166,13 @@ async function dispatched(
                     organization,
                     roles,
                 );
-                // ETag attach (spec §The two PUT
-                // classes): a locked-family document GET
-                // carries the current head pair id as
-                // provenance — the C6 client save's baseline
-                // AND its echo source. Keyed through the SAME
-                // wiring consult + exact-pattern match the
-                // write side's four-outcome table uses above
-                // (never a blanket family-registry read,
-                // never a flows literal). Below the three-instance
-                // threshold with the write side's own inline
-                // check (Commandment IX Generality) — kept
-                // duplicated rather than prematurely shared.
+                // ETag attach: the document GET of a family
+                // whose PUT requires a conditional carries the
+                // current head pair id — the client save's
+                // baseline AND its echo source. Keyed through
+                // the SAME wiring consult + exact-pattern match
+                // the write side uses above (never a flows
+                // literal).
                 const readWiring = wiringForSegments(
                     matched.segments,
                 );
@@ -1282,8 +1182,10 @@ async function dispatched(
                         === documentEntityPattern(
                             readWiring,
                         )
-                    && familyRegistration(readWiring.family)
-                        ?.concurrency === 'locked'
+                    && conditionalOf(
+                        documentEntityPattern(readWiring),
+                        'PUT',
+                    ) === 'required'
                 ) {
                     const prefix = canonicalPath(
                         organization,
@@ -2071,8 +1973,8 @@ export async function GET<T>(
     );
 }
 
-// Locked / instance sibling of GET: body plus the strong
-// ETag (quotes stripped) for If-Match on a later PUT/PATCH.
+// GET plus the strong ETag (quotes stripped), for the
+// If-Match of a later conditional PUT or PATCH.
 export async function GETWithEtag<T>(
     adapter: ClientFacadeAdapter,
     resource: string,

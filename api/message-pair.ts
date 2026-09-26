@@ -103,12 +103,12 @@ export interface MessagePair {
     // Only beside genesis: the create may not land over a
     // tombstone either, so the row latches never-written.
     readonly neverWritten?: true;
-    // Pre-tx lock-head pair id, latched when If-Match
-    // matches the advertised ETag. In-tx re-query only.
+    // The head pair id a handler read; this row latches it
+    // and the statement judges the latch.
     readonly latchedHeadMessagePairId?: string;
     // A latched OPERATION's pin: the head of the PARENT
     // document this operation acts on, not of this pair's
-    // own document. coordinateWrite never reads it — its
+    // own document. The row latch never reads it — that
     // latch is same-document by definition — the handler
     // re-verifies it in-tx against the document.
     readonly pinnedDocumentMessagePairId?: string;
@@ -523,7 +523,7 @@ export function httpDateOf(at: string): string {
     return new Date(at).toUTCString();
 }
 
-// Locked PUT and PATCH concurrency dialect: If-Match carries
+// A conditional PUT or PATCH names its head: If-Match carries
 // the strong ETag. Not a credential — stored verbatim so two
 // writes differing only in If-Match are different messages
 // for replay identity.
@@ -1624,8 +1624,8 @@ export function eventForMessagePair(
 // family-registry.ts createBodyIdField. 'invitations' is the
 // ONE entry this table keeps PERMANENTLY — the invitations side
 // channel is never a family-registry.ts registrant (it has no
-// organization-nesting tier, no concurrency class, no document
-// of its own to register), so this literal table stays
+// organization-nesting tier, no document of its own to
+// register), so this literal table stays
 // its one consult forever, not a waypoint to registration.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     // Not gate-dispatched (the invitations side channel forms
@@ -1695,8 +1695,8 @@ export function createdEntityName(
 
 // A latched operation is a sub-resource write that REVERTS or
 // REPLACES the document it hangs off — it names the head it
-// intends to act on, exactly as a locked PUT names the head it
-// intends to overwrite. Without the echo the server would act
+// intends to act on, exactly as a conditional PUT names the
+// head it intends to overwrite. Without the echo the server would act
 // on whatever its own pre-transaction resolution happened to
 // read, so the same request would 412 or succeed by scheduling
 // alone — a verdict the caller can neither predict nor retry

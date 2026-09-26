@@ -1315,8 +1315,8 @@ export interface FlowDocumentBody {
     readonly revivals: readonly GraphRevival[];
 }
 
-// The HTTP-body gate for PUT /flows/:id (Decision 7, the
-// LOCKED class — Task 3): the full wire document — the
+// The HTTP-body gate for PUT /flows/:id (Decision 7, a
+// conditional PUT): the full wire document — the
 // entity's own fields, the lifecycle trio, the client-
 // authored post-save graph snapshot, and the two transitional
 // decomposition sidecars. organization_id is deliberately
@@ -3316,7 +3316,7 @@ const FLOW_UNDO_KEYS: readonly string[] = ['eventId', 'at'];
 // element is the deletion/revival triple, so the route can
 // post a 'restored' event that supersedes a prior tombstone.
 // `label` names the enclosing body.
-function validateRevivals(
+export function validateRevivals(
     value: unknown,
     label: string,
 ): GraphRevival[] {

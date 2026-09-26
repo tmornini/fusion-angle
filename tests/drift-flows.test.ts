@@ -994,6 +994,7 @@ Deno.test('sidecar insensitivity: graphDelta/revivals disagreeing '
                 entityId: SOME_UNRELATED_ENTITY, at: AT,
             }],
         },
+        { 'if-none-match': '*' },
     ));
     assertStrictEquals(res.status, 201);
 
@@ -1030,6 +1031,7 @@ Deno.test('the lock-head terminal reaches exactly the derived '
     const genesis = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
         documentBody('Genesis', FLOW_DRIFT_LOCK_HEAD_GENESIS),
+        { 'if-none-match': '*' },
     ));
     assertStrictEquals(genesis.status, 201);
     const genesisId = pairIdOf(genesis)!;
@@ -1123,6 +1125,7 @@ async () => {
             state_event_id: FLOW_DRIFT_MULTI_NODE_EV,
             graph, graphDelta, revivals: [],
         },
+        { 'if-none-match': '*' },
     ));
     assertStrictEquals(res.status, 201);
 

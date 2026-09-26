@@ -147,11 +147,10 @@ function recordPutBody(
 }
 
 // Task 7's additive pin: a GENESIS-shaped flows document PUT.
-// A fresh id needs no If-Match (the locked class's
-// genesis-with-neither-header-passes rule), so this addition is
-// purely additive — deliberately NOT mirroring the ideas case's
-// second-PUT chain above, which would need header threading for
-// the locked class.
+// A fresh id declares its genesis with If-None-Match: *, so
+// this addition is purely additive — deliberately NOT mirroring
+// the ideas case's second-PUT chain above, which would need an
+// If-Match echo for a flow.
 function flowDocumentBody(name: string, stateEventId: string) {
     return {
         name,
@@ -366,13 +365,16 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     ));
     assertStrictEquals(revoked.status, 201);
 
-    // Genesis document PUT (flows, org 1) — a fresh id needs no
-    // If-Match under the locked class.
-    const flowGenesis = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'hoKOMoVEGhFjVEMIIFBbOQ', org1Token,
-        flowDocumentBody('Invariant Flow', INV_FLOW_1_EV),
-    ));
+    // Genesis document PUT (flows, org 1) — a fresh id
+    // declares its genesis.
+    const flowGenesis = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'hoKOMoVEGhFjVEMIIFBbOQ',
+        token: org1Token,
+        body: flowDocumentBody('Invariant Flow', INV_FLOW_1_EV),
+        headers: { 'if-none-match': '*' },
+    }));
     assertStrictEquals(flowGenesis.status, 201);
 
     // Work-order CREATE (org 1) — a genesis POST, joined to the

@@ -359,7 +359,7 @@ export async function postObjectiveRevision(
 // head (the GET-stamped state is never re-sent); the
 // transition sends the new state fresh. The get-then-put
 // race against a concurrent drag-reorder is ACCEPTED (spec
-// §2) — objectives concurrency is 'simple' and the page is
+// §2) — the objective PUT is blind here and the page is
 // admin-facing.
 export async function postObjectiveArchival(
     ctx: RequestContext,

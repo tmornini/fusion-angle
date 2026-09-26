@@ -40,9 +40,9 @@ import {
 } from './http-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 
-// The flows-specific below-gate op + locked-class e2e coverage
-// for Task 3's document PUT (the generic locked arm itself is
-// already Task-2-tested against
+// The flows-specific below-gate op + conditional-PUT e2e
+// coverage for the flow document PUT (the generic required arm
+// itself is tested against
 // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects-shaped
 // synthetic
 // families in tests/document-family.test.ts).
@@ -234,6 +234,7 @@ Deno.test('postFlowDocumentOp returns the entity, exactly one'
     const create = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'bgwNLywXomEwlIMSFlkukQ', token, createBody,
+        { 'if-none-match': '*' },
     ));
     assertStrictEquals(create.status, 201);
     const update = await handleRequest(db, req(
@@ -308,6 +309,7 @@ Deno.test('postFlowDocumentOp with revivals posts the restored'
     const create = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'biDOZCyZATKcAVVOCbegTw', token, createBody,
+        { 'if-none-match': '*' },
     ));
     assertStrictEquals(create.status, 201);
     const update = await handleRequest(db, req(
@@ -403,11 +405,11 @@ Deno.test('the document body carries state/state_at/graph while'
     }
 });
 
-// --- e2e locked-class tests (through handleRequest —
+// --- e2e required-conditional tests (through handleRequest —
 // organizations/:id/flows/:id
 // is now wired onto documentPutHandler(FLOWS_WIRING)) ---
 
-Deno.test('locked PUT with no If-Match over a head is 428',
+Deno.test('flow PUT with no If-Match over a head is 428',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -420,13 +422,13 @@ async () => {
     assertStrictEquals(res.status, 428);
     assertStrictEquals(
         (await res.json()).error,
-        'If-Match is required to PUT '
+        'If-Match or If-None-Match is required to PUT '
             + '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ajKMlszDvGpoUWXASHPNEg',
     );
 });
 
-Deno.test('locked PUT with a malformed If-Match is 400',
+Deno.test('flow PUT with a malformed If-Match is 400',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -453,7 +455,7 @@ async () => {
     }
 });
 
-Deno.test('locked PUT with a stale If-Match is 412',
+Deno.test('flow PUT with a stale If-Match is 412',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -473,7 +475,7 @@ async () => {
     );
 });
 
-Deno.test('locked PUT with If-Match and no head is 412',
+Deno.test('flow PUT with If-Match and no head is 412',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -669,6 +671,7 @@ Deno.test('e2e: an old-shape PUT body 400s (validateFlowPutBody'
             history: { kind: 'none' },
             graphDelta: emptyDelta(),
         },
+        { 'if-none-match': '*' },
     ));
     assertStrictEquals(res.status, 400);
 });
@@ -1046,7 +1049,7 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
     );
 });
 
-// The undo's If-Match gate (locked-class parity for the
+// The undo's If-Match gate (the flow PUT's parity for the
 // flows sub-resource POST): an undo names the head it
 // intends to revert, exactly as a save names the head it
 // intends to replace. Without the echo the server would be
@@ -1385,4 +1388,109 @@ async () => {
     await assertStoredPutOmitsUndoHistory(
         db, flowId, 3, token,
     );
+});
+
+Deno.test('a flow PUT with neither conditional is 428',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT', FLOW_PREFIX + flowId, token,
+        documentBody('Undeclared', generateIdentifier()),
+    ));
+    assertStrictEquals(res.status, 428);
+    assertStrictEquals(
+        (await res.json()).error,
+        'If-Match or If-None-Match is required to PUT '
+            + FLOW_PREFIX + flowId,
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('a declared flow genesis is 201; a second is 412',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const first = await handleRequest(db, req(
+        'PUT', FLOW_PREFIX + flowId, token,
+        documentBody('Declared', generateIdentifier()),
+        { 'if-none-match': '*' },
+    ));
+    assertStrictEquals(first.status, 201);
+    const second = await handleRequest(db, req(
+        'PUT', FLOW_PREFIX + flowId, token,
+        documentBody('Declared Again', generateIdentifier()),
+        { 'if-none-match': '*' },
+    ));
+    assertStrictEquals(second.status, 412);
+    assertStrictEquals(
+        (await second.json()).error,
+        'Document already exists at ' + FLOW_PREFIX + flowId,
+    );
+});
+
+Deno.test('a flow\'s stored state carries its sidecars',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const nodeId = generateIdentifier();
+    const body = documentBody('Sidecars', generateIdentifier(), {
+        graphDelta: {
+            ...emptyDelta(),
+            nodes: [{
+                id: nodeId,
+                flow_id: flowId,
+                name: 'N1',
+                position_x: 0,
+                position_y: 0,
+                is_create: false,
+                is_archive: false,
+                task_instructions: '',
+                at: AT,
+            }],
+        },
+        revivals: [{
+            eventId: generateIdentifier(),
+            entityId: nodeId,
+            at: AT,
+        }],
+    });
+    const put = await handleRequest(db, req(
+        'PUT', FLOW_PREFIX + flowId, token, body,
+        { 'if-none-match': '*' },
+    ));
+    assertStrictEquals(put.status, 201);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, FLOW_PREFIX, flowId),
+    ) as Record<string, unknown>;
+    assertEquals(stored['graphDelta'], body.graphDelta);
+    assertEquals(stored['revivals'], body.revivals);
+    const state = flowStoredEntityOf(
+        {
+            name: flowId,
+            messagePairId: flowId,
+            method: 'PUT',
+            body,
+        },
+        'AjdvjuECVZEgZoFajaIEkg',
+    );
+    assertEquals(stored, state);
+    assertEquals(Object.keys(state).slice(-5), [
+        'state', 'state_at', 'state_event_id',
+        'graphDelta', 'revivals',
+    ]);
+    const got = await handleRequest(db, req(
+        'GET', FLOW_PREFIX + flowId, token,
+    ));
+    assertStrictEquals(got.status, 200);
+    const wire = await got.json() as Record<string, unknown>;
+    assertStrictEquals('graphDelta' in wire, false);
+    assertStrictEquals('revivals' in wire, false);
+    assertStrictEquals('hasUndoHistory' in wire, true);
 });

@@ -25,6 +25,7 @@ import {
     attemptFor,
     formWriteMessagePair,
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
 import { messageStore } from '../api/message-store.ts';
@@ -251,7 +252,7 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
     );
 });
 
-// -- (c) the locked arm, against a SYNTHETIC registration. ---
+// -- (c) the required arm, against a SYNTHETIC registration. -
 
 const TEST_FAMILY = 'locked-test-docs';
 const TEST_PATTERN = TEST_FAMILY + '/:id';
@@ -259,15 +260,15 @@ const TEST_PATTERN = TEST_FAMILY + '/:id';
 // never served via documentPutHandler, mirroring a real family's
 // own hand-written sub-resource (e.g.
 // organizations/:id/flows/:id/versions/:etag
-// beside the locked organizations/:id/flows/:id). Proves the gate keys the
-// locked
-// arm off the EXACT entity-route pattern, never the family's
-// first path segment alone — a sibling route must stay 'simple'
-// even though its family registration says 'locked'.
+// beside organizations/:id/flows/:id). Proves the gate keys
+// the conditional off the EXACT route pattern, never the
+// family's first path segment alone — a sibling route takes
+// its own 'optional' entry though the entity's is
+// 'required'.
 const CHILD_PATTERN = TEST_FAMILY + '/:id/child';
 
 // The synthetic family's decompose op stores NOTHING but the
-// pair itself — the locked-arm gate machinery under test lives
+// pair itself — the gate machinery under test lives
 // entirely in api.ts/message-pair.ts, upstream of this op, so
 // the op only needs to prove appendMessagePairOnce ran.
 async function testDocumentOp(
@@ -339,20 +340,19 @@ function testEntityOf(
     };
 }
 
-// Registers a synthetic 'locked' family for the duration of
+// Registers a synthetic 'required' family for the duration of
 // `fn`, through the SAME seams a real family task would use
 // (FAMILY_REGISTRY, DOCUMENT_FAMILY_WIRINGS, the live route
 // table, the pair-wiring sets, WRITE_RESPONSE_SPECS) — then
 // unregisters everything, even if `fn` throws, so no test
 // pollutes another. No live family is registered here through
-// this task; this is the ONLY place the locked arm runs.
+// this task.
 async function withSyntheticLockedFamily<T>(
     fn: () => Promise<T>,
 ): Promise<T> {
     const registration: FamilyRegistration = {
         family: TEST_FAMILY,
         organizationNested: true,
-        concurrency: 'locked',
         createBodyIdField: 'id',
     };
     const mutableRegistry =
@@ -361,8 +361,8 @@ async function withSyntheticLockedFamily<T>(
     const wiring: DocumentFamilyWiring = {
         family: TEST_FAMILY,
         httpNest: 'global',
-        // Inert for these PUT-dispatch tests (the locked arm
-        // never exercises GET), but REQUIRED fields on the
+        // Inert for these PUT-dispatch tests (the required
+        // arm never exercises GET), but REQUIRED fields on the
         // interface — this is the fourth DocumentFamilyWiring
         // construction site (the other three are
         // routes.ts's ideas/projects/flows rows).
@@ -393,8 +393,10 @@ async function withSyntheticLockedFamily<T>(
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.add(CHILD_PATTERN);
     const mutableSpecs = WRITE_RESPONSE_SPECS as
         Record<string, WriteResponseSpec>;
-    mutableSpecs[TEST_PATTERN] =
-        documentWriteResponseSpec(wiring);
+    mutableSpecs[TEST_PATTERN] = {
+        ...documentWriteResponseSpec(wiring),
+        conditional: 'required',
+    };
     mutableSpecs[CHILD_PATTERN] = {
         conditional: 'optional',
         successBody: (_params, body) => body ?? {},
@@ -419,14 +421,20 @@ async function withSyntheticLockedFamily<T>(
     }
 }
 
-Deno.test('locked arm: genesis with neither header passes',
+Deno.test('required arm: genesis with neither header is 428',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
+        const undeclared = await handleRequest(db, req(
+            'PUT', '/' + TEST_FAMILY + '/XufQcWIKhZshfJYOVNeUSw', token,
+            { v: 'first' },
+        ));
+        assertStrictEquals(undeclared.status, 428);
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/XufQcWIKhZshfJYOVNeUSw', token,
             { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         assertStrictEquals(res.status, 201);
         assertStrictEquals(res.headers.get('Follows'), null);
@@ -438,7 +446,7 @@ async () => {
     });
 });
 
-Deno.test('locked arm: GET ETag names the stored pair',
+Deno.test('required arm: GET ETag names the stored pair',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -447,6 +455,7 @@ async () => {
             + generateIdentifier();
         const put = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         assertStrictEquals(put.status, 201);
         const got = await handleRequest(db, req(
@@ -463,7 +472,7 @@ async () => {
     });
 });
 
-Deno.test('locked arm: If-Match with the pair id succeeds; a'
+Deno.test('required arm: If-Match with the pair id succeeds; a'
 + ' stale token 412s; live head with no pin 428s',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -473,6 +482,7 @@ async () => {
             + generateIdentifier();
         const genesis = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         assertStrictEquals(genesis.status, 201);
         const pairId = pairIdOf(genesis);
@@ -494,7 +504,7 @@ async () => {
     });
 });
 
-Deno.test('locked arm: A then B then A yields three distinct'
+Deno.test('required arm: A then B then A yields three distinct'
 + ' ETags',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -504,6 +514,7 @@ async () => {
             + generateIdentifier();
         const first = await handleRequest(db, req(
             'PUT', path, token, { v: 'A' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         assertStrictEquals(first.status, 201);
         const tagA = first.headers.get('ETag')!;
@@ -525,9 +536,9 @@ async () => {
     });
 });
 
-Deno.test('locked arm: a sibling route under the SAME family'
-+ ' prefix stays simple (keyed by routePattern, never the'
-+ ' bare first segment)', async () => {
+Deno.test('required arm: a sibling route under the SAME family'
++ ' prefix takes its own conditional (keyed by routePattern,'
++ ' never the bare first segment)', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
@@ -537,9 +548,9 @@ Deno.test('locked arm: a sibling route under the SAME family'
             'PUT', path, token, { v: 'first' },
         ));
         assertStrictEquals(first.status, 201);
-        // A second PUT, still with NO If-Match — if the
-        // gate mistakenly keyed the locked arm off TEST_FAMILY
-        // alone, this would 428 (head present, echo absent).
+        // A second blind PUT — if the gate keyed the
+        // entity's 'required' conditional off TEST_FAMILY
+        // alone, this would 428.
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
         ));
@@ -547,7 +558,7 @@ Deno.test('locked arm: a sibling route under the SAME family'
     });
 });
 
-Deno.test('locked arm: head present, If-Match absent, 428s',
+Deno.test('required arm: head present, If-Match absent, 428s',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -555,6 +566,7 @@ async () => {
         await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw', token,
             { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw', token,
@@ -563,19 +575,20 @@ async () => {
         assertStrictEquals(res.status, 428);
         assertStrictEquals(
             (await res.json()).error,
-            'If-Match is required to PUT /'
+            'If-Match or If-None-Match is required to PUT /'
             + TEST_FAMILY + '/YHvbnJSZHECuziaHXcsKpw',
         );
     });
 });
 
-Deno.test('locked arm: a stale If-Match echo 412s', async () => {
+Deno.test('required arm: a stale If-Match echo 412s', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
         await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg', token,
             { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg', token,
@@ -588,12 +601,13 @@ Deno.test('locked arm: a stale If-Match echo 412s', async () => {
         assertStrictEquals(
             (await res.json()).error,
             'If-Match does not match the current document at '
-            + '/' + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg',
+            + '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + TEST_FAMILY + '/YIuEjXvCwXAgrpyvcvLJjg',
         );
     });
 });
 
-Deno.test('locked arm: a matching echo stores no predecessor'
+Deno.test('required arm: a matching echo stores no predecessor'
 + ' columns or headers', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -601,6 +615,7 @@ Deno.test('locked arm: a matching echo stores no predecessor'
         const first = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YKtyCizelcaUAaHGwetojA', token,
             { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         const firstEtag = first.headers.get('ETag')!;
         const second = await handleRequest(db, req(
@@ -622,7 +637,7 @@ Deno.test('locked arm: a matching echo stores no predecessor'
     });
 });
 
-Deno.test('locked arm: a stale If-Match resend answers 412'
+Deno.test('required arm: a stale If-Match resend answers 412'
 + ' and stores nothing',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -631,6 +646,7 @@ async () => {
         const first = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YLbPBVpBLImxPQRqLKPKLw', token,
             { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         const firstEtag = first.headers.get('ETag')!;
         const editRequest = req(
@@ -653,7 +669,7 @@ async () => {
     });
 });
 
-Deno.test('locked arm: a fresh-keyed replay echoing a superseded'
+Deno.test('required arm: a fresh-keyed replay echoing a superseded'
 + ' head 412s', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -661,6 +677,7 @@ Deno.test('locked arm: a fresh-keyed replay echoing a superseded'
         const genesis = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/YMhCOBWvbUQVTDYjSloGqw', token,
             { v: 'first' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         const genesisEtag = genesis.headers.get('ETag')!;
         await handleRequest(db, req(
@@ -681,7 +698,7 @@ Deno.test('locked arm: a fresh-keyed replay echoing a superseded'
     });
 });
 
-Deno.test('locked arm: two writers racing the SAME echo — the'
+Deno.test('required arm: two writers racing the SAME echo — the'
 + ' second aborts via the in-tx head re-read', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -752,7 +769,7 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
 // before either write commits. The op holds the head
 // re-read and the write in one transaction, so the loser
 // sees the winner and 412s.
-Deno.test('locked arm: two concurrent PUTs echoing the same head —'
+Deno.test('required arm: two concurrent PUTs echoing the same head —'
 + ' the loser 412s via the in-tx head re-read',
 async () => {
     await withSyntheticLockedFamily(async () => {
@@ -761,6 +778,7 @@ async () => {
         const path = '/' + TEST_FAMILY + '/YRLOudHOEHboXTwRDwLUTg';
         const genesis = await handleRequest(db, req(
             'PUT', path, token, { v: 'genesis' },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         ));
         const head = genesis.headers.get('ETag')!;
         const [first, second] = await Promise.all([
@@ -782,7 +800,7 @@ async () => {
         assertStrictEquals(
             loserBody.error,
             'If-Match does not match the current document at '
-            + path,
+            + '/organizations/AjdvjuECVZEgZoFajaIEkg' + path,
         );
         const messagePairs = await db.messagePairs.getAll();
         const atPath = messagePairs.filter(

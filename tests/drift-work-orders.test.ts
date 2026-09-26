@@ -855,8 +855,8 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
 // which this stateless family does not carry). This case
 // asserts plain Simple-PUT supersession only.
 // Bare-req idiom, no header threading — a NAMED contrast to
-// derive-flows' locked-echo idiom (work-orders is 'simple'
-// concurrency, never 'locked').
+// derive-flows' echo idiom: a work-order PUT may be blind,
+// a flow PUT may not.
 Deno.test('document supersession: PUT #2 (byte-divergent body)'
 + ' supersedes PUT #1; derivation returns PUT #2\'s body',
 async () => {

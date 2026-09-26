@@ -1547,6 +1547,7 @@ Deno.test(
                     generateIdentifier(),
                     '2026-01-01T00:00:00.000000Z',
                 ),
+                headers: { 'if-none-match': '*' },
             }),
         );
         const firstEtag = first.headers.get('etag');

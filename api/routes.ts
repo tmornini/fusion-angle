@@ -1513,7 +1513,7 @@ export async function postFlowCreationOp(
     return;
 }
 
-// Flow document write (Decision 7, the LOCKED class). Phase
+// Flow document write (Decision 7, class B). Phase
 // Final Task 2: flows + graph relation ROW halves stripped —
 // the pair + states.postEvent (flow lifecycle + revivals)
 // commit as ONE transaction. graphDelta/revivals stay in the
@@ -1553,28 +1553,13 @@ export async function postFlowDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<FlowEntity, 'id'>;
-    const latchedId = messagePair?.latchedHeadMessagePairId;
     // Phase Final Task 2: flows + graph ROW halves
     // stripped; states ROW half stripped (message plane only).
     // Revival states events dual-write until the
     // states-trace strip; pair body also carries
     // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
+    // The statement judges the received PUT's own tag.
     if (messagePair !== undefined) {
-        if (latchedId !== undefined) {
-            const latest = await db.readTransaction(
-                async (view) =>
-                    (await messageStore(view).getDocumentHead(
-                        messagePair.path, messagePair.name,
-                    ))?.id,
-            );
-            if (latest !== latchedId) {
-                throw new ApiError(
-                    'If-Match does not match the current'
-                    + ' document at /flows/' + id,
-                    HTTP_PRECONDITION_FAILED,
-                );
-            }
-        }
         await runWrite(
             db,
             attemptFor([messagePair]),
@@ -3217,14 +3202,13 @@ export const WRITE_RESPONSE_SPECS:
     },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
-    // entry above for the shared rationale. flows/:id is the
-    // FIRST locked-class entry (Task 3): the response shape is
-    // unchanged either way (RESPONSE-BYTE PARITY, verified at
-    // plan time) — only the gate's pre-dispatch four-outcome
-    // table (api.ts) differs for a locked family, never this
-    // successBody.
-    'organizations/:id/flows/:id':
-        documentWriteResponseSpec(FLOWS_WIRING),
+    // entry above for the shared rationale. A flow is class B:
+    // every PUT names the head it replaces or declares its
+    // genesis.
+    'organizations/:id/flows/:id': {
+        ...documentWriteResponseSpec(FLOWS_WIRING),
+        conditional: 'required',
+    },
     'organizations/:id/flows/:id/undo': {
         conditional: 'in-order',
     },
@@ -3633,10 +3617,9 @@ export interface DocumentMessagePairFormInput {
         readonly status: number;
         readonly body: unknown;
     };
-    // Locked-class synthesized PUTs (flow undo) must
-    // carry the document head they restored from, or
-    // coordinateWrite 412s an unlatched PUT at a live
-    // locked document.
+    // A synthesized PUT that restores a flow (undo)
+    // latches the head it restored from; the statement
+    // judges that latch.
     readonly latchedHeadMessagePairId?: string;
     readonly headerFields?: readonly FieldLine[];
     readonly operationId: string;
@@ -4857,11 +4840,10 @@ export const routes: Route[] = [
             return postFlowCreationOp(db, body, actor, messagePairs);
         },
     }),
-    // flows/:id is the FIRST locked-class route (Task 3).
+    // flows/:id takes a conditional PUT ('required').
     // G2 GET stays deriveFlow (stamp hasUndoHistory; 404
-    // a state-'deleted' head — stored PUT has no trio).
-    // PUT stays documentPutHandler; the gate's four-
-    // outcome table resolves genesis/412 BEFORE dispatch.
+    // a state-'deleted' head). PUT stays
+    // documentPutHandler; the statement judges its latch.
     // graphDelta/revivals ride the pair body (SIDECAR-KEEP).
     // Member-tier PUT.
     {
@@ -5114,7 +5096,7 @@ export const routes: Route[] = [
     // instance_id + record_type_id when bound (keys ABSENT
     // when unbound — unbound wire bytes unchanged). PUT
     // still rides documentPutHandler(WORK_ORDERS_WIRING)
-    // — 'simple' concurrency, member-tier via
+    // — member-tier via
     // MEMBER_VERBS['/work-orders']. Verbs stay {get, put}
     // — no DELETE.
     route('organizations/:id/work-orders/:id', {
@@ -5716,13 +5698,10 @@ export const routes: Route[] = [
     // backing table, no dual-write, derived entirely from message
     // pairs. Bespoke route() wiring reusing deriveDocumentsAt/
     // documentMessagePairsAt exactly like the identities/:id/pii analog
-    // (gate 8), SIMPLE class (a repeat PUT records Supersedes):
-    // the locked class flows itself rides is structurally
-    // MOOT here — api.ts's isLockedWrite is routePattern ===
-    // documentEntityPattern(wiring), which for flows is
-    // organizations/:id/flows/:id — this tags document never
-    // equals that entity pattern, so it never rides that arm
-    // no matter what family-registry.ts declares for 'flows'. The
+    // (gate 8); a repeat PUT records Supersedes. The tags
+    // route takes its own entry's conditional, never the
+    // flow entity's: its pattern never equals
+    // organizations/:id/flows/:id. The
     // tag NAME (param 2) is the document's own name — the FIRST
     // user-authored path segment in this codebase
     // (validateFlowTagName, api/validators.ts), validated ONLY at
