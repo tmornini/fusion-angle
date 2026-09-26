@@ -34,20 +34,6 @@ export interface InstanceHead {
     readonly values: readonly InstanceValue[];
 }
 
-export function instanceGetBody(
-    id: string,
-    organizationId: string,
-    recordTypeId: string,
-    values: readonly InstanceValue[],
-): Record<string, unknown> {
-    return {
-        id,
-        organization_id: organizationId,
-        record_type_id: recordTypeId,
-        values,
-    };
-}
-
 export function projectionOmitsStored(
     stored: readonly InstanceValue[],
     projected: readonly InstanceValue[],

@@ -1,4 +1,5 @@
 import { assert, assertNotEquals, assertStrictEquals } from '@std/assert';
+import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -183,8 +184,11 @@ async function seedInstance(
     db: MemoryDbAdapter,
     token: string,
 ): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PATCH', INSTANCES + INSTANCE_ID, token, {
+    const put = await handleRequest(db, apiRequest({
+        method: 'PATCH',
+        path: INSTANCES + INSTANCE_ID,
+        token,
+        body: {
             set: [
                 {
                     attribute_id: ATTR_ID,
@@ -192,7 +196,8 @@ async function seedInstance(
                 },
             ],
         },
-    ));
+        headers: { [IF_NONE_MATCH_HEADER]: '*' },
+    }));
     assertStrictEquals(put.status, 201);
 }
 

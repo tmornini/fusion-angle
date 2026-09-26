@@ -4,8 +4,6 @@ import {
 } from './db.ts';
 import type {
     DbAdapter,
-    StorageBackend,
-    Tx,
 } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type {
@@ -97,6 +95,7 @@ import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
     runWrite,
+    runStateWrite,
     canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
@@ -108,7 +107,7 @@ import {
     strongEtagOf,
 } from './message-pair.ts';
 import type {
-    MessagePair, ReceivedRequest,
+    MessagePair, ReceivedRequest, StateProjection,
 } from './message-pair.ts';
 import { messageStore } from './message-store.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
@@ -193,7 +192,6 @@ import {
     deriveInstanceCollection,
     deriveInstanceRevisions,
     mergeInstanceValues,
-    instanceGetBody,
     revisionValuesOf,
     type InstanceValue,
 } from './derive-record-instances.ts';
@@ -2478,11 +2476,14 @@ export async function postWorkOrderTransitionOp(
             clear: validated.clear,
         },
     );
+    const revisionState = instanceStateOf(
+        org, typeId, instanceId, mergedValues,
+    );
     const revisionMessagePair = await formDocumentMessagePairFor({
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
-        body: { values: mergedValues },
+        body: revisionState,
         requesterIdentityId: actor,
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
@@ -2490,7 +2491,7 @@ export async function postWorkOrderTransitionOp(
         organization: org,
         response: {
             status: HTTP_OK,
-            body: { values: mergedValues },
+            body: revisionState,
         },
         headerFields: [{
             name: IF_MATCH_HEADER,
@@ -3312,34 +3313,10 @@ export const WRITE_RESPONSE_SPECS:
         },
         delete: { conditional: 'optional' },
     },
-    // Nested instances detail (Task 20): public PUT is
-    // 405; PATCH creates and updates. Wire success body
-    // echoes the request delta only — never the merged
-    // head. PATCH successBody must NOT validate the
-    // delta. Pair formation runs before the gate's
-    // table (replay needs the hash first); body shape
-    // 400 is the handler's job so 428/412/409 answer
-    // first. On the 201 path the body is already valid,
-    // so the echo matches the handler's re-validated
-    // set/clear.
+    // Instances: PATCH creates with If-None-Match: * and
+    // updates with If-Match; the former answers the state.
     [INSTANCE_DETAIL_PATTERN]: {
-        patch: {
-            conditional: 'optional',
-            successBody: (params, body) => {
-                const raw = body ?? {};
-                return {
-                    id: param(params, 2),
-                    organization_id: param(params, 0),
-                    record_type_id: param(params, 1),
-                    set: Array.isArray(raw['set'])
-                        ? raw['set']
-                        : [],
-                    clear: Array.isArray(raw['clear'])
-                        ? raw['clear']
-                        : [],
-                };
-            },
-        },
+        patch: { conditional: 'required' },
         delete: { conditional: 'optional' },
     },
     'organizations/:id/flows/:id/records/:frid': {
@@ -3861,36 +3838,43 @@ async function instanceDocumentSpent(
     return messagePairs.length > 0;
 }
 
-function backedClient(
-    adapter: DbAdapter,
-): {
-    readonly backend: StorageBackend;
-    readonly clientOn: (tx: Tx) => DbAdapter;
-} {
-    if (
-        !('backend' in adapter)
-        || !('clientOn' in adapter)
-    ) {
-        throw new Error(
-            'a racing write requires a backed adapter',
-        );
-    }
-    return adapter as DbAdapter & {
-        backend: StorageBackend;
-        clientOn: (tx: Tx) => DbAdapter;
+// An instance's whole state (§4): the GET's shape with
+// every value, stored on each revision.
+export function instanceStateOf(
+    organization: Id,
+    typeId: Id,
+    instanceId: Id,
+    values: readonly InstanceValue[],
+): Record<string, unknown> {
+    return {
+        id: instanceId,
+        organization_id: organization,
+        record_type_id: typeId,
+        values,
     };
 }
 
-// Instance PATCH create (Task 20): no live PUT, no
-// If-Match. Body is create-shaped ({set} required,
-// [] legal; clear → 400). Writes the wire PATCH plus
-// an inner PUT {values} so derive still reads PUT|
-// DELETE heads.
+// What this requester may read of an instance's state.
+export function instanceProjection(
+    attributesById: ReadonlyMap<string, AttributeSchemaRow>,
+    roles: readonly string[],
+): StateProjection {
+    return (state) => ({
+        ...state,
+        values: projectReadableValues(
+            revisionValuesOf(state), attributesById, roles,
+        ),
+    });
+}
+
+// Instance create: PATCH with If-None-Match: * (§3). The
+// client declares the genesis; the statement judges it.
+// Tombstone-wins is this family's rule, not the ledger's:
+// a retired name never comes back.
 async function postInstanceCreateOp(
     db: DbAdapter,
     p: string[],
     body: Record<string, unknown>,
-    actor: Id,
     messagePair: MessagePair,
     organization: Id | undefined,
     roles: readonly string[],
@@ -3898,9 +3882,6 @@ async function postInstanceCreateOp(
     const org = requireOrganization(organization);
     const typeId = param(p, 1);
     const instanceId = param(p, 2);
-    const pathname = '/organizations/' + org
-        + '/record-types/' + typeId
-        + '/instances/' + instanceId;
     await requireRecordTypeExists(db, org, typeId);
     const validated = validateInstancePutBody(body);
     const attributesById = await loadAttributeSchemaById(
@@ -3911,176 +3892,113 @@ async function postInstanceCreateOp(
         attributesById,
         roles,
     );
-    validateInstanceValues(
-        validated.set, attributesById,
-    );
-    const mergedValues = mergeInstanceValues(
-        [], { set: validated.set },
-    );
-    const revisionMessagePair = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [org, typeId, instanceId],
-        method: 'PUT',
-        body: { values: mergedValues },
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization: org,
-        response: {
-            status: HTTP_OK,
-            body: { values: mergedValues },
-        },
-        headerFields: [],
-    });
+    validateInstanceValues(validated.set, attributesById);
     const prefix = instancesUriPrefix(org, typeId);
-    const pairs = [
-        messagePair, revisionMessagePair,
-    ];
-    // The gate's 428 ran before either racer wrote.
-    // Re-read on the client that holds the write, so
-    // the second create sees the first head.
-    const backed = backedClient(db);
-    await backed.backend.transaction(
-        'readwrite',
-        async (tx) => {
-            const view = backed.clientOn(tx);
-            const latest = await documentHeadAt(
-                view, prefix, instanceId,
-            );
-            if (latest?.method === 'DELETE') {
-                throw new ApiError(
-                    'instance already exists at '
-                        + pathname,
-                    HTTP_CONFLICT,
-                );
-            }
-            if (latest?.method === 'PUT') {
-                throw new ApiError(
-                    'If-Match is required to PATCH '
-                        + pathname,
-                    HTTP_PRECONDITION_REQUIRED,
-                );
-            }
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-        },
-    );
+    const head = await documentHeadAt(db, prefix, instanceId);
+    if (head?.method === 'DELETE') {
+        throw new ApiError(
+            'instance already exists at /organizations/'
+                + org + '/record-types/' + typeId
+                + '/instances/' + instanceId,
+            HTTP_CONFLICT,
+        );
+    }
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: prefix,
+            name: instanceId,
+            state: instanceStateOf(
+                org, typeId, instanceId,
+                mergeInstanceValues([], { set: validated.set }),
+            ),
+            condition: { kind: 'genesis', declarer: 'client' },
+        }],
+        project: instanceProjection(attributesById, roles),
+        answer: { kind: 'parent' },
+    });
 }
 
-// Instance PATCH two-pair append (Task 17 / R5 / R9).
-// Create (no If-Match, never written) is Task 20: set
-// required, [] legal; clear → 400. ifMatchTarget is the
-// CLIENT's gate-verified If-Match recovered from the
-// formed wire pair — never a live re-derived head.
+// Instance update: PATCH with If-Match (§1 C). The handler
+// reads the head to merge; the statement judges the tag.
 export async function postInstancePatchOp(
     db: DbAdapter,
     p: string[],
     body: Record<string, unknown>,
-    actor: Id,
+    _actor: Id,
     messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
 ): Promise<void> {
-    const org = requireOrganization(organization);
-    const typeId = param(p, 1);
-    const instanceId = param(p, 2);
-    const pathname = '/organizations/' + org
-        + '/record-types/' + typeId
-        + '/instances/' + instanceId;
     if (messagePair === undefined) {
         throw new Error(
             'instance PATCH requires a formed pair',
         );
     }
-    const ifMatchTarget = ifMatchFromMessagePair(messagePair);
-    if (ifMatchTarget === undefined) {
+    if (messagePair.genesis === 'client') {
         return postInstanceCreateOp(
-            db, p, body, actor, messagePair, organization,
-            roles,
+            db, p, body, messagePair, organization, roles,
         );
     }
+    const tag = ifMatchFromMessagePair(messagePair);
+    if (tag === undefined) {
+        throw new Error(
+            'the gate admitted an instance PATCH with no'
+                + ' conditional',
+        );
+    }
+    const org = requireOrganization(organization);
+    const typeId = param(p, 1);
+    const instanceId = param(p, 2);
+    const prefix = instancesUriPrefix(org, typeId);
     const head = await deriveInstanceHead(
         db, org, typeId, instanceId,
     );
-    if (head === undefined) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
+    if (
+        head === undefined
+        && await documentHeadAt(db, prefix, instanceId) !== null
+    ) {
+        throw await missedReadError(
+            db, instanceId, org, 'record_instances',
         );
     }
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
     );
-    if (ifMatchTarget !== head.messagePairId) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
     const validated = validateInstancePatchBody(body);
-    const aclIds = [
-        ...validated.set.map(
-            (entry) => entry.attribute_id,
-        ),
-        ...validated.clear,
-    ];
     assertWritableAttributeIds(
-        aclIds, attributesById, roles,
+        [
+            ...validated.set.map((entry) => entry.attribute_id),
+            ...validated.clear,
+        ],
+        attributesById,
+        roles,
     );
-    validateInstanceValues(
-        validated.set, attributesById,
-    );
-    const mergedValues = mergeInstanceValues(
-        head.values, {
-            set: validated.set,
-            clear: validated.clear,
-        },
-    );
-    // Revision: If-Match target is the in-tx latch.
-    // Wire is operation-plane; ghost-replay closed via
-    // headerFields: [] on the synthetic revision.
-    const revisionMessagePair = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [org, typeId, instanceId],
-        method: 'PUT',
-        body: { values: mergedValues },
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization: org,
-        response: {
-            status: HTTP_OK,
-            body: { values: mergedValues },
-        },
-        headerFields: [{
-            name: IF_MATCH_HEADER,
-            value: strongEtagOf(ifMatchTarget),
+    validateInstanceValues(validated.set, attributesById);
+    // A never-written instance merges onto no values; the
+    // tag names no head, so the statement answers 412.
+    const values = head === undefined ? [] : head.values;
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: prefix,
+            name: instanceId,
+            state: instanceStateOf(
+                org, typeId, instanceId,
+                mergeInstanceValues(values, {
+                    set: validated.set,
+                    clear: validated.clear,
+                }),
+            ),
+            condition: { kind: 'in-order', head: tag },
         }],
+        project: instanceProjection(attributesById, roles),
+        answer: { kind: 'parent' },
     });
-    const latchedMessagePairId = head.messagePairId;
-    const latest = await db.readTransaction(
-        async (view) => (await messageStore(view)
-            .getDocumentHead(
-                revisionMessagePair.path,
-                revisionMessagePair.name,
-            ))?.id,
-    );
-    if (latest !== latchedMessagePairId) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const pairs = [
-        messagePair, revisionMessagePair,
-    ];
-    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Offer only: the dedicated arm in handleRequest
@@ -5671,20 +5589,22 @@ export const routes: Route[] = [
                 attributesById,
                 roles,
             );
-            return instanceGetBody(
-                instanceId, org, typeId, values,
+            return instanceStateOf(
+                org, typeId, instanceId, values,
             );
         },
     }),
     // Nested instance detail (Task 20): public PUT is
-    // 405. PATCH creates (no pin, never written) and
-    // updates (If-Match). Task 16 GET projection +
+    // 405. PATCH creates (If-None-Match: *) and updates
+    // (If-Match). Task 16 GET projection +
     // missedReadError R2. Task 18 DELETE tombstone-wins
     // R4/R9. Ladder PATCH create: parent type 404 →
     // body 400 (set required; clear forbidden) → write-
-    // ACL 403 → value 400 → two-pair tx (wire + inner
-    // PUT). Ladder PATCH update: shape → unknown attr
-    // → ACL on set∪clear → value on set → two-pair tx.
+    // ACL 403 → value 400 → tombstone 409 → one
+    // statement (received PATCH + revision PUT). Ladder
+    // PATCH update: tombstone 404 → shape → unknown attr
+    // → ACL on set∪clear → value on set → one statement,
+    // which judges the tag.
     // Ladder DELETE: parent type 404 → document spent
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-

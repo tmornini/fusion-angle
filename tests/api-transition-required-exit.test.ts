@@ -15,6 +15,7 @@ import {
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -355,6 +356,7 @@ async function seedInstance(
     const put = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
     return put.headers.get('ETag')!;

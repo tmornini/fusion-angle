@@ -66,7 +66,6 @@ import {
 import {
     deriveInstanceHead,
     projectionOmitsStored,
-    instancesUriPrefix,
 } from './derive-record-instances.ts';
 import { projectReadableValues } from './attribute-acl.ts';
 import {
@@ -78,7 +77,6 @@ import {
 } from '../shared/notifications.ts';
 import {
     resolveGlobalOwner,
-    missedReadError,
 } from './derive-states.ts';
 import {
     writeAuthorizerFor,
@@ -98,7 +96,6 @@ import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
-    HTTP_CONFLICT,
     HTTP_METHOD_NOT_ALLOWED,
     HTTP_INTERNAL_ERROR,
     HTTP_UNAUTHORIZED,
@@ -1154,134 +1151,6 @@ async function dispatched(
                     );
                 }
             }
-            // Instance PATCH table (Task 20). AFTER replay.
-            // Malformed If-Match is 400 before create/404/
-            // 412. Never-written + no pin → create. DELETE
-            // head + no pin → 409 spent; + pin → 404.
-            if (
-                method === 'PATCH'
-                && routePattern
-                    === INSTANCE_DETAIL_PATTERN
-            ) {
-                const pathOrganization = param(params, 0);
-                const typeId = param(params, 1);
-                const instanceId = param(params, 2);
-                const prefix = instancesUriPrefix(
-                    pathOrganization, typeId,
-                );
-                const raw = request.headers
-                    .get(IF_MATCH_HEADER);
-                if (raw !== null) {
-                    const parsed = parseIfMatch(raw);
-                    if (parsed === undefined) {
-                        return Response.json(
-                            {
-                                error: 'If-Match must '
-                                    + 'carry exactly '
-                                    + 'one strong '
-                                    + 'validator',
-                            },
-                            {
-                                status:
-                                    HTTP_BAD_REQUEST,
-                            },
-                        );
-                    }
-                }
-                const head = await deriveInstanceHead(
-                    effective,
-                    pathOrganization,
-                    typeId,
-                    instanceId,
-                );
-                const docHead = await documentHeadAt(
-                    effective, prefix, instanceId,
-                );
-                if (head === undefined) {
-                    if (docHead?.method === 'DELETE') {
-                        if (raw === null) {
-                            return Response.json(
-                                {
-                                    error:
-                                        'instance '
-                                        + 'already '
-                                        + 'exists at '
-                                        + pathname,
-                                },
-                                {
-                                    status:
-                                        HTTP_CONFLICT,
-                                },
-                            );
-                        }
-                        throw await missedReadError(
-                            effective,
-                            instanceId,
-                            organization
-                                ?? pathOrganization,
-                            'record_instances',
-                        );
-                    }
-                    if (raw !== null) {
-                        return Response.json(
-                            {
-                                error: 'If-Match does '
-                                    + 'not match the '
-                                    + 'current '
-                                    + 'instance at '
-                                    + pathname,
-                            },
-                            {
-                                status:
-                                    HTTP_PRECONDITION_FAILED,
-                            },
-                        );
-                    }
-                    // Never written, no pin → create.
-                } else {
-                    const advertisedNow =
-                        await instanceAdvertised(
-                            effective,
-                            pathOrganization,
-                            typeId,
-                            instanceId,
-                            roles,
-                        );
-                    if (raw === null) {
-                        return Response.json(
-                            {
-                                error: 'If-Match is '
-                                    + 'required to '
-                                    + 'PATCH '
-                                    + pathname,
-                            },
-                            {
-                                status:
-                                    HTTP_PRECONDITION_REQUIRED,
-                            },
-                        );
-                    }
-                    const ifMatch = parseIfMatch(raw);
-                    if (
-                        advertisedNow === undefined
-                        || ifMatch !== advertisedNow.tag
-                    ) {
-                        return Response.json(
-                            {
-                                error: 'If-Match does '
-                                    + 'not match the '
-                                    + 'current '
-                                    + 'instance at '
-                                    + pathname,
-                            },
-                            {
-                                status:
-                                    HTTP_PRECONDITION_FAILED,
-                            },
-                        );
-                    }
-                }
-            }
             // Same-body as live PUT head → 200, no append.
             // Body equality is octets, not ETag. The no-op
             // still takes the in-tx latch so it cannot
@@ -1568,9 +1437,8 @@ async function dispatched(
                 return Response.json(result);
             }
             case 'PATCH': {
-                // Instance PATCH (Task 20): create and
-                // update. Pair + replay + ETag. Table ran
-                // pre-dispatch above.
+                // Instance PATCH: create and update. The
+                // former's answer already names the revision.
                 if (!matched.patch) {
                     return Response.json(
                         {
@@ -1601,31 +1469,6 @@ async function dispatched(
                         postWriteNotification(
                             adapter, routePattern, params,
                             body, organization, actor,
-                        );
-                    }
-                    if (
-                        written.outcome === 'stale'
-                        || written.outcome === 'refused'
-                        || written.outcome === 'matched'
-                    ) {
-                        return written.response;
-                    }
-                    if (
-                        routePattern
-                            === INSTANCE_DETAIL_PATTERN
-                        && written.outcome === 'land'
-                    ) {
-                        const revision = written.rows.find(
-                            (row) =>
-                                row.id !== messagePair.id,
-                        );
-                        if (revision !== undefined) {
-                            return attachEtag(
-                                written.response, revision.id,
-                            );
-                        }
-                        written.response.headers.delete(
-                            'etag',
                         );
                     }
                     return written.response;

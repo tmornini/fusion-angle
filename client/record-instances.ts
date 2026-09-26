@@ -132,8 +132,8 @@ export async function getRecordInstance(
     );
 }
 
-// PATCH create (no If-Match). Returns the fresh etag
-// so the caller can enter edit without a re-GET.
+// PATCH create, declared by If-None-Match: *. Returns the
+// fresh etag so the caller can enter edit without a re-GET.
 export async function putRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
@@ -143,6 +143,7 @@ export async function putRecordInstance(
     const { etag } = await ctx.PATCHWithEtag(
         instancePath(ctx, recordTypeId, id),
         { set: setWire(set) },
+        [['If-None-Match', '*']],
     );
     return {
         etag: requireEtag(

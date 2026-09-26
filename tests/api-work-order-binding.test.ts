@@ -4,6 +4,7 @@ import {
     assertMatch,
     assertStrictEquals,
 } from '@std/assert';
+import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -244,6 +245,7 @@ async function seedInstance(
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
 }
@@ -436,6 +438,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(putInstB.status, 201);
     // Bind under org A with the foreign instance id + the
@@ -494,6 +497,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(inst.status, 201);
     const before = await messagePairCount(db);

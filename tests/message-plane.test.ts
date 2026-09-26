@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertNotStrictEquals,
     assertStrictEquals,
     assertThrows,
@@ -35,6 +36,8 @@ import {
     documentHeadAt,
     formTokenEventMessagePair,
     formWriteMessagePair,
+    IF_NONE_MATCH_HEADER,
+    responseRecordOf,
     IF_MATCH_HEADER,
     runWrite,
     writeAnswerOf,
@@ -2354,13 +2357,14 @@ Deno.test(
         const INSTANCES = typePath + '/instances/';
         async function landed(
             request: Request,
+            status: number,
         ): Promise<Response> {
             const response = await handleRequest(
                 db, request,
             );
             const text = await response.text();
             assertStrictEquals(
-                response.status, 201, text,
+                response.status, status, text,
             );
             return response;
         }
@@ -2374,7 +2378,7 @@ Deno.test(
                 position: 1,
                 state: 'active',
             },
-        }));
+        }), 201);
         await landed(apiRequest({
             method: 'PUT',
             path: typePath + '/attributes/'
@@ -2393,7 +2397,7 @@ Deno.test(
                     ...DEFAULT_ATTRIBUTE_ACL_ROLES,
                 ],
             },
-        }));
+        }), 201);
         const created = await landed(apiRequest({
             method: 'PATCH',
             path: INSTANCES + instanceId,
@@ -2404,7 +2408,8 @@ Deno.test(
                     value: 'Hello',
                 }],
             },
-        }));
+            headers: { [IF_NONE_MATCH_HEADER]: '*' },
+        }), 201);
         const headEtag = created.headers.get('etag');
         if (headEtag === null) {
             throw new Error('create omitted an etag');
@@ -2455,6 +2460,7 @@ Deno.test(
                         [IF_MATCH_HEADER]: headEtag,
                     },
                 }),
+                200,
             );
             const pair = wire;
             if (pair === undefined) {
@@ -2483,6 +2489,24 @@ Deno.test(
                 response.headers.get('etag'),
                 '"' + revision.id + '"',
             );
+            const stored = await db.messagePairs.getById(
+                pair.id,
+            );
+            assertStrictEquals(
+                parseWire(stored.response).fields.find(
+                    (field) => field.name === 'etag',
+                )?.value,
+                '"' + revision.id + '"',
+            );
+            assertEquals(responseRecordOf(stored.response), {
+                id: instanceId,
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                record_type_id: typeId,
+                values: [{
+                    attribute_id: attributeId,
+                    value: 'World',
+                }],
+            });
             revisionEtag = response.headers.get('etag');
             const src = Deno.readTextFileSync(
                 'api/api.ts',
@@ -2533,7 +2557,7 @@ Deno.test(
                 headers: {
                     [IF_MATCH_HEADER]: revisionEtag,
                 },
-            }));
+            }), 201);
             const pair = lone;
             if (pair === undefined) {
                 throw new Error(
@@ -2554,7 +2578,8 @@ Deno.test(
             }
             assertStrictEquals(only.id, pair.id);
             assertStrictEquals(
-                alone.headers.get('etag'), null,
+                alone.headers.get('etag'),
+                '"' + pair.id + '"',
             );
         } finally {
             detail.patch = patch;

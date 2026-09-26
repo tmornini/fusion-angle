@@ -5,6 +5,7 @@ import {
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
+import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -152,10 +153,13 @@ async function seedInstanceReferrer(
     token: string,
     attributeId: string,
 ): Promise<void> {
-    const patch = await handleRequest(db, req(
-        'PATCH', DETAIL + '/instances/' + INSTANCE_ID, token,
-        { set: [{ attribute_id: attributeId, value: 'High' }] },
-    ));
+    const patch = await handleRequest(db, apiRequest({
+        method: 'PATCH',
+        path: DETAIL + '/instances/' + INSTANCE_ID,
+        token,
+        body: { set: [{ attribute_id: attributeId, value: 'High' }] },
+        headers: { [IF_NONE_MATCH_HEADER]: '*' },
+    }));
     assertStrictEquals(patch.status, 201);
 }
 

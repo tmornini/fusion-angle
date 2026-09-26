@@ -16,6 +16,7 @@ import {
     attemptFor,
     formWriteMessagePair,
     strongEtagOf,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -180,12 +181,13 @@ async function putInstance(
         value: string;
     }[],
 ): Promise<Response> {
-    return handleRequest(db, req(
-        'PATCH',
-        detailPath(instanceId),
+    return handleRequest(db, apiRequest({
+        method: 'PATCH',
+        path: detailPath(instanceId),
         token,
-        { set: [...set] },
-    ));
+        body: { set: [...set] },
+        headers: { [IF_NONE_MATCH_HEADER]: '*' },
+    }));
 }
 
 // Below-gate revision / tombstone seeds — PATCH and DELETE

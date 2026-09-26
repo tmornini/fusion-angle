@@ -1,4 +1,5 @@
 import { assertStrictEquals } from '@std/assert';
+import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -142,6 +143,7 @@ async function putLiveInstance(
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
 }

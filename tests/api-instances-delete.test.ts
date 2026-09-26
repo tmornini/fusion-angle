@@ -1,7 +1,6 @@
 import {
     assertEquals,
     assertInstanceOf,
-    assertMatch,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
@@ -24,11 +23,9 @@ import {
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
-import {
-    ApiError,
-    HTTP_PRECONDITION_FAILED,
-} from '../shared/http-errors.ts';
+import { EntityNotFoundError } from '../api/db.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
@@ -184,6 +181,7 @@ async function putInstance(
     return handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
 }
 
@@ -295,6 +293,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(putAgain.status, 409);
     assertEquals(await putAgain.json(), {
@@ -422,7 +421,7 @@ async () => {
 // wire pair was formed (gate-equivalent) but before its tx.
 // PATCH must 412 (or honest miss) — never revive the head.
 Deno.test('R9 resurrect-hole: DELETE between PATCH form and '
-+ 'append → 412; head stays tombstoned',
++ 'append → 404; head stays tombstoned',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -493,10 +492,12 @@ async () => {
             ORGANIZATION,
             ['member'],
         ),
-    ) as ApiError;
-    assertInstanceOf(err, ApiError);
-    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
-    assertMatch(err.message, /If-Match does not match/);
+    );
+    assertInstanceOf(err, EntityNotFoundError);
+    assertStrictEquals(
+        err.message,
+        'Not found: record_instances/' + INSTANCE_ID,
+    );
     const after = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );

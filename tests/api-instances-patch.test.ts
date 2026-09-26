@@ -1,10 +1,8 @@
 import {
     assert,
     assertEquals,
-    assertInstanceOf,
     assertMatch,
     assertNotStrictEquals,
-    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import {
@@ -30,9 +28,10 @@ import {
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
+    IF_NONE_MATCH_HEADER,
+    writeAnswerOf,
 } from '../api/message-pair.ts';
 import {
-    ApiError,
     HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
 import {
@@ -199,6 +198,7 @@ async function putInstance(
     return handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
 }
 
@@ -277,25 +277,17 @@ async () => {
         },
         { [IF_MATCH_HEADER]: headEtag },
     ));
-    assertStrictEquals(patch.status, 201);
+    assertStrictEquals(patch.status, 200);
     const newEtag = patch.headers.get('ETag');
     assert(newEtag !== null && newEtag !== '');
     assertNotStrictEquals(newEtag, headEtag);
-    const echo = await patch.json() as {
-        id: string;
-        organization_id: string;
-        record_type_id: string;
-        set: { attribute_id: string; value: string }[];
-        clear: string[];
-    };
-    assertEquals(echo, {
+    assertEquals(await patch.json(), {
         id: INSTANCE_ID,
         organization_id: ORGANIZATION,
         record_type_id: TYPE_ID,
-        set: [
+        values: [
             { attribute_id: ATTR_ID, value: 'World' },
         ],
-        clear: [],
     });
     const get = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
@@ -358,7 +350,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: shared },
     ));
-    assertStrictEquals(memberPatch.status, 201);
+    assertStrictEquals(memberPatch.status, 200);
     const afterMember = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -382,7 +374,7 @@ async () => {
                 memberPatch.headers.get('ETag')!,
         },
     ));
-    assertStrictEquals(adminPatch.status, 201);
+    assertStrictEquals(adminPatch.status, 200);
     const afterAdmin = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -410,7 +402,8 @@ async () => {
     assertStrictEquals(res.status, 428);
     assertStrictEquals(
         (await res.json()).error,
-        'If-Match is required to PATCH ' + INSTANCE_DETAIL,
+        'If-Match or If-None-Match is required to PATCH '
+            + INSTANCE_DETAIL,
     );
 });
 
@@ -429,7 +422,7 @@ async () => {
         { set: [{ attribute_id: ATTR_ID, value: 'B' }] },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assertStrictEquals(pnXmXrxOWayANgDLdCjuBw.status, 201);
+    assertStrictEquals(pnXmXrxOWayANgDLdCjuBw.status, 200);
     const YiJPbufDpkyrZcZCYbUJpg =
         pnXmXrxOWayANgDLdCjuBw.headers.get('ETag')!;
     const stale = await handleRequest(db, req(
@@ -441,7 +434,7 @@ async () => {
     assertStrictEquals(
         (await stale.json()).error,
         'If-Match does not match the current '
-            + 'instance at ' + INSTANCE_DETAIL,
+            + 'document at ' + INSTANCE_DETAIL,
     );
     const freshGet = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
@@ -453,7 +446,7 @@ async () => {
         { set: [{ attribute_id: ATTR_ID, value: 'C' }] },
         { [IF_MATCH_HEADER]: YiJPbufDpkyrZcZCYbUJpg },
     ));
-    assertStrictEquals(retry.status, 201);
+    assertStrictEquals(retry.status, 200);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -503,7 +496,7 @@ async () => {
     }
 });
 
-Deno.test('PATCH absent with If-Match → 412 (no live PUT)',
+Deno.test('PATCH absent with If-Match → 400 (validation first)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -513,10 +506,9 @@ async () => {
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
         { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
     ));
-    assertStrictEquals(res.status, 412);
+    assertStrictEquals(res.status, 400);
     assertEquals(await res.json(), {
-        error: 'If-Match does not match the current '
-            + 'instance at ' + INSTANCE_DETAIL,
+        error: 'unknown attribute_id "' + ATTR_ID + '"',
     });
 });
 
@@ -560,7 +552,7 @@ async () => {
     assertStrictEquals(head, undefined);
 });
 
-Deno.test('PATCH foreign instance id with If-Match → 412',
+Deno.test('PATCH foreign instance id with If-Match → 400',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -586,10 +578,9 @@ async () => {
                 '"' + WELL_FORMED_TAG + '"',
         },
     ));
-    assertStrictEquals(res.status, 412);
+    assertStrictEquals(res.status, 400);
     assertEquals(await res.json(), {
-        error: 'If-Match does not match the current '
-            + 'instance at ' + INSTANCE_DETAIL,
+        error: 'unknown attribute_id "' + ATTR_ID + '"',
     });
 });
 
@@ -801,7 +792,7 @@ async () => {
     );
 });
 
-Deno.test('PATCH write-without-read attr → 200; echo has value',
+Deno.test('PATCH write-without-read attr → 200; answer omits it',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -830,16 +821,13 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assertStrictEquals(res.status, 201);
-    const echo = await res.json() as {
-        set: { attribute_id: string; value: string }[];
-    };
-    assertEquals(echo.set, [
-        {
-            attribute_id: ATTR_SUBMIT,
-            value: 'secret-submit',
-        },
-    ]);
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), {
+        id: INSTANCE_ID,
+        organization_id: ORGANIZATION,
+        record_type_id: TYPE_ID,
+        values: [],
+    });
     const get = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
@@ -871,7 +859,7 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
         operationId,
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const originalEtag = first.headers.get('ETag')!;
     const originalResponseId =
         pairIdOf(first)!;
@@ -888,7 +876,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: originalEtag },
     ));
-    assertStrictEquals(secondWrite.status, 201);
+    assertStrictEquals(secondWrite.status, 200);
     assertNotStrictEquals(
         secondWrite.headers.get('ETag'),
         originalEtag,
@@ -950,7 +938,7 @@ async () => {
     ]);
     assertEquals(
         [a.status, b.status].sort(),
-        [201, 412],
+        [200, 412],
     );
 });
 
@@ -1024,7 +1012,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: strongEtagOf(h0) },
     ));
-    assertStrictEquals(advance.status, 201);
+    assertStrictEquals(advance.status, 200);
     const live = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -1035,20 +1023,21 @@ async () => {
     ]);
     // Stale writer must 412 on ifMatchTarget (= H0), not
     // merge against live and 200.
-    const err = await assertRejects(
-        () => postInstancePatchOp(
-            db,
-            [ORGANIZATION, TYPE_ID, INSTANCE_ID],
-            staleBody,
-            'nkgaOHZISTQrILTfPThWCA',
-            staleMessagePair,
-            ORGANIZATION,
-            ['member'],
-        ),
-    ) as ApiError;
-    assertInstanceOf(err, ApiError);
-    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
-    assertMatch(err.message, /If-Match does not match/);
+    await postInstancePatchOp(
+        db,
+        [ORGANIZATION, TYPE_ID, INSTANCE_ID],
+        staleBody,
+        'nkgaOHZISTQrILTfPThWCA',
+        staleMessagePair,
+        ORGANIZATION,
+        ['member'],
+    );
+    const refused = writeAnswerOf(staleMessagePair)!.response;
+    assertStrictEquals(refused.status, HTTP_PRECONDITION_FAILED);
+    assertMatch(
+        (await refused.json()).error,
+        /If-Match does not match/,
+    );
     const after = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -1124,7 +1113,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assertStrictEquals(adminPatch.status, 201);
+    assertStrictEquals(adminPatch.status, 200);
     const YiJPbufDpkyrZcZCYbUJpg = adminPatch.headers.get('ETag')!;
     assertNotStrictEquals(YiJPbufDpkyrZcZCYbUJpg, e0);
     // Member still holding e0 412s.
@@ -1174,7 +1163,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: memberEtag },
     ));
-    assertStrictEquals(retry.status, 201);
+    assertStrictEquals(retry.status, 200);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -1212,4 +1201,127 @@ async () => {
         },
     ));
     assertStrictEquals(await countInstanceMessagePairs(db), 4);
+});
+
+// The member may write ATTR_SUBMIT but not read it.
+const SUBMIT_ONLY = {
+    name: 'SubmitOnly',
+    attribute_type: 'text',
+    sort_order: 0,
+    options: [],
+    constraints: [],
+    read_roles: ['admin'],
+    write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+};
+
+function sortedValues(
+    values: readonly { attribute_id: string; value: string }[],
+): { attribute_id: string; value: string }[] {
+    return [...values].sort((a, b) =>
+        a.attribute_id < b.attribute_id ? -1 : 1
+    );
+}
+
+Deno.test('an instance PATCH answers the merged state'
++ ' projected',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    await putAttribute(db, adminToken, ATTR_SUBMIT, SUBMIT_ONLY);
+    const hidden = { attribute_id: ATTR_SUBMIT, value: 's1' };
+    const shown = { attribute_id: ATTR_ID, value: 'Hello' };
+    const put = await putInstance(db, adminToken, [hidden]);
+    assertStrictEquals(put.status, 201);
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken,
+        { set: [shown] },
+        { [IF_MATCH_HEADER]: put.headers.get('ETag')! },
+    ));
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), {
+        id: INSTANCE_ID,
+        organization_id: ORGANIZATION,
+        record_type_id: TYPE_ID,
+        values: [shown],
+    });
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert(head !== undefined);
+    assertStrictEquals(
+        res.headers.get('ETag'),
+        strongEtagOf(head.messagePairId),
+    );
+    assertEquals(head.values, sortedValues([hidden, shown]));
+});
+
+Deno.test('a restricted member\'s no-op PATCH answers only'
++ ' readable values',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    await putAttribute(db, adminToken, ATTR_SUBMIT, SUBMIT_ONLY);
+    const hidden = { attribute_id: ATTR_SUBMIT, value: 's1' };
+    const shown = { attribute_id: ATTR_ID, value: 'Hello' };
+    const put = await putInstance(db, adminToken, [
+        hidden, shown,
+    ]);
+    assertStrictEquals(put.status, 201);
+    const headEtag = put.headers.get('ETag')!;
+    const before = await countInstanceMessagePairs(db);
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken,
+        { set: [shown] },
+        { [IF_MATCH_HEADER]: headEtag },
+    ));
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.headers.get('ETag'), headEtag);
+    assertEquals(await res.json(), {
+        id: INSTANCE_ID,
+        organization_id: ORGANIZATION,
+        record_type_id: TYPE_ID,
+        values: [shown],
+    });
+    assertStrictEquals(
+        await countInstanceMessagePairs(db), before,
+    );
+});
+
+Deno.test('a restricted member\'s write-only value lands',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    await putAttribute(db, adminToken, ATTR_SUBMIT, SUBMIT_ONLY);
+    const shown = { attribute_id: ATTR_ID, value: 'Hello' };
+    const hidden = { attribute_id: ATTR_SUBMIT, value: 's1' };
+    const put = await putInstance(db, adminToken, [shown]);
+    assertStrictEquals(put.status, 201);
+    const headEtag = put.headers.get('ETag')!;
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, memberToken,
+        { set: [hidden] },
+        { [IF_MATCH_HEADER]: headEtag },
+    ));
+    assertStrictEquals(res.status, 200);
+    const etag = res.headers.get('ETag');
+    assert(etag !== null);
+    assertNotStrictEquals(etag, headEtag);
+    assertEquals(await res.json(), {
+        id: INSTANCE_ID,
+        organization_id: ORGANIZATION,
+        record_type_id: TYPE_ID,
+        values: [shown],
+    });
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
+    );
+    assert(head !== undefined);
+    assertStrictEquals(etag, strongEtagOf(head.messagePairId));
+    assertEquals(head.values, sortedValues([hidden, shown]));
 });

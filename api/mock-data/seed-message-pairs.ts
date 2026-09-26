@@ -2297,12 +2297,6 @@ export async function formInstanceChainSeedInput(
         }
         return event;
     };
-    const createBody = { set: [] };
-    const entry = WRITE_RESPONSE_SPECS[INSTANCE_DETAIL_PATTERN];
-    if (entry === undefined || 'conditional' in entry
-        || entry.patch === undefined) {
-        throw new Error('no PATCH spec for the seed instance');
-    }
     const createOperationId = generateIdentifier();
     const create = await formWriteMessagePair({
         method: 'PATCH',
@@ -2310,20 +2304,13 @@ export async function formInstanceChainSeedInput(
         routePattern: INSTANCE_DETAIL_PATTERN,
         routeSegments: INSTANCE_DETAIL_PATTERN.split('/'),
         pathSegments: INSTANCE_PATH_SEGMENTS,
-        headerFields: [],
-        body: createBody,
+        headerFields: [{ name: 'if-none-match', value: '*' }],
+        body: { set: [] },
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: STARK_ORGANIZATION,
-        responseBody: entry.patch.successBody?.(
-            [
-                STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
-                SEED_INSTANCE_ID,
-            ],
-            createBody,
-            SYSTEM_MEMBER_ID,
-            STARK_ORGANIZATION,
-        ),
+        responseBody: undefined,
+        genesis: 'client',
         operationId: createOperationId,
         requestId: createOperationId,
     });
