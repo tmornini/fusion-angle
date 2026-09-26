@@ -58,6 +58,8 @@ import {
 } from './ledger-statement.ts';
 import { DATE_PLACEHOLDER } from './ledger-root.ts';
 import { notifyPayload } from './advisory-lock.ts';
+import { sortJsonKeys } from
+    '../shared/http-message/canonical.ts';
 
 // Who declared a genesis: the client, by If-None-Match: *,
 // or the handler, for a document it names itself. The
@@ -289,6 +291,37 @@ function receivedRequestWire(
     });
 }
 
+// The response half of every formed pair: its status, the
+// four lines every pair carries, any extra lines, and the
+// body. Credential lines are hoisted for the secret.
+function formedResponse(input: {
+    readonly status: number,
+    readonly etag: Id,
+    readonly operationId: string,
+    readonly requestId: string,
+    readonly fields: readonly FieldLine[],
+    readonly body: unknown,
+}): {
+    readonly message: string,
+    readonly hoisted: readonly FieldLine[],
+} {
+    const split = splitCredentials([
+        { name: 'date', value: DATE_PLACEHOLDER },
+        { name: 'etag', value: strongEtagOf(input.etag) },
+        { name: 'operation-id', value: input.operationId },
+        { name: 'request-id', value: input.requestId },
+        ...input.fields,
+    ]);
+    return {
+        message: storedWire(buildResponseModel({
+            status: input.status,
+            fields: split.kept,
+            body: input.body,
+        })),
+        hoisted: split.hoisted,
+    };
+}
+
 export async function formWriteMessagePair(
     input: WriteMessagePairInput,
 ): Promise<MessagePair> {
@@ -328,32 +361,22 @@ export async function formWriteMessagePair(
     const storedStatus = input.method === 'DELETE'
         ? HTTP_NO_CONTENT
         : (input.responseStatus ?? HTTP_CREATED);
-    const responseLines: FieldLine[] = [
-        { name: 'date', value: DATE_PLACEHOLDER },
-        { name: 'etag', value: strongEtagOf(id) },
-        {
-            name: 'operation-id',
-            value: input.operationId,
-        },
-        { name: 'request-id', value: input.requestId },
-    ];
-    if (input.responseFields !== undefined) {
-        for (const field of input.responseFields) {
-            responseLines.push(field);
-        }
-    }
-    const responseSplit = splitCredentials(responseLines);
-    const responseModel = buildResponseModel({
+    const response = formedResponse({
         status: storedStatus,
-        fields: responseSplit.kept,
+        etag: id,
+        operationId: input.operationId,
+        requestId: input.requestId,
+        fields: input.responseFields === undefined
+            ? []
+            : input.responseFields,
         body: input.method === 'DELETE'
             ? undefined
             : input.responseBody,
     });
-    const responseMessage = storedWire(responseModel);
+    const responseMessage = response.message;
     const secret = secretOfLines([
         ...requestSplit.hoisted,
-        ...responseSplit.hoisted,
+        ...response.hoisted,
     ]);
     return {
         id,
@@ -922,6 +945,328 @@ function refusedAnswer(
     };
 }
 
+export type SiblingCondition =
+    | { readonly kind: 'in-order', readonly head: Id }
+    | {
+        readonly kind: 'genesis',
+        readonly declarer: GenesisDeclarer,
+    };
+
+export type ParentSibling = {
+    readonly method: 'PUT',
+    readonly path: string,
+    readonly name: string,
+    readonly state: Record<string, unknown>,
+    readonly condition: SiblingCondition,
+};
+
+export type StateSibling =
+    | ParentSibling
+    | {
+        readonly method: 'DELETE',
+        readonly path: string,
+        readonly name: string,
+        readonly condition: SiblingCondition,
+    };
+
+export type StateProjection = (
+    state: Record<string, unknown>,
+) => Record<string, unknown>;
+
+export type StateAnswerKind =
+    | { readonly kind: 'parent' }
+    | { readonly kind: 'created', readonly location: string }
+    | { readonly kind: 'received' };
+
+export type StateWrite =
+    | {
+        readonly kind: 'siblings',
+        readonly received: MessagePair,
+        readonly siblings: readonly [
+            ParentSibling, ...StateSibling[],
+        ],
+        readonly project: StateProjection,
+        readonly answer: StateAnswerKind,
+    }
+    | {
+        readonly kind: 'own',
+        readonly received: MessagePair,
+        readonly state: Record<string, unknown>,
+    };
+
+export const unprojected: StateProjection = (state) => state;
+
+// The store sorts JSON keys on write, so state is compared
+// in that same canonical form.
+export function sameAsHead(
+    head: MessagePairEntity,
+    state: Record<string, unknown>,
+): boolean {
+    return responseBodyText(head.response)
+        === JSON.stringify(sortJsonKeys(state));
+}
+
+// The one former for class C, D, and E writes (§3). Every
+// answer is registered under the received object the gate
+// formed, which is the one it reads the answer by.
+export async function runStateWrite(
+    adapter: DbAdapter,
+    write: StateWrite,
+): Promise<WriteAnswer> {
+    const answer = write.kind === 'own'
+        ? await ownAnswer(adapter, write)
+        : await siblingsAnswer(adapter, write);
+    answers.set(write.received, answer);
+    ownWires.set(write.received, answer.response);
+    return answer;
+}
+
+async function ownAnswer(
+    adapter: DbAdapter,
+    write: Extract<StateWrite, { kind: 'own' }>,
+): Promise<WriteAnswer> {
+    const completed = await completedPair(write.received, {
+        status: HTTP_CREATED,
+        etag: write.received.id,
+        fields: [],
+        state: write.state,
+    });
+    return runWrite(
+        adapter, attemptFor([completed]), [completed],
+    );
+}
+
+async function siblingsAnswer(
+    adapter: DbAdapter,
+    write: Extract<StateWrite, { kind: 'siblings' }>,
+): Promise<WriteAnswer> {
+    const parent = write.siblings[0];
+    const pairs = await Promise.all(write.siblings.map(
+        (sibling) => formSiblingPair(write.received, sibling),
+    ));
+    const parentPair = pairs[0]!;
+    const received = write.answer.kind === 'received'
+        ? write.received
+        : await completedPair(write.received, {
+            status: parent.condition.kind === 'genesis'
+                ? HTTP_CREATED
+                : HTTP_OK,
+            etag: parentPair.id,
+            fields: write.answer.kind === 'created'
+                ? [{
+                    name: 'location',
+                    value: write.answer.location,
+                }]
+                : [],
+            state: parent.state,
+        });
+    const rows: readonly (WriteRow | MessagePair)[] = [
+        writeRowOf(received, null), ...pairs,
+    ];
+    const binds = rows.map((row) => bindOf('composed', row));
+    const ran = await runStatement(
+        adapter, 'composed', binds, undefined,
+    );
+    if (ran.kind === 'refused') {
+        return refusedAnswer(rows, binds, 'composed');
+    }
+    const stated = ran.stated;
+    const outcome = stated[0]!.outcome;
+    if (outcome === 'stale') {
+        const at = stated.findIndex(
+            (row) => row.rawOutcome === 'stale',
+        );
+        return {
+            response: refusalOfRow(rows[at]!, binds[at]!),
+            outcome,
+            answeredId: null,
+            bells: [],
+            rows: stated,
+        };
+    }
+    if (outcome === 'matched') {
+        const head = stated[1]!;
+        if (head.rawOutcome !== 'matched') {
+            throw new Error(
+                'a sibling matched its head while the'
+                    + ' parent did not',
+            );
+        }
+        if (head.headResponse === null || head.headId === null) {
+            throw new Error('a matched parent has no head');
+        }
+        const stored = latin1(head.headResponse);
+        return {
+            response: projectedResponse(
+                responseFromHead(stored, received.requestId),
+                stored,
+                write.project,
+            ),
+            outcome,
+            answeredId: head.headId,
+            bells: [],
+            rows: stated,
+        };
+    }
+    const own = responseFromLatin1(mergeSecret(
+        latin1(stated[0]!.response),
+        secretBytes(rows[0]!),
+    ));
+    return {
+        response: write.answer.kind === 'received'
+            ? own
+            : projectedResponse(
+                own, latin1(stated[0]!.response), write.project,
+            ),
+        outcome,
+        answeredId: parentPair.id,
+        bells: bellsOf(rows, stated),
+        rows: stated,
+    };
+}
+
+// A sibling carries its state as its request body until
+// Task 16 empties every synthesized request
+// (Interpretation W).
+async function formSiblingPair(
+    received: MessagePair,
+    sibling: StateSibling,
+): Promise<MessagePair> {
+    const id = generateIdentifier();
+    const body = sibling.method === 'PUT'
+        ? sibling.state
+        : undefined;
+    const status = sibling.method === 'PUT'
+        ? HTTP_CREATED
+        : HTTP_NO_CONTENT;
+    const requestMessage = storedWire(buildRequestModel({
+        method: sibling.method,
+        target: sibling.path + sibling.name,
+        fields: [{
+            name: OPERATION_ID_HEADER,
+            value: received.operationId,
+        }],
+        body,
+    }));
+    const response = formedResponse({
+        status,
+        etag: id,
+        operationId: received.operationId,
+        requestId: received.requestId,
+        fields: [],
+        body,
+    });
+    return {
+        id,
+        requestAt: received.requestAt,
+        path: sibling.path,
+        name: sibling.name,
+        requesterIdentityId: received.requesterIdentityId,
+        requestMessage,
+        requestHash: await requestMessageHash(requestMessage),
+        secret: secretOfLines(response.hoisted),
+        responseStatus: status,
+        responseMessage: response.message,
+        responseHash: await requestMessageHash(
+            response.message,
+        ),
+        method: sibling.method,
+        operationId: received.operationId,
+        requestId: received.requestId,
+        ...(sibling.condition.kind === 'genesis'
+            ? { genesis: sibling.condition.declarer }
+            : {
+                latchedHeadMessagePairId:
+                    sibling.condition.head,
+            }),
+    };
+}
+
+// The received pair's response, written once after
+// formation (Interpretation G): the parent's whole state,
+// its etag, and a created document's location.
+async function completedPair(
+    received: MessagePair,
+    input: {
+        readonly status: number,
+        readonly etag: Id,
+        readonly fields: readonly FieldLine[],
+        readonly state: Record<string, unknown>,
+    },
+): Promise<MessagePair> {
+    const response = formedResponse({
+        status: input.status,
+        etag: input.etag,
+        operationId: received.operationId,
+        requestId: received.requestId,
+        fields: input.fields,
+        body: input.state,
+    });
+    return {
+        ...received,
+        responseStatus: input.status,
+        responseMessage: response.message,
+        responseHash: await requestMessageHash(
+            response.message,
+        ),
+    };
+}
+
+// The received row judges nothing in a sibling write; its
+// siblings do (Interpretation U).
+function writeRowOf(
+    pair: MessagePair,
+    ifMatch: string | null,
+): WriteRow {
+    return {
+        id: pair.id,
+        operationId: pair.operationId,
+        path: pair.path,
+        name: pair.name,
+        requesterIdentityId: pair.requesterIdentityId,
+        method: pair.method,
+        request: requestBytes(pair),
+        secret: pair.secret,
+        response: responseBytes(pair),
+        ifMatch,
+    };
+}
+
+// The wire answer carries the requester's view; the stored
+// response keeps the whole state.
+function projectedResponse(
+    response: Response,
+    stored: string,
+    project: StateProjection,
+): Response {
+    const state = responseRecordOf(stored);
+    if (state === undefined) {
+        return response;
+    }
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(JSON.stringify(project(state)), {
+        status: response.status,
+        headers,
+    });
+}
+
+function bellsOf(
+    rows: readonly (WriteRow | MessagePair)[],
+    stated: readonly StatementAnswer[],
+): string[] {
+    const bells: string[] = [];
+    for (let i = 0; i < stated.length; i++) {
+        if (!stated[i]!.inserted) continue;
+        const source = rows[i]!;
+        bells.push(notifyPayload(eventForMessagePair({
+            path: source.path,
+            requesterIdentityId: source.requesterIdentityId,
+        })));
+    }
+    return bells;
+}
+
 function wireForPair(
     pair: MessagePair,
     stated: readonly StatementAnswer[],
@@ -1031,15 +1376,6 @@ function answerOf(
             rows: stated,
         };
     }
-    const bells: string[] = [];
-    for (let i = 0; i < stated.length; i++) {
-        if (!stated[i]!.inserted) continue;
-        const source = rows[i]!;
-        bells.push(notifyPayload(eventForMessagePair({
-            path: source.path,
-            requesterIdentityId: source.requesterIdentityId,
-        })));
-    }
     return {
         response: responseFromLatin1(mergeSecret(
             latin1(row.response),
@@ -1047,7 +1383,7 @@ function answerOf(
         )),
         outcome,
         answeredId: row.id,
-        bells,
+        bells: bellsOf(rows, stated),
         rows: stated,
     };
 }
