@@ -1600,23 +1600,6 @@ Off the critical path; each with its oracle.
   foreign organization's retired document answers what
   its live one does; history and past versions still
   answer 200.
-- DELETE cascade. No one policy says what a delete does
-  to the documents that name the deleted one. Four
-  references refuse the delete today (the last admin
-  seat, the record-type and attribute RESTRICTs, and the
-  instance placement RESTRICT under a work-order
-  binding), each checked in a read that closes before
-  the write; no audit lists the rest. Consider one
-  policy per reference, named in one place: RESTRICT
-  (refuse while referenced), CASCADE (tombstone the
-  dependents in the same statement as the parent), or
-  ORPHAN (leave the reference, which then reads 410 or
-  404). Oracle: a table of every cross-document
-  reference with its policy; each CASCADE lands parent
-  and dependents in one statement and a GET of each
-  dependent reads it gone; each RESTRICT refuses a
-  racing delete under one statement; no reference is
-  unlisted.
 
 ## Later work
 
@@ -3105,6 +3088,23 @@ Off the critical path; each with its oracle.
   Reword each to the statement that writes today, or
   delete it where the code now says it. Oracle:
   `grep -rn appendMessagePair api/` finds nothing
+- DELETE cascade. No one policy says what a delete does
+  to the documents that name the deleted one. Four
+  references refuse the delete today (the last admin
+  seat, the record-type and attribute RESTRICTs, and the
+  instance placement RESTRICT under a work-order
+  binding), each checked in a read that closes before
+  the write; no audit lists the rest. Consider one
+  policy per reference, named in one place: RESTRICT
+  (refuse while referenced), CASCADE (tombstone the
+  dependents in the same statement as the parent), or
+  ORPHAN (leave the reference, which then reads 410 or
+  404). Oracle: a table of every cross-document
+  reference with its policy; each CASCADE lands parent
+  and dependents in one statement and a GET of each
+  dependent reads it gone; each RESTRICT refuses a
+  racing delete under one statement; no reference is
+  unlisted.
 
 ## Sequencing
 
