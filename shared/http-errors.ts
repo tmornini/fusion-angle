@@ -50,6 +50,7 @@ export const HTTP_FORBIDDEN = 403;
 export const HTTP_NOT_FOUND = 404;
 export const HTTP_METHOD_NOT_ALLOWED = 405;
 export const HTTP_CONFLICT = 409;
+export const HTTP_GONE = 410;
 export const HTTP_LENGTH_REQUIRED = 411;
 export const HTTP_PRECONDITION_FAILED = 412;
 export const HTTP_PAYLOAD_TOO_LARGE = 413;

@@ -498,7 +498,7 @@ async () => {
     assertStrictEquals(second.status, 428);
 });
 
-Deno.test('PATCH create at a tombstoned document → 409 spent',
+Deno.test('PATCH create at a tombstoned document → 410 gone',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -536,10 +536,9 @@ async () => {
         ]),
         DECLARED,
     ));
-    assertStrictEquals(res.status, 409);
+    assertStrictEquals(res.status, 410);
     assertEquals(await res.json(), {
-        error: 'Document already exists at '
-            + INSTANCE_DETAIL,
+        error: 'Document is gone at ' + INSTANCE_DETAIL,
     });
 });
 
@@ -769,7 +768,7 @@ async () => {
     assertStrictEquals(second.status, 412);
 });
 
-Deno.test('a declared create over a tombstone is 409',
+Deno.test('a declared create over a tombstone is 410',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -790,10 +789,9 @@ async () => {
         'PATCH', INSTANCES + instanceId, memberToken,
         { set: [] }, DECLARED,
     ));
-    assertStrictEquals(again.status, 409);
+    assertStrictEquals(again.status, 410);
     assertEquals(await again.json(), {
-        error: 'Document already exists at '
-            + INSTANCES + instanceId,
+        error: 'Document is gone at ' + INSTANCES + instanceId,
     });
     assertStrictEquals(
         backend.statementExecutions(), before + 1,

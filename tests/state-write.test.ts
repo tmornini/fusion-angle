@@ -284,7 +284,7 @@ Deno.test(
 );
 
 Deno.test(
-    'a never-written sibling over a tombstone answers 409',
+    'a never-written sibling over a tombstone answers 410',
     async () => {
         const { db } = openLedger();
         await db.ensureTable();
@@ -328,11 +328,11 @@ Deno.test(
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'stale');
-        assertStrictEquals(answer.response.status, 409);
+        assertStrictEquals(answer.response.status, 410);
         assertEquals(
             await answer.response.json(),
             {
-                error: 'Document already exists at '
+                error: 'Document is gone at '
                     + IDEA_PATH + IDEA,
             },
         );

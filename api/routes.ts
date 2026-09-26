@@ -1,6 +1,7 @@
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
+    RetiredEntityError,
 } from './db.ts';
 import type {
     DbAdapter,
@@ -3915,6 +3916,23 @@ async function postInstanceCreateOp(
     });
 }
 
+// Gone only after the owner check passes: a foreign
+// organization's retired instance answers as its live one
+// does, so a 410 never reveals that it existed.
+async function retiredInstanceError(
+    db: DbAdapter,
+    instanceId: Id,
+    organization: Id,
+): Promise<RetiredEntityError | ForeignOrganizationError> {
+    const missed = await missedReadError(
+        db, instanceId, organization, 'record_instances',
+    );
+    if (missed instanceof ForeignOrganizationError) {
+        return missed;
+    }
+    return new RetiredEntityError('record_instances', instanceId);
+}
+
 // Instance update: PATCH with If-Match (§1 C). The handler
 // reads the head to merge; the statement judges the tag.
 export async function postInstancePatchOp(
@@ -3954,9 +3972,7 @@ export async function postInstancePatchOp(
         head === undefined
         && await documentHeadAt(db, prefix, instanceId) !== null
     ) {
-        throw await missedReadError(
-            db, instanceId, org, 'record_instances',
-        );
+        throw await retiredInstanceError(db, instanceId, org);
     }
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
@@ -5618,10 +5634,18 @@ export const routes: Route[] = [
                 db, org, typeId, instanceId,
             );
             if (head === undefined) {
-                throw await missedReadError(
-                    db, instanceId, org,
-                    'record_instances',
-                );
+                const retired = await documentHeadAt(
+                    db, instancesUriPrefix(org, typeId),
+                    instanceId,
+                ) !== null;
+                throw retired
+                    ? await retiredInstanceError(
+                        db, instanceId, org,
+                    )
+                    : await missedReadError(
+                        db, instanceId, org,
+                        'record_instances',
+                    );
             }
             const attributesById =
                 await loadAttributeSchemaById(

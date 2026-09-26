@@ -25,7 +25,7 @@ import {
     parseIfMatch,
     IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
-import { EntityNotFoundError } from '../api/db.ts';
+import { RetiredEntityError } from '../api/db.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
@@ -217,8 +217,8 @@ async function countDeleteMessagePairs(
 }
 
 Deno.test('DELETE live instance → 204; then collection omit, '
-+ 'detail 404, PATCH+pin 404, PATCH no pin 409, second '
-+ 'DELETE appends tombstone (R4)',
++ 'detail 410, PATCH+pin 410, PATCH create 410, second '
++ 'DELETE appends nothing (R4)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -253,10 +253,9 @@ async () => {
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
-    assertStrictEquals(detail.status, 404);
+    assertStrictEquals(detail.status, 410);
     assertEquals(await detail.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'Gone: record_instances/' + INSTANCE_ID,
     });
 
     // History GET (Task 19): tombstone → 404 R2, same body
@@ -277,10 +276,9 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assertStrictEquals(patch.status, 404);
+    assertStrictEquals(patch.status, 410);
     assertEquals(await patch.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'Gone: record_instances/' + INSTANCE_ID,
     });
 
     const putAgain = await handleRequest(db, req(
@@ -295,10 +293,9 @@ async () => {
         },
         { [IF_NONE_MATCH_HEADER]: '*' },
     ));
-    assertStrictEquals(putAgain.status, 409);
+    assertStrictEquals(putAgain.status, 410);
     assertEquals(await putAgain.json(), {
-        error: 'Document already exists at '
-            + INSTANCE_DETAIL,
+        error: 'Document is gone at ' + INSTANCE_DETAIL,
     });
 
     // New bytes: different Authorization → not a replay.
@@ -421,7 +418,7 @@ async () => {
 // wire pair was formed (gate-equivalent) but before its tx.
 // PATCH must 412 (or honest miss) — never revive the head.
 Deno.test('R9 resurrect-hole: DELETE between PATCH form and '
-+ 'append → 404; head stays tombstoned',
++ 'append → 410; head stays tombstoned',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -493,10 +490,10 @@ async () => {
             ['member'],
         ),
     );
-    assertInstanceOf(err, EntityNotFoundError);
+    assertInstanceOf(err, RetiredEntityError);
     assertStrictEquals(
         err.message,
-        'Not found: record_instances/' + INSTANCE_ID,
+        'Gone: record_instances/' + INSTANCE_ID,
     );
     const after = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,

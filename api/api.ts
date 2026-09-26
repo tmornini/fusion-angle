@@ -7,6 +7,7 @@ import {
     ForeignOrganizationError,
     foreignOrganizationMessage,
     MissingTableError,
+    RetiredEntityError,
     UniqueConstraintError,
 } from './db.ts';
 import type { LatencySimulation } from './latency.ts';
@@ -96,6 +97,7 @@ import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
+    HTTP_GONE,
     HTTP_METHOD_NOT_ALLOWED,
     HTTP_INTERNAL_ERROR,
     HTTP_UNAUTHORIZED,
@@ -1728,6 +1730,14 @@ async function dispatched(
             return Response.json(
                 { error: error.message },
                 { status: HTTP_NOT_FOUND },
+            );
+        }
+        if (
+            error instanceof RetiredEntityError
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: HTTP_GONE },
             );
         }
         if (

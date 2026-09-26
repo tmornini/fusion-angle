@@ -512,7 +512,7 @@ async () => {
     });
 });
 
-Deno.test('PATCH tombstoned → 404; never revives',
+Deno.test('an update of a retired instance is 410; never revives',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -541,10 +541,9 @@ async () => {
                 '"' + WELL_FORMED_TAG + '"',
         },
     ));
-    assertStrictEquals(res.status, 404);
+    assertStrictEquals(res.status, 410);
     assertEquals(await res.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'Gone: record_instances/' + INSTANCE_ID,
     });
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,

@@ -35,7 +35,7 @@ import {
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
-    HTTP_CONFLICT, HTTP_PRECONDITION_FAILED,
+    HTTP_CONFLICT, HTTP_GONE, HTTP_PRECONDITION_FAILED,
     errorJson,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from
@@ -922,9 +922,11 @@ export async function runStatement(
 
 // The refused row names its document and the fact. A
 // statement refused twice states no row, so its head is
-// unknown (null). A tombstone is not a current
-// representation (RFC 9110 §13.1.2): a create over one is a
-// conflict, whoever declared it, not a failed precondition.
+// unknown (null), and a never-written name refused there is
+// a conflict: it cannot know the name is retired. Over a
+// stated tombstone the name is retired for good, so a
+// create there is Gone (RFC 9110 §15.5.11), whoever
+// declared it, not a failed precondition.
 export function refusalOfRow(
     row: WriteRow | MessagePair,
     bind: StatementBind,
@@ -932,9 +934,17 @@ export function refusalOfRow(
 ): Response {
     const document = bind.path + bind.name;
     const neverWritten = bind.ifMatch === NEVER_WRITTEN_IDENTIFIER;
+    if (
+        neverWritten
+        && stated !== null
+        && stated.headMethod === 'DELETE'
+    ) {
+        return errorJson(
+            'Document is gone at ' + document, HTTP_GONE,
+        );
+    }
     if (neverWritten || bind.ifMatch === NIL_IDENTIFIER) {
-        const spent = neverWritten
-            && (stated === null || stated.headMethod === 'DELETE');
+        const spent = neverWritten && stated === null;
         const handler = 'requestMessage' in row
             && row.genesis === 'handler';
         return errorJson(
