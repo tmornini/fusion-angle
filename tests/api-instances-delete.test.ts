@@ -394,23 +394,28 @@ async () => {
     assertStrictEquals(head, undefined);
 });
 
-Deno.test('DELETE with If-Match header → 204 (header ignored)',
+Deno.test('a malformed If-Match on an instance DELETE is 400',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
     const put = await putInstance(db, memberToken, []);
     assertStrictEquals(put.status, 201);
+    const before = await countInstanceMessagePairs(db);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
         undefined,
         { [IF_MATCH_HEADER]: '"stale-or-anything"' },
     ));
-    assertStrictEquals(del.status, 204);
+    assertStrictEquals(del.status, 400);
+    await del.body?.cancel();
+    assertStrictEquals(
+        await countInstanceMessagePairs(db), before,
+    );
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assertStrictEquals(head, undefined);
+    assertStrictEquals(head?.id, INSTANCE_ID);
 });
 
 // R9 resurrect-hole: tombstone interleaved after a PATCH

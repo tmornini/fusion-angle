@@ -223,6 +223,7 @@ Deno.test('foreign-org flow undo is 404', async () => {
             eventId: generateIdentifier(),
             at: AT,
         },
+        { 'If-Match': '"' + generateIdentifier() + '"' },
     ));
     assertStrictEquals(foreign.status, 404);
     assertEquals(await foreign.json(), {

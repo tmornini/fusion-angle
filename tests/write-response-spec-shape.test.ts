@@ -15,7 +15,7 @@ import { generateIdentifier } from
 function specsOf(
     entry: (typeof WRITE_RESPONSE_SPECS)[string],
 ): WriteResponseSpec[] {
-    if ('status' in entry) return [entry];
+    if ('conditional' in entry) return [entry];
     return [
         entry.put, entry.patch, entry.post,
     ].filter(

@@ -22,7 +22,6 @@ import type {
     PutHandler,
     WriteResponseSpec,
 } from './routes.ts';
-import { HTTP_OK } from '../shared/http-errors.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
@@ -136,8 +135,8 @@ export interface DocumentFamilyWiring {
 // never consulted through anything but documentFamilyWiring: the
 // gate's locked/simple keying (api.ts) treats membership here,
 // ANDed with a 'locked' registration, as "this route is served
-// via documentPutHandler" — never a blanket family-registry or
-// DOCUMENT_CLASS_ROUTE_PATTERNS consult, so an unregistered-here
+// via documentPutHandler" — never a blanket family-registry
+// consult, so an unregistered-here
 // family never rides the locked arm no matter what
 // family-registry.ts declares. Exported (a mutable table, like
 // FAMILY_REGISTRY) so the locked-arm's own tests can register a
@@ -680,7 +679,7 @@ export function documentWriteResponseSpec(
         familyRegistration(wiring.family)?.organizationNested
             !== false;
     return {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body, _actor, organization) => {
             const raw = withoutId(body ?? {});
             const doc = wiring.validateDocument(raw) as {

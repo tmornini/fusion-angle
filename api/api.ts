@@ -28,15 +28,15 @@ import {
     writeAnswerOf,
     ownWireOf,
     responseFromHead,
-    attemptFor,
-    runWrite,
     attachEtag,
     attachDate,
     streamGetFromStored,
     parseIfMatch,
+    parseEntityTags,
     LATCHED_OPERATION_ROUTE_PATTERNS,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
 } from './message-pair.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { ReceivedRequest } from './message-pair.ts';
@@ -115,7 +115,6 @@ import {
     authorizeRequest,
     authorizeIdentityPii,
     parseObjectBody,
-    parsePutBody,
 } from './request-auth.ts';
 import {
     routes,
@@ -123,7 +122,10 @@ import {
     param,
     WRITE_RESPONSE_SPECS,
     loadAttributeSchemaById,
+    conditionalOf,
+    type Conditional,
     type Route,
+    type WriteMethod,
     type WriteResponseSpec,
 } from './routes.ts';
 
@@ -233,7 +235,7 @@ function postWriteNotification(
 // WriteResponseSpec, applying regardless of which non-DELETE
 // verb hit it (no prior pattern wired both a PUT and a POST at
 // once). A PerVerbWriteResponseSpec — recognized by the absence
-// of `status` at its top level — supplies one spec per verb
+// of `conditional` at its top level — supplies one spec per verb
 // instead; 'ai-members/:id' needs this because it wires a real
 // PUT alongside its composed-edit POST, and 'human-members/:id'
 // joins it (Phase 8 Task 4) for a DIFFERENT reason — its `put`
@@ -246,12 +248,89 @@ function writeResponseSpecFor(
     method: string,
 ): WriteResponseSpec | undefined {
     const entry = WRITE_RESPONSE_SPECS[routePattern];
-    if (entry === undefined || 'status' in entry) {
+    if (entry === undefined || 'conditional' in entry) {
         return entry;
     }
     if (method === 'PUT') return entry.put;
     if (method === 'PATCH') return entry.patch;
     return entry.post;
+}
+
+function isWriteMethod(method: string): method is WriteMethod {
+    return method === 'PUT' || method === 'POST'
+        || method === 'PATCH' || method === 'DELETE';
+}
+
+// Presence and form only (§2): the gate never reads a head
+// to decide a latch; the statement judges the value.
+function preconditionRefusal(
+    headers: Headers,
+    conditional: Conditional,
+    method: string,
+    pathname: string,
+): Response | undefined {
+    const ifMatch = headers.get(IF_MATCH_HEADER);
+    const ifNoneMatch = headers.get(IF_NONE_MATCH_HEADER);
+    if (conditional === 'none') {
+        return ifMatch === null && ifNoneMatch === null
+            ? undefined
+            : errorJson(
+                method + ' ' + pathname
+                    + ' takes no precondition',
+                HTTP_BAD_REQUEST,
+            );
+    }
+    if (ifMatch !== null && ifNoneMatch !== null) {
+        return errorJson(
+            'If-Match and If-None-Match cannot both hold'
+                + ' at ' + pathname,
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    if (ifNoneMatch !== null) {
+        if (conditional === 'in-order') {
+            return errorJson(
+                method + ' ' + pathname
+                    + ' requires If-Match',
+                HTTP_BAD_REQUEST,
+            );
+        }
+        return ifNoneMatch.trim() === '*'
+            ? undefined
+            : errorJson(
+                'If-None-Match must be *',
+                HTTP_BAD_REQUEST,
+            );
+    }
+    if (ifMatch !== null) {
+        const tags = parseEntityTags(ifMatch);
+        if (
+            tags === undefined
+            || (conditional !== 'in-order' && tags.length !== 1)
+        ) {
+            return errorJson(
+                'If-Match must carry exactly one strong'
+                    + ' validator',
+                HTTP_BAD_REQUEST,
+            );
+        }
+        return undefined;
+    }
+    if (conditional === 'required') {
+        return errorJson(
+            'If-Match or If-None-Match is required to '
+                + method + ' ' + pathname,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    if (conditional === 'in-order') {
+        return errorJson(
+            'If-Match is required to ' + method + ' '
+                + pathname,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    return undefined;
 }
 
 function octetsEqual(
@@ -656,9 +735,7 @@ async function dispatched(
         || method === 'POST'
         || method === 'PATCH'
     ) {
-        const parse = method === 'PUT'
-            ? parsePutBody(ctx.bodyBytes)
-            : parseObjectBody(ctx.bodyBytes);
+        const parse = parseObjectBody(ctx.bodyBytes);
         if (!parse.ok) {
             return Response.json(
                 {
@@ -671,6 +748,32 @@ async function dispatched(
             );
         }
         body = parse.body;
+    }
+    // A route pattern can be pair-wired for one verb (PUT,
+    // say) while exposing no handler for another (DELETE) —
+    // ideas/:id is exactly this today. Requiring the matched
+    // verb's handler to exist keeps that combination 405ing
+    // exactly as it did before pairs existed, rather than
+    // running the pair machinery (and its successBody
+    // validation) against a request no handler will ever see.
+    // Task 10: PATCH joins the write alphabet the same way.
+    const hasWriteHandler =
+        (method === 'PUT' && matched.put !== undefined)
+        || (method === 'POST' && matched.post !== undefined)
+        || (method === 'PATCH'
+            && matched.patch !== undefined)
+        || (method === 'DELETE'
+            && matched.delete !== undefined);
+    if (isWriteMethod(method) && hasWriteHandler) {
+        const refused = preconditionRefusal(
+            request.headers,
+            conditionalOf(routePattern, method),
+            method,
+            pathname,
+        );
+        if (refused !== undefined) {
+            return refused;
+        }
     }
 
     // Region B of the pre-dispatch write authorizer (Phase 12
@@ -718,21 +821,6 @@ async function dispatched(
 
     const isWrite = method === 'PUT' || method === 'POST'
         || method === 'DELETE' || method === 'PATCH';
-    // A route pattern can be pair-wired for one verb (PUT,
-    // say) while exposing no handler for another (DELETE) —
-    // ideas/:id is exactly this today. Requiring the matched
-    // verb's handler to exist keeps that combination 405ing
-    // exactly as it did before pairs existed, rather than
-    // running the pair machinery (and its successBody
-    // validation) against a request no handler will ever see.
-    // Task 10: PATCH joins the write alphabet the same way.
-    const hasWriteHandler =
-        (method === 'PUT' && matched.put !== undefined)
-        || (method === 'POST' && matched.post !== undefined)
-        || (method === 'PATCH'
-            && matched.patch !== undefined)
-        || (method === 'DELETE'
-            && matched.delete !== undefined);
 
     try {
         // Pre-write ownership authorizer for the 9 org-scoped
@@ -788,8 +876,7 @@ async function dispatched(
                 });
             // The locked/simple divide (spec §The two PUT classes): keyed by
             // the route's family registration THROUGH THE WIRING CONSULT —
-            // never a blanket family-registry or
-            // DOCUMENT_CLASS_ROUTE_PATTERNS read — so a family whose
+            // never a blanket family-registry read — so a family whose
             // registration says 'locked' but has no row in
             // document-family.ts's wiring table never rides this arm; only a
             // route actually served via documentPutHandler can — flows is
@@ -887,9 +974,9 @@ async function dispatched(
             // PerVerbWriteResponseSpec instead — see
             // writeResponseSpecFor.
             const spec = method === 'DELETE'
-                ? { status: HTTP_NO_CONTENT }
+                ? undefined
                 : writeResponseSpecFor(routePattern, method);
-            if (spec === undefined) {
+            if (method !== 'DELETE' && spec === undefined) {
                 throw new Error(
                     'no write response spec for wired route: '
                     + routePattern,
@@ -930,16 +1017,15 @@ async function dispatched(
                 organization,
                 operationId: ctx.operationId,
                 requestId: ctx.requestId,
-                ...(isDocumentPut && head === null
-                    ? { genesis: 'handler' as const }
-                    : {}),
-                responseBody: method === 'PUT'
-                    && body === undefined
-                    ? undefined
-                    : spec.successBody?.(
-                        params, body, actor,
-                        organization,
-                    ),
+                ...(request.headers.get(IF_NONE_MATCH_HEADER)
+                    !== null
+                    ? { genesis: 'client' as const }
+                    : isLockedWrite && head === null
+                        ? { genesis: 'handler' as const }
+                        : {}),
+                responseBody: spec?.successBody?.(
+                    params, body, actor, organization,
+                ),
                 ...(routePattern
                     === 'identities/:id/token-revocations/:rid'
                     ? {
@@ -1203,10 +1289,9 @@ async function dispatched(
             if (
                 method === 'PUT'
                 && livePut !== undefined
-                && (
-                    !isLockedWrite
-                    || echoMatchesHead
-                )
+                && request.headers.get(IF_MATCH_HEADER) === null
+                && request.headers.get(IF_NONE_MATCH_HEADER)
+                    === null
             ) {
                 const liveReq = await effective.messagePairs
                     .getById(livePut);
@@ -1258,57 +1343,6 @@ async function dispatched(
                         }
                     }
                 }
-            }
-            // Empty-body PUT is a live empty document. Skip
-            // the family validator; store GET-shaped 200.
-            if (
-                method === 'PUT'
-                && body === undefined
-                && messagePair !== undefined
-            ) {
-                const emptyMessagePair = messagePair;
-                const latchedId =
-                    emptyMessagePair.latchedHeadMessagePairId;
-                if (latchedId !== undefined) {
-                    const latest =
-                        await effective.readTransaction(
-                            (view) =>
-                                documentHeadMessagePairId(
-                                    view,
-                                    emptyMessagePair.path,
-                                    emptyMessagePair.name,
-                                ),
-                        );
-                    if (latest !== latchedId) {
-                        throw new ApiError(
-                            'If-Match does not match'
-                            + ' the current document'
-                            + ' at ' + pathname,
-                            HTTP_PRECONDITION_FAILED,
-                        );
-                    }
-                }
-                await runWrite(
-                    effective,
-                    attemptFor([emptyMessagePair]),
-                    [emptyMessagePair],
-                );
-                const written = writeAnswerOf(
-                    emptyMessagePair,
-                );
-                if (written === undefined) {
-                    throw new Error(
-                        'wired write stored no pair: '
-                        + routePattern,
-                    );
-                }
-                if (written.outcome === 'land') {
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                }
-                return written.response;
             }
         }
         const received: ReceivedRequest = {
@@ -1363,9 +1397,8 @@ async function dispatched(
                 // AND its echo source. Keyed through the SAME
                 // wiring consult + exact-pattern match the
                 // write side's four-outcome table uses above
-                // (never a blanket family-registry or
-                // DOCUMENT_CLASS_ROUTE_PATTERNS read, never a
-                // flows literal). Below the three-instance
+                // (never a blanket family-registry read,
+                // never a flows literal). Below the three-instance
                 // threshold with the write side's own inline
                 // check (Commandment IX Generality) — kept
                 // duplicated rather than prematurely shared.

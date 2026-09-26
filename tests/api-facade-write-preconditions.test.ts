@@ -59,7 +59,7 @@ async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId,
         ideaPutBody(ideaId, 'Headers'), token,
-        operationIdHeader([['if-match', '"probe-value-123"']]),
+        operationIdHeader([['x-probe', 'probe-value-123']]),
     );
     const stored = (await db.messagePairs.getAll())
         .find(r => r.name === ideaId);

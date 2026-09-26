@@ -2089,14 +2089,14 @@ export async function formSeedMessagePair(
     const method = inv.op === true || idParams === undefined
         ? 'POST'
         : 'PUT';
-    // Every bare collection-POST family here is a create route,
-    // all {status: 204} in WRITE_RESPONSE_SPECS (routes.ts) — no
-    // successBody. An op-shaped POST at an id-carrying pattern
-    // (op: true) is the same 204/no-body voice. A document-class
-    // genesis PUT reads its OWN spec from the same table
-    // (documentSeedResponse) so a seeded pair's stored response
-    // can never drift from what the live gate would have stored
-    // for the identical request.
+    // Every bare collection-POST family here is a create route
+    // and forms no response body; an op-shaped POST at an
+    // id-carrying pattern (op: true) forms none either. Only the
+    // body reaches formWriteMessagePair, which stores 201 for
+    // both. A document-class genesis PUT reads its OWN spec
+    // from the same table (documentSeedResponse) so a seeded
+    // pair's stored response can never drift from what the live
+    // gate would have stored for the identical request.
     const response =
         inv.op === true || idParams === undefined
             ? { status: HTTP_NO_CONTENT, body: undefined }
@@ -2147,9 +2147,9 @@ function documentSeedResponse(
     inv: MockDataInvocation,
     routeSegments: readonly string[],
     pathSegments: readonly string[],
-): { readonly status: number; readonly body: unknown } {
+): { readonly body: unknown } {
     const entry = WRITE_RESPONSE_SPECS[inv.routePattern];
-    const spec = entry === undefined || 'status' in entry
+    const spec = entry === undefined || 'conditional' in entry
         ? entry
         : entry.put;
     if (spec === undefined) {
@@ -2163,7 +2163,6 @@ function documentSeedResponse(
             segment.startsWith(':') ? pathSegments[i] : undefined)
         .filter((value): value is string => value !== undefined);
     return {
-        status: spec.status,
         body: spec.successBody?.(
             params, inv.body, inv.requesterIdentityId,
             inv.organization,
@@ -2297,7 +2296,7 @@ export async function formInstanceChainSeedInput(
     };
     const createBody = { set: [] };
     const entry = WRITE_RESPONSE_SPECS[INSTANCE_DETAIL_PATTERN];
-    if (entry === undefined || 'status' in entry
+    if (entry === undefined || 'conditional' in entry
         || entry.patch === undefined) {
         throw new Error('no PATCH spec for the seed instance');
     }

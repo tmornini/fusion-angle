@@ -3,7 +3,6 @@ import { fromFileUrl } from '@std/path';
 import { routes, type Route } from '../api/routes.ts';
 import {
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
-    REPLAY_EXEMPT_ROUTE_PATTERNS,
 } from '../api/message-pair.ts';
 import {
     AUTHENTICATION_ROUTES,
@@ -104,17 +103,6 @@ Deno.test('patch-only synthetic is a write route the walker'
         NAMED_EXEMPT_ROUTE_PATTERNS.has(pattern!),
         false,
     );
-});
-
-Deno.test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'
-+ ' both are also replay-exempt', () => {
-    for (const pattern of AUTHENTICATION_ROUTES) {
-        assert(
-            REPLAY_EXEMPT_ROUTE_PATTERNS.has(pattern),
-            pattern + ' rides the dedicated arm but is not'
-                + ' replay-exempt',
-        );
-    }
 });
 
 // Invitation nest writes are named-exempt (test 1). Pair

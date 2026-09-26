@@ -3116,20 +3116,30 @@ export async function postIdentityProviderDocumentOp(
     return entity;
 }
 
+// The conditional a write takes (§2): optional for class A
+// and every DELETE, required (If-Match or If-None-Match: *)
+// for class B, in-order (If-Match) for class C, none for
+// class D creates and class E operations.
+export type Conditional =
+    | 'optional'
+    | 'required'
+    | 'in-order'
+    | 'none';
+
+export type WriteMethod = 'PUT' | 'POST' | 'PATCH' | 'DELETE';
+
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
 // the message plane's stored response (WRITE_RESPONSE_SPECS +
-// responseFromStored). A pattern absent here, or present with
-// no successBody, returns 204 with no body. Keyed by route
-// pattern, not verb — but ONLY for the pattern's PUT or POST
-// verb: a DELETE on a wired pattern never consults this map
-// (the gate hardcodes 204 for every DELETE — see api/api.ts),
-// so a pattern that carries both a PUT (200, its written row)
-// and a DELETE (204) needs exactly one entry here, describing
-// the PUT alone.
+// responseFromStored). A spec with no successBody forms no
+// response body. Keyed by route pattern, not verb: a DELETE
+// never consults its successBody (the gate forms no body for
+// any DELETE — see api/api.ts), so a pattern that carries both
+// a PUT and a DELETE needs exactly one entry here, and its
+// conditional governs both.
 export interface WriteResponseSpec {
-    readonly status: number;
+    readonly conditional: Conditional;
     readonly successBody?: (
         params: string[],
         body: Record<string, unknown> | undefined,
@@ -3145,12 +3155,13 @@ export interface WriteResponseSpec {
 // and a POST (the composed members + ai_members edit, 204, no
 // body) — their response shapes genuinely diverge, so that one
 // entry supplies a spec per verb instead. Distinguished from a
-// plain WriteResponseSpec by the absence of `status` at the top
-// level (see isPerVerbWriteResponseSpec in api.ts).
+// plain WriteResponseSpec by the absence of `conditional` at
+// the top level (see writeResponseSpecFor in api.ts).
 export interface PerVerbWriteResponseSpec {
     readonly put?: WriteResponseSpec;
     readonly patch?: WriteResponseSpec;
     readonly post?: WriteResponseSpec;
+    readonly delete?: WriteResponseSpec;
 }
 
 export const WRITE_RESPONSE_SPECS:
@@ -3167,10 +3178,10 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/ideas/:id':
         documentWriteResponseSpec(IDEAS_WIRING),
     'organizations/:id/ideas/:id/conversion': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
     },
     'organizations/:id/ideas/:id/submissions/:sid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             ideaSubmissionEntityOf({
                 name: param(params, 2),
@@ -3185,7 +3196,7 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/projects/:id':
         documentWriteResponseSpec(PROJECTS_WIRING),
     'organizations/:id/projects/:id/flows/:pfid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             projectFlowEntityOf({
                 name: param(params, 2),
@@ -3195,7 +3206,7 @@ export const WRITE_RESPONSE_SPECS:
             }),
     },
     'organizations/:id/flows/': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'none',
         // The receipt shares the document name. An empty
         // body matches a DELETE tombstone, so a recreate
         // would store nothing.
@@ -3212,12 +3223,12 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/flows/:id':
         documentWriteResponseSpec(FLOWS_WIRING),
     'organizations/:id/flows/:id/undo': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'in-order',
     },
     // flows/:id/versions[+/:vid] WRITE_RESPONSE_SPECS RETIRED
     // (Phase 15 Task 7): ZERO seed pairs at those documents.
     'organizations/:id/work-orders/': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'none',
         // The receipt shares the document name. An empty
         // body matches a DELETE tombstone, so a recreate
         // would store nothing.
@@ -3226,20 +3237,20 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/work-orders/:id':
         documentWriteResponseSpec(WORK_ORDERS_WIRING),
     'organizations/:id/work-orders/:id/claim': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
         // The response is the claim document. An empty
         // body matches every other empty claim, so a
         // new claim would store nothing.
         successBody: (_params, body) => body ?? {},
     },
     'organizations/:id/work-orders/:id/transition': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
     },
     'organizations/:id/work-orders/:id/binding': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
     },
     'organizations/:id/flows/:id/work-orders/:woid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             flowWorkOrderEntityOf({
                 name: param(params, 2),
@@ -3251,7 +3262,7 @@ export const WRITE_RESPONSE_SPECS:
     // Nested composed POST (Task 9 / Task 23): 204 op response;
     // document + attribute pairs form at nested documents.
     [RECORD_TYPES_COLLECTION_PATTERN]: {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
         // The receipt shares the document name. An empty
         // body matches a DELETE tombstone, so a recreate
         // would store nothing.
@@ -3262,7 +3273,7 @@ export const WRITE_RESPONSE_SPECS:
     // is param 0 (path org, already org-matched at the gate).
     [RECORD_TYPE_DETAIL_PATTERN]: {
         put: {
-            status: HTTP_OK,
+            conditional: 'optional',
             successBody: (params, body) => {
                 const raw = withoutId(body ?? {});
                 validateRecordDocumentBody(raw);
@@ -3279,6 +3290,7 @@ export const WRITE_RESPONSE_SPECS:
                 );
             },
         },
+        delete: { conditional: 'optional' },
     },
     // Nested attributes detail (Task 7): put-only. Params:
     // 0=org, 1=type, 2=attribute. Path-derived echoes for
@@ -3288,7 +3300,7 @@ export const WRITE_RESPONSE_SPECS:
     // shape; the handler re-checks against head presence.
     [ATTRIBUTE_DETAIL_PATTERN]: {
         put: {
-            status: HTTP_OK,
+            conditional: 'optional',
             successBody: (params, body) =>
                 nestedAttributeWireOf(
                     param(params, 0),
@@ -3297,6 +3309,7 @@ export const WRITE_RESPONSE_SPECS:
                     withoutId(body ?? {}),
                 ),
         },
+        delete: { conditional: 'optional' },
     },
     // Nested instances detail (Task 20): public PUT is
     // 405; PATCH creates and updates. Wire success body
@@ -3310,7 +3323,7 @@ export const WRITE_RESPONSE_SPECS:
     // set/clear.
     [INSTANCE_DETAIL_PATTERN]: {
         patch: {
-            status: HTTP_OK,
+            conditional: 'optional',
             successBody: (params, body) => {
                 const raw = body ?? {};
                 return {
@@ -3326,9 +3339,10 @@ export const WRITE_RESPONSE_SPECS:
                 };
             },
         },
+        delete: { conditional: 'optional' },
     },
     'organizations/:id/flows/:id/records/:frid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             flowRecordEntityOf({
                 name: param(params, 2),
@@ -3346,7 +3360,7 @@ export const WRITE_RESPONSE_SPECS:
     // never re-validate the name (route comment); `flow_id` is
     // stamped from the document here, never a client body key.
     'organizations/:id/flows/:id/tags/:name': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             flowTagEntityOf(param(params, 1), {
                 name: validateFlowTagName(param(params, 2)),
@@ -3356,7 +3370,7 @@ export const WRITE_RESPONSE_SPECS:
             }),
     },
     'organizations/:id/objectives/': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'none',
     },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
@@ -3365,7 +3379,7 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/objectives/:id':
         documentWriteResponseSpec(OBJECTIVES_WIRING),
     'organizations/:id/objectives/:id/revisions/:rid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             objectiveRevisionEntityOf({
                 name: param(params, 2),
@@ -3376,7 +3390,7 @@ export const WRITE_RESPONSE_SPECS:
     },
     ['organizations/:id/projects/:id'
         + '/objective-baseline-scores/:sid']: {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => {
             const raw = withoutId(body ?? {});
             validateBaselineScoreEntity(raw);
@@ -3390,7 +3404,7 @@ export const WRITE_RESPONSE_SPECS:
     },
     ['organizations/:id/projects/:id'
         + '/objective-actual-scores/:sid']: {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => {
             const raw = withoutId(body ?? {});
             validateActualScoreEntity(raw);
@@ -3402,7 +3416,7 @@ export const WRITE_RESPONSE_SPECS:
             });
         },
     },
-    'identities/': { status: HTTP_NO_CONTENT },
+    'identities/': { conditional: 'none' },
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive). Creation and the human-member half share
     // this spec via formDocumentMessagePairFor.
@@ -3411,7 +3425,7 @@ export const WRITE_RESPONSE_SPECS:
     // G5: piiEntityOf (GET derive). DELETE is a marked
     // tombstone pair; PUT appends.
     'identities/:id/pii': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
@@ -3427,7 +3441,7 @@ export const WRITE_RESPONSE_SPECS:
     // above 'identities/:id/credentials/:cid' in the routes
     // array).
     'identities/:id/credentials/:cid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateIdentityCredentialEntity(
@@ -3438,7 +3452,7 @@ export const WRITE_RESPONSE_SPECS:
     // G5: registrationEntityOf (GET derive). DELETE is a
     // marked tombstone (append), not a slot replace.
     'identities/:id/registration': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             registrationEntityOf(param(params, 0), {
                 name: '',
@@ -3450,13 +3464,13 @@ export const WRITE_RESPONSE_SPECS:
     // Stored 204 empty; sendWriteResponse maps an
     // appended PUT to 201.
     'identities/:id/default-organization': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
     },
     // Seat document: path is the relationship. Body is
     // type + at. organization_id / identity_id are
     // reconstructed from the path for the wire entity.
     [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => {
             const organization = param(params, 0);
             const identityId = param(params, 1);
@@ -3476,7 +3490,7 @@ export const WRITE_RESPONSE_SPECS:
     // identity_id is stamped from the path so stored PUT
     // = GET (omit-PUT cannot poison GET).
     'identities/:id/tokens/:jti': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             identityTokenEntityOf({
                 name: param(params, 1),
@@ -3493,7 +3507,7 @@ export const WRITE_RESPONSE_SPECS:
     // is stamped from the path so stored PUT = GET
     // (omit-PUT cannot poison GET).
     'identities/:id/token-revocations/:rid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             tokenRevocationEntityOf({
                 name: param(params, 1),
@@ -3506,25 +3520,22 @@ export const WRITE_RESPONSE_SPECS:
             }),
     },
     // The gate PRE-MINTS the successor jti here — the ONE
-    // mint site for a fresh write (this route is REPLAY_
-    // EXEMPT_ROUTE_PATTERNS-wired, so a resend never bypasses
-    // this resolver the way a document/event-append route's
-    // idempotent replay would). The route handler reads this
+    // mint site for a fresh write. The route handler reads this
     // exact value back off the formed pair (messagePairResponseBody)
     // rather than minting a second one.
     'identities/:id/tokens/:jti/rotation': {
-        status: HTTP_OK,
+        conditional: 'none',
         successBody: () => ({
             jti: generateIdentifier(),
         }),
     },
     'identities/:id/tokens/:jti/revocation': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'none',
     },
     // G3: GET wins. organizationEntityOf is id-last; the
     // prior successBody was id-first. Stored PUT = GET.
     'organizations/:id': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => organizationEntityOf({
             name: param(params, 0),
             messagePairId: param(params, 0),
@@ -3535,7 +3546,7 @@ export const WRITE_RESPONSE_SPECS:
     // G4: identityProviderEntityOf (GET derive). identity_id
     // is stamped from the path so stored PUT = GET.
     'identities/:id/providers/:eid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             identityProviderEntityOf({
                 name: param(params, 1),
@@ -3547,11 +3558,56 @@ export const WRITE_RESPONSE_SPECS:
                 },
             }),
     },
+    // The grants and the invitation routes form their own
+    // pairs; their conditional is still the gate's.
+    'authentication/token': { conditional: 'none' },
+    'authentication/authorize': { conditional: 'none' },
+    'organizations/:id/invitations/': {
+        conditional: 'none',
+    },
+    'identities/:id/invitations/:id': {
+        conditional: 'optional',
+    },
+    'organizations/:id/invitations/:id': {
+        conditional: 'optional',
+    },
 };
+
+// Every write route declares its conditional. A route that
+// does not is a fault in this table, never an unguarded
+// write.
+export function conditionalOf(
+    routePattern: string,
+    method: WriteMethod,
+): Conditional {
+    const entry = WRITE_RESPONSE_SPECS[routePattern];
+    if (entry === undefined) {
+        throw new Error(
+            'no conditional for write route: ' + routePattern,
+        );
+    }
+    if ('conditional' in entry) {
+        return entry.conditional;
+    }
+    const spec = method === 'PUT'
+        ? entry.put
+        : method === 'PATCH'
+            ? entry.patch
+            : method === 'DELETE'
+                ? entry.delete
+                : entry.post;
+    if (spec === undefined) {
+        throw new Error(
+            'no conditional for ' + method + ' '
+                + routePattern,
+        );
+    }
+    return spec.conditional;
+}
 
 // The plain/PerVerb resolution every route-inline document-pair
 // block shares (Phase 9 Task 2): a plain WriteResponseSpec
-// answers for itself ('status' at the top level); a
+// answers for itself ('conditional' at the top level); a
 // PerVerbWriteResponseSpec answers through its `.put` arm — the
 // SAME two shapes the hand-written call sites checked one at a
 // time, folded into one shape-driven lookup. The guard-throw
@@ -3564,7 +3620,7 @@ function resolveWriteResponseSpec(
     const entry = WRITE_RESPONSE_SPECS[routePattern];
     const spec = entry === undefined
         ? undefined
-        : 'status' in entry ? entry : entry.put;
+        : 'conditional' in entry ? entry : entry.put;
     if (spec === undefined) {
         throw new Error(
             'no per-write response spec for'
@@ -4510,8 +4566,7 @@ export const routes: Route[] = [
     // TOCTOU). A live jti returns its successor; a
     // known-but-not-live jti is reuse — the whole chain's
     // revocation has already landed atomically — then 409.
-    // Operation path (name ''); REPLAY_EXEMPT_ROUTE_
-    // PATTERNS-wired (message-pair.ts) — the gate never serves
+    // Operation path (name ''). The gate never serves
     // a stored response for a byte-identical resend of this
     // route, so this handler always re-enters and re-checks
     // the reuse guard for real. The gate's successBody
@@ -5629,9 +5684,9 @@ export const routes: Route[] = [
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-
     // complete). No WRITE_AUTHORIZERS (deep sub-family).
-    // Not in DOCUMENT_CLASS (R10). GET/write ETag attaches
-    // in api.ts. DELETE is out of WRITE_RESPONSE_SPECS
-    // (gate hardcodes 204).
+    // GET/write ETag attaches in api.ts. DELETE takes its
+    // conditional from the spec's delete slot and forms no
+    // response body.
     route(INSTANCE_DETAIL_PATTERN, {
         get: async (
             db, p, _actor, organization, roles,
@@ -5718,9 +5773,7 @@ export const routes: Route[] = [
     // backing table, no dual-write, derived entirely from message
     // pairs. Bespoke route() wiring reusing deriveDocumentsAt/
     // documentMessagePairsAt exactly like the identities/:id/pii analog
-    // (gate 8), SIMPLE class (a repeat PUT records Supersedes —
-    // 'organizations/:id/flows/:id/tags/:name' is registered
-    // in message-pair.ts's DOCUMENT_CLASS_ROUTE_PATTERNS):
+    // (gate 8), SIMPLE class (a repeat PUT records Supersedes):
     // the locked class flows itself rides is structurally
     // MOOT here — api.ts's isLockedWrite is routePattern ===
     // documentEntityPattern(wiring), which for flows is

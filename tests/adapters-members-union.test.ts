@@ -266,7 +266,7 @@ Deno.test(
             },
         );
         const spec = WRITE_RESPONSE_SPECS['identities/:id'];
-        if (spec === undefined || !('status' in spec)) {
+        if (spec === undefined || !('conditional' in spec)) {
             throw new Error('no identities/:id spec');
         }
         const memberId = generateIdentifier();

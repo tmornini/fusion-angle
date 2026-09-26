@@ -544,6 +544,23 @@ export function parseIfMatch(
     return inner;
 }
 
+export const IF_NONE_MATCH_HEADER = 'if-none-match';
+
+// A wire If-Match as its strong validators: one or more
+// quoted identifiers, comma-separated (RFC 9110 §13.1.1).
+// Anything else yields undefined; the gate answers 400.
+export function parseEntityTags(
+    header: string,
+): readonly string[] | undefined {
+    const tags: string[] = [];
+    for (const part of header.split(',')) {
+        const tag = parseIfMatch(part.trim());
+        if (tag === undefined) return undefined;
+        tags.push(tag);
+    }
+    return tags;
+}
+
 // Recover the client's If-Match target from a formed wire
 // pair's request message (hoisted into the hash). This is
 // the gate-verified latch for the in-tx head re-read —
@@ -1702,105 +1719,10 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     // Nested attributes detail (Task 7): admin PUT/DELETE.
     ATTRIBUTE_DETAIL_PATTERN,
     // Nested instances detail: PATCH create/update +
-    // DELETE (MESSAGE_PAIR_WIRED only — R10 keeps DOCUMENT_CLASS
-    // clear). Public PUT is 405 (Task 20).
+    // DELETE. Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
     // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.
 ]);
-
-// Route patterns wired for pair STORAGE (MESSAGE_PAIR_WIRED_
-// ROUTE_PATTERNS above) whose gate dispatch must NEVER take the
-// pre-tx idempotency fast path (getPairByRequestHash in api.ts) —
-// a byte-identical resend still re-enters the handler instead
-// of returning the first call's cached response. Membership
-// here is a promise: the route's OWN domain guard already
-// prevents a double-success on two identical requests, so the
-// fast path would be redundant at best — at worst it would
-// SERVE STALE TRUTH the domain guard exists to prevent.
-// rotation's guard is the 409 reuse check (rotateRefreshJti):
-// a resent rotation of an already-rotated-away jti must fail
-// again, not silently replay the first success. The two
-// /authentication/* grant routes join this set for a related
-// reason: a stored authorize response holds a LIVE single-use
-// code (replay re-hands a possibly-spent credential and locks
-// out identical re-logins); a stored token response replayed
-// hands back stale/revoked tokens AND bypasses the rotation
-// reuse-detection and code double-spend guards, which only
-// fire when the handler re-runs. Auth pairs are also keyed by
-// id (appendMessagePairAlways), not hash, so two identical logins each
-// land — message_hash is no longer per-call-unique on these
-// routes. Grown family by family; never remove a pattern
-// without re-deriving why its domain guard still makes the
-// fast path safe to skip.
-export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
-    new Set([
-        'identities/:id/tokens/:jti/rotation',
-        'authentication/token',
-        'authentication/authorize',
-    ]);
-
-// The head-read class, PER ROUTE PATTERN — never inferred from
-// a request's own name. A document is revisited
-// (create then update, or repeated PUT) and takes a pre-tx
-// head-read; an operation document (name always '') and an
-// event-append document (a fresh, client-minted id every write,
-// e.g. states/:id) never head-read, even though an event-
-// append name is never ''. Grown family by family alongside
-// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.
-export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
-    new Set([
-        'organizations/:id/ideas/:id',
-        'organizations/:id/ideas/:id/submissions/:sid',
-        'organizations/:id/projects/:id',
-        'organizations/:id/projects/:id/flows/:pfid',
-        'organizations/:id/flows/',
-        'organizations/:id/flows/:id',
-        // flows/:id/versions/:vid RETIRED (Phase 15 Task 7).
-        // SIMPLE class (Phase 14 Task 9, gate 8): the locked
-        // class 'flows' itself rides is structurally MOOT here —
-        // api.ts's isLockedWrite is routePattern ===
-        // documentEntityPattern(wiring), which for flows is
-        // organizations/:id/flows/:id — a tags document
-        // never equals that, so registering tags here
-        // safely opts that document into the ordinary
-        // head-read, never the locked four-outcome table.
-        'organizations/:id/flows/:id/tags/:name',
-        'organizations/:id/work-orders/',
-        'organizations/:id/work-orders/:id',
-        'organizations/:id/work-orders/:id/claim',
-        'organizations/:id/flows/:id/work-orders/:woid',
-        // Flat records + record-attributes retired (Task 23).
-        'organizations/:id/flows/:id/records/:frid',
-        'organizations/:id/objectives/',
-        'organizations/:id/objectives/:id',
-        'organizations/:id/objectives/:id/revisions/:rid',
-        'organizations/:id/projects/:id'
-            + '/objective-baseline-scores/:sid',
-        'organizations/:id/projects/:id'
-            + '/objective-actual-scores/:sid',
-        'ai-agents/:id',
-        'identities/',
-        'identities/:id',
-        'identities/:id/pii',
-        'identities/:id/credentials/:cid',
-        'identities/:id/registration',
-        'identities/:id/default-organization',
-        'organizations/:id',
-        // Nested record-types collection POST (Task 9): same
-        // head-read class as flat `records` so op + document
-        // share the supersession chain at the type name.
-        RECORD_TYPES_COLLECTION_PATTERN,
-        // Nested record-types detail (Task 3): simple class —
-        // no If-Match required on types.
-        RECORD_TYPE_DETAIL_PATTERN,
-        // Nested attributes detail (Task 7): simple class —
-        // attributes never join the If-Match dialect.
-        ATTRIBUTE_DETAIL_PATTERN,
-        ORGANIZATION_MEMBER_DETAIL_PATTERN,
-        // states/:id/field-values/:fvid RETIRED from live wire
-        // (Phase 15 Task 7); seed still forms pairs at that
-        // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.
-    ]);

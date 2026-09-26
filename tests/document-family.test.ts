@@ -38,7 +38,6 @@ import {
 } from '../api/routes.ts';
 import {
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
-    DOCUMENT_CLASS_ROUTE_PATTERNS,
 } from '../api/message-pair.ts';
 import {
     FAMILY_REGISTRY,
@@ -392,14 +391,12 @@ async function withSyntheticLockedFamily<T>(
     routes.push(routeEntry, childRouteEntry);
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.add(TEST_PATTERN);
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.add(CHILD_PATTERN);
-    DOCUMENT_CLASS_ROUTE_PATTERNS.add(TEST_PATTERN);
-    DOCUMENT_CLASS_ROUTE_PATTERNS.add(CHILD_PATTERN);
     const mutableSpecs = WRITE_RESPONSE_SPECS as
         Record<string, WriteResponseSpec>;
     mutableSpecs[TEST_PATTERN] =
         documentWriteResponseSpec(wiring);
     mutableSpecs[CHILD_PATTERN] = {
-        status: 204,
+        conditional: 'optional',
         successBody: (_params, body) => body ?? {},
     };
     try {
@@ -411,8 +408,6 @@ async function withSyntheticLockedFamily<T>(
         }
         MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.delete(TEST_PATTERN);
         MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.delete(CHILD_PATTERN);
-        DOCUMENT_CLASS_ROUTE_PATTERNS.delete(TEST_PATTERN);
-        DOCUMENT_CLASS_ROUTE_PATTERNS.delete(CHILD_PATTERN);
         delete mutableSpecs[TEST_PATTERN];
         delete mutableSpecs[CHILD_PATTERN];
         delete DOCUMENT_FAMILY_WIRINGS[TEST_FAMILY];
@@ -809,9 +804,6 @@ Deno.test('withSyntheticLockedFamily leaves no residue behind',
     assertStrictEquals(documentFamilyWiring(TEST_FAMILY), undefined);
     assertStrictEquals(
         MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(TEST_PATTERN), false,
-    );
-    assertStrictEquals(
-        DOCUMENT_CLASS_ROUTE_PATTERNS.has(TEST_PATTERN), false,
     );
     assertStrictEquals(WRITE_RESPONSE_SPECS[TEST_PATTERN], undefined);
     assertStrictEquals(
