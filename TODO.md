@@ -1600,6 +1600,26 @@ Off the critical path; each with its oracle.
   foreign organization's retired document answers what
   its live one does; history and past versions still
   answer 200.
+- Admins act within their organization. The gate's
+  self-or-admin guard (`api/api.ts` Region B,
+  `SELF_ONLY_TOKEN_ROUTES`: the token revocation
+  document's PUT and the rotation and revocation POSTs)
+  lets a member name only its own identity but lets an
+  admin name any identity, whether or not it holds a seat
+  in the admin's organization: `callerIsAdmin` is the
+  organization-scoped `admin` role from the verified
+  claim, and nothing compares the path identity's seats
+  to that organization. An organization's admin can so
+  rotate or revoke the token chain of an identity outside
+  it. Scope the admin arm to identities seated in the
+  claim's organization, keeping the root operator's reach
+  only where its own role says so, and sweep every other
+  admin-reachable `identities/:id/…` write for the same
+  reach. Oracle: on each guarded route, an organization
+  admin naming an identity with no seat in its
+  organization is 403 before any read; naming a seated
+  one is unchanged; the root operator's cross-organization
+  reach, where kept, is pinned by name.
 
 ## Later work
 
