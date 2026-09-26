@@ -2903,12 +2903,11 @@ Off the critical path; each with its oracle.
   the bytes until the host's retention expires — state the
   window. The brainstorm also settles two questions this
   bullet inherits. Cascade: erasing a document's pairs
-  follows the DELETE cascade policy (its bullet under
-  `## Critical functionality path`), because a dependent
-  that copied the erased values into its own state — a
-  revision, an operation's response — still holds them,
-  so erasure walks the same reference table the cascade
-  does. Tombstones: the suspicion is that an erased
+  follows the DELETE cascade policy (its bullet below),
+  because a dependent that copied the erased values into
+  its own state — a revision, an operation's response —
+  still holds them, so erasure walks the same reference
+  table the cascade does. Tombstones: the suspicion is that an erased
   document keeps exactly one version, its tombstone — the
   DELETE head the view already refuses to delete — so its
   id still reads retired (the Gone bullet), its
