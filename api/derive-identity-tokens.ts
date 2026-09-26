@@ -20,10 +20,10 @@ import {
 // row per document, its latest event; every event of a jti
 // carries the same chain_id, so the chain fold
 // (readTokenChainFromLedger) filters heads. The derived row
-// is id-LAST (validateIdentityTokenEntity's order plus `id`);
-// `id` is the document name. withoutId FIRST, always. Spec
-// 2026-09-16 page-boot-latency § 2; nothing here reads
-// /identity-tokens/.
+// is id-FIRST (`id`, the document name, then
+// validateIdentityTokenEntity's own order). withoutId FIRST,
+// always. Spec 2026-09-16 page-boot-latency § 2; nothing
+// here reads /identity-tokens/.
 
 const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 
@@ -38,8 +38,8 @@ export function identityTokenEntityOf(
     document: DerivedDocument,
 ): IdentityTokenEntity {
     return {
-        ...validateIdentityTokenEntity(withoutId(document.body)),
         id: document.name,
+        ...validateIdentityTokenEntity(withoutId(document.body)),
     };
 }
 

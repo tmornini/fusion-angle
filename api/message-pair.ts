@@ -489,8 +489,8 @@ export async function formTokenEventMessagePair(
         requestAt: event.at,
         organization: undefined,
         responseBody: {
-            ...validateIdentityTokenEntity(body),
             id: name,
+            ...validateIdentityTokenEntity(body),
         },
         operationId,
         requestId,

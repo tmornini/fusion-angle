@@ -161,10 +161,11 @@ function jtiOf(token: string): string {
     return claims.jti;
 }
 
-// -- 1: KEY ORDER — derived + stored PUT are id-LAST (G4) ------
+// -- 1: KEY ORDER — derived + stored PUT are id-FIRST (G4) -----
 
-Deno.test('KEY ORDER: the derived row is id-LAST — matching'
-+ ' validateIdentityTokenEntity\'s own return-literal order',
+Deno.test('KEY ORDER: the derived row is id-FIRST — matching'
++ ' validateIdentityTokenEntity\'s own return-literal order'
++ ' after it',
 async () => {
     const db = await freshDb();
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
@@ -178,14 +179,14 @@ async () => {
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_ORDER,
     );
     const expectedOrder = [
-        'jti', 'identity_id', 'action', 'chain_id', 'at', 'id',
+        'id', 'jti', 'identity_id', 'action', 'chain_id', 'at',
     ];
     assertEquals(Object.keys(derived), expectedOrder);
 });
 
-// G4: stored PUT = identityTokenEntityOf (id-last). GET wins.
-// The id-first writer pin is deleted — writer matches GET.
-Deno.test('stored PUT body equals identityTokenEntityOf id-last',
+// G4: stored PUT = identityTokenEntityOf (id-first). GET wins.
+// The id-last writer pin is deleted — writer matches GET.
+Deno.test('stored PUT body equals identityTokenEntityOf id-first',
 async () => {
     const db = await freshDb();
     const fields = {
@@ -208,7 +209,7 @@ async () => {
         method: 'PUT',
         body: fields,
     });
-    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
     const derived = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_G4,
@@ -219,7 +220,7 @@ async () => {
 });
 
 Deno.test('formTokenEventMessagePair stored body equals '
-+ 'identityTokenEntityOf id-last', async () => {
++ 'identityTokenEntityOf id-first', async () => {
     const event = {
         jti: JTI_G4_SYNTH, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued' as const,
@@ -238,13 +239,13 @@ Deno.test('formTokenEventMessagePair stored body equals '
         method: 'PUT',
         body: event,
     });
-    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
 });
 
 // Writer matches GET: successBody is identityTokenEntityOf
-// (id-last). The id-first pin is deleted.
-Deno.test('identities/:id/tokens/:jti successBody is id-last',
+// (id-first). The id-last pin is deleted.
+Deno.test('identities/:id/tokens/:jti successBody is id-first',
 () => {
     const entry =
         WRITE_RESPONSE_SPECS['identities/:id/tokens/:jti'];
@@ -258,16 +259,16 @@ Deno.test('identities/:id/tokens/:jti successBody is id-last',
         'XXZruirZyAOoRpNxaDnpSA',
         undefined,
     ) as { id: string };
-    assertStrictEquals(Object.keys(body).at(-1), 'id');
+    assertStrictEquals(Object.keys(body).at(0), 'id');
     assertStrictEquals(body.id, JTI_G4);
 });
 
 // -- 2: GET wire byte-parity — the ACTUAL flipped route against --
-// -- a LITERAL id-LAST reconstruction of what was PUT: -----------
+// -- a LITERAL id-FIRST reconstruction of what was PUT: ----------
 // -- byIdAscending collection order, and the 404 body -------------
 
 Deno.test('GET /identities/:id/tokens + /:jti are wire'
-+ ' byte-identical to a literal id-LAST reconstruction of'
++ ' byte-identical to a literal id-FIRST reconstruction of'
 + ' each jti\'s HEAD: byIdAscending collection order and the'
 + ' 404 body',
 async () => {
@@ -303,25 +304,25 @@ async () => {
     }, DEV_TOKEN,
         operationIdHeader());
 
-    // The literal id-LAST reconstruction of each document's
+    // The literal id-FIRST reconstruction of each document's
     // HEAD body, identifier order (byIdAscending — the
     // derivation's own order, never the backend's) — the
     // expected wire text, independent of any stored row.
     const expected = [
         {
+            id: JTI_W1,
             jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'rotated', chain_id: CHAIN_W, at: AT2,
-            id: JTI_W1,
         },
         {
+            id: JTI_W2,
             jti: JTI_W2, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_W2, at: AT,
-            id: JTI_W2,
         },
         {
+            id: JTI_W3,
             jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_W3, at: AT,
-            id: JTI_W3,
         },
     ].sort((a, b) => compareIdentifiers(a.id, b.id));
 

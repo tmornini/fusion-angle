@@ -193,9 +193,9 @@ Deno.test('a PUT whose body echoes id round-trips through'
     // Phase Final Stage B: organizations table retired.
 });
 
-// G3: stored PUT = organizationEntityOf (id-last). GET wins.
-// The id-first writer pin is deleted — writer matches GET.
-Deno.test('stored PUT body equals organizationEntityOf id-last',
+// G3: stored PUT = organizationEntityOf (id-first). GET wins.
+// The id-last writer pin is deleted — writer matches GET.
+Deno.test('stored PUT body equals organizationEntityOf id-first',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
@@ -211,7 +211,7 @@ async () => {
         method: 'PUT',
         body: fields,
     });
-    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
     const derived = await deriveOrganization(db, id);
     assertEquals(stored, derived);

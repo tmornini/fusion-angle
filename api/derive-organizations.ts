@@ -28,21 +28,19 @@ import {
 // registry row both say false — this task's own report
 // re-confirms the two branches are byte-identical).
 //
-// THE KEY-ORDER DEPARTURE from the seven-sibling entityOf
-// convention (id-first, field-by-field pickString/pickNumber):
-// organizationEntityOf instead re-runs the head pair's own
+// id-FIRST, matching the seven-sibling entityOf convention
+// (Task 5): organizationEntityOf re-runs the head pair's own
 // REQUEST body through validateOrganizationEntity — the SAME
 // validator WRITE_RESPONSE_SPECS['organizations/:id']
 // .successBody already runs (api/routes.ts; message-plane only
 // since Phase Final Task 2 retired the organizations ROW) —
 // so the derived shape is byte-identical to the STORED wire
-// body, id-LAST, never id-first. GET wins: the writer emits
-// this mapper, not the older id-first stamp. Reusing the
-// validator rather than re-listing its six field names here
-// is the DRY choice: ORGANIZATION_BODY_KEYS (validators.ts)
-// stays the one place that vocabulary lives. withoutId
-// strips a stray `id` FIRST — the fetch-edit-PUT client
-// pattern echoes the GET body's own `id` right back into
+// body, id-first. Stored PUT = GET: the writer emits this
+// mapper. Reusing the validator rather than re-listing its six
+// field names here is the DRY choice: ORGANIZATION_BODY_KEYS
+// (validators.ts) stays the one place that vocabulary lives.
+// withoutId strips a stray `id` FIRST — the fetch-edit-PUT
+// client pattern echoes the GET body's own `id` right back into
 // the PUT payload, and the STORED request body is the raw
 // wire body, echoed id and all (formWriteMessagePair stores the
 // caller's body verbatim; successBody's withoutId(body)
@@ -74,8 +72,8 @@ export function organizationEntityOf(
     document: DerivedDocument,
 ): OrganizationEntity {
     return {
-        ...validateOrganizationEntity(withoutId(document.body)),
         id: document.name,
+        ...validateOrganizationEntity(withoutId(document.body)),
     };
 }
 

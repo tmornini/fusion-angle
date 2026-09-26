@@ -3486,7 +3486,7 @@ export const WRITE_RESPONSE_SPECS:
             };
         },
     },
-    // G4: GET wins. identityTokenEntityOf is id-last;
+    // G4: GET wins. identityTokenEntityOf is id-first;
     // identity_id is stamped from the path so stored PUT
     // = GET (omit-PUT cannot poison GET).
     'identities/:id/tokens/:jti': {
@@ -3532,8 +3532,7 @@ export const WRITE_RESPONSE_SPECS:
     'identities/:id/tokens/:jti/revocation': {
         conditional: 'none',
     },
-    // G3: GET wins. organizationEntityOf is id-last; the
-    // prior successBody was id-first. Stored PUT = GET.
+    // G3: GET wins. Stored PUT = GET, `id` first.
     'organizations/:id': {
         conditional: 'optional',
         successBody: (params, body) => organizationEntityOf({
@@ -5826,7 +5825,7 @@ export const routes: Route[] = [
     // none. Phase Final Task 2: the organizations ROW half is
     // stripped — pure message-plane write (postFlowTagDocumentOp
     // shape). WRITE_RESPONSE_SPECS successBody forms the wire
-    // bytes via organizationEntityOf (id-last; GET wins).
+    // bytes via organizationEntityOf (id-first; GET wins).
     route('organizations/:id', {
         get: (db, p) => deriveOrganization(db, param(p, 0)),
         put: postOrganizationDocumentOp,
