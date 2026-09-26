@@ -1431,7 +1431,7 @@ async () => {
             }),
         },
     ));
-    assertStrictEquals(granted.status, 200);
+    assertStrictEquals(granted.status, 201);
     const pending = await handleRequest(db, framedRequest(
         `${BASE}/identities/` + UNSEATED
             + '/invitations/',

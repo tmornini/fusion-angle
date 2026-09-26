@@ -25,6 +25,7 @@ import {
     documentGetHandler,
     documentCollectionGetHandler,
     type DocumentFamilyWiring,
+    withoutId,
 } from '../api/document-family.ts';
 import {
     pickNumber,
@@ -540,8 +541,8 @@ Deno.test('score collection wire equals derive per project: an'
 
 Deno.test('live-write chain: create, reposition, revision edit,'
 + ' archive, reactivate, a conversion with 2 baselines, a'
-+ ' standalone re-score + actual PUT, and a duplicate create —'
-+ ' wire equals derive at every step', async () => {
++ ' standalone re-score + actual PUT, and a refused duplicate'
++ ' create — wire equals derive at every step', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const objectiveId = generateIdentifier();
@@ -847,16 +848,18 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     );
     assertStrictEquals(derivedActualsFinal.length, 1);
 
-    // Duplicate create — same id, fresh revisionId.
-    // Entity-document pairs before: create op + create doc +
+    // Duplicate create — same id, fresh revisionId. The create
+    // declares its genesis, so a taken id is refused and nothing
+    // lands. Entity-document pairs stay: create op + create doc +
     // reposition + archive + reactivate = 5 (archive/reactivate
-    // ride PUT /organizations/:id/objectives/:id after states-document
-    // retirement).
+    // ride PUT /organizations/:id/objectives/:id after
+    // states-document retirement).
     const revisionId3 = OBJECTIVEID_REV_3;
     const objectivesPrefix = canonicalPath(
         STARK_ORGANIZATION
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
+    const beforeDuplicate = (await db.messagePairs.getAll()).length;
     const beforeDuplicateIds = new Set(
         (
             await db.messagePairs.getCollectionPairs(objectivesPrefix,
@@ -873,54 +876,13 @@ Deno.test('live-write chain: create, reposition, revision edit,'
             'Chain Objective v3', '2026-06-07T00:00:00.000000Z',
         ),
     ));
-    assertStrictEquals(duplicate.status, 201);
-    // Supersedes the latest prior entity-document response
-    // (reactivate), not the earlier reposition.
+    assertStrictEquals(duplicate.status, 409);
+    assertEquals(await duplicate.json(), {
+        error: 'Document already exists at ' + objectivesPrefix
+            + objectiveId,
+    });
     assertStrictEquals(
-        duplicate.headers.get('Supersedes'),
-        null,
-    );
-
-    const [afterRequests, afterResponses] = await Promise.all([
-        db.messagePairs.getCollectionPairs(objectivesPrefix),
-        db.messagePairs.getCollectionPairs(objectivesPrefix),
-    ]);
-    const afterPairsAt = afterResponses.filter(
-        (r) => r.name === objectiveId,
-    );
-    assertStrictEquals(afterPairsAt.length, 7);
-    const newRows = afterPairsAt.filter(
-        (r) => !beforeDuplicateIds.has(r.id),
-    );
-    assertStrictEquals(newRows.length, 2);
-    const priorHead = afterPairsAt
-        .filter((row) =>
-            beforeDuplicateIds.has(row.id)
-            && (
-                row.method === 'PUT'
-                || row.method === 'DELETE'
-            ),
-        )
-        .at(-1)!;
-    for (const row of newRows) {
-        assertStrictEquals(
-            row.supersedes, priorHead.id,
-        );
-    }
-    const documentMessagePairsAfter = documentMessagePairsAt(
-        afterRequests, objectivesPrefix,
-    ).filter((messagePair) => messagePair.name === objectiveId);
-    // create doc + reposition + archive + reactivate +
-    // duplicate create's document = 5
-    assertStrictEquals(documentMessagePairsAfter.length, 5);
-    const newestDocumentMessagePair =
-        documentMessagePairsAfter.at(-1)!;
-    const newestDocumentResponseRow = afterPairsAt.find(
-        (r) => r.id === newestDocumentMessagePair.id,
-    )!;
-    assertStrictEquals(
-        newestDocumentResponseRow.supersedes,
-        priorHead.id,
+        (await db.messagePairs.getAll()).length, beforeDuplicate,
     );
 
     const finalGet = await handleRequest(
@@ -939,7 +901,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
             objectiveId,
         ),
     );
-    assertStrictEquals(finalObjective.position, 88);
+    assertStrictEquals(finalObjective.position, 50);
 });
 
 // -- 6. method-filter: create POST is never the document head -
@@ -987,8 +949,11 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
+    // The stored request is the state, which leads with
+    // the document's id until the former stores no request
+    // bytes; the id is the routing key both bodies name.
     const documentBodyKeys = new Set(
-        Object.keys(documentMessagePairs[0]!.body),
+        Object.keys(withoutId(documentMessagePairs[0]!.body)),
     );
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
@@ -1230,4 +1195,59 @@ async () => {
     assert(revs.some((r) => r.id === revisionId));
     const found = revs.find((r) => r.id === revisionId)!;
     assertEquals(found, expected);
+});
+
+Deno.test('POST objectives/ answers 201 with the document\'s'
++ ' state and its location', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const objectiveId = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
+        token,
+        objectiveCreateBody(
+            objectiveId, 7, generateIdentifier(),
+            'Created Objective', '2026-06-01T00:00:00.000000Z',
+        ),
+    ));
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.headers.get('location'), objectiveId);
+    assertEquals(
+        await res.json(),
+        JSON.parse(await storedPutBodyText(
+            db, canonicalPath(STARK_ORGANIZATION, '/objectives/'),
+            objectiveId,
+        )),
+    );
+});
+
+Deno.test('a resent POST objectives/ is 409 and stores nothing',
+async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const objectiveId = generateIdentifier();
+    const body = objectiveCreateBody(
+        objectiveId, 7, generateIdentifier(),
+        'Resent Objective', '2026-06-01T00:00:00.000000Z',
+    );
+    const first = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
+        token, body,
+    ));
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const second = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
+        token, body,
+    ));
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at '
+            + canonicalPath(STARK_ORGANIZATION, '/objectives/')
+            + objectiveId,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });

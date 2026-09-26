@@ -1270,6 +1270,11 @@ async function dispatched(
                         status: HTTP_NO_CONTENT,
                     });
                 }
+                // An unwired handler forms its own pair,
+                // so the former's answer is already whole.
+                if (result instanceof Response) {
+                    return result;
+                }
                 return Response.json(result);
             }
             case 'PATCH': {
@@ -1532,6 +1537,11 @@ async function dispatched(
                     return new Response(null, {
                         status: HTTP_NO_CONTENT,
                     });
+                }
+                // An unwired handler forms its own pair,
+                // so the former's answer is already whole.
+                if (result instanceof Response) {
+                    return result;
                 }
                 return Response.json(result);
             }

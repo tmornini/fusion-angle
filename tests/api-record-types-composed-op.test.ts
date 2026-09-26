@@ -5,7 +5,10 @@ import {
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
-import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
+import {
+    IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
+} from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -23,6 +26,7 @@ import {
 } from './test-fixtures.ts';
 import {
     apiRequest,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -163,9 +167,9 @@ async function seedInstanceReferrer(
     assertStrictEquals(patch.status, 201);
 }
 
-Deno.test('POST .../record-types kind create (admin) → 204; '
-+ 'document + attribute pairs at nested documents; GETs '
-+ 'see them',
+Deno.test('POST .../record-types kind create (admin) → 201 '
++ 'with the type\'s state; document + attribute pairs at '
++ 'nested documents; GETs see them',
 async () => {
     const { db, adminToken } = await adminDb();
     const post = await handleRequest(db, req(
@@ -173,6 +177,7 @@ async () => {
         createBody(TYPE_ID, ATTR_ID, 'Composed'),
     ));
     assertStrictEquals(post.status, 201);
+    const created = await post.json();
 
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
@@ -189,6 +194,7 @@ async () => {
     assertStrictEquals(typeRow.name, 'Composed');
     assertStrictEquals(typeRow.state, 'active');
     assertStrictEquals('state_event_id' in typeRow, false);
+    assertEquals(created, typeRow);
 
     const attrGet = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
@@ -526,7 +532,7 @@ async () => {
     assertStrictEquals(tombstone?.method, 'DELETE');
     const again = await handleRequest(db, req(
         'POST', COLLECTION, adminToken,
-        createBody(typeId, attrId, 'Second'),
+        createBody(typeId, generateIdentifier(), 'Second'),
     ));
     assertStrictEquals(again.status, 201);
     const head = await db.messagePairs.getHeadPair(
@@ -645,4 +651,70 @@ async () => {
         COLLECTION, typeId,
     );
     assertStrictEquals(after?.id, head.id);
+});
+
+Deno.test('POST record-types/ create answers 201 with the'
++ ' document\'s state and its location', async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        createBody(typeId, generateIdentifier(), 'Located'),
+    ));
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.headers.get('location'), typeId);
+    assertEquals(
+        await res.json(),
+        JSON.parse(
+            await storedPutBodyText(db, COLLECTION, typeId),
+        ),
+    );
+});
+
+Deno.test('a resent POST record-types/ create is 409 and'
++ ' stores nothing', async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const body = createBody(typeId, generateIdentifier(), 'Once');
+    const first = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken, body,
+    ));
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const second = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken, body,
+    ));
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at ' + COLLECTION + typeId,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('a record-type create with If-Match is 400',
+async () => {
+    const { db, adminToken } = await adminDb();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: COLLECTION,
+        token: adminToken,
+        body: createBody(
+            generateIdentifier(), generateIdentifier(), 'Tagged',
+        ),
+        headers: {
+            [IF_MATCH_HEADER]: '"' + generateIdentifier() + '"',
+        },
+    }));
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
+        error: 'POST ' + COLLECTION
+            + ' takes no If-Match on a create',
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });

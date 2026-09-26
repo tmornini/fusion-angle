@@ -62,7 +62,7 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 201);
     return grantEventId;
 }
 

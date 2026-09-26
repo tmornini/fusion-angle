@@ -211,7 +211,7 @@ async () => {
     const res = await grantWayne(
         db, 'sarah@x.com', INV_GRANT,
     );
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 201);
     const body = await res.json() as {
         id: string;
         state: string;

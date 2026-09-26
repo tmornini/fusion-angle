@@ -6,6 +6,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
+import { withoutId } from '../api/document-family.ts';
 import { requestHashOfStored } from './ledger-row.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
@@ -156,7 +157,7 @@ Deno.test('a fresh grant appends 2 pairs — the operation and the'
 async () => {
     const db = await freshDb();
     const res = await grant(db, INV_DOC_1);
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     // 8: the fixture's own membership pair (Phase 13 Task 1;
     // role-grant retired), two seeded people (an identities/:id
@@ -178,8 +179,11 @@ async () => {
     ).filter(messagePair => messagePair.name === INV_DOC_1);
     assertStrictEquals(documents.length, 1);
     const wire = documents[0]!.body;
+    // The stored request is the invitation's state, which
+    // leads with its id until the former stores no request
+    // bytes.
     assertEquals(
-        Object.keys(wire).sort(),
+        Object.keys(withoutId(wire)).sort(),
         ['at', 'identity_id', 'organization_id', 'state'],
     );
     assertStrictEquals(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
@@ -189,20 +193,31 @@ async () => {
     assertStrictEquals(wire.state, 'pending');
 });
 
-Deno.test('a duplicate grant appends ONLY its operation message pair — no'
-+ ' phantom document at the duplicate\'s submitted id',
+Deno.test('a duplicate grant answers the pending invitation with'
++ ' 200 and stores nothing — no phantom document at the'
++ ' duplicate\'s submitted id',
 async () => {
     const db = await freshDb();
     const first = await grant(db, INV_DOC_2A);
-    assertStrictEquals(first.status, 200);
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
     const second = await grant(db, INV_DOC_2B);
     assertStrictEquals(second.status, 200);
+    assertEquals(await second.json(), {
+        id: INV_DOC_2A,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        at: AT,
+        state: 'pending',
+    });
     const requests = await db.messagePairs.getAll();
+    assertStrictEquals(requests.length, before);
     const atDuplicateId = requests.filter(
         r => r.path === '/invitations/'
             && r.name === INV_DOC_2B,
     );
-    assertStrictEquals(atDuplicateId.length, 1);
+    assertStrictEquals(atDuplicateId.length, 0);
     const atFreshId = requests.filter(
         r => r.path === '/invitations/'
             && r.name === INV_DOC_2A,
@@ -344,7 +359,9 @@ async () => {
         '/invitations/',
     ).filter(messagePair => messagePair.name === INV_DOC_5);
     assertStrictEquals(documents.length, 2);
-    assertEquals(documents[0]!.body, {
+    // The grant's stored request is the invitation's state,
+    // id first; the later PUT carries the body alone.
+    assertEquals(withoutId(documents[0]!.body), {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: 'toccYYkLEABmlbpHJalgtQ',
         at: AT,
@@ -377,7 +394,9 @@ async () => {
         '/invitations/',
     ).filter(messagePair => messagePair.name === INV_DOC_6);
     assertStrictEquals(documents.length, 2);
-    assertEquals(documents[0]!.body, {
+    // The grant's stored request is the invitation's state,
+    // id first; the later PUT carries the body alone.
+    assertEquals(withoutId(documents[0]!.body), {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: 'toccYYkLEABmlbpHJalgtQ',
         at: AT,
@@ -540,4 +559,37 @@ Deno.test('every stored invitation-family message verifies against'
             row.request_hash,
         );
     }
+});
+
+Deno.test('POST invitations/ answers 201 with the document\'s'
++ ' state and its location', async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const res = await grant(db, id);
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.headers.get('location'), id);
+    assertEquals(
+        await res.json(),
+        JSON.parse(
+            await storedPutBodyText(db, '/invitations/', id),
+        ),
+    );
+});
+
+Deno.test('a resent POST invitations/ is 409 and stores nothing',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const first = await grant(db, id);
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const second = await grant(db, id);
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at /invitations/' + id,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });

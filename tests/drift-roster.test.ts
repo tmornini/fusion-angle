@@ -625,7 +625,7 @@ async () => {
         INV_ROSTER_SARAH, 'sarah.chen@company.com',
         EV_ROSTER_SARAH_GRANT, '2026-06-01T00:00:00.000000Z',
     );
-    assertStrictEquals(sarahGrant.status, 200);
+    assertStrictEquals(sarahGrant.status, 201);
     const sarahRow = (await deriveInvitations(db)).find(
         (row) => row.id === INV_ROSTER_SARAH,
     )!;
@@ -638,7 +638,7 @@ async () => {
         INV_ROSTER_JESSICA, 'jessica.park@company.com',
         EV_ROSTER_JESSICA_GRANT, '2026-06-01T00:00:01.000000Z',
     );
-    assertStrictEquals(jessicaGrant.status, 200);
+    assertStrictEquals(jessicaGrant.status, 201);
     const jessicaAccept = await acceptAs(
         jessicaId, INV_ROSTER_JESSICA, MS_ROSTER_JESSICA,
         EV_ROSTER_JESSICA_ACCEPT, '2026-06-01T00:00:02.000000Z',
@@ -664,7 +664,7 @@ async () => {
         INV_ROSTER_EMILY, 'emily.rodriguez@company.com',
         EV_ROSTER_EMILY_GRANT, '2026-06-01T00:00:03.000000Z',
     );
-    assertStrictEquals(emilyGrant.status, 200);
+    assertStrictEquals(emilyGrant.status, 201);
     const emilyDecline = await declineAs(
         'CJrglMsNBxOWWfbihHQSeg', INV_ROSTER_EMILY,
         EV_ROSTER_EMILY_DECLINE, '2026-06-01T00:00:04.000000Z',
@@ -680,7 +680,7 @@ async () => {
         INV_ROSTER_MARCUS, 'marcus@acmecorp.com',
         EV_ROSTER_MARCUS_GRANT, '2026-06-01T00:00:05.000000Z',
     );
-    assertStrictEquals(marcusGrant.status, 200);
+    assertStrictEquals(marcusGrant.status, 201);
     const marcusRevoke = await revoke(
         INV_ROSTER_MARCUS, EV_ROSTER_MARCUS_REVOKE,
         '2026-06-01T00:00:06.000000Z',
@@ -936,8 +936,8 @@ async () => {
 
 // -- 10. THE ORPHANED-MEMBERSHIP CASE ----------------------------
 
-Deno.test('THE UNSEATED-IDENTITY CASE: an identity created via'
-+ ' postIdentityCreationOp has no seat — GET seats drops it;'
+Deno.test('THE UNSEATED-IDENTITY CASE: an identity born by'
++ ' PUT identities/:id has no seat — GET seats drops it;'
 + ' PUT seat then shows it',
 async () => {
     const db = await seededDb();

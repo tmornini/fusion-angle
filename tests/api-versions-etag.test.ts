@@ -241,7 +241,7 @@ async function grantDave(
             grantAt: AT,
         },
     ));
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 201);
 }
 
 async function seedMemberOrganizations(): Promise<DbAdapter> {

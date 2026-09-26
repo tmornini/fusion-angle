@@ -1158,7 +1158,7 @@ Deno.test(
 );
 
 Deno.test(
-    'one request\'s answering row keeps the'
+    'one request\'s received row keeps the'
         + ' received body and both ids',
     async () => {
         const db = memoryDbAdapter();
@@ -1186,15 +1186,17 @@ Deno.test(
         const fresh = (await db.messagePairs.getAll())
             .filter((row) => !before.has(row.id));
         assertStrictEquals(fresh.length, 2);
-        const etag = response.headers.get('etag');
-        const answering = fresh.find(
-            (row) => '"'+ row.id + '"' === etag,
+        // The answer's etag names the created document
+        // (Interpretation G); the received pair is the one
+        // POST the request stored.
+        const received = fresh.find(
+            (row) => row.method === 'POST',
         );
-        if (answering === undefined) {
-            throw new Error('answering row missing');
+        if (received === undefined) {
+            throw new Error('received row missing');
         }
         assertStrictEquals(
-            wireBody(answering.request), raw,
+            wireBody(received.request), raw,
         );
         for (const row of fresh) {
             assertStrictEquals(
@@ -1215,7 +1217,7 @@ Deno.test(
             );
         }
         const sibling = fresh.find(
-            (row) => row.id !== answering.id,
+            (row) => row.id !== received.id,
         );
         if (sibling === undefined) {
             throw new Error('sibling row missing');
@@ -1223,6 +1225,11 @@ Deno.test(
         assertStrictEquals(
             wireBody(sibling.request) === raw,
             false,
+        );
+        assertStrictEquals(sibling.method, 'PUT');
+        assertStrictEquals(
+            response.headers.get('etag'),
+            '"' + sibling.id + '"',
         );
     },
 );

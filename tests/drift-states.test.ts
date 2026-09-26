@@ -1115,7 +1115,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(acceptGrant.status, 200);
+    assertStrictEquals(acceptGrant.status, 201);
     const accept = await handleRequest(db, req(
         'PUT',
         '/identities/YeQnyZJddPctAdaMBVWEew'
@@ -1154,7 +1154,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-02T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(declineGrant.status, 200);
+    assertStrictEquals(declineGrant.status, 201);
     const decline = await handleRequest(db, req(
         'PUT',
         '/identities/YfxZQrzQBOaPJmijEVzQOg'
@@ -1193,7 +1193,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-03T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(revokeGrant.status, 200);
+    assertStrictEquals(revokeGrant.status, 201);
     const revoke = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION

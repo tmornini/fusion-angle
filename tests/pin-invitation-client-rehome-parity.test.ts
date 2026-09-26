@@ -120,7 +120,7 @@ Deno.test('pendingInvitationFor lifecycle on the message plane'
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
     assertStrictEquals(
         (await assertPending())?.id,
         'iqtxKmWMdfYjxphbQhAJnw',
@@ -150,7 +150,7 @@ Deno.test('pendingInvitationFor lifecycle on the message plane'
             grantAt: '2026-06-02T00:00:02.000000Z',
         },
     ));
-    assertStrictEquals(regrant.status, 200);
+    assertStrictEquals(regrant.status, 201);
     assertStrictEquals(
         (await assertPending())?.id,
         INV_REHOME_PARITY_2,
@@ -173,7 +173,7 @@ Deno.test('deriveInvitation (one document read) equals'
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
 
     assertEquals(
         await deriveInvitation(db, INV_REHOME_LOAD_1),

@@ -106,6 +106,8 @@ import {
     documentHeadAt,
     formWriteMessagePair,
     ifMatchFromMessagePair,
+    rawIfMatchFromMessagePair,
+    responseRecordOf,
 } from './message-pair.ts';
 import type {
     MessagePair,
@@ -753,10 +755,9 @@ function ownerOrganizationViaMembershipPairPlane(
 // requestAt (the write's own origination) yet strictly-later
 // RESPONSE `at` stamps (appendMessagePairOnce's nowUtc() is
 // monotonic), so the document message pair — appended after the
-// operation message pair — becomes the document's head; a duplicate
-// create's Supersedes therefore resolves against the prior
-// DOCUMENT message pair, not the prior operation message pair (the Phase 5
-// shared-document mechanism, re-pinned here).
+// operation message pair — becomes the document's head. A live
+// create lands through the former instead; the edit and the
+// seed's creates form this bundle.
 export interface RecordWriteMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -1037,6 +1038,25 @@ async function requestDiffers(
     );
 }
 
+// The record-type document is judged by its stored state.
+// A former-born head's request carries the entity's `id`
+// and `organization_id`, which the edit's request lacks,
+// so a request comparison always reads changed, submits a
+// row that matches, and the statement drops the edit.
+async function stateDiffers(
+    db: DbAdapter,
+    pair: MessagePair,
+): Promise<boolean> {
+    const head = await messageStore(db).getDocumentHead(
+        pair.path, pair.name,
+    );
+    if (head === null) return true;
+    return !sameValue(
+        responseRecordOf(head.response),
+        responseRecordOf(pair.responseMessage),
+    );
+}
+
 function sameValue(left: unknown, right: unknown): boolean {
     if (Object.is(left, right)) return true;
     if (
@@ -1088,7 +1108,7 @@ async function recordRowsToSubmit(
     db: DbAdapter,
     formed: RecordWriteMessagePairs,
 ): Promise<MessagePair[]> {
-    const recordChanged = await requestDiffers(
+    const recordChanged = await stateDiffers(
         db, formed.document,
     );
     const changedPuts: MessagePair[] = [];
@@ -1139,14 +1159,13 @@ async function deleteAlreadyApplied(
 // document + attribute pairs; states.postEvent on create/edit
 // stays until the states-trace group. Removed attributes are
 // RESTRICTED inside the same tx (message-plane referrers; 409
-// bytes preserved). `messagePairs` is optional so the seed's below-
-// facade call keeps compiling; the route always supplies the
-// bundle.
+// bytes preserved). The live route lands a create through
+// the former; the seed's below-facade creates land here.
 export async function postRecordWriteOp(
     db: DbAdapter,
     payload: Record<string, unknown>,
     _actor: Id,
-    messagePairs?: RecordWriteMessagePairs,
+    messagePairs: RecordWriteMessagePairs,
     // Verified token organization scoping the RESTRICT
     // referrer sweep (collectAttributeReferrers). Optional so
     // the below-facade seed path (creates only; never removes
@@ -1160,9 +1179,14 @@ export async function postRecordWriteOp(
             ? body.removedAttributeIds
             : [];
     // Choose rows before the read. RESTRICT runs first;
-    // the statement is the write.
-    const rows = messagePairs === undefined
-        ? undefined
+    // the statement is the write. A create submits every
+    // row.
+    const rows = body.kind === 'create'
+        ? [
+            messagePairs.operation,
+            messagePairs.document,
+            ...messagePairs.attributePuts,
+        ]
         : await recordRowsToSubmit(db, messagePairs);
     // Phase Final Task 2: states ROW half stripped —
     // document/attribute pairs alone carry truth.
@@ -1194,9 +1218,7 @@ export async function postRecordWriteOp(
             }
         });
     }
-    if (rows !== undefined) {
-        await runWrite(db, attemptFor(rows), rows);
-    }
+    await runWrite(db, attemptFor(rows), rows);
 }
 
 // Phase Final Task 2: writeFlowGraphDelta RETIRED. The four
@@ -1444,72 +1466,32 @@ export function flowCreateDocumentBody(
     };
 }
 
-// The three pairs a live POST /flows forms (Task 5): the gate's
-// own operation message pair (204, at the flows/:id document per Task 1's
-// createdEntityName override — POST 'flows' and PUT 'flows/:id'
-// collapse onto the SAME (path, name), see derive-
-// documents.ts's DOCUMENT_METHODS filter for why the two never
-// collide as documents), plus the document and join pairs the
-// route pre-forms below. All three share ONE requestAt (the
-// create's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePairOnce's nowUtc() is monotonic), so the
-// document message pair — appended after the
-// operation message pair — becomes the document's head.
+// The three pairs the seed forms for one flow (pass 1,
+// seed-message-pairs.ts): the operation pair, the flow
+// document, and its project join, sharing one requestAt.
 export interface FlowCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
     readonly join: MessagePair;
 }
 
-// Flow creation. Phase Final Task 2: flows + graph relation
-// + project_flows ROW halves stripped — message plane carries
-// the document (graphDelta SIDECAR-KEEP) and the join; only
-// the initial 'active' states.postEvent remains until the
-// states-trace group. graphDelta is still validated at the
-// HTTP gate and stored on the document message pair. Exported so the
-// seed can drive flow creation through the same gate the
-// route uses (Decision 6's below-facade carve-out). `messagePairs`
-// is optional so the seed's below-facade call keeps
-// compiling; the route always supplies the triple.
-// An unchanged document is left out when the join
-// changes. A resend of every body is what matches.
-async function flowRowsToSubmit(
-    db: DbAdapter,
-    formed: FlowCreationMessagePairs,
-): Promise<MessagePair[]> {
-    const documentChanged = await requestDiffers(
-        db, formed.document,
-    );
-    const joinChanged = await requestDiffers(
-        db, formed.join,
-    );
-    const hasChange = documentChanged || joinChanged;
-    const rows = [formed.operation];
-    if (documentChanged || !hasChange) {
-        rows.push(formed.document);
-    }
-    if (joinChanged || !hasChange) {
-        rows.push(formed.join);
-    }
-    return rows;
-}
-
+// The seed's below-facade flow creation (Decision 6's
+// carve-out): its pairs were formed before the rehearsal's
+// writes, so it lands them as formed. A create submits
+// every row; the live route lands through the former.
 export async function postFlowCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     _actor: Id,
-    messagePairs?: FlowCreationMessagePairs,
+    messagePairs: FlowCreationMessagePairs,
 ): Promise<void> {
     validateFlowCreateBody(body);
-    const rows = messagePairs === undefined
-        ? undefined
-        : await flowRowsToSubmit(db, messagePairs);
-    if (rows !== undefined) {
-        await runWrite(
-            db, attemptFor(rows), rows,
-        );
-    }
-    return;
+    const rows = [
+        messagePairs.operation,
+        messagePairs.document,
+        messagePairs.join,
+    ];
+    await runWrite(db, attemptFor(rows), rows);
 }
 
 // Flow document write (Decision 7, class B). Phase
@@ -1678,20 +1660,9 @@ function undoneFlowBody(
     return documentBody;
 }
 
-// The three pairs a live POST /objectives forms (Task 3): the
-// gate's own operation message pair (204, at the objectives/:id document
-// per the create-body-id-field override — POST 'objectives' and
-// PUT 'objectives/:id' collapse onto the SAME (path,
-// name), the flows/records precedent), the synthesized document
-// message pair (objectives/:id), and the synthesized revision pair
-// (objectives/:id/revisions/:rid) the route pre-forms below. All
-// three share ONE requestAt (the create's own origination) yet
-// strictly-later RESPONSE `at` stamps (appendMessagePairOnce's
-// nowUtc() is monotonic), so the document message pair — appended after
-// the operation message pair — becomes the shared document's head; the
-// revision pair lives at its OWN distinct document (a fresh
-// revision id per create), so it is always genesis there unless
-// a live PUT had already visited that exact revision id.
+// The three pairs the seed forms for one objective (pass 1,
+// seed-message-pairs.ts): the operation pair, the objective
+// document, and its first revision, sharing one requestAt.
 export interface ObjectiveCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -1735,38 +1706,23 @@ export function objectiveRevisionBodyOf(
     return createBody.revision;
 }
 
-// Objective creation: operation + document + first-revision
-// pairs commit as ONE transaction. Phase Final Task 2:
-// objectives + objective_revisions ROW halves stripped —
-// pure message-plane write. The genesis state folds onto
-// the document message pair via objectiveDocumentBodyOf
-// (states-document retirement); no separate states/:id event
-// is written. Exported so the seed can drive objective
-// creation through the same gate the route uses (Decision
-// 6's below-facade carve-out). `messagePairs` is optional so the
-// seed's below-facade shape keeps compiling; the route
-// always supplies the bundle, since 'objectives' is pair-
-// wired and never bearer-exempt. Create appends THREE pairs
-// — operation, document, revision — in that order, LAST.
+// The seed's below-facade objective creation (Decision 6's
+// carve-out): its pairs were formed before the rehearsal's
+// writes, so it lands them as formed. The genesis state
+// folds onto the document via objectiveDocumentBodyOf; the
+// live route lands through the former.
 export async function postObjectiveCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    messagePairs?: ObjectiveCreationMessagePairs,
+    messagePairs: ObjectiveCreationMessagePairs,
 ): Promise<void> {
     validateObjectiveCreateBody(body);
-    // Phase Final Task 2: objectives +
-    // objective_revisions ROW halves stripped.
-    if (messagePairs !== undefined) {
-        const pairs = [
-            messagePairs.operation,
-            messagePairs.document,
-            messagePairs.revision,
-        ];
-        await runWrite(
-            db, attemptFor(pairs), pairs,
-        );
-    }
-    return;
+    const pairs = [
+        messagePairs.operation,
+        messagePairs.document,
+        messagePairs.revision,
+    ];
+    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Objective document write — the fifth lifecycle-state family
@@ -1825,58 +1781,6 @@ export function identityDocumentBodyOf(
         return { kind };
     }
     return { kind, ...profile };
-}
-
-// Identity creation: Phase Final Task 2 strips the
-// identities + identity_credentials ROW halves — pure
-// message-plane write. A person's PII enters later via PUT
-// identities/:id/pii. NO state event (an identity carries
-// no lifecycle event at creation). The pairs a live POST
-// /identities forms: operation (204 at identities/:id) +
-// identities/:id document ({kind} alone). A service ALSO
-// forms the credential-document message pair at
-// identities/:id/credentials/:cid, appended last.
-export type IdentityWriteMessagePairs =
-    | {
-        readonly kind: 'person';
-        readonly operation: MessagePair;
-        readonly identityDocument: MessagePair;
-    }
-    | {
-        readonly kind: 'service';
-        readonly operation: MessagePair;
-        readonly identityDocument: MessagePair;
-        readonly credentialDocument: MessagePair;
-    };
-
-// Exported so the seed can drive identity creation through
-// the same gate the route uses. `messagePairs` is optional so the
-// seed's below-facade shape keeps compiling; the route always
-// supplies the bundle. Create appends operation + identity
-// document (+ credential document for service), LAST.
-export async function postIdentityCreationOp(
-    db: DbAdapter,
-    body: Record<string, unknown>,
-    messagePairs?: IdentityWriteMessagePairs,
-): Promise<void> {
-    validateIdentityCreateBody(body);
-    // Phase Final Task 2: identities + identity_credentials
-    // ROW halves stripped.
-    if (messagePairs !== undefined) {
-        const pairs = [
-            messagePairs.operation,
-            messagePairs.identityDocument,
-        ];
-        if (messagePairs.kind === 'service') {
-            pairs.push(
-                messagePairs.credentialDocument,
-            );
-        }
-        await runWrite(
-            db, attemptFor(pairs), pairs,
-        );
-    }
-    return;
 }
 
 // A wired route forms its pair before dispatch; only a
@@ -3133,10 +3037,6 @@ export const WRITE_RESPONSE_SPECS:
     },
     'organizations/:id/flows/': {
         conditional: 'none',
-        // The receipt shares the document name. An empty
-        // body matches a DELETE tombstone, so a recreate
-        // would store nothing.
-        successBody: (_params, body) => body ?? {},
     },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
@@ -3179,13 +3079,16 @@ export const WRITE_RESPONSE_SPECS:
                 body: withoutId(body ?? {}),
             }),
     },
-    // Nested composed POST (Task 9 / Task 23): 204 op response;
-    // document + attribute pairs form at nested documents.
+    // Nested composed POST: a create lands through the
+    // former, which writes its own answer. The composed edit
+    // does not ride the former yet, so the gate still forms
+    // its receipt from this successBody. The receipt shares
+    // the document name, and an empty body would match a
+    // DELETE tombstone, so an edit after a delete would
+    // store nothing. It retires when the edit rides the
+    // former.
     [RECORD_TYPES_COLLECTION_PATTERN]: {
         conditional: 'optional',
-        // The receipt shares the document name. An empty
-        // body matches a DELETE tombstone, so a recreate
-        // would store nothing.
         successBody: (_params, body) => body ?? {},
     },
     // Nested record-types detail (Task 3): put-only per-verb
@@ -3966,76 +3869,72 @@ export const routes: Route[] = [
         get: documentCollectionGetHandler(IDENTITIES_WIRING),
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
-        // ROUTE_POLICY. Task 5: forms the identities/:id
-        // document message pair (+ the credential-document
-        // message pair for a service) INLINE PRE-TX, beside
-        // the gate's own operation message pair. See
-        // postIdentityCreationOp for the transaction shape.
+        // ROUTE_POLICY. The identity and, for a service, its
+        // client_secret credential are declared geneses in one
+        // statement, so a resent create answers 409 and stores
+        // nothing. A person's PII enters later via PUT
+        // identities/:id/pii.
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
-            let messagePairs: IdentityWriteMessagePairs | undefined;
-            if (
-                messagePair !== undefined && organization !== undefined
-            ) {
-                const b = validateIdentityCreateBody(body);
-                const identityDocument =
-                    await formDocumentMessagePairFor({
-                        routePattern: 'identities/:id',
-                        params: [b.id],
+            const org = requireOrganization(organization);
+            const b = validateIdentityCreateBody(body);
+            const identity: ParentSibling = {
+                method: 'PUT',
+                path: canonicalPath(org, '/identities/'),
+                name: b.id,
+                state: {
+                    ...identityDocumentEntityOf({
+                        name: b.id,
+                        messagePairId: b.id,
+                        method: 'PUT',
                         body: identityDocumentBodyOf(b.kind),
-                        requesterIdentityId: actor,
-                        requestAt: messagePair.requestAt,
-                        operationId: messagePair.operationId,
-                        requestId: messagePair.requestId,
-                        organization,
-                    });
-                if (b.kind === 'service') {
-                    const { id: credId, ...fields } =
-                        b.credential as {
-                            id: string;
-                            secret: string;
-                        } & Record<string, unknown>;
-                    if (typeof fields.secret !== 'string'
-                        || fields.secret === '') {
-                        throw new ValidationError(
-                            'IdentityCreateServiceBody'
-                            + '.credential.secret must'
-                            + ' be a non-empty string',
-                        );
-                    }
-                    const credentialDocument =
-                        await formDocumentMessagePairFor({
-                            routePattern:
-                                'identities/:id/credentials/:cid',
-                            params: [b.id, credId],
-                            body: {
-                                ...fields,
-                                secret: await hashPassword(
-                                    fields.secret,
-                                ),
-                            },
-                            requesterIdentityId: actor,
-                            requestAt: messagePair.requestAt,
-                            operationId: messagePair.operationId,
-                            requestId: messagePair.requestId,
-                            organization,
-                        });
-                    messagePairs = {
-                        kind: 'service',
-                        operation: messagePair,
-                        identityDocument,
-                        credentialDocument,
-                    };
-                } else {
-                    messagePairs = {
-                        kind: 'person',
-                        operation: messagePair,
-                        identityDocument,
-                    };
+                    }, org),
+                },
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            };
+            const credentials: StateSibling[] = [];
+            if (b.kind === 'service') {
+                const { id: credId, ...fields } =
+                    b.credential as {
+                        id: string;
+                        secret: string;
+                    } & Record<string, unknown>;
+                if (typeof fields.secret !== 'string'
+                    || fields.secret === '') {
+                    throw new ValidationError(
+                        'IdentityCreateServiceBody'
+                        + '.credential.secret must'
+                        + ' be a non-empty string',
+                    );
                 }
+                const credential = {
+                    ...fields,
+                    secret: await hashPassword(fields.secret),
+                };
+                validateIdentityCredentialEntity(credential);
+                credentials.push({
+                    method: 'PUT',
+                    path: canonicalPath(
+                        org,
+                        '/identities/' + b.id + '/credentials/',
+                    ),
+                    name: credId,
+                    state: credential,
+                    condition: {
+                        kind: 'genesis', declarer: 'handler',
+                    },
+                });
             }
-            return postIdentityCreationOp(db, body, messagePairs);
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received: requirePair(messagePair),
+                siblings: [identity, ...credentials],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
@@ -4690,71 +4589,71 @@ export const routes: Route[] = [
         get: (db, _p, _actor, organization) =>
             deriveFlows(db, requireOrganization(organization)),
         // Member-tier POST — /flows carries POST in
-        // MEMBER_VERBS. Forms the document + join pairs pre-tx
-        // (Task 5) beside the gate's own operation message pair — the
-        // SAME shape a live genesis PUT /flows/:id and a live
-        // PUT /projects/:id/flows/:pfid would each carry — ONLY
-        // when the gate supplied both a pair and a fence
-        // organization (the Phase 3 condition verbatim); a
-        // below-facade caller (api/mock-data.ts, no gate) skips
-        // all three, preserving dual-write discipline. See
-        // postFlowCreationOp for the transaction shape.
+        // MEMBER_VERBS. The flow and its project join are
+        // declared geneses in one statement, the shape a
+        // genesis PUT /flows/:id and a PUT
+        // /projects/:id/flows/:pfid would each carry, so a
+        // resent create answers 409 and stores nothing. The
+        // seed forms its own pairs (postFlowCreationOp).
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
-            let messagePairs: FlowCreationMessagePairs | undefined;
-            if (messagePair !== undefined && organization !== undefined) {
-                const b = validateFlowCreateBody(body);
-                const documentBody = flowCreateDocumentBody(b);
-                validateFlowDocumentBody(documentBody);
-                await assertLiveFlowGraphWriteLaw(
-                    db, documentBody.graph as
-                        Record<string, unknown>,
-                );
-                const document = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/flows/:id',
-                    params: [organization, b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                // The live :pfid PUT's request shape, verified by
-                // content: validateProjectFlowEntity accepts
-                // EXACTLY project_id/flow_id/at
-                // (api/validators.ts) — the same three keys
-                // b.projectFlow already carries, so it doubles as
-                // the join pair's body verbatim.
-                validateProjectFlowEntity(b.projectFlow);
-                const projectId = pickString(
-                    b.projectFlow, 'project_id',
-                );
-                // Genesis-undefined (chain 'none'): a flow's
-                // create-time join is always fresh (design
-                // decision — no duplicate-create carve-out at this
-                // document through this task; pinned by the same-
-                // join-id retry test in tests/drift-flows.test.ts).
-                const join = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/projects/:id'
-                        + '/flows/:pfid',
-                    params: [
-                        organization, projectId,
-                        b.projectFlowId,
-                    ],
-                    body: b.projectFlow,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                messagePairs = { operation: messagePair, document, join };
-            }
-            return postFlowCreationOp(db, body, actor, messagePairs);
+            const org = requireOrganization(organization);
+            const b = validateFlowCreateBody(body);
+            const documentBody = flowCreateDocumentBody(b);
+            validateFlowDocumentBody(documentBody);
+            await assertLiveFlowGraphWriteLaw(
+                db, documentBody.graph as
+                    Record<string, unknown>,
+            );
+            // validateProjectFlowEntity accepts EXACTLY
+            // project_id/flow_id/at — the keys b.projectFlow
+            // already carries, so it is the join's body
+            // verbatim.
+            validateProjectFlowEntity(b.projectFlow);
+            const projectId = pickString(
+                b.projectFlow, 'project_id',
+            );
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received: requirePair(messagePair),
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(org, '/flows/'),
+                        name: b.id,
+                        state: flowStoredEntityOf({
+                            name: b.id,
+                            messagePairId: b.id,
+                            method: 'PUT',
+                            body: documentBody,
+                        }, org),
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(
+                            org, '/projects/' + projectId + '/flows/',
+                        ),
+                        name: b.projectFlowId,
+                        state: {
+                            ...projectFlowEntityOf({
+                                name: b.projectFlowId,
+                                messagePairId: b.projectFlowId,
+                                method: 'PUT',
+                                body: b.projectFlow,
+                            }),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                ],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     // flows/:id takes a conditional PUT ('required').
@@ -5024,28 +4923,84 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
             ),
         // Admin-only composed create/edit (MEMBER_VERBS has
-        // GET only). Same transaction / RESTRICT discipline
-        // as flat POST /records; document message pair at the nested
-        // detail document, attributes at ATTRIBUTE_DETAIL_
-        // PATTERN.
+        // GET only). A create lands the type and each
+        // attribute as declared geneses in one statement, so a
+        // resent create answers 409 and stores nothing. An
+        // edit keeps the flat POST /records RESTRICT
+        // discipline: document at the nested detail document,
+        // attributes at ATTRIBUTE_DETAIL_PATTERN.
         post: async (
             db, _p, body, actor, messagePair, organization,
         ) => {
-            let messagePairs: RecordWriteMessagePairs | undefined;
-            if (
-                messagePair !== undefined
-                && organization !== undefined
-            ) {
-                const b = validateRecordWriteBody(body);
-                messagePairs = await formRecordWriteMessagePairs(
-                    db, b, actor, messagePair, organization,
-                    RECORD_TYPE_DETAIL_PATTERN,
-                    [organization, b.id],
+            const org = requireOrganization(organization);
+            const received = requirePair(messagePair);
+            const b = validateRecordWriteBody(body);
+            if (b.kind === 'edit') {
+                return postRecordWriteOp(
+                    db, body, actor,
+                    await formRecordWriteMessagePairs(
+                        db, b, actor, received, org,
+                        RECORD_TYPE_DETAIL_PATTERN,
+                        [org, b.id],
+                    ),
+                    org,
                 );
             }
-            return postRecordWriteOp(
-                db, body, actor, messagePairs, organization,
+            // Interpretation T: the one presence check a
+            // handler makes. A create names no head.
+            if (rawIfMatchFromMessagePair(received) !== undefined) {
+                throw new ApiError(
+                    'POST ' + recordTypesUriPrefix(org)
+                        + ' takes no If-Match on a create',
+                    HTTP_BAD_REQUEST,
+                );
+            }
+            const documentBody = recordDocumentBodyOf(b);
+            validateRecordDocumentBody(documentBody);
+            const attributes: StateSibling[] = b.attributes.map(
+                (attr) => {
+                    const attributeBody =
+                        recordAttributeDocumentBodyOf(
+                            attr as unknown as
+                                Record<string, unknown>,
+                        );
+                    validateAttributeDocument(attributeBody);
+                    return {
+                        method: 'PUT',
+                        path: attributesUriPrefix(org, b.id),
+                        name: attr.id,
+                        state: attributeBody,
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    };
+                },
             );
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received,
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: recordTypesUriPrefix(org),
+                        name: b.id,
+                        state: {
+                            ...recordTypeEntityOf({
+                                name: b.id,
+                                messagePairId: b.id,
+                                method: 'PUT',
+                                body: documentBody,
+                            }, org),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    ...attributes,
+                ],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     route(RECORD_TYPE_DETAIL_PATTERN, {
@@ -5724,61 +5679,69 @@ export const routes: Route[] = [
     // the generic documentCollectionGetHandler —
     // objectiveDocumentEntityOf reads entity fields and `state`
     // alike from the head body. POST stays this hand-written
-    // bundle — objectives' own create forms the document PLUS
-    // its first revision pair in one pass
-    // (postObjectiveCreationOp), mirroring records'/work-
-    // orders' own precedent.
+    // create — objectives' own create lands the document PLUS
+    // its first revision in one statement, mirroring
+    // records'/work-orders' own precedent.
     route('organizations/:id/objectives/', {
         get: documentCollectionGetHandler(OBJECTIVES_WIRING),
-        // Forms the document + revision pairs pre-tx (Task 3)
-        // beside the gate's own operation message pair — the SAME shape
-        // a live genesis PUT /objectives/:id and a live PUT
-        // /objectives/:id/revisions/:rid would each carry — ONLY
-        // when the gate supplied both a pair and a fence
-        // organization (the route('flows') condition verbatim);
-        // a below-facade caller (api/mock-data.ts, no gate) skips
-        // both, preserving dual-write discipline. See
-        // postObjectiveCreationOp for the transaction shape.
+        // The objective and its first revision are declared
+        // geneses in one statement, the shape a genesis PUT
+        // /objectives/:id and a PUT
+        // /objectives/:id/revisions/:rid would each carry, so
+        // a resent create answers 409 and stores nothing. The
+        // seed forms its own pairs (postObjectiveCreationOp).
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
-            let messagePairs: ObjectiveCreationMessagePairs | undefined;
-            if (messagePair !== undefined && organization !== undefined) {
-                const b = validateObjectiveCreateBody(body);
-                const documentBody = objectiveDocumentBodyOf(b);
-                validateObjectiveDocumentBody(documentBody);
-                const document = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/objectives/:id',
-                    params: [organization, b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                const revisionBody = objectiveRevisionBodyOf(b);
-                validateObjectiveRevisionEntity(revisionBody);
-                const revision = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/objectives/:id'
-                        + '/revisions/:rid',
-                    params: [
-                        organization, b.id, b.revisionId,
-                    ],
-                    body: revisionBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                messagePairs = {
-                    operation: messagePair, document, revision,
-                };
-            }
-            return postObjectiveCreationOp(db, body, messagePairs);
+            const org = requireOrganization(organization);
+            const b = validateObjectiveCreateBody(body);
+            const documentBody = objectiveDocumentBodyOf(b);
+            validateObjectiveDocumentBody(documentBody);
+            const revisionBody = objectiveRevisionBodyOf(b);
+            validateObjectiveRevisionEntity(revisionBody);
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received: requirePair(messagePair),
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(org, '/objectives/'),
+                        name: b.id,
+                        state: {
+                            ...objectiveDocumentEntityOf({
+                                name: b.id,
+                                messagePairId: b.id,
+                                method: 'PUT',
+                                body: documentBody,
+                            }, org),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(
+                            org,
+                            '/objectives/' + b.id + '/revisions/',
+                        ),
+                        name: b.revisionId,
+                        state: {
+                            ...objectiveRevisionEntityOf({
+                                name: b.revisionId,
+                                messagePairId: b.revisionId,
+                                method: 'PUT',
+                                body: revisionBody,
+                            }),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                ],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     // objectives/:id is the seventh family. GET is FLIPPED

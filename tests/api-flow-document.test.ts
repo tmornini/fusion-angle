@@ -23,6 +23,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import {
     postFlowDocumentOp,
+    withoutId,
 } from '../api/routes.ts';
 import {
     validateFlowDocumentBody,
@@ -583,16 +584,15 @@ async () => {
     assertStrictEquals(fresh.headers.get('Supersedes'), null);
 });
 
-// Task 5: create's own 204 operation message pair and its
-// synthesized document message pair are now TWO rows at
-// organizations/:id/flows/:id's document — the GET-attached
-// head is the DOCUMENT message pair (appended strictly
-// later; a live PUT chains Follows/Supersedes off it), never
-// the create response's own operation pair id.
+// The create's received pair and its document message
+// pair are TWO rows at organizations/:id/flows/:id's
+// document. The GET-attached head is the DOCUMENT message
+// pair, and the create's answer names that same pair
+// (Interpretation G), never the received pair's own id.
 Deno.test('e2e: GET organizations/:id/flows/:id carries'
     + ' ETag == the head pair'
-+ ' id — create\'s own synthesized document message pair, never its'
-+ ' operation response (Task 8: ledger-derived handler)',
++ ' id — the create\'s document message pair, which the'
++ ' create\'s own answer names (Task 8: ledger-derived handler)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -607,7 +607,7 @@ async () => {
     assertStrictEquals(got.status, 200);
     const headId = pairIdOf(got);
     assert(headId);
-    assertNotStrictEquals(headId, createdId);
+    assertStrictEquals(headId, createdId);
     const stored = await db.messagePairs.getById(headId);
     assert(stored !== undefined);
     assertStrictEquals(pairIdOf(got), stored.id);
@@ -766,9 +766,13 @@ async () => {
         revivals: [],
     };
     // Validates as a genuine FlowDocumentBody — the Phase 3
-    // gate-validate precedent, proven at the wire.
+    // gate-validate precedent, proven at the wire. The
+    // stored request is the flow's state, which leads with
+    // its id until the former stores no request bytes.
     assertEquals(
-        validateFlowDocumentBody(decodedDocument.body).entity,
+        validateFlowDocumentBody(
+            withoutId(decodedDocument.body),
+        ).entity,
         {
             name: 'Fresh Flow',
             is_locked: false,
@@ -777,7 +781,11 @@ async () => {
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
         },
     );
-    assertEquals(decodedDocument.body, expectedDocument);
+    assertEquals(decodedDocument.body, {
+        id: flowId,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        ...expectedDocument,
+    });
 
     const joinPrefix =
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
@@ -790,7 +798,7 @@ async () => {
     const decodedJoin =
         decodeRequestMessage(joinPairs[0]!.request);
     assertStrictEquals(decodedJoin.method, 'PUT');
-    assertEquals(decodedJoin.body, {
+    assertEquals(withoutId(decodedJoin.body), {
         project_id: 'qfhFObbtDfxUZwEGxySBoQ',
         flow_id: flowId,
         at: AT,
@@ -806,10 +814,9 @@ async () => {
     assertStrictEquals(ats.size, 1);
 });
 
-Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
-+ ' create op holds no echo — and its second document message pair'
-+ ' carries Supersedes to the first, never Follows, while'
-+ ' the first document message pair was genesis', async () => {
+Deno.test('e2e: a duplicate POST flows (same id) is 409 and'
++ ' stores nothing — the flow document keeps its one genesis'
++ ' document message pair', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const flowId = generateIdentifier();
@@ -872,12 +879,19 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
             graphDelta: emptyDelta(),
         },
     ));
-    assertStrictEquals(
-        second.status, 201,
-        'the create op holds no echo — no 412',
-    );
+    // A POST create declares a genesis; the taken id
+    // refuses it (Interpretation Q).
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at '
+            + canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/')
+            + flowId,
+    });
 
     const requestsAfterSecond = await db.messagePairs.getAll();
+    assertStrictEquals(
+        requestsAfterSecond.length, requestsAfterFirst.length,
+    );
     const flowPairsAfterSecond = requestsAfterSecond.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
@@ -886,23 +900,9 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     const documentRequests = flowPairsAfterSecond.filter(
         r => decodeRequestMessage(r.request).method === 'PUT',
     );
-    assertStrictEquals(documentRequests.length, 2);
-    const secondDocumentRequest = documentRequests.find(
-        r => r.id !== firstDocumentRequest!.id,
-    );
-    assert(
-        secondDocumentRequest,
-        'no second document message pair at the flow document',
-    );
-    const secondDocumentResponse = await db.messagePairs.getById(
-        secondDocumentRequest!.id,
-    );
+    assertStrictEquals(documentRequests.length, 1);
     assertStrictEquals(
-        secondDocumentResponse.supersedes,
-        firstDocumentRequest!.id,
-    );
-    assertStrictEquals(
-        'follows' in secondDocumentResponse, false,
+        documentRequests[0]!.id, firstDocumentRequest!.id,
     );
 });
 

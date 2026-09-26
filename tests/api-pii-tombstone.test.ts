@@ -325,7 +325,7 @@ async () => {
             grantEventId: generateIdentifier(), grantAt: AT,
         },
     ));
-    assertStrictEquals(grantRes.status, 200);
+    assertStrictEquals(grantRes.status, 201);
     const invitationId =
         ((await grantRes.json()) as { id: string }).id;
     const acceptRes = await handleRequest(db, req(

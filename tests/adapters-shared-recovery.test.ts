@@ -591,7 +591,7 @@ Deno.test('a concurrent facade refresh and remint present'
             grantAt: '2026-06-04T00:00:01.000000Z',
         },
     }));
-    assertStrictEquals(granted.status, 200);
+    assertStrictEquals(granted.status, 201);
     const pair = await issuePair(db);
     client.putSessionCredentials({
         accessToken: pair.access_token,

@@ -41,6 +41,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 
 const SEED_FLOW_ORGANIZATION_TWO = seedIdentifier('seed-flow-org2');
@@ -796,8 +797,9 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
 
 // -- 8. duplicate-create (the R2 multiset case) ----------------
 
-Deno.test('duplicate-create: two creates, same flow id, distinct '
-+ 'lifecycle events, and a fresh join row on wire/derive',
+Deno.test('duplicate-create: a second create at the same flow id'
++ ' is 409 and stores nothing; one lifecycle event and one join'
++ ' row on wire/derive',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -811,16 +813,20 @@ async () => {
         FLOW_DRIFT_DUP_EV_A,
     );
     assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
     const second = await createFlow(
         db, token, flowId, pfidB, projectId,
         FLOW_DRIFT_DUP_EV_B,
     );
-    // The create op holds no echo of its own — a duplicate
-    // create succeeds outright, never 412ing.
-    assertStrictEquals(second.status, 201);
+    // The create declares its genesis: a taken flow id is
+    // refused, never superseded.
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 
-    // ONE flow head on wire/derive — the derived head is the
-    // (at, id) winner, the second create's own document message pair.
     const derivedFlow = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
@@ -829,15 +835,11 @@ async () => {
     );
     assertWireEqualsDerived(wireText, derivedFlow);
 
-    // TWO lifecycle events (derive vs states dual-write).
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert(derivedHistory.length >= 0);
-    assertStrictEquals(derivedHistory.length, 2);
+    assertStrictEquals(derivedHistory.length, 1);
 
-    // TWO join rows on wire and derive (Phase Final Task 2:
-    // project_flows row half stripped).
     const joinsRes = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId + '/flows/', token,
@@ -850,15 +852,15 @@ async () => {
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assertStrictEquals(wireJoins.length, 2);
-    assertStrictEquals(derivedJoins.length, 2);
+    assertStrictEquals(wireJoins.length, 1);
+    assertStrictEquals(derivedJoins.length, 1);
     assertEquals(
         sortById(wireJoins), sortById(derivedJoins),
     );
 });
 
 Deno.test('duplicate-create with an unchanged document'
-+ ' keeps one head and lands the new join', async () => {
++ ' is 409 and stores nothing: one head, one join', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const flowId = generateIdentifier();
@@ -871,10 +873,16 @@ Deno.test('duplicate-create with an unchanged document'
         db, token, flowId, pfidA, projectId, eventId,
     );
     assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
     const second = await createFlow(
         db, token, flowId, pfidB, projectId, eventId,
     );
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 
     const flowPrefix = '/organizations/'
         + STARK_ORGANIZATION + '/flows/';
@@ -904,8 +912,8 @@ Deno.test('duplicate-create with an unchanged document'
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assertStrictEquals(wireJoins.length, 2);
-    assertStrictEquals(derivedJoins.length, 2);
+    assertStrictEquals(wireJoins.length, 1);
+    assertStrictEquals(derivedJoins.length, 1);
 });
 
 // -- 9. the create-op POST pair is never the derived head -----
@@ -1157,19 +1165,13 @@ async () => {
     );
 });
 
-// -- 13. same-join-id retry: the join stays chain-less ----------
-// (Phase 9 Task 2 Step 0(d') pin, additive and pass-first against
-// HEAD: the create route's join pair hardcodes headPairId:
-// undefined by design — no head-read at all — so a SECOND,
-// genuinely different create [a fresh flow id, a fresh operation]
-// that happens to reuse a prior create's project-flow id still
-// appends a chain-less join pair, never a Supersedes onto the
-// first. Pinned BEFORE the shared former absorbs this site, so a
-// future uniform head-read regresses here first.)
+// -- 13. same-join-id retry: the join is a declared genesis ------
+// A second, genuinely different create [a fresh flow id, a fresh
+// operation] that reuses a prior create's project-flow id names a
+// taken join: the statement refuses the whole create.
 
-Deno.test('same-join-id retry: two different flow creates reusing '
-+ 'one project-flow id each append a chain-less join pair '
-+ '(neither Supersedes nor Follows)', async () => {
+Deno.test('same-join-id retry: a second flow create reusing '
++ 'one project-flow id is 409 and stores nothing', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const projectId = l2cProjectId;
@@ -1180,15 +1182,18 @@ Deno.test('same-join-id retry: two different flow creates reusing '
         FLOW_DRIFT_RETRY_EV_A,
     );
     assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
 
-    // A DIFFERENT flow, a DIFFERENT operation (fresh event id) —
-    // not a byte-identical resend, which would replay via the E6
-    // fast path and append no second pair at all.
     const second = await createFlow(
         db, token, FLOW_DRIFT_RETRY_B, sharedPfid, projectId,
         FLOW_DRIFT_RETRY_EV_B,
     );
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 
     const joinPrefix = canonicalPath(
         STARK_ORGANIZATION,
@@ -1198,14 +1203,56 @@ Deno.test('same-join-id retry: two different flow creates reusing '
     const joinResponses = await db.messagePairs.getDocumentHistory(
         joinPrefix, sharedPfid,
     );
-    assertStrictEquals(joinResponses.length, 2);
+    assertStrictEquals(joinResponses.length, 1);
     assertStrictEquals(
         joinResponses[0]!.supersedes, NIL_IDENTIFIER,
     );
-    assertStrictEquals(
-        joinResponses[1]!.supersedes,
-        joinResponses[0]!.id,
-    );
     assertStrictEquals('follows' in joinResponses[0]!, false);
-    assertStrictEquals('follows' in joinResponses[1]!, false);
+});
+
+Deno.test('POST flows/ answers 201 with the document\'s state'
++ ' and its location', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const res = await createFlow(
+        db, token, flowId, generateIdentifier(), l2cProjectId,
+        generateIdentifier(),
+    );
+    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.headers.get('location'), flowId);
+    assertEquals(
+        await res.json(),
+        JSON.parse(await storedPutBodyText(
+            db, canonicalPath(STARK_ORGANIZATION, '/flows/'),
+            flowId,
+        )),
+    );
+});
+
+Deno.test('a resent POST flows/ is 409 and stores nothing',
+async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const projectFlowId = generateIdentifier();
+    const eventId = generateIdentifier();
+    const first = await createFlow(
+        db, token, flowId, projectFlowId, l2cProjectId, eventId,
+    );
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const second = await createFlow(
+        db, token, flowId, projectFlowId, l2cProjectId, eventId,
+    );
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at '
+            + canonicalPath(STARK_ORGANIZATION, '/flows/')
+            + flowId,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
