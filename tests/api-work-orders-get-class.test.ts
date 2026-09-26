@@ -1,4 +1,4 @@
-import { assert, assertNotEquals, assertStrictEquals } from '@std/assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -21,12 +21,11 @@ import {
     storedCollectionText,
 } from './http-fixtures.ts';
 
-// GET work-orders (inbox), GET organizations/:id/work-orders/:id, and
-// work-order history are Assemble / derive: JavaScript
-// over pair reads. They are not Stream. A bound GET
-// cannot equal the stored document PUT — bind facts
-// live on organizations/:id/work-orders/:id/binding/ and join at read.
-// History stays /history, not /versions.
+// GET work-orders (inbox) and GET
+// organizations/:id/work-orders/:id are Stream: a work
+// order's head is its whole state, binding included (§5).
+// Work-order history is Assemble over the version chain and
+// stays /history, not /versions.
 
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -57,12 +56,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
@@ -130,6 +131,7 @@ async function seedWorkOrder(
             flow_graph: graphJson(),
             position: 1,
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
@@ -246,13 +248,19 @@ async function bindWorkOrder(
     db: MemoryDbAdapter,
     token: string,
 ): Promise<void> {
+    const read = await handleRequest(db, req(
+        'GET', DOCUMENT_PREFIX + WO_ID, token,
+    ));
+    await read.body?.cancel();
     const res = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        { 'If-Match': read.headers.get('ETag')! },
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
-Deno.test('GET organizations/:id/work-orders/:id is Assemble, not Stream',
+Deno.test('GET organizations/:id/work-orders/:id is Stream',
 async () => {
     const { db, token } = await seededDb();
     await bindWorkOrder(db, token);
@@ -260,10 +268,8 @@ async () => {
     const stored = JSON.parse(
         await storedPutBodyText(db, DOCUMENT_PREFIX, WO_ID),
     ) as Record<string, unknown>;
-    assertStrictEquals(Object.hasOwn(stored, 'instance_id'), false);
-    assertStrictEquals(
-        Object.hasOwn(stored, 'record_type_id'), false,
-    );
+    assertStrictEquals(stored['instance_id'], INSTANCE_ID);
+    assertStrictEquals(stored['record_type_id'], TYPE_ID);
 
     const detail = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
@@ -275,10 +281,10 @@ async () => {
     >;
     assertStrictEquals(got['instance_id'], INSTANCE_ID);
     assertStrictEquals(got['record_type_id'], TYPE_ID);
-    assertNotEquals(got, stored);
+    assertEquals(got, stored);
 });
 
-Deno.test('GET work-orders is Assemble, not Stream',
+Deno.test('GET work-orders is Stream',
 async () => {
     const { db, token } = await seededDb();
     await bindWorkOrder(db, token);
@@ -287,14 +293,6 @@ async () => {
         await storedCollectionText(db, DOCUMENT_PREFIX),
     ) as Record<string, unknown>[];
     assert(storedHeads.length > 0);
-    for (const head of storedHeads) {
-        assertStrictEquals(
-            Object.hasOwn(head, 'instance_id'), false,
-        );
-        assertStrictEquals(
-            Object.hasOwn(head, 'record_type_id'), false,
-        );
-    }
 
     const list = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
@@ -307,7 +305,7 @@ async () => {
     assert(bound !== undefined);
     assertStrictEquals(bound['instance_id'], INSTANCE_ID);
     assertStrictEquals(bound['record_type_id'], TYPE_ID);
-    assertNotEquals(rows, storedHeads);
+    assertEquals(rows, storedHeads);
 });
 
 Deno.test('unbound GET omits bind keys (absent, not null)',

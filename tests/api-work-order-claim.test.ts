@@ -7,6 +7,7 @@ import {
 import {
     PUT,
     DELETE,
+    GETWithEtag,
     RequestError,
     handleRequest,
 } from '../api/api.ts';
@@ -18,9 +19,15 @@ import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
-import { nowUtc, type StateEntity } from '../shared/types.ts';
+import {
+    nowUtc,
+    resetClock,
+    setClockForTest,
+    type StateEntity,
+} from '../shared/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -29,7 +36,7 @@ import {
 const OTHER = generateIdentifier();
 const PRIOR_HOLDER = generateIdentifier();
 const STALE = generateIdentifier();
-import { workOrderClaimHistoryFor } from
+import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
@@ -42,20 +49,49 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
-// PUT organizations/:id/work-orders/:id/claim decides and appends in ONE
-// transaction: a live foreign claim is a 409, a live own
-// claim an idempotent no-op, an expired claim is superseded
-// by 'claim_expired' + 'claimed' atomically. GET returns
-// claim facts; 404 only when unclaimed. DELETE releases.
+// An operation on a work order names the head it read.
+async function headTag(
+    db: MemoryDbAdapter,
+    workOrderId = 'yNSSnbrpacodQTzUEcdEVA',
+): Promise<string> {
+    const { etag } = await GETWithEtag(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId,
+        DEV_TOKEN, operationIdHeader(),
+    );
+    if (etag === undefined) {
+        throw new Error('the work order GET carried no ETag');
+    }
+    return etag;
+}
+
+async function latched(
+    db: MemoryDbAdapter,
+    workOrderId?: string,
+): Promise<readonly (readonly [string, string])[]> {
+    return operationIdHeader([[
+        'If-Match', '"' + await headTag(db, workOrderId) + '"',
+    ]]);
+}
+
+// PUT organizations/:id/work-orders/:id/claim lands the work
+// order's next version on the head it names: a live foreign
+// claim is a 409; the holder's fresh claim records a renewal,
+// and an exact resend stores nothing; an expired claim is
+// superseded by 'claim_expired' + 'claimed' in one version.
+// GET returns the live claim's facts, and 404 when there is
+// none, an expired claim included. DELETE releases.
 
 const LOCK_TIMEOUT_SECONDS = 300;
 
@@ -68,19 +104,10 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// yNSSnbrpacodQTzUEcdEVA is seeded via a REAL PUT (never a raw
-// db.workOrders.put)
-// so it carries a genuine organizations/:id/work-orders/:id
-// document message pair —
-// Phase 14 Task 4's flip needs one: applyClaimPair's
-// lockTimeoutAsOf requires a document head before ANY claim
-// pair (api/derive-states.ts), an invariant every real work
-// order satisfies (postWorkOrderCreationOp always synthesizes
-// one beside the create; every seeded work order gets its own,
-// api/mock-data/seed-message-pairs.ts's Phase 5 Task 4). A raw
-// row poke has no real-world analog, so it stopped being a
-// faithful fixture once the gate started reading the message
-// plane.
+// yNSSnbrpacodQTzUEcdEVA is seeded via a REAL conditional PUT
+// (never a raw db.workOrders.put), so it carries a genuine
+// head: every claim reads and latches the work order's head.
+// A raw row poke has no real-world analog.
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -93,17 +120,16 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
     return db;
 }
 
-// workOrderClaimHistoryFor is the claim gate's sole source
-// (create/claim/transition/release pairs). Releases ride
-// DELETE organizations/:id/work-orders/:id/claim (states/:id retired).
+// The claim events the version chain recorded. Releases ride
+// DELETE organizations/:id/work-orders/:id/claim.
 function claimEventsFor(
     db: MemoryDbAdapter,
 ): Promise<StateEntity[]> {
-    return workOrderClaimHistoryFor(
+    return workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
     );
 }
@@ -127,7 +153,7 @@ Deno.test('a fresh claim appends one claimed event', async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim',
         freshClaimBody(), DEV_TOKEN,
-        operationIdHeader());
+        await latched(db));
     const events = await claimEventsFor(db);
     assertStrictEquals(events.length, 1);
     assertStrictEquals(events[0]!.state, 'claimed');
@@ -138,16 +164,17 @@ Deno.test(
     'a repeat claim by the holder is an idempotent no-op',
     async () => {
         const db = await seededDb();
+        const body = freshClaimBody();
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
-            freshClaimBody(), DEV_TOKEN,
-            operationIdHeader());
+            body, DEV_TOKEN,
+            await latched(db));
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
-            freshClaimBody(), DEV_TOKEN,
-            operationIdHeader());
+            body, DEV_TOKEN,
+            await latched(db));
         const events = await claimEventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'claimed');
@@ -167,13 +194,14 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), await devToken(OTHER),
-            operationIdHeader());
+            await latched(db));
+        const foreignClaim = await latched(db);
         const err = await assertRejects(
             () => PUT(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                     + 'yNSSnbrpacodQTzUEcdEVA/claim',
                 freshClaimBody(), DEV_TOKEN,
-                operationIdHeader()),
+                foreignClaim),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);
@@ -202,12 +230,12 @@ Deno.test(
                 expireAt: '2020-01-01T00:00:00.000000Z',
             },
             await devToken(OTHER),
-            operationIdHeader());
+            await latched(db));
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await claimEventsFor(db);
         assertEquals(
             events.map(ev => ev.state),
@@ -228,22 +256,20 @@ Deno.test(
         // DELETE organizations/:id/work-orders/:id/claim path the live
         // deleteWorkOrderClaim adapter uses (workbox's
         // "release claim" action) — never a raw row poke, so
-        // the release is visible to the flipped gate's own
-        // message-plane read (workOrderClaimHistoryFor). This is
-        // the hazard-closure scenario itself, driven through
-        // postWorkOrderClaimOp end to end, not just at the
-        // derive layer.
+        // the release lands on the head the next claim reads.
+        // This is the hazard-closure scenario itself, driven
+        // through postWorkOrderClaimOp end to end.
         await seedOrganizationMember(db, OTHER);
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), await devToken(OTHER),
-            operationIdHeader());
+            await latched(db));
         await DELETE(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             await devToken(OTHER),
-            operationIdHeader());
+            await latched(db));
         // 'XXZruirZyAOoRpNxaDnpSA's fresh claim succeeds THROUGH THE LIVE
         // GATE — a foreign live claim would 409 here (see the
         // sibling test above), so success alone proves the
@@ -252,7 +278,7 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'yNSSnbrpacodQTzUEcdEVA/claim',
             freshClaimBody(), DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await claimEventsFor(db);
         assertEquals(
             events.map(ev => ev.state),
@@ -282,7 +308,7 @@ Deno.test(
                 expireAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await claimEventsFor(db);
         assertStrictEquals(events.length, 1);
         const ev = events[0]!;
@@ -310,7 +336,7 @@ Deno.test(
                 expireAt: '2020-01-01T00:00:00.000000Z',
             },
             await devToken(PRIOR_HOLDER),
-            operationIdHeader());
+            await latched(db));
         const claimEventId = generateIdentifier();
         const claimAt = '2099-01-01T00:00:01.000000Z';
         const expireEventId = generateIdentifier();
@@ -325,7 +351,7 @@ Deno.test(
                 expireAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await claimEventsFor(db);
         // prior seeded event + expire + new claim = 3.
         assertStrictEquals(events.length, 3);
@@ -342,52 +368,32 @@ Deno.test(
     },
 );
 
-// The codebase's FIRST genuine two-actor contention pin (Phase
-// 14 Task 4 mandate — every prior "race" test in this suite is
-// sequential). Structural assertions ONLY: exactly one 'claimed'
-// event lands, and exactly one of the two responses carries the
-// byte-exact 409 body — never which actor wins, never a timing
-// margin. MemoryDbAdapter serializes whole transaction bodies
-// (api/store-serializer.ts's promise-chain tail), so this cannot
-// exercise a genuinely interleaved read-then-write — the SAME
-// atomicity that makes the gate correct also makes the two
-// transaction bodies here run one fully before the other starts.
-// It still proves the invariant under Promise.all-driven
-// concurrent DISPATCH (two requests in flight at once, racing to
-// enqueue), and pins the SAME atomicity: were the gate ever
-// changed to read its prior-claim decision outside the
-// transaction (or to await a non-row-op mid-transaction —
-// AGENTS.md § Transaction bodies await only row ops), this
-// test would catch the
-// regression even though it cannot force a live interleaving
-// today. Pass-first on the OLD (row-plane) path; held unchanged
-// through the message-plane flip.
+// Two members read the same head and claim. The first lands
+// (200); the second names the head the first replaced, so
+// the statement refuses it (412) and one claimed event
+// stands. Sequenced, so the pin cannot flake.
 Deno.test(
-    'two-actor contention: exactly one claimed event lands and'
-    + ' exactly one request gets the byte-exact 409 body — never'
-    + ' which actor wins',
+    'two-actor contention: the second claim on a stale tag'
+    + ' is 412 and exactly one claimed event lands',
     async () => {
         const db = await seededDb();
         await seedOrganizationMember(db, OTHER);
         const tokenOther = await devToken(OTHER);
-        const [a, b] = await Promise.all([
-            handleRequest(db, req(
-                'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                    + 'yNSSnbrpacodQTzUEcdEVA/claim',
-                DEV_TOKEN, freshClaimBody(),
-            )),
-            handleRequest(db, req(
-                'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                    + 'yNSSnbrpacodQTzUEcdEVA/claim',
-                tokenOther, freshClaimBody(),
-            )),
-        ]);
-        assertEquals([a.status, b.status].sort(), [201, 409]);
-        const loser = a.status === 409 ? a : b;
-        assertEquals(
-            await loser.json(),
-            { error: 'work order is already claimed' },
-        );
+        const tag = { 'If-Match': '"' + await headTag(db) + '"' };
+        const a = await handleRequest(db, req(
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/claim',
+            DEV_TOKEN, freshClaimBody(), tag,
+        ));
+        assertStrictEquals(a.status, 200);
+        await a.body?.cancel();
+        const b = await handleRequest(db, req(
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + 'yNSSnbrpacodQTzUEcdEVA/claim',
+            tokenOther, freshClaimBody(), tag,
+        ));
+        assertStrictEquals(b.status, 412);
+        await b.body?.cancel();
         const events = await claimEventsFor(db);
         assertStrictEquals(
             events.filter((ev) => ev.state === 'claimed').length,
@@ -412,6 +418,7 @@ Deno.test(
                 + missingId + '/claim',
             DEV_TOKEN,
             freshClaimBody(),
+            { 'If-Match': '"' + generateIdentifier() + '"' },
         ));
         assertStrictEquals(response.status, 404);
         assertEquals(
@@ -436,7 +443,7 @@ Deno.test('GET claim 404s when unclaimed', async () => {
     });
 });
 
-Deno.test('GET claim returns facts; expired is still a row',
+Deno.test('GET claim returns facts; an expired claim is 404',
 async () => {
     const db = await seededDb();
     const expiresAt = '2099-12-31T00:00:00.000000Z';
@@ -446,7 +453,7 @@ async () => {
             ...freshClaimBody(),
             expires_at: expiresAt,
         }, DEV_TOKEN,
-        operationIdHeader());
+        await latched(db));
     const live = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
@@ -466,7 +473,7 @@ async () => {
             position: 2,
         },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw/claim', {
@@ -477,20 +484,15 @@ async () => {
             expires_at: '2020-01-01T00:05:00.000000Z',
         },
         await devToken(STALE),
-        operationIdHeader());
+        await latched(db, 'yNXXsTEwShOozlQCEWKIIw'));
     const expired = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw/claim', DEV_TOKEN,
     ));
-    assertStrictEquals(expired.status, 200);
-    const body = await expired.json() as {
-        member_id: string;
-        expires_at: string;
-    };
-    assertStrictEquals(body.member_id, STALE);
-    assertStrictEquals(
-        body.expires_at, '2020-01-01T00:05:00.000000Z',
-    );
+    assertStrictEquals(expired.status, 404);
+    assertEquals(await expired.json(), {
+        error: 'Not found: work_order_claims/yNXXsTEwShOozlQCEWKIIw',
+    });
 });
 
 Deno.test('DELETE claim releases; GET then 404s', async () => {
@@ -499,12 +501,14 @@ Deno.test('DELETE claim releases; GET then 404s', async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim',
         freshClaimBody(), DEV_TOKEN,
-        operationIdHeader());
+        await latched(db));
     const del = await handleRequest(db, req(
         'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
+        undefined, { 'If-Match': '"' + await headTag(db) + '"' },
     ));
-    assertStrictEquals(del.status, 204);
+    assertStrictEquals(del.status, 200);
+    await del.body?.cancel();
     const get = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
@@ -512,3 +516,153 @@ Deno.test('DELETE claim releases; GET then 404s', async () => {
     assertStrictEquals(get.status, 404);
 });
 
+
+const CLAIM_PATH = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+    + 'yNSSnbrpacodQTzUEcdEVA/claim';
+
+Deno.test('a claim without If-Match is 428', async () => {
+    const db = await seededDb();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT', CLAIM_PATH, DEV_TOKEN, freshClaimBody(),
+    ));
+    assertStrictEquals(res.status, 428);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('a claim lands one version', async () => {
+    const db = await seededDb();
+    const body = freshClaimBody();
+    const res = await handleRequest(db, req(
+        'PUT', CLAIM_PATH, DEV_TOKEN, body,
+        { 'If-Match': '"' + await headTag(db) + '"' },
+    ));
+    assertStrictEquals(res.status, 200);
+    const version = await res.json() as {
+        claim: { member_id: string; at: string };
+        events: { id: string; state: string }[];
+    };
+    assertStrictEquals(
+        version.claim.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+    );
+    assertStrictEquals(version.claim.at, body.claimAt);
+    assertEquals(
+        version.events.map((event) => [event.id, event.state]),
+        [[body.claimEventId, 'claimed']],
+    );
+    assertStrictEquals(await headTag(db), pairIdOf(res));
+});
+
+Deno.test('a foreign live claim is 409 from the head', async () => {
+    const db = await seededDb();
+    await seedOrganizationMember(db, OTHER);
+    await PUT(
+        db, CLAIM_PATH.slice(1), freshClaimBody(),
+        await devToken(OTHER), await latched(db),
+    );
+    const tag = await headTag(db);
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT', CLAIM_PATH, DEV_TOKEN, freshClaimBody(),
+        { 'If-Match': '"' + tag + '"' },
+    ));
+    assertStrictEquals(res.status, 409);
+    assertEquals(
+        await res.json(),
+        { error: 'work order is already claimed' },
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    assertStrictEquals(await headTag(db), tag);
+});
+
+Deno.test(
+    'a claim over a lapsed claim records its expiry',
+    async () => {
+        const db = await seededDb();
+        await seedOrganizationMember(db, PRIOR_HOLDER);
+        await PUT(
+            db, CLAIM_PATH.slice(1), freshClaimBody(),
+            await devToken(PRIOR_HOLDER), await latched(db),
+        );
+        const tag = await headTag(db);
+        const pastExpiry = Date.now()
+            + (LOCK_TIMEOUT_SECONDS + 1) * 1000;
+        setClockForTest(() => pastExpiry);
+        try {
+            const body = freshClaimBody();
+            const res = await handleRequest(db, req(
+                'PUT', CLAIM_PATH, DEV_TOKEN, body,
+                { 'If-Match': '"' + tag + '"' },
+            ));
+            assertStrictEquals(res.status, 200);
+            const version = await res.json() as {
+                events: {
+                    id: string;
+                    state: string;
+                    member_id: string;
+                }[];
+            };
+            assertEquals(
+                version.events.map((event) => [
+                    event.id, event.state, event.member_id,
+                ]),
+                [
+                    [
+                        body.expireEventId, 'claim_expired',
+                        PRIOR_HOLDER,
+                    ],
+                    [
+                        body.claimEventId, 'claimed',
+                        'XXZruirZyAOoRpNxaDnpSA',
+                    ],
+                ],
+            );
+        } finally {
+            resetClock();
+        }
+    },
+);
+
+Deno.test('the claim GET reads the head\'s live claim', async () => {
+    const db = await seededDb();
+    const body = freshClaimBody();
+    await PUT(
+        db, CLAIM_PATH.slice(1), body, DEV_TOKEN,
+        await latched(db),
+    );
+    const live = await handleRequest(db, req(
+        'GET', CLAIM_PATH, DEV_TOKEN,
+    ));
+    assertStrictEquals(live.status, 200);
+    const claim = await live.json() as {
+        member_id: string;
+        expires_at: string;
+    };
+    const head = await GETWithEtag<{
+        claim: { expires_at: string };
+    }>(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA',
+        DEV_TOKEN, operationIdHeader(),
+    );
+    assertEquals(claim, {
+        member_id: 'XXZruirZyAOoRpNxaDnpSA',
+        expires_at: head.body.claim.expires_at,
+    });
+    const lapsed = Date.parse(claim.expires_at);
+    setClockForTest(() => lapsed);
+    try {
+        const expired = await handleRequest(db, req(
+            'GET', CLAIM_PATH, DEV_TOKEN,
+        ));
+        assertStrictEquals(expired.status, 404);
+        await expired.body?.cancel();
+    } finally {
+        resetClock();
+    }
+});

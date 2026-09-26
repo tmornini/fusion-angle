@@ -23,7 +23,7 @@ import { buildWorkOrders } from
     '../api/mock-data/work-orders.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import { workOrderHistoryFor } from
     '../api/derive-states.ts';
@@ -59,12 +59,14 @@ function req(
     path: string,
     token?: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         ...(token !== undefined ? { token } : {}),
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
@@ -201,11 +203,18 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postWorkOrderTransitionOp(
-        db, WORK_ORDER_ID, transitionBody,
-        'XXZruirZyAOoRpNxaDnpSA', undefined, [], messagePair,
+    await postSeedWorkOrderTransitionOp(
+        db, STARK_ORGANIZATION, WORK_ORDER_ID, transitionBody,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
 
+    const read = await handleRequest(db, req(
+        'GET',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + WORK_ORDER_ID,
+        DEV_TOKEN,
+    ));
+    await read.body?.cancel();
     const release = await handleRequest(
         db,
         req(
@@ -213,9 +222,12 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WORK_ORDER_ID + '/claim',
             DEV_TOKEN,
+            undefined,
+            { 'If-Match': read.headers.get('ETag')! },
         ),
     );
-    assertStrictEquals(release.status, 204);
+    assertStrictEquals(release.status, 200);
+    await release.body?.cancel();
 
     return db;
 }

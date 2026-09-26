@@ -15,42 +15,29 @@ import {
 import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
-    WorkOrderEntity,
-    MessagePairEntity,
-    StateEntity,
 } from '../shared/types.ts';
 import {
-    MS_PER_SECOND, nowUtc,
-    setClockForTest, resetClock,
+    nowUtc,
+    resetClock,
 } from '../shared/types.ts';
-import { canonicalPath } from '../api/message-pair.ts';
+import {
+    canonicalPath,
+    responseRecordOf,
+} from '../api/message-pair.ts';
 import {
     documentMessagePairsAt,
-    type DocumentMessagePair,
 } from '../api/derive-documents.ts';
-import {
-    documentGetHandler,
-    documentCollectionGetHandler,
-    type DocumentFamilyWiring,
-} from '../api/document-family.ts';
-import {
-    pickString,
-    validateWorkOrderDocumentBody,
-} from '../api/validators.ts';
-import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
-import { postWorkOrderDocumentOp } from '../api/routes.ts';
-import {
-    latestClaimEvent,
-} from '../shared/work-order-claims.ts';
+import { validateWorkOrderVersion } from '../api/validators.ts';
+import type { WorkOrderVersion } from '../api/work-order-version.ts';
 import {
     appendLegacyTransition,
 } from './legacy-transition-fixture.ts';
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
+    missedReadError,
+    workOrderHeadFor,
     workOrderLifecycleStatesFor,
-    workOrderHistoryFor,
-    workOrderBindingFor,
 } from '../api/derive-states.ts';
 import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import {
@@ -91,8 +78,6 @@ const EDGE_2 = generateIdentifier();
 const WO_DRIFT_CHAIN_1_REL1 = generateIdentifier();
 const WO_DRIFT_CHAIN_1_CE1 = generateIdentifier();
 const WO_DRIFT_CHAIN_1_EE1 = generateIdentifier();
-const WO_DRIFT_CHAIN_1_CE2 = generateIdentifier();
-const WO_DRIFT_CHAIN_1_EE2 = generateIdentifier();
 const WO_DRIFT_CHAIN_1_CE3 = generateIdentifier();
 const WO_DRIFT_CHAIN_1_EE3 = generateIdentifier();
 const WO_DRIFT_DUP_1_A_EV1 = generateIdentifier();
@@ -106,21 +91,6 @@ const WO_DRIFT_METHOD_FILTER_1_FWO = generateIdentifier();
 const WO_DRIFT_METHOD_FILTER_1_EV1 = generateIdentifier();
 const WO_DRIFT_METHOD_FILTER_1_EV2 = generateIdentifier();
 const WO_DRIFT_METHOD_FILTER_1_EV3 = generateIdentifier();
-const WO_DRIFT_TRACE_1_EV1 = generateIdentifier();
-const WO_DRIFT_TRACE_1_EV2 = generateIdentifier();
-const WO_DRIFT_TRACE_1_EV3 = generateIdentifier();
-const WO_DRIFT_TRACE_1_TE1 = generateIdentifier();
-const WO_DRIFT_TRACE_1_REL1 = generateIdentifier();
-const WO_DRIFT_TRACE_1_CE1 = generateIdentifier();
-const WO_DRIFT_TRACE_1_EE1 = generateIdentifier();
-const WO_DRIFT_TRACE_1_CE2 = generateIdentifier();
-const WO_DRIFT_TRACE_1_EE2 = generateIdentifier();
-const WO_DRIFT_TRACE_1_CE3 = generateIdentifier();
-const WO_DRIFT_TRACE_1_EE3 = generateIdentifier();
-const WO_DRIFT_TRACE_1_TE2 = generateIdentifier();
-const WO_DRIFT_TRACE_1_FV1 = generateIdentifier();
-const WO_DRIFT_TRACE_1_FV2 = generateIdentifier();
-const WO_DRIFT_TRACE_1_TE3 = generateIdentifier();
 const WO_DRIFT_RETRY_FWO_SHARED = generateIdentifier();
 const WO_DRIFT_RETRY_A = generateIdentifier();
 const WO_DRIFT_RETRY_A_EV1 = generateIdentifier();
@@ -143,12 +113,14 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
@@ -216,87 +188,46 @@ function workOrderFlowGraph(
     };
 }
 
-// Mirrors routes.ts's private WORK_ORDERS_WIRING by content —
-// that row is module-private (every family's wiring row is), so
-// this test reconstructs the three fields its OWN read path
-// consults (family, lifecycle, notFoundTable, entityOf);
-// documentOp/validateDocument ride along to satisfy the
-// interface but are never invoked by the two generic read
-// functions below.
-const WORK_ORDERS_TEST_WIRING: DocumentFamilyWiring = {
-    family: 'work-orders',
-    httpNest: 'organization',
-    lifecycle: 'stateless',
-    notFoundTable: 'work_orders',
-    validateDocument: validateWorkOrderDocumentBody,
-    documentOp: postWorkOrderDocumentOp,
-    entityOf: (document, organization) => ({
-        id: document.name,
-        organization_id: organization,
-        ...document.body,
-    }),
-};
-
-// Any Id works here — both generic read paths ignore their
-// `actor` argument entirely.
-const READER_ACTOR: Id = generateIdentifier();
-
-// Mirror the live list/detail GET attach (routes.ts): bind
-// keys ride the wire when present and stay ABSENT when not.
-async function withBindingEmbed(
-    db: DbAdapter,
-    organization: Id,
-    row: WorkOrderEntity,
-): Promise<WorkOrderEntity & {
-    instance_id?: string;
-    record_type_id?: string;
-}> {
-    const bind = await workOrderBindingFor(
-        db, organization, row.id,
-    );
-    if (bind === null) return row;
-    return {
-        ...row,
-        instance_id: bind.instanceId,
-        record_type_id: bind.recordTypeId,
-    };
-}
-
+// The work orders' head versions, as the ops read them: the
+// stored response of each live head, through the storage
+// edge's validator.
 async function derivedWorkOrders(
     db: DbAdapter, organization: Id,
-): Promise<(WorkOrderEntity & {
-    instance_id?: string;
-    record_type_id?: string;
-})[]> {
-    const rows = await documentCollectionGetHandler(
-        WORK_ORDERS_TEST_WIRING,
-    )(
-        db, [], READER_ACTOR, organization, [],
-    ) as WorkOrderEntity[];
-    const out: (WorkOrderEntity & {
-        instance_id?: string;
-        record_type_id?: string;
-    })[] = [];
-    for (const row of rows) {
-        out.push(
-            await withBindingEmbed(db, organization, row),
-        );
-    }
-    return out;
+): Promise<WorkOrderVersion[]> {
+    const heads = await db.messagePairs.getCollectionHeadPairs(
+        canonicalPath(organization, '/work-orders/'),
+    );
+    return heads.map((pair) => validateWorkOrderVersion(
+        responseRecordOf(pair.response)!,
+    ));
 }
 
 async function derivedWorkOrder(
     db: DbAdapter, organization: Id, id: Id,
-): Promise<WorkOrderEntity & {
-    instance_id?: string;
-    record_type_id?: string;
-}> {
-    const row = await documentGetHandler(
-        WORK_ORDERS_TEST_WIRING,
-    )(
-        db, [organization, id], READER_ACTOR, organization, [],
-    ) as WorkOrderEntity;
-    return withBindingEmbed(db, organization, row);
+): Promise<WorkOrderVersion> {
+    const head = await workOrderHeadFor(db, organization, id);
+    if (head === null) {
+        throw await missedReadError(
+            db, id, organization, 'work_orders',
+        );
+    }
+    return head.version;
+}
+
+// An operation on a work order names the head it read.
+async function headTag(
+    db: MemoryDbAdapter,
+    token: string,
+    workOrderId: string,
+): Promise<Record<string, string>> {
+    const read = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId,
+        token,
+    ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    return { 'If-Match': read.headers.get('ETag')! };
 }
 
 // Every seeded work order's own id: the 45 hand-authored rows
@@ -336,7 +267,7 @@ Deno.test('seeded GET /work-orders wire equals derived collection,'
     const derived = await derivedWorkOrders(
         db, STARK_ORGANIZATION,
     );
-    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertEquals(JSON.parse(wireText), derived);
     assertStrictEquals(derived.length, 145);
     // Phase Final Stage B: work_orders table retired.
 });
@@ -404,7 +335,7 @@ Deno.test('per-work-order GET wire equals derive for every seed,'
         const derived = await derivedWorkOrder(
             db, STARK_ORGANIZATION, id,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(JSON.parse(wireText), derived);
         assert(
             typeof derived.flow_graph === 'object'
             && derived.flow_graph !== null
@@ -517,7 +448,7 @@ async function assertEntityAndJoinParity(
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assertStrictEquals(entityText, JSON.stringify(derivedEntity));
+    assertEquals(JSON.parse(entityText), derivedEntity);
 
     const joinRes = await handleRequest(
         db,
@@ -555,11 +486,10 @@ async () => {
     // nowUtc() at the point of use — exactly as a real client
     // mints them (claim/release ops, deleteWorkOrderClaim) —
     // NEVER a fixed past literal: the claim steps below are
-    // checked by
-    // the LIVE route's isClaimEventExpired against REAL
-    // Date.now(), so a fixed literal far from the sandbox's real
-    // clock would read as already-expired and corrupt the
-    // "fresh"/"idempotent" branches this chain drives. nowUtc()
+    // judged against the request's own stamp, so a fixed
+    // literal far from the sandbox's real clock would read as
+    // already-expired and corrupt the "fresh"/"idempotent"
+    // branches this chain drives. nowUtc()
     // is globally strictly monotonic, so sequential mints stay
     // ordered with no gap bookkeeping needed.
 
@@ -633,8 +563,10 @@ async () => {
             },
             transitionAt: transition2At,
         },
+        await headTag(db, tokenA, workOrderId),
     ));
-    assertStrictEquals(transition2.status, 201);
+    assertStrictEquals(transition2.status, 200);
+    await transition2.body?.cancel();
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Entity PUT: a position bump. Its own body's flow_graph
@@ -651,8 +583,9 @@ async () => {
             && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (
-        decodeRequestMessage(storedCreatePostRow.request)
-            .body['workOrder'] as { flow_graph: Record<string, unknown> }
+        responseRecordOf(storedCreatePostRow.response) as {
+            flow_graph: Record<string, unknown>;
+        }
     ).flow_graph;
     const entityPut = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -661,6 +594,7 @@ async () => {
             flow_graph: graph,
             position: 2,
         },
+        await headTag(db, tokenA, workOrderId),
     ));
     assertStrictEquals(entityPut.status, 200);
     const putBody = await entityPut.json() as {
@@ -680,29 +614,31 @@ async () => {
             expireEventId: WO_DRIFT_CHAIN_1_EE1,
             expireAt: claimFreshAt,
         },
+        await headTag(db, tokenA, workOrderId),
     ));
     assertStrictEquals(claimFresh.status, 200);
+    await claimFresh.body?.cancel();
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
-    // Repeat-claim by A — idempotent no-op: the pair appends,
-    // but NO new state event lands. Fires milliseconds after the
-    // fresh claim above, well within the 8-hour DEFAULT_LOCK_
-    // TIMEOUT, so the LIVE route's real-clock isClaimEventExpired
-    // reads it as live.
+    // Repeat-claim by A — idempotent no-op: A resends its
+    // claim, milliseconds after the fresh claim above and well
+    // within the 8-hour DEFAULT_LOCK_TIMEOUT, so the claim is
+    // live and NO new state event lands.
     const beforeRepeat =
         0 /* states table retired */;
-    const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId + '/claim',
         tokenA, {
-            claimEventId: WO_DRIFT_CHAIN_1_CE2,
-            claimAt: claimRepeatAt,
-            expireEventId: WO_DRIFT_CHAIN_1_EE2,
-            expireAt: claimRepeatAt,
+            claimEventId: WO_DRIFT_CHAIN_1_CE1,
+            claimAt: claimFreshAt,
+            expireEventId: WO_DRIFT_CHAIN_1_EE1,
+            expireAt: claimFreshAt,
         },
+        await headTag(db, tokenA, workOrderId),
     ));
     assertStrictEquals(claimRepeat.status, 200);
+    await claimRepeat.body?.cancel();
     assertStrictEquals(
         0 /* states table retired */,
         beforeRepeat,
@@ -710,9 +646,10 @@ async () => {
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Claim attempt by actor B — 409, nothing stored.
+    const claimRejectAt = nowUtc();
+    const rejectTag = await headTag(db, tokenB, workOrderId);
     const beforeReject =
         (await db.messagePairs.getAll()).length;
-    const claimRejectAt = nowUtc();
     const claimReject = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId + '/claim',
@@ -722,8 +659,10 @@ async () => {
             expireEventId: WO_DRIFT_CHAIN_1_EE3,
             expireAt: claimRejectAt,
         },
+        rejectTag,
     ));
     assertStrictEquals(claimReject.status, 409);
+    await claimReject.body?.cancel();
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, beforeReject,
     );
@@ -736,8 +675,11 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim',
         tokenA,
+        undefined,
+        await headTag(db, tokenA, workOrderId),
     ));
-    assertStrictEquals(unclaim.status, 204);
+    assertStrictEquals(unclaim.status, 200);
+    await unclaim.body?.cancel();
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // The full chain: create(3) + transition1(1) +
@@ -755,8 +697,9 @@ async () => {
 // -- 6. duplicate-create multiset -------------------------------
 
 Deno.test('duplicate-create: two creates, same work-order id, fresh'
-+ ' join id + fresh event ids/ats on the second — ONE document'
-+ ' head; TWO join pairs; SIX birth state events', async () => {
++ ' join id + fresh event ids/ats on the second — the second is'
++ ' 409; ONE document head; ONE join pair; THREE birth state'
++ ' events', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = generateIdentifier();
@@ -807,9 +750,10 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
             '2026-05-02T00:00:01.000000Z',
         ),
     ));
-    // The create op holds no echo of its own — a duplicate
-    // create succeeds outright, never 412ing.
-    assertStrictEquals(second.status, 201);
+    // The create declares its genesis: a taken name is 409,
+    // and nothing lands.
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
 
     const entityRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -819,26 +763,22 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assertStrictEquals(
-        await entityRes.text(),
-        JSON.stringify(derivedEntity),
-    );
+    assertEquals(await entityRes.json(), derivedEntity);
     // Phase Final Stage B: work_orders table retired.
 
     assertStrictEquals(
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )).length,
-        6,
+        3,
     );
 
     const derivedJoins = (await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assertStrictEquals(derivedJoins.length, 2);
     assertEquals(
         sortById(derivedJoins).map(r => r.id),
-        [pfidA, pfidB].sort(),
+        [pfidA],
     );
 });
 
@@ -854,9 +794,8 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
 // to skew (that test skewed the flow document's state_at,
 // which this stateless family does not carry). This case
 // asserts plain Simple-PUT supersession only.
-// Bare-req idiom, no header threading — a NAMED contrast to
-// derive-flows' echo idiom: a work-order PUT may be blind,
-// a flow PUT may not.
+// Like a flow PUT, a work-order PUT declares its genesis or
+// names the head it replaces.
 Deno.test('document supersession: PUT #2 (byte-divergent body)'
 + ' supersedes PUT #1; derivation returns PUT #2\'s body',
 async () => {
@@ -871,8 +810,10 @@ async () => {
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
     const firstId = pairIdOf(first);
     assert(firstId);
 
@@ -883,8 +824,10 @@ async () => {
             flow_graph: workOrderFlowGraph(4 * 60 * 60),
             position: 2,
         },
+        { 'If-Match': first.headers.get('ETag')! },
     ));
     assertStrictEquals(second.status, 200);
+    await second.body?.cancel();
     assertStrictEquals(second.headers.get('Supersedes'), null);
 
     const getRes = await handleRequest(
@@ -895,9 +838,7 @@ async () => {
     const derived = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assertStrictEquals(
-        await getRes.text(), JSON.stringify(derived),
-    );
+    assertEquals(await getRes.json(), derived);
     assertStrictEquals(derived.display_id, 'second');
     assertStrictEquals(derived.position, 2);
     // Phase Final Stage B: work_orders table retired.
@@ -908,8 +849,8 @@ async () => {
 
 Deno.test('the create-op POST pair is not read as a document'
 + ' message pair — documentMessagePairsAt returns exactly one'
-+ ' pair (the PUT), and the create/document bodies share zero'
-+ ' top-level keys',
++ ' pair (the PUT), and the create body and the version share'
++ ' no top-level key but the id',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -968,13 +909,16 @@ async () => {
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
+    const documentRow = pairsAt.find(
+        (r) => r.id === documentMessagePairs[0]!.id,
+    )!;
     const documentBodyKeys = new Set(
-        Object.keys(documentMessagePairs[0]!.body),
+        Object.keys(responseRecordOf(documentRow.response)!),
     );
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
     );
-    assertEquals(overlap, []);
+    assertEquals(overlap, ['id']);
 });
 
 // -- decode helper (test-side; mirrors tests/api-shadow-ledger- -
@@ -1000,693 +944,16 @@ function decodeRequestMessage(message: string): {
     };
 }
 
-// -- 9. THE TRACE-REPLAY PROOF -----------------------------------
-//
-// A test-side helper (BY DESIGN — its only consumer is this
-// proof; the production version, if ever needed, belongs to the
-// states-consumers phase against its own consumers) replays a
-// live work order's full state history from its MESSAGE PAIRS
-// ALONE, never from old-plane rows. Every replay rule below is
-// PINNED (verification findings, lens 3 — B1/P1/P2/P3 applied);
-// see the task brief for the authoritative wording.
+// -- 10. same-join-id retry: the join declares its genesis -----
+// The create's join declares its genesis beside the work
+// order's, so a SECOND, genuinely different create [a fresh
+// work-order id, a fresh operation] that reuses a prior
+// create's flow-work-order id is refused whole: 409, and the
+// join keeps its one pair.
 
-// Every successful pair at a prefix, ANY method — the test-side
-// counterpart of derive-documents.ts's documentMessagePairsAt, which
-// deliberately EXCLUDES POST (the DOCUMENT head is PUT/DELETE
-// only). The create's own 3-slot birth arrays live in the POST
-// operation message pair, so this replay needs the unfiltered read the
-// production reduction intentionally never exposes — named for
-// its role (every pair, any method) rather than "documentMessagePairsAt
-// without the filter", so no reader mistakes it for a production
-// substitute.
-interface AnyMessagePair {
-    readonly id: string;
-    readonly at: string;
-    readonly name: string;
-    readonly method: string;
-    readonly body: Record<string, unknown>;
-    readonly requesterIdentityId: string;
-}
-
-function atIdCompare(
-    a: { readonly at: string; readonly id: string },
-    b: { readonly at: string; readonly id: string },
-): number {
-    return a.at < b.at ? -1
-        : a.at > b.at ? 1
-            : a.id < b.id ? -1
-                : a.id > b.id ? 1
-                    : 0;
-}
-
-function allMessagePairsAt(
-    rows: readonly MessagePairEntity[],
-    path: string,
-): AnyMessagePair[] {
-    const messagePairs: AnyMessagePair[] = [];
-    for (const row of rows) {
-        if (row.path !== path) {
-            continue;
-        }
-        const decoded = decodeRequestMessage(row.request);
-        messagePairs.push({
-            id: row.id,
-            at: row.response_at,
-            name: row.name,
-            method: decoded.method,
-            body: decoded.body,
-            requesterIdentityId: row.requester_identity_id,
-        });
-    }
-    return messagePairs.sort(atIdCompare);
-}
-
-// A pure Date-parse subtraction — the replay's own comparator,
-// reproducing the route's `>=` boundary EXACTLY WITHOUT importing
-// isClaimEventExpired (Date.now-coupled; barred by the brief).
-function msBetween(laterIso: string, earlierIso: string): number {
-    return Date.parse(laterIso) - Date.parse(earlierIso);
-}
-
-function isExpiredAsOf(
-    claimAt: string,
-    priorAt: string,
-    lockTimeoutSeconds: number,
-): boolean {
-    return msBetween(claimAt, priorAt)
-        >= lockTimeoutSeconds * MS_PER_SECOND;
-}
-
-// LOCKTIMEOUT SOURCING: the WO's DOCUMENT HEAD as of `momentAt`
-// — the (at, id) winner among PUT/DELETE pairs whose response
-// `at` strictly precedes it. `entityMessagePairs` is ascending by (at,
-// id) already (documentMessagePairsAt's own contract), so the last
-// entry passing the filter IS that winner.
-function documentHeadBefore(
-    entityMessagePairs: readonly DocumentMessagePair[],
-    momentAt: string,
-): DocumentMessagePair | undefined {
-    const before = entityMessagePairs.filter((p) => p.at < momentAt);
-    return before[before.length - 1];
-}
-
-function lockTimeoutAsOf(
-    entityMessagePairs: readonly DocumentMessagePair[],
-    momentAt: string,
-): number {
-    const head = documentHeadBefore(entityMessagePairs, momentAt);
-    if (head === undefined) {
-        throw new Error(
-            'no document head before ' + momentAt,
-        );
-    }
-    return asWorkOrderFlowGraph(
-        head.body['flow_graph'],
-        'trace-replay document head flow_graph',
-    ).lockTimeout;
-}
-
-interface FieldValueTriple {
-    readonly id: string;
-    readonly state_event_id: string;
-    readonly attribute_id: string;
-    readonly value: string;
-}
-
-// Each claim pair re-runs the 0/AjdvjuECVZEgZoFajaIEkg/2-event decision with
-// the
-// pair BODY's claimAt as the reference clock. PRIOR state
-// reduces from the REPLAYED events so far (never old-plane
-// rows) via latestClaimEvent's own CLAIM_STATES filter + (at,
-// id) max — the mechanics are pure and Date.now-free, so
-// reusing them here does not reintroduce the barred coupling.
-function applyClaimMessagePair(
-    replayed: StateEntity[],
-    entityMessagePairs: readonly DocumentMessagePair[],
-    claim: AnyMessagePair,
-    workOrderId: string,
-): void {
-    const claimEventId = pickString(claim.body, 'claimEventId');
-    const claimAt = pickString(claim.body, 'claimAt');
-    const expireEventId = pickString(
-        claim.body, 'expireEventId',
-    );
-    const expireAt = pickString(claim.body, 'expireAt');
-    if (replayed.some((row) => row.id === claimEventId)) {
-        return;
-    }
-    const lockTimeout = lockTimeoutAsOf(entityMessagePairs, claim.at);
-    const prior = latestClaimEvent(replayed, workOrderId);
-    const priorLive = prior !== null
-        && prior.state === 'claimed'
-        && !isExpiredAsOf(claimAt, prior.at, lockTimeout);
-
-    if (priorLive) {
-        // Idempotent re-claim by the SAME actor: the claim
-        // pair's requesterIdentityId is the only actor signal
-        // the body carries — 0 events. (A foreign live claim
-        // 409s before any pair forms — never reaches here.)
-        return;
-    }
-    if (prior !== null && prior.state === 'claimed') {
-        replayed.push({
-            id: expireEventId,
-            entity_id: workOrderId,
-            state: 'claim_expired',
-            // Recovered from the PRIOR claim pair's OWN
-            // replayed event author, never the current pair.
-            member_id: prior.member_id,
-            at: expireAt,
-        });
-    }
-    replayed.push({
-        id: claimEventId,
-        entity_id: workOrderId,
-        state: 'claimed',
-        member_id: claim.requesterIdentityId,
-        at: claimAt,
-    });
-}
-
-function applyTransitionMessagePair(
-    replayed: StateEntity[],
-    replayedFieldValues: FieldValueTriple[],
-    transition: AnyMessagePair,
-    workOrderId: string,
-): void {
-    const transitionEventId = pickString(
-        transition.body, 'transitionEventId',
-    );
-    const targetState = pickString(
-        transition.body, 'targetState',
-    );
-    const transitionAt = pickString(
-        transition.body, 'transitionAt',
-    );
-    replayed.push({
-        id: transitionEventId,
-        entity_id: workOrderId,
-        state: targetState,
-        member_id: transition.requesterIdentityId,
-        at: transitionAt,
-    });
-
-    // Task 8 / Task 3: new-shape pure-moves omit fieldValues;
-    // only legacy bags contribute fold rows (A4 shape-disjoint).
-    const rawFieldValues = transition.body['fieldValues'];
-    if (Array.isArray(rawFieldValues)) {
-        const fieldValues = rawFieldValues as readonly {
-            id: string;
-            fields: Record<string, unknown>;
-        }[];
-        for (const row of fieldValues) {
-            replayedFieldValues.push({
-                id: row.id,
-                state_event_id: pickString(
-                    row.fields, 'state_event_id',
-                ),
-                attribute_id: pickString(
-                    row.fields, 'attribute_id',
-                ),
-                value: pickString(row.fields, 'value'),
-            });
-        }
-    }
-
-    const release = transition.body['release'];
-    if (release !== null) {
-        const releaseFields = release as {
-            id: string; state: string; at: string;
-        };
-        replayed.push({
-            id: releaseFields.id,
-            entity_id: workOrderId,
-            // VERBATIM from the pair body — the gate does not
-            // constrain release.state to 'claim_released';
-            // never hardcode the constant.
-            state: releaseFields.state,
-            member_id: transition.requesterIdentityId,
-            at: releaseFields.at,
-        });
-    }
-}
-
-// Replays postWorkOrderReleaseOp: a live unexpired claim as
-// of releaseAt → claim_released; otherwise zero events.
-function applyReleaseMessagePair(
-    replayed: StateEntity[],
-    entityMessagePairs: readonly DocumentMessagePair[],
-    release: AnyMessagePair,
-    workOrderId: string,
-): void {
-    const legacy = Object.hasOwn(
-        release.body, 'releaseEventId',
-    );
-    const releaseEventId = legacy
-        ? pickString(release.body, 'releaseEventId')
-        : release.id;
-    const releaseAt = legacy
-        ? pickString(release.body, 'releaseAt')
-        : release.at;
-    const prior = latestClaimEvent(replayed, workOrderId);
-    if (legacy) {
-        const lockTimeout = lockTimeoutAsOf(
-            entityMessagePairs, release.at,
-        );
-        const priorLive = prior !== null
-            && prior.state === 'claimed'
-            && !isExpiredAsOf(
-                releaseAt, prior.at, lockTimeout,
-            );
-        if (!priorLive) return;
-    } else if (
-        prior === null
-        || prior.state !== 'claimed'
-    ) {
-        return;
-    }
-    replayed.push({
-        id: releaseEventId,
-        entity_id: workOrderId,
-        state: 'claim_released',
-        member_id: release.requesterIdentityId,
-        at: releaseAt,
-    });
-}
-
-interface ReplayResult {
-    readonly events: StateEntity[];
-    readonly fieldValues: FieldValueTriple[];
-}
-
-// The orchestrator: gather every message pair the live chain
-// could have formed for `workOrderId`, then replay them in
-// (at, id) order into a StateEntity[] — the SAME shape and the
-// SAME order db.states.getAllFor(workOrderId) returns.
-async function replayWorkOrderStates(
-    db: MemoryDbAdapter,
-    organization: string,
-    workOrderId: string,
-): Promise<ReplayResult> {
-    const woPrefix = canonicalPath(
-        organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
-    );
-    const [woRequests] = await Promise.all([
-        db.messagePairs.getCollectionPairs(woPrefix),
-        db.messagePairs.getCollectionPairs(woPrefix),
-    ]);
-    const allWoMessagePairs = allMessagePairsAt(woRequests, woPrefix);
-    const createMessagePair = allWoMessagePairs.find(
-        (p) => p.method === 'POST' && p.name === workOrderId,
-    );
-    if (createMessagePair === undefined) {
-        throw new Error(
-            'no create pair found for ' + workOrderId,
-        );
-    }
-    const entityMessagePairs = documentMessagePairsAt(
-        woRequests, woPrefix,
-    ).filter((messagePair) => messagePair.name === workOrderId);
-
-    const claimPrefix = canonicalPath(
-        organization,
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/claim/',
-    );
-    const [claimRequests] = await Promise.all([
-        db.messagePairs.getCollectionPairs(claimPrefix),
-        db.messagePairs.getCollectionPairs(claimPrefix),
-    ]);
-    const claimMessagePairs = allMessagePairsAt(
-        claimRequests, claimPrefix,
-    ).filter(
-        (p) => p.method === 'POST' || p.method === 'PUT',
-    );
-    const claimDeletes = allMessagePairsAt(
-        claimRequests, claimPrefix,
-    ).filter((p) => p.method === 'DELETE');
-
-    const releasePrefix = canonicalPath(
-        organization,
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/release/',
-    );
-    const [releaseRequests] =
-        await Promise.all([
-            db.messagePairs.getCollectionPairs(releasePrefix,
-            ),
-            db.messagePairs.getCollectionPairs(releasePrefix,
-            ),
-        ]);
-    const releaseMessagePairs = [
-        ...allMessagePairsAt(
-            releaseRequests, releasePrefix,
-        ).filter((p) => p.method === 'POST'),
-        ...claimDeletes,
-    ];
-
-    const transitionPrefix = canonicalPath(
-        organization,
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/transition/',
-    );
-    const [
-        transitionRequests,
-    ] = await Promise.all([
-        db.messagePairs.getCollectionPairs(transitionPrefix),
-        db.messagePairs.getCollectionPairs(transitionPrefix),
-    ]);
-    const transitionMessagePairs = allMessagePairsAt(
-        transitionRequests, transitionPrefix,
-    ).filter((p) => p.method === 'POST');
-
-    // The create pair's 3-slot arrays synthesize the three birth
-    // events, all authored by the create pair's own
-    // requesterIdentityId.
-    const events: StateEntity[] = [];
-    const ids = createMessagePair.body['stateEventIds'] as
-        readonly string[];
-    const ats = createMessagePair.body['stateEventAts'] as
-        readonly string[];
-    const states = createMessagePair.body['states'] as
-        readonly string[];
-    for (let i = 0; i < 3; i++) {
-        events.push({
-            id: ids[i]!,
-            entity_id: workOrderId,
-            state: states[i]!,
-            member_id: createMessagePair.requesterIdentityId,
-            at: ats[i]!,
-        });
-    }
-
-    const fieldValues: FieldValueTriple[] = [];
-    type Kind = 'claim' | 'transition' | 'release';
-    const actions: {
-        kind: Kind; messagePair: AnyMessagePair;
-    }[] = [
-        ...claimMessagePairs.map((messagePair) => ({
-            kind: 'claim' as const, messagePair,
-        })),
-        ...transitionMessagePairs.map((messagePair) => ({
-            kind: 'transition' as const, messagePair,
-        })),
-        ...releaseMessagePairs.map((messagePair) => ({
-            kind: 'release' as const, messagePair,
-        })),
-    ].sort((a, b) => atIdCompare(
-        a.messagePair, b.messagePair,
-    ));
-
-    for (const action of actions) {
-        if (action.kind === 'claim') {
-            applyClaimMessagePair(
-                events, entityMessagePairs,
-                action.messagePair, workOrderId,
-            );
-        } else if (action.kind === 'transition') {
-            applyTransitionMessagePair(
-                events, fieldValues,
-                action.messagePair, workOrderId,
-            );
-        } else {
-            applyReleaseMessagePair(
-                events, entityMessagePairs,
-                action.messagePair, workOrderId,
-            );
-        }
-    }
-
-    events.sort(atIdCompare);
-    return { events, fieldValues };
-}
-
-Deno.test('THE TRACE-REPLAY PROOF: a test-side replay of a live'
-+ ' work order\'s message pairs alone reproduces its full'
-+ ' states history, event-for-event and (at, id)-ordered',
-async () => {
-    const db = await seededDb();
-    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
-    await seedOrganizationMember(db, MEMBER_B);
-    const tokenB = await organizationToken(MEMBER_B);
-
-    const workOrderId = generateIdentifier();
-    const flowWorkOrderId = generateIdentifier();
-    const flowId = EMPTY_FLOW_ID;
-    // A TINY lockTimeout: isClaimEventExpired checks the LIVE
-    // route's decision via msSinceUtc (the clock seam), never a
-    // body timestamp, so every claim-related `at` below is minted
-    // via nowUtc() at the point of use (never a fixed literal —
-    // see case 5's own note) and the expired-takeover leg (5)
-    // advances the test clock past this tiny window —
-    // client-minted ats far from the boundary either way, since
-    // the advance comfortably clears it.
-    const tinyLockTimeoutSeconds = 1;
-    const graph = workOrderFlowGraph(tinyLockTimeoutSeconds);
-
-    // Leg 1: birth-claimed create by A.
-    const created = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', tokenA,
-        createWorkOrderBody(
-            workOrderId, flowWorkOrderId, flowId, graph,
-            {
-                ids: [
-                    WO_DRIFT_TRACE_1_EV1,
-                    WO_DRIFT_TRACE_1_EV2,
-                    WO_DRIFT_TRACE_1_EV3,
-                ],
-                ats: [nowUtc(), nowUtc(), nowUtc()],
-                states: [N_START, N_MIDDLE, 'claimed'],
-            },
-            nowUtc(),
-        ),
-    ));
-    assertStrictEquals(created.status, 201);
-
-    // Leg 2: release — a transition carrying release, ending
-    // A's birth claim (distinct from leg 8's named release
-    // op). Mint transitionAt before releaseAt (the api-work-
-    // order-transition.test.ts idiom).
-    const releaseTransitionAt = nowUtc();
-    const releaseAt = nowUtc();
-    const release = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId + '/transition',
-        tokenA, {
-            transitionEventId: WO_DRIFT_TRACE_1_TE1,
-            targetState: N_MIDDLE,
-            release: {
-                id: WO_DRIFT_TRACE_1_REL1,
-                state: 'claim_released',
-                at: releaseAt,
-            },
-            transitionAt: releaseTransitionAt,
-        },
-    ));
-    assertStrictEquals(release.status, 201);
-
-    // The entity PUT: position bump, flow_graph held CONSTANT
-    // (case 5's named invariant) — LOCKTIMEOUT SOURCING is
-    // exercised across a document head change without a moving
-    // lock_timeout target. Compare the STORED, round-tripped
-    // create body's own workOrder.flow_graph against the entity
-    // PUT's STORED, round-tripped response body — two
-    // independently re-encoded values, not the same in-memory
-    // literal — so a canonical-JSON regression that mangled
-    // either differently would be caught.
-    const storedCreatePostRow = (await db.messagePairs.getCollectionPairs(
-        canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
-    )).find(
-        (r) => r.name === workOrderId
-            && decodeRequestMessage(r.request).method === 'POST',
-    )!;
-    const storedCreateFlowGraph = (
-        decodeRequestMessage(storedCreatePostRow.request)
-            .body['workOrder'] as { flow_graph: Record<string, unknown> }
-    ).flow_graph;
-    const entityPut = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, tokenA, {
-            display_id: 'drift-' + workOrderId,
-            flow_graph: graph,
-            position: 2,
-        },
-    ));
-    assertStrictEquals(entityPut.status, 200);
-    const putBody = await entityPut.json() as {
-        flow_graph: Record<string, unknown>;
-    };
-    assertEquals(putBody.flow_graph, storedCreateFlowGraph);
-
-    // Leg 3: re-claim by A — fresh (prior is 'claim_released').
-    const reclaimAt = nowUtc();
-    const reclaim = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId + '/claim',
-        tokenA, {
-            claimEventId: WO_DRIFT_TRACE_1_CE1,
-            claimAt: reclaimAt,
-            expireEventId: WO_DRIFT_TRACE_1_EE1,
-            expireAt: reclaimAt,
-        },
-    ));
-    assertStrictEquals(reclaim.status, 200);
-
-    // Leg 4: idempotent re-claim by A — fires milliseconds after
-    // leg 3, well within the tiny lockTimeout, same actor — 0
-    // events.
-    const idempotentAt = nowUtc();
-    const idempotent = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId + '/claim',
-        tokenA, {
-            claimEventId: WO_DRIFT_TRACE_1_CE2,
-            claimAt: idempotentAt,
-            expireEventId: WO_DRIFT_TRACE_1_EE2,
-            expireAt: idempotentAt,
-        },
-    ));
-    assertStrictEquals(idempotent.status, 200);
-
-    // Advance the test clock past the tiny lockTimeout so leg
-    // 3's claim genuinely reads as expired to the LIVE route's
-    // isClaimEventExpired (msSinceUtc seam).
-    setClockForTest(() =>
-        Date.now()
-        + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
-
-    // Leg 5: expired takeover by B — 2 events ('claim_expired'
-    // naming A, 'claimed' naming B).
-    const takeoverExpireAt = nowUtc();
-    const takeoverClaimAt = nowUtc();
-    const takeover = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId + '/claim',
-        tokenB, {
-            claimEventId: WO_DRIFT_TRACE_1_CE3,
-            claimAt: takeoverClaimAt,
-            expireEventId: WO_DRIFT_TRACE_1_EE3,
-            expireAt: takeoverExpireAt,
-        },
-    ));
-    assertStrictEquals(takeover.status, 200);
-
-    // Leg 6: transition with values, by B.
-    // Task 8 CUT: legacy fieldValues below the gate.
-    const withValuesAt = nowUtc();
-    await appendLegacyTransition(
-        db, STARK_ORGANIZATION, workOrderId, {
-            transitionEventId: WO_DRIFT_TRACE_1_TE2,
-            targetState: N_MIDDLE,
-            fieldValues: [
-                {
-                    id: WO_DRIFT_TRACE_1_FV1,
-                    fields: {
-                        state_event_id: WO_DRIFT_TRACE_1_TE2,
-                        attribute_id: ATTR_SEVERITY,
-                        value: 'medium',
-                    },
-                },
-                {
-                    id: WO_DRIFT_TRACE_1_FV2,
-                    fields: {
-                        state_event_id: WO_DRIFT_TRACE_1_TE2,
-                        attribute_id: ATTR_NOTES,
-                        value: 'reviewed',
-                    },
-                },
-            ],
-            release: null,
-            transitionAt: withValuesAt,
-        },
-        { actor: 'XXZruirZyAOoRpNxaDnpSA', requestAt: withValuesAt },
-    );
-
-    // Leg 7: transition to finish by B — claim stays live so
-    // Leg 8's named release op has a live claim to end
-    // (distinct from Leg 2's embedded transition+release).
-    const finishTransitionAt = nowUtc();
-    const finish = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId + '/transition',
-        tokenB, {
-            transitionEventId: WO_DRIFT_TRACE_1_TE3,
-            targetState: N_FINISH,
-            release: null,
-            transitionAt: finishTransitionAt,
-        },
-    ));
-    assertStrictEquals(finish.status, 201);
-
-    // Leg 8: unclaim via DELETE organizations/:id/work-orders/:id/claim
-    // (deleteWorkOrderClaim's wire path), by A.
-    const unclaim = await handleRequest(db, req(
-        'DELETE',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/claim',
-        tokenA,
-    ));
-    assertStrictEquals(unclaim.status, 204);
-
-    const replay = await replayWorkOrderStates(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
-    // Pin the test-side pair replay against the live
-    // production derive (lifecycle) — both read the same
-    // operation-message-pair composition (create/claim/release/transition).
-    const derivedHistory = await workOrderLifecycleStatesFor(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
-    assertEquals(replay.events, derivedHistory);
-    // create(3) + release-transition(2) + reclaim(1) +
-    // idempotent(0) + expired-takeover(2) + values-transition(1)
-    // + finish-transition(1) + unclaim(1) = 11.
-    assertStrictEquals(replay.events.length, 11);
-
-    // Phase Final Task 2: SFV row plane empty; message-plane
-    // transition fold rides work-order history (C4).
-    const history = await workOrderHistoryFor(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
-    const derivedFieldValues = history.flatMap((row) =>
-        row.field_values.map((fv) => ({
-            id: fv.id,
-            state_event_id: row.id,
-            attribute_id: fv.attribute_id,
-            value: fv.value,
-        })),
-    );
-    assertStrictEquals(replay.fieldValues.length, 2);
-    // Phase Final Stage B: state_field_values table retired.
-    assertEquals(
-        sortById(replay.fieldValues).map((row) => ({
-            state_event_id: row.state_event_id,
-            attribute_id: row.attribute_id,
-            value: row.value,
-        })),
-        sortById(derivedFieldValues).map((row) => ({
-            state_event_id: row.state_event_id,
-            attribute_id: row.attribute_id,
-            value: row.value,
-        })),
-    );
-});
-
-// -- 10. same-join-id retry: the join stays chain-less ----------
-// (Phase 9 Task 2 Step 0(d') pin, additive and pass-first against
-// HEAD: the create route's join pair hardcodes
-// headMessagePairId:
-// undefined by design — no head-read at all — so a SECOND,
-// genuinely different create [a fresh work-order id, a fresh
-// operation] that happens to reuse a prior create's flow-work-
-// order id still appends a chain-less join pair, never a
-// Supersedes onto the first. Pinned BEFORE the shared former
-// absorbs this site, so a future uniform head-read regresses
-// here first.)
-
-Deno.test('same-join-id retry: two different work-order creates '
-+ 'reusing one flow-work-order id each append a chain-less '
-+ 'join pair (neither Supersedes nor Follows)', async () => {
+Deno.test('same-join-id retry: a second work-order create '
++ 'reusing one flow-work-order id is 409 and the join keeps '
++ 'one chain-less pair', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const flowId = EMPTY_FLOW_ID;
@@ -1738,7 +1005,8 @@ Deno.test('same-join-id retry: two different work-order creates '
             '2026-05-03T00:00:01.000000Z',
         ),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
 
     const joinPrefix = canonicalPath(
         STARK_ORGANIZATION,
@@ -1748,14 +1016,9 @@ Deno.test('same-join-id retry: two different work-order creates '
     const joinResponses = await db.messagePairs.getDocumentHistory(
         joinPrefix, sharedFwoId,
     );
-    assertStrictEquals(joinResponses.length, 2);
+    assertStrictEquals(joinResponses.length, 1);
     assertStrictEquals(
         joinResponses[0]!.supersedes, NIL_IDENTIFIER,
     );
-    assertStrictEquals(
-        joinResponses[1]!.supersedes,
-        joinResponses[0]!.id,
-    );
     assertStrictEquals('follows' in joinResponses[0]!, false);
-    assertStrictEquals('follows' in joinResponses[1]!, false);
 });

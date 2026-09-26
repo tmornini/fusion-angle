@@ -23,7 +23,7 @@ import {
     postFlowCreation,
 } from '../client/flow-mutations.ts';
 import {
-    putWorkOrder,
+    workOrderIfMatch,
 } from '../client/work-orders-mutations.ts';
 import {
     postRecordChange,
@@ -31,6 +31,7 @@ import {
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
+    storedWorkOrderFlowGraph,
     type GraphNode,
     type GraphEdge,
     type NodeAttribute,
@@ -114,20 +115,28 @@ async function seedWorkOrder(
     currentNodeId: string,
 ): Promise<void> {
     const ctx = inPageContext(db, await organizationToken());
-    await putWorkOrder(ctx, id, {
-        displayId: 'WO-1',
-        flowGraph,
-        position: 0,
-    });
+    await ctx.PUT(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
+        {
+            display_id: 'WO-1',
+            flow_graph: storedWorkOrderFlowGraph(flowGraph),
+            position: 0,
+        },
+        [['If-None-Match', '*']],
+    );
+    const { etag } = await ctx.GETWithEtag(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
+    );
     // Genesis transition via the named op (states/:id
     // retired). pure-move instance shape; no claim release.
-    await ctx.POST('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
+    await ctx.POSTWithHeaders(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
         + '/transition', {
         transitionEventId: 't-create-' + id,
         targetState: currentNodeId,
         release: null,
         transitionAt: AT_CREATED,
-    });
+    }, [workOrderIfMatch(etag)]);
 }
 
 // The binding PUT and the attribute PUT (below) both need

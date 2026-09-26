@@ -122,7 +122,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -131,6 +131,7 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+            '428',
         ],
     },
     {
@@ -1844,7 +1845,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -1854,6 +1855,7 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+            '428',
         ],
     },
     {
@@ -2455,7 +2457,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match or If-None-Match: *',
         ],
         statuses:
         [
@@ -2465,6 +2467,7 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+            '428',
         ],
     },
     {
@@ -2476,7 +2479,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -2486,6 +2489,7 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+            '428',
         ],
     },
     {
@@ -2500,7 +2504,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -2510,6 +2514,7 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+            '428',
         ],
     },
     {

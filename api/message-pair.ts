@@ -1113,12 +1113,18 @@ export async function runStateWrite(
     return answer;
 }
 
+// A PUT naming the head it replaces is its successor, 200,
+// as an in-order parent is below; any other lands a new
+// document, 201.
 async function ownAnswer(
     adapter: DbAdapter,
     write: Extract<StateWrite, { kind: 'own' }>,
 ): Promise<WriteAnswer> {
     const completed = await completedPair(write.received, {
-        status: HTTP_CREATED,
+        status: ifMatchFromMessagePair(write.received)
+                === undefined
+            ? HTTP_CREATED
+            : HTTP_OK,
         etag: write.received.id,
         fields: [],
         state: write.state,

@@ -10,9 +10,9 @@ import { missedReadError } from './derive-states.ts';
 import type {
     FlowCreateBody,
     FlowUndoBody,
-    WorkOrderCreateBody,
     RecordWriteBody,
     ObjectiveCreateBody,
+    WorkOrderTransitionRelease,
 } from './validators.ts';
 import type {
     Id,
@@ -29,7 +29,6 @@ import type {
     ClientRegistrationEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
-    StateEntity,
     ObjectiveEntity,
     ProjectEntity,
     ProjectObjectiveBaselineScoreEntity,
@@ -38,8 +37,9 @@ import type {
     RecordAttributeEntity,
     MembershipEntity,
     IdentityProviderEntity,
-    WorkOrderEntity,
     WorkOrderFlowGraph,
+    MessagePairEntity,
+    TransitionFieldValueEntity,
     MemberEntity,
     AttributeType,
     Constraint,
@@ -47,6 +47,7 @@ import type {
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
+    nowUtc,
 } from '../shared/types.ts';
 import { hashPassword } from
     '../shared/password-hash.ts';
@@ -98,6 +99,7 @@ import {
     runWrite,
     runStateWrite,
     unprojected,
+    sameAsHead,
     entityTagsOf,
     latchesOf,
     canonicalPath,
@@ -105,26 +107,20 @@ import {
     formWriteMessagePair,
     messagePairResponseBody,
     ifMatchFromMessagePair,
-    rawIfMatchFromMessagePair,
-    parseIfMatch,
-    IF_MATCH_HEADER,
-    strongEtagOf,
 } from './message-pair.ts';
 import type {
-    MessagePair, ReceivedRequest, StateProjection,
+    MessagePair,
+    ParentSibling,
+    ReceivedRequest,
+    StateProjection,
+    StateSibling,
 } from './message-pair.ts';
 import { messageStore } from './message-store.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
-import {
-    latestClaimEvent,
-    isClaimEventExpired,
-    isClaimState,
-    isExpiresAtPassed,
-    addUtcSeconds,
-} from '../shared/work-order-claims.ts';
+import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -142,7 +138,6 @@ import {
 } from './authentication.ts';
 import {
     ApiError,
-    HTTP_OK,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_CONFLICT,
@@ -268,13 +263,19 @@ import {
     tokenRevocationEntityOf,
 } from './derive-identity-spine.ts';
 import {
-    workOrderBindingFor,
-    workOrderClaimDocumentFor,
-    workOrderClaimHistoryFor,
-    workOrderDocumentHeadFor,
+    workOrderHeadFor,
     workOrderHistoryFor,
-    workOrderLifecycleStatesFor,
 } from './derive-states.ts';
+import {
+    boundVersion,
+    claimedVersion,
+    createdVersion,
+    fieldsVersion,
+    isClaimLive,
+    releasedVersion,
+    transitionedVersion,
+    type WorkOrderVersion,
+} from './work-order-version.ts';
 import {
     deriveOrganization,
     deriveOrganizations,
@@ -402,19 +403,12 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
 };
 // The work-orders wiring row — the fourth family, and the
 // FIRST 'stateless' one (Decision 7's state-in-entity design
-// does not apply to a work-order document; see
-// postWorkOrderDocumentOp's own comment for why). Both PUT
-// (Task 2/3) and GET (Task 7)
-// now ride the generic machinery, so entityOf serves a live GET
-// reader (documentGetHandler / documentCollectionGetHandler)
-// exactly as ideaEntityOf/projectEntityOf/flowEntityOf each
-// serve their OWN family's GET path: the head pair's body,
-// stamped with id and organization_id, already carries exactly
-// the {display_id, flow_graph, position} keys
-// validateWorkOrderDocumentBody's gate admits, so no per-field
-// picking is needed. notFoundTable is 'work_orders' — the first
-// family whose storage table name (db-backed.ts's EntityStore
-// key) differs from its family name.
+// does not apply to a work-order document: its lifecycle rides
+// its operations). The GETs stream the stored head, which is
+// the whole version (api/api.ts), so no per-field picking is
+// needed. notFoundTable is 'work_orders' — the first family
+// whose storage table name (db-backed.ts's EntityStore key)
+// differs from its family name.
 function workOrderDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
@@ -1886,267 +1880,232 @@ export async function postIdentityCreationOp(
     return;
 }
 
-// The create's synthesized document body (Task 3, the
-// flow-creation-triple precedent): the SAME shape a live
-// genesis PUT /work-orders/:id would carry — the work
-// order's own three fields, picked directly from b.workOrder
-// (never spread verbatim) so a below-facade caller's
-// tolerated organization_id (validateWorkOrderCreateBody
-// never restricts workOrder's own keys) never leaks into the
-// byte-compared document. The ONE construction both the
-// route's pre-tx pair body and this comment's own covenant
-// describe — never a second, divergently-picked literal.
-function workOrderCreateDocumentBody(
-    b: WorkOrderCreateBody,
-): Record<string, unknown> {
-    return {
-        display_id: pickString(b.workOrder, 'display_id'),
-        flow_graph: asObject(
-            b.workOrder['flow_graph'], 'flow_graph',
-        ),
-        position: pickNumber(b.workOrder, 'position'),
-    };
+// A wired route forms its pair before dispatch; only a
+// below-facade caller could arrive without one.
+function requirePair(
+    messagePair: MessagePair | undefined,
+): MessagePair {
+    if (messagePair === undefined) {
+        throw new Error('a wired route formed no pair');
+    }
+    return messagePair;
 }
 
-// The three pairs a live POST /work-orders forms (Task 3):
-// the gate's own operation message pair (204, at the work-orders/:id
-// document per the registry's createBodyIdField — POST
-// 'work-orders' and PUT 'work-orders/:id' collapse onto the
-// SAME (path, name), exactly as flows/:id did for its
-// own create), plus the document and join pairs the route
-// pre-forms below. All three share ONE requestAt (the
-// create's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePairOnce's nowUtc() is monotonic), so the
-// document message pair — appended after the
-// operation message pair — becomes the document's head.
-export interface WorkOrderCreationMessagePairs {
-    readonly operation: MessagePair;
-    readonly document: MessagePair;
-    readonly join: MessagePair;
-    readonly claim: MessagePair;
-}
-
-// Work-order creation. Phase Final Task 2: work_orders +
-// flow_work_orders ROW halves stripped — THREE initial state
-// events (start, post-start, creation-time 'claimed') and
-// the operation/document/join pairs commit as ONE
-// transaction. Events are applied IN ORDER and authored by
-// the verified caller (actor), never the body. Seed drives
-// work-order genesis through postWorkOrderDocumentOp /
-// postFlowWorkOrderDocumentOp instead; states traces stay
-// direct until the states-trace group. The route always
-// supplies the triple and forms all three pairs pre-tx.
-// An unchanged document, join, or claim is left out
-// when another row changes. A resend of every body
-// is what matches, and the statement stores nothing.
-async function workOrderRowsToSubmit(
-    db: DbAdapter,
-    formed: WorkOrderCreationMessagePairs,
-): Promise<MessagePair[]> {
-    const documentChanged = await requestDiffers(
-        db, formed.document,
-    );
-    const joinChanged = await requestDiffers(
-        db, formed.join,
-    );
-    const claimChanged = await requestDiffers(
-        db, formed.claim,
-    );
-    const hasChange = documentChanged
-        || joinChanged
-        || claimChanged;
-    const rows = [formed.operation];
-    if (documentChanged || !hasChange) {
-        rows.push(formed.document);
-    }
-    if (joinChanged || !hasChange) {
-        rows.push(formed.join);
-    }
-    if (claimChanged || !hasChange) {
-        rows.push(formed.claim);
-    }
-    return rows;
-}
-
-export async function postWorkOrderCreationOp(
+// Work-order creation (§5): one version carrying its three
+// births (start, post-start, and the creator's claim) and
+// the flow join, in one statement. Both declare their
+// genesis, so a resent create answers 409 and stores
+// nothing. Every event is authored by the verified caller.
+async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    _actor: Id,
-    messagePairs?: WorkOrderCreationMessagePairs,
+    actor: Id,
+    messagePair: MessagePair | undefined,
+    organization: Id | undefined,
 ): Promise<void> {
-    validateWorkOrderCreateBody(body);
-    const rows = messagePairs === undefined
-        ? undefined
-        : await workOrderRowsToSubmit(db, messagePairs);
-    // Phase Final Task 2: work_orders + flow_work_orders
-    // ROW halves stripped.
-    if (rows !== undefined) {
-        await runWrite(
-            db, attemptFor(rows), rows,
-        );
-    }
-    return;
+    const org = requireOrganization(organization);
+    const b = validateWorkOrderCreateBody(body);
+    const fields = validateWorkOrderDocumentBody(
+        withoutId(b.workOrder),
+    ).entity;
+    const graph = asWorkOrderFlowGraph(
+        fields.flow_graph, 'WorkOrderCreateBody',
+    );
+    validateFlowWorkOrderEntity(b.flowWorkOrder);
+    const flowId = pickString(b.flowWorkOrder, 'flow_id');
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: requirePair(messagePair),
+        siblings: [
+            {
+                method: 'PUT',
+                path: canonicalPath(org, '/work-orders/'),
+                name: b.id,
+                state: createdVersion({
+                    id: b.id,
+                    organization_id: org,
+                    fields,
+                    births: b.stateEventIds.map(
+                        (id, i) => ({
+                            id,
+                            state: b.states[i]!,
+                            at: b.stateEventAts[i]!,
+                        }),
+                    ),
+                    creator: actor,
+                    lockTimeoutSeconds: graph.lockTimeout,
+                }),
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            },
+            {
+                method: 'PUT',
+                path: canonicalPath(
+                    org, '/flows/' + flowId + '/work-orders/',
+                ),
+                name: b.flowWorkOrderId,
+                state: {
+                    ...flowWorkOrderEntityOf({
+                        name: b.flowWorkOrderId,
+                        messagePairId: b.flowWorkOrderId,
+                        method: 'PUT',
+                        body: b.flowWorkOrder,
+                    }),
+                },
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            },
+        ],
+        project: unprojected,
+        answer: { kind: 'created', location: b.id },
+    });
 }
 
-// Claim a work order. A live claim by another member is
-// a 409 before any write. The same actor's repeat whose
-// body matches answers 200 and stores nothing. A claim
-// aged past the flow's lockTimeout is superseded.
-//
-// The decision read and the write are separate, so two
-// callers can both observe no claim head. That write is
-// genesis: the nil succession slot admits one PUT, and
-// the other answers 409. A present head — expired, the
-// same actor, or a DELETE — is in-order with If-Match
-// set to that head. Stale and succession refusal are the
-// same 409. A reclaim after DELETE matches that DELETE,
-// never a second genesis: the nil slot already holds
-// the first claim.
-//
-// Exported so the seed can drive a claim through the
-// same gate the route uses. `messagePair` is optional.
-// A wired return must run the statement, matched no-op
-// included: the gate crashes when the answer is absent.
-//
-// PHASE 14 TASK 4: the prior-claim decision read is re-
-// anchored onto the message plane (workOrderClaimHistoryFor,
-// api/derive-states.ts) — ENTITY-SCOPED indexed reads inside
-// this SAME transaction, never a nested tx — in place of the
-// row-plane view.states.getAllFor(workOrderId). Author gate 3:
-// latestClaimEvent and isClaimEventExpired (the live Date.now
-// clock) stay byte-identical — ONLY the event SOURCE flips.
-//
-// PHASE 15 TASK 2: the claim-gate graph read is re-anchored
-// onto workOrderDocumentHeadFor (message-plane document head)
-// in place of view.workOrders.getById. isClaimEventExpired +
-// 409 bytes + EntityNotFoundError mapping stay byte-identical
-// — ONLY the row source flips. Phase Final Task 2: work_orders
-// dropped from the tx list (no dual-write half remains).
+// Claim, release, and binding (§5): each reads the head,
+// matches the client's tag to it, and lands the next
+// version in order on that head. The statement judges the
+// latch. `validate` forms the operation's input once the
+// fence has passed, so a malformed body answers 400 whatever
+// its tag; `next` may refuse from the head it is given. A
+// tag naming another head was read from a head this one
+// replaced: the statement refuses it, so no rule of this
+// head is asked.
+async function workOrderOperation<Input>(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+    messagePair: MessagePair,
+    validate: () => Input,
+    next: (
+        head: WorkOrderVersion,
+        input: Input,
+    ) => WorkOrderVersion | Promise<WorkOrderVersion>,
+): Promise<void> {
+    const head = await workOrderHeadFor(
+        db, organization, workOrderId,
+    );
+    if (head === null) {
+        throw await missedReadError(
+            db, workOrderId, organization, 'work_orders',
+        );
+    }
+    const input = validate();
+    const latches = latchesOf(
+        entityTagsOf(messagePair), [head.pair.id],
+    );
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for '
+                + head.pair.path + workOrderId,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const latch = latches.heads[0]!;
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: head.pair.path,
+            name: workOrderId,
+            state: latch === head.pair.id
+                ? await next(head.version, input)
+                : head.version,
+            condition: { kind: 'in-order', head: latch },
+        }],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
+}
+
+// Claim a work order. A live claim by another member is a
+// 409 from the head; the holder resending its claim is the
+// head, so nothing lands. A lapsed claim is recorded as
+// expired, authored by its holder, before the new claim.
 export async function postWorkOrderClaimOp(
     db: DbAdapter,
     workOrderId: Id,
     body: Record<string, unknown>,
     actor: Id,
     organization: Id,
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    validateWorkOrderClaimBody(body);
-    // Phase Final Task 2: work_orders ROW half stripped.
-    // claim_expired + claimed live on the operation
-    // message pair body (workOrderClaimHistoryFor reads
-    // them back).
-    const claimRead = await db.readTransaction(async (view) => {
-        const wo = await workOrderDocumentHeadFor(
-            view, organization, workOrderId,
-        );
-        if (wo === null) {
-            throw await missedReadError(
-                view, workOrderId, organization,
-                'work_orders',
-            );
-        }
-        const graph = asWorkOrderFlowGraph(
-            wo.flow_graph,
-            'work_orders.flow_graph',
-        );
-        const events = await workOrderClaimHistoryFor(
-            view, organization, workOrderId,
-        );
-        const prior = latestClaimEvent(
-            events, workOrderId,
-        );
-        const claimDoc = await workOrderClaimDocumentFor(
-            view, organization, workOrderId,
-        );
-        const priorExpired = claimDoc !== null
-            ? isExpiresAtPassed(claimDoc.expiresAt)
-            : prior !== null
-                && isClaimEventExpired(
-                    prior, graph.lockTimeout,
+    const claim = validateWorkOrderClaimBody(body);
+    const received = requirePair(messagePair);
+    await workOrderOperation(
+        db, organization, workOrderId, received,
+        () => claim,
+        (head) => {
+            const change = claimedVersion(head, {
+                member: actor,
+                claimEventId: claim.claimEventId,
+                claimAt: claim.claimAt,
+                expireEventId: claim.expireEventId,
+                expireAt: claim.expireAt,
+                expiresAt: claim.expiresAt !== undefined
+                    ? claim.expiresAt
+                    : addUtcSeconds(
+                        claim.claimAt,
+                        asWorkOrderFlowGraph(
+                            head.flow_graph,
+                            'work_orders.flow_graph',
+                        ).lockTimeout,
+                    ),
+                now: received.requestAt,
+            });
+            if (change.kind === 'held') {
+                throw new ApiError(
+                    'work order is already claimed',
+                    HTTP_CONFLICT,
                 );
-        const head = messagePair === undefined
-            ? null
-            : await documentHeadAt(
-                view, messagePair.path, messagePair.name,
-            );
-        return {
-            claimed: prior !== null
-                && prior.state === 'claimed'
-                && !priorExpired
-                && prior.member_id !== actor,
-            headId: head === null ? null : head.id,
-        };
-    });
-    if (claimRead.claimed) {
-        throw new ApiError(
-            'work order is already claimed',
-            HTTP_CONFLICT,
-        );
-    }
-    if (messagePair !== undefined) {
-        // The gate's answer map is keyed by this object,
-        // so the attempt latch has to land on it.
-        if (claimRead.headId === null) {
-            Object.assign(messagePair, {
-                genesis: 'handler' as const,
-            });
-        } else {
-            Object.assign(messagePair, {
-                latchedHeadMessagePairId: claimRead.headId,
-            });
-        }
-        const answer = await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-        if (
-            answer.outcome === 'refused'
-            || answer.outcome === 'stale'
-        ) {
-            throw new ApiError(
-                'work order is already claimed',
-                HTTP_CONFLICT,
-            );
-        }
-    }
+            }
+            return change.version;
+        },
+    );
 }
 
-// DELETE work-orders/:id/claim — tombstone the claim
-// document. The gate's DELETE table already 404s a never-
-// written document and 204s an already-DELETE head without
-// dispatch. A PUT head proceeds here; append the DELETE
-// pair. applyReleaseMessagePair synthesizes claim_released from
-// the pair (id/at/actor) — no caller-minted body.
+// DELETE work-orders/:id/claim releases the live claim: an
+// operation on the work order, answering its state. The
+// release event takes the DELETE's own id and arrival. With
+// no live claim the version is the head, and nothing lands.
 export async function deleteWorkOrderClaimOp(
     db: DbAdapter,
-    _workOrderId: Id,
-    _actor: Id,
-    _organization: Id,
-    messagePair?: MessagePair,
+    workOrderId: Id,
+    actor: Id,
+    organization: Id,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return;
+    const received = requirePair(messagePair);
+    await workOrderOperation(
+        db, organization, workOrderId, received,
+        () => ({
+            eventId: received.id,
+            member: actor,
+            at: received.requestAt,
+            now: received.requestAt,
+        }),
+        (head, release) => releasedVersion(head, release),
+    );
 }
 
-// Current node id from lifecycle ASC + frozen graph.
-// Latest non-claim event's state; none → isCreate node;
-// undefined when neither exists (empty graph residual).
+// The node a work order sits at: its version's state, or
+// its graph's create node before any event sets one;
+// undefined only for a graph with neither.
 function currentNodeIdFor(
-    lifecycle: readonly StateEntity[],
+    version: WorkOrderVersion,
     graph: WorkOrderFlowGraph,
 ): string | undefined {
-    for (let i = lifecycle.length - 1; i >= 0; i--) {
-        const event = lifecycle[i]!;
-        if (!isClaimState(event.state)) {
-            return event.state;
-        }
+    if (version.state !== undefined) {
+        return version.state;
     }
     const create = graph.nodes.find(
         (node) => node.isCreate,
@@ -2157,13 +2116,12 @@ function currentNodeIdFor(
 // W10 required-at-exit: every gate-tier leave of a node
 // with isRequired refs validates MERGED state (head +
 // this delta). Unbound → 400 naming the bind (A3).
-// Preloaded head/bind/schema reuse the value-bearing
+// Preloaded values and schema reuse the value-bearing
 // path's already-read rows (ONE head read).
 async function assertRequiredAttributesAtExit(
     db: DbAdapter,
     organization: Id,
-    workOrderId: Id,
-    flowGraph: Record<string, unknown>,
+    version: WorkOrderVersion,
     delta: {
         readonly set: readonly {
             readonly attribute_id: string;
@@ -2172,7 +2130,6 @@ async function assertRequiredAttributesAtExit(
         readonly clear: readonly string[];
     },
     preloaded?: {
-        bind: { instanceId: Id; recordTypeId: Id };
         headValues: readonly InstanceValue[];
         attributesById: ReadonlyMap<
             string, AttributeSchemaRow
@@ -2180,12 +2137,9 @@ async function assertRequiredAttributesAtExit(
     },
 ): Promise<void> {
     const graph = asWorkOrderFlowGraph(
-        flowGraph, 'work_orders.flow_graph',
+        version.flow_graph, 'work_orders.flow_graph',
     );
-    const lifecycle = await workOrderLifecycleStatesFor(
-        db, organization, workOrderId,
-    );
-    const nodeId = currentNodeIdFor(lifecycle, graph);
+    const nodeId = currentNodeIdFor(version, graph);
     if (nodeId === undefined) {
         return;
     }
@@ -2201,12 +2155,10 @@ async function assertRequiredAttributesAtExit(
     if (required.length === 0) {
         return;
     }
-    const bind = preloaded !== undefined
-        ? preloaded.bind
-        : await workOrderBindingFor(
-            db, organization, workOrderId,
-        );
-    if (bind === null) {
+    if (
+        version.instance_id === undefined
+        || version.record_type_id === undefined
+    ) {
         throw new ValidationError(
             'work order has no instance binding',
         );
@@ -2216,13 +2168,13 @@ async function assertRequiredAttributesAtExit(
     if (headValues === undefined) {
         const head = await deriveInstanceHead(
             db, organization,
-            bind.recordTypeId, bind.instanceId,
+            version.record_type_id, version.instance_id,
         );
         headValues = head?.values ?? [];
     }
     if (attributesById === undefined) {
         attributesById = await loadAttributeSchemaById(
-            db, organization, bind.recordTypeId,
+            db, organization, version.record_type_id,
         );
     }
     const merged = mergeInstanceValues(
@@ -2257,377 +2209,370 @@ async function assertRequiredAttributesAtExit(
     }
 }
 
-// Transition a work order along an edge. Dual-tolerant
-// below the facade (seed tier + stored-data fidelity):
-// legacy pure-append OR instance set/clear against the
-// bound instance head. organization === undefined is the
-// below-facade seed tier (validate + append only). The
-// live gate rejects the legacy key in the dispatch arrow
-// (Task 8 CUT). Gate tier fences the WO (404/403); value-
-// bearing instance shape adds bind assert + If-Match
-// ladder + ACL/constraints + W10 required-at-exit + one
-// tx of op + revision. Authorship is stamped from the
-// verified caller (actor). `messagePair` is optional.
+// One transition lands one work-order version and, when it
+// bears values, the bound instance's revision, in one
+// statement (§5). The work order is the parent; the tags
+// latch the documents the transition derives from, parent
+// first (Interpretation J). An instance revision equal to
+// its head is left out.
+async function landWorkOrderTransition(
+    db: DbAdapter,
+    head: {
+        readonly version: WorkOrderVersion,
+        readonly pair: MessagePairEntity,
+    },
+    messagePair: MessagePair,
+    event: Parameters<typeof transitionedVersion>[1],
+    instance:
+        | { readonly kind: 'none' }
+        | {
+            readonly kind: 'revised',
+            readonly head: MessagePairEntity,
+            readonly state: Record<string, unknown>,
+        },
+    tags: readonly string[],
+): Promise<void> {
+    const documents = instance.kind === 'none'
+        ? [head.pair.id]
+        : [head.pair.id, instance.head.id];
+    const latches = latchesOf(tags, documents);
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for '
+                + latches.documents.map((index) => index === 0
+                    ? head.pair.path + head.version.id
+                    : 'the bound instance').join(' and '),
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const workOrder: ParentSibling = {
+        method: 'PUT',
+        path: head.pair.path,
+        name: head.version.id,
+        state: transitionedVersion(head.version, event),
+        condition: { kind: 'in-order', head: latches.heads[0]! },
+    };
+    const revision: readonly StateSibling[] =
+        instance.kind === 'none'
+            || sameAsHead(instance.head, instance.state)
+            ? []
+            : [{
+                method: 'PUT',
+                path: instance.head.path,
+                name: instance.head.name,
+                state: instance.state,
+                condition: {
+                    kind: 'in-order', head: latches.heads[1]!,
+                },
+            }];
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [workOrder, ...revision],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
+}
+
+// The release a transition carries, as the version records
+// it.
+function transitionReleaseOf(
+    release: WorkOrderTransitionRelease | null,
+): Parameters<typeof transitionedVersion>[1]['release'] {
+    return release === null
+        ? { kind: 'kept' }
+        : { kind: 'released', id: release.id, at: release.at };
+}
+
+// The event's field values, from the instance delta it
+// carries: a set row per value, a clear row per attribute.
+function deltaFieldValueEntities(
+    set: readonly { attribute_id: string, value: string }[],
+    clear: readonly string[],
+): TransitionFieldValueEntity[] {
+    return [
+        ...set.map((entry) => ({
+            id: entry.attribute_id,
+            attribute_id: entry.attribute_id,
+            value: entry.value,
+        })),
+        ...clear.map((attributeId) => ({
+            id: attributeId,
+            attribute_id: attributeId,
+            cleared: true,
+        } as TransitionFieldValueEntity)),
+    ].sort(byIdAscending);
+}
+
+// The work order's head, or its miss.
+async function requireWorkOrderHead(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+): Promise<{
+    readonly version: WorkOrderVersion,
+    readonly pair: MessagePairEntity,
+}> {
+    const head = await workOrderHeadFor(
+        db, organization, workOrderId,
+    );
+    if (head === null) {
+        throw await missedReadError(
+            db, workOrderId, organization, 'work_orders',
+        );
+    }
+    return head;
+}
+
+// Transition a work order along an edge (§5). A pure move
+// latches the work order; a value-bearing one also latches
+// the bound instance and revises it in the same statement.
+// The checks run in their covenant order: the fence, the
+// binding, ACL, constraints, then required-at-exit against
+// the head's own frozen graph. Authorship is the verified
+// caller's.
 export async function postWorkOrderTransitionOp(
     db: DbAdapter,
     workOrderId: Id,
     body: Record<string, unknown>,
     actor: Id,
-    organization: Id | undefined,
+    organization: Id,
     roles: readonly string[],
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    const validated =
-        validateWorkOrderTransitionBody(body);
-    if (organization === undefined) {
-        // Below-facade tier (seed): no gate, no fence —
-        // validate + append, the WO-create precedent.
-        // Historical seed moves are not re-gated (W10).
-        if (messagePair !== undefined) {
-            await runWrite(
-                db,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        }
-        return;
-    }
-    const valueBearing =
-        validated.kind === 'instance'
-        && (validated.set.length
-            + validated.clear.length > 0);
-    if (!valueBearing) {
-        // Pure move: legacy kind OR instance-kind empty
-        // delta. Pre-tx fence + W10 required-at-exit;
-        // one-dialect If-Match reject; then append.
-        const wo = await workOrderDocumentHeadFor(
-            db, organization, workOrderId,
+    const validated = validateWorkOrderTransitionBody(body);
+    if (validated.kind !== 'instance') {
+        throw new Error(
+            'the gate admitted a retired transition body',
         );
-        if (wo === null) {
-            throw await missedReadError(
-                db, workOrderId, organization,
-                'work_orders',
-            );
-        }
-        if (
-            validated.kind === 'instance'
-            && messagePair !== undefined
-            && rawIfMatchFromMessagePair(messagePair)
-                !== undefined
-        ) {
-            throw new ValidationError(
-                'If-Match is forbidden on a'
-                + ' pure-move transition',
-            );
-        }
+    }
+    const received = requirePair(messagePair);
+    const head = await requireWorkOrderHead(
+        db, organization, workOrderId,
+    );
+    const event = {
+        eventId: validated.transitionEventId,
+        targetState: validated.targetState,
+        member: actor,
+        at: validated.transitionAt,
+        fieldValueEntities: deltaFieldValueEntities(
+            validated.set, validated.clear,
+        ),
+        release: transitionReleaseOf(validated.release),
+    };
+    const valueBearing =
+        validated.set.length + validated.clear.length > 0;
+    if (!valueBearing) {
         await assertRequiredAttributesAtExit(
-            db, organization, workOrderId,
-            wo.flow_graph,
+            db, organization, head.version,
             { set: [], clear: [] },
         );
-        if (messagePair !== undefined) {
-            await runWrite(
-                db,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        }
+        await landWorkOrderTransition(
+            db, head, received, event, { kind: 'none' },
+            entityTagsOf(received),
+        );
         return;
     }
-    // Value-bearing instance-kind. PRE-TX after fence
-    // (instance-PATCH shape: tx wraps only the appends).
-    const wo = await workOrderDocumentHeadFor(
-        db, organization, workOrderId,
-    );
-    if (wo === null) {
-        throw await missedReadError(
-            db, workOrderId, organization,
-            'work_orders',
-        );
-    }
-    if (validated.kind !== 'instance') {
-        // Exhaustiveness: valueBearing implies instance.
-        throw new Error(
-            'value-bearing transition is not instance',
-        );
-    }
-    const bind = await workOrderBindingFor(
-        db, organization, workOrderId,
-    );
-    if (bind === null) {
+    const typeId = head.version.record_type_id;
+    const instanceId = head.version.instance_id;
+    if (typeId === undefined || instanceId === undefined) {
         throw new ValidationError(
             'work order has no instance binding',
         );
     }
     if (
-        bind.instanceId !== validated.instanceId
-        || bind.recordTypeId !== validated.recordTypeId
+        instanceId !== validated.instanceId
+        || typeId !== validated.recordTypeId
     ) {
         throw new ValidationError(
             'instance_id/record_type_id do not match'
             + ' the work order\'s binding',
         );
     }
-    if (messagePair === undefined) {
-        throw new Error(
-            'value-bearing transition requires a'
-            + ' formed pair',
-        );
-    }
-    const transitionPath =
-        '/organizations/' + organization
-        + '/work-orders/' + workOrderId
-        + '/transition';
-    const rawIfMatch = rawIfMatchFromMessagePair(messagePair);
-    if (rawIfMatch === undefined) {
-        throw new ApiError(
-            'If-Match is required to transition with'
-            + ' set/clear at ' + transitionPath,
-            HTTP_PRECONDITION_REQUIRED,
-        );
-    }
-    const ifMatchTarget = parseIfMatch(rawIfMatch);
-    if (ifMatchTarget === undefined) {
-        throw new ValidationError(
-            'If-Match must carry exactly one strong'
-            + ' validator',
-        );
-    }
-    // Compose postInstancePatchOp pipeline against the
-    // bound instance (org, bind.recordTypeId,
-    // bind.instanceId). COPY head-assert blocks inline
-    // (A5 — do not extract).
-    const org = organization;
-    const typeId = bind.recordTypeId;
-    const instanceId = bind.instanceId;
-    const pathname = '/organizations/' + org
-        + '/record-types/' + typeId
-        + '/instances/' + instanceId;
-    const head = await deriveInstanceHead(
-        db, org, typeId, instanceId,
+    const instanceHead = await db.messagePairs.getHeadPair(
+        instancesUriPrefix(organization, typeId), instanceId,
     );
-    if (head === undefined) {
+    if (instanceHead === null || instanceHead.method !== 'PUT') {
         throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
+            'If-Match does not match the current instance at '
+                + '/organizations/' + organization
+                + '/record-types/' + typeId
+                + '/instances/' + instanceId,
             HTTP_PRECONDITION_FAILED,
         );
     }
+    const headValues = revisionValuesOf(
+        requestBodyOf(instanceHead.request),
+    );
     const attributesById = await loadAttributeSchemaById(
-        db, org, typeId,
+        db, organization, typeId,
     );
-    if (ifMatchTarget !== head.messagePairId) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const aclIds = [
-        ...validated.set.map(
-            (entry) => entry.attribute_id,
-        ),
-        ...validated.clear,
-    ];
     assertWritableAttributeIds(
-        aclIds, attributesById, roles,
+        [
+            ...validated.set.map((entry) => entry.attribute_id),
+            ...validated.clear,
+        ],
+        attributesById,
+        roles,
     );
-    validateInstanceValues(
-        validated.set, attributesById,
-    );
-    // W10 required-at-exit AFTER ACL 403 + constraints
-    // 400 (ladder pin 7). Reuse head — ONE read.
+    validateInstanceValues(validated.set, attributesById);
     await assertRequiredAttributesAtExit(
-        db, organization, workOrderId,
-        wo.flow_graph,
+        db, organization, head.version,
+        { set: validated.set, clear: validated.clear },
+        { headValues, attributesById },
+    );
+    await landWorkOrderTransition(
+        db, head, received, event,
         {
-            set: validated.set,
-            clear: validated.clear,
+            kind: 'revised',
+            head: instanceHead,
+            state: instanceStateOf(
+                organization, typeId, instanceId,
+                mergeInstanceValues(headValues, {
+                    set: validated.set,
+                    clear: validated.clear,
+                }),
+            ),
         },
-        {
-            bind,
-            headValues: head.values,
-            attributesById,
-        },
+        entityTagsOf(received),
     );
-    const mergedValues = mergeInstanceValues(
-        head.values, {
-            set: validated.set,
-            clear: validated.clear,
-        },
-    );
-    const revisionState = instanceStateOf(
-        org, typeId, instanceId, mergedValues,
-    );
-    const revisionMessagePair = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [org, typeId, instanceId],
-        method: 'PUT',
-        body: revisionState,
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization: org,
-        response: {
-            status: HTTP_OK,
-            body: revisionState,
-        },
-        headerFields: [{
-            name: IF_MATCH_HEADER,
-            value: strongEtagOf(ifMatchTarget),
-        }],
-    });
-    const latchedMessagePairId = head.messagePairId;
-    await db.readTransaction(async (view) => {
-        const liveWo =
-            await workOrderDocumentHeadFor(
-                view, organization, workOrderId,
-            );
-        if (liveWo === null) {
-            throw await missedReadError(
-                view, workOrderId, organization,
-                'work_orders',
-            );
-        }
-        // The latched pair must still be the head.
-        const latest = (await messageStore(view)
-            .getDocumentHead(
-                revisionMessagePair.path,
-                revisionMessagePair.name,
-            ))?.id;
-        if (latest !== latchedMessagePairId) {
-            throw new ApiError(
-                'If-Match does not match the current '
-                    + 'instance at ' + pathname,
-                HTTP_PRECONDITION_FAILED,
-            );
-        }
-    });
-    const pairs = [
-        messagePair, revisionMessagePair,
-    ];
-    await runWrite(db, attemptFor(pairs), pairs);
 }
 
-// Bind a work order to one org-owned instance of one
-// record type (spec W1). Member tier rides the
-// /work-orders MEMBER_VERBS segment prefix — no policy
-// edit (the /claim precedent). Claim-AGNOSTIC (A7).
-// Rebind is forbidden in v1: a prior binding pair
-// naming a different (instance, type) → 409 in-tx;
-// a byte-identical resend replays via message_hash.
-// Covenant ladder: fence → body → instance → join →
-// in-tx 409 (NOT claim's body-first order).
+// A seeded historical move (W10: historical seed moves are
+// not re-gated): no ACL, constraint, or required-at-exit
+// check, and no instance read. No client sends the seed a
+// tag, so the handler latches the head it read
+// (Interpretation N). A legacy body's values are recorded
+// on its own event, as the history fold assigned them.
+export async function postSeedWorkOrderTransitionOp(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+    body: Record<string, unknown>,
+    actor: Id,
+    messagePair: MessagePair,
+): Promise<void> {
+    const validated = validateWorkOrderTransitionBody(body);
+    const head = await requireWorkOrderHead(
+        db, organization, workOrderId,
+    );
+    await landWorkOrderTransition(
+        db, head, messagePair,
+        {
+            eventId: validated.transitionEventId,
+            targetState: validated.targetState,
+            member: actor,
+            at: validated.transitionAt,
+            fieldValueEntities: validated.kind === 'legacy'
+                ? validated.fieldValues.map((row) => ({
+                    id: row.id,
+                    attribute_id: pickString(
+                        row.fields, 'attribute_id',
+                    ),
+                    value: pickString(row.fields, 'value'),
+                })).sort(byIdAscending)
+                : deltaFieldValueEntities(
+                    validated.set, validated.clear,
+                ),
+            release: transitionReleaseOf(validated.release),
+        },
+        { kind: 'none' },
+        [head.pair.id],
+    );
+}
+
+// Bind a work order to one org-owned instance of one record
+// type (spec W1). Claim-agnostic (A7). The covenant ladder
+// is fence → body → instance → join → 409: the instance
+// miss is EntityNotFoundError, never missedReadError (a
+// foreign 403 would be an existence oracle; W1 / W7). A
+// rebind to another instance is 409; the same binding is
+// the head, so nothing lands.
 export async function postWorkOrderBindingOp(
     db: DbAdapter,
     workOrderId: Id,
     body: Record<string, unknown>,
     _actor: Id,
     organization: Id,
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    await db.readTransaction(async (view) => {
-        const wo = await workOrderDocumentHeadFor(
-            view, organization, workOrderId,
-        );
-        if (wo === null) {
-            throw await missedReadError(
-                view, workOrderId, organization,
-                'work_orders',
+    await workOrderOperation(
+        db, organization, workOrderId,
+        requirePair(messagePair),
+        () => validateWorkOrderBindingBody(body),
+        async (head, bind) => {
+            const instance = await deriveInstanceHead(
+                db, organization,
+                bind.recordTypeId, bind.instanceId,
             );
-        }
-        const bind = validateWorkOrderBindingBody(body);
-        // Instance miss is EntityNotFoundError (404)
-        // — never missedReadError (would 403 foreign
-        // and create an existence oracle; W1 / W7).
-        const head = await deriveInstanceHead(
-            view, organization,
-            bind.recordTypeId, bind.instanceId,
-        );
-        if (head === undefined) {
-            throw new EntityNotFoundError(
-                'record_instances',
-                bind.instanceId,
+            if (instance === undefined) {
+                throw new EntityNotFoundError(
+                    'record_instances', bind.instanceId,
+                );
+            }
+            const chain = await recordTypeIdsForWorkOrder(
+                db, organization, workOrderId,
             );
-        }
-        const chain =
-            await recordTypeIdsForWorkOrder(
-                view, organization, workOrderId,
+            if (
+                chain === null
+                || !chain.recordTypeIds.includes(
+                    bind.recordTypeId,
+                )
+            ) {
+                throw new ValidationError(
+                    'record_type_id is not joined to'
+                    + ' the work order\'s flow',
+                );
+            }
+            const change = boundVersion(
+                head, bind.instanceId, bind.recordTypeId,
             );
-        if (
-            chain === null
-            || !chain.recordTypeIds.includes(
-                bind.recordTypeId,
-            )
-        ) {
-            throw new ValidationError(
-                'record_type_id is not joined to'
-                + ' the work order\'s flow',
-            );
-        }
-        const prior = await workOrderBindingFor(
-            view, organization, workOrderId,
-        );
-        if (
-            prior !== null
-            && (prior.instanceId
-                    !== bind.instanceId
-                || prior.recordTypeId
-                    !== bind.recordTypeId)
-        ) {
-            throw new ApiError(
-                'work order is already bound to'
-                + ' a different instance',
-                HTTP_CONFLICT,
-            );
-        }
-    });
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
+            if (change.kind === 'rebound') {
+                throw new ApiError(
+                    'work order is already bound to'
+                    + ' a different instance',
+                    HTTP_CONFLICT,
+                );
+            }
+            return change.version;
+        },
+    );
 }
 
-// Work-order document write — the fourth family's evidence for
-// the 'stateless' lifecycle class (Decision 7 does NOT apply
-// here): a work order's lifecycle is written ONLY by the
-// create/claim/transition ops above and the states/:id unclaim
-// path, never by a document PUT, so this op posts NO states
-// event of its own. Phase Final Task 2: the work_orders ROW
-// half is stripped — pure message-plane write
-// (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
-// successBody forms the wire bytes; the reconstructed return
-// is for below-facade callers and type parity.
-// validateWorkOrderDocumentBody rejects a body carrying
-// state at the gate. Exported so the seed can drive a work-
-// order document write through the same op the route uses.
-// `messagePair` is optional. The actor parameter is spelled `_actor`:
-// no state event here to author.
+// Work-order document PUT (§5): the received PUT is the
+// version, the request's fields over the head's facets
+// with no event of its own. Its own tag, or If-None-Match:
+// *, latches it; the statement judges it.
 export async function postWorkOrderDocumentOp(
     db: DbAdapter,
-    _id: Id,
+    id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<WorkOrderEntity, 'id'>> {
-    const doc = validateWorkOrderDocumentBody(withoutId(body));
-    const entity = {
-        ...doc.entity,
-        ...documentOperationOrganization(body),
-    } as unknown as Omit<WorkOrderEntity, 'id'>;
-    // Phase Final Task 2: work_orders ROW half stripped.
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return entity;
+    messagePair: MessagePair | undefined,
+    organization: Id | undefined,
+): Promise<void> {
+    const org = requireOrganization(organization);
+    const fields = validateWorkOrderDocumentBody(
+        withoutId(body),
+    ).entity;
+    const head = await workOrderHeadFor(db, org, id);
+    await runStateWrite(db, {
+        kind: 'own',
+        received: requirePair(messagePair),
+        state: fieldsVersion(
+            head === null
+                ? { id, organization_id: org }
+                : head.version,
+            fields,
+        ),
+    });
 }
 
 // Flow work-order join document write. Phase Final Task 2:
@@ -3208,27 +3153,22 @@ export const WRITE_RESPONSE_SPECS:
     },
     // flows/:id/versions[+/:vid] WRITE_RESPONSE_SPECS RETIRED
     // (Phase 15 Task 7): ZERO seed pairs at those documents.
+    // A work order's writes answer its version, which the
+    // former writes; none echoes its request (§5).
     'organizations/:id/work-orders/': {
         conditional: 'none',
-        // The receipt shares the document name. An empty
-        // body matches a DELETE tombstone, so a recreate
-        // would store nothing.
-        successBody: (_params, body) => body ?? {},
     },
-    'organizations/:id/work-orders/:id':
-        documentWriteResponseSpec(WORK_ORDERS_WIRING),
+    'organizations/:id/work-orders/:id': {
+        conditional: 'required',
+    },
     'organizations/:id/work-orders/:id/claim': {
-        conditional: 'optional',
-        // The response is the claim document. An empty
-        // body matches every other empty claim, so a
-        // new claim would store nothing.
-        successBody: (_params, body) => body ?? {},
+        conditional: 'in-order',
     },
     'organizations/:id/work-orders/:id/transition': {
-        conditional: 'optional',
+        conditional: 'in-order',
     },
     'organizations/:id/work-orders/:id/binding': {
-        conditional: 'optional',
+        conditional: 'in-order',
     },
     'organizations/:id/flows/:id/work-orders/:woid': {
         conditional: 'optional',
@@ -3748,13 +3688,12 @@ export async function postInstanceDeleteOp(
 
 // Org WOs whose CURRENT bind names `instanceId` AND
 // whose current node is non-terminal in that WO's own
-// frozen flow_graph. Cost-ordered, entity-scoped in-tx
-// reads only (collectAttributeReferrers shape): ONE
-// collection-prefix WO-heads read; binding/lifecycle
-// only for candidates that still bind this instance.
-// Current node = latest non-claim lifecycle state's
-// `state`; a WO with no transition yet sits at its
-// graph's isCreate node. Terminal = no outgoing edge.
+// frozen flow_graph. Entity-scoped in-tx reads only
+// (collectAttributeReferrers shape): ONE collection-prefix
+// read names the work orders; each head version carries
+// its binding and its node. A WO with no transition yet
+// sits at its graph's isCreate node. Terminal = no
+// outgoing edge.
 async function inFlightPlacementBlockersFor(
     view: DbAdapter,
     organization: Id,
@@ -3770,26 +3709,22 @@ async function inFlightPlacementBlockersFor(
         woMessagePairs, workOrdersPrefix,
     );
     const blockers: string[] = [];
-    for (const [woId, doc] of woHeads) {
-        const bind = await workOrderBindingFor(
+    for (const woId of woHeads.keys()) {
+        const head = await workOrderHeadFor(
             view, organization, woId,
         );
         if (
-            bind === null
-            || bind.instanceId !== instanceId
+            head === null
+            || head.version.instance_id !== instanceId
         ) {
             continue;
         }
         const graph = asWorkOrderFlowGraph(
-            doc.body['flow_graph'],
+            head.version.flow_graph,
             'work_orders.flow_graph',
         );
-        const lifecycle =
-            await workOrderLifecycleStatesFor(
-                view, organization, woId,
-            );
         const nodeId = currentNodeIdFor(
-            lifecycle, graph,
+            head.version, graph,
         );
         if (nodeId === undefined) {
             continue;
@@ -4942,197 +4877,53 @@ export const routes: Route[] = [
             }
         },
     }),
-    // GET list: generic documentCollectionGetHandler rows
-    // plus a per-row workOrderBindingFor attach (instance_id
-    // + record_type_id when bound; keys ABSENT when unbound
-    // so unbound wire bytes stay unchanged). Browser-tier N
-    // on a read-only route — Task 7 measure is the evidence
-    // gate. POST stays this hand-written create — unlike
+    // The collection and entity GETs stream the stored heads
+    // (api/api.ts): a work order's head is its whole state.
+    // POST stays this hand-written create — unlike
     // ideas/projects, work-orders never folded genesis into
     // the document PUT (Decision 6), mirroring flows' own
     // precedent, so a separate create verb remains here.
+    // Member-tier POST — /work-orders carries POST in
+    // MEMBER_VERBS.
     route('organizations/:id/work-orders/', {
-        get: async (db, p, actor, organization, roles) => {
-            const org = requireOrganization(organization);
-            const rows = await documentCollectionGetHandler(
-                WORK_ORDERS_WIRING,
-            )(db, p, actor, organization, roles) as {
-                id: string;
-            }[];
-            const binds = await Promise.all(
-                rows.map(row => workOrderBindingFor(
-                    db, org, row.id,
-                )),
-            );
-            const out: unknown[] = [];
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i]!;
-                const bind = binds[i]!;
-                out.push({
-                    ...row,
-                    ...(bind === null
-                        ? {}
-                        : {
-                            instance_id:
-                                bind.instanceId,
-                            record_type_id:
-                                bind.recordTypeId,
-                        }),
-                });
-            }
-            return out;
-        },
-        // Member-tier POST — /work-orders carries POST in
-        // MEMBER_VERBS (the claim sub-route is also a member
-        // POST). Forms the document + join pairs pre-tx
-        // (Task 3) beside the gate's own operation message pair — the
-        // SAME shape a live genesis PUT /work-orders/:id and a
-        // live PUT /flows/:id/work-orders/:woid would each
-        // carry — ONLY when the gate supplied both a pair and
-        // a fence organization (the Phase 3 condition
-        // verbatim); a below-facade caller (api/mock-data.ts,
-        // no gate) skips all three, preserving dual-write
-        // discipline. See postWorkOrderCreationOp for the
-        // transaction shape.
-        post: async (
+        get: documentCollectionGetHandler(WORK_ORDERS_WIRING),
+        post: (
             db, _p, body, actor, messagePair, organization,
-        ) => {
-            let messagePairs: WorkOrderCreationMessagePairs | undefined;
-            if (messagePair !== undefined && organization !== undefined) {
-                const b = validateWorkOrderCreateBody(body);
-                const documentBody =
-                    workOrderCreateDocumentBody(b);
-                validateWorkOrderDocumentBody(documentBody);
-                const document = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/work-orders/:id',
-                    params: [organization, b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                // The live :woid PUT's request shape, verified
-                // by content: validateFlowWorkOrderEntity
-                // accepts EXACTLY flow_id/work_order_id/at —
-                // the same three keys b.flowWorkOrder already
-                // carries, so it doubles as the join pair's
-                // body verbatim.
-                validateFlowWorkOrderEntity(b.flowWorkOrder);
-                const flowId = pickString(
-                    b.flowWorkOrder, 'flow_id',
-                );
-                // Genesis-undefined (chain 'none'): a work
-                // order's create-time join is always fresh
-                // (design decision — no duplicate-create carve-
-                // out at this document through this task; pinned
-                // by the same-join-id retry test in
-                // tests/drift-work-orders.test.ts).
-                const join = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/flows/:id'
-                        + '/work-orders/:woid',
-                    params: [
-                        organization, flowId,
-                        b.flowWorkOrderId,
-                    ],
-                    body: b.flowWorkOrder,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                const graph = asWorkOrderFlowGraph(
-                    b.workOrder['flow_graph'],
-                    'workOrder.flow_graph',
-                );
-                const claimAt = b.stateEventAts[2]!;
-                const claim = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/work-orders/:id'
-                        + '/claim',
-                    params: [organization, b.id],
-                    body: {
-                        claimEventId: b.stateEventIds[2]!,
-                        claimAt,
-                        expireEventId:
-                            b.stateEventIds[2]! + '-exp',
-                        expireAt: claimAt,
-                        expires_at: addUtcSeconds(
-                            claimAt, graph.lockTimeout,
-                        ),
-                    },
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                messagePairs = {
-                    operation: messagePair, document, join, claim,
-                };
-            }
-            return postWorkOrderCreationOp(
-                db, body, actor, messagePairs,
-            );
-        },
+        ) => postWorkOrderCreationOp(
+            db, body, actor, messagePair, organization,
+        ),
     }),
-    // work-orders/:id is the fourth family. GET exits the
-    // generic documentEntityRoute path deliberately: the
-    // derivedDocumentEntity shape (via documentGetHandler)
-    // plus ONE workOrderBindingFor read that embeds
-    // instance_id + record_type_id when bound (keys ABSENT
-    // when unbound — unbound wire bytes unchanged). PUT
-    // still rides documentPutHandler(WORK_ORDERS_WIRING)
-    // — member-tier via
-    // MEMBER_VERBS['/work-orders']. Verbs stay {get, put}
-    // — no DELETE.
+    // work-orders/:id is the fourth family. PUT rides
+    // documentPutHandler(WORK_ORDERS_WIRING) — member-tier
+    // via MEMBER_VERBS['/work-orders']. Verbs stay
+    // {get, put} — no DELETE.
     route('organizations/:id/work-orders/:id', {
-        get: async (db, p, actor, organization, roles) => {
-            const org = requireOrganization(organization);
-            const id = param(p, 1);
-            const entity = await documentGetHandler(
-                WORK_ORDERS_WIRING,
-            )(db, p, actor, organization, roles);
-            const bind = await workOrderBindingFor(
-                db, org, id,
-            );
-            return {
-                ...(entity as object),
-                ...(bind === null
-                    ? {}
-                    : {
-                        instance_id: bind.instanceId,
-                        record_type_id: bind.recordTypeId,
-                    }),
-            };
-        },
+        get: documentGetHandler(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
-    // PUT claims, GET returns facts (404 only when
-    // unclaimed), DELETE releases (DELETE head =
-    // unclaimed). Member-tier via MEMBER_VERBS
+    // PUT claims and DELETE releases: operations on the work
+    // order, answering its state. GET reads the head's live
+    // claim (404 when none). Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.
     route('organizations/:id/work-orders/:id/claim', {
         get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(
-                organization,
-            );
             const workOrderId = param(p, 1);
-            const claim = await workOrderClaimDocumentFor(
-                db, org, workOrderId,
+            const head = await workOrderHeadFor(
+                db, requireOrganization(organization),
+                workOrderId,
             );
-            if (claim === null) {
+            const claim = head?.version.claim;
+            if (
+                claim === undefined
+                || !isClaimLive(claim, nowUtc())
+            ) {
                 throw new EntityNotFoundError(
                     'work_order_claims', workOrderId,
                 );
             }
             return {
-                member_id: claim.memberId,
-                expires_at: claim.expiresAt,
+                member_id: claim.member_id,
+                expires_at: claim.expires_at,
             };
         },
         put: (db, p, body, actor, messagePair, organization) =>
@@ -5149,12 +4940,8 @@ export const routes: Route[] = [
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS, and isPermitted matches on the segment
     // prefix, so the sub-route is member-permitted like
-    // /claim. See postWorkOrderTransitionOp for the
-    // transaction shape. organization is NOT
-    // requireOrganization — the op discriminates the
-    // below-facade seed tier (undefined) from the gate.
-    // Task 8 CUT: gate rejects the legacy fieldValues key
-    // here only; the op stays dual-tolerant for seed.
+    // /claim. Task 8 CUT: the gate rejects the legacy
+    // fieldValues key here; only the seed lands it.
     route('organizations/:id/work-orders/:id/transition', {
         post: (
             db, p, body, actor, messagePair,
@@ -5169,12 +4956,13 @@ export const routes: Route[] = [
             }
             return postWorkOrderTransitionOp(
                 db, param(p, 1), body, actor,
-                organization, roles, messagePair,
+                requireOrganization(organization), roles,
+                messagePair,
             );
         },
     }),
-    // Create-only PUT — first bind 201; rebind 409;
-    // no DELETE. POST is gone. Member-tier via
+    // A bind answers the work order's state; a rebind to
+    // another instance is 409; no DELETE. Member-tier via
     // MEMBER_VERBS PUT on /work-orders.
     route('organizations/:id/work-orders/:id/binding', {
         put: (db, p, body, actor, messagePair, organization) =>
@@ -5184,7 +4972,7 @@ export const routes: Route[] = [
             ),
     }),
     // GET work-orders/:id/history (states-URI elimination A1):
-    // lifecycle + inline field_values fold, (at, id) DESC.
+    // the version chain's events, newest first.
     // Miss posture lives inside workOrderHistoryFor (empty →
     // missedReadError). No api.ts pre-dispatch guard — the
     // derive reads only this org's paths.

@@ -706,6 +706,7 @@ Deno.test(
                 PATCH: unused,
                 PATCHWithEtag: unused,
                 DELETE: unused,
+                DELETEWithEtag: unused,
                 POST: unused,
                 postForHeaders: (
                     _resource, payload, _token, fields,

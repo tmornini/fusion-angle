@@ -340,9 +340,10 @@ export function formatCompactCurrency(
 // that must assert age without sleeping installs a fake here
 // and MUST resetClock() in afterEach. Deterministic tests
 // over real-clock false prophets (Office of Verification).
-// Both msSinceUtc (live claim-expiry gate) and nowUtc (body
-// claimAt mints that derive's isExpiredAsOf re-decides) read
-// this seam — real sleep used to advance both together.
+// Both msSinceUtc (the client's claim-expiry check) and
+// nowUtc (the request stamp a claim judges its prior
+// claim's expires_at against) read this seam — real sleep
+// used to advance both together.
 let clockNowMs: () => number = () => Date.now();
 
 export function setClockForTest(
@@ -1271,6 +1272,13 @@ export interface WorkOrderEntity {
     // GET embed when bound (absent when unbound).
     instance_id?: Id;
     record_type_id?: Id;
+    // The head's claim (absent when unclaimed); "claimed
+    // now" is judged against expires_at at read.
+    claim?: {
+        member_id: Id;
+        at: string;
+        expires_at: string;
+    };
 }
 
 export interface FlowWorkOrderEntity {

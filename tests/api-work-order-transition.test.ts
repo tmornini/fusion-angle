@@ -10,6 +10,7 @@ import {
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import {
+    GETWithEtag,
     POST,
     PUT,
     RequestError,
@@ -30,7 +31,7 @@ import { EntityNotFoundError } from '../api/db.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
-    postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
@@ -83,8 +84,20 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
     return db;
+}
+
+// An operation on a work order names the head it read.
+async function latched(
+    db: MemoryDbAdapter,
+): Promise<readonly (readonly [string, string])[]> {
+    const { etag } = await GETWithEtag(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA',
+        DEV_TOKEN, operationIdHeader(),
+    );
+    return operationIdHeader([['If-Match', '"' + etag + '"']]);
 }
 
 function eventsFor(
@@ -120,9 +133,9 @@ async function appendLegacyTransition(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postWorkOrderTransitionOp(
-        db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,
-        undefined, [], messagePair,
+    await postSeedWorkOrderTransitionOp(
+        db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA', body,
+        SYSTEM_MEMBER_ID, messagePair,
     );
 }
 
@@ -140,7 +153,7 @@ Deno.test(
                 transitionAt: nowUtc(),
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'n-next');
@@ -236,7 +249,7 @@ Deno.test(
                 expireAt: claimAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         // Mint transitionAt before release.at so the
         // at-ordered log matches route post order.
         const transitionAt = nowUtc();
@@ -254,7 +267,7 @@ Deno.test(
                 transitionAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await eventsFor(db);
         assertEquals(
             events.map(ev => ev.state),
@@ -279,7 +292,7 @@ Deno.test(
                 transitionAt: nowUtc(),
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(
@@ -343,6 +356,7 @@ Deno.test(
     'a transition body with an unexpected key is a 400',
     async () => {
         const db = await seededDb();
+        const tags = await latched(db);
         const err = await assertRejects(
             () => POST(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -354,7 +368,7 @@ Deno.test(
                     surprise: true,
                 },
                 DEV_TOKEN,
-                operationIdHeader()),
+                tags),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 400);
@@ -466,7 +480,7 @@ Deno.test(
                 transitionAt: callerAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'n-next');
@@ -489,7 +503,7 @@ Deno.test(
                 expireAt: claimAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         // Far-future values to distinguish caller-minted
         // from a server-generated nowUtc().
         const transitionAt = '2099-01-01T00:00:00.000000Z';
@@ -507,7 +521,7 @@ Deno.test(
                 transitionAt,
             },
             DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const events = await eventsFor(db);
         // events: claimed, n-next, claim_released
         assertStrictEquals(events[1]!.state, 'n-next');

@@ -82,6 +82,30 @@ function req(
     });
 }
 
+// The If-Match an operation on a work order sends: the tag
+// of the head it read, then the instance's when it bears
+// values.
+async function latched(
+    db: MemoryDbAdapter,
+    token: string,
+    woId: string,
+    instanceEtag?: string,
+): Promise<Record<string, string>> {
+    const get = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + woId,
+        token,
+    ));
+    assertStrictEquals(get.status, 200);
+    await get.body?.cancel();
+    const tag = get.headers.get('ETag')!;
+    return {
+        [IF_MATCH_HEADER]: instanceEtag === undefined
+            ? tag
+            : tag + ', ' + instanceEtag,
+    };
+}
+
 function nodeJson(
     id: string,
     opts: {
@@ -287,6 +311,7 @@ async function seedWorkOrder(
             flow_graph: flowGraph,
             position: 1,
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
@@ -395,8 +420,10 @@ async function bindInstance(
             instance_id: INSTANCE_ID,
             record_type_id: TYPE_ID,
         },
+        await latched(db, token, woId),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
 // Place the WO on n-step by leaving n-create (no required).
@@ -412,8 +439,10 @@ async function placeOnStep(
             + '/transition',
         token,
         pureMoveBody(eventId, NODE_STEP),
+        await latched(db, token, woId),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
 async function baseSeed(): Promise<{
@@ -454,6 +483,7 @@ Deno.test(
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-unbound', NODE_TARGET),
+            await latched(db, adminToken, WO_ID),
         ));
         assertStrictEquals(res.status, 400);
         assertEquals(await res.json(), {
@@ -464,7 +494,7 @@ Deno.test(
 );
 
 Deno.test(
-    '2 pure move bound + head satisfies → 204',
+    '2 pure move bound + head satisfies → 200',
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
@@ -481,8 +511,10 @@ Deno.test(
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-ok', NODE_TARGET),
+            await latched(db, adminToken, WO_ID),
         ));
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
+        await res.body?.cancel();
     },
 );
 
@@ -503,6 +535,7 @@ Deno.test(
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-miss', NODE_TARGET),
+            await latched(db, adminToken, WO_ID),
         ));
         assertStrictEquals(res.status, 400);
         const err = await res.json() as {
@@ -517,7 +550,7 @@ Deno.test(
 );
 
 Deno.test(
-    '4 value-bearing fills ref in THIS delta → 204',
+    '4 value-bearing fills ref in THIS delta → 200',
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
@@ -542,9 +575,10 @@ Deno.test(
                     },
                 ],
             }),
-            { [IF_MATCH_HEADER]: etag },
+            await latched(db, adminToken, WO_ID, etag),
         ));
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
+        await res.body?.cancel();
     },
 );
 
@@ -577,7 +611,7 @@ Deno.test(
                 includeSet: true,
                 includeClear: true,
             }),
-            { [IF_MATCH_HEADER]: etag },
+            await latched(db, adminToken, WO_ID, etag),
         ));
         assertStrictEquals(res.status, 400);
         const err = await res.json() as {
@@ -592,7 +626,7 @@ Deno.test(
 );
 
 Deno.test(
-    '6 no required refs: unbound pure move → 204',
+    '6 no required refs: unbound pure move → 200',
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
@@ -603,8 +637,10 @@ Deno.test(
         const res = await handleRequest(db, req(
             'POST', TRANSITION_FREE, adminToken,
             pureMoveBody('te-free', NODE_FREE),
+            await latched(db, adminToken, WO_FREE),
         ));
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
+        await res.body?.cancel();
     },
 );
 
@@ -652,7 +688,7 @@ Deno.test(
                     },
                 ],
             }),
-            { [IF_MATCH_HEADER]: etag },
+            await latched(db, adminToken, WO_ID, etag),
         ));
         assertStrictEquals(res.status, 403);
         assertEquals(await res.json(), {
@@ -685,6 +721,7 @@ Deno.test(
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-foreign', NODE_TARGET),
+            await latched(db, adminToken, WO_ID),
         ));
         assertStrictEquals(res.status, 400);
         const err = await res.json() as {

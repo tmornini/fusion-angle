@@ -119,6 +119,22 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
+// An operation on a work order names the head it read.
+async function headTag(
+    db: MemoryDbAdapter,
+    token: string,
+    workOrderId: string,
+): Promise<Record<string, string>> {
+    const read = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId,
+        token,
+    ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    return { 'If-Match': read.headers.get('ETag')! };
+}
+
 // Claim-expiry legs advance the test clock (msSinceUtc seam);
 // reset so no suite poisons the next.
 Deno.test.afterEach(() => {
@@ -644,8 +660,10 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             release: null,
             transitionAt: nowUtc(),
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(transition1.status, 201);
+    assertStrictEquals(transition1.status, 200);
+    await transition1.body?.cancel();
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const transition2At = nowUtc();
@@ -663,8 +681,10 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             },
             transitionAt: transition2At,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(transition2.status, 201);
+    assertStrictEquals(transition2.status, 200);
+    await transition2.body?.cancel();
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // The MOVING lock_timeout case: an entity PUT shrinks
@@ -678,6 +698,7 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             flow_graph: workOrderFlowGraph(tinyLockTimeoutSeconds),
             position: 2,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(entityPut.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
@@ -692,27 +713,29 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             expireEventId: WORKORDERID_EE1,
             expireAt: freshClaimAt,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(freshClaim.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
-    // An idempotent re-claim by the SAME actor, milliseconds
-    // later — 0 events, well within the (now tiny) lock_timeout.
+    // An idempotent re-claim: the SAME actor resends its
+    // claim, milliseconds later — 0 events, well within the
+    // (now tiny) lock_timeout.
     const beforeRepeat = (
         await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )
     ).length;
-    const repeatClaimAt = nowUtc();
     const repeatClaim = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId +
             '/claim', token, {
-            claimEventId: WORKORDERID_CE2,
-            claimAt: repeatClaimAt,
-            expireEventId: WORKORDERID_EE2,
-            expireAt: repeatClaimAt,
+            claimEventId: WORKORDERID_CE1,
+            claimAt: freshClaimAt,
+            expireEventId: WORKORDERID_EE1,
+            expireAt: freshClaimAt,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(repeatClaim.status, 200);
     const afterRepeat = await assertHistoryParity(
@@ -720,9 +743,9 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
     );
     assertStrictEquals(afterRepeat.length, beforeRepeat);
 
-    // Advance the test clock past the tiny lock_timeout —
-    // isClaimEventExpired checks msSinceUtc (the clock seam),
-    // never a body timestamp — then a claim_expired takeover:
+    // Advance the test clock past the tiny lock_timeout — the
+    // claim's request stamp rides the clock seam, never a body
+    // timestamp — then a claim_expired takeover:
     // 2 events (claim_expired naming the prior claimant,
     // claimed naming the new one).
     setClockForTest(() =>
@@ -739,6 +762,7 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
             expireEventId: WORKORDERID_EE3,
             expireAt: takeoverExpireAt,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(takeover.status, 200);
     const finalHistory = await assertHistoryParity(
@@ -770,6 +794,7 @@ async () => {
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(put.status, 201);
 
@@ -783,8 +808,10 @@ async () => {
             release: null,
             transitionAt: AT,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(genesis.status, 201);
+    assertStrictEquals(genesis.status, 200);
+    await genesis.body?.cancel();
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -796,8 +823,10 @@ async () => {
             expireEventId: WORKORDERID_EE1,
             expireAt: claimAt,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(claim.status, 201);
+    assertStrictEquals(claim.status, 200);
+    await claim.body?.cancel();
 
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
@@ -864,6 +893,7 @@ async () => {
             expireEventId: WORKORDERID_EE1,
             expireAt: claimAt,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(claim.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
@@ -874,8 +904,11 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim',
         token,
+        undefined,
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(released.status, 204);
+    assertStrictEquals(released.status, 200);
+    await released.body?.cancel();
     const afterRelease = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -902,8 +935,10 @@ async () => {
             expireEventId: WORKORDERID_EE2,
             expireAt: reclaimAt,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(reclaimed.status, 201);
+    assertStrictEquals(reclaimed.status, 200);
+    await reclaimed.body?.cancel();
 
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,

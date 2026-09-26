@@ -797,15 +797,18 @@ Deno.test(
 );
 
 Deno.test(
-    'mock data lands every rehearsed row in three'
-        + ' statements',
+    'mock data lands every rehearsed row in fifteen'
+        + ' statements, one per chain depth',
     async () => {
         const backend = new MemoryStorageBackend();
         const seed = await rehearseMockData({
             hashPassword: testHashPassword,
         });
         await postSeedLanding(backend, seed.rehearsal);
-        assertStrictEquals(backend.statementExecutions(), 3);
+        // The deepest chain is a work order's: fifteen
+        // versions (measurements/probes/seed/shape.ts,
+        // maxDepth).
+        assertStrictEquals(backend.statementExecutions(), 15);
         const landed = new Map(
             (await adapterOver(backend).messagePairs.getAll())
                 .map((row) => [row.id, row]),
@@ -932,20 +935,33 @@ Deno.test(
                 depth: depths[index],
             }))
             .filter(({ statement }) =>
-                statement.rows.length === 2
+                statement.rows.length === 3
                 && statement.rows[0]!.method === 'POST'
                 && statement.rows[0]!.path === transitionPath);
+        // WO01's chain places them fifth and sixth: each
+        // lands the work order's next version.
         assertEquals(
-            latched.map(({ depth }) => depth), [2, 3],
+            latched.map(({ depth }) => depth), [5, 6],
         );
-        for (const { statement } of latched) {
-            const revision = statement.rows[1]!;
+        const create = statements.find((statement) =>
+            statement.rows.some((row) =>
+                row.method === 'PATCH'
+                && row.name === SEED_INSTANCE_ID));
+        assert(create !== undefined);
+        const genesis = create.rows.find(
+            (row) => row.method === 'PUT',
+        );
+        assert(genesis !== undefined);
+        const priorHeads = [
+            genesis.id, latched[0]!.statement.rows[2]!.id,
+        ];
+        latched.forEach(({ statement }, index) => {
+            const revision = statement.rows[2]!;
             assertStrictEquals(revision.method, 'PUT');
-            assertStringIncludes(
-                latin1(revision.request),
-                'if-match: "' + statement.supersedes[1]!
-                    + '"\r\n',
+            assertStrictEquals(revision.name, SEED_INSTANCE_ID);
+            assertStrictEquals(
+                statement.supersedes[2], priorHeads[index],
             );
-        }
+        });
     },
 );

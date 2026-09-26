@@ -412,3 +412,15 @@ export async function getWorkOrder(
     );
     return toWorkOrder(row);
 }
+
+// The work order and the tag of the head it came from, for
+// the If-Match of an operation on it.
+export async function getWorkOrderWithEtag(
+    ctx: RequestContext,
+    id: string,
+): Promise<{ workOrder: WorkOrder, etag: string | undefined }> {
+    const read = await ctx.GETWithEtag<WorkOrderEntity>(
+        organizationItem(ctx, 'work-orders', id),
+    );
+    return { workOrder: toWorkOrder(read.body), etag: read.etag };
+}

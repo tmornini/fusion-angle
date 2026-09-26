@@ -63,6 +63,12 @@ export interface HttpFacade {
         headerFields?:
             readonly (readonly [string, string])[],
     ): Promise<void>;
+    DELETEWithEtag(
+        resource: string,
+        token: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
+    ): Promise<{ etag: string | undefined }>;
     POST<T>(
         resource: string,
         payload: Record<string, unknown>,
@@ -376,6 +382,16 @@ export function createHttpFacade(
                         undefined, headerFields,
                     ),
                 );
+            },
+            DELETEWithEtag: async (
+                resource, token, headerFields,
+            ) => {
+                const response = await exchangeOnce(
+                    'DELETE', resource, token,
+                    undefined, headerFields,
+                );
+                await unwrapResponse(response);
+                return { etag: etagFromHeader(response) };
             },
             POST: async (
                 resource, payload, token, headerFields,

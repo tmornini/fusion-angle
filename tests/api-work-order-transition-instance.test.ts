@@ -14,6 +14,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import type { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -91,6 +93,38 @@ function req(
             ? { headers: extraHeaders } : {}),
         ...(operationId !== undefined ? { operationId } : {}),
     });
+}
+
+// A client reads the work order's tag before an operation
+// on it.
+async function workOrderTag(
+    db: MemoryDbAdapter,
+    token: string,
+    woId: string = WO_ID,
+): Promise<string> {
+    const res = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + woId,
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
+    return res.headers.get('ETag')!;
+}
+
+// The If-Match a transition sends: the work order's tag,
+// then the instance's when it bears values.
+async function latched(
+    db: MemoryDbAdapter,
+    token: string,
+    instanceEtag?: string,
+): Promise<Record<string, string>> {
+    const tag = await workOrderTag(db, token);
+    return {
+        [IF_MATCH_HEADER]: instanceEtag === undefined
+            ? tag
+            : tag + ', ' + instanceEtag,
+    };
 }
 
 async function requestCount(
@@ -273,6 +307,7 @@ async function seedWorkOrder(
             flow_graph: graphJson(),
             position: 1,
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
@@ -385,8 +420,10 @@ async function bindInstance(
             instance_id: instanceId,
             record_type_id: recordTypeId,
         },
+        { [IF_MATCH_HEADER]: await workOrderTag(db, token, woId) },
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
 async function seededBound(): Promise<{
@@ -515,8 +552,7 @@ async () => {
     assertStrictEquals(res.status, 428);
     assertEquals(await res.json(), {
         error:
-            'If-Match is required to transition with'
-            + ' set/clear at ' + TRANSITION,
+            'If-Match is required to POST ' + TRANSITION,
     });
 });
 
@@ -562,9 +598,10 @@ async () => {
                 },
             ],
         }),
-        { [IF_MATCH_HEADER]: etag },
+        await latched(db, adminToken, etag),
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
     const stale = await handleRequest(db, req(
         'POST', TRANSITION, adminToken,
         valueBody({
@@ -576,17 +613,17 @@ async () => {
                 },
             ],
         }),
-        { [IF_MATCH_HEADER]: etag },
+        await latched(db, adminToken, etag),
     ));
     assertStrictEquals(stale.status, 412);
     assertEquals(await stale.json(), {
         error:
             'If-Match does not match the current '
-            + 'instance at ' + INSTANCE_DETAIL,
+            + 'document at ' + INSTANCE_DETAIL,
     });
 });
 
-Deno.test('value-bearing fresh If-Match → 204; head advances',
+Deno.test('value-bearing fresh If-Match → 200; head advances',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const before = await instancePairCount(db);
@@ -600,9 +637,10 @@ async () => {
                 },
             ],
         }),
-        { [IF_MATCH_HEADER]: etag },
+        await latched(db, adminToken, etag),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
     const get = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, adminToken,
     ));
@@ -634,7 +672,7 @@ async () => {
     );
 });
 
-Deno.test('pure move WITH If-Match → 400',
+Deno.test('pure move with the instance If-Match → 412',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
@@ -642,7 +680,8 @@ async () => {
         pureMoveBody('te-pure-if'),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assertStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 412);
+    await res.body?.cancel();
 });
 
 Deno.test(
@@ -654,8 +693,10 @@ Deno.test(
         const move = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-pure-etag'),
+            await latched(db, adminToken),
         ));
-        assertStrictEquals(move.status, 201);
+        assertStrictEquals(move.status, 200);
+        await move.body?.cancel();
         const patch = await handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, adminToken,
             {
@@ -689,9 +730,10 @@ Deno.test(
                     },
                 ],
             }),
-            { [IF_MATCH_HEADER]: etag },
+            await latched(db, adminToken, etag),
         ));
-        assertStrictEquals(tx.status, 201);
+        assertStrictEquals(tx.status, 200);
+        await tx.body?.cancel();
         const patch = await handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, adminToken,
             {
@@ -750,6 +792,7 @@ async () => {
             ...pureMoveBody('te-pure-assert'),
             instance_id: INSTANCE_ID,
         },
+        await latched(db, adminToken),
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -764,6 +807,7 @@ async () => {
             ...pureMoveBody('te-pure-rt'),
             record_type_id: TYPE_ID,
         },
+        await latched(db, adminToken),
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -941,9 +985,10 @@ async () => {
                 },
             ],
         }),
-        { [IF_MATCH_HEADER]: etag },
+        await latched(db, adminToken, etag),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 });
 
 // --- 6. constraints ---
@@ -980,19 +1025,20 @@ async () => {
 
 // --- 7. one tx ---
 
-Deno.test('fresh success grows requests by EXACTLY 2',
+Deno.test('fresh success grows requests by EXACTLY 3',
 async () => {
     const { db, adminToken, etag } = await seededBound();
     const before = await requestCount(db);
     const res = await handleRequest(db, req(
         'POST', TRANSITION, adminToken,
         valueBody({ eventId: 'te-tx-2' }),
-        { [IF_MATCH_HEADER]: etag },
+        await latched(db, adminToken, etag),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
     assertStrictEquals(
         await requestCount(db),
-        before + 2,
+        before + 3,
     );
 });
 
@@ -1022,9 +1068,10 @@ async () => {
 // --- 8. race ---
 
 Deno.test('two concurrent value-bearing same If-Match → '
-+ '[204, 412] and one revision',
++ '[200, 412] and one revision',
 async () => {
     const { db, adminToken, etag } = await seededBound();
+    const tags = await latched(db, adminToken, etag);
     const beforePairs = await instancePairCount(db);
     const [a, b] = await Promise.all([
         handleRequest(db, req(
@@ -1038,7 +1085,7 @@ async () => {
                     },
                 ],
             }),
-            { [IF_MATCH_HEADER]: etag },
+            tags,
         )),
         handleRequest(db, req(
             'POST', TRANSITION, adminToken,
@@ -1051,13 +1098,15 @@ async () => {
                     },
                 ],
             }),
-            { [IF_MATCH_HEADER]: etag },
+            tags,
         )),
     ]);
     assertEquals(
         [a.status, b.status].sort(),
-        [201, 412],
+        [200, 412],
     );
+    await a.body?.cancel();
+    await b.body?.cancel();
     assertStrictEquals(
         await instancePairCount(db),
         beforePairs + 1,
@@ -1085,10 +1134,11 @@ async () => {
     const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
-        { [IF_MATCH_HEADER]: etag },
+        await latched(db, adminToken, etag),
         operationId,
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
     const afterFirst = await instancePairCount(db);
     const afterFirstReq = await requestCount(db);
     const head = await handleRequest(db, req(
@@ -1098,10 +1148,11 @@ async () => {
     assert(fresh !== null && fresh !== etag);
     const replay = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
-        { [IF_MATCH_HEADER]: fresh },
+        await latched(db, adminToken, fresh),
         operationId,
     ));
     assertStrictEquals(replay.status, 200);
+    await replay.body?.cancel();
     assertStrictEquals(
         await instancePairCount(db),
         afterFirst,
@@ -1139,7 +1190,143 @@ async () => {
             + 'xuMWXmMtPdenikPwsAUujg/transition',
         adminToken,
         pureMoveBody('te-absent-pure'),
+        { [IF_MATCH_HEADER]: strongEtagOf(generateIdentifier()) },
     ));
     assertStrictEquals(res.status, 404);
 });
 
+
+// --- 11. the work order's latch ---
+
+Deno.test('a pure move sends the work order\'s tag', async () => {
+    const { db, adminToken } = await seededBound();
+    const bare = await handleRequest(db, req(
+        'POST', TRANSITION, adminToken,
+        pureMoveBody('te-pure-bare'),
+    ));
+    assertStrictEquals(bare.status, 428);
+    await bare.body?.cancel();
+    const res = await handleRequest(db, req(
+        'POST', TRANSITION, adminToken,
+        pureMoveBody('te-pure-tag'),
+        await latched(db, adminToken),
+    ));
+    assertStrictEquals(res.status, 200);
+    const version = await res.json() as { state: string };
+    assertStrictEquals(version.state, NODE_NEXT);
+});
+
+Deno.test(
+    'a value-bearing transition names both heads',
+    async () => {
+        const { db, adminToken, etag } = await seededBound();
+        const backend = db.backend as MemoryStorageBackend;
+        const tags = await latched(db, adminToken, etag);
+        const before = backend.statementExecutions();
+        const beforePairs = await instancePairCount(db);
+        const res = await handleRequest(db, req(
+            'POST', TRANSITION, adminToken,
+            valueBody({ eventId: 'te-both' }),
+            tags,
+        ));
+        assertStrictEquals(res.status, 200);
+        const version = await res.json() as {
+            state: string;
+            events: { id: string }[];
+        };
+        assertStrictEquals(version.state, NODE_NEXT);
+        assertEquals(
+            version.events.map((event) => event.id),
+            ['te-both'],
+        );
+        assertStrictEquals(
+            backend.statementExecutions(), before + 1,
+        );
+        assertStrictEquals(
+            await instancePairCount(db), beforePairs + 1,
+        );
+        assertNotStrictEquals(
+            await workOrderTag(db, adminToken),
+            tags[IF_MATCH_HEADER]!.split(',')[0],
+        );
+    },
+);
+
+Deno.test(
+    'a value-bearing transition missing the instance tag'
+        + ' is 428 naming the instance',
+    async () => {
+        const { db, adminToken } = await seededBound();
+        const before = await requestCount(db);
+        const res = await handleRequest(db, req(
+            'POST', TRANSITION, adminToken,
+            valueBody({ eventId: 'te-no-instance' }),
+            await latched(db, adminToken),
+        ));
+        assertStrictEquals(res.status, 428);
+        assertEquals(await res.json(), {
+            error: 'If-Match is required for the bound instance',
+        });
+        assertStrictEquals(await requestCount(db), before);
+    },
+);
+
+Deno.test('a third tag is 412', async () => {
+    const { db, adminToken, etag } = await seededBound();
+    const two = await latched(db, adminToken, etag);
+    const before = await requestCount(db);
+    const res = await handleRequest(db, req(
+        'POST', TRANSITION, adminToken,
+        valueBody({ eventId: 'te-third' }),
+        {
+            [IF_MATCH_HEADER]: two[IF_MATCH_HEADER]! + ', '
+                + strongEtagOf(generateIdentifier()),
+        },
+    ));
+    assertStrictEquals(res.status, 412);
+    assertEquals(await res.json(), {
+        error: 'If-Match names no document this operation'
+            + ' derives from',
+    });
+    assertStrictEquals(await requestCount(db), before);
+});
+
+// Review Focus 3: two members hold both tags; one lands, the
+// other's tags are stale, and the instance is revised once.
+// Sequenced, so the pin cannot flake.
+Deno.test('racing value-bearing transitions land once', async () => {
+    const {
+        db, adminToken, memberToken, etag,
+    } = await seededBound();
+    const adminTags = await latched(db, adminToken, etag);
+    const memberTags = await latched(db, memberToken, etag);
+    assertEquals(memberTags, adminTags);
+    const beforePairs = await instancePairCount(db);
+    const first = await handleRequest(db, req(
+        'POST', TRANSITION, adminToken,
+        valueBody({
+            eventId: 'te-race-first',
+            set: [{ attribute_id: ATTR_ID, value: 'first' }],
+        }),
+        adminTags,
+    ));
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
+    const second = await handleRequest(db, req(
+        'POST', TRANSITION, memberToken,
+        valueBody({
+            eventId: 'te-race-second',
+            set: [{ attribute_id: ATTR_ID, value: 'second' }],
+        }),
+        memberTags,
+    ));
+    assertStrictEquals(second.status, 412);
+    assertEquals(await second.json(), {
+        error: 'If-Match does not match the current document at'
+            + ' /organizations/' + ORGANIZATION
+            + '/work-orders/' + WO_ID,
+    });
+    assertStrictEquals(
+        await instancePairCount(db), beforePairs + 1,
+    );
+});

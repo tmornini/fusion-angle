@@ -10,13 +10,13 @@ import {
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
-    latestClaimEvent,
-    isClaimEventExpired,
     addUtcSeconds,
+    isExpiresAtPassed,
 } from '../shared/work-order-claims.ts';
 import {
     validateWorkOrderFlowGraph,
     getWorkOrderHistory,
+    getWorkOrderWithEtag,
     type WorkOrder,
 } from './work-orders-queries.ts';
 import {
@@ -61,6 +61,17 @@ export function subscribeWorkOrderChanges(
 // the same bell their in-module siblings ring.
 export function notifyWorkOrderChanges(): void {
     workOrderChanges.notify();
+}
+
+// An operation on a work order latches the head it read.
+// A GET that carried no tag leaves nothing to latch.
+export function workOrderIfMatch(
+    etag: string | undefined,
+): readonly [string, string] {
+    if (etag === undefined) {
+        throw new Error('the work order GET carried no ETag');
+    }
+    return ['If-Match', '"' + etag + '"'];
 }
 
 async function generateDisplayId(
@@ -240,12 +251,11 @@ export async function postWorkOrderTransition(
     const {
         workOrderId, edgeId, values, instanceEtag,
     } = input;
-    // Wave 1: wo + history + record binding (all keyed
-    // by workOrderId). Pass history down so claim-release
-    // never re-fetches.
-    const [wo, history, recordId] =
+    // Wave 1: wo with its tag + history + record binding
+    // (all keyed by workOrderId).
+    const [read, history, recordId] =
         await Promise.all([
-            ctx.GET<WorkOrderEntity>(
+            ctx.GETWithEtag<WorkOrderEntity>(
                 organizationItem(
                     ctx, 'work-orders', workOrderId,
                 ),
@@ -253,6 +263,8 @@ export async function postWorkOrderTransition(
             getWorkOrderHistory(ctx, workOrderId),
             getRecordForWorkOrder(ctx, workOrderId),
         ]);
+    const wo = read.body;
+    const workOrderTag = workOrderIfMatch(read.etag);
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
@@ -329,20 +341,16 @@ export async function postWorkOrderTransition(
     const transitionEventId =
         generateIdentifier();
 
-    // If a live claim exists for the work order, the
+    // If the caller holds the work order's live claim, the
     // transition implicitly releases it — carry a
     // 'claim_released' event the named POST writes
     // atomically alongside the transition. The release
     // event is authored server-side by the verified
-    // caller (actor). History was fetched in wave 1.
-    const latestClaim = latestClaimEvent(
-        history, workOrderId,
-    );
-    const hasLiveClaim = latestClaim !== null
-        && latestClaim.state === 'claimed'
-        && !isClaimEventExpired(
-            latestClaim, fg.lockTimeout,
-        );
+    // caller (actor).
+    const claim = wo.claim;
+    const hasLiveClaim = claim !== undefined
+        && !isExpiresAtPassed(claim.expires_at)
+        && claim.member_id === ctx.identity.id;
     // Mint transitionAt first: the route emits the
     // transition event before the release event, so
     // transitionAt < release.at must hold in the
@@ -380,20 +388,25 @@ export async function postWorkOrderTransition(
         body['set'] = set;
         body['clear'] = clear;
         // NO auto-retry on 412 — the page owns recovery.
+        // The work order's tag, then the instance's.
         await ctx.POSTWithHeaders(
             organizationItem(
                 ctx, 'work-orders', workOrderId,
             ) + '/transition',
             body,
-            [['If-Match', '"' + etag + '"']],
+            [[
+                'If-Match',
+                workOrderTag[1] + ', "' + etag + '"',
+            ]],
         );
     } else {
-        // Pure move: neither delta nor If-Match.
-        await ctx.POST(
+        // Pure move: no delta; the work order's tag alone.
+        await ctx.POSTWithHeaders(
             organizationItem(
                 ctx, 'work-orders', workOrderId,
             ) + '/transition',
             body,
+            [workOrderTag],
         );
     }
 
@@ -401,13 +414,17 @@ export async function postWorkOrderTransition(
 }
 
 // Bind a work order to one org-owned instance of one
-// record type. Create-only PUT; notify on success.
+// record type, latching the head it read; a rebind is
+// refused. Notify on success.
 export async function putWorkOrderBinding(
     ctx: RequestContext,
     workOrderId: string,
     instanceId: string,
     recordTypeId: string,
 ): Promise<void> {
+    const { etag } = await getWorkOrderWithEtag(
+        ctx, workOrderId,
+    );
     await ctx.PUT(
         organizationItem(
             ctx, 'work-orders', workOrderId,
@@ -416,53 +433,53 @@ export async function putWorkOrderBinding(
             instance_id: instanceId,
             record_type_id: recordTypeId,
         },
+        [workOrderIfMatch(etag)],
     );
     workOrderChanges.notify();
 }
 
+// The fields replace the head's; its state, claim, and
+// binding carry over. The PUT names the head it read.
 export async function putWorkOrder(
     ctx: RequestContext,
     id: string,
     workOrder: Omit<WorkOrder, 'id' | 'organizationId'>,
 ): Promise<void> {
+    const { etag } = await getWorkOrderWithEtag(ctx, id);
     await ctx.PUT(
         organizationItem(ctx, 'work-orders', id),
         {
-        display_id: workOrder.displayId,
-        flow_graph: storedWorkOrderFlowGraph(
-            workOrder.flowGraph,
-        ),
-        position: workOrder.position,
-    });
+            display_id: workOrder.displayId,
+            flow_graph: storedWorkOrderFlowGraph(
+                workOrder.flowGraph,
+            ),
+            position: workOrder.position,
+        },
+        [workOrderIfMatch(etag)],
+    );
     workOrderChanges.notify();
 }
 
 // The claim decision lives server-side: PUT
-// work-orders/:id/claim reads the prior claim and
-// appends the new claim document in ONE transaction,
-// so two tabs racing the same claim cannot both
-// succeed — the duplicate-claim TOCTOU is closed at
-// the route, not papered over by a disabled button.
-// The caller mints event ids plus expires_at (the
-// stored fact). expireAt is minted BEFORE claimAt
-// so it orders earlier in the event log (nowUtc is
-// strictly monotonic).
+// work-orders/:id/claim latches the head this call read,
+// so two tabs racing the same claim cannot both succeed —
+// the later one's tag is stale — and the duplicate-claim
+// TOCTOU is closed at the statement, not papered over by
+// a disabled button. The caller mints event ids plus
+// expires_at (the stored fact). expireAt is minted BEFORE
+// claimAt so it orders earlier in the event log (nowUtc
+// is strictly monotonic).
 export async function putWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    const wo = await ctx.GET<WorkOrderEntity>(
-        organizationItem(
-            ctx, 'work-orders', workOrderId,
-        ),
-    );
-    const graph = validateWorkOrderFlowGraph(
-        wo.flow_graph,
+    const { workOrder, etag } = await getWorkOrderWithEtag(
+        ctx, workOrderId,
     );
     const expireAt = nowUtc();
     const claimAt = nowUtc();
     const expiresAt = addUtcSeconds(
-        claimAt, graph.lockTimeout,
+        claimAt, workOrder.flowGraph.lockTimeout,
     );
     await ctx.PUT(
         organizationItem(
@@ -474,6 +491,7 @@ export async function putWorkOrderClaim(
             expireAt,
             expires_at: expiresAt,
         },
+        [workOrderIfMatch(etag)],
     );
     workOrderChanges.notify();
 }

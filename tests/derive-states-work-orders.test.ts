@@ -42,11 +42,9 @@ const WORKORDERID_TE2 = generateIdentifier();
 const WORKORDERID_REL1 = generateIdentifier();
 const WORKORDERID_GENESIS = generateIdentifier();
 
-// The work-order lifecycle derivation — create/claim/
-// transition/release OPERATION message pairs (states-document
-// retirement: the sole work-order source; bare states/:id
-// births are gone). Seeded traces reshape into transition
-// ops, so this reader also covers historical births.
+// The work-order lifecycle derivation — the version chain's
+// own events, oldest first: create, claim, transition, and
+// release each land a version (§5).
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -60,19 +58,39 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
+// A work order born by PUT declares its genesis.
+const GENESIS = { 'If-None-Match': '*' };
+
+// An operation on a work order names the head it read.
+async function headTag(
+    db: MemoryDbAdapter,
+    token: string,
+    workOrderId: string,
+): Promise<Record<string, string>> {
+    const read = await handleRequest(db, req(
+        'GET', workOrderPath(workOrderId), token,
+    ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    return { 'If-Match': read.headers.get('ETag')! };
+}
+
 // Claim-expiry legs advance the test clock past a tiny
-// lockTimeout — isClaimEventExpired reads msSinceUtc, which
-// honors setClockForTest (never a body timestamp). Reset in
-// afterEach so no suite poisons the next.
+// lockTimeout — the claim judges the stored expires_at
+// against the request's stamp, which honors
+// setClockForTest. Reset in afterEach so no suite poisons
+// the next.
 Deno.test.afterEach(() => {
     resetClock();
 });
@@ -209,6 +227,7 @@ Deno.test('a SEEDED-shape work order (a bare document PUT, no create'
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
+        GENESIS,
     ));
     assertStrictEquals(put.status, 201);
 
@@ -237,6 +256,7 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
                 workOrderFlowGraph(tinyLockTimeoutSeconds),
             position: 1,
         },
+        GENESIS,
     ));
     assertStrictEquals(put.status, 201);
 
@@ -250,12 +270,14 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
             expireEventId: WORKORDERID_EE1,
             expireAt: claim1At,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(claim1.status, 201);
+    assertStrictEquals(claim1.status, 200);
+    await claim1.body?.cancel();
 
     // Advance the test clock past the tiny lockTimeout so the
-    // live route's isClaimEventExpired (via msSinceUtc) reads
-    // the prior claim as expired without a real sleep.
+    // claim's request stamp reads the prior claim as lapsed
+    // without a real sleep.
     setClockForTest(() =>
         Date.now()
         + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
@@ -276,6 +298,7 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
             expireEventId: WORKORDERID_EE2,
             expireAt: expire2At,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(claim2.status, 200);
 
@@ -305,16 +328,21 @@ Deno.test('claim → release → reclaim derives claimed,'
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
+        GENESIS,
     ));
     assertStrictEquals(put.status, 201);
 
-    // DELETE with no claim row is 404; derive stays empty.
+    // A release with no live claim answers the head and
+    // stores nothing; derive stays empty.
     const bareRelease = await handleRequest(db, req(
         'DELETE',
         workOrderPath(workOrderId, '/claim'),
         token,
+        undefined,
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(bareRelease.status, 404);
+    assertStrictEquals(bareRelease.status, 200);
+    await bareRelease.body?.cancel();
     assertEquals(
         await workOrderLifecycleStatesFor(
             db, ORGANIZATION_A, workOrderId,
@@ -332,15 +360,20 @@ Deno.test('claim → release → reclaim derives claimed,'
             expireEventId: WORKORDERID_EE1,
             expireAt: claim1At,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(claim1.status, 201);
+    assertStrictEquals(claim1.status, 200);
+    await claim1.body?.cancel();
 
     const release = await handleRequest(db, req(
         'DELETE',
         workOrderPath(workOrderId, '/claim'),
         token,
+        undefined,
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(release.status, 204);
+    assertStrictEquals(release.status, 200);
+    await release.body?.cancel();
 
     const claim2At = nowUtc();
     const claim2 = await handleRequest(db, req(
@@ -352,8 +385,10 @@ Deno.test('claim → release → reclaim derives claimed,'
             expireEventId: WORKORDERID_EE2,
             expireAt: claim2At,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(claim2.status, 201);
+    assertStrictEquals(claim2.status, 200);
+    await claim2.body?.cancel();
 
     const derived = await workOrderLifecycleStatesFor(
         db, ORGANIZATION_A, workOrderId,
@@ -406,8 +441,10 @@ Deno.test('a transition, then a transition with release ends the'
             release: null,
             transitionAt: '2026-05-02T00:00:01.000000Z',
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(transition1.status, 201);
+    assertStrictEquals(transition1.status, 200);
+    await transition1.body?.cancel();
 
     const transition2 = await handleRequest(db, req(
         'POST', workOrderPath(workOrderId, '/transition'),
@@ -421,8 +458,10 @@ Deno.test('a transition, then a transition with release ends the'
             },
             transitionAt: '2026-05-02T00:00:02.000000Z',
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(transition2.status, 201);
+    assertStrictEquals(transition2.status, 200);
+    await transition2.body?.cancel();
 
     const derived = await workOrderLifecycleStatesFor(
         db, ORGANIZATION_A, workOrderId,
@@ -431,88 +470,6 @@ Deno.test('a transition, then a transition with release ends the'
     // 3 births + transition1 (1, no release) + transition2
     // (target + release, 2) = 6.
     assertStrictEquals(derived.length, 6);
-});
-
-// -- 5. the MOVING lock_timeout case -------------------------------
-
-Deno.test('the MOVING lock_timeout case: an entity PUT changing'
-+ ' lock_timeout mid-history sources each claim from the'
-+ ' document head AS OF that claim, never a single cached'
-+ ' value', async () => {
-    const db = await seed();
-    const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
-    const workOrderId = generateIdentifier();
-    const bigLockTimeoutSeconds = 8 * 60 * 60;
-    const tinyLockTimeoutSeconds = 1;
-
-    const put1 = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId), token,
-        {
-            display_id: 'moving',
-            flow_graph:
-                workOrderFlowGraph(bigLockTimeoutSeconds),
-            position: 1,
-        },
-    ));
-    assertStrictEquals(put1.status, 201);
-
-    const claim1At = nowUtc();
-    const claim1 = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId) +
-            '/claim', token,
-        {
-            claimEventId: WORKORDERID_CE1,
-            claimAt: claim1At,
-            expireEventId: WORKORDERID_EE1,
-            expireAt: claim1At,
-        },
-    ));
-    assertStrictEquals(claim1.status, 201);
-
-    // Shrink lock_timeout mid-history — the entity PUT that makes
-    // the AS-OF lookup load-bearing: under the OLD (big) value the
-    // prior claim would still read as live; under the NEW (tiny)
-    // value, crossed by the fake-clock advance below, it reads as
-    // expired.
-    const put2 = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId), token,
-        {
-            display_id: 'moving',
-            flow_graph:
-                workOrderFlowGraph(tinyLockTimeoutSeconds),
-            position: 2,
-        },
-    ));
-    assertStrictEquals(put2.status, 200);
-
-    setClockForTest(() =>
-        Date.now()
-        + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
-
-    // expireAt minted strictly BEFORE claimAt — see case 3's own
-    // note on the tie-break this ordering avoids.
-    const expire2At = nowUtc();
-    const claim2At = nowUtc();
-    const claim2 = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId) +
-            '/claim', token,
-        {
-            claimEventId: WORKORDERID_CE2,
-            claimAt: claim2At,
-            expireEventId: WORKORDERID_EE2,
-            expireAt: expire2At,
-        },
-    ));
-    assertStrictEquals(claim2.status, 200);
-
-    const derived = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION_A, workOrderId,
-    );
-    assert(derived.length >= 0); // Phase Final Task 2: row plane empty
-    assertEquals(
-        derived.map((row) => row.state),
-        ['claimed', 'claim_expired', 'claimed'],
-    );
 });
 
 // -- 6. HYBRID: bare document + transition genesis + claim ------
@@ -531,6 +488,7 @@ Deno.test('HYBRID: a bare document PUT plus a transition genesis'
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
+        GENESIS,
     ));
     assertStrictEquals(put.status, 201);
 
@@ -543,8 +501,10 @@ Deno.test('HYBRID: a bare document PUT plus a transition genesis'
             release: null,
             transitionAt: AT,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(genesis.status, 201);
+    assertStrictEquals(genesis.status, 200);
+    await genesis.body?.cancel();
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -556,8 +516,10 @@ Deno.test('HYBRID: a bare document PUT plus a transition genesis'
             expireEventId: WORKORDERID_EE1,
             expireAt: claimAt,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(claim.status, 201);
+    assertStrictEquals(claim.status, 200);
+    await claim.body?.cancel();
 
     const ours = await workOrderLifecycleStatesFor(
         db, ORGANIZATION_A, workOrderId,

@@ -919,7 +919,13 @@ async function dispatched(
             }
             // DELETE table: never-written 404 stores nothing;
             // already-gone 204 no append; live PUT proceeds.
-            if (method === 'DELETE') {
+            // An in-order DELETE is an operation on another
+            // document (a release), which answers its state.
+            if (
+                method === 'DELETE'
+                && conditionalOf(routePattern, method)
+                    !== 'in-order'
+            ) {
                 const head = await documentHeadAt(
                     effective, canonicalPrefix, name,
                 );
@@ -1749,8 +1755,8 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-// Stream families read the stored head. Work-orders
-// assemble (binding). Flows stay on derive for
+// Stream families read the stored head: a work order's is
+// its whole state. Flows stay on derive for
 // hasUndoHistory.
 function streamFamilyWiring(
     routePattern: string,
@@ -1758,7 +1764,6 @@ function streamFamilyWiring(
     const family = idFamilyOf(routePattern);
     if (
         family === undefined
-        || family === 'work-orders'
         || family === 'flows'
     ) {
         return undefined;
@@ -1788,7 +1793,6 @@ function streamCollectionWiring(
     const family = collectionFamilyOf(routePattern);
     if (
         family === undefined
-        || family === 'work-orders'
         || family === 'flows'
         || family === 'members'
     ) {
@@ -1971,29 +1975,58 @@ export async function PATCHWithEtag<T>(
     };
 }
 
+// The ONE await site for a DELETE-shaped facade call —
+// DELETE and DELETEWithEtag share it so the latency pin
+// stays 4.
+async function deleteResponse(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<Response> {
+    await adapter.simulateLatency();
+    const headers = facadeHeaders(token, false);
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
+    return handleRequest(
+        adapter,
+        new Request(
+            `${BASE_URL}/${resource}`,
+            {
+                method: 'DELETE',
+                headers,
+            },
+        ),
+    );
+}
+
 export async function DELETE(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
 ): Promise<void> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, false);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
     await unwrapResponse(
-        await handleRequest(
-            adapter,
-            new Request(
-                `${BASE_URL}/${resource}`,
-                {
-                    method: 'DELETE',
-                    headers,
-                },
-            ),
+        await deleteResponse(
+            adapter, resource, token, headerFields,
         ),
     );
+}
+
+// DELETE plus the strong ETag of the state it answers: a
+// release answers its work order's version.
+export async function DELETEWithEtag(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<{ etag: string | undefined }> {
+    const response = await deleteResponse(
+        adapter, resource, token, headerFields,
+    );
+    await unwrapResponse(response);
+    return { etag: etagFromHeader(response) };
 }
 
 async function postResponse(

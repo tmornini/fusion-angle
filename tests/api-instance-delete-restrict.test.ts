@@ -66,6 +66,7 @@ function req(
     token: string,
     body?: unknown,
     operationId?: string,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
@@ -73,7 +74,24 @@ function req(
         token,
         body,
         ...(operationId !== undefined ? { operationId } : {}),
+        ...(headers !== undefined ? { headers } : {}),
     });
+}
+
+// An operation on a work order names the head it read.
+async function workOrderTag(
+    db: MemoryDbAdapter,
+    token: string,
+    woId: string,
+): Promise<Record<string, string>> {
+    const read = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + woId,
+        token,
+    ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    return { 'If-Match': read.headers.get('ETag')! };
 }
 
 // Three-node line: create → mid → terminal. Mid has
@@ -166,6 +184,8 @@ async function seedWorkOrder(
             flow_graph: flowGraph(),
             position: 1,
         },
+        undefined,
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
@@ -272,8 +292,11 @@ async function bindInstance(
             instance_id: instanceId,
             record_type_id: TYPE_ID,
         },
+        undefined,
+        await workOrderTag(db, token, woId),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
 async function transitionTo(
@@ -294,8 +317,11 @@ async function transitionTo(
             release: null,
             transitionAt: nowUtc(),
         },
+        undefined,
+        await workOrderTag(db, token, woId),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
 // Fixture: type + instance + flow join + TWO WOs both
@@ -416,6 +442,8 @@ async () => {
             instance_id: INSTANCE_ID,
             record_type_id: TYPE_ID,
         },
+        undefined,
+        await workOrderTag(db, token, WO_UNBOUND),
     ));
     assertStrictEquals(bind.status, 404);
     assertEquals(await bind.json(), {

@@ -25,6 +25,7 @@ import {
     putWorkOrderBinding,
     putWorkOrderClaim,
     putWorkOrder,
+    workOrderIfMatch,
 } from
 '../client/work-orders-mutations.ts';
 import {
@@ -256,6 +257,10 @@ async function seedClaim(
     workOrderId: string,
     claimAt: string,
 ): Promise<void> {
+    const { etag } = await ctx.GETWithEtag(
+        'organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/work-orders/' + workOrderId,
+    );
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId + '/claim',
@@ -264,16 +269,21 @@ async function seedClaim(
         claimAt,
         expireEventId: generateIdentifier(),
         expireAt: claimAt,
-    });
+    }, [workOrderIfMatch(etag)]);
 }
 
 async function seedRelease(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    await ctx.DELETE(
+    const { etag } = await ctx.GETWithEtag(
+        'organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/work-orders/' + workOrderId,
+    );
+    await ctx.DELETEWithEtag(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId + '/claim',
+        [workOrderIfMatch(etag)],
     );
 }
 
@@ -281,16 +291,21 @@ async function seedBareWorkOrder(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    await putWorkOrder(ctx, workOrderId, {
-        displayId: 'WO-T',
-        flowGraph: {
-            name: 'test',
-            nodes: [],
-            edges: [],
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+    await ctx.PUT(
+        'organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/work-orders/' + workOrderId,
+        {
+            display_id: 'WO-T',
+            flow_graph: {
+                name: 'test',
+                nodes: [],
+                edges: [],
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            },
+            position: 0,
         },
-        position: 0,
-    });
+        [['If-None-Match', '*']],
+    );
 }
 
 // ── postWorkOrderCreation ─────────
@@ -891,8 +906,8 @@ Deno.test(
 );
 
 Deno.test(
-    'putWorkOrderClaim is idempotent — a repeat '
-    + 'claim by the holder appends no duplicate',
+    'putWorkOrderClaim by the holder renews its claim'
+    + ' and records the renewal',
     async () => {
         const { db, ctx } = await setupDb();
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
@@ -913,14 +928,12 @@ Deno.test(
             (e: StateEntity) =>
                 e.state === 'claimed',
         );
-        // Initial creation claim plus exactly ONE
-        // from the two explicit calls: the claim
-        // route reads and appends in one
-        // transaction, so the holder's repeat
-        // claim is a no-op.
+        // Initial creation claim plus ONE per explicit
+        // call: each mints a fresh claimAt, so the
+        // holder's repeat renews its claim.
         assertStrictEquals(
-            claimed.length, 2,
-            'expected exactly 2 claimed events,'
+            claimed.length, 3,
+            'expected exactly 3 claimed events,'
             + ' got ' + claimed.length,
         );
     },

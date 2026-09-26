@@ -115,11 +115,14 @@ export interface DocumentFamilyWiring {
     // family extras]); throws ValidationError.
     readonly validateDocument:
         (body: Record<string, unknown>) => unknown;
-    // The family's decompose op (old-plane rows + pair).
+    // The family's decompose op (old-plane rows + pair). The
+    // fenced organization is for a family whose version
+    // carries it; the others ignore it.
     readonly documentOp: (
         db: DbAdapter, id: Id,
         body: Record<string, unknown>, actor: Id,
-        messagePair?: MessagePair,
+        messagePair: MessagePair | undefined,
+        organization: Id | undefined,
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
     // stamped by the caller). A 'state' family's mapper reads
@@ -298,10 +301,10 @@ export async function documentHeadMessagePairId(
 export function documentPutHandler(
     wiring: DocumentFamilyWiring,
 ): PutHandler {
-    return (db, params, body, actor, messagePair) =>
+    return (db, params, body, actor, messagePair, organization) =>
         wiring.documentOp(
             db, entityIdParam(wiring, params),
-            body, actor, messagePair,
+            body, actor, messagePair, organization,
         );
 }
 

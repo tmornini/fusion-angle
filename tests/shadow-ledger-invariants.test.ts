@@ -170,9 +170,10 @@ function flowDocumentBody(name: string, stateEventId: string) {
     };
 }
 
-function workOrderFields(displayId: string, organization: string) {
+// The body OMITS organization_id: the fence hands the op
+// the organization, and the body gate refuses the key.
+function workOrderFields(displayId: string) {
     return {
-        organization_id: organization,
         display_id: displayId,
         flow_graph: storedWorkOrderFlowGraph({
             name: 'Invariant Flow',
@@ -192,11 +193,10 @@ function workOrderCreateBody(
     id: string,
     flowWorkOrderId: string,
     flowId: string,
-    organization: string,
 ) {
     return {
         id,
-        workOrder: workOrderFields('INV-WO-CREATE', organization),
+        workOrder: workOrderFields('INV-WO-CREATE'),
         flowWorkOrderId,
         flowWorkOrder: {
             flow_id: flowId,
@@ -333,11 +333,14 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // Entity PUT (work-orders, org 1) — the entity-PUT hash path,
     // shared code but never route-exercised in this mixed batch
     // before now.
-    const workOrderPut = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'jAzfROfUUwRELEudEFwdGw', org1Token,
-        workOrderFields('INV-WO-1', STARK_ORGANIZATION),
-    ));
+    const workOrderPut = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'jAzfROfUUwRELEudEFwdGw',
+        token: org1Token,
+        body: workOrderFields('INV-WO-1'),
+        headers: { 'if-none-match': '*' },
+    }));
     assertStrictEquals(workOrderPut.status, 201);
 
     // Operation POST (identity-tokens — global, not org-
@@ -388,7 +391,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             , org1Token,
         workOrderCreateBody(
             INV_WO_CREATE_1, INV_WO_CREATE_1_FWO,
-            'hoKOMoVEGhFjVEMIIFBbOQ', STARK_ORGANIZATION,
+            'hoKOMoVEGhFjVEMIIFBbOQ',
         ),
     ));
     assertStrictEquals(workOrderCreated.status, 201);

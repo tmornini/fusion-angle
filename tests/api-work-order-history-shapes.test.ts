@@ -1,6 +1,8 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
@@ -9,11 +11,8 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
-import {
-    runWrite,
-    attemptFor,
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
+import { postSeedWorkOrderTransitionOp } from '../api/routes.ts';
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
@@ -42,6 +41,17 @@ const NODE_FINISH = generateIdentifier();
 const EDGE_2 = generateIdentifier();
 const ATTR_SEVERITY = generateIdentifier();
 const ATTR_X = generateIdentifier();
+// A value-bearing body names the instance it revises.
+const BOUND = {
+    instance_id: generateIdentifier(),
+    record_type_id: generateIdentifier(),
+};
+// Three set ids in ascending order.
+const [ATTR_B0, ATTR_B1, ATTR_B2] = [
+    generateIdentifier(),
+    generateIdentifier(),
+    generateIdentifier(),
+].sort(compareIdentifiers);
 
 function req(
     method: string,
@@ -150,8 +160,8 @@ async function createWorkOrder(
     assertStrictEquals(created.status, 201);
 }
 
-// Below-gate transition append (appendInstancePair idiom).
-// routePattern organizations/:id/work-orders/:id/transition; POST; 204.
+// Below-gate transition through the seed op: it lands the
+// work order's version with this event's own field values.
 async function appendTransitionPair(
     db: MemoryDbAdapter,
     organization: string,
@@ -179,11 +189,10 @@ async function appendTransitionPair(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await runWrite(
-        db,
-        attemptFor([messagePair]),
-        [messagePair],
-    )
+    await postSeedWorkOrderTransitionOp(
+        db, organization, workOrderId, body,
+        SYSTEM_MEMBER_ID, messagePair,
+    );
     return messagePair.id;
 }
 
@@ -203,11 +212,11 @@ interface HistoryEvent {
     field_values: HistoryFieldValue[];
 }
 
-// Pin 1: legacy-only cross-event migration — same fv row
-// id in two pairs; head-reduce attributes value to the
-// LATER event only.
-Deno.test('legacy-only WO: fold pools by fv id; later event'
-+ ' owns the head',
+// Pin 1: legacy-only — the same fv row id in two
+// transitions; each event records its own value (a version
+// carries only its own events, never a later one's).
+Deno.test('legacy-only WO: each event keeps its own field'
++ ' values',
 async () => {
     const db = await seedBaseDb();
     const workOrderId = generateIdentifier();
@@ -262,9 +271,11 @@ async () => {
     const late = history.find((r) => r.id === teLate);
     assert(early !== undefined);
     assert(late !== undefined);
-    // Head-reduce by fv row id: only the later event carries
-    // the value; earlier event's bag is empty for this id.
-    assertEquals(early!.field_values, []);
+    assertEquals(early!.field_values, [{
+        id: fvShared,
+        attribute_id: ATTR_X,
+        value: 'old',
+    }]);
     assertEquals(late!.field_values, [{
         id: fvShared,
         attribute_id: ATTR_X,
@@ -301,6 +312,7 @@ async () => {
         {
             transitionEventId: teNew,
             targetState: 'n-finish',
+            ...BOUND,
             set: [
                 { attribute_id: 'UZgNCkZlSJcSaAmAJuSkcw', value: 'x' },
                 { attribute_id: 'UQTJZvCoKlFjEoDlDUwekw', value: 'y' },
@@ -371,11 +383,12 @@ async () => {
         {
             transitionEventId: teNew,
             targetState: 'n-finish',
+            ...BOUND,
             set: [
-                { attribute_id: 'b2', value: 'p' },
-                { attribute_id: 'b1', value: 'q' },
+                { attribute_id: ATTR_B2!, value: 'p' },
+                { attribute_id: ATTR_B1!, value: 'q' },
             ],
-            clear: ['b0'],
+            clear: [ATTR_B0!],
             release: null,
             transitionAt: nowUtc(),
         },
@@ -401,9 +414,9 @@ async () => {
         false,
     );
     assertEquals(neu!.field_values, [
-        { id: 'b0', attribute_id: 'b0', cleared: true },
-        { id: 'b1', attribute_id: 'b1', value: 'q' },
-        { id: 'b2', attribute_id: 'b2', value: 'p' },
+        { id: ATTR_B0!, attribute_id: ATTR_B0!, cleared: true },
+        { id: ATTR_B1!, attribute_id: ATTR_B1!, value: 'q' },
+        { id: ATTR_B2!, attribute_id: ATTR_B2!, value: 'p' },
     ]);
 });
 
@@ -420,6 +433,7 @@ async () => {
         {
             transitionEventId: generateIdentifier(),
             targetState: NODE_MIDDLE,
+            ...BOUND,
             set: [
                 { attribute_id: 'WeXjAaAxGSpLpamfEuvcww', value: 'v' },
             ],

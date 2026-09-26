@@ -91,6 +91,7 @@ Deno.test('foreign-org work-order claim is 404', async () => {
             flow_graph: graphJson(),
             position: 1,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(created.status, 201);
 
@@ -105,6 +106,7 @@ Deno.test('foreign-org work-order claim is 404', async () => {
             expireEventId: generateIdentifier(),
             expireAt: claimAt,
         },
+        { 'If-Match': '"' + generateIdentifier() + '"' },
     ));
     assertStrictEquals(foreign.status, 404);
     assertEquals(await foreign.json(), {
@@ -128,6 +130,7 @@ Deno.test('foreign-org work-order release is 404', async () => {
             flow_graph: graphJson(),
             position: 2,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(created.status, 201);
 
@@ -136,6 +139,8 @@ Deno.test('foreign-org work-order release is 404', async () => {
         '/organizations/' + organizationB
             + '/work-orders/yDEYnDEKhTTMRnyKdusvCw/claim',
         tokenB,
+        undefined,
+        { 'If-Match': '"' + generateIdentifier() + '"' },
     ));
     assertStrictEquals(foreign.status, 404);
 });
@@ -155,6 +160,7 @@ Deno.test('foreign-org work-order transition is 404', async () => {
             flow_graph: graphJson(),
             position: 3,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(created.status, 201);
 
@@ -169,6 +175,7 @@ Deno.test('foreign-org work-order transition is 404', async () => {
             release: null,
             transitionAt: nowUtc(),
         },
+        { 'If-Match': '"' + generateIdentifier() + '"' },
     ));
     assertStrictEquals(foreign.status, 404);
     assertEquals(await foreign.json(), {
