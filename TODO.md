@@ -1556,6 +1556,43 @@ Off the critical path; each with its oracle.
   everything the system needs, and a test finds every
   environment read in product code and scripts and fails
   on a name without the prefix outside the two edges
+- Gone for every document. State by PUT retires a
+  record instance's id for good: the never-written latch
+  makes tombstone-wins the statement's rule, and a
+  retired instance's read, update, and re-create answer
+  410 Gone (RFC 9110 §15.5.11). Every other family
+  re-creates over its tombstone (the nil latch lands over
+  a DELETE head) and answers 404 after a delete. An id is
+  an identity: reusing one lets a stale reference — a
+  binding, an export, an audit line, a client's cache —
+  name a different document, as two customers sharing an
+  id would. Consider tombstone-wins, and so 410, for
+  every document. It costs re-creation by PUT for the
+  class A families and `If-None-Match: *` over a
+  tombstone for flows and work orders; the POST creates
+  already mint fresh ids. Oracle: for each family,
+  create, DELETE, then GET answers 410 and a declared
+  create answers 410; a never-written id answers 404; a
+  foreign organization's retired document answers what
+  its live one does; history and past versions still
+  answer 200.
+- DELETE cascade. No one policy says what a delete does
+  to the documents that name the deleted one. Four
+  references refuse the delete today (the last admin
+  seat, the record-type and attribute RESTRICTs, and the
+  instance placement RESTRICT under a work-order
+  binding), each checked in a read that closes before
+  the write; no audit lists the rest. Consider one
+  policy per reference, named in one place: RESTRICT
+  (refuse while referenced), CASCADE (tombstone the
+  dependents in the same statement as the parent), or
+  ORPHAN (leave the reference, which then reads 410 or
+  404). Oracle: a table of every cross-document
+  reference with its policy; each CASCADE lands parent
+  and dependents in one statement and a GET of each
+  dependent reads it gone; each RESTRICT refuses a
+  racing delete under one statement; no reference is
+  unlisted.
 
 ## Later work
 
@@ -2857,9 +2894,23 @@ Off the critical path; each with its oracle.
   "removed", never "erased" (item 2). `DELETE` is logical
   until `VACUUM`, and WAL and point-in-time backups hold
   the bytes until the host's retention expires — state the
-  window. Oracle: `tests/api-pii-tombstone.test.ts`
+  window. The brainstorm also settles two questions this
+  bullet inherits. Cascade: erasing a document's pairs
+  follows the DELETE cascade policy (its bullet under
+  `## Critical functionality path`), because a dependent
+  that copied the erased values into its own state — a
+  revision, an operation's response — still holds them,
+  so erasure walks the same reference table the cascade
+  does. Tombstones: the suspicion is that an erased
+  document keeps exactly one version, its tombstone — the
+  DELETE head the view already refuses to delete — so its
+  id still reads retired (the Gone bullet), its
+  succession still has a head, and the erasure pair names
+  every predecessor the tombstone's `supersedes` chain
+  lost. Oracle: `tests/api-pii-tombstone.test.ts`
   'erased PII remains in superseded pairs; login is 401'
-  inverted for the erased pairs.
+  inverted for the erased pairs, and each erased
+  document's one remaining pair is its tombstone.
 - The code's word `erased` becomes `deleted`: this is an
   HTTP application, and the state it names is a DELETE
   head at `identities/:id/pii`. Its own change: the PII
