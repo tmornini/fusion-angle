@@ -3181,6 +3181,20 @@ Off the critical path; each with its oracle.
   store. Each rename is its own commit. Oracle: a test
   sweeps identifiers for the four verbs and fails on any
   that is not in its named-exception list.
+- The ledger root's body is JSON. `/migrations/0000-root`
+  (`api/ledger-root.ts:16-17`) is the one head whose
+  response body is not a JSON object: 64 hex characters of
+  the empty string's sha256, with no `content-type`, so it
+  carries none of its path's ids. Every other document
+  body carries its id. Form it as a JSON object with `id`
+  `0000-root` and the digest under a named key, with
+  `content-type: application/json` and the
+  `content-length` that follows. Both backends read the
+  root (`api/backend-memory.ts:248`,
+  `api/backend-postgres.ts:117`); every deployment seeds
+  fresh, so nothing stored migrates. Oracle: the root
+  head's response parses as a JSON object whose `id` is
+  `0000-root`, in both backends.
 
 ## Sequencing
 
