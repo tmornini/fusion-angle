@@ -11,7 +11,7 @@ import {
     documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
-    requestBodyOf,
+    bodyOf,
     headDocumentOf,
     documentIsTombstone,
     type DerivedDocument,
@@ -387,7 +387,7 @@ export async function storedRevisionDocument(
         name: id,
         messagePairId: found.id,
         method: found.method,
-        body: requestBodyOf(found.request),
+        body: bodyOf(found.request),
     };
 }
 
@@ -464,7 +464,7 @@ async function serveDocumentRevision(
             wiring, db, organization, id,
         );
     }
-    const body = requestBodyOf(found.request);
+    const body = bodyOf(found.request);
     const document: DerivedDocument = {
         name: id,
         messagePairId: found.id,

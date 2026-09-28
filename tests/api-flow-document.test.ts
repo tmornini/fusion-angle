@@ -189,7 +189,7 @@ async function headEtag(
 
 // Decode a stored request row's serializeWire message back into its
 // method + body — the SAME decode derive-documents.ts's private
-// requestMethodOf/requestBodyOf perform, reconstructed here
+// requestMethodOf/bodyOf perform, reconstructed here
 // read-only for wire-level assertions (this file never imports
 // those, since they are not exported production surface).
 function decodeRequestMessage(message: string): {

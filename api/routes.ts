@@ -185,7 +185,7 @@ import {
     deriveDocumentsAt,
     byIdAscending,
     headDocumentOf,
-    requestBodyOf,
+    bodyOf,
 } from './derive-documents.ts';
 import {
     instancesUriPrefix,
@@ -2181,7 +2181,7 @@ export async function postWorkOrderTransitionOp(
         );
     }
     const headValues = revisionValuesOf(
-        requestBodyOf(instanceHead.request),
+        bodyOf(instanceHead.request),
     );
     const attributesById = await loadAttributeSchemaById(
         db, organization, typeId,
@@ -4895,7 +4895,7 @@ export const routes: Route[] = [
                     db, id, org, 'record_types',
                 );
             }
-            const body = requestBodyOf(
+            const body = bodyOf(
                 found.request,
             );
             return recordTypeEntityOf(
@@ -5115,7 +5115,7 @@ export const routes: Route[] = [
                 );
             const values = projectReadableValues(
                 revisionValuesOf(
-                    requestBodyOf(found.request),
+                    bodyOf(found.request),
                 ),
                 attributesById,
                 roles,

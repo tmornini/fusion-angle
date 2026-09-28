@@ -34,7 +34,7 @@ const DELETE_METHOD = 'DELETE';
 const DOCUMENT_METHODS: ReadonlySet<string> =
     new Set([PUT_METHOD, DELETE_METHOD]);
 
-export function requestBodyOf(
+export function bodyOf(
     message: string,
 ): Record<string, unknown> {
     const model = parseWire(message);
@@ -92,7 +92,7 @@ export function documentMessagePairsAt(
             at: messagePair.response_at,
             name: messagePair.name,
             method: messagePair.method,
-            body: requestBodyOf(messagePair.request),
+            body: bodyOf(messagePair.request),
             requesterIdentityId:
                 messagePair.requester_identity_id,
         });
@@ -156,7 +156,7 @@ export function headDocumentOf(
         name: head.name,
         messagePairId: head.id,
         method: head.method,
-        body: requestBodyOf(head.request),
+        body: bodyOf(head.request),
     };
 }
 
