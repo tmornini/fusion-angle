@@ -44,9 +44,10 @@ export function bodyOf(
         : {};
 }
 
-// One decoded PUT/DELETE pair at a prefix: the request's
-// parsed body, plus the fields a family's own reduction needs
-// beyond the document itself — the response envelope's own
+// One decoded PUT/DELETE pair at a prefix: its stored
+// response's parsed body (the wire), plus the fields a
+// family's own reduction needs beyond the document itself —
+// the response envelope's own
 // (at, id) for arrival order, and the requester for
 // provenance. Shared raw material for both the head-document
 // reduction below and a family's own lifecycle reduction over
@@ -92,7 +93,7 @@ export function documentMessagePairsAt(
             at: messagePair.response_at,
             name: messagePair.name,
             method: messagePair.method,
-            body: bodyOf(messagePair.request),
+            body: bodyOf(messagePair.response),
             requesterIdentityId:
                 messagePair.requester_identity_id,
         });
@@ -156,7 +157,7 @@ export function headDocumentOf(
         name: head.name,
         messagePairId: head.id,
         method: head.method,
-        body: bodyOf(head.request),
+        body: bodyOf(head.response),
     };
 }
 

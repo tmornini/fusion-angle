@@ -896,6 +896,21 @@ export async function loadAttributeSchemaById(
     return map;
 }
 
+// An attribute's stored response is a route PUT's wire,
+// the path's keys and all, or the former's bare document;
+// the path owns the keys either way.
+function attributeStateOf(
+    body: Record<string, unknown>,
+): Record<string, unknown> {
+    const {
+        id: _id,
+        organization_id: _organization,
+        record_type_id: _recordType,
+        ...state
+    } = body;
+    return state;
+}
+
 // G6: GET derive is the stored PUT. Document echoes plus
 // the stored nested document body (both ACL keys required).
 export function nestedAttributeWireOf(
@@ -2181,7 +2196,7 @@ export async function postWorkOrderTransitionOp(
         );
     }
     const headValues = revisionValuesOf(
-        bodyOf(instanceHead.request),
+        bodyOf(instanceHead.response),
     );
     const attributesById = await loadAttributeSchemaById(
         db, organization, typeId,
@@ -4896,7 +4911,7 @@ export const routes: Route[] = [
                 );
             }
             const body = bodyOf(
-                found.request,
+                found.response,
             );
             return recordTypeEntityOf(
                 {
@@ -4928,7 +4943,8 @@ export const routes: Route[] = [
             const rows: { id: string }[] = [];
             for (const [id, document] of documents) {
                 const wire = nestedAttributeWireOf(
-                    org, typeId, id, document.body,
+                    org, typeId, id,
+                    attributeStateOf(document.body),
                 );
                 rows.push(wire as { id: string });
             }
@@ -4958,7 +4974,8 @@ export const routes: Route[] = [
                 );
             }
             return nestedAttributeWireOf(
-                org, typeId, attrId, document.body,
+                org, typeId, attrId,
+                attributeStateOf(document.body),
             );
         },
         put: async (db, p, body, _actor, messagePair) => {
@@ -5115,7 +5132,7 @@ export const routes: Route[] = [
                 );
             const values = projectReadableValues(
                 revisionValuesOf(
-                    bodyOf(found.request),
+                    bodyOf(found.response),
                 ),
                 attributesById,
                 roles,

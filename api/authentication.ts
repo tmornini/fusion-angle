@@ -38,8 +38,7 @@ import {
     pickString,
     validateIdentityCredentialEntity,
 } from './validators.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
+import { bodyOf } from './derive-documents.ts';
 import {
     planRotation,
     isTokenRevoked,
@@ -1444,14 +1443,6 @@ const AUTHORIZATION_CODE_SEGMENTS: readonly string[] = [
     ':hash',
 ];
 
-function decodedBodyOf(message: string): Record<string, unknown> {
-    const model = parseWire(message);
-    const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? JSON.parse(body.toText()) as Record<string, unknown>
-        : {};
-}
-
 // authorization_code grant: one redemption of the code
 // document. No head, or a DELETE head, is 401 before
 // mint. The spend is a latched DELETE in the same
@@ -1488,7 +1479,7 @@ async function grantAuthorizationCode(
     ) {
         return invalid;
     }
-    const storedBody = decodedBodyOf(stored.response);
+    const storedBody = bodyOf(stored.response);
     const issuerId = stored.requester_identity_id;
     const clientId = pickString(storedBody, 'client_id');
     const challenge = storedBody.code_challenge;

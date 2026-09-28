@@ -30,7 +30,8 @@ import {
 //
 // id-FIRST, matching the seven-sibling entityOf convention
 // (Task 5): organizationEntityOf re-runs the head pair's own
-// REQUEST body through validateOrganizationEntity — the SAME
+// stored response (the wire) through
+// validateOrganizationEntity — the SAME
 // validator WRITE_RESPONSE_SPECS['organizations/:id']
 // .successBody already runs (api/routes.ts; message-plane only
 // since Phase Final Task 2 retired the organizations ROW) —
@@ -39,14 +40,11 @@ import {
 // mapper. Reusing the validator rather than re-listing its six
 // field names here is the DRY choice: ORGANIZATION_BODY_KEYS
 // (validators.ts) stays the one place that vocabulary lives.
-// withoutId strips a stray `id` FIRST — the fetch-edit-PUT
-// client pattern echoes the GET body's own `id` right back into
-// the PUT payload, and the STORED request body is the raw
-// wire body, echoed id and all (formWriteMessagePair stores the
-// caller's body verbatim; successBody's withoutId(body)
-// strips it before validating). Mirroring that same strip
-// here is what keeps assertOnlyKeys from rejecting a head
-// pair the live PUT legitimately formed.
+// withoutId strips `id` FIRST — the stored response is the
+// wire, id-first, and validateOrganizationEntity's
+// assertOnlyKeys rejects an `id` key. Stripping it here is what
+// keeps assertOnlyKeys from rejecting a head pair the live PUT
+// legitimately formed.
 //
 // ONE shared readonly tx per call (Efficiency): db.messagePairs
 // read inside the SAME db.readTransaction(...) rather

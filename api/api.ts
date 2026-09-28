@@ -27,7 +27,6 @@ import {
     documentHeadAt,
     writeAnswerOf,
     ownWireOf,
-    responseFromHead,
     attachEtag,
     attachDate,
     streamGetFromStored,
@@ -38,10 +37,6 @@ import {
 } from './message-pair.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { ReceivedRequest } from './message-pair.ts';
-import {
-    bodyOctetsOf,
-} from './message-form.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
 import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
@@ -326,17 +321,6 @@ function preconditionRefusal(
         );
     }
     return undefined;
-}
-
-function octetsEqual(
-    left: Uint8Array,
-    right: Uint8Array,
-): boolean {
-    if (left.length !== right.length) return false;
-    for (let i = 0; i < left.length; i++) {
-        if (left[i] !== right[i]) return false;
-    }
-    return true;
 }
 
 async function instanceAdvertised(
@@ -882,29 +866,6 @@ async function dispatched(
                     organization,
                     body,
                 });
-            // Keyed through the wiring consult and the exact
-            // entity pattern, so a family's sub-resource PUT
-            // under the same prefix never reads the entity's
-            // head.
-            const wiring = wiringForSegments(
-                matched.segments,
-            );
-            const isDocumentPut = method === 'PUT'
-                && wiring !== undefined
-                && routePattern
-                    === documentEntityPattern(wiring);
-            // Advertised ETag is the live PUT pair id. A
-            // DELETE head is not live, so the same-body
-            // no-append never answers over one.
-            const head = isDocumentPut
-                ? await documentHeadAt(
-                    effective, canonicalPrefix, name,
-                )
-                : null;
-            const livePut = head !== null
-                && head.method === 'PUT'
-                ? head.id
-                : undefined;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
             // (message-pair.ts resolution: DELETEs join their
@@ -990,68 +951,6 @@ async function dispatched(
                     }
                     : {}),
             });
-            // Same-body as live PUT head → 200, no append.
-            // Body equality is octets, not ETag. The no-op
-            // still takes the in-tx latch so it cannot
-            // return a dead ETag.
-            if (
-                method === 'PUT'
-                && livePut !== undefined
-                && request.headers.get(IF_MATCH_HEADER) === null
-                && request.headers.get(IF_NONE_MATCH_HEADER)
-                    === null
-            ) {
-                const liveReq = await effective.messagePairs
-                    .getById(livePut);
-                if (liveReq !== undefined) {
-                    const liveOctets = bodyOctetsOf(
-                        parseWire(liveReq.request),
-                    );
-                    const newOctets = bodyOctetsOf(
-                        parseWire(messagePair.requestMessage),
-                    );
-                    if (octetsEqual(liveOctets, newOctets)) {
-                        const raced =
-                            await effective.readTransaction(async (view) => {
-                                    const latest =
-                                        await documentHeadMessagePairId(
-                                            view,
-                                            canonicalPrefix,
-                                            name,
-                                        );
-                                    return latest
-                                        !== livePut;
-                                },
-                            );
-                        if (raced) {
-                            return Response.json(
-                                {
-                                    error: 'If-Match does not '
-                                        + 'match the current '
-                                        + 'document at '
-                                        + pathname,
-                                },
-                                {
-                                    status:
-                                        HTTP_PRECONDITION_FAILED,
-                                },
-                            );
-                        }
-                        const stored =
-                            await effective.messagePairs
-                                .getById(livePut);
-                        if (stored !== undefined) {
-                            return attachEtag(
-                                responseFromHead(
-                                    stored.response,
-                                    ctx.requestId,
-                                ),
-                                stored.id,
-                            );
-                        }
-                    }
-                }
-            }
         }
         const received: ReceivedRequest = {
             target: requestTarget(request),

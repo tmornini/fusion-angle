@@ -77,7 +77,10 @@ async function seedDefaultOrganizationEvent(
         requesterIdentityId: identityId,
         requestAt: at,
         organization: undefined,
-        responseBody: undefined,
+        responseBody: {
+            id: identityId,
+            organization_id: organizationId,
+        },
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });

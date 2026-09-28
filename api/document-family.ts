@@ -75,10 +75,11 @@ export function requireOrganization(
     return organization;
 }
 
-// Strip `id` from the request body before
-// passing to entity validators. `id` is a
-// routing/storage key, not a body field;
-// validators enforce the exact body key set.
+// Strip `id` from a body (a request's, or a
+// stored response's wire) before passing it to
+// entity validators. `id` is a routing/storage
+// key, not a body field; validators enforce the
+// exact body key set.
 export function withoutId(
     body: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -387,7 +388,7 @@ export async function storedRevisionDocument(
         name: id,
         messagePairId: found.id,
         method: found.method,
-        body: bodyOf(found.request),
+        body: bodyOf(found.response),
     };
 }
 
@@ -464,7 +465,7 @@ async function serveDocumentRevision(
             wiring, db, organization, id,
         );
     }
-    const body = bodyOf(found.request);
+    const body = bodyOf(found.response);
     const document: DerivedDocument = {
         name: id,
         messagePairId: found.id,

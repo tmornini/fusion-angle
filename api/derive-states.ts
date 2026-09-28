@@ -16,14 +16,13 @@ import {
     responseRecordOf,
 } from './message-pair.ts';
 import {
+    bodyOf,
     documentMessagePairsAt,
     deriveDocumentsAt,
     byIdAscending,
     type DocumentMessagePair,
 } from './derive-documents.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
 import {
     historyOf,
     type WorkOrderVersion,
@@ -108,8 +107,8 @@ async function organizationIds(
 }
 
 // The invitation's own organization_id — carried in the STORED
-// REQUEST body (derive-invitations.ts's own precedent), never the
-// path (the invitations path is flat, unlike every
+// response, the wire (derive-invitations.ts's own precedent),
+// never the path (the invitations path is flat, unlike every
 // org-nested family above). Document read of this id at the
 // invitations collection — the same head fold, reused rather
 // than reimplemented.
@@ -394,16 +393,6 @@ function ownerProbeCollection(
     );
 }
 
-function responseBodyOf(
-    message: string,
-): Record<string, unknown> {
-    const model = parseWire(message);
-    const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? JSON.parse(body.toText()) as Record<string, unknown>
-        : {};
-}
-
 function ownerFromPath(
     path: string,
     name: Id,
@@ -420,7 +409,7 @@ function ownerFromPath(
         path === ROLE_GRANTS_URI_PREFIX
         || path === INVITATIONS_PREFIX
     ) {
-        const body = responseBodyOf(message);
+        const body = bodyOf(message);
         const organizationId = body['organization_id'];
         if (typeof organizationId === 'string') {
             return organizationId;

@@ -111,12 +111,3 @@ export function requestMessageHash(
         Octets.fromLatin1(wire).asBytes(),
     );
 }
-
-export function bodyOctetsOf(
-    model: MessageModel,
-): Uint8Array {
-    const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? body.toBytes()
-        : new Uint8Array(0);
-}

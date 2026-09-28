@@ -70,5 +70,8 @@ export async function deriveFlowTag(
             db, name, organization, FLOW_TAGS_TABLE, flowId,
         );
     }
-    return flowTagEntityOf(flowId, document);
+    // The stored response is the tag's wire; the path owns
+    // its flow_id.
+    const { flow_id: _flow, ...body } = document.body;
+    return flowTagEntityOf(flowId, { ...document, body });
 }
