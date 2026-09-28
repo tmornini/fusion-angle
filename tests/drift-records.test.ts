@@ -735,10 +735,12 @@ async () => {
     // Phase Final Stage B: records table retired.
 
     // Step 2: edit — add attrC, remove attrA.
-    const edited = await handleRequest(db, req(
-        'POST', '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/', token,
-        editRecordBody(
+    const edited = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/',
+        token,
+        body: editRecordBody(
             recordId, STARK_ORGANIZATION, 'Chain Record',
             [
                 attributeBody(
@@ -748,8 +750,9 @@ async () => {
             [attrA],
             'active',
         ),
-    ));
-    assertStrictEquals(edited.status, 201);
+        headers: { 'If-Match': created.headers.get('etag')! },
+    }));
+    assertStrictEquals(edited.status, 200);
     await assertRecordWire();
     await assertAttributeAbsent(attrA);
     await assertAttributeWire(attrB);
@@ -761,15 +764,18 @@ async () => {
     const beforeAttrCount = (
         await derivedRecordAttributes(db, STARK_ORGANIZATION)
     ).length;
-    const rejected = await handleRequest(db, req(
-        'POST', '/organizations/' + STARK_ORGANIZATION
-            + '/record-types/', token,
-        editRecordBody(
+    const rejected = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/',
+        token,
+        body: editRecordBody(
             recordId, STARK_ORGANIZATION, 'Chain Record',
             [], ['CPJmMPXRaBIiNdGBofUPVg'],
             'active',
         ),
-    ));
+        headers: { 'If-Match': edited.headers.get('etag')! },
+    }));
     assertStrictEquals(rejected.status, 409);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, beforeRequestCount,

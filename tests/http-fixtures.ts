@@ -194,6 +194,27 @@ export function apiRequest(input: {
     });
 }
 
+// An accept, decline, or revoke names the invitation head it
+// changes; the invitation id ends the request's path.
+export async function invitationLatched(
+    db: DbAdapter,
+    request: Request,
+): Promise<Request> {
+    const id = new URL(request.url).pathname.split('/').at(-1);
+    if (id === undefined) {
+        throw new Error('no invitation id in ' + request.url);
+    }
+    const head = await db.messagePairs.getHeadPair(
+        '/invitations/', id,
+    );
+    if (head === null) {
+        throw new Error('no invitation head at ' + id);
+    }
+    const headers = new Headers(request.headers);
+    headers.set('If-Match', '"' + head.id + '"');
+    return new Request(request, { headers });
+}
+
 export function storedMessageBodyText(
     message: string,
 ): string {

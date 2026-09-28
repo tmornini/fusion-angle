@@ -36,6 +36,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    invitationLatched,
 } from './http-fixtures.ts';
 
 const DRIFT_STATES_FENCE_OWN_IDEA = generateIdentifier();
@@ -1116,7 +1117,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         },
     ));
     assertStrictEquals(acceptGrant.status, 201);
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/YeQnyZJddPctAdaMBVWEew'
             + '/invitations/YUuiirIfYgZZdbyLqxAHmg',
@@ -1126,8 +1127,8 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             eventId: DRIFT_STATES_INV_ACCEPT_ACCEPT,
             at: '2026-03-01T00:00:00.000001Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
     const acceptDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'YUuiirIfYgZZdbyLqxAHmg',
     );
@@ -1155,7 +1156,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         },
     ));
     assertStrictEquals(declineGrant.status, 201);
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/YfxZQrzQBOaPJmijEVzQOg'
             + '/invitations/YXTFXcJwnALAOHAFRMiiPg',
@@ -1164,8 +1165,8 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             eventId: DRIFT_STATES_INV_DECLINE_DECLINE,
             at: '2026-03-02T00:00:00.000001Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
     const declineDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'YXTFXcJwnALAOHAFRMiiPg',
     );
@@ -1194,7 +1195,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         },
     ));
     assertStrictEquals(revokeGrant.status, 201);
-    const revoke = await handleRequest(db, req(
+    const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
             + '/invitations/YZtAiXGchFrNHaSixyjBsg',
@@ -1203,8 +1204,8 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             eventId: DRIFT_STATES_INV_REVOKE_REVOKE,
             at: '2026-03-03T00:00:00.000001Z',
         },
-    ));
-    assertStrictEquals(revoke.status, 204);
+    )));
+    assertStrictEquals(revoke.status, 200);
     const revokeDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'YZtAiXGchFrNHaSixyjBsg',
     );

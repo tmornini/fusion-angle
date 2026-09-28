@@ -1098,6 +1098,11 @@ async function dispatched(
                     organization,
                     roles,
                 );
+                // A handler that attaches its head's ETag answers
+                // with its own response.
+                if (result instanceof Response) {
+                    return result;
+                }
                 // ETag attach: the document GET of a family
                 // whose PUT requires a conditional carries the
                 // current head pair id — the client save's

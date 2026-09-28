@@ -19,6 +19,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -256,7 +257,7 @@ Deno.test('leg 6: LIVE accept — grant + accept an invitation through'
     assertStrictEquals(grant.status, 201);
 
     const membershipId = MS_DRIFT_IDENTITY_SARAH;
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + sarahId
             + '/invitations/iHfMDzumeGtJONHzPjOjWQ',
@@ -267,8 +268,8 @@ Deno.test('leg 6: LIVE accept — grant + accept an invitation through'
             eventId: EV_MS_DRIFT_IDENTITY_SARAH_ACCEPT,
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
 
     // Phase Final Task 2: memberships ROW half stripped —
     // accept lands on the message plane only.

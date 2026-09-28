@@ -631,8 +631,8 @@ export async function deriveInvitationStates(
 }
 
 // One invitation's lifecycle: ONE document read. dbOrView-
-// shaped; opens no nested transaction
-// (currentInvitationState's in-tx gate reads through it).
+// shaped and opens no nested transaction, so a caller may
+// read it inside a transaction it already holds.
 export async function invitationLifecycleStatesFor(
     dbOrView: DbAdapter,
     id: Id,

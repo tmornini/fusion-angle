@@ -3204,13 +3204,11 @@ const IDEA_CONVERSION_BASELINE_KEYS: readonly string[] = [
 // row, TWO state events (the idea's 'promoted' and the
 // project's initial), and N baseline-score rows, written
 // atomically. The idea is the route param. The facet fields are
-// NOT fully validated here — the org-scoped projects store
-// stamps organization_id from the verified token and
-// re-validates through validateProjectEntity AFTER the stamp
-// (so the project body OMITS organization_id); the ideas store
-// re-validates the promoted idea through validateIdeaEntity, and
-// each baseline row through validateBaselineScoreEntity, as the
-// composing puts land. Authorship of both events is stamped
+// NOT fully validated here — the route validates the project
+// document (which OMITS organization_id; the fence stamps it),
+// the promoted idea's document, and each baseline row through
+// validateBaselineScoreEntity before the statement. Authorship
+// of both events is stamped
 // from the verified caller in the route, never the body — the
 // body carries only the event ids and the (server-fixed) state
 // values. The baseline ids are minted client-side and non-empty.

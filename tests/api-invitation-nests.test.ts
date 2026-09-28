@@ -3,8 +3,10 @@ import { routes, matchRoute } from
     '../api/routes.ts';
 import { pathSegmentsOf } from
     '../api/path-segments.ts';
-import { memoryDbAdapter } from
-    '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken, reachableToken } from
@@ -22,6 +24,7 @@ import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -122,7 +125,7 @@ async function seedPerson(
     });
 }
 
-async function seedWorld(): Promise<DbAdapter> {
+async function seedWorld(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Stark');
@@ -230,7 +233,7 @@ Deno.test('invitee PUT identity nest accepted writes'
     + ' the seat', async () => {
     const db = await seedWorld();
     await grantWayne(db, 'sarah@x.com', 'hZjjtxCNiLqiQahFZuykvA');
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hZjjtxCNiLqiQahFZuykvA',
@@ -242,8 +245,8 @@ Deno.test('invitee PUT identity nest accepted writes'
             eventId: EV_ACC,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(res.status, 204);
+    )));
+    assertStrictEquals(res.status, 200);
     assertEquals(
         await membershipsFor(db, 'toccYYkLEABmlbpHJalgtQ'),
         ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
@@ -256,7 +259,7 @@ Deno.test('invitee PUT identity nest accepted writes'
 Deno.test('invitee PUT declined', async () => {
     const db = await seedWorld();
     await grantWayne(db, 'dave@x.com', 'hgFLbVZKltowuLSHmjQVKw');
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + DAVE
             + '/invitations/hgFLbVZKltowuLSHmjQVKw',
@@ -266,8 +269,8 @@ Deno.test('invitee PUT declined', async () => {
             eventId: EV_DEC,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(res.status, 204);
+    )));
+    assertStrictEquals(res.status, 200);
     const row = (await deriveInvitations(db))
         .find(inv => inv.id === 'hgFLbVZKltowuLSHmjQVKw')!;
     assertStrictEquals(row.state, 'declined');
@@ -280,7 +283,7 @@ Deno.test('invitee PUT declined', async () => {
 Deno.test('admin PUT org nest revoked', async () => {
     const db = await seedWorld();
     await grantWayne(db, 'sarah@x.com', 'isEimNpTpNyPKQzbcYxoiA');
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'isEimNpTpNyPKQzbcYxoiA',
@@ -291,8 +294,8 @@ Deno.test('admin PUT org nest revoked', async () => {
             eventId: EV_REV,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(res.status, 204);
+    )));
+    assertStrictEquals(res.status, 200);
     const row = (await deriveInvitations(db))
         .find(inv => inv.id === 'isEimNpTpNyPKQzbcYxoiA')!;
     assertStrictEquals(row.state, 'revoked');
@@ -301,7 +304,7 @@ Deno.test('admin PUT org nest revoked', async () => {
 Deno.test('invitee PUT revoked is 403', async () => {
     const db = await seedWorld();
     await grantWayne(db, 'sarah@x.com', 'hcTwUMjMVqkOKDsPOhKxiA');
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hcTwUMjMVqkOKDsPOhKxiA',
@@ -312,14 +315,14 @@ Deno.test('invitee PUT revoked is 403', async () => {
             eventId: EV_BAD,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
+    )));
     assertStrictEquals(res.status, 403);
 });
 
 Deno.test('admin PUT accepted is 403', async () => {
     const db = await seedWorld();
     await grantWayne(db, 'sarah@x.com', 'hadMASAdKHbHSgRNcCrndw');
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'hadMASAdKHbHSgRNcCrndw',
@@ -331,14 +334,15 @@ Deno.test('admin PUT accepted is 403', async () => {
             eventId: EV_ADM,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
+    )));
     assertStrictEquals(res.status, 403);
 });
 
-Deno.test('PUT from accepted is a no-op', async () => {
+Deno.test('PUT from accepted answers the head and stores nothing',
+async () => {
     const db = await seedWorld();
     await grantWayne(db, 'sarah@x.com', 'hXEuekgeiwIxOSyjdOQYQg');
-    const first = await handleRequest(db, req(
+    const first = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hXEuekgeiwIxOSyjdOQYQg',
@@ -350,9 +354,11 @@ Deno.test('PUT from accepted is a no-op', async () => {
             eventId: EV_409,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(first.status, 204);
-    const second = await handleRequest(db, req(
+    )));
+    assertStrictEquals(first.status, 200);
+    const accepted = await first.json();
+    const before = (await db.messagePairs.getAll()).length;
+    const second = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hXEuekgeiwIxOSyjdOQYQg',
@@ -364,8 +370,15 @@ Deno.test('PUT from accepted is a no-op', async () => {
             eventId: EV_409B,
             at: '2026-01-01T00:00:02.000000Z',
         },
-    ));
-    assertStrictEquals(second.status, 204);
+    )));
+    assertStrictEquals(second.status, 200);
+    assertStrictEquals(
+        second.headers.get('etag'), first.headers.get('etag'),
+    );
+    assertEquals(await second.json(), accepted);
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 Deno.test('org-less invitee reaches identity nest',
@@ -385,7 +398,7 @@ async () => {
     }[];
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.state, 'pending');
-    const acc = await handleRequest(db, req(
+    const acc = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + DAVE
             + '/invitations/hvIFfMMXNtqRPYXnChCzug',
@@ -396,10 +409,45 @@ async () => {
             eventId: EV_HOLE,
             at: '2026-01-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(acc.status, 204);
+    )));
+    assertStrictEquals(acc.status, 200);
     assertEquals(
         await membershipsFor(db, DAVE),
         ['BBjWJsjYIDkTRKIIPrzWRw'],
+    );
+});
+
+Deno.test('the invitation item GETs carry their head\'s ETag',
+async () => {
+    const db = await seedWorld();
+    const id = generateIdentifier();
+    const granted = await grantWayne(db, 'sarah@x.com', id);
+    assertStrictEquals(granted.status, 201);
+    await granted.body?.cancel();
+    const head = await db.messagePairs.getHeadPair(
+        '/invitations/', id,
+    );
+    assert(head !== null);
+    const invitee = await handleRequest(db, req(
+        'GET',
+        '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
+        await organizationToken('toccYYkLEABmlbpHJalgtQ'
+            , 'AjdvjuECVZEgZoFajaIEkg'),
+    ));
+    assertStrictEquals(invitee.status, 200);
+    await invitee.body?.cancel();
+    assertStrictEquals(
+        invitee.headers.get('etag'), '"' + head.id + '"',
+    );
+    const admin = await handleRequest(db, req(
+        'GET',
+        '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/' + id,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'),
+    ));
+    assertStrictEquals(admin.status, 200);
+    await admin.body?.cancel();
+    assertStrictEquals(
+        admin.headers.get('etag'), '"' + head.id + '"',
     );
 });

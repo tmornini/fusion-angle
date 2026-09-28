@@ -93,11 +93,30 @@ Deno.test('nested record-types write stamps the bound org'
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organizationA,
     );
-    const res = await handleRequest(db, req(
+    const created = await handleRequest(db, req(
         'POST', '/organizations/' + organizationA + '/record-types/',
         token,
-        editBody(organizationB)));
-    assertStrictEquals(res.status, 201);
+        {
+            kind: 'create',
+            id: 'rbfHGatkwQzGZJVXKJEeyw',
+            record: {
+                organization_id: organizationA,
+                name: 'rec', description: 'd', position: 0,
+            },
+            attributes: [],
+            initialState: 'active',
+        }));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const res = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + organizationA + '/record-types/',
+        token,
+        body: editBody(organizationB),
+        headers: { 'If-Match': created.headers.get('etag')! },
+    }));
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
     const get = await handleRequest(db, req(
         'GET',
         '/organizations/' + organizationA

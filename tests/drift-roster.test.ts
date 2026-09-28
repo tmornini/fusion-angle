@@ -31,6 +31,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -573,7 +574,7 @@ async () => {
         membershipId: string, acceptEventId: string,
         acceptAt: string,
     ): Promise<Response> {
-        return handleRequest(db, req(
+        return handleRequest(db, await invitationLatched(db, req(
             'PUT',
             '/identities/' + invitee
                 + '/invitations/' + invitationId,
@@ -584,14 +585,14 @@ async () => {
                 eventId: acceptEventId,
                 at: acceptAt,
             },
-        ));
+        )));
     }
 
     async function declineAs(
         invitee: string, invitationId: string,
         declineEventId: string, declineAt: string,
     ): Promise<Response> {
-        return handleRequest(db, req(
+        return handleRequest(db, await invitationLatched(db, req(
             'PUT',
             '/identities/' + invitee
                 + '/invitations/' + invitationId,
@@ -601,14 +602,14 @@ async () => {
                 eventId: declineEventId,
                 at: declineAt,
             },
-        ));
+        )));
     }
 
     async function revoke(
         invitationId: string, revokeEventId: string,
         revokeAt: string,
     ): Promise<Response> {
-        return handleRequest(db, req(
+        return handleRequest(db, await invitationLatched(db, req(
             'PUT',
             '/organizations/' + organization
                 + '/invitations/' + invitationId,
@@ -617,7 +618,7 @@ async () => {
                 eventId: revokeEventId,
                 at: revokeAt,
             },
-        ));
+        )));
     }
 
     // A: fresh grant — pending.
@@ -643,7 +644,7 @@ async () => {
         jessicaId, INV_ROSTER_JESSICA, MS_ROSTER_JESSICA,
         EV_ROSTER_JESSICA_ACCEPT, '2026-06-01T00:00:02.000000Z',
     );
-    assertStrictEquals(jessicaAccept.status, 204);
+    assertStrictEquals(jessicaAccept.status, 200);
     const jessicaRow = (await deriveInvitations(db)).find(
         (row) => row.id === INV_ROSTER_JESSICA,
     )!;
@@ -669,7 +670,7 @@ async () => {
         'CJrglMsNBxOWWfbihHQSeg', INV_ROSTER_EMILY,
         EV_ROSTER_EMILY_DECLINE, '2026-06-01T00:00:04.000000Z',
     );
-    assertStrictEquals(emilyDecline.status, 204);
+    assertStrictEquals(emilyDecline.status, 200);
     const emilyRow = (await deriveInvitations(db)).find(
         (row) => row.id === INV_ROSTER_EMILY,
     )!;
@@ -685,7 +686,7 @@ async () => {
         INV_ROSTER_MARCUS, EV_ROSTER_MARCUS_REVOKE,
         '2026-06-01T00:00:06.000000Z',
     );
-    assertStrictEquals(marcusRevoke.status, 204);
+    assertStrictEquals(marcusRevoke.status, 200);
     const marcusRow = (await deriveInvitations(db)).find(
         (row) => row.id === INV_ROSTER_MARCUS,
     )!;
@@ -718,7 +719,7 @@ async () => {
         EV_ROSTER_JESSICA_REACCEPT,
         '2026-06-01T00:00:08.000000Z',
     );
-    assertStrictEquals(jessicaReaccept.status, 204);
+    assertStrictEquals(jessicaReaccept.status, 200);
     assertStrictEquals(
         0 /* states table retired */,
         statesBefore,

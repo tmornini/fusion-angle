@@ -10,6 +10,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -77,7 +78,7 @@ async () => {
     // Decline: no longer pending — declined is terminal.
     const invitee = await organizationToken(
         inviteeId, ORGANIZATION_TWO);
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId
             + '/invitations/hhLDowecKAZZsoTcnjSQrg',
@@ -87,8 +88,8 @@ async () => {
             eventId: INV_DEDUP_STEP0_FIRST_DECLINE,
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
     assertStrictEquals(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,
@@ -119,7 +120,7 @@ async () => {
     assertStrictEquals(afterRegrant?.id, 'hjPGoZqbkGJVvYQFoLWXCA');
 
     // Accept the fresh one: no pending again.
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId
             + '/invitations/hjPGoZqbkGJVvYQFoLWXCA',
@@ -130,8 +131,8 @@ async () => {
             eventId: INV_DEDUP_STEP0_SECOND_ACCEPT,
             at: '2026-06-01T00:00:03.000000Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
     assertStrictEquals(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,

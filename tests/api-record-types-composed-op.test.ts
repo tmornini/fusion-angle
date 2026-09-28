@@ -31,8 +31,8 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested composed POST .../record-types (Task 9): admin-only
-// create/edit bundle reusing flat postRecordWriteOp + nested
-// document/attribute documents. RESTRICT edit rolls the whole
+// create/edit of the type and its nested attribute documents,
+// landed through the former. RESTRICT edit rolls the whole
 // batch back; forged organization_id loses to the path org.
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -255,9 +255,12 @@ async () => {
 
     const requestsBefore = await db.messagePairs.getAll();
     const responsesBefore = await db.messagePairs.getAll();
-    const edit = await handleRequest(db, req(
-        'POST', COLLECTION, adminToken,
+    const edit = await handleRequest(db, taggedEdit(
+        adminToken,
         editBody(TYPE_ID, 'Renamed', [ATTR_ID]),
+        '"' + (await db.messagePairs.getHeadPair(
+            COLLECTION, TYPE_ID,
+        ))!.id + '"',
     ));
     assertStrictEquals(edit.status, 409);
     const err = await edit.json() as { error: string };
@@ -388,6 +391,10 @@ async () => {
         path: COLLECTION,
         token: adminToken,
         operationId: generateIdentifier(),
+        headers: {
+            [IF_MATCH_HEADER]: '"' + (await db.messagePairs
+                .getHeadPair(COLLECTION, TYPE_ID))!.id + '"',
+        },
         body: {
             kind: 'edit',
             id: TYPE_ID,
@@ -433,7 +440,13 @@ async () => {
             removedAttributeIds: [],
         },
     }));
-    assertStrictEquals(edit.status, 201);
+    assertStrictEquals(edit.status, 200);
+    assertEquals(
+        await edit.json(),
+        JSON.parse(
+            await storedPutBodyText(db, COLLECTION, TYPE_ID),
+        ),
+    );
 
     const restricted = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
@@ -578,8 +591,8 @@ async () => {
         adminToken,
     ));
     assertStrictEquals(removed.status, 204);
-    const edit = await handleRequest(db, req(
-        'POST', COLLECTION, adminToken, {
+    const edit = await handleRequest(db, taggedEdit(
+        adminToken, {
             kind: 'edit',
             id: typeId,
             record: {
@@ -594,8 +607,17 @@ async () => {
             state: 'active',
             removedAttributeIds: [gone],
         },
+        '"' + (await db.messagePairs.getHeadPair(
+            COLLECTION, typeId,
+        ))!.id + '"',
     ));
-    assertStrictEquals(edit.status, 201);
+    assertStrictEquals(edit.status, 200);
+    assertEquals(
+        await edit.json(),
+        JSON.parse(
+            await storedPutBodyText(db, COLLECTION, typeId),
+        ),
+    );
     const renamed = await handleRequest(db, req(
         'GET', detail + '/attributes/' + kept, adminToken,
     ));
@@ -626,8 +648,8 @@ async () => {
     );
     assert(head);
     const before = (await db.messagePairs.getAll()).length;
-    const resend = await handleRequest(db, req(
-        'POST', COLLECTION, adminToken, {
+    const resend = await handleRequest(db, taggedEdit(
+        adminToken, {
             kind: 'edit',
             id: typeId,
             record: {
@@ -642,6 +664,7 @@ async () => {
             state: 'active',
             removedAttributeIds: [],
         },
+        '"' + head.id + '"',
     ));
     assertStrictEquals(resend.status, 200);
     assertStrictEquals(
@@ -714,6 +737,129 @@ async () => {
         error: 'POST ' + COLLECTION
             + ' takes no If-Match on a create',
     });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+function taggedEdit(
+    token: string,
+    body: Record<string, unknown>,
+    etag: string,
+): Request {
+    return apiRequest({
+        method: 'POST',
+        path: COLLECTION,
+        token,
+        body,
+        headers: { [IF_MATCH_HEADER]: etag },
+    });
+}
+
+async function createdType(
+    db: MemoryDbAdapter,
+    token: string,
+    typeId: string,
+    name: string,
+): Promise<string> {
+    const created = await handleRequest(db, req(
+        'POST', COLLECTION, token,
+        createBody(typeId, generateIdentifier(), name),
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const etag = created.headers.get('etag');
+    assert(etag !== null);
+    return etag;
+}
+
+Deno.test('an edit without If-Match is 428', async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    await createdType(db, adminToken, typeId, 'Untagged');
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        editBody(typeId, 'Renamed', []),
+    ));
+    assertStrictEquals(res.status, 428);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('an edit answers the type\'s state', async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const etag = await createdType(
+        db, adminToken, typeId, 'Answered',
+    );
+    const res = await handleRequest(db, taggedEdit(
+        adminToken, editBody(typeId, 'Renamed', []), etag,
+    ));
+    assertStrictEquals(res.status, 200);
+    const head = await db.messagePairs.getHeadPair(
+        COLLECTION, typeId,
+    );
+    assert(head !== null);
+    assertStrictEquals(res.headers.get('etag'), '"' + head.id + '"');
+    const state = await res.json() as { name: string };
+    assertEquals(
+        state,
+        JSON.parse(await storedPutBodyText(db, COLLECTION, typeId)),
+    );
+    assertStrictEquals(state.name, 'Renamed');
+});
+
+Deno.test('an unchanged edit answers the head and stores nothing',
+async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const attrId = generateIdentifier();
+    const created = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        createBody(typeId, attrId, 'Kept'),
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const etag = created.headers.get('etag');
+    assert(etag !== null);
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, taggedEdit(adminToken, {
+        kind: 'edit',
+        id: typeId,
+        record: {
+            organization_id: ORGANIZATION,
+            name: 'Kept',
+            description: 'Kept desc',
+            position: 1,
+        },
+        attributes: [attributeFields(attrId, typeId, 'Priority')],
+        state: 'active',
+        removedAttributeIds: [],
+    }, etag));
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.headers.get('etag'), etag);
+    assertEquals(
+        await res.json(),
+        JSON.parse(await storedPutBodyText(db, COLLECTION, typeId)),
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('an edit of a missing type is 404', async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, taggedEdit(
+        adminToken, editBody(typeId, 'Nobody', []),
+        '"' + generateIdentifier() + '"',
+    ));
+    assertStrictEquals(res.status, 404);
+    await res.body?.cancel();
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );

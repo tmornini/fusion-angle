@@ -34,7 +34,7 @@ export interface DerivedInvitationRow {
     readonly state: InvitationState;
 }
 
-function invitationRowOf(
+export function invitationRowOf(
     document: DerivedDocument,
 ): DerivedInvitationRow {
     return {
@@ -70,8 +70,8 @@ export async function deriveInvitations(
 
 // The document read: one invitation's head, or undefined
 // when no document was ever written at this id. dbOrView-
-// shaped and opens no nested transaction — callable from
-// within an open write-gate transaction.
+// shaped and opens no nested transaction, so a caller may
+// read it inside a transaction it already holds.
 export async function deriveInvitation(
     dbOrView: DbAdapter,
     id: Id,

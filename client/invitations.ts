@@ -88,7 +88,11 @@ export async function getInvitations(
         'identities/' + ctx.identity.id
             + '/invitations/',
     );
-    return rows.map(row => ({
+    return rows.map(inviteeViewOf);
+}
+
+function inviteeViewOf(row: InviteeRow): InvitationView {
+    return {
         id: row.id,
         organizationId: row.organization_id,
         ...(row.organization_name !== undefined
@@ -99,7 +103,33 @@ export async function getInvitations(
             : {}),
         invitedAt: row.at,
         state: row.state,
-    }));
+    };
+}
+
+function invitationPath(ctx: RequestContext, id: Id): string {
+    return 'identities/' + ctx.identity.id + '/invitations/' + id;
+}
+
+// One of the caller's own invitations, with the tag of the
+// head it was read from, which accept and decline latch.
+export async function getInvitationWithEtag(
+    ctx: RequestContext,
+    id: Id,
+): Promise<{ invitation: InvitationView, etag: string }> {
+    const read = await ctx.GETWithEtag<InviteeRow>(
+        invitationPath(ctx, id),
+    );
+    return {
+        invitation: inviteeViewOf(read.body),
+        etag: requiredEtag(read.etag),
+    };
+}
+
+function requiredEtag(etag: string | undefined): string {
+    if (etag === undefined) {
+        throw new Error('the invitation GET carried no ETag');
+    }
+    return etag;
 }
 
 // The active org's outstanding invitations, for an admin — the
@@ -193,15 +223,16 @@ export async function postInvitationAcceptance(
     id: Id,
     organizationId: Id,
 ): Promise<void> {
+    const { etag } = await getInvitationWithEtag(ctx, id);
     await ctx.PUT(
-        'identities/' + ctx.identity.id
-            + '/invitations/' + id,
+        invitationPath(ctx, id),
         {
             state: 'accepted',
             membershipId: generateIdentifier(),
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
+        [['If-Match', '"' + etag + '"']],
     );
     try {
         await remintSessionClaims(ctx, organizationId);
@@ -298,33 +329,39 @@ export async function postInvitationDecline(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
+    const { etag } = await getInvitationWithEtag(ctx, id);
     await ctx.PUT(
-        'identities/' + ctx.identity.id
-            + '/invitations/' + id,
+        invitationPath(ctx, id),
         {
             state: 'declined',
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
+        [['If-Match', '"' + etag + '"']],
     );
     invitationChanges.notify();
 }
 
 // Cancel a pending invitation (admin only). The invitation row
 // persists as audit; a 'revoked' event supersedes the pending.
+// The admin reads it on the organization nest, whose head tag
+// the revocation latches.
 export async function postInvitationRevocation(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
+    const path = 'organizations/'
+        + activeOrganization(ctx)
+        + '/invitations/' + id;
+    const read = await ctx.GETWithEtag<SentRow>(path);
     await ctx.PUT(
-        'organizations/'
-            + activeOrganization(ctx)
-            + '/invitations/' + id,
+        path,
         {
             state: 'revoked',
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
+        [['If-Match', '"' + requiredEtag(read.etag) + '"']],
     );
     invitationChanges.notify();
 }

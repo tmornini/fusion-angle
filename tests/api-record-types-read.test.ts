@@ -360,3 +360,30 @@ async () => {
     ));
     assertStrictEquals(history.status, 200);
 });
+
+Deno.test('the record-type GET carries its head\'s ETag',
+async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const token = await seedOrganizationWithMember(
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'nkgaOHZISTQrILTfPThWCA',
+        'Org One', generateIdentifier(), 'member',
+    );
+    const id = generateIdentifier();
+    await seedRecordTypePair(
+        db, 'AjdvjuECVZEgZoFajaIEkg', id,
+        recordTypeBody('Tagged', 0, 'active'),
+    );
+    const headId = await seedRecordTypePair(
+        db, 'AjdvjuECVZEgZoFajaIEkg', id,
+        recordTypeBody('Tagged v2', 0, 'active'),
+    );
+    const res = await handleRequest(db, req(
+        'GET',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id,
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
+    assertStrictEquals(res.headers.get('etag'), '"' + headId + '"');
+});

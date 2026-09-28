@@ -22,6 +22,7 @@ import {
 } from '../api/derive-documents.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -264,7 +265,7 @@ Deno.test('a pending invitee is absent from the roster', async () => {
     assert(!before.has('toccYYkLEABmlbpHJalgtQ'));
     // Sarah accepts; now the Wayne roster includes her.
     const id = (await deriveInvitations(db))[0]!.id;
-    const acc = await handleRequest(db, req(
+    const acc = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -272,8 +273,8 @@ Deno.test('a pending invitee is absent from the roster', async () => {
             state: 'accepted',
             membershipId: MS_SARAH, eventId: EV_ACC,
             at: AT,
-        }));
-    assertStrictEquals(acc.status, 204);
+        })));
+    assertStrictEquals(acc.status, 200);
     const after = await rosterIds(db);
     assert(after.has('toccYYkLEABmlbpHJalgtQ'));
 });
@@ -293,7 +294,7 @@ async function rosterIds(
 Deno.test('accept makes the invitation org reachable', async () => {
     const db = await seed();
     const id = await grantSarahToWayne(db);
-    await handleRequest(db, req(
+    await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -302,7 +303,7 @@ Deno.test('accept makes the invitation org reachable', async () => {
             membershipId: MS_SARAH_2,
             eventId: EV_ACC_2,
             at: AT,
-        }));
+        })));
     const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
@@ -413,16 +414,18 @@ async () => {
     const sTok = await organizationToken('toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const operationId = generateIdentifier();
-    const UQTJZvCoKlFjEoDlDUwekw = await handleRequest(db, req(
+    const UQTJZvCoKlFjEoDlDUwekw = await handleRequest(
+        db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hasVDnGjEylAnJDTPjnZuQ',
-        sTok, accBody, operationId));
-    assertStrictEquals(UQTJZvCoKlFjEoDlDUwekw.status, 204);
-    const UZgNCkZlSJcSaAmAJuSkcw = await handleRequest(db, req(
+        sTok, accBody, operationId)));
+    assertStrictEquals(UQTJZvCoKlFjEoDlDUwekw.status, 200);
+    const UZgNCkZlSJcSaAmAJuSkcw = await handleRequest(
+        db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hasVDnGjEylAnJDTPjnZuQ',
-        sTok, accBody, operationId));
-    assertStrictEquals(UZgNCkZlSJcSaAmAJuSkcw.status, 204);
+        sTok, accBody, operationId)));
+    assertStrictEquals(UZgNCkZlSJcSaAmAJuSkcw.status, 200);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db
             , 'hasVDnGjEylAnJDTPjnZuQ')).length, 2,
@@ -470,16 +473,16 @@ async () => {
     const sTok = await organizationToken('toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const operationId = generateIdentifier();
-    const d1 = await handleRequest(db, req(
+    const d1 = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hlmIVMfGBbdTSoChNYsQkQ',
-        sTok, decBody, operationId));
-    assertStrictEquals(d1.status, 204);
-    const d2 = await handleRequest(db, req(
+        sTok, decBody, operationId)));
+    assertStrictEquals(d1.status, 200);
+    const d2 = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + 'hlmIVMfGBbdTSoChNYsQkQ',
-        sTok, decBody, operationId));
-    assertStrictEquals(d2.status, 204);
+        sTok, decBody, operationId)));
+    assertStrictEquals(d2.status, 200);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db
             , 'hlmIVMfGBbdTSoChNYsQkQ')).length, 2,
@@ -524,16 +527,16 @@ async () => {
         at: REVOKE_AT,
     };
     const operationId = generateIdentifier();
-    const r1 = await handleRequest(db, req(
+    const r1 = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
-        tok, revBody, operationId));
-    assertStrictEquals(r1.status, 204);
-    const r2 = await handleRequest(db, req(
+        tok, revBody, operationId)));
+    assertStrictEquals(r1.status, 200);
+    const r2 = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + 'itekPiJIBiPQhcZveiqTKw',
-        tok, revBody, operationId));
-    assertStrictEquals(r2.status, 204);
+        tok, revBody, operationId)));
+    assertStrictEquals(r2.status, 200);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db
             , 'itekPiJIBiPQhcZveiqTKw')).length, 2,
@@ -595,7 +598,7 @@ Deno.test('accept: empty membershipId is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -604,7 +607,7 @@ Deno.test('accept: empty membershipId is rejected (400)', async () => {
             membershipId: '',
             eventId: EV_X,
             at: AT,
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });
 
@@ -613,7 +616,7 @@ async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -621,7 +624,7 @@ async () => {
             state: 'declined',
             eventId: '',
             at: AT,
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });
 
@@ -629,7 +632,7 @@ Deno.test('revoke: empty revokeEventId is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/' + id,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
@@ -637,7 +640,7 @@ Deno.test('revoke: empty revokeEventId is rejected (400)', async () => {
             state: 'revoked',
             eventId: '',
             at: AT,
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });
 
@@ -681,7 +684,7 @@ async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -690,7 +693,7 @@ async () => {
             membershipId: MS_X,
             // eventId intentionally absent
             at: AT,
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });
 
@@ -699,7 +702,7 @@ async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -708,7 +711,7 @@ async () => {
             membershipId: MS_X,
             eventId: EV_X,
             at: 42,   // non-string
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });
 
@@ -716,7 +719,7 @@ Deno.test('decline: missing declineAt is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -724,7 +727,7 @@ Deno.test('decline: missing declineAt is rejected (400)', async () => {
             state: 'declined',
             eventId: EV_X,
             // at intentionally absent
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });
 
@@ -744,7 +747,7 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
     // than proving the property this test exists to pin.
     const db = await seed();
     const id = await grantSarahToWayne(db);
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -753,8 +756,8 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
             membershipId: MS_SARAH_REMOVED,
             eventId: EV_ACC_REMOVED,
             at: '2026-01-01T00:00:01.000000Z',
-        }));
-    assertStrictEquals(accept.status, 204);
+        })));
+    assertStrictEquals(accept.status, 200);
     const del = await handleRequest(db, req(
         'DELETE', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/members/'
             + 'toccYYkLEABmlbpHJalgtQ',
@@ -762,7 +765,7 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
             , 'BBjWJsjYIDkTRKIIPrzWRw')));
     assertStrictEquals(del.status, 204);
     const statesBefore = (await invitationLifecycleStatesFor(db, id)).length;
-    const reaccept = await handleRequest(db, req(
+    const reaccept = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
@@ -771,8 +774,8 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
             membershipId: MS_SARAH_AGAIN,
             eventId: EV_ACC_AGAIN,
             at: '2026-01-01T00:00:02.000000Z',
-        }));
-    assertStrictEquals(reaccept.status, 204);
+        })));
+    assertStrictEquals(reaccept.status, 200);
     const sarahInWayne = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -786,7 +789,7 @@ Deno.test('revoke: missing revokeAt is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, req(
+    const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/' + id,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
@@ -794,6 +797,6 @@ Deno.test('revoke: missing revokeAt is rejected (400)', async () => {
             state: 'revoked',
             eventId: EV_X,
             // at intentionally absent
-        }));
+        })));
     assertStrictEquals(res.status, 400);
 });

@@ -29,6 +29,7 @@ import {
     apiRequest,
     framedRequest,
     presentedFields,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -83,7 +84,7 @@ Deno.test('accept writes the seat at the invitation'
     assertStrictEquals(grant.status, 201);
 
     const operationId = generateIdentifier();
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + SARAH_ID
             + '/invitations/ixyIgeiKspwtanaBXyAGpg',
@@ -96,8 +97,8 @@ Deno.test('accept writes the seat at the invitation'
             at: '2026-06-05T00:00:01.000000Z',
         },
         operationId,
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests] = await Promise.all([

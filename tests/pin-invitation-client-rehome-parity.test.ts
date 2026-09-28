@@ -17,6 +17,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -126,7 +127,7 @@ Deno.test('pendingInvitationFor lifecycle on the message plane'
         'iqtxKmWMdfYjxphbQhAJnw',
     );
 
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId
             + '/invitations/iqtxKmWMdfYjxphbQhAJnw',
@@ -135,8 +136,8 @@ Deno.test('pendingInvitationFor lifecycle on the message plane'
             eventId: INV_REHOME_PARITY_1_DECLINE,
             at: '2026-06-02T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
     assertStrictEquals(await assertPending(), null);
 
     // Declined-reinvite: multi-candidate on the same

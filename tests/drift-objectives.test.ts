@@ -730,9 +730,16 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     const baselineIdB = generateIdentifier();
     const secondObjectiveId = OBJECTIVE_SEEDS[0]!.id;
     const beforeConversion = (await db.messagePairs.getAll()).length;
-    const conversion = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
-            + '/conversion', token, {
+    const ideaHead = await db.messagePairs.getHeadPair(
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
+    );
+    const conversion = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
+            + '/conversion',
+        token,
+        headers: { 'If-Match': '"' + ideaHead!.id + '"' },
+        body: {
             projectId,
             project: {
                 title: 'Chain Project', description: 'd',
@@ -773,8 +780,14 @@ Deno.test('live-write chain: create, reposition, revision edit,'
                 },
             ],
         },
-    ));
-    assertStrictEquals(conversion.status, 201);
+    }));
+    assertStrictEquals(conversion.status, 200);
+    assertEquals(
+        await conversion.json(),
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
+        )),
+    );
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         beforeConversion + 5,

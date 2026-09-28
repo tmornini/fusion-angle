@@ -15,6 +15,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -42,10 +43,11 @@ const WORKORDERID_EV3 = generateIdentifier();
 // precedent (tests/drift-memberships-identity.test.ts leg 5,
 // tests/drift-identity-tokens.test.ts legs 3/5): each core is
 // called BOTH pre-tx (the plain adapter) and in-tx (an open
-// db.transaction view sharing its EVENTUAL write-gate caller's
-// own table list — invitations-domain.ts's accept/decline/
-// revoke transactions and routes.ts's postWorkOrderClaimOp) and
-// proven byte-identical. workOrderClaimHistoryFor's pin
+// read-transaction view) and proven byte-identical. The
+// invitation transitions and postWorkOrderClaimOp read heads
+// before their statement and open no transaction, so each
+// pin now proves the core reads the same inside and outside
+// one. workOrderClaimHistoryFor's pin
 // retired with the replayer: the claim reads the work
 // order's head. documentStateHeadFor pins retired with C5
 // (the helper itself is gone).
@@ -91,14 +93,14 @@ async function grant(
 // -- deriveInvitation ---------------------------------------
 
 Deno.test('deriveInvitation: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' acceptInvitation\'s own table list) — the membershipExistsFor'
-+ ' precedent', async () => {
++ ' adapter) vs in-tx (an open read-transaction view) after a'
++ ' live accept — the membershipExistsFor precedent',
+async () => {
     const db = await seededDb();
     const id = INV_PARITY_OPSTATE_ACCEPTED;
     const inviteeId = 'MQFcPtrZPIGjMCRAXtZUnA'; // Sarah Chen
     await grant(db, id, 'sarah.chen@company.com');
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
@@ -108,11 +110,11 @@ Deno.test('deriveInvitation: byte-identical pre-tx (the plain'
             eventId: ID_ACCEPT,
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
 
-    // Phase Final Task 2: memberships ROW half stripped from
-    // acceptInvitation's tx list.
+    // The accept opens no transaction; the core must read the
+    // same plainly and inside a read transaction.
     const preTx = await deriveInvitation(db, id);
     const inTx = await db.readTransaction(
         (view) => deriveInvitation(view, id),
@@ -135,12 +137,12 @@ Deno.test('deriveInvitation: byte-identical pre-tx (the plain'
 // -- invitationLifecycleStatesFor --------------------------------
 
 Deno.test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
-+ ' plain adapter) vs in-tx (an open db.transaction view sharing'
-+ ' revokeInvitation\'s own table list)', async () => {
++ ' plain adapter) vs in-tx (an open read-transaction view)'
++ ' after a live revoke', async () => {
     const db = await seededDb();
     const id = INV_PARITY_LIFECYCLE_REVOKED;
     await grant(db, id, 'emily.rodriguez@company.com');
-    const revoke = await handleRequest(db, req(
+    const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/invitations/' + id,
@@ -150,8 +152,8 @@ Deno.test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
             eventId: ID_REVOKE,
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(revoke.status, 204);
+    )));
+    assertStrictEquals(revoke.status, 200);
 
     const preTx = await invitationLifecycleStatesFor(db, id);
     const inTx = await db.readTransaction(

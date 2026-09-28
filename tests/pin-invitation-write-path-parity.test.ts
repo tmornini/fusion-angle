@@ -11,6 +11,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -34,11 +35,12 @@ const ID_GRANT = generateIdentifier();
 // parity pin. grantInvitation calls pendingInvitationFor (via
 // grantOutcomeFor) pre-tx alone, to decide the response; the
 // statement's nil latch judges a taken invitation id.
-// acceptInvitation/declineInvitation/revokeInvitation each call
-// currentInvitationState only in-tx today. This file proves
+// acceptInvitation/declineInvitation/revokeInvitation read the
+// invitation's head before their statement, which judges the
+// client's tag; none opens a transaction. This file proves
 // BOTH flipped functions return the SAME result pre-tx (the
-// plain adapter) and in-tx (an open db.transaction view sharing
-// the EXACT table list their own write-gate caller uses) — the
+// plain adapter) and in-tx (an open read-transaction view, as
+// the pre-state-by-PUT transactions read them) — the
 // membershipExistsFor / drift-phase14-cores-parity.test.ts
 // precedent, applied to the write-path functions themselves
 // (both now exported for this purpose) rather than the raw
@@ -46,13 +48,10 @@ const ID_GRANT = generateIdentifier();
 // proven property, not a coincidence.
 //
 // Phase 14 Task 3 ADDS to this proof: acceptInvitation's own
-// `already`-membership gate now calls membershipExistsFor
-// in-tx (api/invitations-domain.ts), so this file's own
-// ACCEPT_TX_TABLES list is the flipped check's REAL table set,
-// not a stand-in — the parity test below proves the
-// message-plane derive is honest under acceptInvitation's own
-// transaction shape, both before a membership exists and after
-// one lands.
+// `already`-membership check calls membershipExistsFor before
+// its statement (api/invitations-domain.ts); the parity test
+// below proves the message-plane derive agrees pre-tx and
+// in-tx, both before a membership exists and after one lands.
 
 function req(
     method: string,
@@ -74,11 +73,9 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// The exact table lists acceptInvitation/declineInvitation/
-// revokeInvitation open their own write-gate
-// transaction over (api/invitations-domain.ts). Phase Final
-// Task 2: invitations + memberships ROW halves stripped;
-// states stays until states-trace.
+// pendingInvitationFor read plainly and inside a read
+// transaction must agree; the transitions open no
+// transaction of their own (api/invitations-domain.ts).
 async function assertPendingWritePathParity(
     db: MemoryDbAdapter,
     organization: string,
@@ -124,7 +121,7 @@ Deno.test('pendingInvitationFor: pre-tx vs in-tx agree across'
         db, ORGANIZATION_TWO, inviteeId);
     assertStrictEquals(afterGrant?.id, 'iUFAcBfktmuASnGGNrPCKw');
 
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId
             + '/invitations/iUFAcBfktmuASnGGNrPCKw',
@@ -133,8 +130,8 @@ Deno.test('pendingInvitationFor: pre-tx vs in-tx agree across'
             eventId: INV_PARITY_WRITE_FIRST_DECLINE,
             at: '2026-06-02T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
     assertStrictEquals(
         await assertPendingWritePathParity(
             db, ORGANIZATION_TWO, inviteeId),
@@ -161,8 +158,7 @@ Deno.test('pendingInvitationFor: pre-tx vs in-tx agree across'
 });
 
 Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
-+ ' pending, accepted, declined, and revoked, each over its own'
-+ ' write-gate\'s own table list', async () => {
++ ' pending, accepted, declined, and revoked', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
@@ -211,7 +207,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
     const jessicaToken = await organizationToken(
         jessicaId, ORGANIZATION_TWO);
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + jessicaId
             + '/invitations/iOhteLyCdhnLqTaeGYCoYQ',
@@ -221,8 +217,8 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
             eventId: INV_PARITY_WRITE_ACCEPTED_ACCEPT,
             at: '2026-06-03T00:00:02.000000Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
     assertStrictEquals(
         await assertStateWritePathParity(
             'iOhteLyCdhnLqTaeGYCoYQ',
@@ -239,7 +235,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
     const emilyId = 'CJrglMsNBxOWWfbihHQSeg';
     const emilyToken = await organizationToken(
         emilyId, ORGANIZATION_TWO);
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + emilyId
             + '/invitations/iPxNOWCigMcIYgqchAefWA',
@@ -248,8 +244,8 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
             eventId: INV_PARITY_WRITE_DECLINED_DECLINE,
             at: '2026-06-03T00:00:04.000000Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
     assertStrictEquals(
         await assertStateWritePathParity(
             'iPxNOWCigMcIYgqchAefWA',
@@ -262,7 +258,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
         'iZisVMKVGRGkyLzjwyTjow', 'marcus@acmecorp.com',
         '2026-06-03T00:00:05.000000Z',
     );
-    const revoke = await handleRequest(db, req(
+    const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/invitations/iZisVMKVGRGkyLzjwyTjow',
@@ -271,8 +267,8 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
             eventId: INV_PARITY_WRITE_REVOKED_REVOKE,
             at: '2026-06-03T00:00:06.000000Z',
         },
-    ));
-    assertStrictEquals(revoke.status, 204);
+    )));
+    assertStrictEquals(revoke.status, 200);
     assertStrictEquals(
         await assertStateWritePathParity(
             'iZisVMKVGRGkyLzjwyTjow',
@@ -304,9 +300,9 @@ async function assertMembershipExistsWritePathParity(
     return preTx;
 }
 
-Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
-+ " own table list) agree before and after a live accept — the"
-+ ' `already` gate\'s derived row source, held honest', async () => {
+Deno.test('membershipExistsFor: pre-tx vs in-tx agree before and'
++ ' after a live accept — the `already` check\'s derived row'
++ ' source, held honest', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
@@ -333,7 +329,7 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
     assertStrictEquals(grant.status, 201);
 
     const operationId = generateIdentifier();
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId
             + '/invitations/iJbzDBDkWJrjxankczlJEQ',
@@ -344,8 +340,8 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
             at: '2026-06-04T00:00:01.000000Z',
         },
         operationId,
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
 
     assertStrictEquals(
         await assertMembershipExistsWritePathParity(

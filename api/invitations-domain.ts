@@ -4,6 +4,7 @@ import {
     assertInvitationState,
     type Id,
     type InvitationState,
+    type MessagePairEntity,
 } from '../shared/types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
@@ -12,6 +13,8 @@ import {
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
     HTTP_CONFLICT,
+    HTTP_PRECONDITION_FAILED,
+    HTTP_PRECONDITION_REQUIRED,
 } from '../shared/http-errors.ts';
 import {
     pickString,
@@ -19,26 +22,22 @@ import {
     validateInvitationTransitionBody,
 } from './validators.ts';
 import {
-    attemptFor,
+    attachEtag,
     canonicalPath,
+    entityTagsOf,
     formWriteMessagePair,
+    latchesOf,
     runStateWrite,
-    runWrite,
     unprojected,
 } from './message-pair.ts';
 import type {
-    MessagePair, ReceivedRequest,
+    MessagePair, ReceivedRequest, StateSibling,
 } from './message-pair.ts';
-import { formDocumentMessagePairFor } from './routes.ts';
-import { HttpMessage } from
-    '../shared/http-message/http-message.ts';
-import { parseWire } from
-    '../shared/http-message/wire-codec.ts';
-import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
-    './family-registry.ts';
+import { messageStore } from './message-store.ts';
+import { headDocumentOf } from './derive-documents.ts';
 import {
-    deriveInvitation,
     deriveInvitations,
+    invitationRowOf,
 } from './derive-invitations.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
@@ -48,7 +47,10 @@ import {
     deriveInvitationStates,
     invitationLifecycleStatesFor,
 } from './derive-states.ts';
-import { membershipExistsFor } from './derive-memberships.ts';
+import {
+    membershipExistsFor,
+    seatsPrefixFor,
+} from './derive-memberships.ts';
 import {
     param,
     storedRevisionDocument,
@@ -219,8 +221,11 @@ export async function getInvitationOnIdentityNest(
         'forbidden: only the invitee or an admin'
         + ' may read this invitation',
     );
-    const inv = await loadInvitation(db, id);
-    if (inv === null || inv.identity_id !== identityId) {
+    const loaded = await loadInvitation(db, id);
+    if (
+        loaded === null
+        || loaded.invitation.identity_id !== identityId
+    ) {
         throw new ApiError(
             'Not found: /identities/' + identityId
                 + '/invitations/' + id,
@@ -228,7 +233,12 @@ export async function getInvitationOnIdentityNest(
         );
     }
     const joins = await identityViewJoins(db);
-    return invitationIdentityView(inv, joins);
+    return attachEtag(
+        Response.json(
+            invitationIdentityView(loaded.invitation, joins),
+        ),
+        loaded.head.id,
+    );
 }
 
 // GET /organizations/:id/invitations/ — pending invites
@@ -283,10 +293,10 @@ export async function getInvitationOnOrganizationNest(
     );
     const organization = param(params, 0);
     const id = param(params, 1);
-    const inv = await loadInvitation(db, id);
+    const loaded = await loadInvitation(db, id);
     if (
-        inv === null
-        || inv.organization_id !== organization
+        loaded === null
+        || loaded.invitation.organization_id !== organization
     ) {
         throw new ApiError(
             'Not found: /organizations/' + organization
@@ -294,7 +304,12 @@ export async function getInvitationOnOrganizationNest(
             HTTP_NOT_FOUND,
         );
     }
-    return invitationOrganizationView(db, inv);
+    return attachEtag(
+        Response.json(await invitationOrganizationView(
+            db, loaded.invitation,
+        )),
+        loaded.head.id,
+    );
 }
 
 // POST /organizations/:id/invitations/ — grant pending.
@@ -555,45 +570,6 @@ export async function pendingInvitationFor(
         : { id: pending.id, at: pending.at };
 }
 
-// The invitation document: `path = /invitations/`, `name =
-// <id>`, body = the three grant fields plus `state` (spec
-// 2026-09-15 § 2). Its head IS the state — the grant writes
-// 'pending'; accept, decline, and revoke each append a full
-// PUT with the terminal state, so a collection read of
-// /invitations/ or a document read of one id answers "what
-// state" with no op-prefix scan. The operation POST pairs
-// (acceptance / decline / revocation) remain the HTTP audit
-// of each request; derivation never reads them.
-async function formInvitationDocumentMessagePair(
-    actor: Id,
-    requestAt: string,
-    operationId: string,
-    requestId: string,
-    invitationId: Id,
-    body: {
-        readonly organization_id: Id;
-        readonly identity_id: Id;
-        readonly at: string;
-        readonly state: InvitationState;
-    },
-): Promise<MessagePair> {
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/invitations/' + invitationId,
-        routePattern: 'invitations/:id',
-        routeSegments: ['invitations', ':id'],
-        pathSegments: ['invitations', invitationId],
-        headerFields: [],
-        body,
-        requesterIdentityId: actor,
-        requestAt,
-        organization: undefined,
-        responseBody: { id: invitationId, ...body },
-        operationId,
-        requestId,
-    });
-}
-
 async function formInvitationOperationMessagePair(
     actor: Id,
     requestAt: string,
@@ -622,6 +598,97 @@ async function formInvitationOperationMessagePair(
     });
 }
 
+// Accept, decline, and revoke (§1 C): each is an operation on
+// the invitation, latched on the head the client read. The
+// invitation lands its terminal state in order on that tag,
+// beside `siblings` (accept's seat). A head already in the
+// terminal state is the answer, and nothing lands; any other
+// state but pending is 409. A tag naming another head was read
+// from a head this one replaced: the statement refuses it, so
+// no rule of this head is asked.
+async function transitionInvitation(
+    db: DbAdapter,
+    loaded: InvitationHead,
+    terminal: InvitationState,
+    messagePair: MessagePair,
+    // Deferred: accept's seat read runs only when this lands.
+    siblings: () => Promise<readonly StateSibling[]>,
+): Promise<Response> {
+    const inv = loaded.invitation;
+    const latches = latchesOf(
+        entityTagsOf(messagePair), [loaded.head.id],
+    );
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for '
+                + INVITATIONS_STORAGE_PREFIX + inv.id,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const latch = latches.heads[0]!;
+    const current = latch === loaded.head.id;
+    if (
+        current
+        && inv.state !== terminal
+        && inv.state !== 'pending'
+    ) {
+        throw new ApiError(
+            'invitation is not pending', HTTP_CONFLICT);
+    }
+    const lands = current && inv.state === 'pending';
+    const parent = {
+        method: 'PUT',
+        path: INVITATIONS_STORAGE_PREFIX,
+        name: inv.id,
+        state: {
+            id: inv.id,
+            organization_id: inv.organization_id,
+            identity_id: inv.identity_id,
+            at: inv.at,
+            state: lands ? terminal : inv.state,
+        },
+    } as const;
+    const [first, ...rest] = lands ? await siblings() : [];
+    const answer = await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: first === undefined
+            ? [{
+                ...parent,
+                condition: { kind: 'in-order', head: latch },
+            }]
+            : [
+                {
+                    ...parent,
+                    condition: {
+                        kind: 'in-order',
+                        head: latch,
+                        read: loaded.head,
+                    },
+                },
+                first,
+                ...rest,
+            ],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
+    if (answer.outcome === 'land') {
+        db.postNotification({
+            kind: 'scoped',
+            organizationIds: [inv.organization_id],
+            identityIds: [inv.identity_id],
+        });
+    }
+    return answer.response;
+}
+
 async function acceptInvitation(
     db: DbAdapter,
     id: Id,
@@ -635,9 +702,12 @@ async function acceptInvitation(
     requestAt: string,
     operationId: string,
     received?: ReceivedRequest,
-): Promise<undefined> {
-    const inv = await loadInvitation(db, id);
-    if (inv === null || inv.identity_id !== pathIdentityId) {
+): Promise<Response> {
+    const loaded = await loadInvitation(db, id);
+    if (
+        loaded === null
+        || loaded.invitation.identity_id !== pathIdentityId
+    ) {
         throw new ApiError(
             'Not found: /identities/' + pathIdentityId
                 + '/invitations/' + id,
@@ -647,6 +717,7 @@ async function acceptInvitation(
     if (received === undefined) {
         throw new Error('requestId is required');
     }
+    const inv = loaded.invitation;
     if (inv.identity_id !== actor) {
         throw new ApiError(
             'forbidden: only the invitee may accept',
@@ -665,83 +736,31 @@ async function acceptInvitation(
             HTTP_BAD_REQUEST,
         );
     }
-    const storedBody = {
-        membershipId,
-        acceptEventId: transition.eventId,
-        acceptAt: transition.at,
-    };
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId, received.requestId,
-        storedBody, id, 'acceptance', received);
-    const terminal = await formInvitationDocumentMessagePair(
-        actor, requestAt, operationId,
-        received.requestId, id,
         {
-            organization_id: inv.organization_id,
-            identity_id: inv.identity_id,
-            at: inv.at,
-            state: 'accepted',
+            membershipId,
+            acceptEventId: transition.eventId,
+            acceptAt: transition.at,
         },
+        id, 'acceptance', received);
+    // The seat is granted once: a live seat stays as it is.
+    return transitionInvitation(
+        db, loaded, 'accepted', messagePair,
+        async () => await membershipExistsFor(
+                db, inv.organization_id, actor,
+            )
+            ? []
+            : [{
+                method: 'PUT',
+                path: seatsPrefixFor(inv.organization_id),
+                name: actor,
+                state: { type: 'member', at: transition.at },
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            }],
     );
-    const seatDocumentBody = {
-        type: 'member',
-        at: transition.at,
-    };
-    const seatDocument = await formDocumentMessagePairFor({
-        routePattern:
-            ORGANIZATION_MEMBER_DETAIL_PATTERN,
-        params: [
-            inv.organization_id, actor,
-        ],
-        body: seatDocumentBody,
-        requesterIdentityId: actor,
-        requestAt,
-        organization: inv.organization_id,
-        operationId,
-        requestId: received.requestId,
-    });
-    let conflict = false;
-    let committed = false;
-    const acceptPairs = await db.readTransaction(
-        async (view) => {
-            const state = await currentInvitationState(
-                view, id,
-            );
-            // Already accepted: no-op. Declined/revoked: 409.
-            if (state === 'accepted') return null;
-            if (state !== 'pending') {
-                conflict = true;
-                return null;
-            }
-            const already = await membershipExistsFor(
-                view, inv.organization_id, actor,
-            );
-            return [
-                ...(already ? [] : [seatDocument]),
-                messagePair,
-                terminal,
-            ];
-        },
-    );
-    if (acceptPairs !== null) {
-        await runWrite(
-            db, attemptFor(acceptPairs), acceptPairs,
-        );
-        committed = true;
-    }
-    if (conflict) {
-        throw new ApiError(
-            'invitation is not pending', HTTP_CONFLICT);
-    }
-    if (!committed) {
-        return undefined;
-    }
-    db.postNotification({
-        kind: 'scoped',
-        organizationIds: [inv.organization_id],
-        identityIds: [inv.identity_id],
-    });
-    return undefined;
 }
 
 async function declineInvitation(
@@ -756,9 +775,12 @@ async function declineInvitation(
     requestAt: string,
     operationId: string,
     received?: ReceivedRequest,
-): Promise<undefined> {
-    const inv = await loadInvitation(db, id);
-    if (inv === null || inv.identity_id !== pathIdentityId) {
+): Promise<Response> {
+    const loaded = await loadInvitation(db, id);
+    if (
+        loaded === null
+        || loaded.invitation.identity_id !== pathIdentityId
+    ) {
         throw new ApiError(
             'Not found: /identities/' + pathIdentityId
                 + '/invitations/' + id,
@@ -768,7 +790,7 @@ async function declineInvitation(
     if (received === undefined) {
         throw new Error('requestId is required');
     }
-    if (inv.identity_id !== actor) {
+    if (loaded.invitation.identity_id !== actor) {
         throw new ApiError(
             'forbidden: only the invitee may decline',
             HTTP_FORBIDDEN);
@@ -779,53 +801,17 @@ async function declineInvitation(
             HTTP_BAD_REQUEST,
         );
     }
-    const storedBody = {
-        declineEventId: transition.eventId,
-        declineAt: transition.at,
-    };
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId, received.requestId,
-        storedBody, id, 'decline', received);
-    const terminal = await formInvitationDocumentMessagePair(
-        actor, requestAt, operationId,
-        received.requestId, id,
         {
-            organization_id: inv.organization_id,
-            identity_id: inv.identity_id,
-            at: inv.at,
-            state: 'declined',
+            declineEventId: transition.eventId,
+            declineAt: transition.at,
         },
+        id, 'decline', received);
+    return transitionInvitation(
+        db, loaded, 'declined', messagePair,
+        () => Promise.resolve([]),
     );
-    let conflict = false;
-    let committed = false;
-    const decline = await db.readTransaction(async (view) => {
-        const state = await currentInvitationState(view, id);
-        // Already declined: no-op. Accepted/revoked: 409.
-        if (state === 'declined') return false;
-        if (state !== 'pending') {
-            conflict = true;
-            return false;
-        }
-        return true;
-    });
-    if (decline) {
-        const pairs = [messagePair, terminal];
-        await runWrite(db, attemptFor(pairs), pairs);
-        committed = true;
-    }
-    if (conflict) {
-        throw new ApiError(
-            'invitation is not pending', HTTP_CONFLICT);
-    }
-    if (!committed) {
-        return undefined;
-    }
-    db.postNotification({
-        kind: 'scoped',
-        organizationIds: [inv.organization_id],
-        identityIds: [inv.identity_id],
-    });
-    return undefined;
 }
 
 async function revokeInvitation(
@@ -840,14 +826,14 @@ async function revokeInvitation(
     requestAt: string,
     operationId: string,
     received?: ReceivedRequest,
-): Promise<undefined> {
-    const inv = await loadInvitation(db, id);
+): Promise<Response> {
+    const loaded = await loadInvitation(db, id);
     if (received === undefined) {
         throw new Error('requestId is required');
     }
     if (
-        inv === null
-        || inv.organization_id !== pathOrganization
+        loaded === null
+        || loaded.invitation.organization_id !== pathOrganization
     ) {
         throw new ApiError(
             'Not found: /organizations/' + pathOrganization
@@ -861,102 +847,39 @@ async function revokeInvitation(
             HTTP_BAD_REQUEST,
         );
     }
-    const storedBody = {
-        revokeEventId: transition.eventId,
-        revokeAt: transition.at,
-    };
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId, received.requestId,
-        storedBody, id, 'revocation', received);
-    const terminal = await formInvitationDocumentMessagePair(
-        actor, requestAt, operationId,
-        received.requestId, id,
         {
-            organization_id: inv.organization_id,
-            identity_id: inv.identity_id,
-            at: inv.at,
-            state: 'revoked',
+            revokeEventId: transition.eventId,
+            revokeAt: transition.at,
         },
+        id, 'revocation', received);
+    return transitionInvitation(
+        db, loaded, 'revoked', messagePair,
+        () => Promise.resolve([]),
     );
-    let conflict = false;
-    let committed = false;
-    const revoke = await db.readTransaction(async (view) => {
-        const state = await currentInvitationState(view, id);
-        // The same revocation body is a no-op.
-        // A different body against a revoked
-        // invitation is 409.
-        if (state === 'revoked') {
-            if (await revocationIsReplay(
-                view, id, transition,
-            )) {
-                return false;
-            }
-            conflict = true;
-            return false;
-        }
-        if (state !== 'pending') {
-            conflict = true;
-            return false;
-        }
-        return true;
-    });
-    if (revoke) {
-        const pairs = [messagePair, terminal];
-        await runWrite(db, attemptFor(pairs), pairs);
-        committed = true;
-    }
-    if (conflict) {
-        throw new ApiError(
-            'invitation is not pending', HTTP_CONFLICT);
-    }
-    if (!committed) {
-        return undefined;
-    }
-    db.postNotification({
-        kind: 'scoped',
-        organizationIds: [inv.organization_id],
-        identityIds: [inv.identity_id],
-    });
-    return undefined;
 }
 
-async function revocationIsReplay(
-    view: DbAdapter,
-    id: Id,
-    transition: { readonly eventId: string; readonly at: string },
-): Promise<boolean> {
-    const prefix = '/invitations/' + id + '/revocation/';
-    const stored = await view.messagePairs
-        .getCollectionPairs(prefix);
-    for (const row of stored) {
-        const model = parseWire(row.request);
-        const body = HttpMessage.fromModel(model).body();
-        if (!body.exists()) continue;
-        const parsed = JSON.parse(body.toText()) as {
-            readonly revokeEventId?: string;
-            readonly revokeAt?: string;
-            readonly eventId?: string;
-            readonly at?: string;
-        };
-        const eventId = parsed.eventId
-            ?? parsed.revokeEventId;
-        const at = parsed.at ?? parsed.revokeAt;
-        if (
-            eventId === transition.eventId
-            && at === transition.at
-        ) {
-            return true;
-        }
-    }
-    return false;
-}
+// The invitation's head: its row, and the pair a client's
+// If-Match names.
+type InvitationHead = {
+    readonly invitation: InvitationRow;
+    readonly head: MessagePairEntity;
+};
 
 async function loadInvitation(
     adapter: DbAdapter,
     id: Id,
-): Promise<InvitationRow | null> {
-    const row = await deriveInvitation(adapter, id);
-    return row === undefined ? null : row;
+): Promise<InvitationHead | null> {
+    const head = await messageStore(adapter).getDocumentHead(
+        INVITATIONS_STORAGE_PREFIX, id,
+    );
+    return head === null
+        ? null
+        : {
+            invitation: invitationRowOf(headDocumentOf(head)),
+            head,
+        };
 }
 
 const INVITATIONS_STORAGE_PREFIX =
@@ -1021,8 +944,11 @@ export async function getInvitationVersionsOnIdentityNest(
         'forbidden: only the invitee or an admin'
         + ' may read this invitation',
     );
-    const inv = await loadInvitation(db, id);
-    if (inv === null || inv.identity_id !== identityId) {
+    const loaded = await loadInvitation(db, id);
+    if (
+        loaded === null
+        || loaded.invitation.identity_id !== identityId
+    ) {
         throw new ApiError(
             'Not found: /identities/' + identityId
                 + '/invitations/' + id,
@@ -1048,8 +974,11 @@ export async function getInvitationVersionOnIdentityNest(
         'forbidden: only the invitee or an admin'
         + ' may read this invitation',
     );
-    const inv = await loadInvitation(db, id);
-    if (inv === null || inv.identity_id !== identityId) {
+    const loaded = await loadInvitation(db, id);
+    if (
+        loaded === null
+        || loaded.invitation.identity_id !== identityId
+    ) {
         throw new ApiError(
             'Not found: /identities/' + identityId
                 + '/invitations/' + id,
@@ -1084,10 +1013,10 @@ export async function getInvitationVersionsOnOrganizationNest(
     );
     const organization = param(params, 0);
     const id = param(params, 1);
-    const inv = await loadInvitation(db, id);
+    const loaded = await loadInvitation(db, id);
     if (
-        inv === null
-        || inv.organization_id !== organization
+        loaded === null
+        || loaded.invitation.organization_id !== organization
     ) {
         throw new ApiError(
             'Not found: /organizations/' + organization
@@ -1114,10 +1043,10 @@ export async function getInvitationVersionOnOrganizationNest(
     const organization = param(params, 0);
     const id = param(params, 1);
     const etag = param(params, params.length - 1);
-    const inv = await loadInvitation(db, id);
+    const loaded = await loadInvitation(db, id);
     if (
-        inv === null
-        || inv.organization_id !== organization
+        loaded === null
+        || loaded.invitation.organization_id !== organization
     ) {
         throw new ApiError(
             'Not found: /organizations/' + organization

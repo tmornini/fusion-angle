@@ -11,6 +11,7 @@ import type {
     FlowCreateBody,
     FlowUndoBody,
     RecordWriteBody,
+    RecordWriteEditBody,
     ObjectiveCreateBody,
     WorkOrderTransitionRelease,
 } from './validators.ts';
@@ -107,7 +108,7 @@ import {
     formWriteMessagePair,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
-    responseRecordOf,
+    attachEtag,
 } from './message-pair.ts';
 import type {
     MessagePair,
@@ -139,7 +140,6 @@ import {
 } from './authentication.ts';
 import {
     ApiError,
-    HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
@@ -161,8 +161,8 @@ import {
 } from './derive-projects.ts';
 import {
     deriveRecordTypeCollection,
-    deriveRecordTypeEntity,
     recordTypeEntityOf,
+    recordTypeHeadFor,
     recordTypesUriPrefix,
     requireRecordTypeExists,
 } from './derive-record-types.ts';
@@ -184,6 +184,7 @@ import {
 import {
     deriveDocumentsAt,
     byIdAscending,
+    headDocumentOf,
     requestBodyOf,
 } from './derive-documents.ts';
 import {
@@ -756,7 +757,7 @@ function ownerOrganizationViaMembershipPairPlane(
 // RESPONSE `at` stamps (appendMessagePairOnce's nowUtc() is
 // monotonic), so the document message pair — appended after the
 // operation message pair — becomes the document's head. A live
-// create lands through the former instead; the edit and the
+// create or edit lands through the former instead; only the
 // seed's creates form this bundle.
 export interface RecordWriteMessagePairs {
     readonly operation: MessagePair;
@@ -807,7 +808,7 @@ export function recordDocumentBodyOf(
 // DEFAULT_ATTRIBUTE_ACL_ROLES stamps only a body that
 // carries none — a genuinely NEW attribute. The
 // composed edit hands each existing attribute its
-// stored arrays (formRecordWriteMessagePairs), so the
+// stored arrays (postRecordTypeEditOp), so the
 // nested attribute PUT stays the only ACL writer.
 export function recordAttributeDocumentBodyOf(
     row: Record<string, unknown>,
@@ -831,113 +832,6 @@ export function recordAttributeDocumentBodyOf(
             Array.isArray(rest['write_roles'])
                 ? rest['write_roles']
                 : [...defaultRoles],
-    };
-}
-
-// Shared composed-write pair bundle for nested POST
-// .../record-types (Task 9 / Task 23). Document path is
-// RECORD_TYPE_DETAIL_PATTERN; attributes form at
-// ATTRIBUTE_DETAIL_PATTERN.
-async function formRecordWriteMessagePairs(
-    db: DbAdapter,
-    b: RecordWriteBody,
-    actor: Id,
-    messagePair: MessagePair,
-    organization: Id,
-    documentRoutePattern: string,
-    documentParams: readonly string[],
-): Promise<RecordWriteMessagePairs> {
-    const documentBody = recordDocumentBodyOf(b);
-    // The document gate the synthesized pair passes, as a
-    // live PUT would.
-    validateRecordDocumentBody(documentBody);
-    const document = await formDocumentMessagePairFor({
-        routePattern: documentRoutePattern,
-        params: [...documentParams],
-        body: documentBody,
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization,
-    });
-    // Covenant: an ACL is set only by the nested
-    // attribute PUT; the composed edit carries each
-    // stored ACL forward, and a new attribute takes
-    // the default. The composed body can never carry
-    // roles (the validator's key set — correctly).
-    const storedAttributes = b.kind === 'edit'
-        ? await loadAttributeSchemaById(
-            db, organization, b.id,
-        )
-        : undefined;
-    const attributePuts = await Promise.all(
-        b.attributes.map(async (attr) => {
-            const stored = storedAttributes?.get(attr.id);
-            const raw = attr as unknown as
-                Record<string, unknown>;
-            const attributeBody =
-                recordAttributeDocumentBodyOf(
-                    stored === undefined
-                        ? raw
-                        : {
-                            ...raw,
-                            read_roles: [
-                                ...stored.readRoles,
-                            ],
-                            write_roles: [
-                                ...stored.writeRoles,
-                            ],
-                        },
-                );
-            return formDocumentMessagePairFor({
-                routePattern:
-                    ATTRIBUTE_DETAIL_PATTERN,
-                params: [
-                    organization, b.id, attr.id,
-                ],
-                body: attributeBody,
-                requesterIdentityId: actor,
-                requestAt: messagePair.requestAt,
-                operationId: messagePair.operationId,
-                requestId: messagePair.requestId,
-                organization,
-            });
-        }),
-    );
-    const removedIds = b.kind === 'edit'
-        ? b.removedAttributeIds : [];
-    const attributeDeletes = await Promise.all(
-        removedIds.map(async (id) => {
-            // DELETE responses are UNIVERSALLY 204 with no
-            // body (message-pair.ts resolution, mirrored
-            // here for the synthesized removal pair) —
-            // SPEC-LESS, so an explicit response override
-            // skips WRITE_RESPONSE_SPECS entirely.
-            return formDocumentMessagePairFor({
-                routePattern: ATTRIBUTE_DETAIL_PATTERN,
-                params: [
-                    organization, b.id, id,
-                ],
-                body: undefined,
-                requesterIdentityId: actor,
-                requestAt: messagePair.requestAt,
-                operationId: messagePair.operationId,
-                requestId: messagePair.requestId,
-                organization,
-                method: 'DELETE',
-                response: {
-                    status: HTTP_NO_CONTENT,
-                    body: undefined,
-                },
-            });
-        }),
-    );
-    return {
-        operation: messagePair,
-        document,
-        attributePuts,
-        attributeDeletes,
     };
 }
 
@@ -1021,195 +915,117 @@ export function nestedAttributeWireOf(
     };
 }
 
-// One formed row against the document already stored.
-// No head means the row is new. Field equality is the
-// caller's edit, read before the statement opens.
-async function requestDiffers(
-    db: DbAdapter,
-    pair: MessagePair,
-): Promise<boolean> {
-    const head = await messageStore(db).getDocumentHead(
-        pair.path, pair.name,
-    );
-    if (head === null) return true;
-    return !sameValue(
-        requestBodyOf(head.request),
-        requestBodyOf(pair.requestMessage),
-    );
-}
-
-// The record-type document is judged by its stored state.
-// A former-born head's request carries the entity's `id`
-// and `organization_id`, which the edit's request lacks,
-// so a request comparison always reads changed, submits a
-// row that matches, and the statement drops the edit.
-async function stateDiffers(
-    db: DbAdapter,
-    pair: MessagePair,
-): Promise<boolean> {
-    const head = await messageStore(db).getDocumentHead(
-        pair.path, pair.name,
-    );
-    if (head === null) return true;
-    return !sameValue(
-        responseRecordOf(head.response),
-        responseRecordOf(pair.responseMessage),
-    );
-}
-
-function sameValue(left: unknown, right: unknown): boolean {
-    if (Object.is(left, right)) return true;
-    if (
-        typeof left !== 'object'
-        || typeof right !== 'object'
-        || left === null
-        || right === null
-    ) {
-        return false;
-    }
-    if (Array.isArray(left) || Array.isArray(right)) {
-        if (
-            !Array.isArray(left)
-            || !Array.isArray(right)
-        ) {
-            return false;
-        }
-        if (left.length !== right.length) return false;
-        for (let i = 0; i < left.length; i++) {
-            if (!sameValue(left[i], right[i])) {
-                return false;
-            }
-        }
-        return true;
-    }
-    const leftRecord = left as Record<string, unknown>;
-    const rightRecord = right as Record<string, unknown>;
-    const keys = Object.keys(leftRecord);
-    if (keys.length !== Object.keys(rightRecord).length) {
-        return false;
-    }
-    for (const key of keys) {
-        if (!Object.hasOwn(rightRecord, key)) {
-            return false;
-        }
-        if (!sameValue(leftRecord[key], rightRecord[key])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// These rows carry no latch, so a statement of them has no
-// document row and stores nothing when any submitted row
-// matches. Submit the record document only when its
-// fields differ, and an attribute put only when that
-// attribute differs. A resend submits the unchanged
-// rows, matches, and stores nothing.
-async function recordRowsToSubmit(
-    db: DbAdapter,
-    formed: RecordWriteMessagePairs,
-): Promise<MessagePair[]> {
-    const recordChanged = await stateDiffers(
-        db, formed.document,
-    );
-    const changedPuts: MessagePair[] = [];
-    for (const pair of formed.attributePuts) {
-        if (await requestDiffers(db, pair)) {
-            changedPuts.push(pair);
-        }
-    }
-    // A DELETE whose head is already DELETE matches and,
-    // with no latched row beside it, would drop the puts
-    // beside it. Leave that one out when another row
-    // changes. A pure resend still submits it, so the
-    // statement matches.
-    const pendingDeletes: MessagePair[] = [];
-    for (const pair of formed.attributeDeletes) {
-        if (!(await deleteAlreadyApplied(db, pair))) {
-            pendingDeletes.push(pair);
-        }
-    }
-    const hasChange = recordChanged
-        || changedPuts.length > 0
-        || pendingDeletes.length > 0;
-    const rows = [formed.operation];
-    if (recordChanged || !hasChange) {
-        rows.push(formed.document);
-    }
-    rows.push(...(hasChange
-        ? changedPuts
-        : formed.attributePuts));
-    rows.push(...(hasChange
-        ? pendingDeletes
-        : formed.attributeDeletes));
-    return rows;
-}
-
-async function deleteAlreadyApplied(
-    db: DbAdapter,
-    pair: MessagePair,
-): Promise<boolean> {
-    const head = await db.messagePairs.getHeadPair(
-        pair.path, pair.name,
-    );
-    return head !== null && head.method === 'DELETE';
-}
-
-// Record creation or edit, discriminated by payload.kind.
-// Phase Final Task 2: records + record_attributes ROW halves
-// stripped — attributes/record body ride the operation +
-// document + attribute pairs; states.postEvent on create/edit
-// stays until the states-trace group. Removed attributes are
-// RESTRICTED inside the same tx (message-plane referrers; 409
-// bytes preserved). The live route lands a create through
-// the former; the seed's below-facade creates land here.
+// The seed's record-type create: the bundle it formed lands
+// as one statement. A live create or edit lands through the
+// former.
 export async function postRecordWriteOp(
     db: DbAdapter,
     payload: Record<string, unknown>,
     _actor: Id,
     messagePairs: RecordWriteMessagePairs,
-    // Verified token organization scoping the RESTRICT
-    // referrer sweep (collectAttributeReferrers). Optional so
-    // the below-facade seed path (creates only; never removes
-    // referenced attributes) keeps compiling; the live route
-    // always supplies it when removals can fire.
-    organization?: Id,
 ): Promise<void> {
-    const body = validateRecordWriteBody(payload);
-    const removedIds =
-        body.kind === 'edit'
-            ? body.removedAttributeIds
-            : [];
-    // Choose rows before the read. RESTRICT runs first;
-    // the statement is the write. A create submits every
-    // row.
-    const rows = body.kind === 'create'
-        ? [
-            messagePairs.operation,
-            messagePairs.document,
-            ...messagePairs.attributePuts,
-        ]
-        : await recordRowsToSubmit(db, messagePairs);
-    // Phase Final Task 2: states ROW half stripped —
-    // document/attribute pairs alone carry truth.
-    if (removedIds.length > 0) {
-        // Prefer the verified token claim; fall back to
-        // the body's stamped organization_id only for
-        // below-facade callers that omit organization
-        // (seed never removes referenced attributes).
-        const boundOrganization = requireOrganization(
-            organization ?? body.record.organization_id,
+    validateRecordWriteBody(payload);
+    const rows = [
+        messagePairs.operation,
+        messagePairs.document,
+        ...messagePairs.attributePuts,
+        ...messagePairs.attributeDeletes,
+    ];
+    await runWrite(db, attemptFor(rows), rows);
+}
+
+// The composed edit (§1 C), an operation on the type: the
+// type lands in order on the client's tag; each attribute in
+// order on the live head read here, or as a declared genesis
+// when it has none; each removal as a DELETE in order on its
+// live head. An attribute equal to its head is left out
+// (§7), and a removal with no live head has nothing to
+// remove. Removed attributes are RESTRICTED before the
+// statement (409).
+async function postRecordTypeEditOp(
+    db: DbAdapter,
+    received: MessagePair,
+    b: RecordWriteEditBody,
+    organization: Id,
+): Promise<void> {
+    const documentBody = recordDocumentBodyOf(b);
+    validateRecordDocumentBody(documentBody);
+    const typeHead = await recordTypeHeadFor(
+        db, organization, b.id,
+    );
+    const latches = latchesOf(
+        entityTagsOf(received), [typeHead.id],
+    );
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for '
+                + recordTypesUriPrefix(organization) + b.id,
+            HTTP_PRECONDITION_REQUIRED,
         );
+    }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const attributes = attributesUriPrefix(organization, b.id);
+    const heads = new Map(
+        (await db.messagePairs.getCollectionHeadPairs(attributes))
+            .map((head) => [head.name, head]),
+    );
+    // Covenant: an ACL is set only by the nested attribute
+    // PUT; the edit carries each stored ACL forward, and a
+    // new attribute takes the default.
+    const puts: StateSibling[] = [];
+    for (const attr of b.attributes) {
+        const head = heads.get(attr.id);
+        const raw = attr as unknown as Record<string, unknown>;
+        const stored = head === undefined
+            ? undefined
+            : attributeSchemaOf(
+                attr.id, headDocumentOf(head).body,
+            );
+        const state = recordAttributeDocumentBodyOf(
+            stored === undefined
+                ? raw
+                : {
+                    ...raw,
+                    read_roles: [...stored.readRoles],
+                    write_roles: [...stored.writeRoles],
+                },
+        );
+        validateAttributeDocument(state);
+        if (head !== undefined && sameAsHead(head, state)) {
+            continue;
+        }
+        puts.push({
+            method: 'PUT',
+            path: attributes,
+            name: attr.id,
+            state,
+            condition: head === undefined
+                ? { kind: 'genesis', declarer: 'handler' }
+                : { kind: 'in-order', head: head.id },
+        });
+    }
+    const deletes: StateSibling[] = [];
+    for (const id of b.removedAttributeIds) {
+        const head = heads.get(id);
+        if (head === undefined) continue;
+        deletes.push({
+            method: 'DELETE',
+            path: attributes,
+            name: id,
+            condition: { kind: 'in-order', head: head.id },
+        });
+    }
+    if (b.removedAttributeIds.length > 0) {
         await db.readTransaction(async (view) => {
-            // Flat window: body.id is the record (type)
-            // id; fourth-leg instance scan scopes there.
-            const referrers =
-                await collectAttributeReferrers(
-                    view,
-                    boundOrganization,
-                    removedIds,
-                    body.id,
-                );
+            const referrers = await collectAttributeReferrers(
+                view, organization, b.removedAttributeIds, b.id,
+            );
             for (const [id, refs] of referrers) {
                 if (hasReferrers(refs)) {
                     throw new ApiError(
@@ -1220,7 +1036,46 @@ export async function postRecordWriteOp(
             }
         });
     }
-    await runWrite(db, attemptFor(rows), rows);
+    const type = {
+        method: 'PUT',
+        path: recordTypesUriPrefix(organization),
+        name: b.id,
+        state: {
+            ...recordTypeEntityOf({
+                name: b.id,
+                messagePairId: b.id,
+                method: 'PUT',
+                body: documentBody,
+            }, organization),
+        },
+    } as const;
+    const latch = latches.heads[0]!;
+    // An unchanged type beside a changed attribute is skipped,
+    // so the answer and the received pair name the head read.
+    const [first, ...rest] = [...puts, ...deletes];
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received,
+        siblings: first === undefined
+            ? [{
+                ...type,
+                condition: { kind: 'in-order', head: latch },
+            }]
+            : [
+                {
+                    ...type,
+                    condition: {
+                        kind: 'in-order',
+                        head: latch,
+                        read: typeHead,
+                    },
+                },
+                first,
+                ...rest,
+            ],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
 }
 
 // Phase Final Task 2: writeFlowGraphDelta RETIRED. The four
@@ -3022,7 +2877,7 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/ideas/:id':
         documentWriteResponseSpec(IDEAS_WIRING),
     'organizations/:id/ideas/:id/conversion': {
-        conditional: 'optional',
+        conditional: 'in-order',
     },
     'organizations/:id/ideas/:id/submissions/:sid': {
         conditional: 'optional',
@@ -3093,17 +2948,10 @@ export const WRITE_RESPONSE_SPECS:
                 body: withoutId(body ?? {}),
             }),
     },
-    // Nested composed POST: a create lands through the
-    // former, which writes its own answer. The composed edit
-    // does not ride the former yet, so the gate still forms
-    // its receipt from this successBody. The receipt shares
-    // the document name, and an empty body would match a
-    // DELETE tombstone, so an edit after a delete would
-    // store nothing. It retires when the edit rides the
-    // former.
+    // Nested composed POST: a create and an edit each land
+    // through the former, which writes its own answer.
     [RECORD_TYPES_COLLECTION_PATTERN]: {
         conditional: 'optional',
-        successBody: (_params, body) => body ?? {},
     },
     // Nested record-types detail (Task 3): put-only per-verb
     // entry. Id is param 1 (:record-type-id); organization_id
@@ -3376,10 +3224,10 @@ export const WRITE_RESPONSE_SPECS:
         conditional: 'none',
     },
     'identities/:id/invitations/:id': {
-        conditional: 'optional',
+        conditional: 'in-order',
     },
     'organizations/:id/invitations/:id': {
-        conditional: 'optional',
+        conditional: 'in-order',
     },
 };
 
@@ -4406,166 +4254,122 @@ export const routes: Route[] = [
     // the hand-written dispatch it replaces.
     documentCollectionRoute(IDEAS_WIRING),
     // Convert an idea to a project (promotion): the LONE
-    // cross-aggregate write. A new projects row, the promoted
-    // ideas row, TWO state events (the idea's 'promoted' and the
-    // new project's initial), and N project_objective_baseline_
-    // scores rows commit as ONE transaction — a mid-write failure
-    // rolls the whole thing back rather than landing a project
-    // without its baselines (or an idea promoted without its
-    // project). The idea is the route param. The org-scoped
-    // projects store stamps organization_id from the verified
-    // token and re-validates through validateProjectEntity, so
-    // the project body OMITS it; the ideas store re-validates the
-    // promoted idea, and the baseline store each row, as the
-    // composing puts land. Both events are authored by the
-    // verified caller (actor), never the body. Composed IN THE
-    // SAME ORDER the old commit batch used (project, idea, idea
-    // event, project event, baselines). Member-tier POST —
+    // cross-aggregate write, an operation on the idea (§1 C).
+    // The promoted idea lands in order on the client's tag, and
+    // the project and each baseline land as declared geneses,
+    // all in one statement: a project never exists without its
+    // baselines, nor an idea promoted without its project. The
+    // answer is the idea's state. Member-tier POST —
     // isPermitted matches /ideas on the segment prefix, so
     // /ideas/:id/conversion is member-permitted.
-    //
-    // Phase 3 Task 4: the operation message pair above lives at the
-    // ideas-family OPERATION path (name '') — a projects-
-    // prefix scan finds no pair for a conversion-born project
-    // without a SECOND pair at the project's OWN document.
-    // Synthesized below, BYTE-INDISTINGUISHABLE from a
-    // live PUT /projects/:id's pair at that same document (same
-    // response spec, same head-read), so derivation needs no
-    // conversion special case. Phase 5 Task 5: the idea's OWN
-    // 'promoted' transition gets a THIRD pair the same way, at
-    // the idea's EXISTING document — unlike the project
-    // pair above (a fresh document, genesis), the idea's head-
-    // read finds its prior pair, so this one records Supersedes
-    // provenance. This closes the standing watch-point: before
-    // this task, a converted idea's derived history MISSED its
-    // 'promoted' event because no pair recorded it. Phase 7
-    // Task 4: each validated baseline gets its OWN pair too, at
-    // its project-nested document (projects/:id/objective-
-    // baseline-scores/:sid) — every baseline id is client-
-    // minted FRESH per conversion, so these are genesis like
-    // the project pair above, never Supersedes. All 3+N formed
-    // PRE-TX — formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (AGENTS.md §
-    // Transaction bodies await only row ops) — then
-    // appended as the tx's LAST acts, beside the operation
-    // message pair. Formed ONLY when the gate supplied both a pair and
-    // a fence organization; a below-facade caller with neither
-    // (none exists for conversion today) skips all 3+N
-    // appends, preserving dual-write discipline.
     route('organizations/:id/ideas/:id/conversion', {
         post: async (
-            db, p, body, actor, messagePair, organization,
+            db, p, body, _actor, messagePair, organization,
         ) => {
+            const fenced = requireOrganization(organization);
+            const received = requirePair(messagePair);
             const ideaId = param(p, 1);
             const b = validateIdeaConversionBody(body);
-            // The document a live PUT /projects/:id would
-            // carry: the entity's own fields plus the state
-            // this conversion assigns. Validated pre-tx —
-            // a malformed project body now 400s here instead of
-            // at the in-tx store re-validation; same observable,
-            // earlier.
             const projectDocument = {
                 ...b.project,
                 state: b.projectState,
             };
             validateProjectDocumentBody(projectDocument);
-            // The document a live PUT /ideas/:id would carry for
-            // this SAME conversion: the promoted idea's own
-            // fields plus domain `state`. Validated pre-tx,
-            // mirroring projectDocument above.
             const ideaDocument = {
                 ...b.idea,
                 state: b.ideaState,
             };
             validateIdeaDocumentBody(ideaDocument);
-            let projectMessagePair: MessagePair | undefined;
-            let ideaMessagePair: MessagePair | undefined;
-            const baselineMessagePairs: MessagePair[] = [];
-            if (
-                messagePair !== undefined
-                && organization !== undefined
-            ) {
-                projectMessagePair = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/projects/:id',
-                    params: [organization, b.projectId],
-                    body: projectDocument,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                // The idea's OWN document message pair, at its EXISTING
-                // document (the idea was created earlier, through
-                // a live PUT /ideas/:id) — this head-read finds
-                // that prior pair, so this one records Supersedes,
-                // unlike the project pair above (a fresh document,
-                // genesis).
-                ideaMessagePair = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/ideas/:id',
-                    params: [organization, ideaId],
-                    body: ideaDocument,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                // The per-baseline pairs (Task 4): N synthesized
-                // pairs, one per validated baseline, at each
-                // baseline's OWN document — every baseline id is
-                // client-minted FRESH for this conversion, so
-                // each pair is genesis there (the store's document
-                // head read (`messageStore(db).getDocumentHead`) finds no
-                // prior pair) unless a live PUT had already
-                // visited that exact id. Body is the baseline's
-                // `fields` VERBATIM — the live standalone PUT
-                // body, unlike projectDocument/ideaDocument above
-                // (which assemble a document from disjoint
-                // parts) — so the response spec's successBody
-                // below is what runs validateBaselineScoreEntity.
-                for (const baseline of b.baselines) {
-                    baselineMessagePairs.push(
-                        await formDocumentMessagePairFor({
-                            routePattern:
-                                'organizations/:id/projects/:id'
-                                + '/objective-baseline-scores'
-                                + '/:sid',
-                            params: [
-                                organization, b.projectId,
-                                baseline.id,
-                            ],
-                            body: baseline.fields,
-                            requesterIdentityId: actor,
-                            requestAt: messagePair.requestAt,
-                            operationId: messagePair.operationId,
-                            requestId: messagePair.requestId,
-                            organization,
-                        },
-                    ));
-                }
+            for (const baseline of b.baselines) {
+                validateBaselineScoreEntity(baseline.fields);
             }
-            // Phase Final Task 2: idea + project + baseline ROW
-            // halves stripped; only states events + pairs remain
-            // (states row half strips with the states-trace
-            // group).
-            const pairs = [
-                ...(messagePair !== undefined
-                    ? [messagePair] : []),
-                ...(projectMessagePair !== undefined
-                    ? [projectMessagePair] : []),
-                ...(ideaMessagePair !== undefined
-                    ? [ideaMessagePair] : []),
-                ...baselineMessagePairs,
-            ];
-            if (pairs.length > 0) {
-                await runWrite(
-                    db, attemptFor(pairs), pairs,
+            const ideas = canonicalPath(fenced, '/ideas/');
+            const head = await messageStore(db).getDocumentHead(
+                ideas, ideaId,
+            );
+            if (head === null) {
+                throw await missedReadError(
+                    db, ideaId, fenced, 'ideas',
                 );
             }
-            return;
+            const latches = latchesOf(
+                entityTagsOf(received), [head.id],
+            );
+            if (latches.kind === 'missing') {
+                throw new ApiError(
+                    'If-Match is required for ' + ideas + ideaId,
+                    HTTP_PRECONDITION_REQUIRED,
+                );
+            }
+            if (latches.kind === 'extra') {
+                throw new ApiError(
+                    'If-Match names no document this operation'
+                        + ' derives from',
+                    HTTP_PRECONDITION_FAILED,
+                );
+            }
+            const baselines = canonicalPath(
+                fenced,
+                '/projects/' + b.projectId
+                    + '/objective-baseline-scores/',
+            );
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received,
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: ideas,
+                        name: ideaId,
+                        state: {
+                            ...ideaEntityOf({
+                                name: ideaId,
+                                messagePairId: ideaId,
+                                method: 'PUT',
+                                body: ideaDocument,
+                            }, fenced),
+                        },
+                        condition: {
+                            kind: 'in-order',
+                            head: latches.heads[0]!,
+                            read: head,
+                        },
+                    },
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(fenced, '/projects/'),
+                        name: b.projectId,
+                        state: {
+                            ...projectEntityOf({
+                                name: b.projectId,
+                                messagePairId: b.projectId,
+                                method: 'PUT',
+                                body: projectDocument,
+                            }, fenced),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    ...b.baselines.map((baseline) => ({
+                        method: 'PUT' as const,
+                        path: baselines,
+                        name: baseline.id,
+                        state: scoreEntityOf({
+                            name: baseline.id,
+                            messagePairId: baseline.id,
+                            method: 'PUT',
+                            body: baseline.fields,
+                        }),
+                        condition: {
+                            kind: 'genesis' as const,
+                            declarer: 'handler' as const,
+                        },
+                    })),
+                ],
+                project: unprojected,
+                answer: { kind: 'parent' },
+            });
         },
     }),
     // GET is FLIPPED (Phase 3 Task 6): the list derives from
@@ -4928,8 +4732,8 @@ export const routes: Route[] = [
     // factories — documentPutHandler takes param 1 as id
     // on an org nest (param 0 is the path org). PUT
     // reuses postRecordDocumentOp (same state body /
-    // pair append). POST reuses formRecordWriteMessagePairs +
-    // postRecordWriteOp with nested documents.
+    // pair append). POST lands a create or an edit through
+    // the former, split by the body's kind.
     // DELETE is inline records/:id posture plus type RESTRICT.
     route(RECORD_TYPES_COLLECTION_PATTERN, {
         get: (db, _p, _actor, organization) =>
@@ -4940,25 +4744,16 @@ export const routes: Route[] = [
         // GET only). A create lands the type and each
         // attribute as declared geneses in one statement, so a
         // resent create answers 409 and stores nothing. An
-        // edit keeps the flat POST /records RESTRICT
-        // discipline: document at the nested detail document,
-        // attributes at ATTRIBUTE_DETAIL_PATTERN.
+        // edit is an operation on the type, latched on its
+        // head (postRecordTypeEditOp).
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
             const org = requireOrganization(organization);
             const received = requirePair(messagePair);
             const b = validateRecordWriteBody(body);
             if (b.kind === 'edit') {
-                return postRecordWriteOp(
-                    db, body, actor,
-                    await formRecordWriteMessagePairs(
-                        db, b, actor, received, org,
-                        RECORD_TYPE_DETAIL_PATTERN,
-                        [org, b.id],
-                    ),
-                    org,
-                );
+                return postRecordTypeEditOp(db, received, b, org);
             }
             // Interpretation T: the one presence check a
             // handler makes. A create names no head.
@@ -5018,11 +4813,19 @@ export const routes: Route[] = [
         },
     }),
     route(RECORD_TYPE_DETAIL_PATTERN, {
-        get: (db, p, _actor, organization) =>
-            deriveRecordTypeEntity(
-                db, requireOrganization(organization),
-                param(p, 1),
-            ),
+        // The head's ETag is the tag a composed edit latches.
+        get: async (db, p, _actor, organization) => {
+            const fenced = requireOrganization(organization);
+            const head = await recordTypeHeadFor(
+                db, fenced, param(p, 1),
+            );
+            return attachEtag(
+                Response.json(recordTypeEntityOf(
+                    headDocumentOf(head), fenced,
+                )),
+                head.id,
+            );
+        },
         put: (db, p, body, actor, messagePair) =>
             postRecordDocumentOp(
                 db, param(p, 1), body, actor, messagePair,
