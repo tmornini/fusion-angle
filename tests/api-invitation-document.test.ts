@@ -16,6 +16,7 @@ import { deriveInvitations } from '../api/derive-invitations.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
     invitationLatched,
 } from './http-fixtures.ts';
@@ -68,6 +69,7 @@ const MS_DOC_5 = generateIdentifier();
 const EV_ACC_5 = generateIdentifier();
 const INV_DOC_6 = generateIdentifier();
 const EV_REV_6 = generateIdentifier();
+const INV_SEAT_NO_OP = generateIdentifier();
 
 function req(
     method: string,
@@ -295,6 +297,9 @@ Deno.test('a fresh accept appends its seat document at the'
     );
     assertStrictEquals(documents.length, 1);
     assertEquals(documents[0]!.body, {
+        id: 'toccYYkLEABmlbpHJalgtQ',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
         type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     });
@@ -313,18 +318,44 @@ Deno.test('a fresh accept appends its seat document at the'
         at: '2026-01-01T00:00:01.000000Z',
     };
     assertEquals(await got.json(), acceptBody);
-    // The seat's stored response is its body until Task 15/16:
-    // its derive still reads the request, strictly.
     const stored = JSON.parse(
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
                 , 'toccYYkLEABmlbpHJalgtQ',
         ),
     );
-    assertEquals(stored, {
-        type: 'member',
-        at: '2026-01-01T00:00:01.000000Z',
-    });
+    assertEquals(stored, acceptBody);
+});
+
+// One shape per family: the accept stores the seat's wire,
+// so the route's identical PUT over it is the statement's
+// match.
+Deno.test('a route PUT of the accepted seat stores nothing'
++ ' and answers 200', async () => {
+    const db = await freshDb();
+    await grant(db, INV_SEAT_NO_OP);
+    const accepted = await accept(
+        db, INV_SEAT_NO_OP, generateIdentifier(),
+        generateIdentifier(), '2026-01-01T00:00:01.000000Z',
+    );
+    assertStrictEquals(accepted.status, 200);
+    const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
+    const [head] = documentMessagePairsAt(
+        await db.messagePairs.getCollectionPairs(prefix), prefix,
+    ).filter((pair) => pair.name === 'toccYYkLEABmlbpHJalgtQ');
+    assert(head !== undefined);
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT', prefix + 'toccYYkLEABmlbpHJalgtQ',
+        await organizationToken(),
+        { type: 'member', at: '2026-01-01T00:00:01.000000Z' },
+    ));
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(pairIdOf(res), head.id);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 Deno.test('a no-op re-accept appends no seat document',

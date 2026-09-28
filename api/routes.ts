@@ -896,9 +896,8 @@ export async function loadAttributeSchemaById(
     return map;
 }
 
-// An attribute's stored response is a route PUT's wire,
-// the path's keys and all, or the former's bare document;
-// the path owns the keys either way.
+// An attribute's stored response is its wire, which
+// repeats the path's keys; the path owns them.
 function attributeStateOf(
     body: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -1002,16 +1001,18 @@ async function postRecordTypeEditOp(
             : attributeSchemaOf(
                 attr.id, headDocumentOf(head).body,
             );
-        const state = recordAttributeDocumentBodyOf(
-            stored === undefined
-                ? raw
-                : {
-                    ...raw,
-                    read_roles: [...stored.readRoles],
-                    write_roles: [...stored.writeRoles],
-                },
+        const state = nestedAttributeWireOf(
+            organization, b.id, attr.id,
+            recordAttributeDocumentBodyOf(
+                stored === undefined
+                    ? raw
+                    : {
+                        ...raw,
+                        read_roles: [...stored.readRoles],
+                        write_roles: [...stored.writeRoles],
+                    },
+            ),
         );
-        validateAttributeDocument(state);
         if (head !== undefined && sameAsHead(head, state)) {
             continue;
         }
@@ -3788,10 +3789,12 @@ export const routes: Route[] = [
                     );
                 }
                 const credential = {
-                    ...fields,
-                    secret: await hashPassword(fields.secret),
+                    id: credId,
+                    ...validateIdentityCredentialEntity({
+                        ...fields,
+                        secret: await hashPassword(fields.secret),
+                    }),
                 };
-                validateIdentityCredentialEntity(credential);
                 credentials.push({
                     method: 'PUT',
                     path: canonicalPath(
@@ -4783,17 +4786,17 @@ export const routes: Route[] = [
             validateRecordDocumentBody(documentBody);
             const attributes: StateSibling[] = b.attributes.map(
                 (attr) => {
-                    const attributeBody =
-                        recordAttributeDocumentBodyOf(
-                            attr as unknown as
-                                Record<string, unknown>,
-                        );
-                    validateAttributeDocument(attributeBody);
                     return {
                         method: 'PUT',
                         path: attributesUriPrefix(org, b.id),
                         name: attr.id,
-                        state: attributeBody,
+                        state: nestedAttributeWireOf(
+                            org, b.id, attr.id,
+                            recordAttributeDocumentBodyOf(
+                                attr as unknown as
+                                    Record<string, unknown>,
+                            ),
+                        ),
                         condition: {
                             kind: 'genesis', declarer: 'handler',
                         },

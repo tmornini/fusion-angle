@@ -111,6 +111,9 @@ Deno.test('accept writes the seat at the invitation'
         && messagePair.method === 'PUT');
     assertStrictEquals(seats.length, 1);
     assertEquals(seats[0]!.body, {
+        id: SARAH_ID,
+        organization_id: ORGANIZATION_TWO,
+        identity_id: SARAH_ID,
         type: 'member',
         at: '2026-06-05T00:00:01.000000Z',
     });

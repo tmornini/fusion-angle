@@ -108,9 +108,8 @@ export function seatsPrefixFor(organization: Id): string {
     return '/organizations/' + organization + '/members/';
 }
 
-// A seat's stored response repeats the path's keys (a
-// route PUT's wire) or carries none (the invitation
-// accept's { type, at }); the path owns them either way.
+// A seat's stored response is its wire, which repeats the
+// path's keys; the path owns them.
 function seatStateOf(
     body: Record<string, unknown>,
 ): Record<string, unknown> {

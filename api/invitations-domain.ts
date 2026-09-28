@@ -49,6 +49,7 @@ import {
 } from './derive-states.ts';
 import {
     membershipExistsFor,
+    seatEntityOf,
     seatsPrefixFor,
 } from './derive-memberships.ts';
 import {
@@ -755,7 +756,14 @@ async function acceptInvitation(
                 method: 'PUT',
                 path: seatsPrefixFor(inv.organization_id),
                 name: actor,
-                state: { type: 'member', at: transition.at },
+                state: {
+                    ...seatEntityOf({
+                        name: actor,
+                        messagePairId: actor,
+                        method: 'PUT',
+                        body: { type: 'member', at: transition.at },
+                    }, inv.organization_id),
+                },
                 condition: {
                     kind: 'genesis', declarer: 'handler',
                 },

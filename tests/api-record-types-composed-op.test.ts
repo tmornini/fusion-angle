@@ -26,8 +26,10 @@ import {
 } from './test-fixtures.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import { DEFAULT_ATTRIBUTE_ACL_ROLES } from '../shared/types.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested composed POST .../record-types (Task 9): admin-only
@@ -712,6 +714,45 @@ Deno.test('a resent POST record-types/ create is 409 and'
     assertEquals(await second.json(), {
         error: 'Document already exists at ' + COLLECTION + typeId,
     });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+// One shape per family: the create stores each attribute's
+// wire, so the route's identical PUT over it is the
+// statement's match.
+Deno.test('a route PUT of the create\'s attribute stores nothing'
++ ' and answers 200', async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const attrId = generateIdentifier();
+    const created = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        createBody(typeId, attrId, 'Wired'),
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const attributes = COLLECTION + typeId + '/attributes/';
+    const head = await db.messagePairs.getHeadPair(
+        attributes, attrId,
+    );
+    assert(head !== null);
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT', attributes + attrId, adminToken, {
+            name: 'Priority',
+            attribute_type: 'text',
+            sort_order: 0,
+            options: [],
+            constraints: [],
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        },
+    ));
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(pairIdOf(res), head.id);
+    await res.body?.cancel();
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );
