@@ -142,10 +142,10 @@ export class BackedDbAdapter
                 throw error;
             }
             for (const row of stated) {
-                if (row.outcome !== 'land') {
+                if (row.rawOutcome !== 'land') {
                     throw new Error(
                         'seed statement returned '
-                            + row.outcome,
+                            + row.rawOutcome,
                     );
                 }
             }

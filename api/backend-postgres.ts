@@ -23,10 +23,11 @@ import {
     identifierOfUuidText,
     uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
-import type {
-    Attempt,
-    StatementAnswer,
-    StatementBind,
+import {
+    isInserted,
+    type Attempt,
+    type StatementAnswer,
+    type StatementBind,
 } from '../shared/ledger-statement.ts';
 import { mintRootBind } from './ledger-root.ts';
 import { statementText } from
@@ -705,7 +706,6 @@ async function queryStatement(
                 'ledger statement outcome ' + outcome,
             );
         }
-        const inserted = outcome === 'land';
         const rawOutcome = row.raw_outcome;
         if (
             rawOutcome !== 'land'
@@ -742,7 +742,7 @@ async function queryStatement(
                 ? null
                 : bytesOfBytea(row.head_response),
             headMethod,
-            inserted,
+            inserted: isInserted(outcome, rawOutcome),
             supersedes: identifierOfUuidText(
                 row.supersedes,
             ),

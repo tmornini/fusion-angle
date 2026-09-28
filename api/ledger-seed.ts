@@ -230,10 +230,10 @@ export class RehearsalBackend implements StorageBackend {
             throw error;
         }
         for (const answer of answers) {
-            if (answer.outcome !== 'land') {
+            if (answer.rawOutcome !== 'land') {
                 throw new Error(
                     'seed statement returned '
-                        + answer.outcome,
+                        + answer.rawOutcome,
                 );
             }
         }
@@ -351,9 +351,9 @@ function assertLanded(
     supersedes: readonly string[],
 ): void {
     answers.forEach((answer, index) => {
-        if (answer.outcome !== 'land') {
+        if (answer.rawOutcome !== 'land') {
             throw new Error(
-                'seed statement returned ' + answer.outcome,
+                'seed statement returned ' + answer.rawOutcome,
             );
         }
         if (answer.supersedes !== supersedes[index]) {

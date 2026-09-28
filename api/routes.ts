@@ -1099,7 +1099,8 @@ function sameValue(left: unknown, right: unknown): boolean {
     return true;
 }
 
-// The statement stores nothing when any submitted row
+// These rows carry no latch, so a statement of them has no
+// document row and stores nothing when any submitted row
 // matches. Submit the record document only when its
 // fields differ, and an attribute put only when that
 // attribute differs. A resend submits the unchanged
@@ -1117,10 +1118,11 @@ async function recordRowsToSubmit(
             changedPuts.push(pair);
         }
     }
-    // A DELETE whose head is already DELETE matches and
-    // would drop the puts beside it. Leave that one out
-    // when another row changes. A pure resend still
-    // submits it, so the statement matches.
+    // A DELETE whose head is already DELETE matches and,
+    // with no latched row beside it, would drop the puts
+    // beside it. Leave that one out when another row
+    // changes. A pure resend still submits it, so the
+    // statement matches.
     const pendingDeletes: MessagePair[] = [];
     for (const pair of formed.attributeDeletes) {
         if (!(await deleteAlreadyApplied(db, pair))) {
@@ -2155,30 +2157,42 @@ async function landWorkOrderTransition(
             HTTP_PRECONDITION_FAILED,
         );
     }
-    const workOrder: ParentSibling = {
-        method: 'PUT',
+    const workOrder = {
+        method: 'PUT' as const,
         path: head.pair.path,
         name: head.version.id,
         state: transitionedVersion(head.version, event),
-        condition: { kind: 'in-order', head: latches.heads[0]! },
     };
-    const revision: readonly StateSibling[] =
-        instance.kind === 'none'
-            || sameAsHead(instance.head, instance.state)
-            ? []
-            : [{
-                method: 'PUT',
-                path: instance.head.path,
-                name: instance.head.name,
-                state: instance.state,
-                condition: {
-                    kind: 'in-order', head: latches.heads[1]!,
-                },
-            }];
+    const latch = latches.heads[0]!;
     await runStateWrite(db, {
         kind: 'siblings',
         received: messagePair,
-        siblings: [workOrder, ...revision],
+        siblings: instance.kind === 'none'
+                || sameAsHead(instance.head, instance.state)
+            ? [{
+                ...workOrder,
+                condition: { kind: 'in-order', head: latch },
+            }]
+            : [
+                {
+                    ...workOrder,
+                    condition: {
+                        kind: 'in-order',
+                        head: latch,
+                        read: head.pair,
+                    },
+                },
+                {
+                    method: 'PUT',
+                    path: instance.head.path,
+                    name: instance.head.name,
+                    state: instance.state,
+                    condition: {
+                        kind: 'in-order',
+                        head: latches.heads[1]!,
+                    },
+                },
+            ],
         project: unprojected,
         answer: { kind: 'parent' },
     });

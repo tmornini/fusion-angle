@@ -1,7 +1,6 @@
 import {
     assert,
     assertEquals,
-    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import { BackedDbAdapter } from '../api/db-backed.ts';
@@ -547,8 +546,8 @@ Deno.test(
 );
 
 Deno.test(
-    'a later sibling matching its head while the parent'
-        + ' lands throws',
+    'an unchanged parent beside a changed sibling answers'
+        + " the parent's head",
     async () => {
         const { db } = openLedger();
         await db.ensureTable();
@@ -556,7 +555,7 @@ Deno.test(
             method: 'PUT' as const,
             path: IDEA_PATH,
             name: 'second',
-            state: { id: 'second' },
+            state: { id: 'second', n: 1 },
             condition: HANDLER_GENESIS,
         };
         await runStateWrite(db, {
@@ -577,34 +576,71 @@ Deno.test(
         );
         assert(ideaHead !== null);
         assert(secondHead !== null);
-        const before = (await db.messagePairs.getAll())
-            .length;
-        await assertRejects(
-            async () => await runStateWrite(db, {
-                kind: 'siblings',
-                received: await received(undefined),
-                siblings: [
-                    idea(
-                        { id: IDEA, title: 'B' },
-                        { kind: 'in-order', head: ideaHead.id },
-                    ),
-                    {
-                        ...second,
-                        condition: {
-                            kind: 'in-order',
-                            head: secondHead.id,
-                        },
+        const pair = await received(undefined);
+        const answer = await runStateWrite(db, {
+            kind: 'siblings',
+            received: pair,
+            siblings: [
+                {
+                    method: 'PUT',
+                    path: IDEA_PATH,
+                    name: IDEA,
+                    state: { id: IDEA, title: 'A' },
+                    condition: {
+                        kind: 'in-order',
+                        head: ideaHead.id,
+                        read: ideaHead,
                     },
-                ],
-                project: unprojected,
-                answer: { kind: 'parent' },
-            }),
-            Error,
-            'a sibling matched its head while the parent'
-                + ' did not',
+                },
+                {
+                    ...second,
+                    state: { id: 'second', n: 2 },
+                    condition: {
+                        kind: 'in-order',
+                        head: secondHead.id,
+                    },
+                },
+            ],
+            project: unprojected,
+            answer: { kind: 'parent' },
+        });
+        assertStrictEquals(answer.outcome, 'land');
+        assertStrictEquals(answer.response.status, 200);
+        assertStrictEquals(answer.answeredId, ideaHead.id);
+        assertStrictEquals(
+            answer.response.headers.get('etag'),
+            '"' + ideaHead.id + '"',
+        );
+        assertEquals(
+            await answer.response.json(),
+            { id: IDEA, title: 'A' },
         );
         assertStrictEquals(
-            (await db.messagePairs.getAll()).length, before,
+            (await db.messagePairs.getHeadPair(IDEA_PATH, IDEA))
+                ?.id,
+            ideaHead.id,
+        );
+        const secondNow = await db.messagePairs.getHeadPair(
+            IDEA_PATH, 'second',
+        );
+        assert(secondNow !== null);
+        assertEquals(
+            responseRecordOf(secondNow.response),
+            { id: 'second', n: 2 },
+        );
+        const inserted = answer.rows
+            .filter((row) => row.inserted)
+            .map((row) => row.id);
+        assertEquals(inserted, [pair.id, secondNow.id]);
+        assertStrictEquals(answer.bells.length, inserted.length);
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.id === pair.id);
+        assert(stored !== undefined);
+        assertStrictEquals(
+            stored.response.includes(
+                '\r\netag: "' + ideaHead.id + '"\r\n',
+            ),
+            true,
         );
     },
 );

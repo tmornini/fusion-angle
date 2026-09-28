@@ -124,14 +124,24 @@ export async function classifyStatement(
         });
     }
     const outcome = reportedOutcome(prepared);
-    const inserted = outcome === 'land';
     const classified: ClassifiedRow[] = [];
     for (const item of prepared) {
         classified.push(await hashedRow(
-            item, outcome, inserted,
+            item,
+            outcome,
+            isInserted(outcome, item.outcome),
         ));
     }
     return classified;
+}
+
+// A landing statement skips its matched rows, so a row is
+// inserted only when both it and its statement land.
+export function isInserted(
+    outcome: Outcome,
+    rawOutcome: Outcome,
+): boolean {
+    return outcome === 'land' && rawOutcome === 'land';
 }
 
 export function refusalOf(
@@ -205,7 +215,8 @@ function supersedesOf(head: Head | null): string {
 // A nil latch is a declared genesis: it may not land over
 // a live document, and it never matches one. A
 // never-written latch may not land over a tombstone either:
-// the name is spent.
+// the name is spent. Only a PUT or DELETE is a version of
+// its document, so only it can match the head.
 function rawOutcome(
     row: StatementRow,
     head: Head | null,
@@ -227,6 +238,7 @@ function rawOutcome(
     }
     if (
         head !== null
+        && (row.method === 'PUT' || row.method === 'DELETE')
         && sameBytes(
             bodyBytes(head.response),
             bodyBytes(response),
@@ -237,19 +249,29 @@ function rawOutcome(
     return 'land';
 }
 
+// Stale anywhere refuses the statement. A matched row is
+// skipped, but with no landing document row the statement
+// is a no-op: nothing is stored, the received pair too.
 function reportedOutcome(
     prepared: readonly Prepared[],
 ): Outcome {
-    let outcome: Outcome = 'land';
-    for (const item of prepared) {
-        if (item.outcome === 'stale') {
-            return 'stale';
-        }
-        if (item.outcome === 'matched') {
-            outcome = 'matched';
-        }
+    if (prepared.some((item) => item.outcome === 'stale')) {
+        return 'stale';
     }
-    return outcome;
+    const matched = prepared.some(
+        (item) => item.outcome === 'matched',
+    );
+    const documentLands = prepared.some(
+        (item) => item.outcome === 'land' && isDocumentRow(item),
+    );
+    return matched && !documentLands ? 'matched' : 'land';
+}
+
+// A document row carries a latch; the received pair never
+// does. A statement of blind rows has no document row, so
+// one matched row stores nothing.
+function isDocumentRow(item: Prepared): boolean {
+    return item.row.ifMatch !== null;
 }
 
 function overlaidPrefix(
