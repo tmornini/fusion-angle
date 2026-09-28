@@ -3146,6 +3146,41 @@ Off the critical path; each with its oracle.
   200 and stores nothing; a token issued to another
   client is refused; a real and a guessed token of the
   same length answer byte-identical responses.
+- CRUD verbs out of names, comments, and test titles. This
+  is an HTTP application on a SQL database: a state change
+  is PUT, POST, PATCH, or DELETE at the HTTP layer and
+  INSERT at the store, never "create", "update", "upsert",
+  or "write" standing in for one of them. The case that
+  surfaced it is `postRecordWriteOp` (`api/routes.ts:921`,
+  the seed's record-type POST bundle) and its family:
+  `RecordWriteBody`, `RecordWriteCreateBody`,
+  `RecordWriteEditBody`, `RecordWriteMessagePairs`,
+  `formRecordWriteMessagePairs`, `validateRecordWriteBody`,
+  `validateRecordWriteAttribute`, and
+  `tests/api-records-write.test.ts`. The former's names are
+  ruled, one rename-only commit, the store's `'land'`
+  outcome unchanged:
+  `StateWrite` → `NextStates`,
+  `FormedStateWrite` → `FormedStatement`,
+  `WriteAnswer` → `StatementAnswer`,
+  `formStateWrite` → `formedStatement`,
+  `landStateWrite` → `landedStatement`,
+  `runStateWrite` → `landedStates`,
+  `runWrite` → `landedRows`,
+  `runStatement` → `executeStatement`,
+  `StatementRun` → `StatementExecution`,
+  `runLedgerStatement` → `executeLedgerStatement`.
+  Across `api/`, `client/`, `shared/`, `web-app/`, and
+  `server/`, 53 distinct
+  identifiers contain Create, Update, or Upsert and 41
+  contain Write. Some stay: the DOM's `createElement` and
+  constructors such as `createHttpFacade`. The audit rules
+  on each of the rest, naming by the HTTP-verb convention
+  (`getNoun`, `putNoun`, `deleteNoun`,
+  `postNounOperation`) at the HTTP layer and INSERT at the
+  store. Each rename is its own commit. Oracle: a test
+  sweeps identifiers for the four verbs and fails on any
+  that is not in its named-exception list.
 
 ## Sequencing
 
