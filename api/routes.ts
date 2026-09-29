@@ -1988,7 +1988,8 @@ async function assertRequiredAttributesAtExit(
 // statement (§5). The work order is the parent; the tags
 // latch the documents the transition derives from, parent
 // first (Interpretation J). An instance revision equal to
-// its head is left out.
+// its head still latches it: the statement judges its tag
+// and skips the matched row (§7).
 async function landWorkOrderTransition(
     db: DbAdapter,
     head: {
@@ -2037,7 +2038,6 @@ async function landWorkOrderTransition(
         kind: 'siblings',
         received: messagePair,
         siblings: instance.kind === 'none'
-                || sameAsHead(instance.head, instance.state)
             ? [{
                 ...workOrder,
                 condition: { kind: 'in-order', head: latch },
