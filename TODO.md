@@ -302,13 +302,6 @@ Off the critical path; each with its oracle.
     Oracle: `tests/members-pending-skeleton.test.ts`
     'members paints the table skeleton while its GETs
     are held (I21)' lands, red or green
-  - K17, `2026-09-29-k17-signed-objective-score` — an
-    approved objectives row reads "—" where its saved
-    −100 baseline belongs
-    (`docs/superpowers/test-plan-mitigations/2026-09-29-K-K17.md`).
-    Oracle: `tests/presenter-project-objectives.test.ts`
-    'approved row with no actual reads its signed
-    baseline (K17)' green
 
 ## Later work
 
