@@ -282,6 +282,37 @@ Off the critical path; each with its oracle.
   (`tests/presenter-record-detail.test.ts`) makes any
   rewrite honest. G9's staleness was the corrupted test
   name, restored by the small-items sweep
+- The 29 Sep walk's mitigations — one plan and
+  worktree each, the plan on its branch as
+  `docs/superpowers/plans/<slug>.md`; a sub-bullet
+  leaves when its branch lands, and the last one out
+  takes this line with it
+  - F29, `2026-09-29-f29-zoomed-viewbox` — deleting
+    the open panel's node or edge leaves the panel open
+    behind an empty selection, so the next empty-canvas
+    click restores the viewBox the panel saved on open
+    (`docs/superpowers/test-plan-mitigations/2026-09-29-F-F29.md`).
+    Oracle: `tests/browser/canvas-pan.test.ts` 'An
+    empty-canvas click after deleting the open edge
+    keeps the zoomed viewBox (F29)' green
+  - I21, `2026-09-29-i21-members-skeleton` — the
+    members skeleton the walk did not see while its
+    organization GETs were paused
+    (`docs/superpowers/test-plan-mitigations/2026-09-29-I-I21.md`).
+    Oracle: `tests/members-pending-skeleton.test.ts`
+    'members paints the table skeleton while its GETs
+    are held (I21)' lands, red or green
+  - K17, `2026-09-29-k17-signed-objective-score` — an
+    approved objectives row reads "—" where its saved
+    −100 baseline belongs
+    (`docs/superpowers/test-plan-mitigations/2026-09-29-K-K17.md`).
+    Oracle: `tests/presenter-project-objectives.test.ts`
+    'approved row with no actual reads its signed
+    baseline (K17)' green
+  - TEST-PLAN drift, `2026-09-29-walk-drift` — AT2,
+    AT4, A2, F9, F21, G36, and K26 still describe
+    behavior the walk did not see. Oracle: each case
+    reads as the 29 Sep walk and the re-count saw
 
 ## Later work
 
