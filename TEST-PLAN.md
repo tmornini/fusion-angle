@@ -422,9 +422,12 @@ TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
 `tests/tz/*.test.ts` timezone suite; AT2 without
-`POSTGRES_URL` skips the seven `pg-*.test.ts` /
-`schema-lifecycle.test.ts` stubs, and after AT4 those
-seven run. The number grows as tests land in either
+`POSTGRES_URL` ignores eight live-Postgres
+placeholders — one in each of the seven
+`pg-*.test.ts` files and one in
+`schema-lifecycle.test.ts` — and AT4 runs those eight
+files against its own Postgres. The number grows as
+tests land in either
 glob and is not pinned here. Update the case count
 when a case is added or removed.
 
@@ -447,7 +450,7 @@ any AT red.
 - [ ] **AT1** Run `deno check --frozen api shared server
   tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3490 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, on 29 Sep `ok | 3622 passed | 0 failed | 8 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite. The eight ignored are the live-Postgres placeholders — one in each of the seven `pg-*.test.ts` files and one in `schema-lifecycle.test.ts` — which skip without `POSTGRES_URL`; AT4 runs those files.
   Pin: exploratory — the command is its own witness
 - [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, and `bin/postgres-seed`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
