@@ -755,8 +755,8 @@ export function responseRecordOf(
 
 // One statement for the rows of one write. Salts and
 // the notify payload are minted here, outside the
-// statement. A blind refusal runs the statement again,
-// up to three times. Postgres ignores `now`.
+// statement. A blind statement runs at most three times
+// in all. Postgres ignores `now`.
 export type WriteRow = {
     readonly id: string,
     readonly operationId: string,
@@ -860,8 +860,8 @@ export type StatementRun =
 const NON_BLIND_RUNS = 2;
 const BLIND_RUNS = 3;
 
-// A blind refusal runs the statement again, up to three
-// times. Any other refusal runs it once more with the same
+// A blind statement runs at most three times in all. Any
+// other refusal runs it once more with the same
 // binds: the re-run classifies against the row that won, so
 // the answer can name the row it refused.
 export async function runStatement(

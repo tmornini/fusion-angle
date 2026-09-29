@@ -170,9 +170,9 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
 // at the op level — see tests/api-work-order-document.test.ts's
-// own resend case: the fast path lives at the gate (api.ts),
-// agnostic to which op serves the route, so this pin holds
-// unchanged straight through the absorption). ------------------
+// own resend case: the statement matches the resend against
+// the head and stores nothing, whichever op serves the
+// route). ------------------------------------------------------
 
 Deno.test('a byte-identical PUT resend to nested attributes/:id'
 + ' converges to one stored request/response pair',

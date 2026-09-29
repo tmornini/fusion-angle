@@ -336,7 +336,8 @@ async () => {
     assertStrictEquals(await countInstanceMessagePairs(db), 0);
 });
 
-Deno.test('DELETE byte-identical replay → 204 (replay fast path)',
+Deno.test('DELETE byte-identical replay → 204; the tombstone'
++ ' matches, nothing appends',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();

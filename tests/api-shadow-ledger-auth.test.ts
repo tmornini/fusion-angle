@@ -364,7 +364,7 @@ Deno.test('a wrong password stores no NEW pair beyond the'
 
 Deno.test('a double-spent authorization code stores nothing on'
 + ' the replay — the domain guard, not a stored-response'
-+ ' replay, governs (REPLAY_EXEMPT_ROUTE_PATTERNS)',
++ ' replay, governs',
 async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);

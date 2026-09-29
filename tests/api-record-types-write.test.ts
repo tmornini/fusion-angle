@@ -35,7 +35,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested record-types WRITE surface (Task 3): admin PUT
-// (simple class, state document), admin DELETE with type
+// (blind or conditional, state document), admin DELETE with type
 // RESTRICT, write authorizer, and byte-identical DELETE
 // replay. Composed POST create-with-attributes is Task 9.
 
@@ -356,7 +356,7 @@ async () => {
 });
 
 Deno.test('PUT over existing head with NO precondition '
-+ 'header → 200 supersedes (simple class)',
++ 'header → 200 supersedes (a blind PUT)',
 async () => {
     const { db, adminToken } = await adminDb();
     const first = await handleRequest(db, req(

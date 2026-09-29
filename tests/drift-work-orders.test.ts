@@ -977,8 +977,9 @@ Deno.test('same-join-id retry: a second work-order create '
     assertStrictEquals(first.status, 201);
 
     // A DIFFERENT work order, a DIFFERENT operation (fresh event
-    // ids) — not a byte-identical resend, which would replay via
-    // the E6 fast path and append no second pair at all.
+    // ids) — not a byte-identical resend, which its handler's
+    // genesis latch would refuse, 409, appending no second pair
+    // at all.
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
         createWorkOrderBody(

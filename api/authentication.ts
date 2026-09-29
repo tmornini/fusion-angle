@@ -873,12 +873,10 @@ function rotationWrite(
 // truth for the atomic rotate. The received pair lands only
 // on the 'rotate' branch; a replay lands the chain's
 // revocation alone, and an unknown jti lands nothing. The
-// route is REPLAY_EXEMPT_ROUTE_PATTERNS-wired
-// (message-pair.ts / api.ts): the gate never serves a stored
-// response for a byte-identical resend of this route, so a
-// resent reuse attempt genuinely re-enters this function and
-// re-fails — this function's own re-check IS the guard the
-// exemption relies on; it must stay live on every call.
+// gate serves no stored response for a resend, so a resent
+// reuse attempt genuinely re-enters this function and
+// re-fails — this function's own re-check IS the reuse
+// guard; it must stay live on every call.
 //
 // The write is formed outside the transaction, which awaits
 // only row ops (AGENTS.md). Inside it, the heads are read

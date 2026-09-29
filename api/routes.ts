@@ -1107,10 +1107,10 @@ async function postRecordTypeEditOp(
 // instead, and this helper reads it straight back so the seed's
 // write still carries it — inert for the fenced route
 // (overwritten either way regardless of what this returns),
-// load-bearing for the seed. Seven sites now share this exact
-// shape (ideas, projects, flows, work-orders, records,
-// record-attributes, objectives) — past the rule-of-three, so
-// it is extracted once rather than duplicated a seventh time.
+// load-bearing for the seed. Six sites now share this exact
+// shape (ideas, projects, flows, records, record-attributes,
+// objectives) — past the rule-of-three, so it is extracted
+// once rather than duplicated a sixth time.
 function documentOperationOrganization(
     body: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -3010,8 +3010,9 @@ export const WRITE_RESPONSE_SPECS:
         },
         delete: { conditional: 'optional' },
     },
-    // Instances: PATCH creates with If-None-Match: * and
-    // updates with If-Match; the former answers the state.
+    // Instances: a PATCH declares a create with
+    // If-None-Match: *; If-Match names the head it follows.
+    // The former answers the state.
     [INSTANCE_DETAIL_PATTERN]: {
         patch: { conditional: 'required' },
         delete: { conditional: 'optional' },
@@ -4075,10 +4076,9 @@ export const routes: Route[] = [
     // answers its successor's state; a known-but-not-live
     // jti is reuse — the whole chain's revocation has already
     // landed atomically — then 409. Operation path (name
-    // ''). The gate never serves a stored response for a
-    // byte-identical resend of this route, so this handler
-    // always re-enters and re-checks the reuse guard for
-    // real. The received pair lands only on the 'rotate'
+    // ''). A byte-identical resend re-enters this handler,
+    // which re-checks the reuse guard for real. The
+    // received pair lands only on the 'rotate'
     // branch, so a 409 (reuse, unknown, or contention)
     // stores no pair even though the reuse branch still
     // revokes the chain for real.

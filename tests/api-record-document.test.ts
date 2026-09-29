@@ -249,16 +249,16 @@ Deno.test('postRecordDocumentOp with a new state writes a'
     );
 });
 
-// -- 3. the fast-path sibling pin (added at the fold commit,
+// -- 3. the resend sibling pin (added at the fold commit,
 // now that RECORDS_WIRING wires records/:id onto this op) ---
 //
-// The gate's pre-tx idempotency fast path (api.ts) replays a
-// byte-identical resend's STORED response without re-dispatching
-// to the op — sibling of api-idea-document.test.ts's own "a
-// byte-identical resend converges: one pair".
+// The statement matches a byte-identical resend against the
+// head and stores nothing (Decision 11) — sibling of
+// api-idea-document.test.ts's own "a byte-identical resend
+// converges: one pair".
 
-Deno.test('a byte-identical resend replays the stored response:'
-+ ' one pair', async () => {
+Deno.test('a byte-identical resend stores nothing: one pair',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const body = recordDocument('Idempotent', 'active');

@@ -198,9 +198,9 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     assert(firstId);
 
     // A genuinely DIFFERENT body (a second save's own response
-    // id) — a byte-identical resend would instead hit the gate's
-    // pre-tx idempotency fast path and replay the first response
-    // unchanged (message-pair.ts), never forming a second pair.
+    // id) — a byte-identical resend would instead match the
+    // head and store nothing (Decision 11), never forming a
+    // second pair.
     const saved = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cGVtCERtMGxhyNGAsQBBuQ', token,

@@ -215,17 +215,13 @@ Deno.test('postWorkOrderDocumentOp lands the version as the'
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
-// -- 3. byte-identical resend (the shadow-ledger pin's sibling
+// -- 3. a same-body resend (the shadow-ledger pin's sibling
 // at the op level — see tests/api-idea-document.test.ts's own
-// "a byte-identical resend converges" case). This exercises the
-// CURRENT hand-written organizations/:id/work-orders/:id PUT (unchanged until
-// the
-// absorption commit registers WORK_ORDERS_WIRING) — the fast
-// path lives at the gate (api.ts), agnostic to which op serves
-// the route, so this pin holds unchanged straight through the
-// absorption (finding 11: wire-byte parity). -----------------
+// "a byte-identical resend converges" case). The resend names
+// the head with If-Match; the statement matches its body
+// against that head, so nothing lands (Decision 11). --------
 
-Deno.test('a byte-identical PUT resend to'
+Deno.test('a same-body PUT resend under the head\'s tag to'
     + ' organizations/:id/work-orders/:id converges'
 + ' to one stored request/response pair', async () => {
     const db = await freshDb();

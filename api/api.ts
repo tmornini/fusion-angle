@@ -866,15 +866,14 @@ async function dispatched(
                     organization,
                     body,
                 });
-            // DELETE responses are UNIVERSALLY 204 with no
-            // body — every wired DELETE handler returns void
-            // (message-pair.ts resolution: DELETEs join their
-            // family's document class but never carry a
-            // response body). The gate short-circuits the spec
-            // lookup for DELETE rather than asking
+            // A DELETE has no write response spec: its
+            // handler forms its answer — a tombstone's 204
+            // with no body, or the claim release's 200 with
+            // the work order's state. The gate short-circuits
+            // the spec lookup for DELETE rather than asking
             // WRITE_RESPONSE_SPECS to key by (pattern, verb):
             // a route pattern can carry BOTH a PUT (200, its
-            // written row) and a DELETE (204) — the map's one
+            // written row) and a DELETE — the map's one
             // entry per pattern serves the PUT/POST verb only.
             // The rare pattern that wires BOTH a PUT and a POST
             // with genuinely different shapes (ai-members/:id),

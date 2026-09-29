@@ -140,9 +140,9 @@ Deno.test(
 // retry-convergence pin (the tx is still atomic — proven above
 // by the rollback case). E6: the id and state are minted
 // ONCE by the caller; a byte-identical resend of the SAME
-// genesis PUT must hit the idempotency fold — one idea, one
-// genesis event, one stored pair — never a second row or a
-// second event.
+// genesis PUT matches the head and stores nothing — one idea,
+// one genesis event, one stored pair — never a second row or
+// a second event.
 Deno.test(
     'a byte-identical resend of a genesis PUT converges:'
     + ' one idea, one pair',
