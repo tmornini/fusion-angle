@@ -270,6 +270,15 @@ Page URLs use relative paths (`/ideas/` or
 `/ideas/index.html`). The API is `/api/…`. One origin
 (`Deno.serve` inside the compiled binary). Testing is HTTP-only.
 
+### Follow the RFCs
+
+Where an RFC speaks, the product follows it, RFC 9110
+first. A conditional that fails answers what the RFC says
+even when another status reads friendlier: an `If-Match`
+that names no current representation answers 412, even
+for an id never written (RFC 9110 §13.1.1), and a retired
+instance answers 410 Gone (§15.5.11).
+
 ### node:crypto scrypt
 
 `server/scrypt-hash.ts` is the one product-process `node:` import
