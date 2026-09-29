@@ -422,9 +422,12 @@ TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
 `tests/tz/*.test.ts` timezone suite; AT2 without
-`POSTGRES_URL` skips the seven `pg-*.test.ts` /
-`schema-lifecycle.test.ts` stubs, and after AT4 those
-seven run. The number grows as tests land in either
+`POSTGRES_URL` ignores eight live-Postgres
+placeholders — one in each of the seven
+`pg-*.test.ts` files and one in
+`schema-lifecycle.test.ts` — and AT4 runs those eight
+files against its own Postgres. The number grows as
+tests land in either
 glob and is not pinned here. Update the case count
 when a case is added or removed.
 
@@ -447,7 +450,7 @@ any AT red.
 - [ ] **AT1** Run `deno check --frozen api shared server
   tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, today `ok | 3490 passed | 0 failed | 7 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, on 29 Sep `ok | 3622 passed | 0 failed | 8 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite. The eight ignored are the live-Postgres placeholders — one in each of the seven `pg-*.test.ts` files and one in `schema-lifecycle.test.ts` — which skip without `POSTGRES_URL`; AT4 runs those files.
   Pin: exploratory — the command is its own witness
 - [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, and `bin/postgres-seed`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
@@ -455,9 +458,12 @@ any AT red.
   owns its own Docker Postgres, not the
   walk DB. The suite creates and drops
   its own `fusion_test_*` schema. PASS:
-  exits 0, `ok | 52 passed | 0 failed`
-  across the seven files. `./test validate`
-  stays Postgres-free.
+  exits 0, `ok | N passed | 0 failed`
+  across the eight files `bin/test-postgres`
+  names — the seven `pg-*.test.ts` and
+  `schema-lifecycle.test.ts`; on 29 Sep
+  `ok | 67 passed | 0 failed`.
+  `./test validate` stays Postgres-free.
   Pin: exploratory — the command is its own witness
 - [ ] **AT5** Run `./test browser`. It bundles the client with
   `deno bundle` into `$TMPDIR` and runs `TZ=UTC deno
@@ -483,7 +489,7 @@ any AT red.
 - [ ] **A1** Run `./bin/build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-${SHA}.zip`.
   Pin: exploratory — the exit code and the ZIP
        file appearing on disk
-- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
+- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with content-hashed assets — `assets/app.<hash>.js` (plus its code-split chunks), `assets/styles.<hash>.css`, the `pages-*.<hash>.css` bundles, and the `*.<hash>.woff2` fonts, where each `<hash>` is sixteen lowercase hex digits that change with the file's content, so read a build's names from its `site/asset-manifest.json` rather than expecting fixed ones — 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
   The 29 are the `PAGE_REGISTRY` HTML files; do
   **not** count root `index.html` inside the 29
   (it stays the separate "plus root `index.html`");
@@ -494,8 +500,9 @@ any AT red.
        actually emits those 29 files (the eight named
        above included) into `site/`, the 18
        directories, the `fusion-angle` executable,
-       `site/assets/app.js`, `site/assets/styles.css`,
-       the fonts, and the generated verb/status rooms
+       the hashed `site/assets/app.<hash>.js` and
+       `site/assets/styles.<hash>.css`, the fonts, and
+       the generated verb/status rooms
 - [ ] **A3** `./deploy --local 8080 --postgres
   mock-data`. Deploy validates, mints secrets,
   starts compose postgres and server, wipes,
@@ -2645,15 +2652,17 @@ opens and renders.)
        regression swapping green and red survives it. Also
        exploratory: the 3-px width, the centred label, and
        the attribute-count subtitle
-- [ ] **F9** On Layout Test — whose "revise" and "back to
-  draft" edges close loops — edges render by class:
-  forward edges are solid blue lines with arrow markers
-  and named labels. Cycle edges, those that close a loop
-  because a return path from target back to source already
-  exists in the graph, are dashed orange with a warning
-  arrow. Sibling transitions between nodes that have no
-  return path render solid blue even when they share a
-  level.
+- [ ] **F9** On Layout Test, edges render by class.
+  Forward edges are solid primary (blue) lines with arrow
+  markers and named labels. A cycle edge is a back-edge of
+  the depth-first walk from Create — an edge into a node
+  still on the walk's current path — and renders dashed
+  warning (orange) with a warning arrow. Layout Test has
+  exactly one: "back to draft" (Revise → Draft).
+  "revise" (Decision → Revise) is a solid primary forward
+  edge into that loop, not a cycle edge. Sibling
+  transitions between nodes that have no return path
+  render solid primary even when they share a level.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to an
        ancestor is a cycle edge' (decides the back-edge
        classification the dashed-orange paint follows);
@@ -2908,19 +2917,26 @@ opens and renders.)
        exploratory — the preview's painted colour and its
        match to the committed edge
 - [ ] **F21** Shift-drag backward (later node →
-  earlier node). PASS: the curved preview is
-  dashed orange with a warning arrow while over
-  the target — the reachability check recognises
-  that target → … → source already exists. The
-  committed cycle edge matches the preview.
+  earlier node). PASS: while over the target the
+  curved preview is dashed warning (orange) with a
+  warning arrow — the preview follows the
+  reachability check, which recognises that target →
+  … → source already exists. The committed
+  Transition follows F9's depth-first back-edge rule
+  instead, so it may render solid primary (blue): on
+  29 Sep it did, and "back to draft" (Revise → Draft)
+  stayed the only dashed cycle edge. The preview and
+  the committed edge follow different rules and need
+  not match.
   Pin: tests/flow-layout.test.ts 'wouldBeCycle: backward
        edge creates cycle' (decides the reachability check
-       flags the backward edge before it is committed);
-       tests/flow-cycle-edges.test.ts 'a back-edge to an
-       ancestor is a cycle edge' (decides the committed
-       edge is classified as a cycle, which is what dashes
-       and colours it); exploratory — the painted
-       dashed-orange preview
+       that dashes the preview before the edge is
+       committed); tests/flow-cycle-edges.test.ts 'a
+       back-edge to an ancestor is a cycle edge' (decides
+       the committed edge's class by the depth-first
+       back-edge rule, which the reachability check does
+       not share); exploratory — the painted dashed-orange
+       preview and the committed edge's solid paint
 - [ ] **F22** Shift-drag and release in empty
   canvas (no node under cursor). PASS: the grey
   straight-line preview disappears and nothing
@@ -5669,24 +5685,28 @@ FSM, unlike `flows/detail`).
   orgs (`shouldShowOrganizationSwitcher`). PASS: the
   select lists "Stark Industries" and "Wayne
   Enterprises" with Stark active, alongside a "Set as
-  default" control (`.org-set-default`); the plain
-  org-name text line in the chip is cleared so the org is
-  not named twice. Note the Members and Ideas lists for
-  Stark. Select "Wayne Enterprises" → the page does a
-  FULL reload and re-scopes: Members shows Wayne's
-  roster and Ideas shows Wayne's ideas (org-fenced —
-  Stark's rows are no longer visible). Reload the page
-  again WITHOUT changing the select → the selection
-  persists (Wayne stays active; the choice is stored
-  under `fusion-angle:active-organization-id` and boot
-  re-exchanges a scoped token from it). A single-org
-  seeded user, by contrast, sees NO `<select>` in the
-  sidebar — just the org name as PLAIN TEXT in the
-  chip. The top bar shows neither the switcher nor a
-  greeting; its only org-aware affordance is the
+  default" control (`.org-set-default`); the chip names
+  only the signed-in person — its org-name line is
+  cleared so the org is not named twice. Note the Ideas
+  and Members lists for Stark. Select "Wayne
+  Enterprises" → the page does a FULL reload onto
+  Wayne: Ideas shows Wayne's ideas and Members shows
+  Wayne's humans (org-fenced — Stark's rows are no
+  longer visible). Reload the page again WITHOUT
+  changing the select → Wayne stays active (the choice
+  is stored under `fusion-angle:active-organization-id`
+  and boot re-exchanges a scoped token from it). A
+  Wayne-only member, such as
+  `mike.thompson@company.com`, sees NO `<select>` in
+  the sidebar — just "Wayne Enterprises" as PLAIN TEXT
+  in the chip under their name. The top bar carries
+  neither the switcher nor a greeting, yet it still
+  names the active org as a read-only stat: the first
+  label of its stat strip (`#header-stats`), beside the
   pending-invitations bell (V3). Source of truth:
   `web-app/app/organization-switcher.ts`,
   `web-app/app/sidebar-member.ts`,
+  `web-app/app/header-info.ts`,
   `web-app/app/adapters/organization-session.ts`,
   `web-app/app/app-boot.ts::scopeBootToActiveOrganization`.
   Pin: tests/adapters-organization-session-exchange.test.ts
@@ -5711,8 +5731,9 @@ FSM, unlike `flows/detail`).
        wins mechanism behind the reload-persistence
        clause); exploratory — the live full-page reload,
        the plain-text-vs-select rendering for a
-       single-org user, and the top bar carrying neither
-       switcher nor greeting
+       Wayne-only member, and the top bar carrying
+       neither switcher nor greeting while its stat strip
+       names the org read-only
 - [ ] **G41** Person and agent writes land on the message
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
@@ -6513,20 +6534,30 @@ NPS", and "Improve employee morale" are not.
        descending with no-score last'; exploratory — the
        live sort-control click and re-order
 - [ ] **K26** Filter to `under_review` status + sort by
-  Projected Impact descending. Three seeded `under_review`
-  mock projects, high first: Workforce Capacity
-  Forecasting, Predictive Maintenance System, Employee
-  Training Assistant. PASS if those three rows render,
-  ranked high first — the "review queue ranked by impact"
-  workflow we designed.
+  Projected Impact descending. Four rows render: the
+  three seeded `under_review` projects — Workforce
+  Capacity Forecasting (+79), Predictive Maintenance
+  System (+1), and Employee Training Assistant (no
+  baselines, "—") — plus AA22a's converted project,
+  which AA23 left `under_review`. PASS if the three
+  seeded titles rank high-to-low in that order with
+  Employee Training Assistant last, and the converted
+  row sits wherever its own projected impact places it.
+  That value comes from the baselines this walk dragged
+  in AA22 and AA22a, so its slot varies by walk: on
+  29 Sep it read +55, between Workforce Capacity
+  Forecasting and Predictive Maintenance System. This
+  is the "review queue ranked by impact" workflow we
+  designed.
   Pin: tests/presenter-projects-list-column.test.ts
        'applyProjectSortToggle orders by projected impact
        descending with no-score last' (decides the
        descending-with-absent-last ordering mechanism);
        exploratory — the live filter-to-`under_review`,
-       and that these three seeded projects rank in this
+       that these three seeded projects rank in this
        order (a seed-data fact, not a product covenant a
-       unit test should pin)
+       unit test should pin), and where AA22a's converted
+       row lands among them
 
 ### K27–K29 — Dashboard Impact + Aggregates
 
