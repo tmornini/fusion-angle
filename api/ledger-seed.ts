@@ -148,7 +148,7 @@ function withoutRequest(bind: StatementBind): StatementBind {
 // one transaction open on the scratch, which nothing else
 // uses: the ops' own transactions and reads re-enter it,
 // and a bare statement applies on it, so the statements
-// overlap as a transaction's do. It keeps openClient's
+// overlap as a transaction's do. It keeps the seed's
 // verdict beneath the adapter: a matched, stale, or
 // refused row fails the seed. A conflict must not reach
 // runWrite, which would retry and answer refused. A wave's

@@ -1,12 +1,10 @@
-import { assert, assertEquals, assertStrictEquals } from
-    '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
 import { deriveIdentityPiiRows } from
     '../api/derive-identity-spine.ts';
 import {
-    deriveInvitation,
     deriveInvitations,
 } from '../api/derive-invitations.ts';
 import {
@@ -26,8 +24,6 @@ const INV_REHOME_PARITY_1_GRANT = generateIdentifier();
 const INV_REHOME_PARITY_1_DECLINE = generateIdentifier();
 const INV_REHOME_PARITY_2 = generateIdentifier();
 const INV_REHOME_PARITY_2_GRANT = generateIdentifier();
-const INV_REHOME_LOAD_1 = generateIdentifier();
-const INV_REHOME_LOAD_1_GRANT = generateIdentifier();
 
 // Phase 15 gate 6 parity pins: the re-homes that close
 // Author gate 6 for the exit census.
@@ -157,33 +153,4 @@ Deno.test('pendingInvitationFor lifecycle on the message plane'
         INV_REHOME_PARITY_2,
     );
     // Phase Final Stage B: roster tables retired.
-});
-
-Deno.test('deriveInvitation (one document read) equals'
-+ ' deriveInvitations find-by-id, and is undefined for an'
-+ ' unknown id', async () => {
-    const db = await seededDb();
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
-    const grant = await handleRequest(db, req(
-        'POST', '/organizations/' + ORGANIZATION_TWO
-            + '/invitations/', admin, {
-            email: 'sarah.chen@company.com',
-            invitationId: INV_REHOME_LOAD_1,
-            grantEventId: INV_REHOME_LOAD_1_GRANT,
-            grantAt: '2026-06-02T00:00:00.000000Z',
-        },
-    ));
-    assertStrictEquals(grant.status, 201);
-
-    assertEquals(
-        await deriveInvitation(db, INV_REHOME_LOAD_1),
-        (await deriveInvitations(db))
-            .find(r => r.id === INV_REHOME_LOAD_1),
-    );
-
-    assertEquals(
-        await deriveInvitation(db, generateIdentifier()),
-        undefined,
-    );
 });

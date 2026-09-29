@@ -7,11 +7,11 @@ import {
     deriveIdentityPiiRows,
 } from '../api/derive-identity-spine.ts';
 import {
-    deriveInvitation,
     deriveInvitations,
 } from '../api/derive-invitations.ts';
 import {
     getIdentityInvitations,
+    getInvitationOnIdentityNest,
 } from '../api/invitations-domain.ts';
 import {
     buildUnaffiliatedIdentity,
@@ -62,8 +62,13 @@ Deno.test('the unaffiliated identity holds exactly one'
         invitation.organization_id, STARK_ORGANIZATION,
     );
     assertStrictEquals(invitation.state, 'pending');
+    // The invitee's own read of the invitation's head agrees.
+    const read = await getInvitationOnIdentityNest(
+        db, [unaffiliated.id, invitation.id], unaffiliated.id,
+        undefined, [],
+    ) as Response;
     assertStrictEquals(
-        (await deriveInvitation(db, invitation.id))?.state,
+        (await read.json() as { state: string }).state,
         'pending',
     );
 });

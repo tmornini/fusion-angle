@@ -1,6 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
-    invitationLifecycleStatesFor,
     deriveInvitationStates,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
@@ -124,6 +123,23 @@ function req(
         body,
         ...(operationId !== undefined ? { operationId } : {}),
     });
+}
+
+// A Wayne invitation's versions as Tony, its admin, reads
+// them: newest first, each with its etag, arrival, and
+// author.
+async function versionsOf(
+    db: MemoryDbAdapter,
+    id: string,
+): Promise<{ etag: string; at: string; member_id: string }[]> {
+    const res = await handleRequest(db, req(
+        'GET', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
+            + id + '/versions/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+            , 'BBjWJsjYIDkTRKIIPrzWRw'),
+    ));
+    assertStrictEquals(res.status, 200);
+    return await res.json();
 }
 
 // Stark 'AjdvjuECVZEgZoFajaIEkg' and Wayne 'BBjWJsjYIDkTRKIIPrzWRw'. Tony
@@ -368,26 +384,17 @@ async () => {
             tok, body, operationId));
     assertStrictEquals(r2.status, 409);
     assertStrictEquals((await deriveInvitations(db)).length, 1);
-    assertStrictEquals(
-        (await invitationLifecycleStatesFor(db, INV_IDEM)).length, 1,
-    );
-    // The pending row is the grant's own document PUT.
-    const life = await invitationLifecycleStatesFor(
-        db, INV_IDEM,
-    );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
+    const versions = await versionsOf(db, INV_IDEM);
+    assertStrictEquals(versions.length, 1);
+    // The pending version is the grant's own document PUT.
+    const ev = versions[0]!;
     const [grantPut] = documentMessagePairsAt(
         await db.messagePairs.getDocumentHistory(
             '/invitations/', INV_IDEM,
         ),
         '/invitations/',
     );
-    assertStrictEquals(ev.id, grantPut!.id);
+    assertStrictEquals(ev.etag, grantPut!.id);
     assertStrictEquals(ev.at, grantPut!.at);
 });
 
@@ -426,27 +433,17 @@ async () => {
             + 'hasVDnGjEylAnJDTPjnZuQ',
         sTok, accBody, operationId)));
     assertStrictEquals(UZgNCkZlSJcSaAmAJuSkcw.status, 200);
-    assertStrictEquals(
-        (await invitationLifecycleStatesFor(db
-            , 'hasVDnGjEylAnJDTPjnZuQ')).length, 2,
-    );
-    // The accepted row is the terminal PUT's own pair.
-    const life = await invitationLifecycleStatesFor(
-        db, 'hasVDnGjEylAnJDTPjnZuQ',
-    );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
+    const versions = await versionsOf(db, 'hasVDnGjEylAnJDTPjnZuQ');
+    assertStrictEquals(versions.length, 2);
+    // The accepted version is the terminal PUT's own pair.
+    const ev = versions[0]!;
     const terminalPut = documentMessagePairsAt(
         await db.messagePairs.getDocumentHistory(
             '/invitations/', 'hasVDnGjEylAnJDTPjnZuQ',
         ),
         '/invitations/',
     ).at(-1)!;
-    assertStrictEquals(ev.id, terminalPut.id);
+    assertStrictEquals(ev.etag, terminalPut.id);
     assertStrictEquals(ev.at, terminalPut.at);
     assertStrictEquals(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
 });
@@ -483,27 +480,17 @@ async () => {
             + 'hlmIVMfGBbdTSoChNYsQkQ',
         sTok, decBody, operationId)));
     assertStrictEquals(d2.status, 200);
-    assertStrictEquals(
-        (await invitationLifecycleStatesFor(db
-            , 'hlmIVMfGBbdTSoChNYsQkQ')).length, 2,
-    );
-    // The declined row is the terminal PUT's own pair.
-    const life = await invitationLifecycleStatesFor(
-        db, 'hlmIVMfGBbdTSoChNYsQkQ',
-    );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
+    const versions = await versionsOf(db, 'hlmIVMfGBbdTSoChNYsQkQ');
+    assertStrictEquals(versions.length, 2);
+    // The declined version is the terminal PUT's own pair.
+    const ev = versions[0]!;
     const terminalPut = documentMessagePairsAt(
         await db.messagePairs.getDocumentHistory(
             '/invitations/', 'hlmIVMfGBbdTSoChNYsQkQ',
         ),
         '/invitations/',
     ).at(-1)!;
-    assertStrictEquals(ev.id, terminalPut.id);
+    assertStrictEquals(ev.etag, terminalPut.id);
     assertStrictEquals(ev.at, terminalPut.at);
 });
 
@@ -537,27 +524,17 @@ async () => {
             + 'itekPiJIBiPQhcZveiqTKw',
         tok, revBody, operationId)));
     assertStrictEquals(r2.status, 200);
-    assertStrictEquals(
-        (await invitationLifecycleStatesFor(db
-            , 'itekPiJIBiPQhcZveiqTKw')).length, 2,
-    );
-    // The revoked row is the terminal PUT's own pair.
-    const life = await invitationLifecycleStatesFor(
-        db, 'itekPiJIBiPQhcZveiqTKw',
-    );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
+    const versions = await versionsOf(db, 'itekPiJIBiPQhcZveiqTKw');
+    assertStrictEquals(versions.length, 2);
+    // The revoked version is the terminal PUT's own pair.
+    const ev = versions[0]!;
     const terminalPut = documentMessagePairsAt(
         await db.messagePairs.getDocumentHistory(
             '/invitations/', 'itekPiJIBiPQhcZveiqTKw',
         ),
         '/invitations/',
     ).at(-1)!;
-    assertStrictEquals(ev.id, terminalPut.id);
+    assertStrictEquals(ev.etag, terminalPut.id);
     assertStrictEquals(ev.at, terminalPut.at);
     assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
@@ -764,7 +741,7 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw')));
     assertStrictEquals(del.status, 204);
-    const statesBefore = (await invitationLifecycleStatesFor(db, id)).length;
+    const versionsBefore = (await versionsOf(db, id)).length;
     const reaccept = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
@@ -781,7 +758,7 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
             && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
     assertEquals(sarahInWayne, []);
     assertStrictEquals(
-        (await invitationLifecycleStatesFor(db, id)).length, statesBefore,
+        (await versionsOf(db, id)).length, versionsBefore,
     );
 });
 

@@ -65,7 +65,7 @@ Deno.test(
         const seen = await db.backend.transaction(
             'readwrite',
             async (tx) => {
-                const view = db.openClient(tx);
+                const view = db.clientOn(tx);
                 await view.messagePairs.append(
                     PAIR_ID, aMessagePair,
                 );

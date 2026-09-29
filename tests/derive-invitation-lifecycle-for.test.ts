@@ -3,7 +3,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     deriveInvitationStates,
-    invitationLifecycleStatesFor,
 } from '../api/derive-states.ts';
 import {
     ORGANIZATION_TWO,
@@ -19,13 +18,12 @@ import {
     compareIdentifiers,
 } from '../shared/identifier.ts';
 
-// invitationLifecycleStatesFor reads ONE invitation document's
-// own PUT history (api/derive-states.ts) — the grant's 'pending'
-// PUT, then the terminal PUT — via getDocumentHistory, rather
-// than the whole-collection scan deriveInvitationStates needs
-// to DISCOVER every id. This file proves it byte-identical to
-// deriveInvitationStates's own per-entity subset over the same
-// three live lifecycles plus pending and never-granted.
+// An invitation's version list (GET …/invitations/:id/versions/)
+// reads ONE document's own PUT history — the grant's 'pending'
+// PUT, then the terminal PUT — rather than the whole-collection
+// scan deriveInvitationStates needs to DISCOVER every id. This
+// file proves the two agree, version for row, over the three
+// live lifecycles plus pending and never-granted.
 
 function req(
     method: string,
@@ -75,7 +73,41 @@ async function bulkRowsFor(
         .sort((a, b) => compareIdentifiers(a.id, b.id));
 }
 
-Deno.test('invitationLifecycleStatesFor: pending-only (granted,'
+// The invitation's versions as its organization's admin
+// reads them, in the lifecycle row's shape: pair id, state,
+// author, and arrival, sorted as bulkRowsFor sorts. Null
+// when the read answers 404.
+async function versionRowsFor(
+    db: MemoryDbAdapter, id: string,
+): Promise<unknown[] | null> {
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
+    );
+    const res = await handleRequest(db, req(
+        'GET', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/' + id + '/versions/', admin,
+    ));
+    if (res.status === 404) {
+        await res.body?.cancel();
+        return null;
+    }
+    assertStrictEquals(res.status, 200);
+    const versions = await res.json() as {
+        etag: string;
+        state: string;
+        member_id: string;
+        at: string;
+    }[];
+    return versions.map((version) => ({
+        id: version.etag,
+        entity_id: id,
+        state: version.state,
+        member_id: version.member_id,
+        at: version.at,
+    })).sort((a, b) => compareIdentifiers(a.id, b.id));
+}
+
+Deno.test('the version list: pending-only (granted,'
 + ' unanswered) matches deriveInvitationStates\'s own subset',
 async () => {
     const db = await seededDb();
@@ -83,7 +115,10 @@ async () => {
     const grantEventId = generateIdentifier();
     await grant(db, id, 'sarah.chen@company.com', grantEventId);
 
-    const scoped = await invitationLifecycleStatesFor(db, id);
+    const scoped = await versionRowsFor(db, id) as {
+        state: string;
+        member_id: string;
+    }[];
     assertStrictEquals(scoped.length, 1);
     assertStrictEquals(scoped[0]!.state, 'pending');
     assertStrictEquals(
@@ -92,7 +127,7 @@ async () => {
     assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-Deno.test('invitationLifecycleStatesFor: accepted carries both the'
+Deno.test('the version list: accepted carries both the'
 + ' pending and accepted rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
@@ -113,7 +148,9 @@ async () => {
     )));
     assertStrictEquals(accept.status, 200);
 
-    const scoped = await invitationLifecycleStatesFor(db, id);
+    const scoped = await versionRowsFor(db, id) as {
+        state: string;
+    }[];
     assertStrictEquals(scoped.length, 2);
     assertEquals(
         scoped.map((row) => row.state).sort(),
@@ -122,7 +159,7 @@ async () => {
     assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-Deno.test('invitationLifecycleStatesFor: declined carries both the'
+Deno.test('the version list: declined carries both the'
 + ' pending and declined rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
@@ -142,7 +179,9 @@ async () => {
     )));
     assertStrictEquals(decline.status, 200);
 
-    const scoped = await invitationLifecycleStatesFor(db, id);
+    const scoped = await versionRowsFor(db, id) as {
+        state: string;
+    }[];
     assertStrictEquals(scoped.length, 2);
     assertEquals(
         scoped.map((row) => row.state).sort(),
@@ -151,7 +190,7 @@ async () => {
     assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-Deno.test('invitationLifecycleStatesFor: revoked carries both the'
+Deno.test('the version list: revoked carries both the'
 + ' pending and revoked rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
@@ -171,7 +210,9 @@ async () => {
     )));
     assertStrictEquals(revoke.status, 200);
 
-    const scoped = await invitationLifecycleStatesFor(db, id);
+    const scoped = await versionRowsFor(db, id) as {
+        state: string;
+    }[];
     assertStrictEquals(scoped.length, 2);
     assertEquals(
         scoped.map((row) => row.state).sort(),
@@ -180,22 +221,19 @@ async () => {
     assertEquals(scoped, await bulkRowsFor(db, id));
 });
 
-Deno.test('invitationLifecycleStatesFor: a never-granted id derives'
-+ ' an empty array, no throw', async () => {
+Deno.test('the version list: a never-granted id answers 404,'
++ ' and the bulk lifecycle has no row for it', async () => {
     const db = await seededDb();
-    await invitationLifecycleStatesFor(db, generateIdentifier());
     const missingId = generateIdentifier();
-    assertEquals(
-        await invitationLifecycleStatesFor(db, missingId),
-        [],
-    );
+    assertStrictEquals(await versionRowsFor(db, missingId), null);
+    assertEquals(await bulkRowsFor(db, missingId), []);
 });
 
 // -- the phantom-echo id: no document, so no rows ------------------
 
-Deno.test('invitationLifecycleStatesFor: a duplicate-grant\'s'
-+ ' echo id (no document ever written there) derives an EMPTY'
-+ ' array — structurally, not by cross-reference',
+Deno.test('the version list: a duplicate-grant\'s echo id (no'
++ ' document ever written there) answers 404 — structurally,'
++ ' not by cross-reference',
 async () => {
     const db = await seededDb();
     const freshId = generateIdentifier();
@@ -223,18 +261,16 @@ async () => {
     const echoBody = await echoRes.json() as { id: string };
     assertStrictEquals(echoBody.id, freshId);
 
-    assertEquals(
-        await invitationLifecycleStatesFor(db, echoId), [],
-    );
+    assertStrictEquals(await versionRowsFor(db, echoId), null);
     assertEquals(
         await bulkRowsFor(db, echoId), [],
     );
 
     // The FRESH id's own single pending row is untouched by the
     // echo.
-    const freshRows = await invitationLifecycleStatesFor(
-        db, freshId,
-    );
+    const freshRows = await versionRowsFor(db, freshId) as {
+        state: string;
+    }[];
     assertStrictEquals(freshRows.length, 1);
     assertStrictEquals(freshRows[0]!.state, 'pending');
 });
