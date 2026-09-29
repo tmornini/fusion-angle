@@ -187,8 +187,11 @@ export class MemoryStorageBackend
                 inserted: item.inserted,
                 supersedes: item.supersedes,
                 requestHashHex: item.requestHashHex,
-                secretHashHex: item.secretHashHex,
+                requestSecretsHashHex:
+                    item.requestSecretsHashHex,
                 responseHashHex: item.responseHashHex,
+                responseSecretsHashHex:
+                    item.responseSecretsHashHex,
                 pairHashHex: item.pairHashHex,
             });
         }
@@ -369,8 +372,9 @@ function entityOf(
         stamp: string,
         response: Uint8Array,
         requestHashHex: string,
-        secretHashHex: string,
+        requestSecretsHashHex: string,
         responseHashHex: string,
+        responseSecretsHashHex: string,
         pairHashHex: string,
     },
 ): { id: string } {
@@ -386,11 +390,13 @@ function entityOf(
         request: latin1(row.request),
         request_salt: hexOf(row.requestSalt),
         request_hash: item.requestHashHex,
-        secret: latin1(row.secret),
-        secret_hash: item.secretHashHex,
+        request_secrets: latin1(row.requestSecrets),
+        request_secrets_hash: item.requestSecretsHashHex,
         response: latin1(item.response),
         response_salt: hexOf(row.responseSalt),
         response_hash: item.responseHashHex,
+        response_secrets: latin1(row.responseSecrets),
+        response_secrets_hash: item.responseSecretsHashHex,
         pair_hash: item.pairHashHex,
     };
     return entity as { id: string };

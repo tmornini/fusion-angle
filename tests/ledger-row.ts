@@ -12,7 +12,7 @@ import {
 import {
     leafHashHex,
     pairRootHex,
-    secretHashHex,
+    secretsHashHex,
 } from '../shared/pair-root.ts';
 
 const ZERO_SALT = '00'.repeat(16);
@@ -28,7 +28,8 @@ export type LedgerSeed = {
     readonly response: string,
     readonly operation_id: string,
     readonly supersedes?: string,
-    readonly secret?: string,
+    readonly request_secrets?: string,
+    readonly response_secrets?: string,
 };
 
 function bytesOf(text: string): Uint8Array {
@@ -66,19 +67,23 @@ export async function ledgerFields(
 ): Promise<Omit<MessagePairEntity, 'id'>> {
     const supersedes = seed.supersedes
         ?? NIL_IDENTIFIER;
-    const secret = seed.secret ?? '';
+    const requestSecrets = seed.request_secrets ?? '';
+    const responseSecrets = seed.response_secrets ?? '';
     const requestSalt = ZERO_SALT;
     const responseSalt = ZERO_SALT;
     const requestHash = await leafHashHex(
         bytesOfHex(requestSalt),
         bytesOf(seed.request),
     );
-    const secretHash = await secretHashHex(
-        bytesOf(secret),
+    const requestSecretsHash = await secretsHashHex(
+        bytesOf(requestSecrets),
     );
     const responseHash = await leafHashHex(
         bytesOfHex(responseSalt),
         bytesOf(seed.response),
+    );
+    const responseSecretsHash = await secretsHashHex(
+        bytesOf(responseSecrets),
     );
     const pairHash = await pairRootHex({
         id: rootText(seed.id),
@@ -92,8 +97,9 @@ export async function ledgerFields(
         method: seed.method,
         responseAt: seed.response_at,
         requestHashHex: requestHash,
-        secretHashHex: secretHash,
+        requestSecretsHashHex: requestSecretsHash,
         responseHashHex: responseHash,
+        responseSecretsHashHex: responseSecretsHash,
     });
     return {
         operation_id: seed.operation_id,
@@ -106,11 +112,13 @@ export async function ledgerFields(
         request: seed.request,
         request_salt: requestSalt,
         request_hash: requestHash,
-        secret,
-        secret_hash: secretHash,
+        request_secrets: requestSecrets,
+        request_secrets_hash: requestSecretsHash,
         response: seed.response,
         response_salt: responseSalt,
         response_hash: responseHash,
+        response_secrets: responseSecrets,
+        response_secrets_hash: responseSecretsHash,
         pair_hash: pairHash,
     };
 }

@@ -202,7 +202,9 @@ async () => {
         false,
     );
     assert(
-        authorizeRequest!.secret.includes('authorization:'),
+        authorizeRequest!.request_secrets.includes(
+            'authorization:',
+        ),
         'authorize secret missing the basic line',
     );
     const authorizeResponse = responses.find(
@@ -213,7 +215,7 @@ async () => {
         false,
     );
     assert(
-        authorizeResponse!.secret.includes(
+        authorizeResponse!.response_secrets.includes(
             'code="' + code + '"',
         ),
         'authorize secret missing the code',
@@ -226,7 +228,9 @@ async () => {
         false,
     );
     assert(
-        tokenRequest!.secret.includes('authorization:'),
+        tokenRequest!.request_secrets.includes(
+            'authorization:',
+        ),
         'token secret missing the basic line',
     );
     const tokenResponse = responses.find(
@@ -237,7 +241,9 @@ async () => {
         false,
     );
     assert(
-        tokenResponse!.secret.includes(access_token),
+        tokenResponse!.response_secrets.includes(
+            access_token,
+        ),
         'token secret missing access_token',
     );
     assertStrictEquals(
@@ -246,7 +252,9 @@ async () => {
         'token stored JSON must omit refresh_token',
     );
     assert(
-        tokenResponse!.secret.includes('set-cookie:'),
+        tokenResponse!.response_secrets.includes(
+            'set-cookie:',
+        ),
         'token secret missing the refresh cookie',
     );
 });
@@ -438,8 +446,8 @@ async () => {
     const refreshRequest = requests.find(
         (r) => r.path === '/authentication/token/'
             && (
-                r.secret.startsWith(cookieLine)
-                || r.secret.includes(
+                r.request_secrets.startsWith(cookieLine)
+                || r.request_secrets.includes(
                     '\r\n' + cookieLine,
                 )
             ),
@@ -450,7 +458,7 @@ async () => {
     );
     assert(refreshResponse);
     assert(
-        refreshResponse!.secret.includes(
+        refreshResponse!.response_secrets.includes(
             rotated.access_token,
         ),
     );
@@ -495,7 +503,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     assertStrictEquals(requests.length, 8);
     const exchangeRequest = requests.find(
         r => r.path === '/authentication/token/'
-            && r.secret.includes(subjectToken),
+            && r.request_secrets.includes(subjectToken),
     );
     assert(exchangeRequest);
     const exchangeResponse = responses.find(
@@ -503,7 +511,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     );
     assert(exchangeResponse);
     assert(
-        exchangeResponse!.secret.includes(
+        exchangeResponse!.response_secrets.includes(
             bodyJson.access_token,
         ),
     );
@@ -588,7 +596,7 @@ Deno.test('a client_credentials grant stores its own pair with live'
     assertStrictEquals(requests.length, 9);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
-            && r.secret.includes(assertion),
+            && r.request_secrets.includes(assertion),
     );
     assert(credRequest);
     const credResponse = responses.find(
@@ -596,7 +604,9 @@ Deno.test('a client_credentials grant stores its own pair with live'
     );
     assert(credResponse);
     assert(
-        credResponse!.secret.includes(body.access_token),
+        credResponse!.response_secrets.includes(
+            body.access_token,
+        ),
     );
     assertStrictEquals(
         credResponse!.response.includes(
@@ -630,7 +640,7 @@ Deno.test('a successful authentication/token POST posts a scoped'
     }]);
 });
 
-Deno.test('the code grant Basic line is stored in secret',
+Deno.test('the code grant Basic line is stored in request_secrets',
 async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
@@ -665,7 +675,7 @@ async () => {
     const row = requests.find(
         r => r.path === '/authentication/token/');
     assert(row);
-    assert(row!.secret.includes('authorization:'));
+    assert(row!.request_secrets.includes('authorization:'));
     assertStrictEquals(
         row!.request.includes(code), false,
     );

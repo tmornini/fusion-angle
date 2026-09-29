@@ -46,10 +46,11 @@ export function rootBind(
         method: 'PUT',
         request: new Uint8Array(0),
         requestSalt: zeros,
-        secret: new Uint8Array(0),
+        requestSecrets: new Uint8Array(0),
         responsePrefix: bytes.slice(0, valueAt),
         responseSuffix: bytes.slice(valueAt + 29),
         responseSalt: zeros.slice(),
+        responseSecrets: new Uint8Array(0),
         ifMatch: null,
         notify: notifyPayload({
             kind: 'scoped',

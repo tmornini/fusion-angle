@@ -11,7 +11,7 @@ import {
     laterStamp,
     leafHashHex,
     pairRootHex,
-    secretHashHex,
+    secretsHashHex,
 } from './pair-root.ts';
 
 export type Attempt =
@@ -30,10 +30,11 @@ export type StatementRow = {
     method: string,
     request: Uint8Array,
     requestSalt: Uint8Array,
-    secret: Uint8Array,
+    requestSecrets: Uint8Array,
     responsePrefix: Uint8Array,
     responseSuffix: Uint8Array,
     responseSalt: Uint8Array,
+    responseSecrets: Uint8Array,
     ifMatch: string | null,
 };
 
@@ -56,8 +57,9 @@ export type StatementAnswer = {
     inserted: boolean,
     supersedes: string,
     requestHashHex: string,
-    secretHashHex: string,
+    requestSecretsHashHex: string,
     responseHashHex: string,
+    responseSecretsHashHex: string,
     pairHashHex: string,
 };
 
@@ -81,8 +83,9 @@ export type ClassifiedRow = {
     headResponse: Uint8Array | null,
     headMethod: string | null,
     requestHashHex: string,
-    secretHashHex: string,
+    requestSecretsHashHex: string,
     responseHashHex: string,
+    responseSecretsHashHex: string,
     pairHashHex: string,
 };
 
@@ -345,10 +348,15 @@ async function hashedRow(
         item.row.requestSalt,
         item.row.request,
     );
-    const secretHash = await secretHashHex(item.row.secret);
+    const requestSecretsHashHex = await secretsHashHex(
+        item.row.requestSecrets,
+    );
     const responseHashHex = await leafHashHex(
         item.row.responseSalt,
         item.response,
+    );
+    const responseSecretsHashHex = await secretsHashHex(
+        item.row.responseSecrets,
     );
     const pairHashHex = await pairRootHex({
         id: uuidTextOfIdentifier(item.row.id),
@@ -362,8 +370,9 @@ async function hashedRow(
         method: item.row.method,
         responseAt: item.stamp,
         requestHashHex,
-        secretHashHex: secretHash,
+        requestSecretsHashHex,
         responseHashHex,
+        responseSecretsHashHex,
     });
     return {
         outcome,
@@ -380,8 +389,9 @@ async function hashedRow(
             ? null
             : item.head.method,
         requestHashHex,
-        secretHashHex: secretHash,
+        requestSecretsHashHex,
         responseHashHex,
+        responseSecretsHashHex,
         pairHashHex,
     };
 }

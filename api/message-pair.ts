@@ -21,7 +21,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import {
     mergeSecret,
-    secretBytes as secretOfLines,
+    secretBytes,
     splitCredentials,
 } from '../shared/http-message/credentials.ts';
 import {
@@ -89,10 +89,11 @@ export interface MessagePair {
     readonly requesterIdentityId: Id;
     readonly requestMessage: string;   // serializeWire
     readonly requestHash: string;
-    readonly secret: Uint8Array;
+    readonly requestSecrets: Uint8Array;
     readonly responseStatus: number;
     readonly responseMessage: string;
     readonly responseHash: string;
+    readonly responseSecrets: Uint8Array;
     readonly method: string;
     readonly operationId: string;
     readonly requestId: string;
@@ -292,7 +293,7 @@ function receivedRequestWire(
 
 // The response half of every formed pair: its status, the
 // four lines every pair carries, any extra lines, and the
-// body. Credential lines are hoisted for the secret.
+// body. Credential lines are hoisted for its secrets.
 function formedResponse(input: {
     readonly status: number,
     readonly etag: Id,
@@ -373,10 +374,6 @@ export async function formWriteMessagePair(
             : input.responseBody,
     });
     const responseMessage = response.message;
-    const secret = secretOfLines([
-        ...requestSplit.hoisted,
-        ...response.hoisted,
-    ]);
     return {
         id,
         requestAt: input.requestAt,
@@ -385,10 +382,11 @@ export async function formWriteMessagePair(
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
-        secret,
+        requestSecrets: secretBytes(requestSplit.hoisted),
         responseStatus: storedStatus,
         responseMessage,
         responseHash: await requestMessageHash(responseMessage),
+        responseSecrets: secretBytes(response.hoisted),
         method: input.method,
         operationId: input.operationId,
         requestId: input.requestId,
@@ -771,9 +769,10 @@ export type WriteRow = {
     readonly method: string,
     readonly request: Uint8Array,
     readonly requestSalt?: Uint8Array,
-    readonly secret: Uint8Array,
+    readonly requestSecrets: Uint8Array,
     readonly response: Uint8Array,
     readonly responseSalt?: Uint8Array,
+    readonly responseSecrets: Uint8Array,
     readonly ifMatch: string | null,
 };
 
@@ -1267,7 +1266,7 @@ async function siblingsAnswer(
     }
     const own = responseFromLatin1(mergeSecret(
         latin1(stated[0]!.response),
-        secretBytes(rows[0]!),
+        rows[0]!.responseSecrets,
     ));
     return {
         response: write.answer.kind === 'received'
@@ -1332,12 +1331,13 @@ async function formSiblingPair(
         requesterIdentityId: context.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
-        secret: secretOfLines(response.hoisted),
+        requestSecrets: secretBytes([]),
         responseStatus: status,
         responseMessage: response.message,
         responseHash: await requestMessageHash(
             response.message,
         ),
+        responseSecrets: secretBytes(response.hoisted),
         method: sibling.method,
         operationId: context.operationId,
         requestId: context.requestId,
@@ -1397,8 +1397,9 @@ function writeRowOf(
         requesterIdentityId: pair.requesterIdentityId,
         method: pair.method,
         request: requestBytes(pair),
-        secret: pair.secret,
+        requestSecrets: pair.requestSecrets,
         response: responseBytes(pair),
+        responseSecrets: pair.responseSecrets,
         ifMatch,
     };
 }
@@ -1448,7 +1449,7 @@ function wireForPair(
     if (row === undefined) return answer.response;
     const stored = latin1(row.response);
     return responseFromLatin1(
-        mergeSecret(stored, secretBytes(pair)),
+        mergeSecret(stored, pair.responseSecrets),
     );
 }
 
@@ -1471,7 +1472,6 @@ function bindOf(
     const request = requestBytes(row);
     const response = responseBytes(row);
     const split = splitDate(response);
-    const secret = secretBytes(row);
     return {
         id: row.id,
         operationId: row.operationId,
@@ -1481,10 +1481,11 @@ function bindOf(
         method: row.method,
         request,
         requestSalt: saltOf(requestSaltOf(row)),
-        secret,
+        requestSecrets: row.requestSecrets,
         responsePrefix: split.prefix,
         responseSuffix: split.suffix,
         responseSalt: saltOf(responseSaltOf(row)),
+        responseSecrets: row.responseSecrets,
         ifMatch: ifMatchOf(attempt, row),
         notify: notifyPayload(eventForMessagePair({
             path: row.path,
@@ -1552,7 +1553,7 @@ function answerOf(
     return {
         response: responseFromLatin1(mergeSecret(
             latin1(row.response),
-            secretBytes(rows[index]!),
+            rows[index]!.responseSecrets,
         )),
         outcome,
         answeredId: row.id,
@@ -1610,18 +1611,6 @@ function responseBytes(
     return Octets.fromLatin1(
         (row as MessagePair).responseMessage,
     ).asBytes();
-}
-
-function secretBytes(
-    row: WriteRow | MessagePair,
-): Uint8Array {
-    if (
-        'secret' in row
-        && row.secret instanceof Uint8Array
-    ) {
-        return row.secret;
-    }
-    return new Uint8Array(0);
 }
 
 function requestSaltOf(

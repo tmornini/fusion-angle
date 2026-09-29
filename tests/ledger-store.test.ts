@@ -13,6 +13,7 @@ import type { WriteRow } from '../api/message-pair.ts';
 import { DATE_PLACEHOLDER } from '../api/ledger-root.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
+import { sha256HexOfBytes } from '../shared/digest.ts';
 import {
     NEVER_WRITTEN_IDENTIFIER,
     NIL_IDENTIFIER,
@@ -28,15 +29,15 @@ import {
     imfFixdate,
     leafHashHex,
     pairRootHex,
-    secretHashHex,
+    secretsHashHex,
 } from '../shared/pair-root.ts';
 
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
-Deno.test('pinned row matches the four digests', async () => {
+Deno.test('pinned row matches the five digests', async () => {
     const request = new TextEncoder().encode('req');
     const requestSalt = new Uint8Array(16).fill(0x11);
-    const secret = new Uint8Array(0);
+    const secrets = new Uint8Array(0);
     const responseSalt = new Uint8Array(16).fill(0x22);
     const response = new TextEncoder().encode(
         'HTTP/1.1 201 \r\n'
@@ -49,10 +50,11 @@ Deno.test('pinned row matches the four digests', async () => {
     const requestHash = await leafHashHex(
         requestSalt, request,
     );
-    const secretHash = await secretHashHex(secret);
+    const requestSecretsHash = await secretsHashHex(secrets);
     const responseHash = await leafHashHex(
         responseSalt, response,
     );
+    const responseSecretsHash = await secretsHashHex(secrets);
     const pairHash = await pairRootHex({
         id: '00000000-0000-0000-0000-000000000001',
         operationId: '00000000-0000-0000-0000-000000000002',
@@ -63,15 +65,16 @@ Deno.test('pinned row matches the four digests', async () => {
         method: 'PUT',
         responseAt: '2026-09-23T00:00:00.000000Z',
         requestHashHex: requestHash,
-        secretHashHex: secretHash,
+        requestSecretsHashHex: requestSecretsHash,
         responseHashHex: responseHash,
+        responseSecretsHashHex: responseSecretsHash,
     });
     assertEquals(
         requestHash,
         'bf60c6295dfe880bfc15db7af6ee2acc1991cf793a765123e035e9c54326ab39',
     );
     assertEquals(
-        secretHash,
+        requestSecretsHash,
         'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     );
     assertEquals(
@@ -79,8 +82,12 @@ Deno.test('pinned row matches the four digests', async () => {
         '2f3231e1a728bf8d8997752e308dd9e2adbb14dc83fb76d9ee23d7208d6c5f87',
     );
     assertEquals(
+        responseSecretsHash,
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    );
+    assertEquals(
         pairHash,
-        'f2e4a0d0c4a55a8e5efbbf3a689ab8ef03278458c3bc8510e0b5f9ae532364b9',
+        '22e77480cc694d64d95a938e584337e576af2cb6aec1eec755401b1574ef5b66',
     );
     assertEquals(
         imfFixdate('2026-09-23T00:00:00.000000Z'),
@@ -91,6 +98,50 @@ Deno.test('pinned row matches the four digests', async () => {
         29,
     );
 });
+
+Deno.test(
+    'pair_hash takes the request secrets before the response'
+        + ' secrets',
+    async () => {
+        const requestSecretsHash = await sha256HexOfBytes(
+            textBytes('authorization: Basic abc\r\n'),
+        );
+        const responseSecretsHash = await sha256HexOfBytes(
+            textBytes('set-cookie: a=1\r\n'),
+        );
+        assertEquals(
+            requestSecretsHash,
+            'd4aadadce5d1b534fbb86391cee4b8e1'
+                + '8cb7ea81773b88df88998625274bd654',
+        );
+        assertEquals(
+            responseSecretsHash,
+            '5c5e8214d509be5f783d90e4913ce28a'
+                + '0e9d97d8bd4465c05bceb62e54eaa67e',
+        );
+        const pairHash = await pairRootHex({
+            id: '00000000-0000-0000-0000-000000000001',
+            operationId: '00000000-0000-0000-0000-000000000002',
+            path: '/migrations/',
+            name: '0001-example',
+            supersedes: NIL_UUID,
+            requesterIdentityId: 'fa_owner',
+            method: 'PUT',
+            responseAt: '2026-09-23T00:00:00.000000Z',
+            requestHashHex: 'bf60c6295dfe880bfc15db7af6ee2acc'
+                + '1991cf793a765123e035e9c54326ab39',
+            requestSecretsHashHex: requestSecretsHash,
+            responseHashHex: '2f3231e1a728bf8d8997752e308dd9e2'
+                + 'adbb14dc83fb76d9ee23d7208d6c5f87',
+            responseSecretsHashHex: responseSecretsHash,
+        });
+        assertEquals(
+            pairHash,
+            '861114d59c2019cb8435ac96e5540f49'
+                + '769563a92da2b53538afaafa49a38a9e',
+        );
+    },
+);
 
 const PATH = '/migrations/';
 const NAME = '0001-example';
@@ -143,7 +194,8 @@ function statementRow(fields: {
     responseSuffix: Uint8Array,
     request?: Uint8Array,
     requestSalt?: Uint8Array,
-    secret?: Uint8Array,
+    requestSecrets?: Uint8Array,
+    responseSecrets?: Uint8Array,
     responseSalt?: Uint8Array,
     method?: string,
     requesterIdentityId?: string,
@@ -159,11 +211,14 @@ function statementRow(fields: {
         request: fields.request ?? textBytes('req'),
         requestSalt: fields.requestSalt
             ?? new Uint8Array(16).fill(0x11),
-        secret: fields.secret ?? new Uint8Array(0),
+        requestSecrets: fields.requestSecrets
+            ?? new Uint8Array(0),
         responsePrefix: fields.responsePrefix,
         responseSuffix: fields.responseSuffix,
         responseSalt: fields.responseSalt
             ?? new Uint8Array(16).fill(0x22),
+        responseSecrets: fields.responseSecrets
+            ?? new Uint8Array(0),
         ifMatch: fields.ifMatch,
     };
 }
@@ -569,7 +624,7 @@ Deno.test(
         const operationId = identifierAt(9);
         const request = textBytes('req');
         const requestSalt = new Uint8Array(16).fill(0x11);
-        const secret = new Uint8Array(0);
+        const secrets = new Uint8Array(0);
         const responseSalt = new Uint8Array(16).fill(0x22);
         const responseSuffix = textBytes('\r\n\r\nhello');
         const rows = await classifyStatement(
@@ -580,10 +635,11 @@ Deno.test(
                 ifMatch: null,
                 request,
                 requestSalt,
-                secret,
+                requestSecrets: secrets,
                 responsePrefix: PREFIX,
                 responseSuffix,
                 responseSalt,
+                responseSecrets: secrets,
                 method: 'PUT',
                 requesterIdentityId: 'fa_owner',
             })],
@@ -599,7 +655,7 @@ Deno.test(
         const requestHashHex = await leafHashHex(
             requestSalt, request,
         );
-        const secretHex = await secretHashHex(secret);
+        const secretsHex = await secretsHashHex(secrets);
         const responseHashHex = await leafHashHex(
             responseSalt, spliced,
         );
@@ -611,7 +667,10 @@ Deno.test(
         assertEquals(landed.headResponse, null);
         assertEquals(landed.response, spliced);
         assertEquals(landed.requestHashHex, requestHashHex);
-        assertEquals(landed.secretHashHex, secretHex);
+        assertEquals(landed.requestSecretsHashHex, secretsHex);
+        assertEquals(
+            landed.responseSecretsHashHex, secretsHex,
+        );
         assertEquals(
             landed.responseHashHex,
             responseHashHex,
@@ -632,9 +691,56 @@ Deno.test(
                 method: 'PUT',
                 responseAt: now,
                 requestHashHex,
-                secretHashHex: secretHex,
+                requestSecretsHashHex: secretsHex,
                 responseHashHex,
+                responseSecretsHashHex: secretsHex,
             }),
+        );
+    },
+);
+
+Deno.test(
+    'pair_hash changes when either secrets column changes',
+    async () => {
+        const now = '2026-09-23T00:00:00.000003Z';
+        const line = textBytes('authorization: Basic abc\r\n');
+        const classified = async (fields: {
+            requestSecrets?: Uint8Array,
+            responseSecrets?: Uint8Array,
+        }) => (await classifyStatement(
+            'blind',
+            [statementRow({
+                id: identifierAt(8),
+                operationId: identifierAt(9),
+                ifMatch: null,
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nhello'),
+                ...fields,
+            })],
+            [],
+            now,
+        ))[0]!;
+        const bare = await classified({});
+        const request = await classified({
+            requestSecrets: line,
+        });
+        const response = await classified({
+            responseSecrets: line,
+        });
+        const empty = await sha256HexOfBytes(
+            new Uint8Array(0),
+        );
+        const lineHash = await sha256HexOfBytes(line);
+        assertEquals(bare.requestSecretsHashHex, empty);
+        assertEquals(bare.responseSecretsHashHex, empty);
+        assertEquals(request.requestSecretsHashHex, lineHash);
+        assertEquals(request.responseSecretsHashHex, empty);
+        assertEquals(response.requestSecretsHashHex, empty);
+        assertEquals(response.responseSecretsHashHex, lineHash);
+        assertNotEquals(request.pairHashHex, bare.pairHashHex);
+        assertNotEquals(response.pairHashHex, bare.pairHashHex);
+        assertNotEquals(
+            request.pairHashHex, response.pairHashHex,
         );
     },
 );
@@ -863,8 +969,9 @@ function writeRow(fields: {
         requesterIdentityId: 'fa_owner',
         method: fields.method ?? 'PUT',
         request: textBytes('req'),
-        secret: new Uint8Array(0),
+        requestSecrets: new Uint8Array(0),
         response: wireOf(fields.body),
+        responseSecrets: new Uint8Array(0),
         ifMatch: fields.ifMatch,
     };
 }
@@ -1466,7 +1573,7 @@ Deno.test(
 const REQUEST_HASH_OF_ZERO_SALT =
     '374708fff7719dd5979ec875d56cd228'
     + '6f6d3cf7ec317a3b25632aab28ec37bb';
-const SECRET_HASH_OF_EMPTY =
+const SECRETS_HASH_OF_EMPTY =
     'e3b0c44298fc1c149afbf4c8996fb924'
     + '27ae41e4649b934ca495991b7852b855';
 
@@ -1490,7 +1597,8 @@ Deno.test(
             root.requester_identity_id, 'fa_owner',
         );
         assertStrictEquals(root.request, '');
-        assertStrictEquals(root.secret, '');
+        assertStrictEquals(root.request_secrets, '');
+        assertStrictEquals(root.response_secrets, '');
         assertStrictEquals(root.request_salt, '00'.repeat(16));
         assertStrictEquals(
             root.response_salt, '00'.repeat(16),
@@ -1499,7 +1607,10 @@ Deno.test(
             root.request_hash, REQUEST_HASH_OF_ZERO_SALT,
         );
         assertStrictEquals(
-            root.secret_hash, SECRET_HASH_OF_EMPTY,
+            root.request_secrets_hash, SECRETS_HASH_OF_EMPTY,
+        );
+        assertStrictEquals(
+            root.response_secrets_hash, SECRETS_HASH_OF_EMPTY,
         );
         assert(root.response.startsWith('HTTP/1.1 201 '));
         assert(root.response.includes(
@@ -1512,7 +1623,7 @@ Deno.test(
             'operation-id: ' + root.operation_id + '\r\n',
         ));
         assert(root.response.endsWith(
-            '\r\n\r\n' + SECRET_HASH_OF_EMPTY,
+            '\r\n\r\n' + SECRETS_HASH_OF_EMPTY,
         ));
         assertEquals(
             root.response.includes('request-id'),
@@ -1540,8 +1651,10 @@ Deno.test(
             method: root.method,
             responseAt: root.response_at,
             requestHashHex: root.request_hash,
-            secretHashHex: root.secret_hash,
+            requestSecretsHashHex: root.request_secrets_hash,
             responseHashHex: root.response_hash,
+            responseSecretsHashHex:
+                root.response_secrets_hash,
         });
         assertStrictEquals(root.pair_hash, pairHash);
         assertEquals(

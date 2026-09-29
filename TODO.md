@@ -33,8 +33,8 @@ skew tests, which went with item 8's trio.
    retirement; and the seed — one transaction beneath the
    adapter, its batches and chain order. The store goes
    first because its DDL is what the other two fill: the
-   credential column holds zero bytes until the message
-   plane hoists into it, and the INSERT hashes whatever
+   two secrets columns hold zero bytes until the message
+   plane hoists into them, and the INSERT hashes whatever
    bytes it is given. The scripts behind the figures items
    0 to 3 call measured live under `measurements/probes/`,
    whose README names each and the figures whose script
@@ -43,7 +43,9 @@ skew tests, which went with item 8's trio.
    names lowercase; one line per name, repeats joined with
    `, ` in the order received, `set-cookie` alone never
    joined (RFC 9110 §5.3); lines ascending by name,
-   bytewise; `name: value` with one space and the value
+   bytewise, the six credential lines after every other
+   line (a stored message holds none);
+   `name: value` with one space and the value
    trimmed; CRLF line ends, a blank line, then the body
    bytes; the version token fixed at `HTTP/1.1` and a
    response's reason phrase empty. A sender's line order,
@@ -98,8 +100,8 @@ skew tests, which went with item 8's trio.
    `subject_token` and `actor_token`, and the
    `client_credentials` grant's `client_assertion`
    (`api/authentication.ts:1066-1067`) — so no stored
-   request body holds a secret and `secret` is the one
-   column of secrets, the message plane naming each
+   request body holds a secret and the secrets columns
+   hold every one, the message plane naming each
    grant's line;
    and the authorize `code` and the token grant's
    `access_token` leave the response body for
@@ -112,21 +114,22 @@ skew tests, which went with item 8's trio.
    precedent, and the departure from RFC 6749 §5.1 is
    accepted: both clients are ours. Credential lines are
    hoisted whole — name and value — out of `request` and
-   `response` into one fenced column, `secret`, named
-   for its leaf and salt, which holds them in canonical
-   order joined by CRLF with none trailing, zero bytes
-   when there are none: `authorization`,
-   `proxy-authorization`, and `cookie` from a request,
-   `set-cookie`, `authentication-info`, and
-   `proxy-authentication-info` from a response — every
+   `response` into two fenced columns,
+   `request_secrets` and `response_secrets`, each
+   holding its own message's lines as the canonical
+   message serializes them — after every other field,
+   by name, each CRLF-terminated — zero bytes when there
+   are none: `authorization`, `proxy-authorization`,
+   `cookie`, `set-cookie`, `authentication-info`, and
+   `proxy-authentication-info` — every
    credential-carrying field HTTP defines (RFC 9110 §11,
    RFC 6265),
-   not a list that grows with our routes. No name sits on
-   both sides of the fence, so sorting by name merges the
-   hoisted lines back and rebuilds each message exactly:
-   every byte stays stored. SCHEMA.md's secrets section
-   takes that rule when this ships. Moving the `code`
-   breaks the one reader of response bodies, so this item
+   not a list that grows with our routes. Splicing a
+   column back before its message's blank line rebuilds
+   that message exactly: every byte stays stored.
+   SCHEMA.md's secrets section states that rule. Moving
+   the `code` breaks the one reader of response bodies,
+   so this item
    carries the repair: the grant finds a code today by
    searching authorize responses for it
    (`getAllWhereBody`, `api/authentication.ts:1253-1254`,
@@ -219,13 +222,14 @@ skew tests, which went with item 8's trio.
    full check walks every succession and names a pair
    stamped before its predecessor. The hashes form a
    tree. Each leaf —
-   `request_hash`, `secret_hash`, `response_hash` — is
+   `request_hash`, `request_secrets_hash`,
+   `response_hash`, `response_secrets_hash` — is
    `sha256(salt ‖ bytes)`, its salt stored and fenced with
    the bytes it hides: a bare digest of guessable bytes is
    a guessing oracle, and a fast hash of a request that
    held a password would sit beside the scrypt hash and
    undercut it. `pair_hash` is `sha256` over the envelope
-   columns and the three leaves, so every reader verifies
+   columns and the four leaves, so every reader verifies
    the root from what it may see, and a reader who sees a
    leaf's bytes and salt verifies that leaf too. The
    root's input is fixed by the design, never by a
@@ -680,12 +684,13 @@ skew tests, which went with item 8's trio.
    so item 0's one statement hands its minted `date` back
    with no view between. The column fence is that
    grant: `fa_api` never reads back
-   `request`, the fenced credential column, or the request
-   and secret salts; it reads the response, the response
-   salt, and all four digests, so it verifies `pair_hash`
-   and the response leaf, and a reader of envelopes alone
-   verifies the root alone. `requester_identity_id` — the
-   verified token's `sub` — stays readable. No read may
+   `request`, the two fenced secrets columns, or the
+   request and secrets salts; it reads the response, the
+   response salt, and all five digests, so it verifies
+   `pair_hash` and the response leaf, and a reader of
+   envelopes alone verifies the root alone.
+   `requester_identity_id` — the verified token's `sub` —
+   stays readable. No read may
    use `SELECT *` (one does,
    `api/backend-postgres.ts:538`), and every read stops
    selecting `request`, which item 1 made sure nothing
@@ -904,7 +909,7 @@ skew tests, which went with item 8's trio.
    — does two small things. It asks what it holds itself
    through the privilege functions, which answer with
    catalog reads revoked (measured), and refuses to serve
-   if it can read `request` or the credential column,
+   if it can read `request` or the secrets columns,
    update, delete, or
    make temporary objects — the rights the owner
    controls; the four superuser revokes it never
@@ -1016,14 +1021,14 @@ skew tests, which went with item 8's trio.
    measured duration, and item 3's full check passing
    afterward. `fa_archiver` adds a backup no host
    owns (item 2's principle): it holds SELECT on a view
-   without the fenced credential column, cannot log in,
+   without the two fenced secrets columns, cannot log in,
    exports through `COPY`, and restores onto any Postgres
    — `pg_dump` cannot serve it, because it locks the table
    and dumps a view as a definition with no rows
-   (measured). A restore must fill the credential column,
-   which is NOT NULL, and zero bytes is the honest fill:
-   `pair_hash` still verifies on every pair, the secret
-   leaf no longer does, and the api runs the same, since
+   (measured). A restore must fill the secrets columns,
+   which are NOT NULL, and zero bytes is the honest fill:
+   `pair_hash` still verifies on every pair, the secrets
+   leaves no longer do, and the api runs the same, since
    it reads no credential back. A full copy for a host
    move stays the owner's `pg_dump`. The brainstorm
    settles whether the archiver's view also applies item
@@ -1461,7 +1466,7 @@ Off the critical path; each with its oracle.
   `headsOf`, `api/backend-memory.ts:304-351`). The
   narrowest also compares the head's `supersedes`,
   which neither selects today. The statement keeps its
-  fourteen parameters. Lands no later than the retries
+  fifteen parameters. Lands no later than the retries
   bullet.
   Oracle: a Layer 1 test resends a landed in-order
   PUT with its original `If-Match` and gets 200 with

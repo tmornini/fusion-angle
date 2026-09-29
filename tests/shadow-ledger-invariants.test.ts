@@ -429,7 +429,7 @@ Deno.test('every stored request message re-hashes to its own'
 // End-to-end spot check: every write in the mixed batch
 // above rode a real Authorization bearer
 // (organizationToken mints a real HMAC JWT). That line
-// is hoisted into secret; the stored request does not
+// is hoisted into request_secrets; the stored request does not
 // keep it. Mock-data seed pairs carry no header fields
 // (api/mock-data/seed-message-pairs.ts); the mixed
 // batch is the live-traffic half.
@@ -442,7 +442,7 @@ async () => {
     const requests = await db.messagePairs.getAll();
     assert(requests.length > 0);
     const withBearer = requests.filter(
-        row => BEARER_JWT.test(row.secret),
+        row => BEARER_JWT.test(row.request_secrets),
     );
     assert(
         withBearer.length > 0,

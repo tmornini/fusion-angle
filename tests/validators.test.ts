@@ -1330,6 +1330,44 @@ Deno.test(
 );
 
 Deno.test(
+    'validateMessagePairEntity rejects secrets that are not'
+        + ' credential lines',
+    () => {
+        for (const key of ['request_secrets', 'response_secrets']) {
+            for (const text of [
+                'authorization: Basic abc',
+                '\r\nauthorization: Basic abc\r\n',
+                'authorization: Basic abc\r\n\r\n',
+                'x-trace: no\r\n',
+                'nocolon\r\n',
+            ]) {
+                assertThrows(
+                    () => validateMessagePairEntity({
+                        ...validMessagePair,
+                        [key]: text,
+                    }),
+                    Error,
+                    'MessagePairEntity.' + key
+                        + ' must be CRLF-terminated'
+                        + ' credential lines',
+                );
+            }
+        }
+        const got = validateMessagePairEntity({
+            ...validMessagePair,
+            request_secrets: 'authorization: Basic abc\r\n',
+            response_secrets: 'set-cookie: a=1\r\n',
+        });
+        assertStrictEquals(
+            got.request_secrets, 'authorization: Basic abc\r\n',
+        );
+        assertStrictEquals(
+            got.response_secrets, 'set-cookie: a=1\r\n',
+        );
+    },
+);
+
+Deno.test(
     'validateMessagePairEntity rejects message_hash key',
     () => {
         assertThrows(

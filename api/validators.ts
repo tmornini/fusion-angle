@@ -70,6 +70,8 @@ import {
     isProviderModelId,
 } from './provider-models.ts';
 import { ValidationError } from '../shared/types.ts';
+import { isSecretsText } from
+    '../shared/http-message/credentials.ts';
 import { isIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -2241,8 +2243,9 @@ const MESSAGE_PAIR_BODY_KEYS: readonly string[] = [
     'requester_identity_id', 'method',
     'response_at',
     'request', 'request_salt', 'request_hash',
-    'secret', 'secret_hash',
+    'request_secrets', 'request_secrets_hash',
     'response', 'response_salt', 'response_hash',
+    'response_secrets', 'response_secrets_hash',
     'pair_hash',
 ];
 
@@ -2270,6 +2273,20 @@ function pickSalt(
         throw new ValidationError(
             'MessagePairEntity.' + key
             + ' must be 32 lowercase hex characters',
+        );
+    }
+    return value;
+}
+
+function pickSecrets(
+    body: Record<string, unknown>,
+    key: string,
+): string {
+    const value = pickString(body, key);
+    if (!isSecretsText(value)) {
+        throw new ValidationError(
+            'MessagePairEntity.' + key
+            + ' must be CRLF-terminated credential lines',
         );
     }
     return value;
@@ -2326,11 +2343,19 @@ export function validateMessagePairEntity(
         request: pickString(body, 'request'),
         request_salt: pickSalt(body, 'request_salt'),
         request_hash: pickDigest(body, 'request_hash'),
-        secret: pickString(body, 'secret'),
-        secret_hash: pickDigest(body, 'secret_hash'),
+        request_secrets: pickSecrets(body, 'request_secrets'),
+        request_secrets_hash: pickDigest(
+            body, 'request_secrets_hash',
+        ),
         response: pickString(body, 'response'),
         response_salt: pickSalt(body, 'response_salt'),
         response_hash: pickDigest(body, 'response_hash'),
+        response_secrets: pickSecrets(
+            body, 'response_secrets',
+        ),
+        response_secrets_hash: pickDigest(
+            body, 'response_secrets_hash',
+        ),
         pair_hash: pickDigest(body, 'pair_hash'),
     };
 }

@@ -520,9 +520,11 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     requester_identity_id, method,
                     response_at,
                     request, request_salt, request_hash,
-                    secret, secret_hash,
+                    request_secrets, request_secrets_hash,
                     response, response_salt,
-                    response_hash, pair_hash
+                    response_hash,
+                    response_secrets, response_secrets_hash,
+                    pair_hash
                 ) VALUES (
                     ${uuidTextOfIdentifier(
                         id22(EXPLAIN_INSERT_N),
@@ -541,6 +543,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     decode(${hash}, 'hex'),
                     ${wire},
                     decode(${salt}, 'hex'),
+                    decode(${hash}, 'hex'),
+                    ${new Uint8Array(0)},
                     decode(${hash}, 'hex'),
                     decode(${hash}, 'hex')
                 )

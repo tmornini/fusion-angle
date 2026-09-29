@@ -105,8 +105,9 @@ function fakeClient(): {
                     supersedes: '00000000-0000-0000-0000-'
                         + '000000000000',
                     request_hash: '00'.repeat(32),
-                    secret_hash: '00'.repeat(32),
+                    request_secrets_hash: '00'.repeat(32),
                     response_hash: '00'.repeat(32),
+                    response_secrets_hash: '00'.repeat(32),
                     pair_hash: '00'.repeat(32),
                 }] as T[];
             }
@@ -294,7 +295,7 @@ async () => {
     const bytes = values.filter(
         (value) => value instanceof Uint8Array,
     );
-    assertStrictEquals(bytes.length, 9);
+    assertStrictEquals(bytes.length, 11);
     assertEquals(
         bytes[0],
         Octets.fromLatin1(MESSAGE_PAIR_ROW.request).asBytes(),
@@ -327,11 +328,13 @@ async () => {
         request: Buffer.from(bytes),
         request_salt: Buffer.alloc(16),
         request_hash: Buffer.alloc(32),
-        secret: Buffer.alloc(0),
-        secret_hash: Buffer.alloc(32),
+        request_secrets: Buffer.alloc(0),
+        request_secrets_hash: Buffer.alloc(32),
         response: Buffer.from(bytes),
         response_salt: Buffer.alloc(16),
         response_hash: Buffer.alloc(32),
+        response_secrets: Buffer.alloc(0),
+        response_secrets_hash: Buffer.alloc(32),
         pair_hash: Buffer.alloc(32),
     }];
     const backend = new PostgresBackend(fake.sql);
