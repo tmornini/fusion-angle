@@ -114,9 +114,14 @@ Three layers verify this product. Layer 1 is
 `./test validate browser` — Layer 1 then `./test browser`
 — the operator's gate before `./bin/build`, a deploy, or
 a walk. Layer 3 is the serial walk
-(`./deploy --local 8080 --postgres mock-data`, then one
-explorer through TEST-PLAN.md); it is exploration and
-gates nothing. A browser observation changes product
+(`./deploy --local 8080 --postgres mock-data`, then
+explorers through TEST-PLAN.md until every case has
+a scored line); it is exploration and
+gates nothing. The master relays a successor
+explorer from the checkpoint when one returns
+incomplete. Skip is not BLOCKED. Named driver
+limits get one attempt, not an overnight grind.
+A browser observation changes product
 only through a red test at Layer 1 or Layer 2: a
 product commit may cite a TEST-PLAN mitigation stub
 only when its `Reproduced by` names a red test.
