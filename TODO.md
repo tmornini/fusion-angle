@@ -444,84 +444,17 @@ skew tests, which went with item 8's trio.
    parse/stringify bullet in `## Later work` and the
    hash-and-verify half of its verifiable-ledger bullet;
    the brainstorm says what is left of each.
-1. State arrives by PUT, and the application reads the
-   response as a unit — every PATCH, and every POST that
-   changes state, lands a sibling PUT in the same
-   statement under the same `operation_id`, as instance
-   PATCH does today (`postInstancePatchOp`,
-   `api/routes.ts:3745-3761`). POST has two kinds: one
-   changes state and is stored in PATCH's style; the other
-   only reads — a convenience over GET, joined or computed
-   by the database or the server — and stores nothing, as
-   a GET stores nothing. A write that derives its state
-   from a head is in-order: a PATCH or a state-changing
-   POST carries `If-Match` naming the head it read, its
-   sibling names that head, a missing latch answers 428
-   at the gate (RFC 6585 §3), a field its writer may not
-   change (`api/attribute-acl.ts:43`) answers 403 at the
-   gate and lands nothing, and a refused sibling — the
-   index's, when two derive from one head — refuses the
-   whole statement and answers 412, after which the
-   client resends from a fresh read, as the retries
-   bullet permits; nothing re-fills `supersedes` around
-   a stale body, which would drop the winner's change,
-   and only the blind PUT retries on the server, since it
-   derives nothing. A POST that creates a document is a
-   genesis and carries no latch; two creates of one name
-   are refused by the index and answer 409. Every unit a
-   client reads carries its `etag`, so the client always
-   holds the latch. A PATCH or POST that would leave
-   the head's state unchanged stores nothing at all, as
-   item 0's PUT does: neither its own pair nor a sibling
-   lands, and it answers 200 with the head's unit, as that
-   PUT does. Today a no-op claim still stores its pair
-   (`api/routes.ts:1919-1923`) and a no-op PATCH appends a
-   version and answers 201
-   (`tests/api-instances-create.test.ts:578-614`).
-   Sameness is judged on responses — the candidate
-   response body against the head's response body, whole
-   against whole, never a projection — never
-   on the stored request bodies the check reads today
-   (`api/api.ts:1341`). A sibling PUT is synthesized —
-   nothing was received for it and nothing sent — so its
-   `request` is zero bytes and its `response` is the
-   message a read of it will serve, formed whole by the
-   handler
-   in the same statement: its own status line, `date`
-   spliced from its own stamp as every pair's is, `etag`
-   naming itself, its `request-id` and `operation-id`,
-   `content-type` and
-   `content-length`, and the WHOLE state as body — every
-   field, whatever its writer may read, as the
-   document's validator orders it with `id` last, so a
-   read adds nothing — for a PATCH usually the wire's
-   own bytes, for authorize's code document (item 0)
-   and the token grant's `tokens/:jti` a message the
-   wire never carried, the token document's issued,
-   rotated, and revoked events each landing the whole
-   state so the fold that resolves them
-   (`api/derive-identity-tokens.ts:14-26`) retires; the
-   requester's own response is that message projected
-   (below); and the handler mints both pairs' ids, so
-   nothing
-   looks
-   the sibling up afterward (item 0 retires
-   `revisionMessagePairIdForPatch`). The PATCH revision
-   and the token grant's `tokens/:jti` pair become such
-   pairs; the revision's synthesized request
-   (`api/routes.ts:3724-3743`) — `If-Match`,
-   `operation-id`, and the body's framing lines, not the
-   `[]` its comment claims — retires with them.
-   Work-order create and transition (POST), claim and
-   binding (PUT), and release (DELETE) each land a PUT of
-   `work-orders/:id`, derive reads the head, and
-   `replayWorkOrderOperations` retires — a faithful
-   conversion, nothing item 11 will add; claim expiry
-   stays decided at read time
-   (`isExpiredAsOf`, `api/derive-states.ts:658`, applied
-   at `:754` and `:850`), recording it is item
-   13's. The login code's document is already such a pair
-   (item 0). Flows keep their
+1. The application reads the response as a unit. State
+   by PUT landed at `b548791c`: the mock-data seed's
+   pairs 1,454 → 2,316, depth 3 → 15, stored bytes
+   1,694,553 → 6,243,370; `./test` 44.7 s → 72.4 s
+   (medians of three). After a 412 the client resends
+   from a fresh read, as the retries bullet permits;
+   nothing re-fills `supersedes` around a stale body,
+   which would drop the winner's change, and only the
+   blind PUT retries on the server, since it derives
+   nothing. Every unit a client reads carries its `etag`,
+   so the client always holds the latch. Flows keep their
    event walk until item 11, and the undo's join of an
    undo pair to its document pair moves from equal
    `request_at`, which item 0 drops, to the
@@ -573,9 +506,7 @@ skew tests, which went with item 8's trio.
    stands. A before-and-after
    `./bin/measure --record --visualize` run on the
    list-heavy pages adds both sets of numbers to the
-   history, gating nothing. Derivation is head selection;
-   whatever still needs a body reads it in place from the
-   unit, never from `request`. A collection's heads come
+   history, gating nothing. A collection's heads come
    from a skip walk of `fa_message_pairs_document` — a
    recursive query that asks the index for the next name
    after the last, then one head read per name — one
@@ -665,12 +596,7 @@ skew tests, which went with item 8's trio.
    unit they were given. The application derives from
    `response` only, never from `request`." The landing
    commit adds the file references: the one read function
-   and the client's splitter. A per-route audit proves
-   each PUT
-   response carries what its readers need; a gap closes by
-   the response saying more — the mock data already shows
-   one: a record instance's revisions store `{}` as their
-   response body and their content in the request. API
+   and the client's splitter. API
    tests pin the headers a read serves and the headers it
    must not. Today: the five work-order operations answer
    204 and keep their state in their own request bodies
@@ -689,17 +615,9 @@ skew tests, which went with item 8's trio.
    `api/message-pair.ts:606-636`); a collection GET
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
-   client receives bare JSON. The per-route audit —
-   which POSTs change state and gain `If-Match`, which
-   are read-only conveniences, and what each PUT
-   response must say for its readers — is the spec's
-   first section, written from the code as item 0
-   leaves it. Merged: the API client, packageable (the
-   critical functionality path), which keeps its
-   oracle; and the authorization_code chain root named
-   by its jti, from `## Later work`, whose oracle — one
-   head per jti on every chain kind — the token document
-   keeps. Follows item 0.
+   client receives bare JSON. Merged: the API client,
+   packageable (the critical functionality path), which
+   keeps its oracle. Follows item 0.
    Work-order events become a sub-collection of an
    immutable document type. State by PUT keeps each
    version's own lifecycle events inside the work-order
@@ -1496,10 +1414,21 @@ Off the critical path; each with its oracle.
   has already succeeded: a lost response, or a
   compatible change by another agent. Otherwise it
   answers 412. The statement decides stale before
-  matched (`shared/ledger-statement.ts:224-237`,
-  `api/ledger-statement-sql.ts:126-147`), pinned at
-  `tests/ledger-store.test.ts:279-320`. The
-  message-plane spec keeps that (Decision 2,
+  matched, row by row
+  (`shared/ledger-statement.ts:215-250`,
+  `api/ledger-statement-sql.ts:139-171`), pinned at
+  `tests/ledger-store.test.ts:286-328`. Only a PUT or
+  DELETE row can match its head. A stale row refuses
+  the statement; otherwise a matched row is skipped and
+  the rest land, unless no document row — a row that
+  carries a latch — lands, and then the statement
+  stores nothing, the received pair included. A
+  statement of blind rows has no document row, so it
+  stays all-or-nothing
+  (`shared/ledger-statement.ts:252-275`,
+  `api/ledger-statement-sql.ts:172-193`). The
+  message-plane spec keeps stale before matched
+  (Decision 2,
   `docs/superpowers/specs/2026-09-23-message-plane-design.md`),
   so a resent in-order PUT whose latch names the
   head's predecessor answers 412 even when that head
@@ -1516,16 +1445,24 @@ Off the critical path; each with its oracle.
   - The widest answers 200 whenever the head holds
     the state. It hides an intervening writer, and it
     answers an invented or foreign latch with 200.
-  Either way, both head reads gain what they compare:
-  `headed` (`api/ledger-statement-sql.ts:60-75`) and
-  the memory `Head` (`shared/ledger-statement.ts:62-68`,
-  filled by `headsOf`, `api/backend-memory.ts:280-318`).
-  The gate's latch check (`api/api.ts:1009-1050`) and
-  the flow handler's re-check
-  (`api/routes.ts:1552-1566`) refuse the same latch
-  before the statement runs, so they move with it or
-  retire into it. The statement keeps its fourteen
-  parameters. Lands no later than the retries bullet.
+  After state by PUT the alignment is one branch in the
+  classifier, in both backends, and nothing else moves;
+  a create resent after a lost response is a declared
+  genesis the narrowest reading would answer 200
+  (`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
+  §10). The gate checks only a latch's presence and
+  form (`api/api.ts:254-322`), and the flow PUT no
+  longer re-reads the head to refuse its latch
+  (`api/routes.ts:1395-1421`). Both head reads carry
+  the head's response and method, all the widest
+  reading compares: `headed`
+  (`api/ledger-statement-sql.ts:67-83`) and the memory
+  `Head` (`shared/ledger-statement.ts:64-71`, filled by
+  `headsOf`, `api/backend-memory.ts:304-351`). The
+  narrowest also compares the head's `supersedes`,
+  which neither selects today. The statement keeps its
+  fourteen parameters. Lands no later than the retries
+  bullet.
   Oracle: a Layer 1 test resends a landed in-order
   PUT with its original `If-Match` and gets 200 with
   the landed pair's `etag`, and `./test postgres`
@@ -3130,16 +3067,58 @@ Off the critical path; each with its oracle.
   in `shared/`; the generator is a tool and may read
   the server. Oracle: an import-graph walk from every
   `PAGE_REGISTRY` entry finds no module under `api/`
-- Eleven comments name the retired appenders.
-  `appendMessagePairOnce` and `appendMessagePairAlways`
-  left with the store's one statement, and the comments
-  citing them stayed: `api/routes.ts` (six),
-  `api/api.ts` (two), `api/message-pair.ts` (two), and
-  `api/derive-documents.ts` (one), several explaining
-  stamp order by "appendMessagePairOnce's nowUtc()".
-  Reword each to the statement that writes today, or
-  delete it where the code now says it. Oracle:
-  `grep -rn appendMessagePair api/` finds nothing
+- Comments name absent code. `appendMessagePairOnce`
+  and `appendMessagePairAlways` left with the store's
+  one statement, and the comments citing them stayed:
+  five in `api/` (`api/api.ts:1357`,
+  `api/derive-documents.ts:31`,
+  `api/message-pair.ts:83`, `api/routes.ts:755`,
+  `:2740`), two explaining stamp order by
+  "appendMessagePairOnce's nowUtc()"; three in `tests/`
+  (`tests/api-shadow-ledger-auth.test.ts:289`,
+  `tests/derive-documents.test.ts:19`,
+  `tests/document-family.test.ts:273`); and TEST-PLAN
+  V4's source line (`TEST-PLAN.md:5132`). The state by
+  PUT spec found more: `sendWriteResponse`
+  (`tests/pair-write-coverage.test.ts:55`);
+  `MEMBERS_WIRING` (`api/routes.ts:495`,
+  `api/validators.ts:532-533`, `:838-839`,
+  `:931-932`); the two route sets that spec retired,
+  `REPLAY_EXEMPT_ROUTE_PATTERNS`
+  (`api/authentication.ts:876`,
+  `tests/api-shadow-ledger-auth.test.ts:359`,
+  `tests/api-shadow-ledger-tokens.test.ts:225`) and
+  `DOCUMENT_CLASS_ROUTE_PATTERNS`
+  (`api/derive-states.ts:133`); and the replay fast
+  path, which no longer exists — nothing at the gate
+  reads a request to serve a stored response — yet is
+  described at `api/api.ts:1357`,
+  `api/authentication.ts:876-879`,
+  `api/routes.ts:4078-4079`,
+  `client/flow-mutations.ts:539-540`,
+  `client/ideas.ts:225-226` ("op's idempotency fold"),
+  and in `tests/` at
+  `tests/api-flow-tags.test.ts:201-203`,
+  `tests/api-identity-document.test.ts:175`,
+  `tests/api-ideas-create.test.ts:142-143`,
+  `tests/api-instances-delete.test.ts:339`,
+  `tests/api-member-documents.test.ts:402`,
+  `tests/api-membership-document.test.ts:125`,
+  `tests/api-objective-document.test.ts:251-252`,
+  `tests/api-record-attribute-document.test.ts:173-174`,
+  `tests/api-record-document.test.ts:252-256`,
+  `tests/api-shadow-ledger-auth.test.ts:55`, `:357-359`,
+  `tests/api-shadow-ledger-tokens.test.ts:222-227`,
+  `:274`, `tests/drift-roster.test.ts:789`, and
+  `tests/drift-work-orders.test.ts:986-987`. Reword
+  each to the code that runs today, or delete it where
+  the code now says it. Oracle:
+  `git grep -nE 'appendMessagePair|sendWriteResponse'`,
+  `git grep -nE 'MEMBERS_WIRING|REPLAY_EXEMPT'`, and
+  `git grep -nE 'DOCUMENT_CLASS_ROUTE|idempotency fold'`
+  find nothing under `api/`, `client/`, `tests/`, or
+  TEST-PLAN.md, and every `git grep -niE 'fast[- ]path'`
+  hit there names code that runs
 - DELETE cascade. No one policy says what a delete does
   to the documents that name the deleted one. Four
   references refuse the delete today (the last admin
@@ -3157,6 +3136,18 @@ Off the critical path; each with its oracle.
   dependent reads it gone; each RESTRICT refuses a
   racing delete under one statement; no reference is
   unlisted.
+- The four counting checks close before their
+  statement: the last admin seat
+  (`api/routes.ts:5315-5326`), the record-type RESTRICT
+  (`:4755-4766`), the attribute RESTRICT
+  (`:1039-1051`), and the instance placement RESTRICT
+  (`:3323-3349`) each verify in a read transaction that
+  closes before the write. Oracle: two writers race the
+  last admin seat, a record-type DELETE against an
+  instance create, an attribute DELETE against a flow
+  PUT, and an instance DELETE against a binding, each
+  under one write transaction and the organization's
+  advisory lock; each race refuses one writer.
 - An RFC 7009 revocation endpoint for OAuth clients.
   Revocation today is
   `identities/:id/tokens/:jti/revocation`: the identity
