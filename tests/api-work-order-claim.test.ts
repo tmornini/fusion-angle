@@ -556,6 +556,40 @@ Deno.test('a claim lands one version', async () => {
     assertStrictEquals(await headTag(db), pairIdOf(res));
 });
 
+// Decision 11: a PUT equal to the head stores nothing, so an
+// operation holding the head's tag still lands.
+Deno.test('a PUT of the claimed head\'s fields answers the'
++ ' head', async () => {
+    const db = await seededDb();
+    await PUT(
+        db, CLAIM_PATH.slice(1), freshClaimBody(), DEV_TOKEN,
+        await latched(db),
+    );
+    const tag = await headTag(db);
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA',
+        DEV_TOKEN,
+        { display_id: 'abcd', flow_graph: graphJson(), position: 1 },
+        { 'If-Match': '"' + tag + '"' },
+    ));
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(pairIdOf(res), tag);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    const claim = await handleRequest(db, req(
+        'PUT', CLAIM_PATH, DEV_TOKEN, freshClaimBody(),
+        { 'If-Match': '"' + tag + '"' },
+    ));
+    assertStrictEquals(claim.status, 200);
+    await claim.body?.cancel();
+    assertStrictEquals(await headTag(db), pairIdOf(claim));
+});
+
 Deno.test('a foreign live claim is 409 from the head', async () => {
     const db = await seededDb();
     await seedOrganizationMember(db, OTHER);

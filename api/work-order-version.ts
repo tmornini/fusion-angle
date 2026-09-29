@@ -11,6 +11,7 @@ import type {
 } from '../shared/types.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { microsOf } from '../shared/pair-root.ts';
+import { sortJsonKeys } from '../shared/http-message/canonical.ts';
 
 export type WorkOrderClaim = {
     readonly member_id: Id,
@@ -142,9 +143,21 @@ export function createdVersion(input: {
     });
 }
 
+function sameFields(
+    head: WorkOrderFields,
+    fields: WorkOrderFields,
+): boolean {
+    return head.display_id === fields.display_id
+        && head.position === fields.position
+        && JSON.stringify(sortJsonKeys(head.flow_graph))
+            === JSON.stringify(sortJsonKeys(fields.flow_graph));
+}
+
 // The PUT (§5): the request's fields over the head's
-// facets, no event. With no head the version is born with
-// no state.
+// facets, no event. Fields equal to the head's are the
+// head, so the statement matches and nothing lands
+// (Decision 11). With no head the version is born with no
+// state.
 export function fieldsVersion(
     head: WorkOrderVersion | {
         readonly id: Id,
@@ -152,6 +165,9 @@ export function fieldsVersion(
     },
     fields: WorkOrderFields,
 ): WorkOrderVersion {
+    if ('events' in head && sameFields(head, fields)) {
+        return head;
+    }
     return ordered({ ...head, ...fields, events: [] });
 }
 
