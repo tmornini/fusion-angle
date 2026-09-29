@@ -2917,19 +2917,26 @@ opens and renders.)
        exploratory — the preview's painted colour and its
        match to the committed edge
 - [ ] **F21** Shift-drag backward (later node →
-  earlier node). PASS: the curved preview is
-  dashed orange with a warning arrow while over
-  the target — the reachability check recognises
-  that target → … → source already exists. The
-  committed cycle edge matches the preview.
+  earlier node). PASS: while over the target the
+  curved preview is dashed warning (orange) with a
+  warning arrow — the preview follows the
+  reachability check, which recognises that target →
+  … → source already exists. The committed
+  Transition follows F9's depth-first back-edge rule
+  instead, so it may render solid primary (blue): on
+  29 Sep it did, and "back to draft" (Revise → Draft)
+  stayed the only dashed cycle edge. The preview and
+  the committed edge follow different rules and need
+  not match.
   Pin: tests/flow-layout.test.ts 'wouldBeCycle: backward
        edge creates cycle' (decides the reachability check
-       flags the backward edge before it is committed);
-       tests/flow-cycle-edges.test.ts 'a back-edge to an
-       ancestor is a cycle edge' (decides the committed
-       edge is classified as a cycle, which is what dashes
-       and colours it); exploratory — the painted
-       dashed-orange preview
+       that dashes the preview before the edge is
+       committed); tests/flow-cycle-edges.test.ts 'a
+       back-edge to an ancestor is a cycle edge' (decides
+       the committed edge's class by the depth-first
+       back-edge rule, which the reachability check does
+       not share); exploratory — the painted dashed-orange
+       preview and the committed edge's solid paint
 - [ ] **F22** Shift-drag and release in empty
   canvas (no node under cursor). PASS: the grey
   straight-line preview disappears and nothing
