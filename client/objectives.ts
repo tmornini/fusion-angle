@@ -9,8 +9,10 @@ import {
 } from '../shared/types.ts';
 import {
     type RequestContext,
+    ifMatchField,
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 import {
     createSubscriptionChannel,
@@ -61,10 +63,10 @@ async function getObjectiveWithEtag(
     const read = await ctx.GETWithEtag<ObjectiveEntity>(
         organizationItem(ctx, 'objectives', id),
     );
-    if (read.etag === undefined) {
-        throw new Error('the objective GET carried no ETag');
-    }
-    return { objective: read.body, etag: read.etag };
+    return {
+        objective: read.body,
+        etag: requiredEtag(read.etag, 'the objective GET'),
+    };
 }
 
 export function activeObjectivesOf(
@@ -357,7 +359,7 @@ export async function postObjectiveArchival(
             position: objective.position,
             state: 'archived',
         },
-        [['if-match', '"' + etag + '"']],
+        [ifMatchField(etag)],
     );
     notifyObjectiveChange();
 }
@@ -374,7 +376,7 @@ export async function postObjectiveReactivation(
             position: objective.position,
             state: 'active',
         },
-        [['if-match', '"' + etag + '"']],
+        [ifMatchField(etag)],
     );
     notifyObjectiveChange();
 }
@@ -396,7 +398,7 @@ export async function putObjectivePosition(
             position,
             state: objective.state,
         },
-        [['if-match', '"' + etag + '"']],
+        [ifMatchField(etag)],
     );
     notifyObjectiveChange();
 }

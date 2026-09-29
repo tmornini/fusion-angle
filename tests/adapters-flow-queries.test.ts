@@ -144,7 +144,7 @@ async function seedProject(
         actual_cost: 0,
         position: 0,
         state: 'approved',
-    });
+    }, undefined);
 }
 
 Deno.test(

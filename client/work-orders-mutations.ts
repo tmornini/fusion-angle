@@ -26,8 +26,10 @@ import type {
 } from './request-context.ts';
 import {
     filterByField,
+    ifMatchField,
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 import {
     generateIdentifier,
@@ -60,17 +62,6 @@ export function subscribeWorkOrderChanges(
 // the same bell their in-module siblings ring.
 export function notifyWorkOrderChanges(): void {
     workOrderChanges.notify();
-}
-
-// An operation on a work order latches the head it read.
-// A GET that carried no tag leaves nothing to latch.
-export function workOrderIfMatch(
-    etag: string | undefined,
-): readonly [string, string] {
-    if (etag === undefined) {
-        throw new Error('the work order GET carried no ETag');
-    }
-    return ['If-Match', '"' + etag + '"'];
 }
 
 async function generateDisplayId(
@@ -263,7 +254,9 @@ export async function postWorkOrderTransition(
             getRecordForWorkOrder(ctx, workOrderId),
         ]);
     const wo = read.body;
-    const workOrderTag = workOrderIfMatch(read.etag);
+    const workOrderEtag = requiredEtag(
+        read.etag, 'the work order GET',
+    );
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
@@ -393,10 +386,7 @@ export async function postWorkOrderTransition(
                 ctx, 'work-orders', workOrderId,
             ) + '/transition',
             body,
-            [[
-                'If-Match',
-                workOrderTag[1] + ', "' + etag + '"',
-            ]],
+            [ifMatchField(workOrderEtag, etag)],
         );
     } else {
         // Pure move: no delta; the work order's tag alone.
@@ -405,7 +395,7 @@ export async function postWorkOrderTransition(
                 ctx, 'work-orders', workOrderId,
             ) + '/transition',
             body,
-            [workOrderTag],
+            [ifMatchField(workOrderEtag)],
         );
     }
 
@@ -432,7 +422,7 @@ export async function putWorkOrderBinding(
             instance_id: instanceId,
             record_type_id: recordTypeId,
         },
-        [workOrderIfMatch(etag)],
+        [ifMatchField(etag)],
     );
     workOrderChanges.notify();
 }
@@ -457,7 +447,7 @@ export async function putWorkOrderPosition(
             ),
             position,
         },
-        [workOrderIfMatch(etag)],
+        [ifMatchField(etag)],
     );
     workOrderChanges.notify();
 }
@@ -493,7 +483,7 @@ export async function putWorkOrderClaim(
             expireAt,
             expires_at: expiresAt,
         },
-        [workOrderIfMatch(etag)],
+        [ifMatchField(etag)],
     );
     workOrderChanges.notify();
 }

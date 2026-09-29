@@ -77,7 +77,7 @@ async function seedProject(
     await putProject(ctx, id, {
         ...entity,
         state,
-    });
+    }, undefined);
 }
 
 // Seeds an idea through the SAME document PUT the live route
@@ -207,7 +207,7 @@ Deno.test(
         await putProject(ctx, projectId, {
             ...pFields,
             state: 'declined',
-        });
+        }, undefined);
         const { organization_id: _ideaOrganizationId, ...iFields } =
             buildIdea(ideaId);
         await putIdea(ctx, ideaId, {

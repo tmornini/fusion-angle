@@ -4,6 +4,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    ifMatchField,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -484,12 +486,14 @@ Deno.test(
         const { etag: fresh } = await ctx.GETWithEtag<unknown>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
         );
-        assert(fresh !== undefined);
+        const latch = ifMatchField(
+            requiredEtag(fresh, 'the flow GET'),
+        );
         const replayHeaders = [
             ...(capturedHeaders ?? []).filter(
-                (field) => field[0] !== 'if-match',
+                (field) => field[0] !== latch[0],
             ),
-            ['if-match', '"' + fresh + '"'] as const,
+            latch,
         ];
         await origPut(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,

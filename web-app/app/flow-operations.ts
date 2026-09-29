@@ -28,8 +28,10 @@ import type {
     FlowSaveShape,
 } from '../../client/flow-mutations.ts';
 import {
+    ifMatchField,
     jitteredBackoff,
     organizationItem,
+    requiredEtag,
 } from '../../client/request-context.ts';
 import {
     NODE_WIDTH,
@@ -748,9 +750,9 @@ async function postFlowUndo(
                     eventId: generateIdentifier(),
                     at: nowUtc(),
                 },
-                etag === undefined
-                    ? []
-                    : [['if-match', '"' + etag + '"']],
+                [ifMatchField(
+                    requiredEtag(etag, 'the flow GET'),
+                )],
             );
             return;
         } catch (err) {

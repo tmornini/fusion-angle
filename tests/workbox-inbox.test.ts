@@ -9,7 +9,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    ifMatchField,
     organizationItem,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -330,7 +332,9 @@ Deno.test(
                 release: null,
                 transitionAt: '2030-01-01T00:00:00.000000Z',
             },
-            [['If-Match', '"' + etag + '"']],
+            [ifMatchField(
+                requiredEtag(etag, 'the work order GET'),
+            )],
         );
         const {
             workOrders, transitionsByWo, memberMap,
@@ -535,9 +539,9 @@ Deno.test(
                 eventId: generateIdentifier(),
                 at: nowUtc(),
             },
-            undoHead.etag === undefined
-                ? []
-                : [['if-match', '"' + undoHead.etag + '"']],
+            [ifMatchField(
+                requiredEtag(undoHead.etag, 'the flow GET'),
+            )],
         );
         // A work order born AFTER the restore —
         // WB5a's most damning witness.

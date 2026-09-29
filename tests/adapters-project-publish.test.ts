@@ -107,7 +107,7 @@ Deno.test('postProjectApproval moves state to approved',
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',
-        });
+        }, undefined);
         // The objective and its baseline score are seeded the
         // SAME wire-reachable way (Phase 7 Task 7) — a raw
         // db.objectives.put/db.projectObjectiveBaselineScores.put
@@ -147,7 +147,7 @@ Deno.test('postProjectApproval throws when not ready',
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',
-        });
+        }, undefined);
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
@@ -168,7 +168,7 @@ Deno.test('postProjectArchival moves state to archived',
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'approved',
-        });
+        }, undefined);
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,

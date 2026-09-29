@@ -1,5 +1,9 @@
 import type { RequestContext } from './request-context.ts';
-import { activeOrganization } from './request-context.ts';
+import {
+    activeOrganization,
+    ifMatchField,
+    requiredEtag,
+} from './request-context.ts';
 
 // Domain face of a record instance: values as a map keyed
 // by attribute id. etag is the unquoted pair id for
@@ -68,18 +72,6 @@ function valuesMap(
     );
 }
 
-function requireEtag(
-    etag: string | undefined,
-    where: string,
-): string {
-    if (etag === undefined || etag === '') {
-        throw new Error(
-            'missing ETag on ' + where,
-        );
-    }
-    return etag;
-}
-
 function toRecordInstance(
     row: InstanceDetailWire,
     etag: string,
@@ -110,9 +102,9 @@ export async function getRecordInstances(
     );
     return rows.map(row => toRecordInstance(
         row,
-        requireEtag(
+        requiredEtag(
             row.etag,
-            'instance list row ' + row.id,
+            'the instance list row ' + row.id,
         ),
     ));
 }
@@ -128,7 +120,7 @@ export async function getRecordInstance(
     >(instancePath(ctx, recordTypeId, id));
     return toRecordInstance(
         body,
-        requireEtag(etag, 'instance detail ' + id),
+        requiredEtag(etag, 'the instance GET ' + id),
     );
 }
 
@@ -146,8 +138,8 @@ export async function putRecordInstance(
         [['If-None-Match', '*']],
     );
     return {
-        etag: requireEtag(
-            etag, 'instance PATCH create ' + id,
+        etag: requiredEtag(
+            etag, 'the instance PATCH create ' + id,
         ),
     };
 }
@@ -174,11 +166,11 @@ export async function patchRecordInstance(
     const result = await ctx.PATCHWithEtag(
         instancePath(ctx, recordTypeId, id),
         body,
-        [['If-Match', '"' + etag + '"']],
+        [ifMatchField(etag)],
     );
     return {
-        etag: requireEtag(
-            result.etag, 'instance PATCH ' + id,
+        etag: requiredEtag(
+            result.etag, 'the instance PATCH ' + id,
         ),
     };
 }

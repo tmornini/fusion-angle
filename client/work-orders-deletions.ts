@@ -1,9 +1,9 @@
 import type { RequestContext } from './request-context.ts';
-import { organizationItem } from './request-context.ts';
 import {
-    notifyWorkOrderChanges,
-    workOrderIfMatch,
-} from './work-orders-mutations.ts';
+    ifMatchField,
+    organizationItem,
+} from './request-context.ts';
+import { notifyWorkOrderChanges } from './work-orders-mutations.ts';
 import { getWorkOrderWithEtag } from './work-orders-queries.ts';
 
 // Releases the live claim via DELETE on the claim
@@ -20,7 +20,7 @@ export async function deleteWorkOrderClaim(
     await ctx.DELETEWithEtag(
         organizationItem(ctx, 'work-orders', workOrderId)
             + '/claim',
-        [workOrderIfMatch(etag)],
+        [ifMatchField(etag)],
     );
     notifyWorkOrderChanges();
 }

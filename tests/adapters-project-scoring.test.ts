@@ -162,12 +162,12 @@ async function seedTwoApprovedProjects(
         ...projectBody,
         title: 't1', position: 0,
         state: 'approved',
-    });
+    }, undefined);
     await putProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', {
         ...projectBody,
         title: 't2', position: 1,
         state: 'approved',
-    });
+    }, undefined);
     await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
         + 'ohqxgUBEaFQwYbXsonRPmg', {
         position: 0,

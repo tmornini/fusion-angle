@@ -13,8 +13,10 @@ import {
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import {
+    ifMatchField,
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 import {
     getCurrentHumanMember,
@@ -355,9 +357,7 @@ export async function postIdeaConversion(
             organizationItem(ctx, 'ideas', ideaId),
         ),
     ]);
-    if (idea.etag === undefined) {
-        throw new Error('the idea GET carried no ETag');
-    }
+    const ideaEtag = requiredEtag(idea.etag, 'the idea GET');
     await ctx.POSTWithHeaders(
         organizationItem(ctx, 'ideas', ideaId)
             + '/conversion',
@@ -381,7 +381,7 @@ export async function postIdeaConversion(
                 at: ideaStateAt,
             },
         })),
-    }, [['If-Match', '"' + idea.etag + '"']]);
+    }, [ifMatchField(ideaEtag)]);
     notifyProjectChange();
     notifyProjectScoreChange();
     ideaChanges.notify();

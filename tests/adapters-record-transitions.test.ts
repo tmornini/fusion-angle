@@ -8,6 +8,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    ifMatchField,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -22,9 +24,6 @@ import {
 import {
     postFlowCreation,
 } from '../client/flow-mutations.ts';
-import {
-    workOrderIfMatch,
-} from '../client/work-orders-mutations.ts';
 import {
     postRecordChange,
 } from '../client/records.ts';
@@ -136,7 +135,7 @@ async function seedWorkOrder(
         targetState: currentNodeId,
         release: null,
         transitionAt: AT_CREATED,
-    }, [workOrderIfMatch(etag)]);
+    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
 }
 
 // The binding PUT and the attribute PUT (below) both need

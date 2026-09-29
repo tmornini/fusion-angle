@@ -563,7 +563,7 @@ Deno.test(
             + 'ohqxgUBEaFQwYbXsonRPmg');
         assertStrictEquals(calls[1]!.method, 'PUT');
         assertEquals(calls[1]!.headerFields, [
-            ['if-match', '"objectiveHeadEtagXXXXXX"'],
+            ['If-Match', '"objectiveHeadEtagXXXXXX"'],
         ]);
         assertStrictEquals(calls[1]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -601,7 +601,7 @@ Deno.test(
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
         assertEquals(calls[1]!.headerFields, [
-            ['if-match', '"objectiveHeadEtagXXXXXX"'],
+            ['If-Match', '"objectiveHeadEtagXXXXXX"'],
         ]);
         assertEquals(calls[1]!.body, {
             position: 1.5,

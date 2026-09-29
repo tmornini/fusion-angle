@@ -85,7 +85,7 @@ async function seedProject(
     await putProject(ctx, id, {
         ...entity,
         state,
-    });
+    }, undefined);
 }
 
 Deno.test(
@@ -222,6 +222,7 @@ Deno.test('putProject persists a new project', async () => {
     await putProject(
         ctx, 'pnXmXrxOWayANgDLdCjuBw',
         { ...entity, state: STATE },
+        undefined,
     );
     const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assertStrictEquals(stored.title, 'Created');
@@ -235,7 +236,7 @@ Deno.test('putProject updates an existing project', async () => {
     await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
         ...entity,
         state: STATE,
-    });
+    }, undefined);
     const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assertStrictEquals(stored.title, 'After');
     assertStrictEquals(stored.progress, 100);
@@ -250,7 +251,7 @@ Deno.test(
         await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
             ...entity,
             state: STATE,
-        });
+        }, undefined);
         const fresh = inPageContext(db, await organizationToken());
         const row = await getProjectEntity(fresh, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(row.title, 'Persisted');

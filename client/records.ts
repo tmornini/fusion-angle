@@ -11,7 +11,9 @@ import {
 } from '../shared/types.ts';
 import {
     activeOrganization,
+    ifMatchField,
     organizationItem,
+    requiredEtag,
     type RequestContext,
 } from './request-context.ts';
 import {
@@ -96,10 +98,10 @@ export async function getRecordWithEtag(
     const read = await ctx.GETWithEtag<RecordEntity>(
         recordTypePath(ctx, id),
     );
-    if (read.etag === undefined) {
-        throw new Error('the record type GET carried no ETag');
-    }
-    return { record: read.body, etag: read.etag };
+    return {
+        record: read.body,
+        etag: requiredEtag(read.etag, 'the record type GET'),
+    };
 }
 
 // Domain state rides the RecordEntity GET row; narrow it
@@ -272,7 +274,7 @@ export async function postRecordChange(
             state: change.state,
             removedAttributeIds:
                 change.removedAttributeIds,
-        }, [['If-Match', '"' + etag + '"']]);
+        }, [ifMatchField(etag)]);
     }
     recordChanges.notify();
 }

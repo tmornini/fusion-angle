@@ -17,6 +17,7 @@ import type { RequestContext } from './request-context.ts';
 import {
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 import { compareIdentifiers } from
     '../shared/identifier.ts';
@@ -418,9 +419,12 @@ export async function getWorkOrder(
 export async function getWorkOrderWithEtag(
     ctx: RequestContext,
     id: string,
-): Promise<{ workOrder: WorkOrder, etag: string | undefined }> {
+): Promise<{ workOrder: WorkOrder, etag: string }> {
     const read = await ctx.GETWithEtag<WorkOrderEntity>(
         organizationItem(ctx, 'work-orders', id),
     );
-    return { workOrder: toWorkOrder(read.body), etag: read.etag };
+    return {
+        workOrder: toWorkOrder(read.body),
+        etag: requiredEtag(read.etag, 'the work order GET'),
+    };
 }
