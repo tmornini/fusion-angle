@@ -6534,20 +6534,30 @@ NPS", and "Improve employee morale" are not.
        descending with no-score last'; exploratory — the
        live sort-control click and re-order
 - [ ] **K26** Filter to `under_review` status + sort by
-  Projected Impact descending. Three seeded `under_review`
-  mock projects, high first: Workforce Capacity
-  Forecasting, Predictive Maintenance System, Employee
-  Training Assistant. PASS if those three rows render,
-  ranked high first — the "review queue ranked by impact"
-  workflow we designed.
+  Projected Impact descending. Four rows render: the
+  three seeded `under_review` projects — Workforce
+  Capacity Forecasting (+79), Predictive Maintenance
+  System (+1), and Employee Training Assistant (no
+  baselines, "—") — plus AA22a's converted project,
+  which AA23 left `under_review`. PASS if the three
+  seeded titles rank high-to-low in that order with
+  Employee Training Assistant last, and the converted
+  row sits wherever its own projected impact places it.
+  That value comes from the baselines this walk dragged
+  in AA22 and AA22a, so its slot varies by walk: on
+  29 Sep it read +55, between Workforce Capacity
+  Forecasting and Predictive Maintenance System. This
+  is the "review queue ranked by impact" workflow we
+  designed.
   Pin: tests/presenter-projects-list-column.test.ts
        'applyProjectSortToggle orders by projected impact
        descending with no-score last' (decides the
        descending-with-absent-last ordering mechanism);
        exploratory — the live filter-to-`under_review`,
-       and that these three seeded projects rank in this
+       that these three seeded projects rank in this
        order (a seed-data fact, not a product covenant a
-       unit test should pin)
+       unit test should pin), and where AA22a's converted
+       row lands among them
 
 ### K27–K29 — Dashboard Impact + Aggregates
 
