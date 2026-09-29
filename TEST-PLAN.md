@@ -4614,8 +4614,16 @@ per-user visibility filter.
 - [ ] **WB23** Claim, release, and transition a work
   order in two tabs: act in the first tab, then act on
   the same work order in the second without reloading
-  it. PASS: the second tab's stale action shows the
-  refusal, and a reload shows the first tab's state.
+  it. PASS: each action reads the work order's head
+  when it is taken and latches that fresh tag, so the
+  second tab's action is judged against the first
+  tab's result rather than refused: a second claim
+  renews the holder's claim, a second release is a
+  200 no-op that stores nothing, and a second
+  transition lands on the fresh head. A value-bearing
+  transition also latches the instance tag the tab
+  loaded, so one sent over a changed instance shows
+  the 412 refusal. A reload shows the result.
   Pin: tests/api-work-order-transition-instance.test.ts
        'racing value-bearing transitions land once'
        (decides that of two transitions latched on one
