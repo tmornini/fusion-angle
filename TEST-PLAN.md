@@ -5685,24 +5685,28 @@ FSM, unlike `flows/detail`).
   orgs (`shouldShowOrganizationSwitcher`). PASS: the
   select lists "Stark Industries" and "Wayne
   Enterprises" with Stark active, alongside a "Set as
-  default" control (`.org-set-default`); the plain
-  org-name text line in the chip is cleared so the org is
-  not named twice. Note the Members and Ideas lists for
-  Stark. Select "Wayne Enterprises" → the page does a
-  FULL reload and re-scopes: Members shows Wayne's
-  roster and Ideas shows Wayne's ideas (org-fenced —
-  Stark's rows are no longer visible). Reload the page
-  again WITHOUT changing the select → the selection
-  persists (Wayne stays active; the choice is stored
-  under `fusion-angle:active-organization-id` and boot
-  re-exchanges a scoped token from it). A single-org
-  seeded user, by contrast, sees NO `<select>` in the
-  sidebar — just the org name as PLAIN TEXT in the
-  chip. The top bar shows neither the switcher nor a
-  greeting; its only org-aware affordance is the
+  default" control (`.org-set-default`); the chip names
+  only the signed-in person — its org-name line is
+  cleared so the org is not named twice. Note the Ideas
+  and Members lists for Stark. Select "Wayne
+  Enterprises" → the page does a FULL reload onto
+  Wayne: Ideas shows Wayne's ideas and Members shows
+  Wayne's humans (org-fenced — Stark's rows are no
+  longer visible). Reload the page again WITHOUT
+  changing the select → Wayne stays active (the choice
+  is stored under `fusion-angle:active-organization-id`
+  and boot re-exchanges a scoped token from it). A
+  Wayne-only member, such as
+  `mike.thompson@company.com`, sees NO `<select>` in
+  the sidebar — just "Wayne Enterprises" as PLAIN TEXT
+  in the chip under their name. The top bar carries
+  neither the switcher nor a greeting, yet it still
+  names the active org as a read-only stat: the first
+  label of its stat strip (`#header-stats`), beside the
   pending-invitations bell (V3). Source of truth:
   `web-app/app/organization-switcher.ts`,
   `web-app/app/sidebar-member.ts`,
+  `web-app/app/header-info.ts`,
   `web-app/app/adapters/organization-session.ts`,
   `web-app/app/app-boot.ts::scopeBootToActiveOrganization`.
   Pin: tests/adapters-organization-session-exchange.test.ts
@@ -5727,8 +5731,9 @@ FSM, unlike `flows/detail`).
        wins mechanism behind the reload-persistence
        clause); exploratory — the live full-page reload,
        the plain-text-vs-select rendering for a
-       single-org user, and the top bar carrying neither
-       switcher nor greeting
+       Wayne-only member, and the top bar carrying
+       neither switcher nor greeting while its stat strip
+       names the org read-only
 - [ ] **G41** Person and agent writes land on the message
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
