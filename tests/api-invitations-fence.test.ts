@@ -717,11 +717,10 @@ Deno.test('decline: missing declineAt is rejected (400)', async () => {
 // synthesis around this same accept path.
 Deno.test('a removed member who re-accepts gets a no-op — not a'
 + ' silent re-admission (KEEP-ATOMIC)', async () => {
-    // Distinct, strictly-increasing `at` stamps: grant/accept
-    // share one invitation entity_id in the states log, so a tied
-    // `at` would fall to the (at, id) reduction's id tie-break —
-    // the SAME reduction the accept path reads — rather
-    // than proving the property this test exists to pin.
+    // Distinct, strictly-increasing `at` stamps, kept from the
+    // states-log era. The accept path reads the invitation's
+    // head document (loadInvitation, then
+    // transitionInvitation), not a reduction over events.
     const db = await seed();
     const id = await grantSarahToWayne(db);
     const accept = await handleRequest(db, await invitationLatched(db, req(
