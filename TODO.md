@@ -302,13 +302,14 @@ Off the critical path; each with its oracle.
     Oracle: `tests/members-pending-skeleton.test.ts`
     'members paints the table skeleton while its GETs
     are held (I21)' lands, red or green
-  - K17, `2026-09-29-k17-signed-objective-score` — an
-    approved objectives row reads "—" where its saved
-    −100 baseline belongs
-    (`docs/superpowers/test-plan-mitigations/2026-09-29-K-K17.md`).
-    Oracle: `tests/presenter-project-objectives.test.ts`
-    'approved row with no actual reads its signed
-    baseline (K17)' green
+- A dragged objective slider's readout speaks a second
+  voice: `web-app/projects/detail.ts`'s input handler
+  writes `sign + String(v)` (ASCII `-100`) where the
+  presenter paints `formatSigned`'s U+2212 `−100`, so
+  K13's row reads `-100` until the save re-renders it.
+  Oracle: a Layer 2 test that drags a `.baseline-slider`
+  to its minimum and reads `.slider-value` as
+  `formatSigned(-100)`
 
 ## Later work
 
