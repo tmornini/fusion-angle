@@ -302,6 +302,14 @@ Off the critical path; each with its oracle.
     Oracle: `tests/members-pending-skeleton.test.ts`
     'members paints the table skeleton while its GETs
     are held (I21)' lands, red or green
+- A dragged objective slider's readout speaks a second
+  voice: `web-app/projects/detail.ts`'s input handler
+  writes `sign + String(v)` (ASCII `-100`) where the
+  presenter paints `formatSigned`'s U+2212 `−100`, so
+  K13's row reads `-100` until the save re-renders it.
+  Oracle: a Layer 2 test that drags a `.baseline-slider`
+  to its minimum and reads `.slider-value` as
+  `formatSigned(-100)`
 
 ## Later work
 
