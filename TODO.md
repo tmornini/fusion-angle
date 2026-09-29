@@ -309,10 +309,6 @@ Off the critical path; each with its oracle.
     Oracle: `tests/presenter-project-objectives.test.ts`
     'approved row with no actual reads its signed
     baseline (K17)' green
-  - TEST-PLAN drift, `2026-09-29-walk-drift` — AT2,
-    AT4, A2, F9, F21, G36, and K26 still describe
-    behavior the walk did not see. Oracle: each case
-    reads as the 29 Sep walk and the re-count saw
 
 ## Later work
 
