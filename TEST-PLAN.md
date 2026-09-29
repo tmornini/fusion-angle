@@ -458,9 +458,12 @@ any AT red.
   owns its own Docker Postgres, not the
   walk DB. The suite creates and drops
   its own `fusion_test_*` schema. PASS:
-  exits 0, `ok | 52 passed | 0 failed`
-  across the seven files. `./test validate`
-  stays Postgres-free.
+  exits 0, `ok | N passed | 0 failed`
+  across the eight files `bin/test-postgres`
+  names — the seven `pg-*.test.ts` and
+  `schema-lifecycle.test.ts`; on 29 Sep
+  `ok | 67 passed | 0 failed`.
+  `./test validate` stays Postgres-free.
   Pin: exploratory — the command is its own witness
 - [ ] **AT5** Run `./test browser`. It bundles the client with
   `deno bundle` into `$TMPDIR` and runs `TZ=UTC deno
