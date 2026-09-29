@@ -137,6 +137,13 @@ export function withoutRequestIdLine(
     };
 }
 
+// A seeded row is synthesized: it stores what was
+// received, which is nothing (§8). The statement hashes
+// what it stores.
+function withoutRequest(bind: StatementBind): StatementBind {
+    return { ...bind, request: new Uint8Array(0) };
+}
+
 // Records what the seed's live ops write. The run holds
 // one transaction open on the scratch, which nothing else
 // uses: the ops' own transactions and reads re-enter it,
@@ -325,7 +332,9 @@ export async function postSeedLanding(
             supersedes: [NIL_IDENTIFIER],
         },
         ...rehearsal.statements.map((statement) => ({
-            rows: statement.rows.map(withoutRequestIdLine),
+            rows: statement.rows.map(
+                (row) => withoutRequest(withoutRequestIdLine(row)),
+            ),
             supersedes: statement.supersedes,
         })),
     ];

@@ -996,15 +996,13 @@ async () => {
     assertStrictEquals(recordDocumentMessagePairs.length, 1);
     assertStrictEquals(recordDocumentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = atRecord.find(
-        (r) => decodeRequestMessage(r.request).method === 'POST',
-    )!;
+    // The received create keeps its request; the document's
+    // state rides its response and leads with the id, the
+    // routing key both bodies name.
+    const postRow = atRecord.find((r) => r.method === 'POST')!;
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
-    // The stored request is the state, which leads with
-    // the document's id until the former stores no request
-    // bytes; the id is the routing key both bodies name.
     const documentBodyKeys = new Set(
         Object.keys(withoutId(recordDocumentMessagePairs[0]!.body)),
     );

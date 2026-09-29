@@ -1806,7 +1806,7 @@ async function authorizePassword(
                 'credentials', cid,
             ],
             headerFields: [],
-            body: credBody,
+            body: undefined,
             requesterIdentityId: identityId,
             requestAt: at,
             organization: undefined,
@@ -1819,6 +1819,7 @@ async function authorizePassword(
             operationId: messagePair.operationId,
             requestId: messagePair.requestId,
             genesis: 'handler',
+            emptyRequest: true,
         });
     }
     const pairs = rehashMessagePair === undefined

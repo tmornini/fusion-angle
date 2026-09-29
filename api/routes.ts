@@ -105,7 +105,6 @@ import {
     latchesOf,
     canonicalPath,
     documentHeadAt,
-    formWriteMessagePair,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
     attachEtag,
@@ -118,7 +117,6 @@ import type {
     StateSibling,
 } from './message-pair.ts';
 import { messageStore } from './message-store.ts';
-import type { FieldLine } from '../shared/http-message/types.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
@@ -3095,8 +3093,7 @@ export const WRITE_RESPONSE_SPECS:
     },
     'identities/': { conditional: 'none' },
     // G3: identities/:id emits identityDocumentEntityOf
-    // (GET derive). Creation and the human-member half share
-    // this spec via formDocumentMessagePairFor.
+    // (GET derive).
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
     'ai-agents/:id': documentWriteResponseSpec(AI_AGENTS_WIRING),
     // G5: piiEntityOf (GET derive). DELETE is a marked
@@ -3277,110 +3274,6 @@ export function conditionalOf(
         );
     }
     return spec.conditional;
-}
-
-// The plain/PerVerb resolution every route-inline document-pair
-// block shares (Phase 9 Task 2): a plain WriteResponseSpec
-// answers for itself ('conditional' at the top level); a
-// PerVerbWriteResponseSpec answers through its `.put` arm — the
-// SAME two shapes the hand-written call sites checked one at a
-// time, folded into one shape-driven lookup. The guard-throw
-// text is byte-kept: every site hardcoded this exact literal,
-// parameterized here by the pattern that would have been
-// hardcoded at that site.
-function resolveWriteResponseSpec(
-    routePattern: string,
-): WriteResponseSpec {
-    const entry = WRITE_RESPONSE_SPECS[routePattern];
-    const spec = entry === undefined
-        ? undefined
-        : 'conditional' in entry ? entry : entry.put;
-    if (spec === undefined) {
-        throw new Error(
-            'no per-write response spec for'
-            + ' ' + routePattern,
-        );
-    }
-    return spec;
-}
-
-export interface DocumentMessagePairFormInput {
-    readonly routePattern: string;
-    // Pattern params, in order (e.g. ['members/:id']'s single
-    // :id, or ['projects/:id/objective-baseline-scores/:sid']'s
-    // [projectId, baselineId]).
-    readonly params: readonly Id[];
-    // undefined only for the record-attribute DELETE tombstone
-    // sites, which carry no body — mirroring WriteMessagePairInput's own
-    // body: Record<string, unknown> | undefined.
-    readonly body: Record<string, unknown> | undefined;
-    readonly requesterIdentityId: Id;
-    readonly requestAt: string;
-    readonly organization: Id | undefined;
-    readonly method?: 'PUT' | 'DELETE';
-    // The spec-less tombstone sites (finding 10 i): an explicit
-    // response, bypassing WRITE_RESPONSE_SPECS entirely.
-    readonly response?: {
-        readonly status: number;
-        readonly body: unknown;
-    };
-    // A synthesized PUT that restores a flow (undo)
-    // latches the head it restored from; the statement
-    // judges that latch.
-    readonly latchedHeadMessagePairId?: string;
-    readonly headerFields?: readonly FieldLine[];
-    readonly operationId: string;
-    readonly requestId: string;
-}
-
-// The shared document-pair former (Phase 9 Task 2, Commandment
-// IX): replaces every route-inline formWriteMessagePair block that
-// shared this ONE core shape — resolve the response, resolve the
-// document, form the pair. Lives beside WRITE_RESPONSE_SPECS
-// (routes.ts, not message-pair.ts): the specs live here, and
-// message-pair.ts must never import routes.ts (Step 0(c) — the
-// import graph stays acyclic; routes.ts already imports
-// formWriteMessagePair FROM message-pair.ts, so the dependency runs
-// one way only). Builds the pair PRE-TX only — the in-tx
-// appendMessagePairOnce calls stay at each op's own transaction.
-export async function formDocumentMessagePairFor(
-    input: DocumentMessagePairFormInput,
-): Promise<MessagePair> {
-    const routeSegments = input.routePattern.split('/');
-    let nextParam = 0;
-    const pathSegments = routeSegments.map((segment) =>
-        segment.startsWith(':')
-            ? input.params[nextParam++]!
-            : segment,
-    );
-    let responseBody: unknown;
-    if (input.response !== undefined) {
-        responseBody = input.response.body;
-    } else {
-        const spec = resolveWriteResponseSpec(input.routePattern);
-        responseBody = spec.successBody?.(
-            [...input.params], input.body,
-            input.requesterIdentityId, input.organization,
-        );
-    }
-    return formWriteMessagePair({
-        method: input.method ?? 'PUT',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: input.routePattern,
-        routeSegments,
-        pathSegments,
-        headerFields: input.headerFields ?? [],
-        body: input.body,
-        requesterIdentityId: input.requesterIdentityId,
-        requestAt: input.requestAt,
-        organization: input.organization,
-        responseBody,
-        operationId: input.operationId,
-        requestId: input.requestId,
-        ...(input.latchedHeadMessagePairId !== undefined
-            ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
-            : {}),
-    });
 }
 
 // Instance DELETE tombstone append (Task 18 / R4 / R9).

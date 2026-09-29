@@ -30,12 +30,11 @@ import {
 } from '../api/validators.ts';
 import {
     canonicalPath,
+    responseRecordOf,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
 } from './http-fixtures.ts';
@@ -185,30 +184,6 @@ async function headEtag(
     const raw = res.headers.get('ETag');
     assertNotStrictEquals(raw, null, 'locked GET carries ETag');
     return raw!;
-}
-
-// Decode a stored request row's serializeWire message back into its
-// method + body — the SAME decode derive-documents.ts's private
-// requestMethodOf/bodyOf perform, reconstructed here
-// read-only for wire-level assertions (this file never imports
-// those, since they are not exported production surface).
-function decodeRequestMessage(message: string): {
-    readonly method: string;
-    readonly body: Record<string, unknown>;
-} {
-    const model = parseWire(message);
-    if (model.startLine.kind !== 'request') {
-        throw new Error(
-            'stored message carries no request line',
-        );
-    }
-    const body = HttpMessage.fromModel(model).body();
-    return {
-        method: model.startLine.method,
-        body: body.exists()
-            ? JSON.parse(body.toText()) as Record<string, unknown>
-            : {},
-    };
 }
 
 // --- below-gate op tests (postFlowDocumentOp directly).
@@ -746,12 +721,9 @@ async () => {
             && r.name === flowId,
     );
     assertStrictEquals(flowPairs.length, 2);
-    const documentRow = flowPairs.find(
-        r => decodeRequestMessage(r.request).method === 'PUT',
-    );
+    const documentRow = flowPairs.find(r => r.method === 'PUT');
     assert(documentRow, 'no document message pair at the flow document');
-    const decodedDocument =
-        decodeRequestMessage(documentRow!.request);
+    const documentState = responseRecordOf(documentRow!.response)!;
     const expectedDocument = {
         name: 'Fresh Flow',
         is_locked: false,
@@ -767,11 +739,11 @@ async () => {
     };
     // Validates as a genuine FlowDocumentBody — the Phase 3
     // gate-validate precedent, proven at the wire. The
-    // stored request is the flow's state, which leads with
-    // its id until the former stores no request bytes.
+    // stored response is the flow's state, which leads with
+    // its id.
     assertEquals(
         validateFlowDocumentBody(
-            withoutId(decodedDocument.body),
+            withoutId(documentState),
         ).entity,
         {
             name: 'Fresh Flow',
@@ -781,7 +753,7 @@ async () => {
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
         },
     );
-    assertEquals(decodedDocument.body, {
+    assertEquals(documentState, {
         id: flowId,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         ...expectedDocument,
@@ -795,10 +767,8 @@ async () => {
             && r.name === projectFlowId,
     );
     assertStrictEquals(joinPairs.length, 1);
-    const decodedJoin =
-        decodeRequestMessage(joinPairs[0]!.request);
-    assertStrictEquals(decodedJoin.method, 'PUT');
-    assertEquals(withoutId(decodedJoin.body), {
+    assertStrictEquals(joinPairs[0]!.method, 'PUT');
+    assertEquals(withoutId(responseRecordOf(joinPairs[0]!.response)!), {
         project_id: 'qfhFObbtDfxUZwEGxySBoQ',
         flow_id: flowId,
         at: AT,
@@ -847,7 +817,7 @@ Deno.test('e2e: a duplicate POST flows (same id) is 409 and'
             && r.name === flowId,
     );
     const firstDocumentRequest = flowPairsAfterFirst.find(
-        r => decodeRequestMessage(r.request).method === 'PUT',
+        r => r.method === 'PUT',
     );
     assert(
         firstDocumentRequest,
@@ -898,7 +868,7 @@ Deno.test('e2e: a duplicate POST flows (same id) is 409 and'
             && r.name === flowId,
     );
     const documentRequests = flowPairsAfterSecond.filter(
-        r => decodeRequestMessage(r.request).method === 'PUT',
+        r => r.method === 'PUT',
     );
     assertStrictEquals(documentRequests.length, 1);
     assertStrictEquals(
@@ -1024,11 +994,12 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
         r => r.id === undoDocumentResponse!.id,
     );
     assert(undoDocumentRequest);
-    const decoded =
-        decodeRequestMessage(undoDocumentRequest!.request);
-    assertStrictEquals(decoded.method, 'PUT');
+    assertStrictEquals(undoDocumentRequest!.method, 'PUT');
+    const restored = responseRecordOf(
+        undoDocumentRequest!.response,
+    )!;
     assertEquals(
-        decoded.body['graph'],
+        restored['graph'],
         undoneGraph,
         'the restore write carries the ORIGINAL one-node'
         + ' graph, resolved from the message plane — never a'
@@ -1044,7 +1015,7 @@ Deno.test('e2e: POST organizations/:id/flows/:id/undo forms a'
         graph: Record<string, unknown>;
     };
     assertEquals(
-        decoded.body['graph'],
+        restored['graph'],
         afterBody.graph,
     );
 });
@@ -1258,7 +1229,7 @@ async function documentMessagePairCount(
     ).length;
 }
 
-async function latestPutRequestBody(
+async function latestPutResponseBody(
     db: MemoryDbAdapter,
     flowId: string,
 ): Promise<Record<string, unknown>> {
@@ -1269,14 +1240,16 @@ async function latestPutRequestBody(
     );
     const latest = puts[puts.length - 1];
     assert(latest, 'no PUT pair at ' + flowId);
-    return decodeRequestMessage(
-        latest.request,
-    ).body;
+    return responseRecordOf(latest.response)!;
 }
 
+// `body` is what the head was formed from: the client's
+// body for a received PUT, the stored state for a sibling
+// the former wrote (its request stores nothing).
 async function assertStoredPutOmitsUndoHistory(
     db: MemoryDbAdapter,
     flowId: string,
+    body: Record<string, unknown>,
     messagePairCount: number,
     token: string,
 ): Promise<void> {
@@ -1287,15 +1260,12 @@ async function assertStoredPutOmitsUndoHistory(
         'hasUndoHistory' in stored, false,
         'stored PUT must omit hasUndoHistory',
     );
-    const requestBody = await latestPutRequestBody(
-        db, flowId,
-    );
     const expected = flowStoredEntityOf(
         {
             name: flowId,
             messagePairId: flowId,
             method: 'PUT',
-            body: requestBody,
+            body,
         },
         'AjdvjuECVZEgZoFajaIEkg',
     );
@@ -1319,7 +1289,7 @@ async function assertStoredPutOmitsUndoHistory(
                 name: flowId,
                 messagePairId: flowId,
                 method: 'PUT',
-                body: requestBody,
+                body,
             },
             'AjdvjuECVZEgZoFajaIEkg',
             messagePairCount,
@@ -1340,7 +1310,8 @@ async () => {
     assertStrictEquals(created.status, 201);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 1);
     await assertStoredPutOmitsUndoHistory(
-        db, flowId, 1, token,
+        db, flowId, await latestPutResponseBody(db, flowId), 1,
+        token,
     );
 
     const saveBody = documentBody(
@@ -1366,7 +1337,7 @@ async () => {
     assertStrictEquals(saved.status, 200);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 2);
     await assertStoredPutOmitsUndoHistory(
-        db, flowId, 2, token,
+        db, flowId, withoutId(saveBody), 2, token,
     );
     const putJson = await saved.json() as {
         hasUndoHistory?: boolean;
@@ -1386,7 +1357,8 @@ async () => {
     assertStrictEquals(undone.status, 200);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 3);
     await assertStoredPutOmitsUndoHistory(
-        db, flowId, 3, token,
+        db, flowId, await latestPutResponseBody(db, flowId), 3,
+        token,
     );
 });
 

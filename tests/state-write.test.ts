@@ -139,6 +139,7 @@ Deno.test(
             responseRecordOf(head.response),
             { id: IDEA, title: 'Born' },
         );
+        assertStrictEquals(head.request, '');
         assertStrictEquals(writeAnswerOf(pair), answer);
     },
 );

@@ -156,8 +156,9 @@ export interface WriteMessagePairInput {
     // canonicalPath.
     readonly organization: Id | undefined;
     // Present only for the answering row: the body bytes the
-    // gate read. Synthesized pairs omit it and build a request
-    // from `body`.
+    // gate read. A synthesized pair sets emptyRequest instead;
+    // only the seed's formers build a request from `body`,
+    // and the seed's landing strips it.
     readonly bodyBytes?: Uint8Array;
     readonly responseBody: unknown | undefined;
     // Lines formed onto the response before the split.
@@ -1300,9 +1301,9 @@ function parentHeadAnswer(
     };
 }
 
-// A sibling carries its state as its request body until
-// Task 16 empties every synthesized request
-// (Interpretation W).
+// A sibling is synthesized: nothing was received for it,
+// so it stores an empty request (§8). Its state rides the
+// response.
 async function formSiblingPair(
     context: SiblingContext,
     sibling: StateSibling,
@@ -1314,15 +1315,7 @@ async function formSiblingPair(
     const status = sibling.method === 'PUT'
         ? HTTP_CREATED
         : HTTP_NO_CONTENT;
-    const requestMessage = storedWire(buildRequestModel({
-        method: sibling.method,
-        target: sibling.path + sibling.name,
-        fields: [{
-            name: OPERATION_ID_HEADER,
-            value: context.operationId,
-        }],
-        body,
-    }));
+    const requestMessage = '';
     const response = formedResponse({
         status,
         etag: id,

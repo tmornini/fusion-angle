@@ -294,12 +294,11 @@ Deno.test(
             request.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
-        const parsed = pairJsonOf(request.request) as {
+        const parsed = pairJsonOf(request.response) as {
             body: Record<string, unknown>;
         };
-        // The stored request is the project's state, which
-        // leads with its id and organization until the former
-        // stores no request bytes.
+        // The stored response is the project's state, which
+        // leads with its id and organization.
         assertEquals(parsed.body, {
             id: 'psZcIMMgiSomMHzDxcUnYQ',
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -328,7 +327,7 @@ Deno.test(
         // The conversion's idea pair is the one carrying
         // 'promoted' (the seed carried 'approved').
         const ideaRequest = atIdea.find((r) => {
-            const body = (pairJsonOf(r.request) as {
+            const body = (pairJsonOf(r.response) as {
                 body: Record<string, unknown>;
             }).body;
             return body['state'] === 'promoted';
@@ -339,7 +338,7 @@ Deno.test(
             ideaRequest.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
-        const ideaParsed = pairJsonOf(ideaRequest.request) as {
+        const ideaParsed = pairJsonOf(ideaRequest.response) as {
             body: Record<string, unknown>;
         };
         assertEquals(ideaParsed.body, {
@@ -382,7 +381,7 @@ Deno.test(
                 'XXZruirZyAOoRpNxaDnpSA',
             );
             const baselineParsed = pairJsonOf(
-                baselineRequest.request,
+                baselineRequest.response,
             ) as { body: Record<string, unknown> };
             // KEY-SET spot-check: the stored body is the
             // baseline's id and its `fields` VERBATIM —

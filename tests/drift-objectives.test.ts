@@ -956,15 +956,13 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = pairsAt.find(
-        (r) => decodeRequestMessage(r.request).method === 'POST',
-    )!;
+    // The received create keeps its request; the document's
+    // state rides its response and leads with the id, the
+    // routing key both bodies name.
+    const postRow = pairsAt.find((r) => r.method === 'POST')!;
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
-    // The stored request is the state, which leads with
-    // the document's id until the former stores no request
-    // bytes; the id is the routing key both bodies name.
     const documentBodyKeys = new Set(
         Object.keys(withoutId(documentMessagePairs[0]!.body)),
     );
