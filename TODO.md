@@ -228,7 +228,11 @@ skew tests, which went with item 8's trio.
    the bytes it hides: a bare digest of guessable bytes is
    a guessing oracle, and a fast hash of a request that
    held a password would sit beside the scrypt hash and
-   undercut it. `pair_hash` is `sha256` over the envelope
+   undercut it. The two secrets leaves are the
+   exception today: bare `sha256` of their column, as
+   `secret_hash` was, because the split of the hoist
+   into two columns was chosen to change no hash's form.
+   `pair_hash` is `sha256` over the envelope
    columns and the four leaves, so every reader verifies
    the root from what it may see, and a reader who sees a
    leaf's bytes and salt verifies that leaf too. The
@@ -449,7 +453,8 @@ skew tests, which went with item 8's trio.
    hash-and-verify half of its verifiable-ledger bullet;
    the brainstorm says what is left of each.
 1. The application reads the response as a unit. State
-   by PUT landed at `b548791c`: the mock-data seed's
+   by PUT landed with "Describe state by PUT in the
+   docs": the mock-data seed's
    pairs 1,454 → 2,316, depth 3 → 15, stored bytes
    1,694,553 → 6,243,370; `./test` 44.7 s → 72.4 s
    (medians of three). After a 412 the client resends
@@ -459,11 +464,7 @@ skew tests, which went with item 8's trio.
    blind PUT retries on the server, since it derives
    nothing. Every unit a client reads carries its `etag`,
    so the client always holds the latch. Flows keep their
-   event walk until item 11, and the undo's join of an
-   undo pair to its document pair moves from equal
-   `request_at`, which item 0 drops, to the
-   `operation_id` both carry
-   (`api/derive-flows.ts:257-263`, `:289-302`). A read
+   event walk until item 11. A read
    hands out the stored
    response whole, and a DELETE head answers a document
    GET 404 and yields no part, as today's head read and
@@ -602,21 +603,14 @@ skew tests, which went with item 8's trio.
    commit adds the file references: the one read function
    and the client's splitter. API
    tests pin the headers a read serves and the headers it
-   must not. Today: the five work-order operations answer
-   204 and keep their state in their own request bodies
-   alone (`api/routes.ts:3001-3014`, `api/api.ts:880-881`;
-   `api/derive-states.ts:605-629`);
-   derivation reads the request body at five seams
-   (`api/derive-documents.ts:95,159`,
-   `api/document-family.ts:396,473`,
-   `api/routes.ts:5088,5303`, `api/api.ts:1341`, and the
-   work-order decoder `api/derive-states.ts:615-617`
-   behind five call sites), item 0
-   having closed the grant's; a document GET parses
-   the stored response, keeps the body, and rebuilds three
-   headers, dropping `Operation-ID` on purpose
-   (`streamGetFromStored`,
-   `api/message-pair.ts:606-636`); a collection GET
+   must not. Today: a work-order operation answers the
+   work order's version, which the head's response
+   stores whole (`api/work-order-version.ts`), and
+   derivation reads no request body; a document GET
+   parses the stored response, keeps the body, and
+   rebuilds three headers, dropping `Operation-ID` on
+   purpose (`streamGetFromStored`,
+   `api/message-pair.ts:710-737`); a collection GET
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
    client receives bare JSON. Merged: the API client,
@@ -1202,11 +1196,14 @@ skew tests, which went with item 8's trio.
     (`## Members and attributes`).
 13. Two processes — high availability for the app and
     for Postgres on Render. The app's precondition is in
-    the tree: `api/derive-states.ts:517-529` — the live
-    claim route decides expiry against `Date.now()` and
-    replay reproduces it only inside one process; record
-    the expiry decision as its own event first (remove
-    the comment there when done). Then two replicas
+    the tree: a claim decides expiry against its
+    request's stamp (`isClaimLive`,
+    `api/work-order-version.ts:107-112`), and the claim
+    GET against the reading process's clock
+    (`api/routes.ts:4525-4544`, `nowUtc()`), so each
+    replica's clock decides the boundary; record the
+    expiry decision as its own event first. Then two
+    replicas
     behind Render's balancer, each answering item 4's
     probe; LISTEN in each (item 9 is per process by
     construction); the throttle's per-process counters
@@ -1456,14 +1453,14 @@ Off the critical path; each with its oracle.
   genesis the narrowest reading would answer 200
   (`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
   §10). The gate checks only a latch's presence and
-  form (`api/api.ts:254-322`), and the flow PUT no
+  form (`api/api.ts:254-324`), and the flow PUT no
   longer re-reads the head to refuse its latch
-  (`api/routes.ts:1395-1421`). Both head reads carry
+  (`api/routes.ts:1395-1422`). Both head reads carry
   the head's response and method, all the widest
   reading compares: `headed`
-  (`api/ledger-statement-sql.ts:67-83`) and the memory
-  `Head` (`shared/ledger-statement.ts:64-71`, filled by
-  `headsOf`, `api/backend-memory.ts:304-351`). The
+  (`api/ledger-statement-sql.ts:68-84`) and the memory
+  `Head` (`shared/ledger-statement.ts:66-73`, filled by
+  `headsOf`, `api/backend-memory.ts:310-354`). The
   narrowest also compares the head's `supersedes`,
   which neither selects today. The statement keeps its
   fifteen parameters. Lands no later than the retries
@@ -3075,55 +3072,35 @@ Off the critical path; each with its oracle.
 - Comments name absent code. `appendMessagePairOnce`
   and `appendMessagePairAlways` left with the store's
   one statement, and the comments citing them stayed:
-  five in `api/` (`api/api.ts:1357`,
+  five in `api/` (`api/api.ts:1356`,
   `api/derive-documents.ts:31`,
-  `api/message-pair.ts:83`, `api/routes.ts:755`,
+  `api/message-pair.ts:80`, `api/routes.ts:755`,
   `:2740`), two explaining stamp order by
   "appendMessagePairOnce's nowUtc()"; three in `tests/`
-  (`tests/api-shadow-ledger-auth.test.ts:289`,
+  (`tests/api-shadow-ledger-auth.test.ts:297`,
   `tests/derive-documents.test.ts:19`,
   `tests/document-family.test.ts:273`); and TEST-PLAN
-  V4's source line (`TEST-PLAN.md:5132`). The state by
+  V4's source line (`TEST-PLAN.md:5140`). The state by
   PUT spec found more: `sendWriteResponse`
   (`tests/pair-write-coverage.test.ts:55`);
   `MEMBERS_WIRING` (`api/routes.ts:495`,
-  `api/validators.ts:532-533`, `:838-839`,
-  `:931-932`); the two route sets that spec retired,
-  `REPLAY_EXEMPT_ROUTE_PATTERNS`
-  (`api/authentication.ts:876`,
-  `tests/api-shadow-ledger-auth.test.ts:359`,
-  `tests/api-shadow-ledger-tokens.test.ts:225`) and
-  `DOCUMENT_CLASS_ROUTE_PATTERNS`
-  (`api/derive-states.ts:133`); and the replay fast
-  path, which no longer exists — nothing at the gate
-  reads a request to serve a stored response — yet is
-  described at `api/api.ts:1357`,
-  `api/authentication.ts:876-879`,
-  `api/routes.ts:4078-4079`,
-  `client/flow-mutations.ts:539-540`,
-  `client/ideas.ts:225-226` ("op's idempotency fold"),
-  and in `tests/` at
-  `tests/api-flow-tags.test.ts:201-203`,
-  `tests/api-identity-document.test.ts:175`,
-  `tests/api-ideas-create.test.ts:142-143`,
-  `tests/api-instances-delete.test.ts:339`,
+  `api/validators.ts:534-535`, `:840-841`,
+  `:933-934`); and the replay fast path, which no
+  longer exists — nothing at the gate reads a request
+  to serve a stored response — yet is described at
+  `client/flow-mutations.ts:541-542`, and in `tests/`
+  at `tests/api-identity-document.test.ts:175`,
   `tests/api-member-documents.test.ts:402`,
   `tests/api-membership-document.test.ts:125`,
-  `tests/api-objective-document.test.ts:251-252`,
-  `tests/api-record-attribute-document.test.ts:173-174`,
-  `tests/api-record-document.test.ts:252-256`,
-  `tests/api-shadow-ledger-auth.test.ts:55`, `:357-359`,
-  `tests/api-shadow-ledger-tokens.test.ts:222-227`,
-  `:274`, `tests/drift-roster.test.ts:789`, and
-  `tests/drift-work-orders.test.ts:986-987`. Reword
-  each to the code that runs today, or delete it where
-  the code now says it. Oracle:
-  `git grep -nE 'appendMessagePair|sendWriteResponse'`,
-  `git grep -nE 'MEMBERS_WIRING|REPLAY_EXEMPT'`, and
-  `git grep -nE 'DOCUMENT_CLASS_ROUTE|idempotency fold'`
-  find nothing under `api/`, `client/`, `tests/`, or
-  TEST-PLAN.md, and every `git grep -niE 'fast[- ]path'`
-  hit there names code that runs
+  `tests/api-shadow-ledger-tokens.test.ts:273-274`, and
+  `tests/drift-roster.test.ts:789`. Reword each to the
+  code that runs today, or delete it where the code now
+  says it. Oracle:
+  `git grep -nE 'appendMessagePair|sendWriteResponse'`
+  and `git grep -nE 'MEMBERS_WIRING'` find nothing
+  under `api/`, `client/`, `tests/`, or TEST-PLAN.md,
+  and every `git grep -niE 'fast[- ]path'` hit there
+  names code that runs
 - DELETE cascade. No one policy says what a delete does
   to the documents that name the deleted one. Four
   references refuse the delete today (the last admin
@@ -3147,10 +3124,18 @@ Off the critical path; each with its oracle.
   (`:4755-4766`), the attribute RESTRICT
   (`:1039-1051`), and the instance placement RESTRICT
   (`:3323-3349`) each verify in a read transaction that
-  closes before the write. Oracle: two writers race the
-  last admin seat, a record-type DELETE against an
-  instance create, an attribute DELETE against a flow
-  PUT, and an instance DELETE against a binding, each
+  closes before the write. Two probes verify and then
+  write with no transaction at all (spec Found 5): the
+  default-organization seat probe
+  (`api/organization-requests.ts:116-125`), and the
+  invitation grant's membership and pending probe
+  (`api/invitations-domain.ts:449-466`), so two grants
+  of one email under different ids both land. Oracle:
+  two writers race the last admin seat, a record-type
+  DELETE against an instance create, an attribute
+  DELETE against a flow PUT, an instance DELETE against
+  a binding, a default-organization PUT against the
+  seat's removal, and two grants of one email, each
   under one write transaction and the organization's
   advisory lock; each race refuses one writer.
 - An RFC 7009 revocation endpoint for OAuth clients.
@@ -3254,8 +3239,8 @@ Off the critical path; each with its oracle.
   commit; item 2 rewords two and closes none
 - Item 7 precedes routing the roster through the
   profile
-- `api/derive-states.ts:517-529` (claim-expiry as its
-  own event) lands before any multi-process deployment
+- `isClaimLive` (claim-expiry as its own event) lands
+  before any multi-process deployment
   — item 13's first commit, or item 12's if the worker
   is a second process
 
