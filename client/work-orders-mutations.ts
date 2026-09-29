@@ -17,7 +17,6 @@ import {
     validateWorkOrderFlowGraph,
     getWorkOrderHistory,
     getWorkOrderWithEtag,
-    type WorkOrder,
 } from './work-orders-queries.ts';
 import {
     createSubscriptionChannel,
@@ -438,14 +437,17 @@ export async function putWorkOrderBinding(
     workOrderChanges.notify();
 }
 
-// The fields replace the head's; its state, claim, and
-// binding carry over. The PUT names the head it read.
-export async function putWorkOrder(
+// A reorder carries only the position: the display id and
+// flow graph come from the head this call read, so a newer
+// value written since the caller's page load is kept, and
+// the PUT latches that head.
+export async function putWorkOrderPosition(
     ctx: RequestContext,
     id: string,
-    workOrder: Omit<WorkOrder, 'id' | 'organizationId'>,
+    position: number,
 ): Promise<void> {
-    const { etag } = await getWorkOrderWithEtag(ctx, id);
+    const { workOrder, etag } =
+        await getWorkOrderWithEtag(ctx, id);
     await ctx.PUT(
         organizationItem(ctx, 'work-orders', id),
         {
@@ -453,7 +455,7 @@ export async function putWorkOrder(
             flow_graph: storedWorkOrderFlowGraph(
                 workOrder.flowGraph,
             ),
-            position: workOrder.position,
+            position,
         },
         [workOrderIfMatch(etag)],
     );

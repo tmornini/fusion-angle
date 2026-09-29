@@ -3,10 +3,8 @@ import type {
     ObjectiveEntity,
     ObjectiveId,
     ObjectiveRevisionEntity,
-    ObjectiveState,
 } from '../shared/types.ts';
 import {
-    assertObjectiveState,
     nowUtc,
 } from '../shared/types.ts';
 import {
@@ -54,24 +52,19 @@ export async function getObjective(
     );
 }
 
-// Domain state rides the ObjectiveEntity GET row; narrow it
-// once, at the wire.
-export function objectiveStateOf(
-    row: ObjectiveEntity,
-): ObjectiveState {
-    return assertObjectiveState(
-        row.state, 'objective ' + row.id,
+// The objective with the tag of the head it was read from,
+// which a merge latches.
+async function getObjectiveWithEtag(
+    ctx: RequestContext,
+    id: ObjectiveId,
+): Promise<{ objective: ObjectiveEntity; etag: string }> {
+    const read = await ctx.GETWithEtag<ObjectiveEntity>(
+        organizationItem(ctx, 'objectives', id),
     );
-}
-
-export function objectiveStatesOf(
-    rows: readonly ObjectiveEntity[],
-): Map<ObjectiveId, ObjectiveState> {
-    const out = new Map<ObjectiveId, ObjectiveState>();
-    for (const row of rows) {
-        out.set(row.id, objectiveStateOf(row));
+    if (read.etag === undefined) {
+        throw new Error('the objective GET carried no ETag');
     }
-    return out;
+    return { objective: read.body, etag: read.etag };
 }
 
 export function activeObjectivesOf(
@@ -80,14 +73,6 @@ export function activeObjectivesOf(
     return rows
         .filter(o => o.state === 'active')
         .sort((a, b) => a.position - b.position);
-}
-
-// One bulk state read from GET rows: drag-reorder echoes
-// each id's current state.
-export async function getObjectiveStates(
-    ctx: RequestContext,
-): Promise<Map<ObjectiveId, ObjectiveState>> {
-    return objectiveStatesOf(await getObjectives(ctx));
 }
 
 // Archived set from the GET-stamped state on each objective
@@ -357,21 +342,23 @@ export async function postObjectiveRevision(
 
 // Read-then-put: only position is echoed from the current
 // head (the GET-stamped state is never re-sent); the
-// transition sends the new state fresh. The get-then-put
-// race against a concurrent drag-reorder is ACCEPTED (spec
-// §2) — the objective PUT is blind here and the page is
-// admin-facing.
+// transition sends the new state fresh. The PUT latches the
+// head it read, so a drag-reorder landing in between refuses
+// this one with a 412 rather than being overwritten.
 export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    const current = await getObjective(ctx, id);
+    const { objective, etag } =
+        await getObjectiveWithEtag(ctx, id);
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
-        position: current.position,
-        state: 'archived',
-    });
+            position: objective.position,
+            state: 'archived',
+        },
+        [['if-match', '"' + etag + '"']],
+    );
     notifyObjectiveChange();
 }
 
@@ -379,27 +366,37 @@ export async function postObjectiveReactivation(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    const current = await getObjective(ctx, id);
+    const { objective, etag } =
+        await getObjectiveWithEtag(ctx, id);
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
-        position: current.position,
-        state: 'active',
-    });
+            position: objective.position,
+            state: 'active',
+        },
+        [['if-match', '"' + etag + '"']],
+    );
     notifyObjectiveChange();
 }
 
+// A reorder carries only the position: the state comes from
+// the head this call read, so an archive or reactivation
+// written since the caller's page load is kept, and the PUT
+// latches that head.
 export async function putObjectivePosition(
     ctx: RequestContext,
     id: ObjectiveId,
     position: number,
-    state: ObjectiveState,
 ): Promise<void> {
+    const { objective, etag } =
+        await getObjectiveWithEtag(ctx, id);
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
-        position,
-        state,
-    });
+            position,
+            state: objective.state,
+        },
+        [['if-match', '"' + etag + '"']],
+    );
     notifyObjectiveChange();
 }

@@ -1,4 +1,9 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -63,10 +68,11 @@ const EMPTY_GRAPH_DELTA = {
 // thread the echo through PUT's headerFields.
 function ifMatchHeaders(
     etag: string | undefined,
-): readonly (readonly [string, string])[] | undefined {
-    return etag === undefined
-        ? undefined
-        : [['if-match', '"' + etag + '"']];
+): readonly (readonly [string, string])[] {
+    if (etag === undefined) {
+        throw new Error('the flow GET carried no ETag');
+    }
+    return [['if-match', '"' + etag + '"']];
 }
 
 function buildNode(
@@ -192,6 +198,43 @@ Deno.test(
         assertEquals(
             states, ['updated', 'active'],
         );
+    },
+);
+
+Deno.test(
+    'putFlow throws naming the missing ETag, sending no'
+    + ' blind PUT',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        let puts = 0;
+        const untagged: RequestContext = {
+            ...ctx,
+            GETWithEtag: async <T>(resource: string) => {
+                const read = await ctx.GETWithEtag<T>(resource);
+                return { body: read.body, etag: undefined };
+            },
+            PUT: async <T>(
+                ...args: Parameters<RequestContext['PUT']>
+            ) => {
+                puts++;
+                return ctx.PUT<T>(...args);
+            },
+        };
+        await assertRejects(
+            () => putFlow(untagged, 'aEsGMmBEFaVdWihhHXwCbw', {
+                name: 'Edited',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [],
+                edges: [],
+            }),
+            Error,
+            'ETag',
+        );
+        assertStrictEquals(puts, 0);
     },
 );
 
@@ -374,7 +417,7 @@ Deno.test(
         const operationId = generateIdentifier();
         const headers: readonly (readonly [string, string])[] = [
             [OPERATION_ID_HEADER, operationId],
-            ...(ifMatchHeaders(etag) ?? []),
+            ...ifMatchHeaders(etag),
         ];
         const path = 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw';
@@ -385,7 +428,7 @@ Deno.test(
             await ctx.GETWithEtag<FlowWithGraph>(path);
         await ctx.PUT(path, body, [
             [OPERATION_ID_HEADER, operationId],
-            ...(ifMatchHeaders(fresh) ?? []),
+            ...ifMatchHeaders(fresh),
         ]);
         const events = await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

@@ -14,6 +14,7 @@ import {
     organizationItem,
     type RequestContext,
 } from '../client/request-context.ts';
+import { RequestError } from '../shared/http-errors.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -23,7 +24,6 @@ import {
     getObjectiveRevisionsByObjective,
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
-    getObjectiveStates,
     postObjectiveCreation,
     postObjectiveArchival,
     postObjectiveReactivation,
@@ -373,10 +373,7 @@ Deno.test(
             others.map(o => o.position),
             1,
         );
-        const states = await getObjectiveStates(ctx);
-        await putObjectivePosition(
-            ctx, o3, newPos, states.get(o3)!,
-        );
+        await putObjectivePosition(ctx, o3, newPos);
 
         // Phase Final Task 2: positions from GET (message plane).
         const all = await getObjectives(ctx);
@@ -410,13 +407,8 @@ Deno.test(
             ctx, o3, 'C', 'd', 3,
         );
 
-        const states = await getObjectiveStates(ctx);
-        await putObjectivePosition(
-            ctx, o2, 1.5, states.get(o2)!,
-        );
-        await putObjectivePosition(
-            ctx, o3, 1.25, states.get(o3)!,
-        );
+        await putObjectivePosition(ctx, o2, 1.5);
+        await putObjectivePosition(ctx, o3, 1.25);
 
         // Phase Final Task 2: positions from GET (message plane).
         const all = await getObjectives(ctx);
@@ -429,10 +421,51 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'a stale archival PUT surfaces 412',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const ctx = ctxFor(db);
+        const id = 'ohqxgUBEaFQwYbXsonRPmg';
+        await ctx.PUT(
+            organizationItem(ctx, 'objectives', id),
+            objectiveDoc(1, 'active'),
+        );
+        // Another write moves the head after the merge's read
+        // and before its PUT.
+        const racing: RequestContext = {
+            ...ctx,
+            GETWithEtag: async <T>(resource: string) => {
+                const read = await ctx.GETWithEtag<T>(resource);
+                await ctx.PUT(
+                    organizationItem(ctx, 'objectives', id),
+                    objectiveDoc(2, 'active'),
+                );
+                return read;
+            },
+        };
+        const error = await assertRejects(
+            () => postObjectiveArchival(racing, id),
+            RequestError,
+        );
+        assertStrictEquals(error.status, 412);
+        const stored = await ctx.GET<{
+            position: number;
+            state: string;
+        }>(organizationItem(ctx, 'objectives', id));
+        assertStrictEquals(stored.state, 'active');
+        assertStrictEquals(stored.position, 2);
+    },
+);
+
 type RecordedCall = {
     method: string;
     path: string;
     body?: Record<string, unknown>;
+    headerFields?:
+        readonly (readonly [string, string])[]
+        | undefined;
 };
 
 // Recording fake RequestContext — pins the hop shape of
@@ -442,6 +475,9 @@ function recordingCtx(
         GET?: (
             path: string,
         ) => Promise<unknown>;
+        GETWithEtag?: (
+            path: string,
+        ) => Promise<{ body: unknown; etag: string }>;
         PUT?: (
             path: string,
             body: Record<string, unknown>,
@@ -463,8 +499,12 @@ function recordingCtx(
         PUT: async <T>(
             path: string,
             body: Record<string, unknown>,
+            headerFields?:
+                readonly (readonly [string, string])[],
         ): Promise<T> => {
-            calls.push({ method: 'PUT', path, body });
+            calls.push({
+                method: 'PUT', path, body, headerFields,
+            });
             if (!handlers.PUT) {
                 throw new Error('unexpected PUT ' + path);
             }
@@ -476,10 +516,19 @@ function recordingCtx(
         DELETE: async () => {
             throw new Error('unexpected DELETE');
         },
-        GETWithEtag: async () => {
-            throw new Error(
-                'unexpected GETWithEtag',
-            );
+        GETWithEtag: async <T>(
+            path: string,
+        ): Promise<{ body: T; etag: string }> => {
+            calls.push({ method: 'GETWithEtag', path });
+            if (!handlers.GETWithEtag) {
+                throw new Error(
+                    'unexpected GETWithEtag ' + path,
+                );
+            }
+            return handlers.GETWithEtag(path) as Promise<{
+                body: T;
+                etag: string;
+            }>;
         },
     } as unknown as RequestContext;
     return { ctx, calls };
@@ -490,26 +539,32 @@ Deno.test(
     + ' archived state and the current position',
     async () => {
         const { ctx, calls } = recordingCtx({
-            GET: async (path) => {
+            GETWithEtag: async (path) => {
                 assertStrictEquals(path
                     , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                     + 'ohqxgUBEaFQwYbXsonRPmg');
                 return {
-                    id: 'ohqxgUBEaFQwYbXsonRPmg',
-                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                    position: 3,
-                    state: 'active',
+                    body: {
+                        id: 'ohqxgUBEaFQwYbXsonRPmg',
+                        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                        position: 3,
+                        state: 'active',
+                    },
+                    etag: 'objectiveHeadEtagXXXXXX',
                 };
             },
             PUT: async () => ({}),
         });
         await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
         assertStrictEquals(calls.length, 2);
-        assertStrictEquals(calls[0]!.method, 'GET');
+        assertStrictEquals(calls[0]!.method, 'GETWithEtag');
         assertStrictEquals(calls[0]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
         assertStrictEquals(calls[1]!.method, 'PUT');
+        assertEquals(calls[1]!.headerFields, [
+            ['if-match', '"objectiveHeadEtagXXXXXX"'],
+        ]);
         assertStrictEquals(calls[1]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
@@ -521,23 +576,36 @@ Deno.test(
 );
 
 Deno.test(
-    'putObjectivePosition echoes the supplied state'
-    + ' verbatim',
+    'putObjectivePosition keeps the head state, sending'
+    + ' only the position from the caller',
     async () => {
         const { ctx, calls } = recordingCtx({
+            GETWithEtag: async () => ({
+                body: {
+                    id: 'ohqxgUBEaFQwYbXsonRPmg',
+                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                    position: 9,
+                    state: 'archived',
+                },
+                etag: 'objectiveHeadEtagXXXXXX',
+            }),
             PUT: async () => ({}),
         });
         await putObjectivePosition(
-            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5, 'active',
+            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5,
         );
-        assertStrictEquals(calls.length, 1);
-        assertStrictEquals(calls[0]!.method, 'PUT');
-        assertStrictEquals(calls[0]!.path
+        assertStrictEquals(calls.length, 2);
+        assertStrictEquals(calls[0]!.method, 'GETWithEtag');
+        assertStrictEquals(calls[1]!.method, 'PUT');
+        assertStrictEquals(calls[1]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
-        assertEquals(calls[0]!.body, {
+        assertEquals(calls[1]!.headerFields, [
+            ['if-match', '"objectiveHeadEtagXXXXXX"'],
+        ]);
+        assertEquals(calls[1]!.body, {
             position: 1.5,
-            state: 'active',
+            state: 'archived',
         });
     },
 );

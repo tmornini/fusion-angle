@@ -96,39 +96,51 @@ export async function putProject(
     ctx: RequestContext,
     id: string,
     document: ProjectDocumentFields,
+    etag?: string,
 ): Promise<void> {
     const { state, ...entity } = document;
-    await ctx.PUT(organizationItem(ctx, 'projects', id), {
-        ...entity,
-        state,
-    });
+    await ctx.PUT(
+        organizationItem(ctx, 'projects', id),
+        { ...entity, state },
+        etag === undefined
+            ? undefined
+            : [['if-match', '"' + etag + '"']],
+    );
     projectChanges.notify();
 }
 
 // The current row's writable fields, read fresh so the
 // domain ops below can overwrite whole-row without the
-// caller ever holding the wire shape. Strip the GET-stamped
-// state so the caller's new state is the only lifecycle
-// value in the PUT body.
+// caller ever holding the wire shape. The GET-stamped state
+// is split out of the fields: a field edit sends the
+// caller's state, a reorder keeps the head's. The head's
+// etag rides along too: a merge latches the head it merged.
 async function projectRowFields(
     ctx: RequestContext,
     id: string,
-): Promise<
-    Omit<
+): Promise<{
+    fields: Omit<
         ProjectEntity,
         | 'id'
         | 'organization_id'
         | 'state'
-    >
-> {
+    >;
+    state: ProjectEntity['state'];
+    etag: string;
+}> {
+    const read = await ctx.GETWithEtag<ProjectEntity>(
+        organizationItem(ctx, 'projects', id),
+    );
+    if (read.etag === undefined) {
+        throw new Error('the project GET carried no ETag');
+    }
     const {
         id: _id,
         organization_id: _org,
-        state: _state,
+        state,
         ...fields
-    } = await getProjectEntity(ctx, id);
-    void _state;
-    return fields;
+    } = read.body;
+    return { fields, state, etag: read.etag };
 }
 
 // The camelCase patch for a project's editable fields.
@@ -148,7 +160,7 @@ export async function putProjectFields(
     patch: ProjectFieldsPatch,
     state: ProjectState,
 ): Promise<void> {
-    const fields = await projectRowFields(ctx, id);
+    const { fields, etag } = await projectRowFields(ctx, id);
     await putProject(ctx, id, {
         ...fields,
         title: patch.title,
@@ -157,21 +169,21 @@ export async function putProjectFields(
         target_end_date: patch.targetEndDate,
         estimated_cost: patch.estimatedCost,
         state,
-    });
+    }, etag);
 }
 
 export async function putProjectPosition(
     ctx: RequestContext,
     id: string,
     position: number,
-    state: ProjectState,
 ): Promise<void> {
-    const fields = await projectRowFields(ctx, id);
+    const { fields, state, etag } =
+        await projectRowFields(ctx, id);
     await putProject(ctx, id, {
         ...fields,
         position,
         state,
-    });
+    }, etag);
 }
 
 // State transition for an existing project: sends the new

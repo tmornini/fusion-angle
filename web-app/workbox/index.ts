@@ -30,7 +30,7 @@ import {
     projectTransitions,
     activeClaimFromHistory,
     getMemberMap,
-    putWorkOrder,
+    putWorkOrderPosition,
     subscribeWorkOrderChanges,
     type RequestContext,
     type WorkOrder,
@@ -57,8 +57,6 @@ const { signal } = createPageAbort();
 
 let activePresenter:
     WorkboxInboxPresenter | null = null;
-let workOrdersById:
-    Map<string, WorkOrder> = new Map();
 
 export async function init(
     _params?: Record<string, string>,
@@ -200,9 +198,6 @@ async function fetchInboxRows(
     const histories = await getWorkOrderHistories(
         ctx, workOrders,
     );
-    workOrdersById = new Map(
-        workOrders.map(w => [w.id, w]),
-    );
     const lockTimeoutByWo = new Map<Id, number>(
         workOrders.map(wo => [
             wo.id,
@@ -297,15 +292,10 @@ function onActiveListLoaded(
         '[data-work-order-card]',
         'data-work-order-card',
         async (id, newPosition) => {
-            const workOrder =
-                workOrdersById.get(id);
-            if (!workOrder) return;
             try {
-                await putWorkOrder(ctx, id, {
-                    displayId: workOrder.displayId,
-                    flowGraph: workOrder.flowGraph,
-                    position: newPosition,
-                });
+                await putWorkOrderPosition(
+                    ctx, id, newPosition,
+                );
             } catch (err) {
                 log.error(
                     'reorder failed',

@@ -26,10 +26,9 @@ import {
 import {
     getMemberMap,
     getTransitionEventsByWorkOrder,
-    getWorkOrder,
     getWorkOrderActiveClaim,
     getWorkOrders,
-    putWorkOrder,
+    putWorkOrderPosition,
     type WorkOrder,
     type TransitionEvent,
 } from '../client/index.ts';
@@ -376,22 +375,14 @@ Deno.test(
         // Mutate to explicit non-creation-order
         // fractional positions so the assertion
         // catches any caller that removes the sort.
-        // NAMED re-pin (Task 7): putWorkOrder is the wire
-        // PUT — it takes the DOMAIN shape ({displayId,
-        // flowGraph, position} with flowGraph PARSED), not
-        // the raw snake_case row, so the domain object is
-        // fetched first (getWorkOrder) and only its position
-        // is patched.
         // Phase Final Task 2: ids from message-plane list.
         const created = await getWorkOrders(ctx);
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {
             const id = created[i]!.id;
-            const workOrder = await getWorkOrder(ctx, id);
-            await putWorkOrder(ctx, id, {
-                ...workOrder,
-                position: explicit[i]!,
-            });
+            await putWorkOrderPosition(
+                ctx, id, explicit[i]!,
+            );
         }
         const tables = await collectTables(db);
         const items = buildInboxItems(
