@@ -2652,15 +2652,17 @@ opens and renders.)
        regression swapping green and red survives it. Also
        exploratory: the 3-px width, the centred label, and
        the attribute-count subtitle
-- [ ] **F9** On Layout Test — whose "revise" and "back to
-  draft" edges close loops — edges render by class:
-  forward edges are solid blue lines with arrow markers
-  and named labels. Cycle edges, those that close a loop
-  because a return path from target back to source already
-  exists in the graph, are dashed orange with a warning
-  arrow. Sibling transitions between nodes that have no
-  return path render solid blue even when they share a
-  level.
+- [ ] **F9** On Layout Test, edges render by class.
+  Forward edges are solid primary (blue) lines with arrow
+  markers and named labels. A cycle edge is a back-edge of
+  the depth-first walk from Create — an edge into a node
+  still on the walk's current path — and renders dashed
+  warning (orange) with a warning arrow. Layout Test has
+  exactly one: "back to draft" (Revise → Draft).
+  "revise" (Decision → Revise) is a solid primary forward
+  edge into that loop, not a cycle edge. Sibling
+  transitions between nodes that have no return path
+  render solid primary even when they share a level.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to an
        ancestor is a cycle edge' (decides the back-edge
        classification the dashed-orange paint follows);
