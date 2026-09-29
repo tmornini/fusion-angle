@@ -400,16 +400,16 @@ limit that note already names.
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
 | F. Tools | 80 |
-| F2. Workbox | 31 |
+| F2. Workbox | 32 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 38 |
+| G. Admin Pages | 40 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
 | K. Objectives & Scoring | 30 |
-| R. Records | 25 |
+| R. Records | 26 |
 | J. Teardown | 3 |
 | SV. Server (Deno + Postgres) | 9 |
-| **Total** | **400** |
+| **Total** | **404** |
 
 A3 **is** SV1 — counted once, in A. The explorer
 skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
@@ -417,7 +417,7 @@ F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 400 distinct
+The per-section table above counts 404 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
@@ -4299,7 +4299,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   instances for the flow's record type (rows use
   `data-instance-pick`, never `data-attribute-id`);
   picking an instance PUTs `work-orders/:id/binding`
-  (201), the dialog closes, and the screen re-presents
+  (200), the dialog closes, and the screen re-presents
   with a bound Instance badge and pre-filled values from
   the instance head.
   Pin: tests/presenter-workbox-detail.test.ts 'buildPage
@@ -4308,7 +4308,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        tests/presenter-workbox-detail.test.ts 'buildPage
        pre-fills inputs from instance values and shows a
        bound badge'; tests/api-work-order-binding.test.ts
-       'fresh bind → 201; detail + list embed; unbound
+       'fresh bind → 200; detail + list embed; unbound
        omits keys'; exploratory — the live dialog
        open/close and the click-to-pick gesture
 - [ ] **WB10b — Disabled fields + bind prompt.** On an
@@ -4327,14 +4327,14 @@ gesture pans instead of dragging, marquee-ing, or connecting.
 
 - [ ] **WB11** Bind an instance, fill Company Name and
   Contact Email, click `submit` → Review. PASS: transition
-  POSTs `work-orders/:id/transition` (201), work order
+  POSTs `work-orders/:id/transition` (200), work order
   moves to the next state, browser navigates back to the
   inbox. The work order appears in the Active tab
   (unclaimed).
   Pin: tests/api-work-order-transition-instance.test.ts
-       'value-bearing fresh If-Match → 204; head advances'
-       (its own assertion checks `res.status === 201`,
-       despite the test's stale name);
+       'value-bearing fresh If-Match → 200; head advances'
+       (decides the transition answers 200 and the
+       instance's head advances);
        tests/browser/workbox-transition.test.ts
        'bind, fill, and submit navigates to the inbox
        (WB11)' (decides bind → fill Company Name and
@@ -4352,14 +4352,16 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   BLOCKED naming that — an honest BLOCKED costs
   nothing. PASS: the
   binding PUT lands at `work-orders/:id/binding` with
-  `{instance_id, record_type_id}` (201); the transition
-  POST is `work-orders/:id/transition` (201) whose body
+  `{instance_id, record_type_id}` (200); the transition
+  POST is `work-orders/:id/transition` (200) whose body
   is the **instance shape** (`targetState`, `instance_id`,
   `record_type_id`, `set`/`clear` delta, `release`,
   `transitionAt` — no `fieldValues` bag) and carries a
-  strong `If-Match` against the instance etag; a pure move
-  omits `set`/`clear`/`instance_id`/`record_type_id` and
-  sends no `If-Match`; a sibling instance revision pair
+  strong `If-Match` naming the work order's etag and the
+  instance's; a pure move omits
+  `set`/`clear`/`instance_id`/`record_type_id` and sends
+  the work order's etag alone (without it the POST is
+  428); a sibling instance revision pair
   advances the head when the transition was value-bearing.
   Derived WO history is `(at, id)` DESC (index 0 =
   current) with one non-claim event per transition
@@ -4367,16 +4369,18 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   `member_id` = actor, `at` = RFC-3339 Zulu). Live form
   values come from the instance head, not a history fold.
   Pin: tests/api-work-order-binding.test.ts 'fresh bind →
-       201; detail + list embed; unbound omits keys';
+       200; detail + list embed; unbound omits keys';
        tests/api-work-order-transition-instance.test.ts
-       'value-bearing fresh If-Match → 204; head advances'
+       'value-bearing fresh If-Match → 200; head advances'
        (its own assertion checks
        `instancePairCount === before + 1` — decides the
        sibling revision pair advancing the head);
        tests/api-work-order-transition-instance.test.ts
-       'pure move WITH If-Match → 400' (decides a pure
-       move sending an If-Match is rejected, so a
-       succeeding one sent none);
+       'a value-bearing transition names both heads';
+       tests/api-work-order-transition-instance.test.ts
+       'a pure move sends the work order's tag' (decides
+       a pure move without a tag is 428 and with the
+       work order's tag is 200);
        tests/api-work-order-transition-instance.test.ts
        'pure move carrying instance_id → 400';
        tests/api-work-order-transition-instance.test.ts
@@ -4389,18 +4393,18 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        exploratory — the live network-log read itself
 - [ ] **WB12** Click the work order row in the Active
   tab. PASS: work order PUTs `work-orders/:id/claim`
-  (201) and the browser navigates to the action screen
+  (200) and the browser navigates to the action screen
   showing the new state's attributes.
   Pin: tests/api-work-order-claim.test.ts 'a fresh claim
        appends one claimed event'; exploratory — the live
        navigation and rendered attributes
 - [ ] **WB13** Click "Release Work Order". PASS: a single
-  click DELETEs `work-orders/:id/claim` (204),
+  click DELETEs `work-orders/:id/claim` (200),
   soft-releases the active claim, and the browser
   navigates to the inbox, where the work order reappears
   in the Active tab.
   Pin: tests/api-work-order-release.test.ts 'release of a
-       live claim is 204 and the claim history shows
+       live claim is 200 and the claim history shows
        claim_released'; exploratory — the live navigation
        back to the inbox and the reappearance in Active
 - [ ] **WB13a — Claim → unclaim → reclaim.** From the
@@ -4607,6 +4611,18 @@ per-user visibility filter.
        parameters, no scope parameter); a function
        signature is not something a `node:test` assertion
        decides
+- [ ] **WB23** Claim, release, and transition a work
+  order in two tabs: act in the first tab, then act on
+  the same work order in the second without reloading
+  it. PASS: the second tab's stale action shows the
+  refusal, and a reload shows the first tab's state.
+  Pin: tests/api-work-order-transition-instance.test.ts
+       'racing value-bearing transitions land once'
+       (decides that of two transitions latched on one
+       head, one lands and the other answers 412 with
+       nothing stored); exploratory — the claim and
+       release races, the second tab's rendered
+       refusal, and the reload
 
 ---
 
@@ -4615,7 +4631,7 @@ per-user visibility filter.
 **Mock-data blast radius:** the mock seed adds ~38 work
 orders to "Customer Onboarding" and ~6 to a second flow,
 plus their flow-work-order join rows and transition
-chains — Workbox cases (WB1–WB22) and dashboard counts
+chains — Workbox cases (WB1–WB23) and dashboard counts
 elsewhere in the walk are lower bounds, not equalities,
 because of this.
 
@@ -5131,7 +5147,7 @@ FSM, unlike `flows/detail`).
   multi-org: reload any sidebar-layout page and the
   sidebar footer now shows the org `<select>` (G36)
   listing both Wayne and Stark. Accept is idempotent — a
-  re-accept is a 204 no-op, no duplicate seat. Source:
+  re-accept is a 200 no-op, no duplicate seat. Source:
   `postInvitationAcceptance`, `acceptInvitation` (atomic
   seat document message pair + invitations/:id/
   acceptance operation message pair via
@@ -5146,8 +5162,9 @@ FSM, unlike `flows/detail`).
        seat lands in the invitation's org, making the
        invitee multi-org);
        tests/api-invitation-nests.test.ts 'PUT from
-       accepted is a no-op' (decides re-accept is a 204
-       no-op with no duplicate);
+       accepted answers the head and stores nothing'
+       (decides re-accept is a 200 no-op with no
+       duplicate);
        tests/adapters-organization-session-exchange.test.ts
        'shouldShowOrganizationSwitcher only at two or
        more orgs' (decides the sidebar `<select>`
@@ -5210,7 +5227,7 @@ FSM, unlike `flows/detail`).
   tests/presenter-invitation-list.test.ts 'an empty sent
   list shows the empty state' alone decides the "No
   outstanding invitations." copy.
-  Revoke is idempotent (re-revoke → 204).
+  Revoke is idempotent (re-revoke → 200).
   Source: `web-app/organization/index.ts`
   (`renderSentInvitations` / `onSentInvitationClick`),
   `SentInvitationsPresenter`, `revokeInvitation`.
@@ -5220,7 +5237,7 @@ FSM, unlike `flows/detail`).
        revoked (admin only)';
        tests/api-invitations-fence.test.ts 'revoke: replay
        of fixed body is a no-op (two events total)'
-       (decides re-revoke is idempotent, 204, no extra
+       (decides re-revoke is idempotent, 200, no extra
        event); tests/presenter-invitation-list.test.ts 'a
        sent invitation shows the invitee email and Revoke';
        tests/presenter-invitation-list.test.ts 'an empty
@@ -5287,6 +5304,18 @@ FSM, unlike `flows/detail`).
        browser test drives `getOrganizationInvitations`
        with a non-admin caller; see Unpinned but
        pinnable)
+- [ ] **V10 — Accept an invitation revoked in another
+  tab** As the admin, open the Organization page's
+  Sent invitations in one tab; as the invitee, in a
+  second cookie jar, open `invitations/index.html`.
+  Revoke the pending invitation in the first tab, then
+  click Accept on it in the second without reloading. PASS: the
+  accept refuses; the list shows it revoked.
+  Pin: tests/api-invitation-document.test.ts 'a stale
+       invitation tag is 412' (decides that an accept
+       latched on the head before a revoke answers 412
+       and stores nothing); exploratory — the rendered
+       refusal and the revoked state on reload
 
 ### Member detail — Human (`members/detail.html?memberId=<hw_*>`)
 
@@ -5740,6 +5769,18 @@ FSM, unlike `flows/detail`).
        Wayne-only member, and the top bar carrying
        neither switcher nor greeting while its stat strip
        names the org read-only
+- [ ] **G48** As Tony Stark, switch the default
+  organization from Stark to Wayne: select "Wayne
+  Enterprises" in the sidebar `<select>`, then click
+  "Set as default" (`.org-set-default`). Sign out and
+  sign back in. PASS: the next login lands in Wayne.
+  Pin: tests/api-identity-default-organization.test.ts
+       'a default organization naming another one lands'
+       (decides that a default-organization PUT naming
+       another organization lands, 200 with a new etag,
+       and the GET reads it back); exploratory — the
+       "Set as default" toast and the login landing in
+       Wayne
 - [ ] **G41** Person and agent writes land on the message
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
@@ -7012,6 +7053,16 @@ K30 only describes.
        to the camelCase domain shape'; exploratory —
        the live four-way comparison across the two
        record types and the two sign-ins
+- [ ] **R22** Save a new instance, then open it in
+  two tabs and edit it in both: save the first tab,
+  then the second. PASS: the stale save refuses; the fresh
+  one shows the merged values.
+  Pin: tests/api-instances-create.test.ts 'a declared
+       create over a live instance is 412' (decides that
+       a create declares itself with `If-None-Match: *`
+       and a second create of the same id refuses);
+       exploratory — the two-tab edit race, the refusal
+       notice, and the merged values on screen
 
 ## J. Teardown
 

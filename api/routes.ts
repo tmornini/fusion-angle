@@ -3280,7 +3280,7 @@ export function conditionalOf(
 // Spent document = any prior response at the instance
 // name (live head OR existing tombstone). Virgin
 // document → missedReadError (R2). Spent → append the
-// gate-formed DELETE pair in one tx (R4 tombstone-wins
+// gate-formed DELETE pair in one statement (R4 tombstone-wins
 // is ledger-complete — every non-replay DELETE appends,
 // including over an already-tombstoned head). In-tx
 // re-probe (R9) closes a concurrent un-spend race:
@@ -3289,8 +3289,8 @@ export function conditionalOf(
 // names this instance AND whose current node is
 // non-terminal in its OWN frozen flow_graph → 409.
 // No attribute ACL — path-tier only (existence, not
-// values). If-Match on DELETE is not a dialect (gate
-// ignores it).
+// values). If-Match is optional: the gate checks its
+// form, and the statement judges its value.
 export async function postInstanceDeleteOp(
     db: DbAdapter,
     p: string[],
@@ -5039,16 +5039,20 @@ export const routes: Route[] = [
         },
     }),
     // Nested instance detail (Task 20): public PUT is
-    // 405. PATCH creates (If-None-Match: *) and updates
-    // (If-Match). Task 16 GET projection +
-    // missedReadError R2. Task 18 DELETE tombstone-wins
-    // R4/R9. Ladder PATCH create: parent type 404 →
-    // body 400 (set required; clear forbidden) → write-
-    // ACL 403 → value 400 → tombstone 409 → one
-    // statement (received PATCH + revision PUT). Ladder
-    // PATCH update: tombstone 404 → shape → unknown attr
-    // → ACL on set∪clear → value on set → one statement,
-    // which judges the tag.
+    // 405. A PATCH with If-None-Match: * declares a new
+    // instance; one with If-Match names the head it
+    // follows. Task 16 GET projection: never written
+    // 404 (missedReadError R2), retired 410. Task 18
+    // DELETE tombstone-wins R4/R9. Ladder PATCH
+    // declared: parent type 404 → body 400 (set
+    // required; clear forbidden) → write-ACL 403 →
+    // value 400 → one statement (received PATCH +
+    // revision PUT), whose never-written latch answers
+    // 412 over a live instance and 410 over a
+    // tombstone. Ladder PATCH in order: tombstone 410
+    // → shape → unknown attr → ACL on set∪clear →
+    // value on set → one statement, which judges the
+    // tag.
     // Ladder DELETE: parent type 404 → document spent
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-

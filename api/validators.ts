@@ -3446,16 +3446,11 @@ export function validateFlowCreateBody(
 // `graphDelta`, `revivals`) is now resolved/computed
 // SERVER-SIDE (api/derive-flows.ts's resolveFlowUndoTarget,
 // api/flow-graph-diff.ts) from the message-plane, never the wire.
-// Both remaining fields stay (not dropped to an empty body):
-// an empty body would make every undo POST for the same flow
-// canonically byte-identical (same method/path/headers),
-// colliding on the gate's pre-tx idempotency fast path
-// (getPairByRequestHash) and silently replaying the FIRST call's
-// cached 204 for every later undo. `eventId`/`at` are the SAME
-// state-trio convention every other document write already
-// uses to keep each attempt's stored request unique — S1 (body
-// timestamps belong to the message's creator), never
-// pair.requestAt.
+// Both remaining fields stay: they stamp the restored
+// version's state event (`state_event_id`, `state_at`) and
+// its graph delta, the SAME state-trio convention every
+// other document write uses — S1 (body timestamps belong to
+// the message's creator), never pair.requestAt.
 export interface FlowUndoBody {
     readonly eventId: string;
     readonly at: string;

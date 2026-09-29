@@ -6,7 +6,8 @@ Families, verbs, and rooms live in `routes[]`
 (141 rooms, derived from the table). On disagreement,
 the table wins. Dispatch is `handleRequest`
 (`api/api.ts`). Pair formation is `api/message-pair.ts`.
-Concurrency class is `api/family-registry.ts`.
+Each write route's conditional is its entry in
+`WRITE_RESPONSE_SPECS` (`api/routes.ts`).
 
 ## Dispatch order
 
@@ -33,9 +34,9 @@ every request (`incomingContext`), then `dispatched`:
    a request. An operation-id groups the pairs of
    one operation (an instance PATCH and its
    revision). It is not a request-hash replay. A
-   resend is idempotent because a matched body
-   answers 200 and stores nothing, not because a
-   request hash is replayed.
+   resent write whose state equals the head matches:
+   it stores nothing and answers 200. No request hash
+   is replayed.
 4. **Match, then the gate.** `matchRoute`, then
    `authenticateRequest` unless the matched pattern
    is in `AUTHENTICATION_ROUTES`.
@@ -45,21 +46,28 @@ every request (`incomingContext`), then `dispatched`:
    unmatched 404, identifier params, `fenceRequest`,
    nested org must equal fenced org (mismatch 403,
    fixed body, no auto-exchange), `authorizeRequest`.
-5. **Body parse** for PUT/POST/PATCH.
-6. **Region B + write authorizer.** Self-only token-
-   revocations (member revokes own chain; admin may
-   name any identity). `writeAuthorizerFor` on
+5. **Body parse** for PUT/POST/PATCH, then **the
+   conditional** (`preconditionRefusal`): its
+   presence and form, per route and verb, with no
+   head read. See Conditional classes.
+6. **Region B + write authorizer.** Self-only token
+   routes (`SELF_ONLY_TOKEN_ROUTES`): the
+   token-revocations PUT and the jti rotation and
+   revocation POSTs. A member acts only on its own
+   chain; an admin may name any identity. Any other
+   caller is 403 by form, before any read.
+   `writeAuthorizerFor` on
    org-scoped PUT/DELETE: owner-null is genesis;
    foreign 403 before pair crypto.
-7. **Pair plane.** Wired writes form the pair pre-tx
-   (`formWriteMessagePair`). A matched body stores
-   nothing and answers 200. A stale If-Match answers
-   412 with `If-Match does not match the current
-   document at <path><name>`; that 412 is not
-   skipped for a byte-identical resend. If-Match
-   table, instance PATCH table, DELETE
-   never-written 404 (stores nothing) /
-   already-gone 204 (no append).
+7. **Pair plane.** Wired writes form the received
+   pair before any transaction
+   (`formWriteMessagePair`). A DELETE that is not an
+   operation meets the DELETE table first:
+   never-written 404 (stores nothing), already-gone
+   204 (no append). Then one statement judges every
+   row the write forms (Conditional classes says
+   how). A stale latch answers 412, even for a
+   byte-identical resend.
 8. **Handler.** Matched verb with `ctx.base`. Auth
    grants intercept into `postToken` / `postAuthorize`.
    Missing verb → 405.
@@ -78,130 +86,223 @@ onto the stored response (`mergeSecret`, then
 `responseFromLatin1`, both in `api/message-pair.ts`).
 The statement splices the date into a landed row, and
 the status line in those bytes is the status on the
-wire. A landed PUT stores 201 when it creates and 200
-when it modifies. A PUT after a DELETE stores 201.
-POST and PATCH store the status their formers write:
-201, except the authentication doors, which store
-200. DELETE stores 204. A landed message carries
-Date, ETag (quoted message-pair identifier),
-Operation-ID, and Request-ID. A document PUT's ETag
-is its pair id, the same value a later GET
-advertises. A landed instance-detail PATCH sends the
-revision row's ETag. If that row is missing, the
-response has no ETag. A matched body stores nothing
-and answers 200 with this request's request-id, no
-date line, and the head's etag and operation-id.
-If-Match is exactly one strong validator
-(`"<identifier>"`); `*`, weak, lists, unquoted, or
-64-hex yield 400.
+wire. A landed PUT stores 201 when no live PUT head
+precedes it and 200 when it succeeds one. A PUT after
+a DELETE stores 201. A POST or PATCH through the
+former stores 201 when its parent document is a
+genesis and 200 when the parent lands in order. The
+authentication doors keep OAuth's response and store
+200. DELETE stores 204. A landed message carries Date,
+ETag (quoted message-pair identifier), Operation-ID,
+and Request-ID. A document PUT's ETag is its pair id,
+the same value a later GET advertises. A write through
+the former answers with its received pair's response:
+the parent document's state, projected for the
+requester, and an ETag naming the parent's new pair. A
+no-op stores nothing, not even the received pair, and
+answers 200 with this request's request-id, no date
+line, the head's etag and operation-id, and the head's
+body projected for the requester. If-Match is one
+strong validator (`"<identifier>"`); an `in-order`
+route also takes a comma-separated list of them, one
+per document. `*`, weak, unquoted, or 64-hex yield
+400, as does a list elsewhere. If-None-Match is `*`
+alone.
 
 Status ladder:
 
-- **200** — a matched body: this request's request-id,
-  no date line, the head's etag and operation-id, and
-  nothing stored. Also a landed PUT that modifies,
-  and a landed authentication door
-- **201** — a landed PUT that creates, including a PUT
-  after a DELETE, and a POST or PATCH whose former
-  wrote 201: the stored response bytes
+- **200** — a landed PUT over a live head; a write
+  whose parent lands in order; a landed
+  authentication door. Also a no-op: this request's request-id, no
+  date line, the head's etag and operation-id, the
+  head's body, and nothing stored
+- **201** — a genesis: a landed PUT with no live
+  head, including a PUT after a DELETE; a POST
+  create, with `Location`; an instance create
 - **204** — DELETE success (landed, or already-gone)
 - **400** — bad JSON / Request-ID / Operation-ID /
-  If-Match / validators
+  validators; a malformed If-Match or If-None-Match;
+  If-None-Match on an `in-order` route; any
+  conditional on a `none` route
 - **404** — authenticated unmatched; DELETE
   never-written; genuine absence
 - **405** — no handler; public instance PUT
-- **409** — domain conflict (rebind, invitation not
-  pending, instance tombstone create without pin); a
-  second genesis (`Document already exists at <path><name>`);
-  a blind PUT that loses three times
+- **409** — domain conflict (a rebind, a live claim by
+  another member, an invitation not pending, a
+  RESTRICT); a handler's genesis over a live document
+  (`Document already exists at <path><name>`); a blind
+  PUT that loses three times
   (`Document remained contended at <path><name>`)
+- **410** — a retired record instance: its GET, its
+  PATCH, and a create over its tombstone (the create's
+  body: `Document is gone at <path><name>`)
 - **411** — A request body requires Content-Length.
   The same sentence answers a Transfer-Encoding
-- **412** — a stale If-Match:
-  `If-Match does not match the current document at <path><name>`
-- **428** — missing If-Match over live locked PUT,
-  live instance PATCH / value-bearing transition, or a
-  latched operation over a live parent document
+- **412** — a stale If-Match
+  (`If-Match does not match the current document at <path><name>`);
+  a client's declared genesis over a live document
+  (`Document already exists at <path><name>`); both
+  headers sent; more tags than documents the
+  operation derives from
+- **428** — a `required` or `in-order` route with no
+  conditional; a tag missing for a document the
+  operation derives from
 
-409 remains the home of domain conflict and holds the
-two store sentences above. 412 is a stale If-Match.
+409 is the home of domain conflict and of what a
+handler declared. 412 refuses what the client
+declared: a stale If-Match or a declared genesis.
 
-## Two PUT classes
+## Conditional classes
 
-`concurrency` on `FAMILY_REGISTRY`
-(`api/family-registry.ts`), plus instance PATCH:
+A *conditional* is the request header that says which
+head a write expects. A document's *head* is its latest
+PUT or DELETE pair. `If-Match: "<etag>"` names the head
+the client read, so the write is *in order*.
+`If-None-Match: *` declares that no live document exists
+yet, so the write is a *genesis*. A write with neither is
+*blind*. Each write route declares the conditional it
+takes (`conditionalOf`, `api/routes.ts`). Classes A
+through E are the write shapes the spec audits
+(`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
+§1):
 
-- **simple** — a matched body answers 200 with this
-  request's request-id, no date line, and the head's
-  etag and operation-id, and stores nothing. A landed
-  create answers 201. A landed modify answers 200.
-  A second genesis answers 409
-  (`Document already exists at <path><name>`). A blind
-  PUT that loses three times answers 409
-  (`Document remained contended at <path><name>`)
-- **locked** — live family is flows only. If-Match is
-  one quoted identifier. A live document with no
-  If-Match answers 428. A stale If-Match answers 412
-  (`If-Match does not match the current document at <path><name>`).
-  A genesis with no If-Match stores 201. A landed
-  modify stores 200. A second genesis answers 409
-  (`Document already exists at <path><name>`). A
-  matched body answers 200 with this request's
-  request-id, no date line, and the head's etag and
-  operation-id, and stores nothing
-- **latched operation** — a sub-resource POST that acts
-  ON its parent document (flow undo today,
-  `LATCHED_OPERATION_ROUTE_PATTERNS`). If-Match pins the
-  PARENT head, not the operation's own path: absent
-  → 428; malformed → 400; ≠ head → 412. No parent head
-  at all is absence, not conflict — the gate stands
-  aside and the handler 404s. The pin rides
-  `pinnedDocumentMessagePairId` and is re-verified
-  in-transaction, so the 412 names a real racer rather
-  than the server's own resolution timing
-- **instance PATCH** — public PUT is 405
-  (`INSTANCE_DETAIL_PATTERN`). A pin is a well-formed
-  If-Match (malformed is 400). Never-written + no pin
-  → create; live head requires If-Match; DELETE head
-  + no pin → 409. A landed answer sends the revision
-  row's ETag. If that row is missing, the response
-  has no ETag
+| Conditional | Takes | Routes |
+|---|---|---|
+| `optional` | If-Match, If-None-Match: *, or neither; a DELETE's useful one is If-Match (If-None-Match: * passes the gate, but a live head refuses it 412) | class A document PUTs; every DELETE but the release |
+| `required` | If-Match or If-None-Match: * | class B: the flow and work-order PUTs; the instance PATCH |
+| `in-order` | If-Match, one tag per document the operation derives from | class C operations: conversion, undo, claim and release, transition, binding, invitation accept, decline, and revoke |
+| `none` | no conditional | class D POST creates; class E operations: the grants, token rotation and revocation |
+
+The instance PATCH does two writes: If-None-Match: *
+declares a create of the id the client minted, and
+If-Match an update. Public instance PUT is 405. The
+record-type POST is `optional` at the gate because it
+also serves two writes: a create takes no If-Match
+(400), and an edit, a class C operation on the type,
+needs one (428 without it).
+
+**The gate checks presence and form, never value.**
+`preconditionRefusal` (`api/api.ts`) runs before any pair
+forms and stores nothing. A `required` or `in-order`
+route with no conditional is 428 (RFC 6585 §3). A
+malformed tag, If-None-Match other than `*`,
+If-None-Match on an `in-order` route, and any
+conditional on a `none` route are 400. Both headers at
+once are 412: with `*` beside a named tag one of them
+fails (RFC 9110 §13.2.2).
+
+**The statement judges the value.** A row may carry a
+*latch*: the head it must follow. An
+If-Match tag is an in-order latch, stale unless it names
+the current head. A declared genesis is the *nil latch*:
+stale over a live PUT head, and it lands over no head or
+a tombstone. The instance create alone uses the
+*never-written latch*: stale over any head, live or
+tombstone, so a retired name never comes back. A blind
+row has no latch; a blind write that loses three
+succession races answers 409.
+
+**Refusals say who declared.** A stale in-order latch is
+412. A refused genesis is 412 when the client declared
+it with If-None-Match: *, and 409 when a handler did,
+for a document a POST create names. A never-written
+latch over a tombstone is 410 Gone (RFC 9110 §15.5.11).
+
+**The statement rule.** A *statement* is the rows of one
+write, judged and stored together: one SQL statement on
+Postgres (`api/ledger-statement-sql.ts`), the same
+classifier in memory (`shared/ledger-statement.ts`). A
+*document
+row* is a row that carries a latch. In a write through
+the former the received pair never does; its siblings
+do. Each row is stale, matched, or land. Only a PUT or
+DELETE row can match: its body equals its head's body,
+byte for byte. A POST or PATCH row never matches. Then:
+
+1. Any stale row refuses the statement. Nothing is
+   stored.
+2. Otherwise, if a row matched and no document row
+   lands, the write is a no-op: nothing is stored, the
+   received pair included, and the answer is 200 with
+   the head.
+3. Otherwise the statement lands. Each row whose
+   outcome is land is inserted. A matched row is
+   skipped and rings no bell.
+
+A statement of blind rows only has no document row, so
+it stays all-or-nothing: one matched row stores nothing.
 
 ## Compositions worth knowing
 
-Six interiors. Each is store primitives in one
-`db.transaction(fn)`, not nested HTTP.
+Every class C, D, and E write lands through one former,
+`runStateWrite` (`api/message-pair.ts`), in one
+statement. The *received pair* is the request as it
+arrived. The handler reads what it merges onto and
+forms each *sibling*: a document the write changes,
+with its whole state and its latch. The first sibling
+is the *parent*, the document the route hangs off. The
+former forms each sibling pair with an empty request
+and the state as its response body. It then completes
+the received pair's response once: 201 for a genesis
+parent and 200 for an in-order one, an ETag naming the
+parent's new pair, the parent's state projected for the
+requester, and `Location` naming the created id on a
+POST create. Every row shares the received pair's
+operation-id. A handler that forms several siblings
+leaves out any later sibling whose state equals its
+head; the parent is never left out, and the statement
+skips it when it matches.
+
+An in-order parent followed by later siblings carries
+the head its handler read; a POST create's genesis
+parent carries none. When the parent equals that head
+while a later sibling lands, the parent is skipped:
+the answer is 200 with the parent's head, and the
+received pair's ETag names that head. The work-order transition, the
+record-type edit, conversion, and invitation accept
+read so.
+
+**POST creates** (class D). Flows, work orders,
+objectives, identities, record types, and invitations.
+The handler declares each created document's genesis,
+so a resent create answers 409 and stores nothing. The
+201 answers the created document's state.
 
 **Idea conversion.**
 `POST organizations/:id/ideas/:id/conversion` in
-`api/routes.ts`. 3+N pairs, one transaction: gate op +
-project document + idea promoted + N baselines.
+`api/routes.ts`. 3+N pairs, one statement: the received
+POST, the promoted idea in order on the client's tag,
+and the project and N baselines as the handler's
+geneses. It answers the idea's state.
 
 **Flow undo.**
 `postFlowUndoOp` (`api/routes.ts`); target
-`resolveFlowUndoTarget` (`api/derive-flows.ts`).
-Restore: op + locked flow document (2 pairs).
-Exhaustion: op only. If-Match is REQUIRED and pins the
-flow document head the caller saw — the resolution walk
-runs outside the transaction, so without the pin a 412
-would report the server's own read timing rather than a
-conflict.
+`resolveFlowUndoTarget` (`api/derive-flows.ts`). One
+sibling, the flow's restored state, in order on the
+client's tag, so a save that raced the undo makes it
+412. At exhaustion the sibling is the flow's current
+state: the statement matches, stores nothing, and
+answers 200 with the head.
 
-**Work-order transition.**
-`postWorkOrderTransitionOp` (`api/routes.ts`). Pure
-move: op only. Value-bearing: op + instance revision.
-If-Match preconditions the bound instance.
-
-**Work-order binding.**
-`PUT .../work-orders/:id/binding` →
-`postWorkOrderBindingOp` (`api/routes.ts`). 1 pair.
-Create-only; different pair → 409.
+**Work-order operations.** Claim (`PUT …/claim`),
+release (`DELETE …/claim`), transition
+(`postWorkOrderTransitionOp`), and binding
+(`postWorkOrderBindingOp`) each land one work-order
+version in order on the work order's head and answer
+its state. A value-bearing transition also lands the
+bound instance's revision, and its If-Match names both
+heads, the work order's first. A live claim by another
+member and a rebind to another instance are 409 from
+the head. A resent claim, a release with no live claim,
+and the same binding again are no-ops.
 
 **Invitation accept.**
 `PUT identities/:id/invitations/:id` →
-`acceptInvitation` (`api/invitations-domain.ts`).
-Pending + new seat: seat document + acceptance op.
-Seat stamped with the invitation's org.
+`acceptInvitation` (`api/invitations-domain.ts`). The
+invitation lands `accepted` in order on the client's
+tag; a new seat lands beside it as the handler's
+genesis, stamped with the invitation's org. Decline and
+revoke land the invitation alone.
 
 **Token grant dispatch.**
 `POST authentication/token` → `postToken`
@@ -210,7 +311,11 @@ authentication/authorize` → `postAuthorize`.
 grant_type: authorization_code, refresh,
 token-exchange, client_credentials. Authorize
 method: password. passkey, provider, and oidc
-answer 501.
+answer 501. A grant keeps OAuth's response on its
+received pair; its token events land beside it as
+siblings (class E, no client latch). An issued jti is
+the handler's genesis; a later event of a jti lands in
+order on the head the handler read.
 
 The examples move to the lines. Authorize and the
 code grant use Basic. Refresh uses the cookie.
@@ -246,8 +351,10 @@ S256 is 400; redeem verifies S256.
 ## Why composition is store-level
 
 POSTs do not re-enter `handleRequest`. One client call
-is one transaction: they compose store primitives
-inside `db.transaction(fn)` (`api/db.ts`).
+is one ledger statement: the former runs every row of
+a write together. Token rotation and revocation also
+re-read their heads, so they wrap that re-read and the
+statement in one `db.transaction(fn)` (`api/db.ts`).
 Atomicity is the platform primitive, not a simulated
 HTTP nest. Validators, crypto, hash, and
 `serializeWire` run outside the tx. See `AGENTS.md
@@ -255,10 +362,13 @@ HTTP nest. Validators, crypto, hash, and
 
 ## Seed pair formation
 
-Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1455`, root
+Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 2317`, root
 included; bootstrap exactly 8 pairs and the root. Pinned by
-`tests/mock-data-pairs.test.ts`. A seed row stores no
-`request-id` line, and neither does the root.
+`tests/mock-data-pairs.test.ts`. A pair's request holds
+what was received, or nothing. A seeded row was never
+received, so every seeded row stores an empty request,
+as the root does. A seed row stores no `request-id`
+line, and neither does the root.
 
 ## How we got here
 

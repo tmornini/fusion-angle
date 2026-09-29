@@ -187,9 +187,20 @@ Two HTTP nests over one prefix: receive at
 
 ## Derivation
 
-Every family is a fold over pairs at a document
-or a collection — `api/derive-*.ts`. The view-accepting
-convention is five rules, not a framework:
+A document's head is its latest PUT or DELETE pair, and
+a head is its document's whole state. After any write
+but a DELETE, the head of each document the write
+changed is a PUT whose response body is that document's
+whole state. The store sorts JSON keys on write
+(`sortJsonKeys`, `shared/http-message/canonical.ts`), so
+a stored body's keys are in sorted order. Every family
+derives from those stored responses — `api/derive-*.ts`
+— through one parser, `bodyOf`
+(`api/derive-documents.ts`). Nothing
+derives from the `request` column;
+`tests/request-readers.test.ts` pins that. The
+view-accepting convention is five rules, not a
+framework:
 
 (a) every core takes `dbOrView: DbAdapter`, so it is
 callable both pre-tx (passed `db`) and from within an
@@ -226,44 +237,110 @@ server-computed `graphDelta` / `revivals`.
 
 Three nouns: record type (schema: name, description,
 ordered attributes, constraints), attribute (field plus
-ACL), instance (data row, full-state `{ values }`). A
-flow binds to one record type via `flows/:id/records`.
+ACL), instance (data row). A flow binds to one record
+type via `flows/:id/records`.
 
 Six attribute types: `text`, `number`, `select`, `radio`,
 `date`, `checkbox`. Three constraint kinds: `regex`,
 `range_min`, `range_max`. Applicability has two
 enforcement sites: `assertConstraintAppliesTo`
-(`api/types.ts`) at the writer, and the editor filtering
-the kind picker.
+(`shared/types.ts`) at the writer, and the editor
+filtering the kind picker.
 
 The work-order transition gate is
 `validateRecordTransition`
-(`adapters/record-transitions.ts`): current-node fields
+(`client/record-transitions.ts`): current-node fields
 only; aggregated `ConstraintViolation[]`. Attribute DELETE
 RESTRICT blocks on live instance heads carrying a value
 for that attribute, and on in-flight graph refs.
 
-Public instance PUT is 405. PATCH creates and updates
-(If-Match 428 / 412). DELETE is a tombstone.
+An instance revision is a PUT whose body is the
+instance's whole state: `{ id, organization_id,
+record_type_id, values }`, every value included. Public
+instance PUT is 405; PATCH does both writes. A create
+is a PATCH of an id the client minted, sent with
+`If-None-Match: *`: the client declares the instance
+new. Its row carries the never-written latch, which is
+stale over any head, so a create answers 412 over a
+live instance and 410 over a retired one. An update is
+a PATCH with `If-Match` naming the head the client
+read; the handler merges `set` and `clear` onto that
+head, and the statement judges the tag (412 when
+stale). A PATCH with neither header is 428. Either
+answer is the merged state, projected to the values
+the requester may read.
+
+DELETE is a tombstone, and a tombstone is final. A
+retired instance answers 410 Gone on its GET, its
+PATCH, and a create; its id is never reused (RFC 9110
+§15.5.11). An id never written answers 404.
 
 ## Work orders
 
-Claim alphabet (`api/work-order-claims.ts`): `claimed` /
-`claim_released` / `claim_expired`.
+A work order is one document with one head. Its
+version carries, in the order `ordered` forms it
+(`api/work-order-version.ts`; the store then sorts
+keys on write): `id`,
+`organization_id`, `display_id`, `flow_graph`,
+`position`, then `state` (the current node), the
+binding as `instance_id` and `record_type_id`, `claim`
+as `{ member_id, at, expires_at }`, and `events`.
+`state`, the binding, and `claim` are absent keys when
+unset, never null. `events` holds only the lifecycle
+events that led from the previous version to this one,
+each `{ id, state, member_id, at, field_values }`.
+
+Five operations each land one version through the
+former, answering the work order's state:
+
+- **Create** (`POST work-orders/`): a genesis version
+  whose `events` are three births — the start node,
+  the post-start node, and the creator's claim —
+  beside the flow's join document.
+- **Claim** (`PUT …/claim`): `claim` becomes the
+  requester. A lapsed prior claim is recorded first as
+  `claim_expired`, authored by its holder. A live claim
+  by another member is 409.
+- **Release** (`DELETE …/claim`): `claim` goes and
+  `claim_released` is recorded. With no live claim
+  nothing lands.
+- **Transition** (`POST …/transition`): `state` moves
+  to the target node; the event carries its
+  `field_values`, and `claim_released` rides it when
+  the body releases. A value-bearing transition also
+  lands the bound instance's revision.
+- **Binding** (`PUT …/binding`): sets the two binding
+  keys, with no event. A rebind to another instance is
+  409.
+
+The four after the create are in order: `If-Match`
+names the work order's head, and a value-bearing
+transition names the instance's head too, one
+entity-tag each. The document PUT (If-Match or
+If-None-Match: *) sets `display_id`, `flow_graph`,
+and `position` over the head's other keys and records
+no event; a reorder (`putWorkOrderPosition`) reads the
+head and latches it.
+
+History is the version chain: every version's
+`events`, newest first (`historyOf`).
+
+Claim alphabet (`shared/work-order-claims.ts`):
+`claimed` / `claim_released` / `claim_expired`.
+
+The server judges a claim by one clock: a claim is live
+until its `expires_at`, against the request's stamp
+(`isClaimLive`). The client mints the claim's event ids
+and stamps (`putWorkOrderClaim`); the server decides
+whether a prior claim lapsed. The workbox pages read a
+claim's liveness from history against the graph's lock
+timeout (`activeClaimFromHistory`).
 
 The workbox shows every active and archived work order
 to every user; there is no per-user visibility filter.
 `buildInboxItems` in `presenters/workbox-inbox.ts` runs
 the active/archive split, the claimed-and-unfinished
 exclusion, and the sort — nothing more.
-
-`getWorkOrderActiveClaim(ctx, workOrderId, lockTimeout)`
-returns `null` for a `'claimed'` event older than
-`lockTimeout` seconds even when no `'claim_expired'` /
-`'claim_released'` event has yet superseded it.
-`putWorkOrderClaim` materializes that implicit expiration
-as an explicit `'claim_expired'` event when a new claim
-notices a stale prior.
 
 ## Conventions
 

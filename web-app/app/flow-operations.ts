@@ -718,11 +718,10 @@ const MAX_UNDO_ATTEMPTS = 3;
 // the very next attempt, landing correctly on "one step back
 // from whatever raced this undo in" with nothing for the client
 // to recompute or refetch. Each attempt mints a FRESH
-// eventId/at (the E6 split putFlow's own retry uses) — a resent
-// attempt must be a byte-DIFFERENT request, or it would collide
-// on the gate's idempotency fast path (FlowUndoBody's own doc
-// comment, api/validators.ts, names why the body keeps these two
-// fields at all). Not exported: performUndo is the only caller.
+// eventId/at (the E6 split putFlow's own retry uses): they
+// stamp the restored version, so each attempt is its own
+// event (FlowUndoBody's doc comment, api/validators.ts).
+// Not exported: performUndo is the only caller.
 async function postFlowUndo(
     ctx: RequestContext,
     flowId: string,

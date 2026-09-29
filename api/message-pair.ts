@@ -1809,12 +1809,12 @@ export function createdEntityName(
         ? value : undefined;
 }
 
-// The coverage gate: pairs, wire headers, and the idempotency
-// fast-path fire ONLY for wired route patterns. Seeded with the
-// ideas patterns in Task 1; every Task 2/3 family commit
-// extends it; the Task 6 exit test asserts it covers every
-// write route — so no intermediate commit ever advertises an
-// ETag it did not store.
+// The coverage gate: pairs and wire headers form ONLY for
+// wired route patterns. Seeded with the ideas patterns in
+// Task 1; every Task 2/3 family commit extends it; the Task 6
+// exit test asserts it covers every write route — so no
+// intermediate commit ever advertises an ETag it did not
+// store.
 export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'organizations/:id/ideas/:id',
     'organizations/:id/ideas/:id/conversion',
