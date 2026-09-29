@@ -489,7 +489,7 @@ any AT red.
 - [ ] **A1** Run `./bin/build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-${SHA}.zip`.
   Pin: exploratory — the exit code and the ZIP
        file appearing on disk
-- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
+- [ ] **A2** Unzip the A1 ZIP (or run `./bin/build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains the `fusion-angle` executable and `site/` with content-hashed assets — `assets/app.<hash>.js` (plus its code-split chunks), `assets/styles.<hash>.css`, the `pages-*.<hash>.css` bundles, and the `*.<hash>.woff2` fonts, where each `<hash>` is sixteen lowercase hex digits that change with the file's content, so read a build's names from its `site/asset-manifest.json` rather than expecting fixed ones — 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
   The 29 are the `PAGE_REGISTRY` HTML files; do
   **not** count root `index.html` inside the 29
   (it stays the separate "plus root `index.html`");
@@ -500,8 +500,9 @@ any AT red.
        actually emits those 29 files (the eight named
        above included) into `site/`, the 18
        directories, the `fusion-angle` executable,
-       `site/assets/app.js`, `site/assets/styles.css`,
-       the fonts, and the generated verb/status rooms
+       the hashed `site/assets/app.<hash>.js` and
+       `site/assets/styles.<hash>.css`, the fonts, and
+       the generated verb/status rooms
 - [ ] **A3** `./deploy --local 8080 --postgres
   mock-data`. Deploy validates, mints secrets,
   starts compose postgres and server, wipes,
