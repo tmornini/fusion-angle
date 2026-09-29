@@ -45,15 +45,6 @@ export async function getObjectives(
     );
 }
 
-export async function getObjective(
-    ctx: RequestContext,
-    id: ObjectiveId,
-): Promise<ObjectiveEntity> {
-    return ctx.GET<ObjectiveEntity>(
-        organizationItem(ctx, 'objectives', id),
-    );
-}
-
 // The objective with the tag of the head it was read from,
 // which a merge latches.
 async function getObjectiveWithEtag(

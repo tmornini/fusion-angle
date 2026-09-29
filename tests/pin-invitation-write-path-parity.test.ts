@@ -3,7 +3,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     pendingInvitationFor,
-    currentInvitationState,
 } from '../api/invitations-domain.ts';
 import { membershipExistsFor } from '../api/derive-memberships.ts';
 import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
@@ -20,16 +19,9 @@ const INV_PARITY_WRITE_FIRST_GRANT = generateIdentifier();
 const INV_PARITY_WRITE_FIRST_DECLINE = generateIdentifier();
 const INV_PARITY_WRITE_SECOND = generateIdentifier();
 const INV_PARITY_WRITE_SECOND_GRANT = generateIdentifier();
-const INV_PARITY_WRITE_PENDING = generateIdentifier();
-const INV_PARITY_WRITE_ACCEPTED_MS = generateIdentifier();
-const INV_PARITY_WRITE_ACCEPTED_ACCEPT = generateIdentifier();
-const INV_PARITY_WRITE_DECLINED_DECLINE = generateIdentifier();
-const INV_PARITY_WRITE_REVOKED_REVOKE = generateIdentifier();
-const NO_SUCH_INVITATION = generateIdentifier();
 const INV_PARITY_MEMBERSHIP_EXISTS_GRANT = generateIdentifier();
 const INV_PARITY_MEMBERSHIP_EXISTS_MS = generateIdentifier();
 const INV_PARITY_MEMBERSHIP_EXISTS_ACCEPT = generateIdentifier();
-const ID_GRANT = generateIdentifier();
 
 // Phase 14 Task 2 commit 3: the write-path pre-tx-vs-in-tx
 // parity pin. grantInvitation calls pendingInvitationFor (via
@@ -38,14 +30,14 @@ const ID_GRANT = generateIdentifier();
 // acceptInvitation/declineInvitation/revokeInvitation read the
 // invitation's head before their statement, which judges the
 // client's tag; none opens a transaction. This file proves
-// BOTH flipped functions return the SAME result pre-tx (the
+// pendingInvitationFor returns the SAME result pre-tx (the
 // plain adapter) and in-tx (an open read-transaction view, as
 // the pre-state-by-PUT transactions read them) — the
 // membershipExistsFor / drift-phase14-cores-parity.test.ts
-// precedent, applied to the write-path functions themselves
-// (both now exported for this purpose) rather than the raw
-// Task 1 cores beneath them. "The SAME derivation" is thereby a
-// proven property, not a coincidence.
+// precedent, applied to the write-path function itself
+// rather than the raw Task 1 cores beneath it. "The SAME
+// derivation" is thereby a proven property, not a
+// coincidence.
 //
 // Phase 14 Task 3 ADDS to this proof: acceptInvitation's own
 // `already`-membership check calls membershipExistsFor before
@@ -155,134 +147,6 @@ Deno.test('pendingInvitationFor: pre-tx vs in-tx agree across'
     const afterRegrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
     assertStrictEquals(afterRegrant?.id, INV_PARITY_WRITE_SECOND);
-});
-
-Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
-+ ' pending, accepted, declined, and revoked', async () => {
-    const db = await seededDb();
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
-
-    async function grant(
-        id: string, email: string, at: string,
-    ): Promise<void> {
-        const res = await handleRequest(db, req(
-            'POST', '/organizations/' + ORGANIZATION_TWO
-            + '/invitations/', admin, {
-                email, invitationId: id,
-                grantEventId: ID_GRANT, grantAt: at,
-            },
-        ));
-        assertStrictEquals(res.status, 201);
-    }
-
-    async function assertStateWritePathParity(
-        id: string,
-    ): Promise<string | null> {
-        const preTx = await currentInvitationState(db, id);
-        const inTx = await db.readTransaction(
-            (view) => currentInvitationState(view, id),
-        );
-        assertStrictEquals(inTx, preTx);
-        return preTx;
-    }
-
-    // pending — Sarah Chen, granted, left untouched.
-    await grant(
-        INV_PARITY_WRITE_PENDING, 'sarah.chen@company.com',
-        '2026-06-03T00:00:00.000000Z',
-    );
-    assertStrictEquals(
-        await assertStateWritePathParity(
-            INV_PARITY_WRITE_PENDING,
-        ),
-        'pending',
-    );
-
-    // accepted — Jessica Park.
-    await grant(
-        'iOhteLyCdhnLqTaeGYCoYQ', 'jessica.park@company.com',
-        '2026-06-03T00:00:01.000000Z',
-    );
-    const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
-    const jessicaToken = await organizationToken(
-        jessicaId, ORGANIZATION_TWO);
-    const accept = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + jessicaId
-            + '/invitations/iOhteLyCdhnLqTaeGYCoYQ',
-        jessicaToken, {
-            state: 'accepted',
-            membershipId: INV_PARITY_WRITE_ACCEPTED_MS,
-            eventId: INV_PARITY_WRITE_ACCEPTED_ACCEPT,
-            at: '2026-06-03T00:00:02.000000Z',
-        },
-    )));
-    assertStrictEquals(accept.status, 200);
-    assertStrictEquals(
-        await assertStateWritePathParity(
-            'iOhteLyCdhnLqTaeGYCoYQ',
-        ),
-        'accepted',
-    );
-
-    // declined — Emily Rodriguez.
-    await grant(
-        'iPxNOWCigMcIYgqchAefWA',
-        'emily.rodriguez@company.com',
-        '2026-06-03T00:00:03.000000Z',
-    );
-    const emilyId = 'CJrglMsNBxOWWfbihHQSeg';
-    const emilyToken = await organizationToken(
-        emilyId, ORGANIZATION_TWO);
-    const decline = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + emilyId
-            + '/invitations/iPxNOWCigMcIYgqchAefWA',
-        emilyToken, {
-            state: 'declined',
-            eventId: INV_PARITY_WRITE_DECLINED_DECLINE,
-            at: '2026-06-03T00:00:04.000000Z',
-        },
-    )));
-    assertStrictEquals(decline.status, 200);
-    assertStrictEquals(
-        await assertStateWritePathParity(
-            'iPxNOWCigMcIYgqchAefWA',
-        ),
-        'declined',
-    );
-
-    // revoked — Marcus Johnson.
-    await grant(
-        'iZisVMKVGRGkyLzjwyTjow', 'marcus@acmecorp.com',
-        '2026-06-03T00:00:05.000000Z',
-    );
-    const revoke = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/invitations/iZisVMKVGRGkyLzjwyTjow',
-        admin, {
-            state: 'revoked',
-            eventId: INV_PARITY_WRITE_REVOKED_REVOKE,
-            at: '2026-06-03T00:00:06.000000Z',
-        },
-    )));
-    assertStrictEquals(revoke.status, 200);
-    assertStrictEquals(
-        await assertStateWritePathParity(
-            'iZisVMKVGRGkyLzjwyTjow',
-        ),
-        'revoked',
-    );
-
-    // A never-granted id, same parity.
-    assertStrictEquals(
-        await assertStateWritePathParity(
-            NO_SUCH_INVITATION,
-        ),
-        null,
-    );
 });
 
 async function assertMembershipExistsWritePathParity(

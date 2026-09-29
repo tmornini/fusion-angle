@@ -50,9 +50,6 @@ import type {
     StatementBind,
 } from '../shared/ledger-statement.ts';
 import {
-    refusalOf,
-} from '../shared/ledger-statement.ts';
-import {
     SuccessionConflict,
     runLedgerStatement,
 } from './ledger-statement.ts';
@@ -861,6 +858,7 @@ export type StatementRun =
 
 // Runs past a refusal only to learn which row lost.
 const NON_BLIND_RUNS = 2;
+const BLIND_RUNS = 3;
 
 // A blind refusal runs the statement again, up to three
 // times. Any other refusal runs it once more with the same
@@ -884,10 +882,9 @@ export async function runStatement(
                 throw error;
             }
             conflicts += 1;
-            const again = attempt === 'blind'
-                ? refusalOf(attempt, conflicts, '', '')
-                    === 'retry'
-                : conflicts < NON_BLIND_RUNS;
+            const again = conflicts < (attempt === 'blind'
+                ? BLIND_RUNS
+                : NON_BLIND_RUNS);
             if (!again) {
                 return { kind: 'refused' };
             }
@@ -1121,7 +1118,7 @@ export async function formStateWrite(
     return formedOf(
         write,
         'composed',
-        [writeRowOf(received, null), ...pairs],
+        [writeRowOf(received), ...pairs],
         pairs[0]!.id,
     );
 }
@@ -1386,10 +1383,7 @@ async function completedPair(
 
 // The received row judges nothing in a sibling write; its
 // siblings do (Interpretation U).
-function writeRowOf(
-    pair: MessagePair,
-    ifMatch: string | null,
-): WriteRow {
+function writeRowOf(pair: MessagePair): WriteRow {
     return {
         id: pair.id,
         operationId: pair.operationId,
@@ -1401,7 +1395,7 @@ function writeRowOf(
         requestSecrets: pair.requestSecrets,
         response: responseBytes(pair),
         responseSecrets: pair.responseSecrets,
-        ifMatch,
+        ifMatch: null,
     };
 }
 

@@ -1,12 +1,10 @@
 import type { DbAdapter } from './db.ts';
 import {
     ValidationError,
-    assertInvitationState,
     type Id,
     type InvitationState,
     type MessagePairEntity,
 } from '../shared/types.ts';
-import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     ApiError,
     HTTP_BAD_REQUEST,
@@ -45,7 +43,6 @@ import {
 } from './derive-identity-spine.ts';
 import {
     deriveInvitationStates,
-    invitationLifecycleStatesFor,
 } from './derive-states.ts';
 import {
     membershipExistsFor,
@@ -57,26 +54,6 @@ import {
     storedRevisionDocument,
     versionSnapshotsAt,
 } from './document-family.ts';
-
-// An invitation's current state: the latest lifecycle event on
-// its id, derived from the message plane.
-//
-// FLIPPED (Phase 14 Task 2): re-points onto
-// invitationLifecycleStatesFor (api/derive-states.ts, Task 1) —
-// wire-identical to the old adapter.states.getCurrentFor(id)
-// dispatch it replaces. latestByKey applies the SAME (at, id)
-// total order. Null when no lifecycle event has been recorded.
-// Exported for tests/pin-invitation-write-path-parity.test.ts.
-export async function currentInvitationState(
-    adapter: DbAdapter,
-    id: Id,
-): Promise<InvitationState | null> {
-    const rows = await invitationLifecycleStatesFor(adapter, id);
-    const latest = latestByKey(rows, ev => ev.entity_id).get(id);
-    return latest === undefined
-        ? null
-        : assertInvitationState(latest.state, 'invitation ' + id);
-}
 
 function requireAdmin(
     roles: readonly string[],

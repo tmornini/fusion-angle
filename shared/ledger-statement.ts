@@ -89,16 +89,6 @@ export type ClassifiedRow = {
     pairHashHex: string,
 };
 
-export type Refusal =
-    | 'retry'
-    | {
-        status: number,
-        error: string,
-    };
-
-const CONFLICT = 409;
-const PRECONDITION_FAILED = 412;
-const BLIND_ATTEMPTS = 3;
 const CR = 13;
 const LF = 10;
 
@@ -145,30 +135,6 @@ export function isInserted(
     rawOutcome: Outcome,
 ): boolean {
     return outcome === 'land' && rawOutcome === 'land';
-}
-
-export function refusalOf(
-    attempt: Attempt,
-    conflicts: number,
-    path: string,
-    name: string,
-): Refusal {
-    const document = path + name;
-    if (attempt === 'blind') {
-        if (conflicts < BLIND_ATTEMPTS) {
-            return 'retry';
-        }
-        return {
-            status: CONFLICT,
-            error: 'Document remained contended at '
-                + document,
-        };
-    }
-    return {
-        status: PRECONDITION_FAILED,
-        error: 'If-Match does not match the current'
-            + ' document at ' + document,
-    };
 }
 
 type Prepared = {

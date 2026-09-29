@@ -23,7 +23,6 @@ import {
 } from '../shared/identifier.ts';
 import {
     classifyStatement,
-    refusalOf,
 } from '../shared/ledger-statement.ts';
 import {
     imfFixdate,
@@ -900,35 +899,6 @@ Deno.test(
         assertEquals(rows[0]!.stamp, EARLY);
     },
 );
-
-Deno.test('a refusal names the document', () => {
-    const contended =
-        'Document remained contended at '
-        + '/migrations/0001-example';
-    const mismatch =
-        'If-Match does not match the current'
-        + ' document at /migrations/0001-example';
-    assertEquals(
-        refusalOf('blind', 1, PATH, NAME),
-        'retry',
-    );
-    assertEquals(
-        refusalOf('blind', 2, PATH, NAME),
-        'retry',
-    );
-    assertEquals(
-        refusalOf('blind', 3, PATH, NAME),
-        { status: 409, error: contended },
-    );
-    assertEquals(
-        refusalOf('in-order', 1, PATH, NAME),
-        { status: 412, error: mismatch },
-    );
-    assertEquals(
-        refusalOf('composed', 1, PATH, NAME),
-        { status: 412, error: mismatch },
-    );
-});
 
 function openLedger(): {
     backend: MemoryStorageBackend,
