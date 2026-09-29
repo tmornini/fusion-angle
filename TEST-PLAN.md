@@ -6439,8 +6439,13 @@ NPS", and "Improve employee morale" are not.
   lists it with the negative-score tone.
   Pin: tests/presenter-project-score-history.test.ts
        'negative score TD carries data-tone="error"';
-       exploratory — the live persistence of the signed
-       value on the objectives screen itself
+       tests/presenter-project-objectives.test.ts
+       'approved row with no actual reads its signed
+       baseline (K17)' (decides the approved row's
+       readout shows the saved baseline as a signed −100
+       until an actual lands); exploratory — the live
+       persistence of the signed value across K13's save
+       and K16's approval
 - [ ] **K18** "No-payload" save: open Workforce Capacity
   Forecasting (K26's reserved trio; read-only here — do
   not drag any slider) with no slider moved off its
