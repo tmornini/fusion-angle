@@ -182,6 +182,57 @@ async () => {
     );
 });
 
+Deno.test('an in-order route with If-None-Match is 400'
++ ' before any read', async () => {
+    assertStrictEquals(
+        await refusedBeforeAnyRead(
+            'POST',
+            ORGANIZATION + '/flows/' + generateIdentifier()
+                + '/undo',
+            { eventId: generateIdentifier(), at: 'x' },
+            { 'If-None-Match': '*' },
+        ),
+        400,
+    );
+});
+
+Deno.test('a required PUT without a conditional is 428'
++ ' before any read', async () => {
+    assertStrictEquals(
+        await refusedBeforeAnyRead(
+            'PUT',
+            ORGANIZATION + '/flows/' + generateIdentifier(),
+            { name: 'F' },
+            {},
+        ),
+        428,
+    );
+});
+
+// The control: a read of the family's head is counted, so a
+// zero above is no blind counter.
+Deno.test('countHeadReads counts a head read', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const path = ORGANIZATION + '/ideas/'
+        + generateIdentifier();
+    const born = await handleRequest(db, apiRequest({
+        method: 'PUT', path, token,
+        body: ideaDocument('A'),
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(born.status, 201);
+    await born.body?.cancel();
+    const reads = countHeadReads(db, ORGANIZATION + '/ideas/');
+    const read = await handleRequest(db, apiRequest({
+        method: 'GET', path, token,
+    }));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    assert(reads() > 0);
+});
+
 Deno.test('a PUT with no body is 400', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);

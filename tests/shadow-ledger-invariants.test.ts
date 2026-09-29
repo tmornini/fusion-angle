@@ -1,10 +1,17 @@
-import { assert, assertMatch, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertMatch,
+    assertObjectMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { requestHashOfStored } from './ledger-row.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
+import { ideaGenesis } from
+    '../api/mock-data/seed-message-pairs.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -13,7 +20,6 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
-    type Id,
 } from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -23,35 +29,6 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import {
-    documentFamilyWiring,
-    documentGetHandler,
-    type DocumentFamilyWiring,
-} from '../api/document-family.ts';
-// This file reaches routes.ts only through mock-seed.ts;
-// import it directly for the family-wiring registration
-// side effect getDocument below depends on.
-import '../api/routes.ts';
-
-const READER: Id = 'XXZruirZyAOoRpNxaDnpSA';
-
-function wiringOf(family: string): DocumentFamilyWiring {
-    const wiring = documentFamilyWiring(family);
-    if (wiring === undefined) {
-        throw new Error('no wiring registered for ' + family);
-    }
-    return wiring;
-}
-
-function getDocument(
-    db: MemoryDbAdapter, family: string, organization: Id,
-    id: Id,
-): Promise<unknown> {
-    return documentGetHandler(wiringOf(family))(
-        db, [organization, id], READER, organization, [],
-    );
-}
-
 const N_START = generateIdentifier();
 const N_FINISH = generateIdentifier();
 const INV_REC_1 = generateIdentifier();
@@ -468,13 +445,18 @@ Deno.test('every pair\'s response_at is RFC-3339 zulu'
 
 // The first fiber of Phase 2's per-family drift check: a
 // seeded idea's create pair stores the idea's state in its
-// response, and that state must reproduce what a GET of the
-// idea answers — proof the stored state is not merely present
-// but semantically faithful to what was really written.
-Deno.test('a seeded idea\'s create-pair state reproduces its'
-+ ' GET state', async () => {
+// response, and that state must be the seed's own input —
+// its fields and its genesis state — proof the stored state
+// is not merely present but faithful to what was really
+// written.
+Deno.test('a seeded idea\'s create-pair state is the seed\'s'
++ ' input', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
+    const genesis = ideaGenesis.find(
+        (row) => row.entityId === idea.id,
+    );
+    assert(genesis, 'no genesis row for the seeded idea');
     const requests = await db.messagePairs.getAll();
     const createRow = requests.find(
         r => r.name === idea.id
@@ -484,12 +466,10 @@ Deno.test('a seeded idea\'s create-pair state reproduces its'
     );
     assert(createRow, 'no create pair for the seeded idea');
     const parsed = messagePairJsonOf(createRow!.response) as {
-        body: {
-            state: string;
-        };
+        body: Record<string, unknown>;
     };
-    const document = await getDocument(
-        db, 'ideas', STARK_ORGANIZATION, idea.id,
-    ) as { state: string };
-    assertStrictEquals(document.state, parsed.body.state);
+    assertObjectMatch(parsed.body, {
+        ...idea,
+        state: genesis.state,
+    });
 });

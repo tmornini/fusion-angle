@@ -52,7 +52,12 @@ Deno.test('every seeded work order keeps its history', async () => {
         const [organization, workOrder] = key.split('/');
         const actual = await workOrderHistoryFor(
             db, organization!, workOrder!,
-        ).catch(() => 'missing');
+        ).catch((error: unknown) => {
+            throw new Error(
+                'the history of ' + key + ' did not derive',
+                { cause: error },
+            );
+        });
         assertEquals(actual, rows, key);
     }
 });

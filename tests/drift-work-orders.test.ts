@@ -624,8 +624,6 @@ async () => {
     // claim, milliseconds after the fresh claim above and well
     // within the 8-hour DEFAULT_LOCK_TIMEOUT, so the claim is
     // live and NO new state event lands.
-    const beforeRepeat =
-        0 /* states table retired */;
     const claimRepeat = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId + '/claim',
@@ -639,10 +637,6 @@ async () => {
     ));
     assertStrictEquals(claimRepeat.status, 200);
     await claimRepeat.body?.cancel();
-    assertStrictEquals(
-        0 /* states table retired */,
-        beforeRepeat,
-    );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Claim attempt by actor B — 409, nothing stored.

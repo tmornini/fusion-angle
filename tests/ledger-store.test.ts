@@ -1498,6 +1498,11 @@ Deno.test(
             backend.statementExecutions(),
             before + 2,
         );
+        assertStrictEquals(
+            (await db.messagePairs.getHeadPair(PATH, NAME))
+                ?.id,
+            headId,
+        );
     },
 );
 

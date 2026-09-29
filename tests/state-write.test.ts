@@ -541,6 +541,50 @@ Deno.test(
     },
 );
 
+// Refused twice, the statement states no head: a spent name
+// cannot be told from a live one, so a never-written latch
+// is a conflict; a nil latch answers its declarer.
+Deno.test(
+    'a genesis refused twice answers by its latch',
+    async () => {
+        const cases: readonly [SiblingCondition, number][] = [
+            [{ kind: 'never-written', declarer: 'client' }, 409],
+            [{ kind: 'genesis', declarer: 'client' }, 412],
+            [HANDLER_GENESIS, 409],
+        ];
+        for (const [condition, status] of cases) {
+            const { backend, db } = openLedger();
+            await db.ensureTable();
+            const before = backend.statementExecutions();
+            backend.refuseNextSuccessions(2);
+            const answer = await runStateWrite(db, {
+                kind: 'siblings',
+                received: await received(undefined),
+                siblings: [idea(
+                    { id: IDEA, title: 'Born' }, condition,
+                )],
+                project: unprojected,
+                answer: { kind: 'parent' },
+            });
+            assertStrictEquals(answer.outcome, 'refused');
+            assertStrictEquals(
+                answer.response.status, status, condition.kind,
+            );
+            assertEquals(await answer.response.json(), {
+                error: 'Document already exists at '
+                    + IDEA_PATH + IDEA,
+            });
+            assertStrictEquals(
+                backend.statementExecutions(), before + 2,
+            );
+            assertStrictEquals(
+                await db.messagePairs.getHeadPair(IDEA_PATH, IDEA),
+                null,
+            );
+        }
+    },
+);
+
 Deno.test(
     'a received answer keeps the pair it was formed with',
     async () => {
@@ -717,6 +761,15 @@ Deno.test('latches pair tags with the heads read', () => {
     assertEquals(
         latchesOf([a], [a, b]),
         { kind: 'missing', documents: [1] },
+    );
+    const c = generateIdentifier();
+    assertEquals(
+        latchesOf([b], [a, b, c]),
+        { kind: 'missing', documents: [0, 2] },
+    );
+    assertEquals(
+        latchesOf([], [a, b]),
+        { kind: 'missing', documents: [0, 1] },
     );
     assertEquals(
         latchesOf([a, b, stale], [a, b]),

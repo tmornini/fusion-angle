@@ -414,6 +414,54 @@ async () => {
     assertStrictEquals(head?.id, INSTANCE_ID);
 });
 
+Deno.test('a stale If-Match on an instance DELETE is 412;'
++ ' nothing stored', async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const put = await putInstance(db, memberToken, [
+        { attribute_id: ATTR_ID, value: 'Hello' },
+    ]);
+    assertStrictEquals(put.status, 201);
+    const before = await countInstanceMessagePairs(db);
+    const del = await handleRequest(db, req(
+        'DELETE', INSTANCE_DETAIL, memberToken,
+        undefined,
+        { [IF_MATCH_HEADER]: '"' + generateIdentifier() + '"' },
+    ));
+    assertStrictEquals(del.status, 412);
+    assertEquals(await del.json(), {
+        error: 'If-Match does not match the current document at '
+            + INSTANCE_DETAIL,
+    });
+    assertStrictEquals(
+        await countInstanceMessagePairs(db), before,
+    );
+    assertStrictEquals(await countDeleteMessagePairs(db), 0);
+});
+
+Deno.test('the head\'s If-Match on an instance DELETE is 204',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const put = await putInstance(db, memberToken, [
+        { attribute_id: ATTR_ID, value: 'Hello' },
+    ]);
+    assertStrictEquals(put.status, 201);
+    await put.body?.cancel();
+    const del = await handleRequest(db, req(
+        'DELETE', INSTANCE_DETAIL, memberToken,
+        undefined,
+        { [IF_MATCH_HEADER]: put.headers.get('ETag')! },
+    ));
+    assertStrictEquals(del.status, 204);
+    await del.body?.cancel();
+    assertStrictEquals(await countDeleteMessagePairs(db), 1);
+});
+
 // R9 resurrect-hole: tombstone interleaved after a PATCH
 // wire pair was formed (gate-equivalent) but before its tx.
 // PATCH must 412 (or honest miss) — never revive the head.
