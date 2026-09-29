@@ -174,6 +174,63 @@ Deno.test(
     },
 );
 
+// The received pair's response is formed anew, so the
+// secrets stored and spliced beside it are the formed
+// response's own hoisted lines, none here.
+Deno.test(
+    'a completed pair stores its formed response\'s secrets',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const operationId = generateIdentifier();
+        const pair = await formWriteMessagePair({
+            method: 'POST',
+            pathname: IDEA_PATH + IDEA + '/conversion',
+            routePattern:
+                'organizations/:id/ideas/:id/conversion',
+            routeSegments: [
+                'organizations', ':id', 'ideas', ':id',
+                'conversion',
+            ],
+            pathSegments: [
+                'organizations', ORGANIZATION, 'ideas', IDEA,
+                'conversion',
+            ],
+            headerFields: [],
+            body: { note: 'x' },
+            requesterIdentityId: MEMBER,
+            requestAt: AT,
+            organization: ORGANIZATION,
+            responseBody: undefined,
+            responseFields: [
+                { name: 'set-cookie', value: 'received=1' },
+            ],
+            operationId,
+            requestId: operationId,
+        });
+        const answer = await runStateWrite(db, {
+            kind: 'siblings',
+            received: pair,
+            siblings: [idea(
+                { id: IDEA, title: 'Born' },
+                HANDLER_GENESIS,
+            )],
+            project: unprojected,
+            answer: { kind: 'parent' },
+        });
+        assertStrictEquals(answer.outcome, 'land');
+        assertStrictEquals(
+            answer.response.headers.get('set-cookie'), null,
+        );
+        await answer.response.body?.cancel();
+        const stored = (await db.messagePairs.getAll()).find(
+            (row) => row.id === pair.id,
+        );
+        assert(stored !== undefined);
+        assertStrictEquals(stored.response_secrets, '');
+    },
+);
+
 Deno.test(
     'a created parent answers its location',
     async () => {

@@ -1380,6 +1380,7 @@ async function completedPair(
         responseHash: await requestMessageHash(
             response.message,
         ),
+        responseSecrets: secretBytes(response.hoisted),
     };
 }
 
