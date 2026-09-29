@@ -1,4 +1,4 @@
-import { assert } from '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { ProjectObjectivesPresenter } from
     '../web-app/app/presenters/project-objectives.ts';
 
@@ -275,5 +275,47 @@ Deno.test(
             'data-action="save-objectives"',
         ),
         'no Save button on archived projects',
+    );
+});
+
+const MINUS_SIGN = '−';
+const EM_DASH = '—';
+
+// The row's `.slider-value`, the readout beside its live
+// slider.
+function sliderReadout(
+    html: string, objectiveId: string,
+): string | undefined {
+    const row = html.match(new RegExp(
+        `data-objective-id="${objectiveId}"`
+        + '[\\s\\S]*?<span class="slider-value">'
+        + '\\s*([^<]*?)\\s*</span>',
+    ));
+    return row?.[1];
+}
+
+Deno.test(
+    'approved row with no actual reads its signed'
+    + ' baseline (K17)',
+    () => {
+    const p = new ProjectObjectivesPresenter(
+        activeObjs, defs,
+        [{ id: 'b1',
+           projectId: 'pnXmXrxOWayANgDLdCjuBw'
+               , objectiveId: 'ohqxgUBEaFQwYbXsonRPmg',
+           memberId: 'xdaJyuuPyHfffCGLhqDrOQ',
+           score: -100,
+           at: '2026-05-14T00:00:00.000000Z' }],
+        [],
+        'approved',
+    );
+    const html = p.buildSection().toString();
+    assertStrictEquals(
+        sliderReadout(html, 'ohqxgUBEaFQwYbXsonRPmg'),
+        MINUS_SIGN + '100',
+    );
+    assertStrictEquals(
+        sliderReadout(html, 'o2'),
+        EM_DASH,
     );
 });

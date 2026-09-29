@@ -139,6 +139,13 @@ export class ProjectObjectivesPresenter {
         }
         const baseValue = baseline?.score ?? 0;
         const actValue = actual?.score ?? baseValue;
+        // The Actual readout mirrors its thumb, which the
+        // baseline pre-fills until an actual lands; only a
+        // row with neither reads as absent.
+        const actualReadout =
+            actual !== undefined || baseline !== undefined
+                ? formatSigned(actValue)
+                : '—';
         const lastActualText =
             actual !== undefined
                 ? `${formatSigned(actual.score)} `
@@ -208,10 +215,7 @@ export class ProjectObjectivesPresenter {
                                 ? 'disabled'
                                 : ''}>
                         <span class="slider-value">
-                            ${actual !== undefined
-                                ? formatSigned(
-                                    actual.score)
-                                : '—'}
+                            ${actualReadout}
                         </span>
                       </div>`
                     : html`<div class="${
