@@ -1241,21 +1241,31 @@ Off the critical path; each with its oracle.
   wait.
   The ledger arc saw four more suites fail under
   `--parallel`, each green on re-run, three failures in
-  ten `./test` runs on 2026-09-24:
-  `tests/adapters-shared-recovery.test.ts:546`
-  ("malformed token: expected 3 segments") and its
-  `recovery re-scopes to the vessel org claim, not the
-  cross-tab preference`;
-  `tests/apex-destination.test.ts:65`
+  ten `./test` runs on 2026-09-24, and state-by-put
+  (2026-09-25 to 2026-09-29) tripped each of these
+  again and two more, all green on re-run (lines at
+  its tip):
+  `tests/adapters-shared-recovery.test.ts:524`
+  (`recovery leaves the cross-tab active-org preference
+  untouched`; "malformed token: expected 3 segments" at
+  `:546`) and `:489` (`recovery re-scopes to the vessel
+  org claim, not the cross-tab preference`);
+  `tests/apex-destination.test.ts:73`
   (`probeRefreshSession posts a cookie refresh grant`,
-  one expected and none seen at `:102`) and its 401
-  probe; `tests/adapters-invitations.test.ts:1076` (`a
+  one expected and none seen), `:113`
+  (`probeRefreshSession treats 401 as unsigned`), and
+  `:132` (`concurrent probes share one refresh POST`,
+  asserting one POST at `:158`);
+  `tests/adapters-invitations.test.ts:1063` (`a
   re-minted token without the seat earns one more
   attempt`: the re-minted token did not list the
-  organization), `:1131`, `the remint waits for an
-  in-flight facade refresh`, and `a failed re-mint after
-  accept surfaces, seat kept`; and (the next bullet)
-  `tests/api-shadow-ledger-tokens.test.ts:860`. The
+  organization), `:1118` (`two re-minted tokens without
+  the seat surface a named failure`), `:989` (`the
+  remint waits for an in-flight facade refresh`),
+  `:929` (`a failed re-mint after accept surfaces, seat
+  kept`), and `:880` (`cookie-session accept remints via
+  refresh POST`); and (the next bullet)
+  `tests/api-shadow-ledger-tokens.test.ts:859`. The
   first three are session and token races, not drains,
   and share a confirmed cause: under `--parallel` every
   test file is a worker in one process, and
@@ -1277,7 +1287,7 @@ Off the critical path; each with its oracle.
   each of the three suites above passes ten consecutive
   `./test` runs, or its failure has a named cause and a
   fix
-- `tests/api-shadow-ledger-tokens.test.ts:860`
+- `tests/api-shadow-ledger-tokens.test.ts:859`
   (`revokeTokenChain racing a concurrent
   rotateRefreshJti`: a rotated jti read `issued` where
   every jti should read `revoked`) — named in the bullet
@@ -1285,7 +1295,7 @@ Off the critical path; each with its oracle.
   unexplained mechanism: its test
   ("revokeTokenChain racing a concurrent
   rotateRefreshJti on the chain's live successor…",
-  `:860`) deliberately races two server-side ledger
+  `:859`) deliberately races two server-side ledger
   operations; nothing it runs touches `navigator.locks`
   or `BroadcastChannel` (none under `api/`), and it
   fails under `--parallel` load with "revoked" expected,
