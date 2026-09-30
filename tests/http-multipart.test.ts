@@ -140,6 +140,16 @@ Deno.test('the splitter refuses every malformed shape',
             'msgtype=request'), 'not an HTTP response part'],
         [TYPE, good.replace('content-length: 2',
             'content-length: 1'), 'delimiter'],
+        [
+            'multipart/mixed; boundary=b0',
+            joinParts(['HTTP/1.1 204 \r\netag: "a"', ''], 'b0'),
+            'ends outside its part',
+        ],
+        [
+            TYPE + '; boundary=other',
+            good,
+            'more than one boundary',
+        ],
     ];
     for (const [type, body, message] of refusals) {
         assertThrows(

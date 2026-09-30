@@ -57,6 +57,7 @@ export function boundaryOf(contentType: string): string {
                 + contentType,
         );
     }
+    let found: string | undefined;
     for (const parameter of parameters) {
         const equals = parameter.indexOf('=');
         if (equals < 0) continue;
@@ -70,11 +71,20 @@ export function boundaryOf(contentType: string): string {
             ? raw.slice(1, -1)
             : raw;
         assertBoundary(boundary);
-        return boundary;
+        if (found !== undefined) {
+            throw new HttpMessageError(
+                'multipart/mixed has more than one boundary: '
+                    + contentType,
+            );
+        }
+        found = boundary;
     }
-    throw new HttpMessageError(
-        'multipart/mixed has no boundary: ' + contentType,
-    );
+    if (found === undefined) {
+        throw new HttpMessageError(
+            'multipart/mixed has no boundary: ' + contentType,
+        );
+    }
+    return found;
 }
 
 export function splitParts(
@@ -104,6 +114,13 @@ export function splitParts(
         if (messageHeadEnd < 0) {
             throw new HttpMessageError(
                 'multipart part has no header section end',
+            );
+        }
+        if (body.slice(start, messageHeadEnd)
+            .includes(CRLF + delimiter)) {
+            // The head must end inside its own part.
+            throw new HttpMessageError(
+                'multipart part head ends outside its part',
             );
         }
         const end = messageHeadEnd + 2 * CRLF.length
