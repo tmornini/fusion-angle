@@ -35,6 +35,7 @@ import {
 import {
     RequestError,
     HTTP_NOT_FOUND,
+    HTTP_GONE,
 } from '../../shared/http-errors.ts';
 import {
     getHumanMember,
@@ -132,14 +133,17 @@ function rerender(): void {
         .renderUpdate(pageContainer);
 }
 
-// Try human, then AI. A 404 on either kind is expected
-// absence for that kind; only a dual 404 is genuine
-// not-found (return null → caller redirects). Any other
-// status is a real fault and must surface — never collapse
-// into the silent redirect that absence uses.
+// Try human, then AI. A 404 or a 410 on either kind is
+// expected absence for that kind: a removed seat is not a
+// human member, as a never-seated one is not. Only absence
+// on both kinds is genuine not-found (return null → caller
+// redirects). Any other status is a real fault and must
+// surface — never collapse into the silent redirect that
+// absence uses.
 export function isAbsentMember(err: unknown): boolean {
     return err instanceof RequestError
-        && err.status === HTTP_NOT_FOUND;
+        && (err.status === HTTP_NOT_FOUND
+            || err.status === HTTP_GONE);
 }
 
 async function loadMemberByEitherKind(
