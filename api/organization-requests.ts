@@ -1,6 +1,9 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, OrganizationEntity } from '../shared/types.ts';
-import type { HeadSelection } from './head-reads.ts';
+import {
+    wholeHeadSelection,
+    type HeadSelection,
+} from './head-reads.ts';
 import {
     attemptFor,
     runWrite,
@@ -88,13 +91,10 @@ export async function selectIdentityDefaultOrganization(
     if (head === null) {
         throw new ApiError('not found', HTTP_NOT_FOUND);
     }
-    return {
-        kind: 'document', head,
-        lifecycle: 'stateless',
-        table: 'identity_default_organization',
-        id: identityId,
-        reader: { sees: 'whole' },
-    };
+    return wholeHeadSelection(
+        head, 'stateless', 'identity_default_organization',
+        identityId,
+    );
 }
 
 export async function putIdentityDefaultOrganization(

@@ -26,6 +26,20 @@ export type HeadSelection = {
     readonly reader: Reader,
 };
 
+// A head served whole needs no reader of its own: the
+// credential and the instance are the only projections.
+export function wholeHeadSelection(
+    head: MessagePairEntity,
+    lifecycle: Lifecycle,
+    table: string,
+    id: Id,
+): HeadSelection {
+    return {
+        kind: 'document', head, lifecycle, table, id,
+        reader: { sees: 'whole' },
+    };
+}
+
 export function isDeletedHead(
     head: MessagePairEntity,
     lifecycle: Lifecycle,

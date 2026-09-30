@@ -26,6 +26,7 @@ import type {
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
+import { wholeHeadSelection } from './head-reads.ts';
 
 // param/requireOrganization/withoutId live HERE, not in
 // routes.ts, so this module has NO runtime (value) dependency on
@@ -304,14 +305,9 @@ export function documentSelect(
                 wiring, db, organizationId, id,
             );
         }
-        return {
-            kind: 'document',
-            head,
-            lifecycle: wiring.lifecycle,
-            table: wiring.notFoundTable,
-            id,
-            reader: { sees: 'whole' },
-        };
+        return wholeHeadSelection(
+            head, wiring.lifecycle, wiring.notFoundTable, id,
+        );
     };
 }
 

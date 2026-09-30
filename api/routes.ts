@@ -113,7 +113,10 @@ import type {
     StateSibling,
 } from './message-pair.ts';
 import type { Reader } from './served-response.ts';
-import type { HeadSelection } from './head-reads.ts';
+import {
+    wholeHeadSelection,
+    type HeadSelection,
+} from './head-reads.ts';
 import { messageStore } from './message-store.ts';
 import {
     generateIdentifier,
@@ -3818,12 +3821,9 @@ export const routes: Route[] = [
                     'identity_pii', identityId,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'identity_pii', id: identityId,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'identity_pii', identityId,
+            );
         },
         put: (db, p, body, actor, messagePair) =>
             postIdentityPiiDocumentOp(
@@ -3973,12 +3973,10 @@ export const routes: Route[] = [
                     'client_registration', identityId,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'client_registration', id: identityId,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'client_registration',
+                identityId,
+            );
         },
         put: async (db, p, body, actor, messagePair) => {
             const identityId = param(p, 0);
@@ -4019,12 +4017,10 @@ export const routes: Route[] = [
                     'identity_token_revocations', rid,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'identity_token_revocations', id: rid,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'identity_token_revocations',
+                rid,
+            );
         },
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
@@ -4083,12 +4079,9 @@ export const routes: Route[] = [
                     IDENTITY_TOKENS_TABLE, jti,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: IDENTITY_TOKENS_TABLE, id: jti,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', IDENTITY_TOKENS_TABLE, jti,
+            );
         },
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
@@ -4205,12 +4198,9 @@ export const routes: Route[] = [
                     'identity_providers', eid,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'identity_providers', id: eid,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'identity_providers', eid,
+            );
         },
         put: (db, p, body, actor, messagePair) =>
             postIdentityProviderDocumentOp(
@@ -4791,12 +4781,9 @@ export const routes: Route[] = [
                     db, id, organizationId, RECORD_TYPES_TABLE,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'state',
-                table: RECORD_TYPES_TABLE, id,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'state', RECORD_TYPES_TABLE, id,
+            );
         },
         put: (db, p, body, actor, messagePair) =>
             postRecordDocumentOp(
@@ -4935,12 +4922,9 @@ export const routes: Route[] = [
                     'record_attributes',
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'record_attributes', id: attrId,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'record_attributes', attrId,
+            );
         },
         put: async (db, p, body, _actor, messagePair) => {
             const org = param(p, 0);
@@ -5216,12 +5200,9 @@ export const routes: Route[] = [
                     flowId,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'flow_records', id: joinId,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'flow_records', joinId,
+            );
         },
         put: (db, p, body, actor, messagePair, organization) =>
             postFlowRecordDocumentOp(
@@ -5287,12 +5268,9 @@ export const routes: Route[] = [
                     db, name, organizationId, 'flow_tags', flowId,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'flow_tags', id: name,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'flow_tags', name,
+            );
         },
         put: (db, _p, _body, _actor, messagePair) =>
             postFlowTagDocumentOp(db, messagePair),
@@ -5328,12 +5306,9 @@ export const routes: Route[] = [
                     'organizations', organizationId,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'organizations', id: organizationId,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'organizations', organizationId,
+            );
         },
         put: postOrganizationDocumentOp,
     }),
@@ -5434,12 +5409,10 @@ export const routes: Route[] = [
                     'organization_members', identityId,
                 );
             }
-            return {
-                kind: 'document', head,
-                lifecycle: 'stateless',
-                table: 'organization_members', id: identityId,
-                reader: { sees: 'whole' },
-            };
+            return wholeHeadSelection(
+                head, 'stateless', 'organization_members',
+                identityId,
+            );
         },
         put: (db, p, body, actor, messagePair) =>
             postMembershipDocumentOp(
