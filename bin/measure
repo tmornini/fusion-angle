@@ -21,6 +21,13 @@ set -euo pipefail
 # and MEASURE_PASSWORD. A local spawn reads CHROME,
 # the signing key, and POSTGRES_URL.
 #
+# A local spawn owns its compose stack: this wrapper
+# mints the secrets (ambient ones are never read), names
+# a project of its own so an operator's stack is never
+# touched, and takes the project down on exit. The seed
+# it runs starts compose's postgres, so 127.0.0.1:5432
+# must be free.
+#
 # --allow-run is unscoped, as in ./bin/test-browser,
 # because two of its targets are known only at run time:
 # Chrome's path comes from CHROME, and ./fusion-angle is
@@ -32,6 +39,8 @@ set -euo pipefail
 BIN="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$BIN/.." && pwd)"
 cd "$ROOT"
+# shellcheck disable=SC1091
+. "$BIN/compose-lib"
 
 needs_help=false
 needs_visualize=false
@@ -64,6 +73,9 @@ elif $needs_base_url; then
     env_flag="--allow-env=CHROME,MEASURE_PASSWORD"
 else
     env_flag="--allow-env=CHROME,JWT_HMAC_SIGNING_KEY,POSTGRES_URL"
+    mint_compose_env 8080
+    export COMPOSE_PROJECT_NAME="fusion-measure-$$"
+    trap compose_down_once EXIT INT TERM
 fi
 
 # shellcheck disable=SC2086

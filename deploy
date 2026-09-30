@@ -149,32 +149,19 @@ else
     MODE='--mock-data'
 fi
 
-CLEANED=""
-cleanup() {
-    if [ -n "${CLEANED:-}" ]; then
-        return
-    fi
-    CLEANED=1
-    docker compose down --remove-orphans || true
-}
+# shellcheck disable=SC1091
+. "$ROOT/bin/compose-lib"
 
 if [ -n "$LOCAL_PORT" ]; then
     ./test validate
     ./test postgres
     ./test browser
 
-    POSTGRES_PASSWORD="$(openssl rand -hex 16)"
-    JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
-    export POSTGRES_PASSWORD
-    export JWT_HMAC_SIGNING_KEY
-    export PORT="$LOCAL_PORT"
-    POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}"
-    POSTGRES_URL="${POSTGRES_URL}@127.0.0.1:5432/fusion"
-    export POSTGRES_URL
+    mint_compose_env "$LOCAL_PORT"
 
-    trap cleanup EXIT
-    trap 'cleanup; exit 130' INT
-    trap 'cleanup; exit 143' TERM
+    trap compose_down_once EXIT
+    trap 'compose_down_once; exit 130' INT
+    trap 'compose_down_once; exit 143' TERM
 
     docker compose up -d --wait postgres
     docker compose build

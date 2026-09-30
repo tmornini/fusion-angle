@@ -49,11 +49,16 @@ require a clean working directory.
 Run `./test validate` to catch type errors and lint issues;
 commit; then build or deploy.
 
-`./bin/serve` and a local `./bin/measure` sweep need
-`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY` already
-set. `./bin/serve dir/ port` sets `PORT`
-from `port`. `./deploy --local` mints those for its
-children.
+`./bin/serve` needs `POSTGRES_URL` and
+`JWT_HMAC_SIGNING_KEY` already set;
+`./bin/serve dir/ port` sets `PORT` from `port`.
+`./deploy --local`,
+`./test postgres`, and a local `./bin/measure` sweep
+mint those for their children through `bin/compose-lib`
+and take their compose stack down on exit; the measure
+and `./test postgres` name a compose project of their
+own, so neither touches an operator's stack. Each needs
+127.0.0.1:5432 free.
 
 When running under the Claude Code sandbox:
 

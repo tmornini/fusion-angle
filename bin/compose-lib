@@ -1,0 +1,29 @@
+# Shared helpers for a local compose stack. Source me;
+# do not exec. Run from the repository root, where
+# compose.yaml lives.
+
+# Mint the stack's secrets and export them, with PORT
+# ($1) and the URL a host process reaches compose's
+# postgres by. An ambient POSTGRES_URL is never read: it
+# could name a database compose does not run. Compose
+# parses every service, so PORT is required even where
+# nothing binds it.
+mint_compose_env() {
+    POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+    JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
+    POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}"
+    POSTGRES_URL="${POSTGRES_URL}@127.0.0.1:5432/fusion"
+    PORT="$1"
+    export POSTGRES_PASSWORD JWT_HMAC_SIGNING_KEY
+    export POSTGRES_URL PORT
+}
+
+# Take the stack down once, however many traps fire.
+COMPOSE_DOWN_DONE=''
+compose_down_once() {
+    if [ -n "$COMPOSE_DOWN_DONE" ]; then
+        return
+    fi
+    COMPOSE_DOWN_DONE=1
+    docker compose down --remove-orphans || true
+}

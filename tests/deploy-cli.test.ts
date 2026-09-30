@@ -233,6 +233,9 @@ Deno.test('deploy source owns the local stack', () => {
     assertNotMatch(src, /echo \$POSTGRES_URL/);
     assertNotMatch(src, /echo \$POSTGRES_PASSWORD/);
     assertNotMatch(src, /echo \$JWT_HMAC_SIGNING_KEY/);
+    assertMatch(src, /\. "\$ROOT\/bin\/compose-lib"/);
+    assertMatch(src, /mint_compose_env "\$LOCAL_PORT"/);
+    assertNotMatch(src, /openssl rand/);
     const trapAt = src.indexOf('trap ');
     const upAt = src.indexOf(
         'docker compose up -d --wait postgres',
@@ -244,13 +247,13 @@ Deno.test('deploy source owns the local stack', () => {
 
 Deno.test('deploy INT TERM traps exit the park', () => {
     const src = Deno.readTextFileSync('deploy');
-    assertMatch(src, /trap 'cleanup; exit 130' INT/);
-    assertMatch(src, /trap 'cleanup; exit 143' TERM/);
+    assertMatch(src, /trap 'compose_down_once; exit 130' INT/);
+    assertMatch(src, /trap 'compose_down_once; exit 143' TERM/);
     const intAt = src.indexOf(
-        "trap 'cleanup; exit 130' INT",
+        "trap 'compose_down_once; exit 130' INT",
     );
     const termAt = src.indexOf(
-        "trap 'cleanup; exit 143' TERM",
+        "trap 'compose_down_once; exit 143' TERM",
     );
     const parkAt = src.indexOf('while true; do');
     assert(intAt >= 0, 'INT trap missing');
