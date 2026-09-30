@@ -137,7 +137,7 @@ function rerender(): void {
 // not-found (return null → caller redirects). Any other
 // status is a real fault and must surface — never collapse
 // into the silent redirect that absence uses.
-function isNotFound(err: unknown): boolean {
+export function isAbsentMember(err: unknown): boolean {
     return err instanceof RequestError
         && err.status === HTTP_NOT_FOUND;
 }
@@ -151,7 +151,7 @@ async function loadMemberByEitherKind(
             ctx, memberId,
         );
     } catch (errHuman) {
-        if (!isNotFound(errHuman)) {
+        if (!isAbsentMember(errHuman)) {
             throw errHuman;
         }
         try {
@@ -159,7 +159,7 @@ async function loadMemberByEitherKind(
                 ctx, memberId,
             );
         } catch (errAi) {
-            if (isNotFound(errAi)) {
+            if (isAbsentMember(errAi)) {
                 return null;
             }
             throw errAi;
