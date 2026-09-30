@@ -34,6 +34,7 @@ import {
     deriveFlow,
     deriveFlows,
     deriveFlowStateHistory,
+    flowEntityOf,
 } from '../api/derive-flows.ts';
 import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
@@ -337,18 +338,33 @@ async function wireFlowsText(
     return res.text();
 }
 
-// The flow GET serves its head's stored body octets.
+// The flow GET serves its head's stored body octets. That
+// body deliberately differs from the derive (the lifecycle
+// trio and the sidecars are stored, organization_id is
+// stamped), so the octets alone do not prove the served
+// flow is the flow the list serves: read as a document, the
+// body must derive to what deriveFlow derives.
 async function assertWireEqualsDerived(
     db: MemoryDbAdapter,
     organization: string,
     flowId: string,
     wireText: string,
 ): Promise<void> {
+    const prefix = canonicalPath(organization, '/flows/');
     assertStrictEquals(
         wireText,
-        await storedPutBodyText(
-            db, canonicalPath(organization, '/flows/'), flowId,
-        ),
+        await storedPutBodyText(db, prefix, flowId),
+    );
+    const head = await db.messagePairs.getHeadPair(prefix, flowId);
+    assert(head !== null);
+    assertEquals(
+        flowEntityOf({
+            name: flowId,
+            messagePairId: head.id,
+            method: 'PUT',
+            body: JSON.parse(wireText) as Record<string, unknown>,
+        }, organization),
+        await deriveFlow(db, organization, flowId),
     );
 }
 
@@ -415,10 +431,10 @@ async () => {
     }
 });
 
-// -- 2. per-flow GET wire equals the stored head --------------
+// -- 2. per-flow GET wire equals the stored head and derive ----
 
-Deno.test('per-flow GET wire equals the stored head for every '
-+ 'seed', async () => {
+Deno.test('per-flow GET wire equals the stored head and its'
++ ' derive for every seed', async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
         const wireText = await wireFlowText(
