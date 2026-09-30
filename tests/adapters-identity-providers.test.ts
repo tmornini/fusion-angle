@@ -25,7 +25,8 @@ import {
     identityProviderEntityOf,
 } from '../api/derive-identity-spine.ts';
 import {
-    appendMessagePairOnce,
+    runWrite,
+    attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -224,9 +225,10 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await appendMessagePairOnce(view, messagePair);
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
     const rows = await deriveIdentityProvidersFor(db
         , 'prBESZPjJDiuXCeZLmbiVw');
@@ -267,9 +269,10 @@ async () => {
         }),
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await appendMessagePairOnce(view, flatPair);
-        },
+    await runWrite(
+        db,
+        attemptFor([flatPair]),
+        [flatPair],
     );
     await seedIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id, {
         ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',

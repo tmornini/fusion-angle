@@ -42,7 +42,8 @@ const INDEX_FILL: Record<string, string> = {
     pk: 'hsl(217 45% 15%)',
     document: 'hsl(217 36% 46%)',
     collection: 'hsl(173 42% 32%)',
-    replay: 'hsl(32 70% 42%)',
+    succession: 'hsl(32 70% 42%)',
+    request_id: 'hsl(262 40% 46%)',
     body: 'hsl(350 48% 44%)',
 };
 
@@ -151,7 +152,13 @@ function parseStores(
     );
     let m: RegExpExecArray | null;
     while ((m = reStore.exec(flat)) !== null) {
-        out.push({ table: camelToSnake(m[1]!), entity: m[2]! });
+        const property = m[1]!;
+        out.push({
+            table: property === 'messagePairs'
+                ? 'fa_message_pairs'
+                : camelToSnake(property),
+            entity: m[2]!,
+        });
     }
     const reState = /(\w+)\s*:\s*StateStore\b/g;
     while ((m = reState.exec(flat)) !== null) {

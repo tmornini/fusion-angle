@@ -5,7 +5,9 @@ import {
 } from '../api/db-memory.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import {
-    formWriteMessagePair, appendMessagePairOnce,
+    runWrite,
+    attemptFor,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
@@ -79,9 +81,10 @@ async function seedDefaultOrganizationEvent(
         responseBody: undefined,
         operationId: generateIdentifier(),
     });
-    await db.transaction(async (view) => {
-            await appendMessagePairOnce(view, messagePair);
-        },
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
     );
 }
 
@@ -206,9 +209,10 @@ Deno.test(
             responseBody: undefined,
             operationId: generateIdentifier(),
         });
-        await db.transaction(async (view) => {
-                await appendMessagePairOnce(view, tombstone);
-            },
+        await runWrite(
+            db,
+            attemptFor([tombstone]),
+            [tombstone],
         );
         assertStrictEquals(
             await identityDefaultOrganization(

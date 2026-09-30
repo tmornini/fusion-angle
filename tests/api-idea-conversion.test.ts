@@ -247,8 +247,8 @@ Deno.test(
         // N=2 here) + three schema/bootstrap pairs = 11.
         const allRequests = await db.messagePairs.getAll();
         const allResponses = await db.messagePairs.getAll();
-        assertStrictEquals(allRequests.length, 10);
-        assertStrictEquals(allResponses.length, 10);
+        assertStrictEquals(allRequests.length, 11);
+        assertStrictEquals(allResponses.length, 11);
         assertStrictEquals(allRequests.length, allResponses.length);
 
         const atProject = allRequests.filter(

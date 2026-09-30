@@ -2,6 +2,7 @@ import {
     assert,
     assertEquals,
     assertMatch,
+    assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
 import { generateIdentifier } from
@@ -481,4 +482,163 @@ async () => {
         bornRow.write_roles,
         ['member', 'admin'],
     );
+});
+
+function attributeFields(
+    id: string,
+    typeId: string,
+    name: string,
+): Record<string, unknown> {
+    return {
+        id,
+        organization_id: ORGANIZATION,
+        record_id: typeId,
+        name,
+        attribute_type: 'text',
+        sort_order: 0,
+        options: [],
+        constraints: [],
+    };
+}
+
+Deno.test('recreate after delete lands a new document head',
+async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const attrId = generateIdentifier();
+    const detail = COLLECTION + typeId;
+    const created = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        createBody(typeId, attrId, 'First'),
+    ));
+    assertStrictEquals(created.status, 201);
+    const deleted = await handleRequest(db, req(
+        'DELETE', detail, adminToken,
+    ));
+    assertStrictEquals(deleted.status, 204);
+    const tombstone = await db.messagePairs.getHeadPair(
+        COLLECTION, typeId,
+    );
+    assertStrictEquals(tombstone?.method, 'DELETE');
+    const again = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        createBody(typeId, attrId, 'Second'),
+    ));
+    assertStrictEquals(again.status, 201);
+    const head = await db.messagePairs.getHeadPair(
+        COLLECTION, typeId,
+    );
+    assertStrictEquals(head?.method, 'PUT');
+    assertNotStrictEquals(head?.id, tombstone?.id);
+    const got = await handleRequest(db, req(
+        'GET', detail, adminToken,
+    ));
+    assertStrictEquals(got.status, 200);
+    const row = await got.json() as { name: string };
+    assertStrictEquals(row.name, 'Second');
+});
+
+Deno.test('a rename beside an already-deleted attribute lands',
+async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const kept = generateIdentifier();
+    const gone = generateIdentifier();
+    const detail = COLLECTION + typeId;
+    const created = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken, {
+            kind: 'create',
+            id: typeId,
+            record: {
+                organization_id: ORGANIZATION,
+                name: 'Asset',
+                description: 'Asset desc',
+                position: 1,
+            },
+            attributes: [
+                attributeFields(kept, typeId, 'Priority'),
+                attributeFields(gone, typeId, 'Notes'),
+            ],
+            initialState: 'active',
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    const removed = await handleRequest(db, req(
+        'DELETE', detail + '/attributes/' + gone,
+        adminToken,
+    ));
+    assertStrictEquals(removed.status, 204);
+    const edit = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken, {
+            kind: 'edit',
+            id: typeId,
+            record: {
+                organization_id: ORGANIZATION,
+                name: 'Asset',
+                description: 'Asset desc',
+                position: 1,
+            },
+            attributes: [
+                attributeFields(kept, typeId, 'Priority v2'),
+            ],
+            state: 'active',
+            removedAttributeIds: [gone],
+        },
+    ));
+    assertStrictEquals(edit.status, 201);
+    const renamed = await handleRequest(db, req(
+        'GET', detail + '/attributes/' + kept, adminToken,
+    ));
+    assertStrictEquals(renamed.status, 200);
+    const renamedRow = await renamed.json() as {
+        name: string;
+    };
+    assertStrictEquals(renamedRow.name, 'Priority v2');
+    const absent = await handleRequest(db, req(
+        'GET', detail + '/attributes/' + gone, adminToken,
+    ));
+    assertStrictEquals(absent.status, 404);
+});
+
+Deno.test('an unchanged record edit stores nothing'
++ ' and keeps the head',
+async () => {
+    const { db, adminToken } = await adminDb();
+    const typeId = generateIdentifier();
+    const attrId = generateIdentifier();
+    const created = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken,
+        createBody(typeId, attrId, 'Composed'),
+    ));
+    assertStrictEquals(created.status, 201);
+    const head = await db.messagePairs.getHeadPair(
+        COLLECTION, typeId,
+    );
+    assert(head);
+    const before = (await db.messagePairs.getAll()).length;
+    const resend = await handleRequest(db, req(
+        'POST', COLLECTION, adminToken, {
+            kind: 'edit',
+            id: typeId,
+            record: {
+                organization_id: ORGANIZATION,
+                name: 'Composed',
+                description: 'Composed desc',
+                position: 1,
+            },
+            attributes: [
+                attributeFields(attrId, typeId, 'Priority'),
+            ],
+            state: 'active',
+            removedAttributeIds: [],
+        },
+    ));
+    assertStrictEquals(resend.status, 200);
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    const after = await db.messagePairs.getHeadPair(
+        COLLECTION, typeId,
+    );
+    assertStrictEquals(after?.id, head.id);
 });

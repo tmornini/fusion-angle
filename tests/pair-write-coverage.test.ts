@@ -125,8 +125,8 @@ Deno.test('invitation writes import pair-formation primitives',
     const path = 'api/invitations-domain.ts';
     const text = sourceText(path);
     assert(
-        text.includes('appendMessagePairOnce'),
-        path + ' does not import appendMessagePairOnce',
+        text.includes('runWrite'),
+        path + ' does not call runWrite',
     );
     assert(
         text.includes('formWriteMessagePair'),

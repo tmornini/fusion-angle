@@ -377,10 +377,17 @@ Deno.test(
             [OPERATION_ID_HEADER, operationId],
             ...(ifMatchHeaders(etag) ?? []),
         ];
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aEsGMmBEFaVdWihhHXwCbw', body, headers);
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aEsGMmBEFaVdWihhHXwCbw', body, headers);
+        const path = 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aEsGMmBEFaVdWihhHXwCbw';
+        await ctx.PUT(path, body, headers);
+        // Same response body, current latch: 200, no
+        // second row. The first echo is stale.
+        const { etag: fresh } =
+            await ctx.GETWithEtag<FlowWithGraph>(path);
+        await ctx.PUT(path, body, [
+            [OPERATION_ID_HEADER, operationId],
+            ...(ifMatchHeaders(fresh) ?? []),
+        ]);
         const events = await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',

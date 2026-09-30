@@ -1,4 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { NIL_IDENTIFIER } from
+    '../shared/identifier.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { handleRequest } from '../api/api.ts';
@@ -243,8 +245,12 @@ async () => {
     assert(genesis);
     assert(reviewRev);
     assert(completeRev);
-    for (const row of [genesis, reviewRev, completeRev]) {
-        assertStrictEquals('follows' in row, false);
-        assertStrictEquals('supersedes' in row, false);
-    }
+    assertStrictEquals('follows' in genesis, false);
+    assertStrictEquals(genesis.supersedes, NIL_IDENTIFIER);
+    assertStrictEquals('follows' in reviewRev, false);
+    assertStrictEquals(reviewRev.supersedes, genesis.id);
+    assertStrictEquals('follows' in completeRev, false);
+    assertStrictEquals(
+        completeRev.supersedes, reviewRev.id,
+    );
 });

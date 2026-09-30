@@ -6,7 +6,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
-import { requestMessageHash } from '../api/message-form.ts';
+import { requestHashOfStored } from './ledger-row.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
@@ -163,7 +163,7 @@ async () => {
     // document and its pii document each), the
     // organizations/:id document (Stage B), and the grant's own
     // 2 pairs.
-    assertStrictEquals(requests.length, 8);
+    assertStrictEquals(requests.length, 9);
     const pairsAt = requests.filter(
         r => r.path === '/invitations/'
             && r.name === INV_DOC_1,
@@ -226,8 +226,8 @@ async () => {
     // toccYYkLEABmlbpHJalgtQ's own conflicting membership pair
     // (Phase 13 Task 1) — the failed grant appends nothing
     // further. Role-grant retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 8);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 8);
 });
 
 // ── accept: the memberships document message pair
@@ -533,10 +533,10 @@ Deno.test('every stored invitation-family message verifies against'
     // membership pair, four seeded people (an identities/:id
     // document and its pii document each), and the
     // organizations/:id document = 21.
-    assertStrictEquals(messagePairs.length, 21);
+    assertStrictEquals(messagePairs.length, 22);
     for (const row of messagePairs) {
         assertStrictEquals(
-            await requestMessageHash(row.request),
+            await requestHashOfStored(row),
             row.request_hash,
         );
     }

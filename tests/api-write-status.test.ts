@@ -107,7 +107,7 @@ async function storedResponseAt(
     };
 }
 
-Deno.test('first PUT is 201 and stores a 200 start-line',
+Deno.test('first PUT is 201 and stores a 201 start-line',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -127,8 +127,8 @@ async () => {
         db, IDEA_PREFIX, 'yNqCXXgKLCqDESGScIzYrQ',
     );
     assertStrictEquals(stored.method, 'PUT');
-    assertStrictEquals(stored.status, 200);
-    assertStrictEquals(stored.hasOperationId, false);
+    assertStrictEquals(stored.status, 201);
+    assertStrictEquals(stored.hasOperationId, true);
 });
 
 Deno.test('document GET detail ETag equals the PUT pair id',
@@ -350,7 +350,7 @@ async () => {
         db, IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
     assertStrictEquals(stored.method, 'PUT');
-    assertStrictEquals(stored.status, 200);
+    assertStrictEquals(stored.status, 201);
     const live = await messageStore(db).getDocumentHead(
         IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
     );
@@ -359,16 +359,12 @@ async () => {
 
 // Memory serializes all ops, so the TOCTOU is
 // unreachable here; the pin is the comparison.
-Deno.test('the post-tx PUT answers 200 when the stored pair '
-+ 'is not ours',
+Deno.test('a same-body answer is status 200 from the'
++ ' stored response',
 () => {
     const src = Deno.readTextFileSync('api/api.ts');
     assertMatch(
         src,
-        new RegExp(
-            'const response = sendWriteResponse\\('
-            + '\\s*stored, \'PUT\','
-            + '\\s*stored\\.id === messagePair\\.id,?\\s*\\)',
-        ),
+        /responseFromLatin1\(\s*stored\.response, 200,?\s*\)/,
     );
 });

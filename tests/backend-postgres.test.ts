@@ -27,6 +27,9 @@ import { POSTGRES_SCHEMA } from
     '../api/schema-postgres.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
+import { uuidTextOfIdentifier } from
+    '../shared/identifier.ts';
+import { ledgerFields } from './ledger-row.ts';
 import {
     ApiError,
     HTTP_INTERNAL_ERROR,
@@ -85,6 +88,26 @@ function fakeClient(): {
                 throw state.failWith;
             }
             calls.push({ text: query, values: [] });
+            if (query.startsWith('WITH input')) {
+                return [{
+                    id: '00000000-0000-0000-0000-'
+                        + '000000000000',
+                    path: '/migrations/',
+                    name: '0000-root',
+                    method: 'PUT',
+                    outcome: 'land',
+                    stamp: '2026-01-01T00:00:00.000000Z',
+                    response: new Uint8Array(),
+                    head_id: null,
+                    head_response: null,
+                    supersedes: '00000000-0000-0000-0000-'
+                        + '000000000000',
+                    request_hash: '00'.repeat(32),
+                    secret_hash: '00'.repeat(32),
+                    response_hash: '00'.repeat(32),
+                    pair_hash: '00'.repeat(32),
+                }] as T[];
+            }
             return [] as T[];
         },
         begin: async (fn) => {
@@ -96,39 +119,53 @@ function fakeClient(): {
     return state;
 }
 
+const MESSAGE_PAIR_ID = 'UuPWIGbUyaAgmEgGDRfnvA';
+const MESSAGE_PAIR_REQUEST =
+    'PUT /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42'
+    + ' HTTP/1.1\r\n\r\n'
+    + String.fromCharCode(0x80, 0x9c, 0xe9);
+const MESSAGE_PAIR_RESPONSE = 'HTTP/1.1 200 OK\r\n\r\n'
+    + String.fromCharCode(0x80, 0x9c, 0xe9);
 const MESSAGE_PAIR_ROW = {
-    id: 'UuPWIGbUyaAgmEgGDRfnvA',
-    path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-    name: '42',
-    requester_identity_id: 'WOTMsfERBVJEuTRTgrQptQ',
-    method: 'PUT',
-    request_at: '2026-01-01T00:00:00.000000Z',
-    request_hash: 'a'.repeat(64),
-    request: 'PUT /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42 HTTP/'
-        + '1.1\r\n\r\n'
-        + String.fromCharCode(0x80, 0x9c, 0xe9),
-    response_at: '2026-01-01T00:00:00.000001Z',
-    response: 'HTTP/1.1 200 OK\r\n\r\n'
-        + String.fromCharCode(0x80, 0x9c, 0xe9),
-    operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
+    id: MESSAGE_PAIR_ID,
+    ...await ledgerFields({
+        id: MESSAGE_PAIR_ID,
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        name: '42',
+        requester_identity_id: 'WOTMsfERBVJEuTRTgrQptQ',
+        method: 'PUT',
+        response_at: '2026-01-01T00:00:00.000001Z',
+        request: MESSAGE_PAIR_REQUEST,
+        response: MESSAGE_PAIR_RESPONSE,
+        operation_id: 'WvNiHVgksjrlfhPfdgfcyQ',
+    }),
 };
 
 Deno.test('ensureTable runs compile-time SCHEMA', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.ensureTable();
-    assertStrictEquals(fake.calls.length, 1);
+    assertStrictEquals(fake.calls.length, 3);
     assertStrictEquals(fake.calls[0]!.text, POSTGRES_SCHEMA);
+    assertMatch(fake.calls[1]!.text, /0000-root/);
+    assertMatch(
+        fake.calls[2]!.text,
+        /INSERT INTO fa_message_pairs/,
+    );
+    fake.rows = [{ id: MESSAGE_PAIR_ID }];
+    await backend.ensureTable();
+    assertStrictEquals(fake.calls.length, 5);
+    assertMatch(fake.calls[4]!.text, /0000-root/);
 });
 
 Deno.test('schema declares collection indexes', () => {
     assertMatch(
         POSTGRES_SCHEMA,
-        /CREATE INDEX IF NOT EXISTS message_pairs_collection/,
+        /CREATE INDEX IF NOT EXISTS fa_message_pairs_collection/,
     );
     assertMatch(
         POSTGRES_SCHEMA,
-        /ON message_pairs \(path, response_at, id\)/,
+        /ON fa_message_pairs \(path, response_at, id\)/,
     );
 });
 
@@ -144,11 +181,11 @@ Deno.test('the columns are path and name; the document index'
     );
     assertMatch(
         POSTGRES_SCHEMA,
-        /CREATE INDEX IF NOT EXISTS message_pairs_document\n/,
+        /CREATE INDEX IF NOT EXISTS fa_message_pairs_document\n/,
     );
     assertMatch(
         POSTGRES_SCHEMA,
-        /ON message_pairs \(path, name, response_at, id\)/,
+        /ON fa_message_pairs \(path, name, response_at, id\)/,
     );
     assertNotMatch(
         POSTGRES_SCHEMA,
@@ -205,27 +242,9 @@ async () => {
     assertMatch(text, /WHERE path = \$1/);
     assertMatch(
         text,
-        /ORDER BY message_pairs\.response_at, message_pairs\.id/,
+        /ORDER BY fa_message_pairs\.response_at, fa_message_pairs\.id/,
     );
 });
-
-Deno.test(
-    'getPairsByRequestHash selects by request_hash, ordered',
-    async () => {
-        const fake = fakeClient();
-        const backend = new PostgresBackend(fake.sql);
-        await backend.transaction('readonly',
-            (tx) => tx.getPairsByRequestHash('a'.repeat(64),
-            ),
-        );
-        const text = fake.calls[0]!.text;
-        assertMatch(text, /WHERE request_hash = \$1/);
-        assertMatch(text, new RegExp(
-            'ORDER BY message_pairs\\.response_at, '
-            + 'message_pairs\\.id',
-        ));
-    },
-);
 
 Deno.test(
     'getDocumentHistory selects by path and name, ordered',
@@ -242,8 +261,8 @@ Deno.test(
         assertMatch(text, /WHERE path = \$1/);
         assertMatch(text, /AND name = \$2/);
         assertMatch(text, new RegExp(
-            'ORDER BY message_pairs\\.response_at, '
-            + 'message_pairs\\.id',
+            'ORDER BY fa_message_pairs\\.response_at, '
+            + 'fa_message_pairs\\.id',
         ));
         assertEquals(
             fake.calls[0]!.values,
@@ -272,14 +291,14 @@ async () => {
         ),
     );
     const text = fake.calls[0]!.text;
-    assertMatch(text, /FROM message_pairs/);
+    assertMatch(text, /FROM fa_message_pairs/);
     assertMatch(text, /path = \$1/);
     assertMatch(
-        text, /message_body\(response\) @>/,
+        text, /fa_message_body\(response\) @>/,
     );
     assertMatch(text, new RegExp(
-        'ORDER BY message_pairs\\.response_at, '
-        + 'message_pairs\\.id',
+        'ORDER BY fa_message_pairs\\.response_at, '
+        + 'fa_message_pairs\\.id',
     ));
     assertEquals(
         fake.calls[0]!.values[0],
@@ -302,13 +321,13 @@ async () => {
     const bytes = values.filter(
         (value) => value instanceof Uint8Array,
     );
-    assertStrictEquals(bytes.length, 2);
+    assertStrictEquals(bytes.length, 9);
     assertEquals(
         bytes[0],
         Octets.fromLatin1(MESSAGE_PAIR_ROW.request).asBytes(),
     );
     assertEquals(
-        bytes[1],
+        bytes[5],
         Octets.fromLatin1(MESSAGE_PAIR_ROW.response).asBytes(),
     );
 });
@@ -319,13 +338,34 @@ async () => {
     const wire = MESSAGE_PAIR_ROW.request;
     const bytes = Octets.fromLatin1(wire).asBytes();
     fake.rows = [{
-        ...MESSAGE_PAIR_ROW,
+        id: uuidTextOfIdentifier(MESSAGE_PAIR_ROW.id),
+        operation_id: uuidTextOfIdentifier(
+            MESSAGE_PAIR_ROW.operation_id,
+        ),
+        supersedes: uuidTextOfIdentifier(
+            MESSAGE_PAIR_ROW.supersedes,
+        ),
+        path: MESSAGE_PAIR_ROW.path,
+        name: MESSAGE_PAIR_ROW.name,
+        requester_identity_id:
+            MESSAGE_PAIR_ROW.requester_identity_id,
+        method: MESSAGE_PAIR_ROW.method,
+        response_at: MESSAGE_PAIR_ROW.response_at,
         request: Buffer.from(bytes),
+        request_salt: Buffer.alloc(16),
+        request_hash: Buffer.alloc(32),
+        secret: Buffer.alloc(0),
+        secret_hash: Buffer.alloc(32),
         response: Buffer.from(bytes),
+        response_salt: Buffer.alloc(16),
+        response_hash: Buffer.alloc(32),
+        pair_hash: Buffer.alloc(32),
     }];
     const backend = new PostgresBackend(fake.sql);
-    const row = await backend.transaction('readonly',
-        (tx) => tx.getById<typeof MESSAGE_PAIR_ROW>(MESSAGE_PAIR_ROW.id,
+    const row = await backend.transaction(
+        'readonly',
+        (tx) => tx.getById<typeof MESSAGE_PAIR_ROW>(
+            MESSAGE_PAIR_ROW.id,
         ),
     );
     assertStrictEquals(row?.request, wire);
@@ -357,11 +397,6 @@ Deno.test('POSTGRES_SCHEMA has no CREATE VIEW', () => {
     );
 });
 
-const ZULU_REQUEST_AT = new RegExp(
-    'to_char\\(request_at AT TIME ZONE \'UTC\','
-    + '\\s*\'YYYY-MM-DD"T"HH24:MI:SS\\.US"Z"\'\\)'
-    + '\\s*AS request_at',
-);
 const ZULU_RESPONSE_AT = new RegExp(
     'to_char\\(response_at AT TIME ZONE \'UTC\','
     + '\\s*\'YYYY-MM-DD"T"HH24:MI:SS\\.US"Z"\'\\)'
@@ -369,7 +404,7 @@ const ZULU_RESPONSE_AT = new RegExp(
 );
 
 Deno.test(
-    'every pair read formats both stamps as zulu text',
+    'every pair read formats response_at as zulu text',
     async () => {
         const fake = fakeClient();
         const backend = new PostgresBackend(fake.sql);
@@ -378,9 +413,6 @@ Deno.test(
             await tx.getById(MESSAGE_PAIR_ROW.id);
             await tx.getAll();
             await tx.getCollectionPairs(path);
-            await tx.getPairsByRequestHash(
-                MESSAGE_PAIR_ROW.request_hash,
-            );
             await tx.getDocumentHistory(
                 path, MESSAGE_PAIR_ROW.name,
             );
@@ -388,16 +420,15 @@ Deno.test(
             await tx.getHeadPair(path, MESSAGE_PAIR_ROW.name);
             await tx.getCollectionHeadPairs(path);
         });
-        assertStrictEquals(fake.calls.length, 8);
+        assertStrictEquals(fake.calls.length, 7);
         for (const call of fake.calls) {
-            assertMatch(call.text, ZULU_REQUEST_AT);
             assertMatch(call.text, ZULU_RESPONSE_AT);
         }
     },
 );
 
 Deno.test(
-    'append casts both stamps to timestamptz',
+    'append casts the response stamp to timestamptz',
     async () => {
         const fake = fakeClient();
         const backend = new PostgresBackend(fake.sql);
@@ -411,7 +442,6 @@ Deno.test(
         // truncates a bound ${x}::timestamptz parameter to
         // millisecond precision; the ::text hop keeps the
         // driver from touching it (see insertPair).
-        assertMatch(text, /\$6::text::timestamptz/);
-        assertMatch(text, /\$9::text::timestamptz/);
+        assertMatch(text, /\$8::text::timestamptz/);
     },
 );

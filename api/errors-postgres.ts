@@ -9,6 +9,8 @@ import {
     HTTP_GATEWAY_TIMEOUT,
     HTTP_INTERNAL_ERROR,
 } from './http-errors.ts';
+import { SuccessionConflict }
+    from './ledger-statement.ts';
 
 const TIMEOUT_CODES = new Set([
     'CONNECT_TIMEOUT',
@@ -39,7 +41,10 @@ interface Fault {
 export function mapPostgresError(
     error: unknown,
 ): Error | ApiError {
-    if (error instanceof ApiError) {
+    if (
+        error instanceof ApiError
+        || error instanceof SuccessionConflict
+    ) {
         return error;
     }
     const fault = faultOf(error);

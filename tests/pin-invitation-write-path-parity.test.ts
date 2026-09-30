@@ -86,7 +86,7 @@ async function assertPendingWritePathParity(
 ): Promise<{ id: string; at: string } | null> {
     const preTx = await pendingInvitationFor(
         db, organization, identityId);
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         (view) => pendingInvitationFor(
             view, organization, identityId),
     );
@@ -184,7 +184,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
         id: string,
     ): Promise<string | null> {
         const preTx = await currentInvitationState(db, id);
-        const inTx = await db.transaction(
+        const inTx = await db.readTransaction(
             (view) => currentInvitationState(view, id),
         );
         assertStrictEquals(inTx, preTx);
@@ -296,7 +296,7 @@ async function assertMembershipExistsWritePathParity(
 ): Promise<boolean> {
     const preTx = await membershipExistsFor(
         db, organization, identityId);
-    const inTx = await db.transaction(
+    const inTx = await db.readTransaction(
         (view) => membershipExistsFor(
             view, organization, identityId),
     );

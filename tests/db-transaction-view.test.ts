@@ -1,124 +1,29 @@
 import {
-    assertEquals, assertRejects, assertStrictEquals,
+    assertRejects, assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { ledgerFields } from './ledger-row.ts';
 
-const aMessagePair = {
+const PAIR_ID = 'syWUUcdBSbBgMwBiCrgbDw';
+const aMessagePair = await ledgerFields({
+    id: PAIR_ID,
     path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     name: '42',
     requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
     method: 'PUT',
-    request_at: '2026-01-01T00:00:00.000000Z',
-    request_hash: 'a'.repeat(64),
-    request: '{"kind":"request"}',
     response_at: '2026-01-01T00:00:00.000000Z',
+    request: '{"kind":"request"}',
     response: '{"kind":"response"}',
     operation_id: '0123456789ABCDEFGHIJKw',
-};
+});
 
-Deno.test(
-    'a view commits writes atomically',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await db.transaction(async (view) => {
-                await view.messagePairs.append(
-                    'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
-                );
-            },
-        );
-        const messagePair = await db.messagePairs.getById(
-            'syWUUcdBSbBgMwBiCrgbDw',
-        );
-        assertStrictEquals(messagePair.id, 'syWUUcdBSbBgMwBiCrgbDw');
-    },
-);
-
-Deno.test(
-    'a throw inside the view rolls back',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await assertRejects(
-            () => db.transaction(async (view) => {
-                    await view.messagePairs.append(
-                    'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
-                );
-                    throw new Error('boom');
-                },
-            ),
-            Error, 'boom',
-        );
-        const messagePairs = await db.messagePairs.getAll();
-        assertEquals(messagePairs, []);
-    },
-);
-
-Deno.test(
-    'stores in the view share one uncommitted buffer',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        const seen = await db.transaction(async (view) => {
-                await view.messagePairs.append(
-                    'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
-                );
-                // Read back inside the same tx — the put is
-                // visible before commit.
-                return view.messagePairs.getCollectionPairs(
-                    aMessagePair.path,
-                );
-            },
-        );
-        assertStrictEquals(seen.length, 1);
-        assertStrictEquals(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
-    },
-);
-
-Deno.test(
-    'a nested view transaction joins the open tx',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await db.transaction(async (view) => {
-                await view.transaction(async (inner) => {
-                        await inner.messagePairs.append(
-                            'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
-                        );
-                    },
-                );
-            },
-        );
-        const messagePair = await db.messagePairs.getById(
-            'syWUUcdBSbBgMwBiCrgbDw',
-        );
-        assertStrictEquals(messagePair.id, 'syWUUcdBSbBgMwBiCrgbDw');
-    },
-);
-
-Deno.test(
-    'a nested write rolls back with the outer tx',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await assertRejects(
-            () => db.transaction(async (view) => {
-                    await view.transaction(async (inner) => {
-                            await inner.messagePairs.append(
-                                'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
-                            );
-                        },
-                    );
-                    throw new Error('boom');
-                },
-            ),
-            Error, 'boom',
-        );
-        assertEquals(
-            await db.messagePairs.getAll(), [],
-        );
-    },
-);
+function assertOnlyRoot(
+    rows: readonly { path: string, name: string }[],
+): void {
+    assertStrictEquals(rows.length, 1);
+    assertStrictEquals(rows[0]!.path, '/migrations/');
+    assertStrictEquals(rows[0]!.name, '0000-root');
+}
 
 Deno.test(
     'reads work through readTransaction',
@@ -148,9 +53,7 @@ Deno.test(
             ),
             Error, 'readonly transaction',
         );
-        assertEquals(
-            await db.messagePairs.getAll(), [],
-        );
+        assertOnlyRoot(await db.messagePairs.getAll());
     },
 );
 
@@ -159,23 +62,30 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        const seen = await db.transaction(async (view) => {
+        const seen = await db.backend.transaction(
+            'readwrite',
+            async (tx) => {
+                const view = db.openClient(tx);
                 await view.messagePairs.append(
-                    'syWUUcdBSbBgMwBiCrgbDw', aMessagePair,
+                    PAIR_ID, aMessagePair,
                 );
-                // Nested read joins the open write tx so the
-                // uncommitted put is visible (read-your-writes).
+                // The nested read joins the open client,
+                // so the uncommitted append is visible.
                 return view.readTransaction(
                     (inner) => inner.messagePairs
-                        .getCollectionPairs(aMessagePair.path),
+                        .getCollectionPairs(
+                            aMessagePair.path,
+                        ),
                 );
             },
         );
         assertStrictEquals(seen.length, 1);
-        assertStrictEquals(seen[0]!.id, 'syWUUcdBSbBgMwBiCrgbDw');
+        assertStrictEquals(seen[0]!.id, PAIR_ID);
         assertStrictEquals(
-            (await db.messagePairs.getById('syWUUcdBSbBgMwBiCrgbDw')).id
-                , 'syWUUcdBSbBgMwBiCrgbDw',
+            (await db.messagePairs.getById(PAIR_ID)).id,
+            PAIR_ID,
         );
     },
 );
+
+

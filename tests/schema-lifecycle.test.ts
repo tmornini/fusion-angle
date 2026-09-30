@@ -4,6 +4,7 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
+import { ledgerFields } from './ledger-row.ts';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
@@ -36,29 +37,32 @@ Deno.test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.messagePairs.append('u1', {
-            path:
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
-            name: '42',
-            requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-            method: 'PUT',
-            request_at:
-                '2026-01-01T00:00:00.000000Z',
-            request_hash: 'a'.repeat(64),
-            request:
-                'PUT /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/42'
-                + ' HTTP/1.1\r\n\r\n',
-            response_at:
-                '2026-01-01T00:00:00.000001Z',
-            response:
-                'HTTP/1.1 200 OK\r\n\r\n',
-            operation_id: '0123456789ABCDEFGHIJKw',
-        });
+        await adapter.messagePairs.append(
+            'u1',
+            await ledgerFields({
+                id: 'u1',
+                path:
+                    '/organizations/'
+                    + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
+                name: '42',
+                requester_identity_id:
+                    'XXZruirZyAOoRpNxaDnpSA',
+                method: 'PUT',
+                response_at:
+                    '2026-01-01T00:00:00.000001Z',
+                request:
+                    'PUT /organizations/'
+                    + 'AjdvjuECVZEgZoFajaIEkg/ideas/42'
+                    + ' HTTP/1.1\r\n\r\n',
+                response: 'HTTP/1.1 200 OK\r\n\r\n',
+                operation_id: '0123456789ABCDEFGHIJKw',
+            }),
+        );
         await adapter.postSchemaCreation();
         const requests =
             await adapter.messagePairs.getAll();
         assertStrictEquals(
-            requests.length, 1,
+            requests.length, 2,
             'second postSchemaCreation preserves'
             + ' data',
         );
@@ -141,7 +145,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     });
 
     Deno.test(
-        'message_pairs.id and message_pairs.operation_id are uuid',
+        'fa_message_pairs.id and operation_id are uuid',
         async () => {
             const rows = await sql.query<{
                 column_name: string;
@@ -150,7 +154,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 SELECT column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema = current_schema()
-                  AND table_name = 'message_pairs'
+                  AND table_name = 'fa_message_pairs'
                   AND column_name IN (
                       'id', 'operation_id',
                       'name',
@@ -175,7 +179,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
 
     Deno.test(
-        'the two stamps are timestamptz with no CHECK',
+        'response_at is timestamptz and request_at is gone',
         async () => {
             const columns = await sql.query<{
                 column_name: string;
@@ -184,24 +188,26 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 SELECT column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema = current_schema()
-                  AND table_name = 'message_pairs'
+                  AND table_name = 'fa_message_pairs'
                   AND column_name IN (
                       'request_at', 'response_at'
                   )
                 ORDER BY column_name
             `;
             assertEquals(
+                columns.map((row) => row.column_name),
+                ['response_at'],
+            );
+            assertEquals(
                 columns.map((row) => row.data_type),
-                [
-                    'timestamp with time zone',
-                    'timestamp with time zone',
-                ],
+                ['timestamp with time zone'],
             );
             const checks = await sql.query<{
                 conname: string;
             }>`
                 SELECT conname FROM pg_constraint
-                WHERE conrelid = 'message_pairs'::regclass
+                WHERE conrelid =
+                    'fa_message_pairs'::regclass
                   AND conname LIKE '%_at_chk'
             `;
             // .length, not a bare array compare: npm:postgres

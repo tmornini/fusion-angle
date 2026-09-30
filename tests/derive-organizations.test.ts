@@ -157,11 +157,14 @@ async () => {
     const organizationId = generateIdentifier();
     await putOrganization(db, organizationId, 'Flat');
     const requests = await db.messagePairs.getAll();
-    // seedAdminSchema forms 2 pairs (role-grants retired);
-    // this PUT is the 3rd.
-    assertStrictEquals(requests.length, 3);
-    assertStrictEquals(requests[2]!.path, '/organizations/');
-    assertStrictEquals(requests[2]!.name, organizationId);
+    // nil root + seedAdminSchema's 2 pairs + this PUT.
+    assertStrictEquals(requests.length, 4);
+    const stored = requests.find(
+        (row) => row.name === organizationId,
+    );
+    assert(stored !== undefined);
+    assertStrictEquals(stored.path, '/organizations/');
+    assertStrictEquals(stored.name, organizationId);
 
     const derived = await deriveOrganization(db, organizationId);
     assertStrictEquals(derived.id, organizationId);

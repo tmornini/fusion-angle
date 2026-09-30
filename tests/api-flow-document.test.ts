@@ -4,8 +4,10 @@ import {
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import {
     deriveFlowStateHistory,
     flowEntityOf,
@@ -416,14 +418,12 @@ async () => {
         documentBody('No Match', generateIdentifier()),
     ));
     assertStrictEquals(res.status, 428);
-    const body = await res.json() as {
-        name: string;
-        error?: string;
-    };
-    assertStrictEquals(body.error, undefined);
-    assertStrictEquals(body.name, 'Fresh Flow');
-    assert(res.headers.get('ETag'));
-    assert(res.headers.get('Date'));
+    assertStrictEquals(
+        (await res.json()).error,
+        'If-Match is required to PUT '
+            + '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'ajKMlszDvGpoUWXASHPNEg',
+    );
 });
 
 Deno.test('locked PUT with a malformed If-Match is 400',
@@ -465,14 +465,12 @@ async () => {
         { 'if-match': '"' + generateIdentifier() + '"' },
     ));
     assertStrictEquals(res.status, 412);
-    const body = await res.json() as {
-        name: string;
-        error?: string;
-    };
-    assertStrictEquals(body.error, undefined);
-    assertStrictEquals(body.name, 'Fresh Flow');
-    assert(res.headers.get('ETag'));
-    assert(res.headers.get('Date'));
+    assertStrictEquals(
+        (await res.json()).error,
+        'If-Match does not match the current document at '
+            + '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aYDQdfcyFUkOqCLKIIvnww',
+    );
 });
 
 Deno.test('locked PUT with If-Match and no head is 412',
@@ -517,9 +515,15 @@ Deno.test('e2e: a byte-identical resend converges (one event, one'
             , 'bZXXOWeDHCowVkWMhrZGgg');
     const requestsAfterFirst = await db.messagePairs.getAll();
 
+    // Same response body with the current latch is 200
+    // and stores nothing. The first echo is now stale.
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'bZXXOWeDHCowVkWMhrZGgg', token, body, headers,
+            + 'bZXXOWeDHCowVkWMhrZGgg', token, body, {
+            'if-match': await headEtag(
+                db, token, 'bZXXOWeDHCowVkWMhrZGgg',
+            ),
+        },
         operationId,
     ));
     assertStrictEquals(second.status, 200);
@@ -731,7 +735,7 @@ async () => {
     assertStrictEquals(created.status, 201);
 
     const messagePairs = await db.messagePairs.getAll();
-    assertStrictEquals(messagePairs.length, 5);
+    assertStrictEquals(messagePairs.length, 6);
 
     const flowPairs = messagePairs.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -789,13 +793,12 @@ async () => {
         at: AT,
     });
 
-    // All three pairs share ONE origination — the create's own
-    // requestAt. slice(3): the fixture's own root-admin pairs
-    // (organization document + role grant + membership, Phase 13
-    // Tasks 1 and 3) precede every test write and carry their
-    // OWN requestAt.
+    // All three pairs share ONE origination — the create's
+    // operation id. slice(4): the nil root, then the fixture's
+    // own root-admin pairs (organization document + role grant
+    // + membership) precede every test write.
     const ats = new Set(
-        messagePairs.slice(3).map(r => r.request_at),
+        messagePairs.slice(4).map(r => r.operation_id),
     );
     assertStrictEquals(ats.size, 1);
 });
@@ -843,7 +846,9 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
     const firstDocumentResponse = await db.messagePairs.getById(
         firstDocumentRequest!.id,
     );
-    assertStrictEquals('supersedes' in firstDocumentResponse, false);
+    assertStrictEquals(
+        firstDocumentResponse.supersedes, NIL_IDENTIFIER,
+    );
     assertStrictEquals('follows' in firstDocumentResponse, false);
 
     const SECOND_AT = '2026-01-01T00:00:01.000000Z';
@@ -851,7 +856,7 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token,
         {
             id: flowId,
-            flow: flowFields('Fresh Flow'),
+            flow: flowFields('Revised Flow'),
             projectFlowId: generateIdentifier(),
             projectFlow: {
                 project_id: 'qfhFObbtDfxUZwEGxySBoQ',
@@ -890,7 +895,8 @@ Deno.test('e2e: a duplicate POST flows (same id) succeeds — the'
         secondDocumentRequest!.id,
     );
     assertStrictEquals(
-        'supersedes' in secondDocumentResponse, false,
+        secondDocumentResponse.supersedes,
+        firstDocumentRequest!.id,
     );
     assertStrictEquals(
         'follows' in secondDocumentResponse, false,
@@ -1291,6 +1297,7 @@ async function assertStoredPutOmitsUndoHistory(
         'AjdvjuECVZEgZoFajaIEkg',
     );
     assertEquals(stored, expected);
+    assertStrictEquals(typeof stored['state'], 'string');
     const got = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
@@ -1301,8 +1308,7 @@ async function assertStoredPutOmitsUndoHistory(
         wire['hasUndoHistory'], messagePairCount > 1,
         'GET stamps hasUndoHistory when COUNT(*) > 1',
     );
-    const { hasUndoHistory: _flag, ...fromGet } = wire;
-    assertEquals(fromGet, stored);
+    assertStrictEquals('state' in wire, false);
     assertEquals(
         wire,
         flowEntityOf(

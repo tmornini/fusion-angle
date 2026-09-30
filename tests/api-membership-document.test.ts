@@ -115,8 +115,8 @@ async () => {
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assertEquals(written, body);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 1);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --

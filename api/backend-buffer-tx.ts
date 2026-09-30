@@ -132,16 +132,6 @@ export function bufferTx(
                 .sort(byResponseAtThenId)
                 .map(row => ({ ...row })) as T[];
         },
-        async getPairsByRequestHash<T extends { id: string }>(
-            hash: string,
-        ): Promise<T[]> {
-            return buffer
-                .filter(row => (
-                    row as Record<string, unknown>
-                )['request_hash'] === hash)
-                .sort(byResponseAtThenId)
-                .map(row => ({ ...row })) as T[];
-        },
         async getDocumentHistory<T extends { id: string }>(
             path: string,
             name: string,
@@ -239,7 +229,7 @@ export function bufferTx(
             // never collides (genesis rows coexist).
             for (
                 const column of uniqueColumns(
-                    'message_pairs',
+                    'fa_message_pairs',
                 )
             ) {
                 const value = (
@@ -257,19 +247,22 @@ export function bufferTx(
                 );
                 if (collision !== undefined) {
                     throw new UniqueConstraintError(
-                        'message_pairs', column,
+                        'fa_message_pairs', column,
                     );
                 }
             }
             const written = {
                 ...serializeRecord(
                     row as Record<string, unknown>,
-                    'message_pairs',
+                    'fa_message_pairs',
                 ),
                 id: row.id,
             } as { id: string };
             buffer.push(written);
             return true;
+        },
+        ledgerBuffer(): { id: string }[] {
+            return buffer;
         },
     };
 }

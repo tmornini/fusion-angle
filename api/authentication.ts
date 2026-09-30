@@ -3,6 +3,8 @@ import {
 } from './db.ts';
 import type {
     DbAdapter,
+    StorageBackend,
+    Tx,
 } from './db.ts';
 import {
     verifyClientAssertion,
@@ -63,8 +65,9 @@ import {
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
 import {
-    appendMessagePairOnce,
-    appendMessagePairAlways,
+    attemptFor,
+    runWrite,
+    ownWireOf,
     canonicalPath,
     formAuthMessagePair,
     formAuthorizationCodeMarkerPair,
@@ -128,6 +131,7 @@ export type TokenResult =
         // arm (api.ts) always supplies a seed, so a result it
         // sees always carries one — resolved by getById.
         readonly messagePairId: string | undefined;
+        readonly wire: Response | undefined;
     }
     | {
         readonly ok: false;
@@ -420,6 +424,7 @@ async function issueTokenPair(
     readonly response: TokenResponse;
     readonly refreshToken: string;
     readonly messagePairId: string | undefined;
+    readonly wire: Response | undefined;
 }> {
     const refreshJti = generateIdentifier();
     const chainId = generateIdentifier();
@@ -452,17 +457,20 @@ async function issueTokenPair(
             action: 'issued', chain_id: chainId, at,
         }, operationId,
     );
-    await adapter.transaction(async (view) => {
-            await appendMessagePairOnce(view, eventMessagePair);
-            if (messagePair !== undefined) {
-                await appendMessagePairAlways(view, messagePair);
-            }
-        },
+    const pairs = [eventMessagePair];
+    if (messagePair !== undefined) {
+        pairs.push(messagePair);
+    }
+    await runWrite(
+        adapter, attemptFor(pairs), pairs,
     );
     return {
         response,
         refreshToken: minted.refreshToken,
         messagePairId: messagePair?.id,
+        wire: messagePair === undefined
+            ? undefined
+            : ownWireOf(messagePair),
     };
 }
 
@@ -666,10 +674,14 @@ async function planRotationAttempt(
 // set — never `kind` alone (two 'replay' plans can carry
 // DIFFERENT append sets if a sibling rotation grew the chain
 // between reads). Equal → commit the PRE-TX-prepared writes
-// (never the fresh re-plan's own appends: its `at` would desync
-// the already-formed event pairs' stored messages from the rows
-// they describe — its ONLY job is the equality check). Diverged
-// → abort the transaction and retry with a wholly fresh attempt.
+// in this same transaction (never the fresh re-plan's own
+// appends: its `at` would desync the already-formed event
+// pairs' stored messages from the rows they describe — its
+// ONLY job is the equality check). The re-read and the
+// statement share the client, so the next rotation observes
+// this write. Diverged → abort and retry fresh. The view is
+// openClient, so a row that does not land still fails the
+// body.
 export async function rotateRefreshJti(
     adapter: DbAdapter,
     identityId: Id,
@@ -679,6 +691,7 @@ export async function rotateRefreshJti(
 ): Promise<RotationOutcome> {
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const backed = backedWrite(adapter);
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
@@ -689,7 +702,10 @@ export async function rotateRefreshJti(
             operationId,
         );
         try {
-            return await adapter.transaction(async (view) => {
+            await backed.backend.transaction(
+                'readwrite',
+                async (tx) => {
+                    const view = backed.openClient(tx);
                     const events =
                         await deriveIdentityTokenEventsForJti(
                             view, presentedJti, identityId,
@@ -698,44 +714,81 @@ export async function rotateRefreshJti(
                         events, presentedJti,
                     );
                     const rows =
-                        latest === 'issued' || latest === null
+                        latest === 'issued'
+                            || latest === null
                             ? events
                             : (await readTokenChainFromLedger(
                                 view, identityId,
                                 presentedJti,
                             )).rows;
                     const freshPlan = planRotation(
-                        rows, presentedJti, newJti, nowUtc(),
+                        rows, presentedJti, newJti,
+                        nowUtc(),
                     );
                     const freshAppends =
                         freshPlan.kind === 'unknown'
                             ? [] : freshPlan.appends;
                     if (!jtiSetsEqual(
                         freshAppends.map(a => a.jti),
-                        provisional.writes.map(w => w.event.jti),
+                        provisional.writes.map(
+                            w => w.event.jti,
+                        ),
                     )) {
                         throw new TokenPlanDivergedError();
                     }
-                    for (const write of provisional.writes) {
-                        await appendMessagePairOnce(view, write.messagePair);
+                    const pairs = provisional.writes.map(
+                        (write) => write.messagePair,
+                    );
+                    if (
+                        provisional.plan.kind === 'rotate'
+                        && messagePair !== undefined
+                    ) {
+                        pairs.push(messagePair);
                     }
-                    if (provisional.plan.kind === 'rotate') {
-                        if (messagePair !== undefined) {
-                            await appendMessagePairAlways(view, messagePair);
-                        }
-                        return {
-                            kind: 'rotate' as const,
-                            newJti: provisional.plan.newJti,
-                        };
+                    if (pairs.length > 0) {
+                        await runWrite(
+                            view, attemptFor(pairs), pairs,
+                        );
                     }
-                    return { kind: 'fail' as const };
                 },
             );
+            if (provisional.plan.kind === 'rotate') {
+                return {
+                    kind: 'rotate' as const,
+                    newJti: provisional.plan.newJti,
+                };
+            }
+            return { kind: 'fail' as const };
         } catch (e) {
-            if (!(e instanceof TokenPlanDivergedError)) throw e;
+            if (!(e instanceof TokenPlanDivergedError)) {
+                throw e;
+            }
         }
     }
     return { kind: 'fail' as const };
+}
+
+// Rotation opens the client beneath the adapter. A view
+// has no backend of its own; callers pass the backed
+// adapter the route already holds.
+function backedWrite(
+    adapter: DbAdapter,
+): {
+    readonly backend: StorageBackend;
+    readonly openClient: (tx: Tx) => DbAdapter;
+} {
+    if (
+        !('backend' in adapter)
+        || !('openClient' in adapter)
+    ) {
+        throw new Error(
+            'token write requires a backed adapter',
+        );
+    }
+    return adapter as DbAdapter & {
+        backend: StorageBackend;
+        openClient: (tx: Tx) => DbAdapter;
+    };
 }
 
 // One revocation attempt's PRE-TX groundwork: the provisional
@@ -803,32 +856,36 @@ export async function revokeTokenChain(
             adapter, identityId, jti, operationId,
         );
         try {
-            await adapter.transaction(async (view) => {
-                    const { chainId, rows } =
-                        await readTokenChainFromLedger(
-                            view, identityId, jti,
+            await adapter.readTransaction(async (view) => {
+                const { chainId, rows } =
+                    await readTokenChainFromLedger(
+                        view, identityId, jti,
+                    );
+                const freshAppends =
+                    chainId === null
+                        ? []
+                        : revocationAppends(
+                            rows, chainId, identityId,
+                            nowUtc(),
                         );
-                    const freshAppends =
-                        chainId === null
-                            ? []
-                            : revocationAppends(
-                                rows, chainId, identityId,
-                                nowUtc(),
-                            );
-                    if (!jtiSetsEqual(
-                        freshAppends.map(a => a.jti),
-                        provisional.writes.map(w => w.event.jti),
-                    )) {
-                        throw new TokenPlanDivergedError();
-                    }
-                    for (const write of provisional.writes) {
-                        await appendMessagePairOnce(view, write.messagePair);
-                    }
-                    if (messagePair !== undefined) {
-                        await appendMessagePairOnce(view, messagePair);
-                    }
-                },
+                if (!jtiSetsEqual(
+                    freshAppends.map(a => a.jti),
+                    provisional.writes.map(w => w.event.jti),
+                )) {
+                    throw new TokenPlanDivergedError();
+                }
+            });
+            const pairs = provisional.writes.map(
+                (write) => write.messagePair,
             );
+            if (messagePair !== undefined) {
+                pairs.push(messagePair);
+            }
+            if (pairs.length > 0) {
+                await runWrite(
+                    adapter, attemptFor(pairs), pairs,
+                );
+            }
             return;
         } catch (e) {
             if (!(e instanceof TokenPlanDivergedError)) throw e;
@@ -921,6 +978,7 @@ async function grantRefresh(
             response,
             refreshToken: minted.refreshToken,
             messagePairId: messagePair.id,
+            wire: ownWireOf(messagePair),
         };
     }
     return failure(HTTP_UNAUTHORIZED, 'refresh token reuse or unknown');
@@ -1021,6 +1079,7 @@ async function grantTokenExchange(
         response: issued.response,
         refreshToken: issued.refreshToken,
         messagePairId: issued.messagePairId,
+        wire: issued.wire,
     };
 }
 
@@ -1149,33 +1208,28 @@ async function grantClientCredentials(
         responseBody: ticketBody,
         operationId: messagePair.operationId,
     });
-    const consumed = await adapter.transaction(async (view) => {
-            const locks = view.writeLocks;
-            if (locks !== undefined) {
-                await locks.lockDocument(
-                    '/authentication/assertion-jtis/',
-                    verdict.jti,
-                );
-            }
-            const existing = await messageStore(view).getDocumentHead(
-                '/authentication/assertion-jtis/',
-                verdict.jti,
-            );
-            if (existing !== null) {
-                return false;
-            }
-            await appendMessagePairAlways(view, ticketMessagePair);
-            await appendMessagePairOnce(view, eventMessagePair);
-            await appendMessagePairAlways(view, messagePair);
-            return true;
-        },
+    const existing = await adapter.readTransaction(
+        async (view) => messageStore(view).getDocumentHead(
+            '/authentication/assertion-jtis/',
+            verdict.jti,
+        ),
     );
-    return consumed
+    if (existing !== null) return replay;
+    const pairs = [
+        ticketMessagePair,
+        eventMessagePair,
+        messagePair,
+    ];
+    const written = await runWrite(
+        adapter, attemptFor(pairs), pairs,
+    );
+    return written.outcome === 'land'
         ? {
             ok: true,
             response,
             refreshToken: minted.refreshToken,
             messagePairId: messagePair.id,
+            wire: ownWireOf(messagePair),
         }
         : replay;
 }
@@ -1266,11 +1320,10 @@ async function authorizeCodeIssuer(
     return {
         identityId: messagePair.requester_identity_id,
         clientId: pickString(requestBody, 'client_id'),
-        // Issue instant = the authorize request pair's `at`
-        // (MessagePairEntity.request_at). Both halves of a
-        // pair carry `at`; the pair is already fetched for
-        // identity/client.
-        issuedAt: messagePair.request_at,
+        // Issue instant is the authorize pair's response
+        // stamp. The pair is already fetched for
+        // identity and client.
+        issuedAt: messagePair.response_at,
         ...(codeChallenge !== undefined
             ? { codeChallenge }
             : {}),
@@ -1402,26 +1455,40 @@ async function grantAuthorizationCode(
             action: 'issued', chain_id: chainId, at,
         }, messagePair.operationId,
     );
-    const consumed = await adapter.transaction(async (view) => {
+    // The spend check and the marker write share one
+    // client. A later grant then observes the marker and
+    // 401s, instead of both reading unspent and both
+    // minting. openClient still fails a row that does
+    // not land.
+    const backed = backedWrite(adapter);
+    const spent = await backed.backend.transaction(
+        'readwrite',
+        async (tx) => {
+            const view = backed.openClient(tx);
             if (await authorizationCodeSpent(
                 view, derivedId, issuer.identityId,
             )) {
-                return false;
+                return true;
             }
-            await appendMessagePairOnce(view, markerMessagePair);
-            await appendMessagePairOnce(view, eventMessagePair);
-            await appendMessagePairAlways(view, messagePair);
-            return true;
+            const pairs = [
+                markerMessagePair,
+                eventMessagePair,
+                messagePair,
+            ];
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
+            return false;
         },
     );
-    return consumed
-        ? {
-            ok: true,
-            response,
-            refreshToken: minted.refreshToken,
-            messagePairId: messagePair.id,
-        }
-        : invalid;
+    if (spent) return invalid;
+    return {
+        ok: true,
+        response,
+        refreshToken: minted.refreshToken,
+        messagePairId: messagePair.id,
+        wire: ownWireOf(messagePair),
+    };
 }
 
 // Dispatch on grant_type. Single-grant primitives are added one
@@ -1464,6 +1531,7 @@ export type AuthorizeResult =
         readonly ok: true;
         readonly response: AuthorizeResponse;
         readonly messagePairId: string;
+        readonly wire: Response | undefined;
     }
     | {
         readonly ok: false;
@@ -1635,14 +1703,18 @@ async function authorizePassword(
             operationId: messagePair.operationId,
         });
     }
-    await adapter.transaction(async (view) => {
-            if (rehashMessagePair !== undefined) {
-                await appendMessagePairOnce(view, rehashMessagePair);
-            }
-            await appendMessagePairAlways(view, messagePair);
-        },
+    const pairs = rehashMessagePair === undefined
+        ? [messagePair]
+        : [rehashMessagePair, messagePair];
+    await runWrite(
+        adapter, attemptFor(pairs), pairs,
     );
-    return { ok: true, response, messagePairId: messagePair.id };
+    return {
+        ok: true,
+        response,
+        messagePairId: messagePair.id,
+        wire: ownWireOf(messagePair),
+    };
 }
 
 // Interactive front door. The password loop is real; passkey,

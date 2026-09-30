@@ -25,33 +25,29 @@ Concurrency class is `api/family-registry.ts`.
 3. **Body parse** for PUT/POST/PATCH. Live
    `requireOperationId` runs before body parse. The
    client supplies Operation-ID; the server never
-   mints it for a public write. An Operation-ID names
-   one write and is never reused — a retry or resend of
-   one operation carries the same Operation-ID, which is
-   what makes the resend byte-identical and lets it
-   replay (Step 5). A handler that forms a revision pair
-   beside the wire pair (the instance PUT and PATCH
-   handlers) writes both under that one id, and the
-   PATCH replay finds its revision pair by it.
+   mints it for a public write. An Operation-ID
+   groups the pairs of one operation (an instance
+   PATCH and its revision). It is not a request-hash
+   replay. A resend is idempotent because a matched
+   body answers 200 and stores nothing, not because a
+   request hash is replayed.
 4. **Region B + write authorizer.** Self-only token-
    revocations (member revokes own chain; admin may
    name any identity). `writeAuthorizerFor` on
    org-scoped PUT/DELETE: owner-null is genesis;
    foreign 403 before pair crypto.
 5. **Pair plane.** Wired writes form the pair pre-tx
-   (`formWriteMessagePair`). Replay via
-   `getPairByRequestHash` unless exempt. After miss:
-   If-Match table, instance PATCH table, same-body
-   document PUT (200, no append; octets, not ETag),
-   DELETE never-written 404 (stores nothing) /
+   (`formWriteMessagePair`). A matched body stores
+   nothing and answers 200. A stale If-Match answers
+   412 with `If-Match does not match the current
+   document at <path><name>`; that 412 is not
+   skipped for a byte-identical resend. If-Match
+   table, instance PATCH table, DELETE
+   never-written 404 (stores nothing) /
    already-gone 204 (no append).
 6. **Handler.** Matched verb with `ctx.base`. Auth
    grants intercept into `postToken` / `postAuthorize`.
    Missing verb → 405.
-
-Replay of a locked write runs before the If-Match table
-so a byte-identical resend does not 412 against the new
-head.
 
 ## Bearer-exempt set
 
@@ -62,54 +58,66 @@ path is never exempt.
 
 ## Wire contract
 
-The response is rebuilt from the stored row
-(`responseFromStored` in `api/message-pair.ts`). Three
-headers (`wireHeadersFor`): Date, ETag (quoted
-message-pair identifier), Operation-ID. A document PUT's
-ETag is its pair id, the same value a later GET advertises.
-A byte-identical replay answers 200 with the original —
-ETag and Date. If-Match is the sole conflict
-mechanism: exactly one strong validator (`"<identifier>"`);
-`*`, weak, lists, unquoted, or 64-hex yield 400.
-
-`sendWriteResponse` sets send-time status: 201 if this
-request appended a pair (PUT/PATCH/POST), 200 if it
-stored nothing (a same-body PUT, or a replay served from
-the ledger), DELETE 204. The stored start-line stays
-GET-shaped 200 / DELETE 204.
+A landed answer is the stored response bytes
+(`responseFromLatin1` in `api/message-pair.ts`). The
+statement splices the date, and the status line in
+those bytes is the status on the wire. PUT, PATCH, and
+POST store 201. DELETE stores 204. The stored message
+carries Date, ETag (quoted message-pair identifier),
+and Operation-ID. A document PUT's ETag is its pair id,
+the same value a later GET advertises. A matched body
+answers 200 with the head's stored response and stores
+nothing. If-Match is exactly one strong validator
+(`"<identifier>"`); `*`, weak, lists, unquoted, or
+64-hex yield 400.
 
 Status ladder:
 
-- **200** — same-body document PUT (no append); a
-  byte-identical replay of any PUT/PATCH/POST; stored
-  PUT start-line
-- **201** — first append of PUT/PATCH/POST
-- **204** — DELETE success (live or already-gone)
+- **200** — a matched body: the head's stored response,
+  and nothing stored
+- **201** — a landed PUT, PATCH, or POST: the stored
+  response bytes
+- **204** — DELETE success (landed, or already-gone)
 - **400** — bad JSON / Request-ID / Operation-ID /
   If-Match / validators
 - **404** — authenticated unmatched; DELETE
   never-written; genuine absence
 - **405** — no handler; public instance PUT
 - **409** — domain conflict (rebind, invitation not
-  pending, instance tombstone create without pin)
-- **412** — stale If-Match
+  pending, instance tombstone create without pin); a
+  second genesis (`Document already exists at <path><name>`);
+  a blind PUT that loses three times
+  (`Document remained contended at <path><name>`)
+- **412** — a stale If-Match:
+  `If-Match does not match the current document at <path><name>`
 - **428** — missing If-Match over live locked PUT,
   live instance PATCH / value-bearing transition, or a
   latched operation over a live parent document
 
-409 is domain; 412 is concurrency.
+409 remains the home of domain conflict and holds the
+two store sentences above. 412 is a stale If-Match.
 
 ## Two PUT classes
 
 `concurrency` on `FAMILY_REGISTRY`
 (`api/family-registry.ts`), plus instance PATCH:
 
-- **simple** — same-body as live head → 200, no append;
-  first append 201; byte-identical replay → 200
-- **locked** — live family is flows only. If-Match
-  quoted identifier. live+absent → 428; live+≠ head → 412;
-  genesis with no If-Match → 201; byte-identical replay →
-  200 before the ladder
+- **simple** — a matched body answers 200 with the
+  head's stored response and stores nothing. A landed
+  write answers with the stored response bytes (201).
+  A second genesis answers 409
+  (`Document already exists at <path><name>`). A blind
+  PUT that loses three times answers 409
+  (`Document remained contended at <path><name>`)
+- **locked** — live family is flows only. If-Match is
+  one quoted identifier. A live document with no
+  If-Match answers 428. A stale If-Match answers 412
+  (`If-Match does not match the current document at <path><name>`).
+  A genesis with no If-Match stores 201. A second
+  genesis answers 409
+  (`Document already exists at <path><name>`). A
+  matched body answers 200 with the head's stored
+  response and stores nothing
 - **latched operation** — a sub-resource POST that acts
   ON its parent document (flow undo today,
   `LATCHED_OPERATION_ROUTE_PATTERNS`). If-Match pins the
@@ -185,7 +193,7 @@ HTTP nest. Validators, crypto, hash, and
 ## Seed pair formation
 
 Mock seed
-`EXPECTED_MESSAGE_PAIR_COUNT = 1453`; bootstrap
+`EXPECTED_MESSAGE_PAIR_COUNT = 1454`; bootstrap
 exactly 8. Pinned by `tests/mock-data-pairs.test.ts`.
 
 ## How we got here

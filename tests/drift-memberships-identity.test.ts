@@ -215,12 +215,12 @@ Deno.test('leg 5: membershipExistsFor — member + non-member parity'
 
     // Phase Final Task 2: invitations + memberships ROW
     // halves stripped from grantInvitation's tx list.
-    const inTxMemberCheck = await db.transaction(
+    const inTxMemberCheck = await db.readTransaction(
         (view) => membershipExistsFor(
             view, STARK_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA',
         ),
     );
-    const inTxNonMemberCheck = await db.transaction(
+    const inTxNonMemberCheck = await db.readTransaction(
         (view) => membershipExistsFor(
             view, STARK_ORGANIZATION, mikeId,
         ),
@@ -379,7 +379,8 @@ async () => {
             at: existing!.at,
         },
     ));
-    assertStrictEquals(echoPut.status, 201);
+    // Same seat body is 200 and stores nothing.
+    assertStrictEquals(echoPut.status, 200);
 
     const derived = sortById(
         await deriveMembershipsForIdentity(db, davidId),

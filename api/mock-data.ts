@@ -1,4 +1,5 @@
 import type { DbAdapter } from './db.ts';
+import type { BackedDbAdapter } from './db-backed.ts';
 
 import {
     postIdeaDocumentOp,
@@ -34,7 +35,10 @@ import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
-import { appendMessagePairOnce } from './message-pair.ts';
+import {
+    attemptFor,
+    runWrite,
+} from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
@@ -129,6 +133,21 @@ import {
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
 // loud rather than silently write the row with no pair.
+export async function writeSeedPair(
+    adapter: DbAdapter,
+    pair: MessagePair,
+    now?: string,
+): Promise<void> {
+    const answer = await runWrite(
+        adapter, attemptFor([pair]), [pair], now,
+    );
+    if (answer.outcome !== 'land') {
+        throw new Error(
+            'seed statement returned ' + answer.outcome,
+        );
+    }
+}
+
 function requireMessagePair(
     messagePairs: ReadonlyMap<string, MessagePair>, key: string,
 ): MessagePair {
@@ -245,7 +264,7 @@ type PasswordHasher = (
 ) => Promise<string>;
 
 export async function seedHumanCredentials(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     recipients: readonly CredentialRecipient[],
     hashPasswordFn: PasswordHasher = hashPassword,
 ): Promise<SeededCredentials> {
@@ -282,7 +301,10 @@ export async function seedHumanCredentials(
     // the identity_credentials ROW half).
     // postIdentityCredential DocumentOp is the SAME op
     // every live PUT identities/:id/credentials/:cid rides.
-    await adapter.transaction(async (view) => {
+    await adapter.backend.transaction(
+        'readwrite',
+        async (tx) => {
+            const view = adapter.openClient(tx);
             await Promise.all([
                 ...planned.map(cred =>
                     postIdentityCredentialDocumentOp(
@@ -336,7 +358,7 @@ export type PostMockDataLoadOptions = {
 };
 
 export async function postMockDataLoad(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): every pair-wired op-invocation's message
@@ -355,8 +377,11 @@ export async function postMockDataLoad(
     // so a failed seed leaves hasSchema() false: the datastore
     // reads as empty and the seed can be retried cleanly.
     await adapter.ensureTable();
-    await adapter.transaction(
-        (view) => postMockDataLoadIn(view, messagePairs),
+    await adapter.backend.transaction(
+        'readwrite',
+        (tx) => postMockDataLoadIn(
+            adapter.openClient(tx), messagePairs,
+        ),
     );
     // Task 1(d): same buildMembers (+ the unaffiliated
     // identity) enumeration that pass 2 used for PII — no
@@ -409,7 +434,7 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                appendMessagePairOnce(
+                writeSeedPair(
                     adapter,
                     requireMessagePair(
                         messagePairs,
@@ -482,8 +507,7 @@ async function postMockDataLoadIn(
         (async () => {
             // Live grant order: operation, then document
             // (grantInvitation, invitations-domain.ts).
-            await appendMessagePairOnce(
-                adapter,
+            const pairs = [
                 requireMessagePair(
                     messagePairs,
                     seedMessagePairKey(
@@ -491,9 +515,6 @@ async function postMockDataLoadIn(
                         UNAFFILIATED_INVITATION_ID,
                     ),
                 ),
-            );
-            await appendMessagePairOnce(
-                adapter,
                 requireMessagePair(
                     messagePairs,
                     seedMessagePairKey(
@@ -501,7 +522,16 @@ async function postMockDataLoadIn(
                         UNAFFILIATED_INVITATION_ID,
                     ),
                 ),
+            ];
+            const answer = await runWrite(
+                adapter, attemptFor(pairs), pairs,
             );
+            if (answer.outcome !== 'land') {
+                throw new Error(
+                    'seed statement returned '
+                        + answer.outcome,
+                );
+            }
         })(),
         // Role grants retired: membership `type` (admin for
         // current, member otherwise) seeds privilege; mint
@@ -540,7 +570,7 @@ async function postMockDataLoadIn(
         // Phase Final Task 2: organizations ROW half stripped —
         // message-plane only (organizationSeedBody still
         // shapes the pair body in seed-message-pairs.ts).
-        appendMessagePairOnce(
+        writeSeedPair(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -549,7 +579,7 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        appendMessagePairOnce(
+        writeSeedPair(
             adapter,
             requireMessagePair(
                 messagePairs,
@@ -871,34 +901,7 @@ async function postMockDataLoadIn(
         // Review/Complete new-shape ops and revision pairs.
         // Append-only (below-facade) — same as every other
         // seed pair write; chain formed pre-tx.
-        ...[
-            seedMessagePairKey(
-                INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
-            ),
-            seedMessagePairKey(
-                'work-orders/:id/binding', WO01_ID,
-            ),
-            seedMessagePairKey(
-                'work-orders/:id/transition',
-                WO01_REVIEW_EVENT_ID,
-            ),
-            seedMessagePairKey(
-                INSTANCE_DETAIL_PATTERN,
-                SEED_INSTANCE_ID + '-review',
-            ),
-            seedMessagePairKey(
-                'work-orders/:id/transition',
-                WO01_COMPLETE_EVENT_ID,
-            ),
-            seedMessagePairKey(
-                INSTANCE_DETAIL_PATTERN,
-                SEED_INSTANCE_ID + '-complete',
-            ),
-        ].map((key) =>
-            appendMessagePairOnce(
-                adapter, requireMessagePair(messagePairs, key),
-            ),
-        ),
+
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -944,6 +947,38 @@ async function postMockDataLoadIn(
             );
         }),
     ]);
+
+    // The instance chain shares one document. Write it in
+    // authored order and stamp each pair at its requestAt,
+    // so a later sibling cannot become the head.
+    const instanceChainKeys = [
+        seedMessagePairKey(
+            INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
+        ),
+        seedMessagePairKey(
+            'work-orders/:id/binding', WO01_ID,
+        ),
+        seedMessagePairKey(
+            'work-orders/:id/transition',
+            WO01_REVIEW_EVENT_ID,
+        ),
+        seedMessagePairKey(
+            INSTANCE_DETAIL_PATTERN,
+            SEED_INSTANCE_ID + '-review',
+        ),
+        seedMessagePairKey(
+            'work-orders/:id/transition',
+            WO01_COMPLETE_EVENT_ID,
+        ),
+        seedMessagePairKey(
+            INSTANCE_DETAIL_PATTERN,
+            SEED_INSTANCE_ID + '-complete',
+        ),
+    ];
+    for (const key of instanceChainKeys) {
+        const pair = requireMessagePair(messagePairs, key);
+        await writeSeedPair(adapter, pair, pair.requestAt);
+    }
 
     // Bindings probe their record inside the write gate
     // (postFlowRecordDocumentOp), so the records above must
@@ -1102,7 +1137,7 @@ async function postMockDataLoadIn(
 }
 
 export async function postBootstrap(
-    adapter: DbAdapter,
+    adapter: BackedDbAdapter,
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): the lone 'XXZruirZyAOoRpNxaDnpSA' human-member create's
@@ -1143,10 +1178,15 @@ export async function postBootstrap(
     // The schema marker stamps LAST so a failed bootstrap leaves
     // the anonymous plane open for retry.
     await adapter.ensureTable();
-    await adapter.transaction((view) => postBootstrapIn(
-            view, identityMessagePair, seatMessagePair, piiMessagePair,
+    await adapter.backend.transaction(
+        'readwrite',
+        (tx) => postBootstrapIn(
+            adapter.openClient(tx),
+            identityMessagePair, seatMessagePair,
+            piiMessagePair,
             systemIdentityMessagePair,
-            defaultOrganizationMessagePair, organizationMessagePair,
+            defaultOrganizationMessagePair,
+            organizationMessagePair,
         ),
     );
     // Task 1(d): bootstrap's lone human is 'XXZruirZyAOoRpNxaDnpSA' with
@@ -1201,12 +1241,12 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             seatMessagePair,
         ),
-        appendMessagePairOnce(adapter, defaultOrganizationMessagePair),
+        writeSeedPair(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        appendMessagePairOnce(adapter, organizationMessagePair),
+        writeSeedPair(adapter, organizationMessagePair),
     ]);
 }

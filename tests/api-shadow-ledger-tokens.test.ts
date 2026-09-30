@@ -11,13 +11,16 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { sha256Hex } from '../shared/digest.ts';
-import { requestMessageHash } from '../api/message-form.ts';
+import { requestHashOfStored } from './ledger-row.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { latestActionForJti } from '../api/identity-tokens.ts';
 import {
-    appendMessagePairAlways, formAuthMessagePair, responseFromStored,
+    runWrite,
+    attemptFor,
+    formAuthMessagePair,
+    responseFromStored,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import {
@@ -125,10 +128,10 @@ Deno.test('PUT identity-tokens/:id appends its pair at the entity'
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 3);
-    assertStrictEquals(requests[2]!.path
+    assertStrictEquals(requests.length, 4);
+    assertStrictEquals(requests[3]!.path
         , '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/');
-    assertStrictEquals(requests[2]!.name, 'vNIIMoezHOyoUeTsbqSzCA');
+    assertStrictEquals(requests[3]!.name, 'vNIIMoezHOyoUeTsbqSzCA');
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'vNIIMoezHOyoUeTsbqSzCA',
     );
@@ -199,12 +202,12 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 3);
+    assertStrictEquals(requests.length, 4);
     assertStrictEquals(
-        requests[2]!.path,
+        requests[3]!.path,
         '/identities/XXZruirZyAOoRpNxaDnpSA/token-revocations/',
     );
-    assertStrictEquals(requests[2]!.name, 'sVWUntTCtQYFCpONjkzAKg');
+    assertStrictEquals(requests[3]!.name, 'sVWUntTCtQYFCpONjkzAKg');
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the message plane.
     const domainRow = await deriveTokenRevocation(
@@ -293,8 +296,8 @@ async () => {
     // 3 bootstrap + seededDb's own pair-forming PUT (Phase 13
     // Task 6's seeding re-point) = 4; the 409 itself appends
     // nothing further.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // ── identity-tokens/:jti/revocation — operation path ──
@@ -385,7 +388,7 @@ async () => {
     ));
     for (const row of await db.messagePairs.getAll()) {
         assertStrictEquals(
-            await requestMessageHash(row.request),
+            await requestHashOfStored(row),
             row.request_hash,
         );
     }
@@ -505,7 +508,11 @@ async function seedAuthorizationCodeMessagePair(
     const messagePair = await formAuthMessagePair(
         seed, requestBody, identityId, 200, { code },
     );
-    await appendMessagePairAlways(db, messagePair);
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
+    );
 }
 
 Deno.test('an authorization_code grant appends its root\'s own'
@@ -540,7 +547,7 @@ async () => {
     // 3 bootstrap + the seeded authorize pair + the spend
     // marker + the root's own event pair + the grant's own
     // operation message pair.
-    assertStrictEquals(requests.length, 6);
+    assertStrictEquals(requests.length, 7);
 });
 
 Deno.test('a token-exchange grant (a real /authentication/token'
@@ -855,25 +862,21 @@ Deno.test('revokeTokenChain racing a concurrent rotateRefreshJti on'
 // ── fault discrimination — the retry catch names ONLY the
 // divergence sentinel (TokenPlanDivergedError, module-private to
 // authentication.ts). Any OTHER thrown error — a genuine store
-// fault, driven here behaviorally by faulting adapter.transaction
-// itself, rather than exporting the sentinel class — must
-// propagate on attempt 1: never retried (the Greedy Catch
-// abomination this task's brief named explicitly), never
-// swallowed, never converted into the operation's own ordinary
-// failure shape (rotation's 409 outcome / revocation's silent
-// void success).
+// fault, driven here by faulting the ledger statement, rather
+// than exporting the sentinel class — must propagate on attempt
+// 1: never retried, never swallowed, never converted into the
+// operation's own ordinary failure shape (rotation's 409
+// outcome / revocation's silent void success).
 
-function adapterWithFaultingTransaction(
+function adapterWithFaultingStatement(
     real: MemoryDbAdapter, fault: Error,
 ): { readonly adapter: DbAdapter; readonly calls: () => number } {
     let calls = 0;
-    (real as unknown as {
-        transaction: () => Promise<never>;
-    }).transaction = async () => {
+    real.executeLedger = () => {
         calls += 1;
-        throw fault;
+        return Promise.reject(fault);
     };
-    return { adapter: real as unknown as DbAdapter, calls: () => calls };
+    return { adapter: real, calls: () => calls };
 }
 
 Deno.test('rotateRefreshJti propagates a non-divergence transaction'
@@ -881,7 +884,7 @@ Deno.test('rotateRefreshJti propagates a non-divergence transaction'
 + ' to the 409 outcome', async () => {
     const db = await seededDb();
     const fault = new Error('store exploded');
-    const faulting = adapterWithFaultingTransaction(db, fault);
+    const faulting = adapterWithFaultingStatement(db, fault);
     await assertRejects(
         () => rotateRefreshJti(
             faulting.adapter, CURRENT_ID, ROOT_JTI,
@@ -898,7 +901,7 @@ Deno.test('revokeTokenChain propagates a non-divergence transaction'
 + ' success', async () => {
     const db = await seededDb();
     const fault = new Error('store exploded');
-    const faulting = adapterWithFaultingTransaction(db, fault);
+    const faulting = adapterWithFaultingStatement(db, fault);
     await assertRejects(
         () => revokeTokenChain(
             faulting.adapter, CURRENT_ID, ROOT_JTI,

@@ -5,6 +5,11 @@ import type {
     NotificationEvent,
     NotificationPost,
 } from './notifications.ts';
+import type {
+    Attempt,
+    StatementAnswer,
+    StatementBind,
+} from '../shared/ledger-statement.ts';
 
 export class EntityNotFoundError extends Error {
     readonly table: string;
@@ -82,7 +87,6 @@ export interface EntityStore<
     // path = $1`: every pair of every document in the
     // collection.
     getCollectionPairs(path: string): Promise<T[]>;
-    getPairsByRequestHash(hash: string): Promise<T[]>;
     getDocumentHistory(
         path: string,
         name: string,
@@ -138,9 +142,6 @@ export interface Tx {
     getCollectionPairs<T extends { id: string }>(
         path: string,
     ): Promise<T[]>;
-    getPairsByRequestHash<T extends { id: string }>(
-        hash: string,
-    ): Promise<T[]>;
     getDocumentHistory<T extends { id: string }>(
         path: string,
         name: string,
@@ -163,23 +164,12 @@ export interface Tx {
     getCollectionHeadPairs<T extends { id: string }>(
         path: string,
     ): Promise<T[]>;
-    // Postgres write coordination. Other backends omit
-    // these; callers treat absence as a no-op.
-    lockRequest?(hash: string): Promise<void>;
-    lockDocument?(path: string, name: string): Promise<void>;
-    lockHead?(id: string): Promise<void>;
+    // In-transaction notify. A read handle omits it.
+    // The statement is the api's bell; this stays for a
+    // caller that already holds the client.
     notify?(event: NotificationEvent): Promise<void>;
-}
-
-export interface WriteLocks {
-    lockRequest(hash: string): Promise<void>;
-    lockDocument(path: string, name: string): Promise<void>;
-    lockHead(id: string): Promise<void>;
-    getHead(path: string, name: string): Promise<{
-        readonly id: string;
-        readonly method: string;
-    } | null>;
-    notify(event: NotificationEvent): Promise<void>;
+    // The open memory buffer, when this handle is one.
+    ledgerBuffer?(): { id: string }[];
 }
 
 // The byte-level seam. Store classes compose a backend
@@ -197,6 +187,12 @@ export interface StorageBackend {
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R>;
     ensureTable(): Promise<void>;
+    executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        now: string | undefined,
+        tx: Tx | undefined,
+    ): Promise<StatementAnswer[]>;
     // Schema lifecycle — each backend signals
     // 'schema exists' its own way: memory by table
     // existence, Postgres by the `schema_marker` row.
@@ -230,8 +226,8 @@ export const ambientRunner = (tx: Tx): TxRunner =>
 
 // The store an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
-// place (`#buildStores`) and a transaction can rebuild it
-// bound to an open tx (A9). The surviving store rides
+// place (`#buildStores`) and a read can rebuild it bound
+// to an open client. The surviving store rides
 // HistoryEntityStore (message plane only).
 export interface DbStores {
     messagePairs: EntityStore<MessagePairEntity>;
@@ -248,29 +244,23 @@ export interface DbLifecycle {
     // schema present: the installer primitive for seeds,
     // not snapshot import.
     ensureTable(): Promise<void>;
+    executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        now?: string,
+    ): Promise<StatementAnswer[]>;
     // The Decision 5 post hook: fired AFTER a write commits,
     // so cross-tab (and future cross-process) subscribers are
     // informed of state changes — never polled. Carried on the
     // COMMON ancestor of DbAdapter and GuardedDbAdapter so
-    // both the open-tx view (#viewForTx) and plain adapters
-    // type-check.
+    // both the open-client view and plain adapters type-check.
     postNotification: NotificationPost;
-    readonly writeLocks?: WriteLocks;
 }
 
 export interface DbAdapter extends DbLifecycle, DbStores {
-    // Run `fn` inside one transaction. The view it receives
-    // exposes the same stores bound to the open tx, so every
-    // op joins it — GET-modify-PUT and multi-PUT commit
-    // atomically. A nested view.transaction re-enters this
-    // same tx.
-    transaction<R>(
-        fn: (view: DbAdapter) => Promise<R>,
-    ): Promise<R>;
-    // Pure-read sibling of `transaction`; both backends
-    // reject a write under it. Nested `readTransaction`
-    // joins whatever mode is open so read-your-writes
-    // stays intact.
+    // A pure read. Both backends reject a write under it.
+    // Nested readTransaction joins the open client, so a
+    // seed phase still sees its own uncommitted rows.
     readTransaction<R>(
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
@@ -281,21 +271,12 @@ export interface DbAdapter extends DbLifecycle, DbStores {
 // family) with the store decorator shell — surviving tables
 // never soft-delete. clients-table elimination retired the
 // rawReadRow primary-key probe with the clients store.
-export interface GuardedDbAdapter
-    extends DbLifecycle, DbStores
-{
-    transaction<R>(
-        fn: (view: GuardedDbAdapter) => Promise<R>,
-    ): Promise<R>;
-    readTransaction<R>(
-        fn: (view: GuardedDbAdapter) => Promise<R>,
-    ): Promise<R>;
-}
+export interface GuardedDbAdapter extends DbAdapter {}
 
 // The tables of the message plane — one,
-// `message_pairs`.
+// `fa_message_pairs`.
 export const TABLE_NAMES = [
-    'message_pairs',
+    'fa_message_pairs',
 ];
 
 // A secondary index is a plain column name, or the object
@@ -328,7 +309,7 @@ export function uniqueColumns(
 // the collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
-    message_pairs: [
-        'path', 'request_hash',
+    fa_message_pairs: [
+        'path',
     ],
 };

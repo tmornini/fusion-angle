@@ -14,7 +14,10 @@ export interface SqlClient {
         fn: (sql: SqlClient) => Promise<T>,
         options?: string,
     ): Promise<T>;
-    unsafe<T>(query: string): Promise<T[]>;
+    unsafe<T>(
+        query: string,
+        parameters?: readonly unknown[],
+    ): Promise<T[]>;
     end(): Promise<void>;
 }
 
@@ -34,7 +37,10 @@ type Tagged = {
         ) => Promise<unknown>
     );
     savepoint?: BeginFn;
-    unsafe: (query: string) => Promise<unknown[]>;
+    unsafe: (
+        query: string,
+        parameters?: readonly unknown[],
+    ) => Promise<unknown[]>;
     end?: () => Promise<void>;
 };
 
@@ -62,8 +68,11 @@ function wrap(sql: Tagged): SqlClient {
             }
             return sql.begin(inner) as Promise<T>;
         },
-        unsafe<T>(query: string): Promise<T[]> {
-            return sql.unsafe(query) as
+        unsafe<T>(
+            query: string,
+            parameters?: readonly unknown[],
+        ): Promise<T[]> {
+            return sql.unsafe(query, parameters) as
                 unknown as Promise<T[]>;
         },
         end(): Promise<void> {

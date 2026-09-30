@@ -21,12 +21,16 @@ import {
     validateInvitationTransitionBody,
 } from './validators.ts';
 import {
+    attemptFor,
     formWriteMessagePair,
-    getPairByRequestHash,
-    appendMessagePairOnce,
+    runWrite,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentMessagePairFor } from './routes.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { parseWire } from
+    '../shared/http-message/wire-codec.ts';
 import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     './family-registry.ts';
 import {
@@ -470,11 +474,6 @@ async function grantInvitation(
         responseStatus: HTTP_OK, responseBody,
         operationId,
     });
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return responseBody;
-    }
     const document = preOutcome.kind === 'fresh'
         ? await formInvitationDocumentMessagePair(
             actor, requestAt, operationId, invitationId,
@@ -486,27 +485,27 @@ async function grantInvitation(
             },
         )
         : undefined;
-    await db.transaction(async (view) => {
-            const outcome = await grantOutcomeFor(
-                view, organization, identityId);
-            const agrees = outcome.kind === preOutcome.kind
-                && (outcome.kind !== 'existing'
-                    || (preOutcome.kind === 'existing'
-                        && outcome.id === preOutcome.id));
-            if (!agrees) {
-                throw new Error(
-                    'grantInvitation: the duplicate-grant'
-                    + ' check raced between its pre-tx read'
-                    + ' and its transaction — retry the'
-                    + ' request',
-                );
-            }
-            await appendMessagePairOnce(view, messagePair);
-            if (document !== undefined) {
-                await appendMessagePairOnce(view, document);
-            }
-        },
-    );
+    await db.readTransaction(async (view) => {
+        const outcome = await grantOutcomeFor(
+            view, organization, identityId);
+        const agrees = outcome.kind === preOutcome.kind
+            && (outcome.kind !== 'existing'
+                || (preOutcome.kind === 'existing'
+                    && outcome.id === preOutcome.id));
+        if (!agrees) {
+            throw new Error(
+                'grantInvitation: the duplicate-grant'
+                + ' check raced between its pre-tx read'
+                + ' and its transaction — retry the'
+                + ' request',
+            );
+        }
+    });
+    const pairs = [messagePair];
+    if (document !== undefined) {
+        pairs.push(document);
+    }
+    await runWrite(db, attemptFor(pairs), pairs);
     if (preOutcome.kind === 'fresh') {
         db.postNotification({
             kind: 'scoped',
@@ -662,11 +661,6 @@ async function acceptInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'acceptance');
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return undefined;
-    }
     const terminal = await formInvitationDocumentMessagePair(
         actor, requestAt, operationId, id,
         {
@@ -694,26 +688,33 @@ async function acceptInvitation(
     });
     let conflict = false;
     let committed = false;
-    await db.transaction(async (view) => {
-            const state = await currentInvitationState(view, id);
+    const acceptPairs = await db.readTransaction(
+        async (view) => {
+            const state = await currentInvitationState(
+                view, id,
+            );
             // Already accepted: no-op. Declined/revoked: 409.
-            if (state === 'accepted') {
-                return;
-            }
+            if (state === 'accepted') return null;
             if (state !== 'pending') {
                 conflict = true;
-                return;
+                return null;
             }
             const already = await membershipExistsFor(
-                view, inv.organization_id, actor);
-            if (!already) {
-                await appendMessagePairOnce(view, seatDocument);
-            }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, terminal);
-            committed = true;
+                view, inv.organization_id, actor,
+            );
+            return [
+                ...(already ? [] : [seatDocument]),
+                messagePair,
+                terminal,
+            ];
         },
     );
+    if (acceptPairs !== null) {
+        await runWrite(
+            db, attemptFor(acceptPairs), acceptPairs,
+        );
+        committed = true;
+    }
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
@@ -767,11 +768,6 @@ async function declineInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'decline');
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return undefined;
-    }
     const terminal = await formInvitationDocumentMessagePair(
         actor, requestAt, operationId, id,
         {
@@ -783,21 +779,21 @@ async function declineInvitation(
     );
     let conflict = false;
     let committed = false;
-    await db.transaction(async (view) => {
-            const state = await currentInvitationState(view, id);
-            // Already declined: no-op. Accepted/revoked: 409.
-            if (state === 'declined') {
-                return;
-            }
-            if (state !== 'pending') {
-                conflict = true;
-                return;
-            }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, terminal);
-            committed = true;
-        },
-    );
+    const decline = await db.readTransaction(async (view) => {
+        const state = await currentInvitationState(view, id);
+        // Already declined: no-op. Accepted/revoked: 409.
+        if (state === 'declined') return false;
+        if (state !== 'pending') {
+            conflict = true;
+            return false;
+        }
+        return true;
+    });
+    if (decline) {
+        const pairs = [messagePair, terminal];
+        await runWrite(db, attemptFor(pairs), pairs);
+        committed = true;
+    }
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
@@ -849,11 +845,6 @@ async function revokeInvitation(
     const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'revocation');
-    const replay = await getPairByRequestHash(
-        db, messagePair.requestHash);
-    if (replay !== undefined) {
-        return undefined;
-    }
     const terminal = await formInvitationDocumentMessagePair(
         actor, requestAt, operationId, id,
         {
@@ -864,19 +855,38 @@ async function revokeInvitation(
         },
     );
     let conflict = false;
-    await db.transaction(async (view) => {
-            const state = await currentInvitationState(view, id);
-            if (state !== 'pending') {
-                conflict = true;
-                return;
+    let committed = false;
+    const revoke = await db.readTransaction(async (view) => {
+        const state = await currentInvitationState(view, id);
+        // The same revocation body is a no-op.
+        // A different body against a revoked
+        // invitation is 409.
+        if (state === 'revoked') {
+            if (await revocationIsReplay(
+                view, id, transition,
+            )) {
+                return false;
             }
-            await appendMessagePairOnce(view, messagePair);
-            await appendMessagePairOnce(view, terminal);
-        },
-    );
+            conflict = true;
+            return false;
+        }
+        if (state !== 'pending') {
+            conflict = true;
+            return false;
+        }
+        return true;
+    });
+    if (revoke) {
+        const pairs = [messagePair, terminal];
+        await runWrite(db, attemptFor(pairs), pairs);
+        committed = true;
+    }
     if (conflict) {
         throw new ApiError(
             'invitation is not pending', HTTP_CONFLICT);
+    }
+    if (!committed) {
+        return undefined;
     }
     db.postNotification({
         kind: 'scoped',
@@ -884,6 +894,32 @@ async function revokeInvitation(
         identityIds: [inv.identity_id],
     });
     return undefined;
+}
+
+async function revocationIsReplay(
+    view: DbAdapter,
+    id: Id,
+    transition: { readonly eventId: string; readonly at: string },
+): Promise<boolean> {
+    const prefix = '/invitations/' + id + '/revocation/';
+    const stored = await view.messagePairs
+        .getCollectionPairs(prefix);
+    for (const row of stored) {
+        const model = parseWire(row.request);
+        const body = HttpMessage.fromModel(model).body();
+        if (!body.exists()) continue;
+        const parsed = JSON.parse(body.toText()) as {
+            readonly revokeEventId?: string;
+            readonly revokeAt?: string;
+        };
+        if (
+            parsed.revokeEventId === transition.eventId
+            && parsed.revokeAt === transition.at
+        ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 async function loadInvitation(

@@ -481,10 +481,22 @@ Deno.test(
             await messagePairPlaneGraph(ctx, flowId),
         );
 
-        // Replay the EXACT captured body (and its echo header).
+        // Same response body with the current latch stores
+        // nothing. The captured echo names the prior head.
+        const { etag: fresh } = await ctx.GETWithEtag<unknown>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
+        );
+        assert(fresh !== undefined);
+        const replayHeaders = [
+            ...(capturedHeaders ?? []).filter(
+                (field) => field[0] !== 'if-match',
+            ),
+            ['if-match', '"' + fresh + '"'] as const,
+        ];
         await origPut(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, captured
-                , capturedHeaders,
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
+            captured,
+            replayHeaders,
         );
 
         // Derived state identical (byte-identical resend).

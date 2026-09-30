@@ -4,13 +4,14 @@ import { TABLE_NAMES } from
 import {
     memoryDbAdapter,
 } from '../api/db-memory.ts';
+import { ledgerFields } from './ledger-row.ts';
 
 // Phase Final Stage B Task 4: TABLE_NAMES shrinks as doomed
 // tables delete. Pin permanent survivors and tables this
 // commit just dropped.
 Deno.test('TABLE_NAMES keeps the permanent survivors', () => {
     for (const name of [
-        'message_pairs',
+        'fa_message_pairs',
     ] as const) {
         assert(
             TABLE_NAMES.includes(name),
@@ -71,19 +72,21 @@ Deno.test(
 Deno.test('MemoryDbAdapter exposes message stores', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await db.messagePairs.append('pair-1', {
+    await db.messagePairs.append('pair-1', await ledgerFields({
+        id: 'pair-1',
         path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         name: '42',
         requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         method: 'PUT',
-        request_at: '2026-01-01T00:00:00.000000Z',
-        request_hash: 'a'.repeat(64),
-        request: '{"kind":"request"}',
         response_at: '2026-01-01T00:00:00.000000Z',
+        request: '{"kind":"request"}',
         response: '{"kind":"response"}',
         operation_id: '0123456789ABCDEFGHIJKw',
-    });
+    }));
     const rows = await db.messagePairs.getAll();
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.id, 'pair-1');
+    assertStrictEquals(rows.length, 2);
+    assertStrictEquals(
+        rows.some((row) => row.id === 'pair-1'),
+        true,
+    );
 });

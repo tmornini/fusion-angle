@@ -42,13 +42,6 @@ export class HistoryEntityStore<
         );
     }
 
-    async getPairsByRequestHash(hash: string): Promise<T[]> {
-        return this.#run(
-            'readonly',
-            tx => tx.getPairsByRequestHash<T>(hash),
-        );
-    }
-
     async getDocumentHistory(
         path: string,
         name: string,

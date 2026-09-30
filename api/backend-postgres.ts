@@ -1,8 +1,7 @@
 // Fourth StorageBackend. postgres.js stays behind
-// postgres-client. Write lock order is request, document,
-// then FOR UPDATE. Notify is in-transaction. The write
-// appends: `ON CONFLICT (id) DO NOTHING`, the row count is
-// the report.
+// postgres-client. A statement inside an open client
+// runs in a savepoint so a succession 23505 does not
+// abort the caller. Notify stays on the write client.
 
 import {
     type StorageBackend,
@@ -18,13 +17,23 @@ import type { NotificationEvent } from
     './notifications.ts';
 import {
     FUSION_EVENTS_CHANNEL,
-    advisoryKey,
     notifyPayload,
 } from './advisory-lock.ts';
 import {
-    decodeIdentifier,
-    encodeIdentifier,
+    identifierOfUuidText,
+    uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
+import type {
+    Attempt,
+    StatementAnswer,
+    StatementBind,
+} from '../shared/ledger-statement.ts';
+import { mintRootBind } from './ledger-root.ts';
+import { statementText } from
+    './ledger-statement-sql.ts';
+import {
+    mapStatementError,
+} from './ledger-statement.ts';
 
 export const POSTGRES_DROP_SCHEMA =
     'DROP SCHEMA public CASCADE;\n'
@@ -37,9 +46,6 @@ export interface PostgresTx extends Tx {
         path: string,
         name: string,
     ): Promise<T[]>;
-    lockRequest(hash: string): Promise<void>;
-    lockDocument(path: string, name: string): Promise<void>;
-    lockHead(id: string): Promise<void>;
     getHead(path: string, name: string): Promise<{
         readonly id: string;
         readonly method: string;
@@ -84,8 +90,50 @@ export class PostgresBackend implements StorageBackend {
     async ensureTable(): Promise<void> {
         try {
             await this.#sql.unsafe(POSTGRES_SCHEMA);
+            const root = await this.#sql.query<{
+                id: string;
+            }>`
+                SELECT id FROM fa_message_pairs
+                WHERE path = '/migrations/'
+                  AND name = '0000-root'
+                LIMIT 1
+            `;
+            if (root.length > 0) return;
+            await this.executeLedger(
+                'genesis',
+                [mintRootBind()],
+                undefined,
+                undefined,
+            );
         } catch (error) {
             throw mapPostgresError(error);
+        }
+    }
+
+    async executeLedger(
+        attempt: Attempt,
+        rows: readonly StatementBind[],
+        _now: string | undefined,
+        tx: Tx | undefined,
+    ): Promise<StatementAnswer[]> {
+        const sql = tx === undefined
+            ? this.#sql
+            : clientOf(tx);
+        try {
+            // A 23505 aborts the surrounding transaction,
+            // and postgres.js rethrows that error after
+            // the caller catches it. A savepoint keeps
+            // the refusal on the statement.
+            if (tx === undefined) {
+                return await queryStatement(
+                    sql, attempt, rows,
+                );
+            }
+            return await sql.begin((sp) =>
+                queryStatement(sp, attempt, rows),
+            );
+        } catch (error) {
+            throw mapStatementError(error);
         }
     }
 
@@ -125,8 +173,18 @@ export class PostgresBackend implements StorageBackend {
     }
 }
 
-// Lock methods need an open transaction. Standalone
-// read passes false; transaction() passes true.
+// Notify needs an open write client. Standalone read
+// passes false; transaction() passes true.
+const clients = new WeakMap<Tx, SqlClient>();
+
+function clientOf(tx: Tx): SqlClient {
+    const sql = clients.get(tx);
+    if (sql === undefined) {
+        throw new Error('ledger client missing');
+    }
+    return sql;
+}
+
 function postgresTx(
     sql: SqlClient,
     mode: TxMode,
@@ -139,7 +197,7 @@ function postgresTx(
             );
         }
     };
-    return {
+    const tx: Tx = {
         async getById<T extends { id: string }>(
             id: string,
         ): Promise<T | null> {
@@ -158,14 +216,6 @@ function postgresTx(
         ): Promise<T[]> {
             const rows = await selectCollectionPairs(
                 sql, path,
-            );
-            return rows.map((row) => entityOf<T>(row));
-        },
-        async getPairsByRequestHash<T extends { id: string }>(
-            hash: string,
-        ): Promise<T[]> {
-            const rows = await selectPairsByRequestHash(
-                sql, hash,
             );
             return rows.map((row) => entityOf<T>(row));
         },
@@ -211,39 +261,12 @@ function postgresTx(
             assertWritable();
             const written = serializeRecord(
                 row as Record<string, unknown>,
-                'message_pairs',
+                'fa_message_pairs',
             );
             return insertPair(sql, written);
         },
         ...(coordination
             ? {
-                async lockRequest(
-                    hash: string,
-                ): Promise<void> {
-                    await advisoryLock(
-                        sql, 'fusion.dedup.' + hash,
-                    );
-                },
-                async lockDocument(
-                    path: string,
-                    name: string,
-                ): Promise<void> {
-                    await advisoryLock(
-                        sql,
-                        'fusion.document.' + path + name,
-                    );
-                },
-                async lockHead(
-                    id: string,
-                ): Promise<void> {
-                    await sql.query`
-                        SELECT id FROM message_pairs
-                        WHERE id = ${
-                            uuidTextOfIdentifier(id)
-                        }
-                        FOR UPDATE
-                    `;
-                },
                 async notify(
                     event: NotificationEvent,
                 ): Promise<void> {
@@ -275,41 +298,8 @@ function postgresTx(
             };
         },
     };
-}
-
-async function advisoryLock(
-    sql: SqlClient,
-    label: string,
-): Promise<void> {
-    const key = Number(await advisoryKey(label));
-    await sql.query`
-        SELECT pg_advisory_xact_lock(${key})
-    `;
-}
-
-function uuidTextOfIdentifier(id: string): string {
-    const bytes = decodeIdentifier(id);
-    let hex = '';
-    for (const b of bytes) {
-        hex += b.toString(16).padStart(2, '0');
-    }
-    return (
-        hex.slice(0, 8) + '-'
-        + hex.slice(8, 12) + '-'
-        + hex.slice(12, 16) + '-'
-        + hex.slice(16, 20) + '-'
-        + hex.slice(20)
-    );
-}
-
-function identifierOfUuidText(uuid: string): string {
-    const hex = uuid.replaceAll('-', '');
-    const bytes = new Uint8Array(16);
-    for (let i = 0; i < 16; i++) {
-        bytes[i] = Number.parseInt(
-            hex.slice(i * 2, i * 2 + 2), 16);
-    }
-    return encodeIdentifier(bytes);
+    clients.set(tx, sql);
+    return tx;
 }
 
 function entityOf<T extends { id: string }>(
@@ -317,12 +307,22 @@ function entityOf<T extends { id: string }>(
 ): T {
     return {
         ...row,
-        id: identifierOfUuidText(row.id as string),
+        id: identifierOfUuidText(String(row.id)),
         operation_id: identifierOfUuidText(
-            row.operation_id as string,
+            String(row.operation_id),
+        ),
+        supersedes: identifierOfUuidText(
+            String(row.supersedes),
         ),
         request: latin1OfBytea(row.request),
+        request_salt: hexOfBytea(row.request_salt),
+        request_hash: hexOfBytea(row.request_hash),
+        secret: latin1OfBytea(row.secret),
+        secret_hash: hexOfBytea(row.secret_hash),
         response: latin1OfBytea(row.response),
+        response_salt: hexOfBytea(row.response_salt),
+        response_hash: hexOfBytea(row.response_hash),
+        pair_hash: hexOfBytea(row.pair_hash),
     } as unknown as T;
 }
 
@@ -354,6 +354,29 @@ function byteaOfWire(message: unknown): Uint8Array {
     return Octets.fromLatin1(message).asBytes();
 }
 
+function bytesOfBytea(value: unknown): Uint8Array {
+    if (value instanceof Uint8Array) return value;
+    throw new Error('message is not BYTEA');
+}
+
+function hexOfBytea(value: unknown): string {
+    let hex = '';
+    for (const byte of bytesOfBytea(value)) {
+        hex += byte.toString(16).padStart(2, '0');
+    }
+    return hex;
+}
+
+function byteaOfHex(hex: string): Uint8Array {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = Number.parseInt(
+            hex.slice(i * 2, i * 2 + 2), 16,
+        );
+    }
+    return bytes;
+}
+
 function textField(
     row: Record<string, unknown>,
     name: string,
@@ -380,16 +403,16 @@ async function selectPairById(
     id: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
-        FROM message_pairs
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
+        FROM fa_message_pairs
         WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
@@ -398,17 +421,17 @@ async function selectAll(
     sql: SqlClient,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
-        FROM message_pairs
-        ORDER BY message_pairs.response_at, message_pairs.id
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
+        FROM fa_message_pairs
+        ORDER BY fa_message_pairs.response_at, fa_message_pairs.id
     `;
 }
 
@@ -417,38 +440,18 @@ async function selectCollectionPairs(
     path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
-        FROM message_pairs
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
+        FROM fa_message_pairs
         WHERE path = ${path}
-        ORDER BY message_pairs.response_at, message_pairs.id
-    `;
-}
-
-async function selectPairsByRequestHash(
-    sql: SqlClient,
-    hash: string,
-): Promise<Record<string, unknown>[]> {
-    return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
-            to_char(response_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS response_at,
-            response, operation_id
-        FROM message_pairs
-        WHERE request_hash = ${hash}
-        ORDER BY message_pairs.response_at, message_pairs.id
+        ORDER BY fa_message_pairs.response_at, fa_message_pairs.id
     `;
 }
 
@@ -458,19 +461,19 @@ async function selectDocumentHistory(
     name: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
-        FROM message_pairs
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
+        FROM fa_message_pairs
         WHERE path = ${path}
           AND name = ${name}
-        ORDER BY message_pairs.response_at, message_pairs.id
+        ORDER BY fa_message_pairs.response_at, fa_message_pairs.id
     `;
 }
 
@@ -481,7 +484,7 @@ async function selectHead(
 ): Promise<{ id: string; method: string }[]> {
     return sql.query<{ id: string; method: string }>`
         SELECT id, method
-        FROM message_pairs
+        FROM fa_message_pairs
         WHERE path = ${path}
           AND name = ${name}
           AND method IN ('PUT', 'DELETE')
@@ -497,21 +500,21 @@ async function selectHeadPair(
     name: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
-        FROM message_pairs
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
+        FROM fa_message_pairs
         WHERE path = ${path}
           AND name = ${name}
           AND method IN ('PUT', 'DELETE')
-        ORDER BY message_pairs.response_at DESC,
-            message_pairs.id DESC
+        ORDER BY fa_message_pairs.response_at DESC,
+            fa_message_pairs.id DESC
         LIMIT 1
     `;
 }
@@ -525,18 +528,18 @@ async function selectCollectionHeadPairs(
     path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
         FROM (
             SELECT DISTINCT ON (name) *
-            FROM message_pairs
+            FROM fa_message_pairs
             WHERE path = ${path}
               AND method IN ('PUT', 'DELETE')
             ORDER BY name DESC, response_at DESC, id DESC
@@ -552,20 +555,20 @@ async function selectWhereBody(
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, path, name, requester_identity_id, method,
-            to_char(request_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS request_at,
-            request_hash, request,
+        SELECT id, operation_id, path, name, supersedes,
+            requester_identity_id, method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            response, operation_id
-        FROM message_pairs
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
+        FROM fa_message_pairs
         WHERE path = ${path}
-          AND message_body(response) @>
+          AND fa_message_body(response) @>
               ${containment}::jsonb
-        ORDER BY message_pairs.response_at, message_pairs.id
+        ORDER BY fa_message_pairs.response_at, fa_message_pairs.id
     `;
 }
 
@@ -582,11 +585,31 @@ async function insertPair(
         row, 'requester_identity_id',
     );
     const method = textField(row, 'method');
-    const requestAt = textField(row, 'request_at');
-    const requestHash = textField(row, 'request_hash');
+    const supersedes = uuidTextOfIdentifier(
+        textField(row, 'supersedes'),
+    );
     const request = byteaOfWire(row.request);
+    const requestSalt = byteaOfHex(
+        textField(row, 'request_salt'),
+    );
+    const requestHash = byteaOfHex(
+        textField(row, 'request_hash'),
+    );
+    const secret = byteaOfWire(row.secret);
+    const secretHash = byteaOfHex(
+        textField(row, 'secret_hash'),
+    );
     const responseAt = textField(row, 'response_at');
     const response = byteaOfWire(row.response);
+    const responseSalt = byteaOfHex(
+        textField(row, 'response_salt'),
+    );
+    const responseHash = byteaOfHex(
+        textField(row, 'response_hash'),
+    );
+    const pairHash = byteaOfHex(
+        textField(row, 'pair_hash'),
+    );
     const operationId = uuidTextOfIdentifier(
         textField(row, 'operation_id'),
     );
@@ -599,22 +622,122 @@ async function insertPair(
     // then parses the full six-digit microsecond text at
     // full resolution, server-side.
     const inserted = await sql.query<{ id: string }>`
-        INSERT INTO message_pairs (
-            id, path, name,
-            requester_identity_id, method,
-            request_at, request_hash, request,
-            response_at, response,
-            operation_id
+        INSERT INTO fa_message_pairs (
+            id, operation_id, path, name, supersedes,
+            requester_identity_id, method, response_at,
+            request, request_salt, request_hash,
+            secret, secret_hash,
+            response, response_salt, response_hash,
+            pair_hash
         ) VALUES (
-            ${id}, ${path}, ${name},
+            ${id}, ${operationId}, ${path}, ${name},
+            ${supersedes},
             ${requester}, ${method},
-            ${requestAt}::text::timestamptz, ${requestHash},
-            ${request},
-            ${responseAt}::text::timestamptz, ${response},
-            ${operationId}
+            ${responseAt}::text::timestamptz,
+            ${request}, ${requestSalt}, ${requestHash},
+            ${secret}, ${secretHash},
+            ${response}, ${responseSalt}, ${responseHash},
+            ${pairHash}
         )
         ON CONFLICT (id) DO NOTHING
         RETURNING id
     `;
     return inserted.length === 1;
+}
+
+type StatementResult = {
+    id: string,
+    path: string,
+    name: string,
+    method: string,
+    outcome: string,
+    stamp: string,
+    response: unknown,
+    head_id: string | null,
+    head_response: unknown,
+    supersedes: string,
+    request_hash: string,
+    secret_hash: string,
+    response_hash: string,
+    pair_hash: string,
+};
+
+async function queryStatement(
+    sql: SqlClient,
+    attempt: Attempt,
+    rows: readonly StatementBind[],
+): Promise<StatementAnswer[]> {
+    const parameters: unknown[] = [attempt];
+    for (const row of rows) {
+        parameters.push(
+            uuidTextOfIdentifier(row.id),
+            uuidTextOfIdentifier(row.operationId),
+            row.path,
+            row.name,
+            row.requesterIdentityId,
+            row.method,
+            row.request,
+            row.requestSalt,
+            row.secret,
+            row.responsePrefix,
+            row.responseSuffix,
+            row.responseSalt,
+            row.ifMatch === null
+                ? null
+                : uuidTextOfIdentifier(row.ifMatch),
+            row.notify,
+        );
+    }
+    let result: StatementResult[];
+    try {
+        result = await sql.unsafe<StatementResult>(
+            statementText(rows.length),
+            parameters,
+        );
+    } catch (error) {
+        throw mapStatementError(error);
+    }
+    if (result.length !== rows.length) {
+        throw new Error(
+            'ledger statement returned '
+            + String(result.length) + ' rows',
+        );
+    }
+    return result.map((row, index) => {
+        const source = rows[index]!;
+        const outcome = row.outcome;
+        if (
+            outcome !== 'land'
+            && outcome !== 'matched'
+            && outcome !== 'stale'
+        ) {
+            throw new Error(
+                'ledger statement outcome ' + outcome,
+            );
+        }
+        const inserted = outcome === 'land';
+        return {
+            id: source.id,
+            path: row.path,
+            name: row.name,
+            method: row.method,
+            outcome,
+            stamp: row.stamp,
+            response: bytesOfBytea(row.response),
+            headId: row.head_id === null
+                ? null
+                : identifierOfUuidText(row.head_id),
+            headResponse: row.head_response === null
+                ? null
+                : bytesOfBytea(row.head_response),
+            inserted,
+            supersedes: identifierOfUuidText(
+                row.supersedes,
+            ),
+            requestHashHex: row.request_hash,
+            secretHashHex: row.secret_hash,
+            responseHashHex: row.response_hash,
+            pairHashHex: row.pair_hash,
+        };
+    });
 }

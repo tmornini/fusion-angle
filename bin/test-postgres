@@ -51,4 +51,5 @@ TZ=UTC "${DENO_PG_TEST[@]}" \
     tests/pg-explain.test.ts \
     tests/pg-identifier-order.test.ts \
     tests/pg-standalone-read.test.ts \
-    tests/schema-lifecycle.test.ts
+    tests/schema-lifecycle.test.ts \
+    tests/pg-ledger-store.test.ts
