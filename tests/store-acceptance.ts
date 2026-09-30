@@ -454,6 +454,7 @@ export function defineStoreAcceptance(
         const posted2 = generateIdentifier();
         const posted3 = generateIdentifier();
         const untouched = generateIdentifier();
+        const operated = generateIdentifier();
         const rows: [string, string, string, number][] = [
             [revised1, 'revised', 'PUT', 1],
             [deleted1, 'deleted', 'PUT', 2],
@@ -463,6 +464,7 @@ export function defineStoreAcceptance(
             [posted2, 'posted', 'POST', 6],
             [posted3, 'posted', 'PATCH', 7],
             [untouched, 'untouched', 'PUT', 8],
+            [operated, 'operated', 'POST', 9],
         ];
         for (const [id, docName, method, k] of rows) {
             await db.messagePairs.append(

@@ -419,29 +419,55 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertNotMatch(text, /Sort/);
     });
 
-    Deno.test('collection head pairs come off the document'
-    + ' index backward under Unique', async () => {
+    Deno.test('collection head pairs walk the document'
+    + ' index one name at a time', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM (
-                SELECT DISTINCT ON (name) *
-                FROM fa_message_pairs
-                WHERE path = ${IDEA_COLLECTION}
-                  AND method IN ('PUT', 'DELETE')
-                ORDER BY name DESC, response_at DESC, id DESC
+            WITH RECURSIVE names AS (
+                (
+                    SELECT name FROM fa_message_pairs
+                    WHERE path = ${VERSION_COLLECTION}
+                    ORDER BY name
+                    LIMIT 1
+                )
+                UNION ALL
+                SELECT (
+                    SELECT later.name FROM fa_message_pairs later
+                    WHERE later.path = ${VERSION_COLLECTION}
+                      AND later.name > names.name
+                    ORDER BY later.name
+                    LIMIT 1
+                )
+                FROM names
+                WHERE names.name IS NOT NULL
+            )
+            SELECT heads.*
+            FROM names
+            CROSS JOIN LATERAL (
+                SELECT * FROM fa_message_pairs head
+                WHERE head.path = ${VERSION_COLLECTION}
+                  AND head.name = names.name
+                  AND head.method IN ('PUT', 'DELETE')
+                ORDER BY head.response_at DESC, head.id DESC
+                LIMIT 1
             ) heads
-            WHERE method = 'PUT'
-            ORDER BY response_at, id
+            WHERE names.name IS NOT NULL
+              AND heads.method = 'PUT'
+            ORDER BY heads.response_at, heads.id
         `;
         const text = explainText(plans);
-        assertMatch(text, /Unique/);
+        assertMatch(text, /Recursive Union/);
+        assertMatch(
+            text,
+            /Index (Only )?Scan using fa_message_pairs_document/,
+        );
         assertMatch(
             text,
             /Index Scan Backward using fa_message_pairs_document/,
         );
-        assertNoSortBeneath(text, 'Unique');
+        assertNoSortBeneath(text, 'Recursive Union');
         assertNotMatch(text, /Seq Scan/);
     });
 

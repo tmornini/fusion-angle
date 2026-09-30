@@ -542,33 +542,60 @@ async function selectHeadPair(
     `;
 }
 
-// DISTINCT ON takes the first row per name straight off
-// the document index read backward; the outer sort orders
-// the heads, a small set. The inner query keeps its native
-// columns (no aliases); the outer list formats the stamps.
+// A skip walk of the document index (spec §6): ask for
+// the first name at the path, then the next name after the
+// last, and read one head per name — one probe per
+// document, where DISTINCT ON read every version. A name
+// with no PUT or DELETE pair has no head. The walked
+// heads, a small set, are then sorted.
 async function selectCollectionHeadPairs(
     sql: SqlClient,
     path: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT id, operation_id, path, name, supersedes,
-            requester_identity_id, method,
+        WITH RECURSIVE names AS (
+            (
+                SELECT name FROM fa_message_pairs
+                WHERE path = ${path}
+                ORDER BY name
+                LIMIT 1
+            )
+            UNION ALL
+            SELECT (
+                SELECT later.name FROM fa_message_pairs later
+                WHERE later.path = ${path}
+                  AND later.name > names.name
+                ORDER BY later.name
+                LIMIT 1
+            )
+            FROM names
+            WHERE names.name IS NOT NULL
+        )
+        SELECT heads.id, heads.operation_id, heads.path,
+            heads.name, heads.supersedes,
+            heads.requester_identity_id, heads.method,
             to_char(response_at AT TIME ZONE 'UTC',
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
-            request, request_salt, request_hash,
-            request_secrets, request_secrets_hash,
-            response, response_salt, response_hash,
-            response_secrets, response_secrets_hash,
-            pair_hash
-        FROM (
-            SELECT DISTINCT ON (name) *
-            FROM fa_message_pairs
-            WHERE path = ${path}
-              AND method IN ('PUT', 'DELETE')
-            ORDER BY name DESC, response_at DESC, id DESC
+            heads.request, heads.request_salt,
+            heads.request_hash,
+            heads.request_secrets, heads.request_secrets_hash,
+            heads.response, heads.response_salt,
+            heads.response_hash,
+            heads.response_secrets,
+            heads.response_secrets_hash,
+            heads.pair_hash
+        FROM names
+        CROSS JOIN LATERAL (
+            SELECT * FROM fa_message_pairs head
+            WHERE head.path = ${path}
+              AND head.name = names.name
+              AND head.method IN ('PUT', 'DELETE')
+            ORDER BY head.response_at DESC, head.id DESC
+            LIMIT 1
         ) heads
-        WHERE method = 'PUT'
+        WHERE names.name IS NOT NULL
+          AND heads.method = 'PUT'
         ORDER BY heads.response_at, heads.id
     `;
 }
