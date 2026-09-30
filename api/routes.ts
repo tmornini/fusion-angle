@@ -114,6 +114,7 @@ import type {
 } from './message-pair.ts';
 import type { Reader } from './served-response.ts';
 import {
+    selectGlobalHead,
     wholeHeadSelection,
     type HeadSelection,
 } from './head-reads.ts';
@@ -4007,21 +4008,10 @@ export const routes: Route[] = [
     // identity is the document — stamped on write, so the
     // stored head carries it.
     route('identities/:id/token-revocations/:rid', {
-        select: async (db, p) => {
-            const rid = param(p, 1);
-            const head = await db.messagePairs.getHeadPair(
-                tokenRevocationsPrefixFor(param(p, 0)), rid,
-            );
-            if (head === null) {
-                throw new EntityNotFoundError(
-                    'identity_token_revocations', rid,
-                );
-            }
-            return wholeHeadSelection(
-                head, 'stateless', 'identity_token_revocations',
-                rid,
-            );
-        },
+        select: (db, p) => selectGlobalHead(
+            db, tokenRevocationsPrefixFor(param(p, 0)),
+            param(p, 1), 'identity_token_revocations',
+        ),
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const id = param(p, 1);
@@ -4069,20 +4059,10 @@ export const routes: Route[] = [
     // GET serves the stored head — 404 body unchanged. PUT
     // is PAIR-ONLY.
     route('identities/:id/tokens/:jti', {
-        select: async (db, p) => {
-            const jti = param(p, 1);
-            const head = await db.messagePairs.getHeadPair(
-                tokensPrefixFor(param(p, 0)), jti,
-            );
-            if (head === null) {
-                throw new EntityNotFoundError(
-                    IDENTITY_TOKENS_TABLE, jti,
-                );
-            }
-            return wholeHeadSelection(
-                head, 'stateless', IDENTITY_TOKENS_TABLE, jti,
-            );
-        },
+        select: (db, p) => selectGlobalHead(
+            db, tokensPrefixFor(param(p, 0)), param(p, 1),
+            IDENTITY_TOKENS_TABLE,
+        ),
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const jti = param(p, 1);
@@ -4188,20 +4168,10 @@ export const routes: Route[] = [
             deriveIdentityProvidersFor(db, param(p, 0)),
     }),
     route('identities/:id/providers/:eid', {
-        select: async (db, p) => {
-            const eid = param(p, 1);
-            const head = await db.messagePairs.getHeadPair(
-                providersPrefixFor(param(p, 0)), eid,
-            );
-            if (head === null) {
-                throw new EntityNotFoundError(
-                    'identity_providers', eid,
-                );
-            }
-            return wholeHeadSelection(
-                head, 'stateless', 'identity_providers', eid,
-            );
-        },
+        select: (db, p) => selectGlobalHead(
+            db, providersPrefixFor(param(p, 0)), param(p, 1),
+            'identity_providers',
+        ),
         put: (db, p, body, actor, messagePair) =>
             postIdentityProviderDocumentOp(
                 db, param(p, 0), param(p, 1),
@@ -5295,21 +5265,10 @@ export const routes: Route[] = [
     // successBody forms the stored bytes via
     // organizationEntityOf; GET serves them as stored.
     route('organizations/:id', {
-        select: async (db, p) => {
-            const organizationId = param(p, 0);
-            const head = await db.messagePairs.getHeadPair(
-                canonicalPath(undefined, '/organizations/'),
-                organizationId,
-            );
-            if (head === null) {
-                throw new EntityNotFoundError(
-                    'organizations', organizationId,
-                );
-            }
-            return wholeHeadSelection(
-                head, 'stateless', 'organizations', organizationId,
-            );
-        },
+        select: (db, p) => selectGlobalHead(
+            db, canonicalPath(undefined, '/organizations/'),
+            param(p, 0), 'organizations',
+        ),
         put: postOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
@@ -5396,24 +5355,10 @@ export const routes: Route[] = [
             ),
     }),
     route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-        select: async (db, p, _actor, organization) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
-            const identityId = param(p, 1);
-            const head = await db.messagePairs.getHeadPair(
-                seatsPrefixFor(organizationId), identityId,
-            );
-            if (head === null) {
-                throw new EntityNotFoundError(
-                    'organization_members', identityId,
-                );
-            }
-            return wholeHeadSelection(
-                head, 'stateless', 'organization_members',
-                identityId,
-            );
-        },
+        select: (db, p, _actor, organization) => selectGlobalHead(
+            db, seatsPrefixFor(requireOrganization(organization)),
+            param(p, 1), 'organization_members',
+        ),
         put: (db, p, body, actor, messagePair) =>
             postMembershipDocumentOp(
                 db, param(p, 1), body, actor, messagePair,

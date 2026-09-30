@@ -1,6 +1,7 @@
 import type { Id, MessagePairEntity } from
     '../shared/types.ts';
-import { RetiredEntityError } from './db.ts';
+import { EntityNotFoundError, RetiredEntityError } from './db.ts';
+import type { DbAdapter } from './db.ts';
 import {
     responseOfWire,
     servedResponse,
@@ -38,6 +39,21 @@ export function wholeHeadSelection(
         kind: 'document', head, lifecycle, table, id,
         reader: { sees: 'whole' },
     };
+}
+
+// A stateless head at a prefix the gate has already fenced:
+// its miss is plain absence, with no owner to probe.
+export async function selectGlobalHead(
+    db: DbAdapter,
+    prefix: string,
+    name: string,
+    table: string,
+): Promise<HeadSelection> {
+    const head = await db.messagePairs.getHeadPair(prefix, name);
+    if (head === null) {
+        throw new EntityNotFoundError(table, name);
+    }
+    return wholeHeadSelection(head, 'stateless', table, name);
 }
 
 export function isDeletedHead(
