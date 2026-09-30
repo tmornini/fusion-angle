@@ -158,6 +158,19 @@ Deno.test('a foreign deleted idea answers what its live one'
     assertStrictEquals(readGone.status, 403);
     await readLive.body?.cancel();
     await readGone.body?.cancel();
+    // At the caller's own collection the foreign id is the
+    // owner probe's miss (404 today), and the deleted one
+    // answers that same miss, never Gone.
+    const mineLive = await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS + live, token: mine,
+    }));
+    const mineGone = await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS + gone, token: mine,
+    }));
+    assertStrictEquals(mineGone.status, mineLive.status);
+    assertStrictEquals(mineLive.status, 404);
+    await mineLive.body?.cancel();
+    await mineGone.body?.cancel();
 });
 
 Deno.test('a state-deleted project and objective answer 410',
