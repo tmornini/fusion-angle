@@ -802,16 +802,30 @@ replaced by one more run.
 
 - [ ] **Step 2: Ask the operator for the base measure**
 
-The tree must be clean (Task 1 committed). Ask the
-operator to run, from `.worktrees/head-reads`, with
-`POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `CHROME`
-set:
+The tree must be clean (Task 1 committed). A local
+sweep builds, seeds `--mock-data` into an empty
+database at `POSTGRES_URL`, and serves; the seed
+refuses a non-empty one. Ask the operator to run, from
+the main checkout, the recipe `bin/test-postgres` uses
+(compose's `postgres` is on tmpfs, so each `up` is
+empty; compose parses the `server` service too, so
+`PORT` must be set, though nothing binds it; `CHROME`
+only if Chrome is not at its default path):
 
 ```bash
 cd .worktrees/head-reads
+export POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+export JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
+export POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}@127.0.0.1:5432/fusion"
+export PORT=8080
+docker compose -p head-reads-measure up -d --wait postgres
 ./bin/measure --record --visualize --runs 25 \
     2>&1 | tee .superpowers/measure-base.txt
+docker compose -p head-reads-measure down --remove-orphans
 ```
+
+Port 5432 must be free; `up` fails if another
+Postgres holds it.
 
 `--record` refuses `--pages` (a partial record is
 illegal, `web-app/app/measure-cli.ts:142-148`), so the
