@@ -6029,10 +6029,13 @@ layout.
   content replaces it. A miss without the pause
   is BLOCKED. A miss with the pause in place is
   FAIL of the exploratory half.
-  Pin: exploratory — the live pre-settlement
-       skeleton; `loadInto` is tested only after its
-       fetch settles (empty, data, or error), never
-       during the pending skeleton itself
+  Pin: tests/members-pending-skeleton.test.ts 'members
+       paints the table skeleton while its GETs are held
+       (I21)' (decides that the members boot paints
+       `.skeleton-card` into `#member-list` before its
+       first read settles, and that the settled roster
+       replaces it); exploratory — the live Fetch-paused
+       skeleton
 - [ ] **I22** If an error occurs inside a `loadInto()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. The explorer has no way to force this fault live; if none occurs naturally, record BLOCKED naming that reason — an honest BLOCKED costs nothing.
   Pin: tests/loading-states.test.ts 'a rejecting
        fetch renders the error state and calls

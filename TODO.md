@@ -295,13 +295,6 @@ Off the critical path; each with its oracle.
     Oracle: `tests/browser/canvas-pan.test.ts` 'An
     empty-canvas click after deleting the open edge
     keeps the zoomed viewBox (F29)' green
-  - I21, `2026-09-29-i21-members-skeleton` — the
-    members skeleton the walk did not see while its
-    organization GETs were paused
-    (`docs/superpowers/test-plan-mitigations/2026-09-29-I-I21.md`).
-    Oracle: `tests/members-pending-skeleton.test.ts`
-    'members paints the table skeleton while its GETs
-    are held (I21)' lands, red or green
 - A dragged objective slider's readout speaks a second
   voice: `web-app/projects/detail.ts`'s input handler
   writes `sign + String(v)` (ASCII `-100`) where the
@@ -310,6 +303,23 @@ Off the critical path; each with its oracle.
   Oracle: a Layer 2 test that drags a `.baseline-slider`
   to its minimum and reads `.slider-value` as
   `formatSigned(-100)`
+- I21's walk probe reads the page at the first paused
+  `/api/organizations/*` request, and on 29 Sep that
+  request was not the page's. The five GETs the walk
+  held are all the top-bar strip's — organization, its
+  seat read on `organizations/{id}/members/`, ideas,
+  projects, flows (`web-app/app/header-info.ts`, sent
+  from `bootApp`'s sidebar branch). The members page's
+  own roster read, which `loadInto` sends only after it
+  has painted the skeleton, is not among them. At the
+  strip's organization GET the page branch may still be
+  importing its code-split chunk, so no page code has
+  run. `tests/members-pending-skeleton.test.ts` shows
+  the skeleton painted once `init` runs. Owner call:
+  have I21 poll for the skeleton while the pause holds,
+  or rule the pre-import blank container a product gap.
+  Oracle: TEST-PLAN I21's probe step and its
+  `### Driving notes` twin
 
 ## Later work
 
@@ -1272,11 +1282,6 @@ Off the critical path; each with its oracle.
     I19) — Layer 2; `tests/command-palette-init.test.ts`
     is a does-not-throw smoke test and the key-index
     logic is unexported inside the DOM listeners
-  - The loading skeleton before a fetch settles (I21) —
-    the walk pauses `Fetch` on `/api/organizations/*`
-    so the pending skeleton is observable; a Layer 1
-    pin can still read `innerHTML` between calling
-    `loadInto` and awaiting it
   - The toast's top-center position and its ~6-second
     auto-dismiss (I23) — Layer 2, reading computed
     position and waiting out `TOAST_DURATION_MS`
