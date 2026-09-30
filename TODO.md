@@ -310,16 +310,27 @@ Off the critical path; each with its oracle.
 - A panel closed outside `withPanelOpen` keeps the
   viewBox it saved on open, so the next empty-canvas
   click or delete restores a stale camera — F29's
-  defect through two more doors in
-  `web-app/flows/detail.ts`: `handleAddNodeAtPosition`
+  defect through four more doors. In
+  `web-app/flows/detail.ts`, `handleAddNodeAtPosition`
   writes `isPanelOpen: false` by hand, and
   `refreshFlowFromServer` drops the panel when a
-  cross-tab edit removes its selection. Oracle: a
-  Layer 2 test in `tests/browser/canvas-pan.test.ts`
-  that opens a node's panel with Auto Fit off,
-  port-drags a new node, zooms in once, and clicks
-  empty canvas — red today, green once both doors
-  call `closePanel()`
+  cross-tab edit removes its selection. Undo and redo
+  commit `applyServerGraph`
+  (`web-app/app/flow-operations.ts`), which writes
+  `isPanelOpen: false` by hand when the selection is
+  gone, and `handleUndo` / `handleRedo` leave
+  `panelStateRef.open` true. `withAutoFitToggled`
+  keeps the save, and `applyPanelTransition` returns
+  null under Auto Fit, so a panel opened with Auto Fit
+  off and closed with it on hands the save to the
+  next click once Auto Fit is off again. Oracle: one
+  Layer 2 test per door in
+  `tests/browser/canvas-pan.test.ts` — with Auto Fit
+  off, open a node's panel; then port-drag a new
+  node, undo the open node's creation, or close the
+  panel under Auto Fit and switch it back off; zoom
+  in once and click empty canvas — each red today,
+  green once its door resets the save
 
 ## Later work
 
