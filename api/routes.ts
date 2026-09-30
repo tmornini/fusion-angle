@@ -99,7 +99,6 @@ import {
     attemptFor,
     runWrite,
     runStateWrite,
-    unprojected,
     sameAsHead,
     entityTagsOf,
     latchesOf,
@@ -113,9 +112,9 @@ import type {
     MessagePair,
     ParentSibling,
     ReceivedRequest,
-    StateProjection,
     StateSibling,
 } from './message-pair.ts';
+import type { Reader } from './served-response.ts';
 import { messageStore } from './message-store.ts';
 import {
     generateIdentifier,
@@ -178,6 +177,7 @@ import {
     ORGANIZATION_MEMBERS_COLLECTION_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN,
+    CREDENTIAL_KEY_READ_ROLES,
 } from './family-registry.ts';
 import {
     deriveDocumentsAt,
@@ -1087,7 +1087,7 @@ async function postRecordTypeEditOp(
                 first,
                 ...rest,
             ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -1470,7 +1470,7 @@ export async function postFlowUndoOp(
                 kind: 'in-order', head: latches.heads[0]!,
             },
         }],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -1732,7 +1732,7 @@ async function postWorkOrderCreationOp(
                 },
             },
         ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'created', location: b.id },
     });
 }
@@ -1796,7 +1796,7 @@ async function workOrderOperation<Input>(
                 : head.version,
             condition: { kind: 'in-order', head: latch },
         }],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -2062,7 +2062,7 @@ async function landWorkOrderTransition(
                     },
                 },
             ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -2719,7 +2719,8 @@ export async function postIdentityCredentialDocumentOp(
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
+    reader: Reader,
 ): Promise<Omit<IdentityCredentialEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<IdentityCredentialEntity, 'id'>;
@@ -2730,6 +2731,8 @@ export async function postIdentityCredentialDocumentOp(
             db,
             attemptFor([messagePair]),
             [messagePair],
+            undefined,
+            reader,
         );
     }
     return entity;
@@ -3111,10 +3114,8 @@ export const WRITE_RESPONSE_SPECS:
             },
         ),
     },
-    // The written row's `secret` rides the wire here — a
-    // deliberate zero-change carry-over (see the route comment
-    // above 'identities/:id/credentials/:cid' in the routes
-    // array).
+    // The stored state keeps secret; the answer is projected
+    // (credentialReader).
     'identities/:id/credentials/:cid': {
         conditional: 'optional',
         successBody: (params, body) => ({
@@ -3434,17 +3435,23 @@ export function instanceStateOf(
     };
 }
 
-// What this requester may read of an instance's state.
-export function instanceProjection(
+// What this requester may read of an instance's values.
+export function instanceReader(
     attributesById: ReadonlyMap<string, AttributeSchemaRow>,
     roles: readonly string[],
-): StateProjection {
-    return (state) => ({
-        ...state,
-        values: projectReadableValues(
-            revisionValuesOf(state), attributesById, roles,
-        ),
-    });
+): Reader {
+    return { sees: 'values', attributesById, roles };
+}
+
+// A credential's secret reaches no reader (§3).
+export function credentialReader(
+    roles: readonly string[],
+): Reader {
+    return {
+        sees: 'keys',
+        readRoles: CREDENTIAL_KEY_READ_ROLES,
+        roles,
+    };
 }
 
 // Instance create: PATCH with If-None-Match: * (§3). The
@@ -3490,7 +3497,7 @@ async function postInstanceCreateOp(
                 kind: 'never-written', declarer: 'client',
             },
         }],
-        project: instanceProjection(attributesById, roles),
+        reader: instanceReader(attributesById, roles),
         answer: { kind: 'parent' },
     });
 }
@@ -3585,7 +3592,7 @@ export async function postInstancePatchOp(
             ),
             condition: { kind: 'in-order', head: tag },
         }],
-        project: instanceProjection(attributesById, roles),
+        reader: instanceReader(attributesById, roles),
         answer: { kind: 'parent' },
     });
 }
@@ -3706,7 +3713,7 @@ export const routes: Route[] = [
                 kind: 'siblings',
                 received: requirePair(messagePair),
                 siblings: [identity, ...credentials],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
@@ -3827,12 +3834,8 @@ export const routes: Route[] = [
     // hash never crosses the boundary. The leaf id is param 1; GET
     // and PUT are exposed exactly as the flat makeIdRoute carried
     // them. ADMIN-ONLY: /identities is not member-tier, so these
-    // fall to the root admin entries — NO MEMBER_VERBS entry. The
-    // PUT wire response carries `secret` — a deliberate zero-
-    // change carry-over from the un-wired behavior (see
-    // WRITE_RESPONSE_SPECS's 'identities/:id/credentials/:cid'
-    // entry, which reconstructs the FULL entity, unlike the GETs'
-    // withoutSecret projection). GET is FLIPPED (Phase 10 Task 8):
+    // fall to the root admin entries — NO MEMBER_VERBS entry.
+    // GET is FLIPPED (Phase 10 Task 8):
     // derived via deriveCredentialsFor, fenced via gate 15
     // (keyed on the PARENT identity id rather than each
     // row's own id) — a
@@ -3923,9 +3926,10 @@ export const routes: Route[] = [
             }
             return withoutSecret(credential);
         },
-        put: (db, p, body, actor, messagePair) =>
+        put: (db, p, body, actor, messagePair, _organization, roles) =>
             postIdentityCredentialDocumentOp(
                 db, param(p, 1), body, actor, messagePair,
+                credentialReader(roles),
             ),
     }),
     // The client-registration facet (clients elimination):
@@ -4278,7 +4282,7 @@ export const routes: Route[] = [
                         },
                     })),
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'parent' },
             });
         },
@@ -4380,7 +4384,7 @@ export const routes: Route[] = [
                         },
                     },
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
@@ -4718,7 +4722,7 @@ export const routes: Route[] = [
                     },
                     ...attributes,
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
@@ -5473,7 +5477,7 @@ export const routes: Route[] = [
                         },
                     },
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },

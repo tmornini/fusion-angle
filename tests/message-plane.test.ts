@@ -1840,6 +1840,7 @@ Deno.test(
             await db.messagePairs.getAll()
         ).length;
         const secondOperation = generateIdentifier();
+        const sentAt = Date.now();
         const second = await handleRequest(
             db, apiRequest({
                 method: 'PUT',
@@ -1862,9 +1863,16 @@ Deno.test(
         assertNotStrictEquals(
             secondRequestId, firstRequestId,
         );
+        const secondDate = second.headers.get('date');
+        assert(secondDate !== null);
+        // An IMF-fixdate round-trips through toUTCString
+        // unchanged; its second resolution floors the bound.
         assertStrictEquals(
-            second.headers.get('date'), null,
+            new Date(secondDate).toUTCString(), secondDate,
         );
+        const answeredAt = Date.parse(secondDate);
+        assert(answeredAt >= sentAt - (sentAt % 1000));
+        assert(answeredAt <= Date.now());
         assertStrictEquals(
             second.headers.get('etag'), headEtag,
         );

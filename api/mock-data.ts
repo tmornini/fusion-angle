@@ -304,7 +304,7 @@ async function hashSeedCredentials(
 
 // Pass 2's last wave: the credential documents, through
 // the op every live PUT identities/:id/credentials/:cid
-// rides.
+// rides. The seed reads no answer, so it sees the whole.
 async function postSeedCredentialsIn(
     adapter: DbAdapter,
     plan: SeedCredentialPlan,
@@ -327,6 +327,7 @@ async function postSeedCredentialsIn(
                         cred.id,
                     ),
                 ),
+                { sees: 'whole' },
             )),
         postIdentityCredentialDocumentOp(
             adapter,
@@ -343,6 +344,7 @@ async function postSeedCredentialsIn(
                     plan.system.id,
                 ),
             ),
+            { sees: 'whole' },
         ),
     ]);
 }

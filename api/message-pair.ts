@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
-import type {
-    Id, MessagePairEntity,
+import {
+    nowUtc, type Id, type MessagePairEntity,
 } from '../shared/types.ts';
 import {
     NEVER_WRITTEN_IDENTIFIER,
@@ -18,7 +18,10 @@ import {
 } from './message-form.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
+import {
+    parseWire,
+    serializeWire,
+} from '../shared/http-message/wire-codec.ts';
 import {
     mergeSecret,
     secretBytes,
@@ -57,6 +60,13 @@ import { DATE_PLACEHOLDER } from './ledger-root.ts';
 import { notifyPayload } from './advisory-lock.ts';
 import { sortJsonKeys } from
     '../shared/http-message/canonical.ts';
+import {
+    projectedBody,
+    responseOfWire,
+    servedResponse,
+    type Reader,
+    type Transmission,
+} from './served-response.ts';
 
 // Who declared a genesis: the client, by If-None-Match: *,
 // or the handler, for a document it names itself. The
@@ -642,44 +652,6 @@ export function responseFromStored(
     return responseFromLatin1(stored.response);
 }
 
-export function responseFromHead(
-    wire: string,
-    requestId: string,
-): Response {
-    const model = parseWire(wire);
-    if (model.startLine.kind !== 'response') {
-        throw new Error(
-            'stored response message has no status line',
-        );
-    }
-    const headers = new Headers();
-    let wroteRequestId = false;
-    for (const field of model.fields) {
-        if (field.name === 'date') continue;
-        if (field.name === 'request-id') {
-            if (wroteRequestId) continue;
-            headers.append('request-id', requestId);
-            wroteRequestId = true;
-            continue;
-        }
-        headers.append(field.name, field.value);
-    }
-    if (!wroteRequestId) {
-        headers.append('request-id', requestId);
-    }
-    const body = HttpMessage.fromModel(model).body();
-    if (!body.exists()) {
-        return new Response(null, {
-            status: HTTP_OK,
-            headers,
-        });
-    }
-    return new Response(body.toText(), {
-        status: HTTP_OK,
-        headers,
-    });
-}
-
 export function responseFromLatin1(
     wire: string,
 ): Response {
@@ -816,12 +788,18 @@ export async function runWrite(
     attempt: Attempt,
     rows: readonly (WriteRow | MessagePair)[],
     now?: string,
+    reader?: Reader,
 ): Promise<WriteAnswer> {
     if (rows.length === 0) {
         throw new Error(
             'ledger statement requires a row',
         );
     }
+    // A plain write's family declares no reader but the
+    // credential's, whose PUT passes one.
+    const answering: Reader = reader === undefined
+        ? { sees: 'whole' }
+        : reader;
     const binds = rows.map((row) => bindOf(attempt, row));
     const pairs = rows.filter(
         (row): row is MessagePair =>
@@ -838,12 +816,12 @@ export async function runWrite(
         }
         return answer;
     }
-    const answer = answerOf(rows, binds, ran.stated);
+    const answer = answerOf(rows, binds, ran.stated, answering);
     for (const pair of pairs) {
         answers.set(pair, answer);
         ownWires.set(
             pair,
-            wireForPair(pair, ran.stated, answer),
+            wireForPair(pair, ran.stated, answer, answering),
         );
     }
     return answer;
@@ -1002,10 +980,6 @@ export type StateSibling =
         readonly condition: SiblingCondition,
     };
 
-export type StateProjection = (
-    state: Record<string, unknown>,
-) => Record<string, unknown>;
-
 export type StateAnswerKind =
     | { readonly kind: 'parent' }
     | { readonly kind: 'created', readonly location: string }
@@ -1029,7 +1003,7 @@ export type StateWrite =
             | readonly [
                 ReadParent, StateSibling, ...StateSibling[],
             ],
-        readonly project: StateProjection,
+        readonly reader: Reader,
         readonly answer: StateAnswerKind,
     }
     | {
@@ -1054,8 +1028,6 @@ export type FormedStateWrite = {
     readonly binds: readonly StatementBind[],
     readonly parentId: Id,
 };
-
-export const unprojected: StateProjection = (state) => state;
 
 // The store sorts JSON keys on write, so state is compared
 // in that same canonical form.
@@ -1199,7 +1171,10 @@ async function statedAnswer(
     );
     return ran.kind === 'refused'
         ? refusedAnswer(formed.rows, formed.binds, formed.attempt)
-        : answerOf(formed.rows, formed.binds, ran.stated);
+        : answerOf(
+            formed.rows, formed.binds, ran.stated,
+            { sees: 'whole' },
+        );
 }
 
 async function siblingsAnswer(
@@ -1261,16 +1236,16 @@ async function siblingsAnswer(
             rows: stated,
         };
     }
-    const own = responseFromLatin1(mergeSecret(
-        latin1(stated[0]!.response),
-        rows[0]!.responseSecrets,
-    ));
+    // A received answer is the received pair's own body, not
+    // the parent's state, so no reader projects it.
+    const stored = latin1(stated[0]!.response);
     return {
-        response: write.answer.kind === 'received'
-            ? own
-            : projectedResponse(
-                own, latin1(stated[0]!.response), write.project,
-            ),
+        response: responseFromLatin1(mergeSecret(
+            write.answer.kind === 'received'
+                ? stored
+                : landedWire(stored, write.reader),
+            rows[0]!.responseSecrets,
+        )),
         outcome,
         answeredId: formed.parentId,
         bells: bellsOf(rows, stated),
@@ -1286,13 +1261,12 @@ function parentHeadAnswer(
     if (parent.headResponse === null || parent.headId === null) {
         throw new Error('a matched parent has no head');
     }
-    const stored = latin1(parent.headResponse);
     return {
-        response: projectedResponse(
-            responseFromHead(stored, write.received.requestId),
-            stored,
-            write.project,
-        ),
+        response: responseOfWire(servedResponse(
+            latin1(parent.headResponse),
+            transmissionOf(write.received.requestId),
+            write.reader,
+        )),
         answeredId: parent.headId,
     };
 }
@@ -1399,25 +1373,6 @@ function writeRowOf(pair: MessagePair): WriteRow {
     };
 }
 
-// The wire answer carries the requester's view; the stored
-// response keeps the whole state.
-function projectedResponse(
-    response: Response,
-    stored: string,
-    project: StateProjection,
-): Response {
-    const state = responseRecordOf(stored);
-    if (state === undefined) {
-        return response;
-    }
-    const headers = new Headers(response.headers);
-    headers.delete('content-length');
-    return new Response(JSON.stringify(project(state)), {
-        status: response.status,
-        headers,
-    });
-}
-
 function bellsOf(
     rows: readonly (WriteRow | MessagePair)[],
     stated: readonly StatementAnswer[],
@@ -1434,18 +1389,44 @@ function bellsOf(
     return bells;
 }
 
+// This transmission, for an answer served from a head.
+function transmissionOf(requestId: string): Transmission {
+    return { date: httpDateOf(nowUtc()), requestId };
+}
+
+// A landed write answers the response it formed: its
+// status and its lines are its own, and only its body
+// passes through the reader's projection (§2).
+function landedWire(stored: string, reader: Reader): string {
+    if (reader.sees === 'whole') return stored;
+    const model = parseWire(stored);
+    if (model.body === undefined) return stored;
+    const text = model.body.toLatin1();
+    const body = projectedBody(text, reader);
+    if (body === text) return stored;
+    return serializeWire({
+        ...model,
+        fields: model.fields.map((field) =>
+            field.name === 'content-length'
+                ? { name: field.name, value: String(body.length) }
+                : field),
+        body: Octets.fromLatin1(body),
+    });
+}
+
 function wireForPair(
     pair: MessagePair,
     stated: readonly StatementAnswer[],
     answer: WriteAnswer,
+    reader: Reader,
 ): Response {
     if (answer.outcome !== 'land') return answer.response;
     const row = stated.find((item) => item.id === pair.id);
     if (row === undefined) return answer.response;
-    const stored = latin1(row.response);
-    return responseFromLatin1(
-        mergeSecret(stored, pair.responseSecrets),
-    );
+    return responseFromLatin1(mergeSecret(
+        landedWire(latin1(row.response), reader),
+        pair.responseSecrets,
+    ));
 }
 
 function refusalDocument(
@@ -1509,6 +1490,7 @@ function answerOf(
     rows: readonly (WriteRow | MessagePair)[],
     binds: readonly StatementBind[],
     stated: readonly StatementAnswer[],
+    reader: Reader,
 ): WriteAnswer {
     const outcome = stated[0]!.outcome;
     if (outcome === 'stale') {
@@ -1532,13 +1514,13 @@ function answerOf(
             throw new Error('matched row has no head');
         }
         return {
-            response: responseFromHead(
+            response: responseOfWire(servedResponse(
                 latin1(row.headResponse),
-                currentRequestId(
-                    rows[index]!,
-                    row.response,
+                transmissionOf(
+                    currentRequestId(rows[index]!, row.response),
                 ),
-            ),
+                reader,
+            )),
             outcome,
             answeredId: row.headId,
             bells: [],
@@ -1547,7 +1529,7 @@ function answerOf(
     }
     return {
         response: responseFromLatin1(mergeSecret(
-            latin1(row.response),
+            landedWire(latin1(row.response), reader),
             rows[index]!.responseSecrets,
         )),
         outcome,

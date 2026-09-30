@@ -219,6 +219,7 @@ export async function seedIdentityCredential(
         await identityCredentialDocumentMessagePair(
             id, cid, fields, requestAt,
         ),
+        { sees: 'whole' },
     );
 }
 

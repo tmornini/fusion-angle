@@ -12,7 +12,6 @@ import {
     responseRecordOf,
     runStateWrite,
     sameAsHead,
-    unprojected,
     writeAnswerOf,
     type MessagePair,
     type SiblingCondition,
@@ -95,7 +94,7 @@ async function born(
         kind: 'siblings',
         received: await received(undefined),
         siblings: [idea(state, HANDLER_GENESIS)],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
     const head = await db.messagePairs.getHeadPair(
@@ -118,7 +117,7 @@ Deno.test(
                 { id: IDEA, title: 'Born' },
                 HANDLER_GENESIS,
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         const head = await db.messagePairs.getHeadPair(
@@ -164,7 +163,7 @@ Deno.test(
                     condition: HANDLER_GENESIS,
                 },
             ],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         const rows = (await db.messagePairs.getAll())
@@ -215,7 +214,7 @@ Deno.test(
                 { id: IDEA, title: 'Born' },
                 HANDLER_GENESIS,
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'land');
@@ -243,7 +242,7 @@ Deno.test(
                 { id: IDEA, title: 'Born' },
                 HANDLER_GENESIS,
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'created', location: IDEA },
         });
         assertStrictEquals(answer.response.status, 201);
@@ -267,7 +266,7 @@ Deno.test(
                 { id: IDEA, title: 'B' },
                 { kind: 'in-order', head: headId },
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.response.status, 200);
@@ -293,7 +292,7 @@ Deno.test(
                 { id: IDEA, title: 'B' },
                 { kind: 'in-order', head: generateIdentifier() },
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.response.status, 412);
@@ -326,7 +325,7 @@ Deno.test(
                     { id: IDEA, title: 'A' },
                     { kind: 'genesis', declarer },
                 )],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: IDEA },
             });
             assertStrictEquals(answer.response.status, status);
@@ -365,7 +364,7 @@ Deno.test(
                     condition: { kind: 'in-order', head: headId },
                 },
             ],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         const tombstone = await db.messagePairs.getHeadPair(
@@ -382,7 +381,7 @@ Deno.test(
                 { id: IDEA, title: 'Again' },
                 { kind: 'never-written', declarer: 'client' },
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'stale');
@@ -416,7 +415,7 @@ Deno.test(
                 { id: IDEA, title: 'A' },
                 { kind: 'never-written', declarer: 'client' },
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.response.status, 412);
@@ -460,9 +459,11 @@ Deno.test(
                 { id: IDEA, title: 'A', hidden: 'h' },
                 { kind: 'in-order', head: headId },
             )],
-            project: (state) => ({
-                id: state['id'], title: state['title'],
-            }),
+            reader: {
+                sees: 'keys',
+                readRoles: new Map([['hidden', []]]),
+                roles: [],
+            },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'matched');
@@ -496,9 +497,11 @@ Deno.test(
                 { id: IDEA, title: 'A', hidden: 'written' },
                 { kind: 'in-order', head: headId },
             )],
-            project: (state) => ({
-                id: state['id'], title: state['title'],
-            }),
+            reader: {
+                sees: 'keys',
+                readRoles: new Map([['hidden', []]]),
+                roles: [],
+            },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'land');
@@ -530,7 +533,7 @@ Deno.test(
                 { id: IDEA, title: 'Born' },
                 HANDLER_GENESIS,
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'land');
@@ -563,7 +566,7 @@ Deno.test(
                 siblings: [idea(
                     { id: IDEA, title: 'Born' }, condition,
                 )],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'parent' },
             });
             assertStrictEquals(answer.outcome, 'refused');
@@ -597,7 +600,7 @@ Deno.test(
                 { id: IDEA, title: 'Born' },
                 HANDLER_GENESIS,
             )],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'received' },
         });
         assertStrictEquals(answer.outcome, 'land');
@@ -667,7 +670,7 @@ Deno.test(
                 idea({ id: IDEA, title: 'A' }, HANDLER_GENESIS),
                 second,
             ],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         const ideaHead = await db.messagePairs.getHeadPair(
@@ -703,7 +706,7 @@ Deno.test(
                     },
                 },
             ],
-            project: unprojected,
+            reader: { sees: 'whole' },
             answer: { kind: 'parent' },
         });
         assertStrictEquals(answer.outcome, 'land');

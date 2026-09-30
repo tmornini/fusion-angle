@@ -73,7 +73,6 @@ import {
     runWrite,
     ownWireOf,
     formAuthMessagePair,
-    unprojected,
 } from './message-pair.ts';
 import type {
     AuthMessagePairSeed,
@@ -670,7 +669,7 @@ function grantWrite(
         kind: 'siblings',
         received: messagePair,
         siblings,
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'received' },
     };
 }
@@ -861,7 +860,7 @@ function rotationWrite(
         kind: 'siblings',
         received: request.received,
         siblings: [successor, presented],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: request.answer,
     };
 }
@@ -1055,7 +1054,7 @@ export async function revokeTokenChain(
                     kind: 'siblings',
                     received,
                     siblings: [first, ...rest],
-                    project: unprojected,
+                    reader: { sees: 'whole' },
                     answer: { kind: 'parent' },
                 },
         );
