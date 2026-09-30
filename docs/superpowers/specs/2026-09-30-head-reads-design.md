@@ -1,7 +1,8 @@
 # A head read serves the stored response
 
 - Date: 2026-09-30
-- Status: awaiting review, pre-plan
+- Status: design and its nine writing-time calls
+  confirmed by the owner, pre-plan
 - Worktree: `.worktrees/head-reads`
 - Base: `ledger-store` at `c1bbc724`
 - Ships: every read of a head served as its stored
@@ -124,10 +125,11 @@ response holds all of it.
 7. **`HttpMessage<T>` is the whole response on the
    client.** The class in `shared/http-message`
    gains a type parameter for its decoded body,
-   defaulting to `unknown`, and one accessor,
-   `toContent(): T`, beside `toWire()` and
-   `toJson()`. No wrapper class exists, and `Unit`
-   names no identifier. §7.
+   defaulting to `unknown`, and `Body` gains the
+   one conversion its family lacks: a page reads
+   `message.body().toValue()`. No wrapper class
+   exists, the message gains no accessor, and
+   `Unit` names no identifier. §7.
 
 8. **The transport keeps the message whole.** One
    method per verb, each returning an
@@ -289,10 +291,22 @@ response holds all of it.
     (`shared/http-message/structured-fields.ts:164`),
     and a UUID may begin with one, so the boundary
     parameter needs a reader of its own.
-20. **`toWire()` and `toJson()` already mean the
-    whole message** (`shared/http-message/http-message.ts:85-99`),
-    and `body()` returns the `Body` facade. No
-    accessor returns the decoded body as a value.
+20. **`Body` converts to everything but its own
+    value.** `toWire()` and `toJson()` mean the
+    whole message
+    (`shared/http-message/http-message.ts:85-99`);
+    `body()` returns a `Body`, which has
+    `toBytes()`, `toText()`, `toBase64()`,
+    `toNumber()`, `toBoolean()`, and `toDate()`
+    (`shared/http-message/body.ts:53-162`) and
+    nothing that returns the decoded object or
+    array. `decoded()` returns a wrapper that
+    answers dotted-path queries, and only tests
+    call it. All six product call sites of `body()`
+    write `exists()` then `JSON.parse(toText())` by
+    hand (`api/derive-documents.ts:37-45`;
+    `api/message-store.ts:52-57`; four in
+    `api/message-pair.ts`).
 21. **A flow is judged deleted by a walk, not by
     its head.** `deriveFlow` reduces every pair's
     client-minted `state_at` and takes the latest
@@ -336,7 +350,8 @@ reader, so a family's routes and the verb that
 reads them change in one commit.
 
 1. **The library.** The multipart joiner and
-   splitter; `HttpMessage<T>` and `toContent()`.
+   splitter; `HttpMessage<T>` and
+   `Body<T>.toValue()`.
 2. **The function.** `servedResponse`; the three
    it replaces retire; write answers use it.
 3. **Tombstones.** The 410 ladder, both kinds,
@@ -738,12 +753,22 @@ compiles unchanged. `fromWire`, `fromModel`, and
 as `GET<T>` does today: the client asserts the
 type at the wire and trusts it after.
 
-**The accessor.** `toContent(): T` returns the
-body decoded by its `content-type`, memoized as
-`toWire()` and `toJson()` are. "Content" is RFC
-9110 §6.4's word for what a message carries. On a
-message with no body it throws, as `body()`'s
-readers do: asking a 204 for its content is a bug.
+**The conversion.** `body()` returns `Body<T>`, and
+`Body<T>` gains `toValue(): T`: the body decoded by
+its `content-type`, the whole value where
+`toNumber()`, `toBoolean()`, and `toDate()` return
+a leaf. It is named for the form that comes out,
+as its siblings are. "Content" is RFC 9110 §6.4's
+word for the octets, which `toBytes()` returns, so
+it names nothing here. On an absent body
+`toValue()` throws, as every accessor on `Body`
+does: asking a 204 for its value is a bug.
+
+**The message gains no accessor.** Its own
+`to…()` methods project the whole message;
+everything about the body stays behind `body()`.
+The six call sites of finding 20 are not
+rewritten here.
 
 **Nothing else.** The transport reads a status
 through `query('status')` and a tag through
@@ -821,8 +846,8 @@ Nothing returns a body beside a tag.
 
 **Presenters** read from what they are given. One
 that takes a wire row takes the message and reads
-`toContent()`. One that takes a domain value is
-unchanged.
+`body().toValue()`. One that takes a domain value
+is unchanged.
 
 **Every write from a held message latches.** A
 write to a document the caller read takes that
