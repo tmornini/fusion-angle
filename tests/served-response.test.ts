@@ -2,6 +2,7 @@ import {
     assert,
     assertEquals,
     assertStrictEquals,
+    assertThrows,
 } from '@std/assert';
 import {
     projectedBody,
@@ -236,6 +237,46 @@ Deno.test('an admin reads every attribute the schema holds',
             + '{"attribute_id":"open","value":"1"},'
             + '{"attribute_id":"closed","value":"12345678901234567890"}'
             + ']}',
+    );
+});
+
+const KEYS: Reader = {
+    sees: 'keys',
+    readRoles: CREDENTIAL_KEY_READ_ROLES,
+    roles: [],
+};
+const VALUES: Reader = {
+    sees: 'values', attributesById: ATTRIBUTES, roles: ['admin'],
+};
+const NOT_AN_OBJECT: unknown[] = [
+    null, 7, 'text', [{ secret: 's' }],
+];
+
+Deno.test('a keys reader refuses a body that is not an object',
+() => {
+    for (const shape of NOT_AN_OBJECT) {
+        assertThrows(
+            () => projectedBody(bodyOf(stored(shape)), KEYS),
+            Error, 'not a JSON object', JSON.stringify(shape),
+        );
+    }
+});
+
+Deno.test('a values reader refuses a body that is not an'
+    + ' object', () => {
+    for (const shape of NOT_AN_OBJECT) {
+        assertThrows(
+            () => projectedBody(bodyOf(stored(shape)), VALUES),
+            Error, 'not a JSON object', JSON.stringify(shape),
+        );
+    }
+});
+
+Deno.test('a values reader refuses an object with no values'
+    + ' array', () => {
+    assertThrows(
+        () => projectedBody(bodyOf(stored({ id: 'x' })), VALUES),
+        Error, 'no values array',
     );
 });
 

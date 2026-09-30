@@ -7,8 +7,10 @@ import {
     parseWire,
     serializeWire,
 } from '../shared/http-message/wire-codec.ts';
-import { parsePreservingNumbers } from
-    '../shared/http-message/json-numbers.ts';
+import {
+    isRawJson,
+    parsePreservingNumbers,
+} from '../shared/http-message/json-numbers.ts';
 import { sortJsonKeys } from
     '../shared/http-message/canonical.ts';
 import { HTTP_OK } from '../shared/http-errors.ts';
@@ -99,7 +101,9 @@ export function servedResponse(
 
 // The only place a body is transformed (§3). It drops what
 // the reader may not see and nothing else; when it drops
-// nothing it returns the octets it was given.
+// nothing it returns the octets it was given. A body whose
+// shape the projection does not declare is refused, never
+// served whole: the guard on `secret` must not fail open.
 export function projectedBody(
     body: string,
     reader: Reader,
@@ -110,12 +114,14 @@ export function projectedBody(
             Octets.fromLatin1(body).asBytes(),
         ),
     );
+    // A number parses to a raw-JSON holder, itself an object.
     if (
         value === null
         || typeof value !== 'object'
         || Array.isArray(value)
+        || isRawJson(value)
     ) {
-        return body;
+        throw new Error('projected body is not a JSON object');
     }
     const record = value as Record<string, unknown>;
     const kept = reader.sees === 'keys'
@@ -151,7 +157,11 @@ function keptValues(
     roles: readonly string[],
 ): Record<string, unknown> | undefined {
     const values = record['values'];
-    if (!Array.isArray(values)) return undefined;
+    if (!Array.isArray(values)) {
+        throw new Error(
+            'projected instance body has no values array',
+        );
+    }
     const readable = values.filter((entry) => {
         const id = (entry as { attribute_id?: unknown })
             .attribute_id;
