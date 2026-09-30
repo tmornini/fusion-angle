@@ -65,8 +65,6 @@ const PARTED = [
     'organizations/:organization-id/record-types/'
         + ':record-type-id/instances/',
     'organizations/:organization-id/record-types/'
-        + ':record-type-id/instances/:instance-id',
-    'organizations/:organization-id/record-types/'
         + ':record-type-id/instances/:instance-id/versions',
     'organizations/:organization-id/record-types/'
         + ':record-type-id/instances/:instance-id/versions/'

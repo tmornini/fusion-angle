@@ -5150,44 +5150,46 @@ export const routes: Route[] = [
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-
     // complete). No WRITE_AUTHORIZERS (deep sub-family).
-    // GET/write ETag attaches in api.ts. DELETE takes its
-    // conditional from the spec's delete slot and forms no
-    // response body.
+    // DELETE takes its conditional from the spec's delete
+    // slot and forms no response body.
     route(INSTANCE_DETAIL_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
-            await requireRecordTypeExists(db, org, typeId);
-            const head = await deriveInstanceHead(
-                db, org, typeId, instanceId,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            if (head === undefined) {
-                const retired = await documentHeadAt(
-                    db, instancesUriPrefix(org, typeId),
-                    instanceId,
-                ) !== null;
-                throw retired
-                    ? await retiredInstanceError(
-                        db, instanceId, org,
-                    )
-                    : await missedReadError(
-                        db, instanceId, org,
-                        'record_instances',
-                    );
-            }
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
+            const head = await db.messagePairs.getHeadPair(
+                instancesUriPrefix(organizationId, typeId),
+                instanceId,
+            );
+            if (head === null) {
+                throw await missedReadError(
+                    db, instanceId, organizationId,
+                    'record_instances',
                 );
+            }
+            // The gate's own 410 would skip the owner probe,
+            // and a foreign retired instance must answer 403.
+            if (head.method === 'DELETE') {
+                throw await retiredInstanceError(
+                    db, instanceId, organizationId,
+                );
+            }
             return {
-                id: head.id,
-                organization_id: org,
-                record_type_id: typeId,
-                values: projectReadableValues(
-                    head.values, attributesById, roles,
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'record_instances', id: instanceId,
+                reader: instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
                 ),
             };
         },

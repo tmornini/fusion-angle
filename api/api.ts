@@ -41,7 +41,6 @@ import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
 import {
-    INSTANCE_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
 } from './family-registry.ts';
 import {
@@ -52,11 +51,6 @@ import { servedSelection } from './head-reads.ts';
 import {
     messageStore,
 } from './message-store.ts';
-import {
-    deriveInstanceHead,
-    projectionOmitsStored,
-} from './derive-record-instances.ts';
-import { projectReadableValues } from './attribute-acl.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -108,7 +102,6 @@ import {
     matchRoute,
     param,
     WRITE_RESPONSE_SPECS,
-    loadAttributeSchemaById,
     conditionalOf,
     type Conditional,
     type Route,
@@ -318,42 +311,6 @@ function preconditionRefusal(
         );
     }
     return undefined;
-}
-
-async function instanceAdvertised(
-    db: DbAdapter,
-    organization: string,
-    typeId: string,
-    instanceId: string,
-    roles: readonly string[],
-): Promise<{
-    tag: string;
-    limited: boolean;
-} | undefined> {
-    const head = await deriveInstanceHead(
-        db, organization, typeId, instanceId,
-    );
-    if (head === undefined) return undefined;
-    const attributesById = await loadAttributeSchemaById(
-        db, organization, typeId,
-    );
-    const projected = projectReadableValues(
-        head.values, attributesById, roles,
-    );
-    return {
-        tag: head.messagePairId,
-        limited: projectionOmitsStored(
-            head.values, projected,
-        ),
-    };
-}
-
-function limitedHeaders(
-    limited: boolean,
-): Record<string, string> {
-    return limited
-        ? { 'Authorization-Limited-Attributes': 'true' }
-        : {};
 }
 
 // The one catch shared by both pre-dispatch ownership regions
@@ -1013,30 +970,6 @@ async function dispatched(
                             params, params.length - 1,
                         ),
                     );
-                }
-                // Instance detail ETag: the head pair id.
-                if (
-                    routePattern
-                        === INSTANCE_DETAIL_PATTERN
-                ) {
-                    const advertisedGet =
-                        await instanceAdvertised(
-                            effective,
-                            param(params, 0),
-                            param(params, 1),
-                            param(params, 2),
-                            roles,
-                        );
-                    if (advertisedGet !== undefined) {
-                        return attachEtag(
-                            Response.json(result, {
-                                headers: limitedHeaders(
-                                    advertisedGet.limited,
-                                ),
-                            }),
-                            advertisedGet.tag,
-                        );
-                    }
                 }
                 // Stream collection GET: one Date: now. No
                 // collection ETag. No 304. Assemble surfaces

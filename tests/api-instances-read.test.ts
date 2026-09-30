@@ -397,14 +397,16 @@ async () => {
         memberGet.headers.get(
             'Authorization-Limited-Attributes',
         ),
-        'true',
-    );
-    assertStrictEquals(
-        adminGet.headers.get(
-            'Authorization-Limited-Attributes',
-        ),
         null,
     );
+    const text = await memberGet.text();
+    assertStrictEquals(text.includes('hidden'), false);
+    assertStrictEquals(text.includes('Hello'), true);
+    assertStrictEquals(
+        memberGet.headers.get('content-length'),
+        String(new TextEncoder().encode(text).byteLength),
+    );
+    await adminGet.body?.cancel();
     const listMember = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
     ));

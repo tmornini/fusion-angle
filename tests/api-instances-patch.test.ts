@@ -1148,8 +1148,6 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assertStrictEquals(blind.status, 412);
-    // Re-GET: member does not see secret; ETag is the
-    // shared head pair id; limited header still appears.
     const reget = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
@@ -1157,12 +1155,6 @@ async () => {
     const memberEtag = reget.headers.get('ETag')!;
     assertNotStrictEquals(memberEtag, e0);
     assertStrictEquals(memberEtag, YiJPbufDpkyrZcZCYbUJpg);
-    assertStrictEquals(
-        reget.headers.get(
-            'Authorization-Limited-Attributes',
-        ),
-        'true',
-    );
     const visible = await reget.json() as {
         values: { attribute_id: string; value: string }[];
     };
