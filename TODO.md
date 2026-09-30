@@ -32,7 +32,10 @@ skew tests, which went with item 8's trio.
    first because its DDL is what the other two fill: the
    credential column holds zero bytes until the message
    plane hoists into it, and the INSERT hashes whatever
-   bytes it is given.
+   bytes it is given. The scripts behind the figures items
+   0 to 3 call measured live under `measurements/probes/`,
+   whose README names each and the figures whose script
+   did not survive.
    Every stored message is in one canonical form: field
    names lowercase; one line per name, repeats joined with
    `, ` in the order received, `set-cookie` alone never

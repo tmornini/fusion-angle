@@ -1,0 +1,220 @@
+Pager usage is off.
+##### SETUP
+CREATE ROLE
+CREATE ROLE
+GRANT
+SET
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+INSERT 0 6
+CREATE VIEW
+GRANT
+GRANT
+RESET
+##### T0 BASELINE: INSERT on table + SELECT on view only
+SET
+--- T0.1 insert, no RETURNING
+INSERT 0 1
+--- T0.2 insert RETURNING response_at (the collision)
+psql:<stdin>:70: ERROR:  permission denied for table message_pairs
+--- T0.3 insert RETURNING a constant
+ landed 
+--------
+      1
+(1 row)
+
+INSERT 0 1
+--- T0.4 stamp minted in a CTE, returned from the CTE, bell rung
+            minted             | rows_landed | bell 
+-------------------------------+-------------+------
+ 2026-09-19 07:56:46.427955+00 |           1 | t
+(1 row)
+
+--- T0.5 same, but the insert is a no-op (WHERE false)
+ rows_landed 
+-------------
+           0
+(1 row)
+
+--- T0.6 direct table reads
+psql:<stdin>:100: ERROR:  permission denied for table message_pairs
+--- T0.7 the view hides alice v1, v2 only
+        path        | name | method | response 
+--------------------+------+--------+----------
+ /identities/alice/ | pii  | DELETE | 3
+ /identities/bob/   | pii  | PUT    | 4
+ /flows/            | f    | PUT    | 5
+ /flows/            | f    | DELETE | 6
+ /t/                | t01  | PUT    | 7
+ /t/                | t03  | PUT    | 7
+ /t/                | t04  | PUT    | 7
+(7 rows)
+
+--- T0.8 stamp stored = stamp returned? (owner checks)
+RESET
+ name |          response_at          
+------+-------------------------------
+ t04  | 2026-09-19 07:56:46.427955+00
+(1 row)
+
+##### LEAK: plain view vs security_barrier view
+SET
+--- L1 plain view, cast that fails only on hidden rows
+psql:<stdin>:112: ERROR:  invalid input syntax for type integer: "hidden-pii-alice-v1"
+RESET
+SET
+ALTER VIEW
+RESET
+SET
+--- L2 security_barrier view, same query
+ count 
+-------
+     7
+(1 row)
+
+RESET
+##### OPTION A: column grants on the table
+SET
+GRANT
+RESET
+SET
+--- A1 insert RETURNING response_at
+ got_stamp 
+-----------
+ t
+(1 row)
+
+INSERT 0 1
+--- A2 granted columns read for EVERY row, hidden included
+                  id                  |      response_at       
+--------------------------------------+------------------------
+ 00000000-0000-0000-0000-0000000000a1 | 2026-01-01 00:00:01+00
+ 00000000-0000-0000-0000-0000000000a2 | 2026-01-01 00:00:02+00
+(2 rows)
+
+--- A3 ungranted column still denied
+psql:<stdin>:138: ERROR:  permission denied for table message_pairs
+RESET
+SET
+REVOKE
+RESET
+##### OPTION B: SECURITY DEFINER function, app has EXECUTE only
+SET
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+RESET
+SET
+--- B1 call the function
+ got_stamp 
+-----------
+ t
+(1 row)
+
+--- B2 direct insert now denied
+--- B3 second successor of one head: the index still refuses
+psql:<stdin>:175: ERROR:  permission denied for table message_pairs
+psql:<stdin>:178: ERROR:  duplicate key value violates unique constraint "message_pairs_succession"
+RESET
+SET
+DROP FUNCTION
+RESET
+##### OPTION C: row-level security on the table
+SET
+ALTER TABLE
+CREATE POLICY
+CREATE POLICY
+GRANT
+GRANT
+RESET
+SET
+--- C1 read under a self-referencing policy
+psql:<stdin>:203: ERROR:  infinite recursion detected in policy for relation "message_pairs"
+RESET
+SET
+DROP POLICY
+CREATE FUNCTION
+CREATE POLICY
+RESET
+SET
+--- C2 read with the predicate behind a definer function
+        path        | name | method 
+--------------------+------+--------
+ /identities/alice/ | pii  | DELETE
+ /identities/bob/   | pii  | PUT
+ /flows/            | f    | PUT
+ /flows/            | f    | DELETE
+(4 rows)
+
+--- C3 insert RETURNING under RLS
+ got_stamp 
+-----------
+ t
+(1 row)
+
+INSERT 0 1
+--- C4 fenced column denied; leak probe under RLS
+psql:<stdin>:230: ERROR:  permission denied for table message_pairs
+ count 
+-------
+     2
+(1 row)
+
+RESET
+SET
+DROP POLICY
+DROP POLICY
+ALTER TABLE
+DROP FUNCTION
+REVOKE
+REVOKE
+RESET
+##### OPTION D: one view, all columns, read AND write through it
+SET
+CREATE VIEW
+GRANT
+GRANT
+RESET
+ table_name | is_insertable_into 
+------------+--------------------
+ pairs      | YES
+ ledger     | YES
+(2 rows)
+
+SET
+--- D1 insert through the view, RETURNING the stamp
+ got_stamp 
+-----------
+ t
+(1 row)
+
+INSERT 0 1
+--- D2 RETURNING a fenced column
+psql:<stdin>:270: ERROR:  permission denied for view ledger
+--- D3 reading a fenced column through the view
+psql:<stdin>:272: ERROR:  permission denied for view ledger
+--- D4 the row fence holds through the same view
+        path        | name | method 
+--------------------+------+--------
+ /identities/alice/ | pii  | DELETE
+ /identities/bob/   | pii  | PUT
+(2 rows)
+
+--- D5 no privilege on the table at all
+psql:<stdin>:277: ERROR:  permission denied for table message_pairs
+psql:<stdin>:281: ERROR:  permission denied for table message_pairs
+--- D6 second successor of one head, through the view
+--- D7 append-only: update and delete through the view
+psql:<stdin>:286: ERROR:  duplicate key value violates unique constraint "message_pairs_succession"
+psql:<stdin>:288: ERROR:  permission denied for view ledger
+--- D8 leak probe through the barrier view
+psql:<stdin>:289: ERROR:  permission denied for view ledger
+ count 
+-------
+     2
+(1 row)
+
+RESET
+##### DONE
