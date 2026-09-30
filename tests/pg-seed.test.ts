@@ -415,9 +415,7 @@ Deno.test({
             'bootstrap', 'mock-data',
         ] as const) {
             const db = memoryDbAdapter();
-            const empty = fakeClient([{
-                message_pairs: false,
-                    }]);
+            const empty = fakeClient([{ message_pairs: false }]);
             await seedPostgres(
                 empty.sql, db, mode, {
                     hashPassword: testHashPassword,

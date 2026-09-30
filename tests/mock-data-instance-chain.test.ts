@@ -44,8 +44,9 @@ function messagePairJsonOf(message: string): {
     };
 }
 
-// Task 6: WO-instance SoT seed chain — genesis empty, binding,
-// Review 6 + Complete 1 new-shape ops with revision pairs.
+// Task 6: WO-instance SoT seed chain — a PATCH create landing
+// its PATCH and PUT together, the binding PUT, then Review and
+// Complete, each one latched POST with its revision.
 
 const BASE = 'http://localhost';
 
