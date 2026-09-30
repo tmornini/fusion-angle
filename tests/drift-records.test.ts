@@ -495,10 +495,11 @@ async () => {
     assertStrictEquals(joinErr.message, expectedJoinMessage);
 });
 
-// -- 3. per-record + per-attribute GET wire equals derive --------
+// -- 3. per-record + per-attribute GET wire is the stored head ---
 
-Deno.test('per-record GET wire equals derive; per-attribute GET'
-+ ' wire equals derive; attribute collection 10/4 split',
+Deno.test('per-record GET wire is the stored head and equals derive'
++ ' by value; per-attribute GET wire is the stored head; attribute'
++ ' collection 10/4 split',
 async () => {
     const db = await seededDb();
     const records = [
@@ -524,14 +525,19 @@ async () => {
             ),
         );
         assertStrictEquals(res.status, 200);
+        const wireText = await res.text();
         assertStrictEquals(
-            await res.text(),
+            wireText,
             await storedPutBodyText(
                 db,
                 '/organizations/' + organization
                     + '/record-types/',
                 id,
             ),
+        );
+        assertEquals(
+            JSON.parse(wireText),
+            await derivedRecord(db, organization, id),
         );
     }
 
@@ -700,14 +706,19 @@ async () => {
                 + '/record-types/' + recordId, token),
         );
         assertStrictEquals(res.status, 200);
+        const wireText = await res.text();
         assertStrictEquals(
-            await res.text(),
+            wireText,
             await storedPutBodyText(
                 db,
                 '/organizations/' + STARK_ORGANIZATION
                     + '/record-types/',
                 recordId,
             ),
+        );
+        assertEquals(
+            JSON.parse(wireText),
+            await derivedRecord(db, STARK_ORGANIZATION, recordId),
         );
     }
 
@@ -922,7 +933,8 @@ async () => {
 // -- 6. duplicate-create refusal ---------------------------------
 
 Deno.test('duplicate-create: the second create is 409 and stores'
-+ ' nothing; wire equals derive', async () => {
++ ' nothing; wire is the stored head and equals derive by value',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = generateIdentifier();
@@ -990,6 +1002,7 @@ Deno.test('duplicate-create: the second create is 409 and stores'
             recordId,
         ),
     );
+    assertEquals(JSON.parse(wireText), derived);
     assertStrictEquals(derived.name, 'Dup First');
 });
 
@@ -1200,6 +1213,7 @@ async () => {
             recordId,
         ),
     );
+    assertEquals(JSON.parse(wireText), derived);
     assertStrictEquals(derived.name, 'Second Life');
 
     const listRes = await handleRequest(
