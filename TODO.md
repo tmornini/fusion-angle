@@ -303,6 +303,23 @@ Off the critical path; each with its oracle.
   Oracle: a Layer 2 test that drags a `.baseline-slider`
   to its minimum and reads `.slider-value` as
   `formatSigned(-100)`
+- I21's walk probe reads the page at the first paused
+  `/api/organizations/*` request, and on 29 Sep that
+  request was not the page's. The five GETs the walk
+  held are all the top-bar strip's — organization, its
+  seat read on `organizations/{id}/members/`, ideas,
+  projects, flows (`web-app/app/header-info.ts`, sent
+  from `bootApp`'s sidebar branch). The members page's
+  own roster read, which `loadInto` sends only after it
+  has painted the skeleton, is not among them. At the
+  strip's organization GET the page branch may still be
+  importing its code-split chunk, so no page code has
+  run. `tests/members-pending-skeleton.test.ts` shows
+  the skeleton painted once `init` runs. Owner call:
+  have I21 poll for the skeleton while the pause holds,
+  or rule the pre-import blank container a product gap.
+  Oracle: TEST-PLAN I21's probe step and its
+  `### Driving notes` twin
 
 ## Later work
 
