@@ -24,6 +24,7 @@ import {
 import { withoutId } from '../api/document-family.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const ME = 'XXZruirZyAOoRpNxaDnpSA';
@@ -226,4 +227,50 @@ async () => {
     }));
     assertStrictEquals(gotObjective.status, 410, 'objectives');
     await gotObjective.body?.cancel();
+});
+
+// A 'state' family's PUT validator makes a stored head with
+// no `state` impossible; one formed below the facade is a
+// bug the request crashes on, never the reader's fault.
+Deno.test('a state head stored without a state answers 500',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const { state: _state, ...stateless } = idea('active');
+    const messagePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: IDEAS + id,
+        routePattern: 'organizations/:id/ideas/:id',
+        routeSegments: ['organizations', ':id', 'ideas', ':id'],
+        pathSegments: ['organizations', STARK, 'ideas', id],
+        headerFields: [],
+        body: stateless,
+        requesterIdentityId: ME,
+        requestAt: nowUtc(),
+        organization: STARK,
+        responseBody: { id, ...stateless },
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
+    );
+    const head = await db.messagePairs.getHeadPair(IDEAS, id);
+    assertStrictEquals(head?.id, messagePair.id);
+    const { result: got, calls } = await captureConsole(
+        'error',
+        () => handleRequest(db, apiRequest({
+            method: 'GET', path: IDEAS + id, token,
+        })),
+    );
+    assertStrictEquals(got.status, 500);
+    assertEquals(await got.json(), { error: 'internal error' });
+    assertStrictEquals(calls.length, 1);
+    const [event, , error] = calls[0]!;
+    assertStrictEquals(event, 'request failed');
+    assertMatch(
+        (error as Error).message,
+        new RegExp(IDEAS + id + '.*' + messagePair.id),
+    );
 });

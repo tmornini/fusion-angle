@@ -7,10 +7,7 @@ import {
     type Reader,
     type Transmission,
 } from './served-response.ts';
-import {
-    documentIsTombstone,
-    headDocumentOf,
-} from './derive-documents.ts';
+import { bodyOf, DELETED_STATE } from './derive-documents.ts';
 
 // A family's lifecycle (api/document-family.ts:108): in
 // a 'state' family a head whose body says `deleted` is a
@@ -35,7 +32,22 @@ export function isDeletedHead(
 ): boolean {
     return head.method === 'DELETE'
         || (lifecycle === 'state'
-            && documentIsTombstone(headDocumentOf(head)));
+            && storedStateOf(head) === DELETED_STATE);
+}
+
+// A 'state' family's PUT validator admits no body without
+// `state`, so a stored head lacking it is the store's bug,
+// never the reader's request: it names the head and fails
+// the request, as a stored message with no status line does.
+function storedStateOf(head: MessagePairEntity): string {
+    const state = bodyOf(head.response)['state'];
+    if (typeof state !== 'string') {
+        throw new Error(
+            'stored head has no state: '
+                + head.path + head.name + ' (' + head.id + ')',
+        );
+    }
+    return state;
 }
 
 // The ladder's last rungs (spec §5): a deleted document
