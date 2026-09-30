@@ -24,8 +24,6 @@ import type {
 } from '../shared/notifications.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
-import { SuccessionConflict } from
-    './ledger-statement.ts';
 import {
     validateMessagePairEntity,
 } from './validators.ts';
@@ -114,44 +112,11 @@ export class BackedDbAdapter
         return this.#backend;
     }
 
-    // The open client, with no seed verdict. A route
-    // that must re-read and write as one transaction
-    // uses this; token rotation and revocation read a
-    // refusal from the answer.
+    // The open client. A route that must re-read and
+    // write as one transaction uses this; token rotation
+    // and revocation read a refusal from the answer.
     clientOn(tx: Tx): DbAdapter {
         return this.#viewForTx(tx);
-    }
-
-    // A view whose statement joins an already-open client.
-    // A matched, stale, or refused row fails the body: the
-    // caller meant every row to land. The seed keeps the
-    // same verdict in RehearsalBackend and assertLanded.
-    openClient(tx: Tx): DbAdapter {
-        const client = this.clientOn(tx);
-        const run = client.executeLedger.bind(client);
-        client.executeLedger = async (attempt, rows, now) => {
-            let stated;
-            try {
-                stated = await run(attempt, rows, now);
-            } catch (error) {
-                if (error instanceof SuccessionConflict) {
-                    throw new Error(
-                        'seed statement returned refused',
-                    );
-                }
-                throw error;
-            }
-            for (const row of stated) {
-                if (row.rawOutcome !== 'land') {
-                    throw new Error(
-                        'seed statement returned '
-                            + row.rawOutcome,
-                    );
-                }
-            }
-            return stated;
-        };
-        return client;
     }
 
     async readTransaction<R>(

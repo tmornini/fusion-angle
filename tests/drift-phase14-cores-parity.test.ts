@@ -2,51 +2,40 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../shared/types.ts';
-import { deriveInvitation } from '../api/derive-invitations.ts';
 import {
-    invitationLifecycleStatesFor,
     workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';
 import {
-    ORGANIZATION_TWO,
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
-    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-const INV_PARITY_OPSTATE_ACCEPTED = generateIdentifier();
-const NO_SUCH_INVITATION = generateIdentifier();
-const INV_PARITY_LIFECYCLE_REVOKED = generateIdentifier();
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();
 const N_FINISH = generateIdentifier();
 const EDGE_2 = generateIdentifier();
-const INVITATIONID_GRANT = generateIdentifier();
-const ID_MS = generateIdentifier();
-const ID_ACCEPT = generateIdentifier();
-const ID_REVOKE = generateIdentifier();
 const WORKORDERID_FWO = generateIdentifier();
 const WORKORDERID_EV1 = generateIdentifier();
 const WORKORDERID_EV2 = generateIdentifier();
 const WORKORDERID_EV3 = generateIdentifier();
 
-// The Author gate 1 rule (e) pre-tx-vs-in-tx PARITY pins for the
-// three Phase 14 Task 1 cores (deriveInvitation,
-// invitationLifecycleStatesFor, workOrderLifecycleStatesFor) —
-// the membershipExistsFor precedent
-// (tests/drift-memberships-identity.test.ts leg 5): each core is
+// The Author gate 1 rule (e) pre-tx-vs-in-tx PARITY pin for
+// the Phase 14 Task 1 core workOrderLifecycleStatesFor — the
+// membershipExistsFor precedent
+// (tests/drift-memberships-identity.test.ts leg 5): the core is
 // called BOTH pre-tx (the plain adapter) and in-tx (an open
-// read-transaction view) and proven byte-identical. The
-// invitation transitions and postWorkOrderClaimOp read heads
-// before their statement and open no transaction, so each
-// pin now proves the core reads the same inside and outside
-// one. workOrderClaimHistoryFor's pin
+// read-transaction view) and proven byte-identical.
+// postWorkOrderClaimOp reads heads before its statement and
+// opens no transaction, so the pin proves the core reads the
+// same inside and outside one. The invitation cores' pins
+// retired with the cores: the invitation routes read the
+// document head. workOrderClaimHistoryFor's pin
 // retired with the replayer: the claim reads the work
 // order's head. documentStateHeadFor pins retired with C5
 // (the helper itself is gone).
@@ -68,111 +57,6 @@ function req(
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
-
-async function grant(
-    db: MemoryDbAdapter,
-    invitationId: string,
-    email: string,
-): Promise<void> {
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
-    );
-    const res = await handleRequest(db, req(
-        'POST', '/organizations/' + ORGANIZATION_TWO
-            + '/invitations/', admin, {
-            email,
-            invitationId,
-            grantEventId: INVITATIONID_GRANT,
-            grantAt: '2026-06-01T00:00:00.000000Z',
-        },
-    ));
-    assertStrictEquals(res.status, 201);
-}
-
-// -- deriveInvitation ---------------------------------------
-
-Deno.test('deriveInvitation: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open read-transaction view) after a'
-+ ' live accept — the membershipExistsFor precedent',
-async () => {
-    const db = await seededDb();
-    const id = INV_PARITY_OPSTATE_ACCEPTED;
-    const inviteeId = 'MQFcPtrZPIGjMCRAXtZUnA'; // Sarah Chen
-    await grant(db, id, 'sarah.chen@company.com');
-    const accept = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + inviteeId + '/invitations/' + id,
-        await organizationToken(inviteeId, ORGANIZATION_TWO),
-        {
-            state: 'accepted',
-            membershipId: ID_MS,
-            eventId: ID_ACCEPT,
-            at: '2026-06-01T00:00:01.000000Z',
-        },
-    )));
-    assertStrictEquals(accept.status, 200);
-
-    // The accept opens no transaction; the core must read the
-    // same plainly and inside a read transaction.
-    const preTx = await deriveInvitation(db, id);
-    const inTx = await db.readTransaction(
-        (view) => deriveInvitation(view, id),
-    );
-    assertEquals(inTx, preTx);
-    assertStrictEquals(preTx?.state, 'accepted');
-
-    // A never-granted id, same parity.
-    const preTxMissing = await deriveInvitation(
-        db, NO_SUCH_INVITATION,
-    );
-    const inTxMissing = await db.readTransaction(
-        (view) =>
-            deriveInvitation(view, NO_SUCH_INVITATION),
-    );
-    assertEquals(inTxMissing, preTxMissing);
-    assertStrictEquals(preTxMissing, undefined);
-});
-
-// -- invitationLifecycleStatesFor --------------------------------
-
-Deno.test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
-+ ' plain adapter) vs in-tx (an open read-transaction view)'
-+ ' after a live revoke', async () => {
-    const db = await seededDb();
-    const id = INV_PARITY_LIFECYCLE_REVOKED;
-    await grant(db, id, 'emily.rodriguez@company.com');
-    const revoke = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/invitations/' + id,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
-        {
-            state: 'revoked',
-            eventId: ID_REVOKE,
-            at: '2026-06-01T00:00:01.000000Z',
-        },
-    )));
-    assertStrictEquals(revoke.status, 200);
-
-    const preTx = await invitationLifecycleStatesFor(db, id);
-    const inTx = await db.readTransaction(
-        (view) => invitationLifecycleStatesFor(view, id),
-    );
-    assertEquals(inTx, preTx);
-    assertStrictEquals(preTx.length, 2);
-
-    const preTxMissing = await invitationLifecycleStatesFor(
-        db, NO_SUCH_INVITATION,
-    );
-    const inTxMissing = await db.readTransaction(
-        (view) =>
-            invitationLifecycleStatesFor(
-                view, NO_SUCH_INVITATION,
-            ),
-    );
-    assertEquals(inTxMissing, preTxMissing);
-    assertEquals(preTxMissing, []);
-});
 
 // -- workOrderLifecycleStatesFor ---------------------------------
 

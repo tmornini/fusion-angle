@@ -2,8 +2,6 @@ import { assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id } from '../shared/types.ts';
-import { assertInvitationState } from '../shared/types.ts';
-import { deriveInvitation } from '../api/derive-invitations.ts';
 import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
@@ -16,11 +14,11 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// The document-head oracle: deriveInvitation is ONE document
+// The document-head oracle: an invitation GET is ONE document
 // read whose head carries `state` (spec 2026-09-15 § 2).
-// This file proves it agrees with invitationLifecycleStatesFor
-// (the document's own history, latest row) over the three
-// live lifecycles plus pending and never-granted.
+// This file proves it agrees with the invitation's version
+// list (the document's own history, newest version) over the
+// three live lifecycles plus pending and never-granted.
 
 function req(
     method: string,
@@ -40,25 +38,41 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// The row-plane reproduction of deriveInvitation's own head
-// read: the document's OWN history, latest row, mirroring the
-// algorithm rather than the privacy (the
-// drift-memberships-identity.test.ts leg-4 precedent).
-async function rowPlaneOpState(
+// The state an invitation GET answers its organization's
+// admin, or undefined when it answers 404.
+async function readState(
     db: MemoryDbAdapter, id: Id,
 ): Promise<string | undefined> {
-    const { invitationLifecycleStatesFor } = await import(
-        '../api/derive-states.ts'
+    return (await adminRead(db, id) as { state: string } | undefined)
+        ?.state;
+}
+
+// The newest version's state: the document's OWN history,
+// read through its version list.
+async function newestVersionState(
+    db: MemoryDbAdapter, id: Id,
+): Promise<string | undefined> {
+    const versions = await adminRead(db, id + '/versions/') as
+        { state: string }[] | undefined;
+    return versions?.[0]?.state;
+}
+
+async function adminRead(
+    db: MemoryDbAdapter, resource: string,
+): Promise<unknown> {
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
-    const rows = await invitationLifecycleStatesFor(db, id);
-    if (rows.length === 0) return undefined;
-    const latest = [...rows].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
-    return assertInvitationState(latest.state, 'invitation ' + id);
+    const res = await handleRequest(db, req(
+        'GET', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/' + resource, admin,
+    ));
+    if (res.status === 404) {
+        await res.body?.cancel();
+        return undefined;
+    }
+    assertStrictEquals(res.status, 200);
+    return await res.json();
 }
 
 async function grant(
@@ -81,24 +95,24 @@ async function grant(
     assertStrictEquals(res.status, 201);
 }
 
-Deno.test('deriveInvitation: pending (granted, unanswered)'
-+ ' derives \'pending\', matching the row-plane state',
+Deno.test('an invitation GET: pending (granted, unanswered)'
++ ' reads \'pending\', matching its newest version',
 async () => {
     const db = await seededDb();
     const id = generateIdentifier();
     await grant(db, id, 'sarah.chen@company.com');
 
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state, 'pending',
+        await readState(db, id), 'pending',
     );
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state,
-        await rowPlaneOpState(db, id),
+        await readState(db, id),
+        await newestVersionState(db, id),
     );
 });
 
-Deno.test('deriveInvitation: accepted derives \'accepted\','
-+ ' matching the row-plane current state', async () => {
+Deno.test('an invitation GET: accepted reads \'accepted\','
++ ' matching its newest version', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
     const inviteeId = 'MQFcPtrZPIGjMCRAXtZUnA'; // Sarah Chen
@@ -118,16 +132,16 @@ Deno.test('deriveInvitation: accepted derives \'accepted\','
     assertStrictEquals(accept.status, 200);
 
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state, 'accepted',
+        await readState(db, id), 'accepted',
     );
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state,
-        await rowPlaneOpState(db, id),
+        await readState(db, id),
+        await newestVersionState(db, id),
     );
 });
 
-Deno.test('deriveInvitation: declined derives \'declined\','
-+ ' matching the row-plane current state', async () => {
+Deno.test('an invitation GET: declined reads \'declined\','
++ ' matching its newest version', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
     const inviteeId = 'zyGBRshxOnKHUfcyFRqowg'; // Jessica Park
@@ -146,16 +160,16 @@ Deno.test('deriveInvitation: declined derives \'declined\','
     assertStrictEquals(decline.status, 200);
 
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state, 'declined',
+        await readState(db, id), 'declined',
     );
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state,
-        await rowPlaneOpState(db, id),
+        await readState(db, id),
+        await newestVersionState(db, id),
     );
 });
 
-Deno.test('deriveInvitation: revoked derives \'revoked\','
-+ ' matching the row-plane current state', async () => {
+Deno.test('an invitation GET: revoked reads \'revoked\','
++ ' matching its newest version', async () => {
     const db = await seededDb();
     const id = generateIdentifier();
     await grant(db, id, 'emily.rodriguez@company.com');
@@ -174,20 +188,18 @@ Deno.test('deriveInvitation: revoked derives \'revoked\','
     assertStrictEquals(revoke.status, 200);
 
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state, 'revoked',
+        await readState(db, id), 'revoked',
     );
     assertStrictEquals(
-        (await deriveInvitation(db, id))?.state,
-        await rowPlaneOpState(db, id),
+        await readState(db, id),
+        await newestVersionState(db, id),
     );
 });
 
-Deno.test('deriveInvitation: a never-granted id derives'
-+ ' undefined, no throw', async () => {
+Deno.test('an invitation GET: a never-granted id answers 404,'
++ ' as its version list does', async () => {
     const db = await seededDb();
-    await deriveInvitation(db, generateIdentifier());
-    assertStrictEquals(
-        (await deriveInvitation(db, generateIdentifier()))?.state,
-        undefined,
-    );
+    const id = generateIdentifier();
+    assertStrictEquals(await readState(db, id), undefined);
+    assertStrictEquals(await newestVersionState(db, id), undefined);
 });

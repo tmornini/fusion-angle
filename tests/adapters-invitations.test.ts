@@ -11,9 +11,6 @@ import {
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
 import {
-    invitationLifecycleStatesFor,
-} from '../api/derive-states.ts';
-import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -252,6 +249,26 @@ async function ctxFor(sub: string, organization: string) {
         db, await organizationToken(sub, organization),
     );
     return { db, ctx, daveId };
+}
+
+// The invitation's newest version as its organization's
+// admin reads it, with the author the server recorded.
+async function newestVersion(
+    admin: RequestContext,
+    organization: string,
+    id: string,
+): Promise<{ etag: string; at: string; member_id: string }> {
+    const versions = await admin.GET<{
+        etag: string;
+        at: string;
+        member_id: string;
+    }[]>(
+        'organizations/' + organization + '/invitations/'
+            + id + '/versions/',
+    );
+    const newest = versions[0];
+    assert(newest !== undefined, 'the invitation has no version');
+    return newest;
 }
 
 // A context bound to an existing db (for two actors in one test).
@@ -720,16 +737,10 @@ Deno.test('grant: entity lands and event author is server-derived',
     assertStrictEquals(invs.length, 1);
     // Entity landed with a non-empty id.
     assert(invs[0]!.id !== '');
-    // State event exists and carries an at.
-    const life = await invitationLifecycleStatesFor(
-        db, invs[0]!.id,
+    // The newest version exists and carries an at.
+    const ev = await newestVersion(
+        tony, 'BBjWJsjYIDkTRKIIPrzWRw', invs[0]!.id,
     );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
     assert(ev.at !== '');
     assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 }));
@@ -748,17 +759,11 @@ Deno.test('accept: event author is server-derived, membership lands',
         toccYYkLEABmlbpHJalgtQ, inv.id,
         'BBjWJsjYIDkTRKIIPrzWRw',
     );
-    // State event landed with a non-empty id + at.
-    const life = await invitationLifecycleStatesFor(
-        db, inv.id,
+    // The version landed with a non-empty etag + at.
+    const ev = await newestVersion(
+        tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
-    assert(ev.id !== '');
+    assert(ev.etag !== '');
     assert(ev.at !== '');
     assertStrictEquals(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
     // Membership landed at a non-empty id.
@@ -779,16 +784,10 @@ Deno.test('decline: event author is server-derived',
     const inv = (await deriveInvitations(db))[0]!;
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationDecline(dave, inv.id);
-    const life = await invitationLifecycleStatesFor(
-        db, inv.id,
+    const ev = await newestVersion(
+        tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
-    assert(ev.id !== '');
+    assert(ev.etag !== '');
     assert(ev.at !== '');
     assertStrictEquals(ev.member_id, daveId);
 }));
@@ -802,16 +801,10 @@ Deno.test('revoke: event author is server-derived',
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = (await deriveInvitations(db))[0]!;
     await postInvitationRevocation(tony, inv.id);
-    const life = await invitationLifecycleStatesFor(
-        db, inv.id,
+    const ev = await newestVersion(
+        tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
-    const ev = [...life].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-            : a.id < b.id ? -1
-            : a.id > b.id ? 1 : 0,
-    ).at(-1)!;
-    assert(ev.id !== '');
+    assert(ev.etag !== '');
     assert(ev.at !== '');
     assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 }));

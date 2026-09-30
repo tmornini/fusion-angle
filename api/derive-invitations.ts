@@ -67,22 +67,3 @@ export async function deriveInvitations(
     }
     return rows.sort(byIdAscending);
 }
-
-// The document read: one invitation's head, or undefined
-// when no document was ever written at this id. dbOrView-
-// shaped and opens no nested transaction, so a caller may
-// read it inside a transaction it already holds.
-export async function deriveInvitation(
-    dbOrView: DbAdapter,
-    id: Id,
-): Promise<DerivedInvitationRow | undefined> {
-    const history = await dbOrView.messagePairs.getDocumentHistory(
-        INVITATIONS_PREFIX, id,
-    );
-    const document = deriveDocumentsAt(
-        history, INVITATIONS_PREFIX,
-    ).get(id);
-    return document === undefined
-        ? undefined
-        : invitationRowOf(document);
-}

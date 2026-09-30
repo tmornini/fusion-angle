@@ -47,8 +47,8 @@ import {
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
 //       No bulk derive remains (C3).
-//   (e) deriveInvitationStates / invitationLifecycleStatesFor —
-//       the invitation document's own PUT history: the
+//   (e) deriveInvitationStates — the invitation
+//       documents' own PUT history: the
 //       grant's 'pending' and the later terminal PUT (spec
 //       2026-09-15 § 2). The answering ops (acceptance /
 //       decline / revocation) are the HTTP audit alone; no
@@ -615,21 +615,6 @@ export async function deriveInvitationStates(
     );
     return invitationLifecycleRowsOf(
         documentMessagePairsAt(stored, INVITATIONS_PREFIX),
-    );
-}
-
-// One invitation's lifecycle: ONE document read. dbOrView-
-// shaped and opens no nested transaction, so a caller may
-// read it inside a transaction it already holds.
-export async function invitationLifecycleStatesFor(
-    dbOrView: DbAdapter,
-    id: Id,
-): Promise<StateEntity[]> {
-    const history = await dbOrView.messagePairs.getDocumentHistory(
-        INVITATIONS_PREFIX, id,
-    );
-    return invitationLifecycleRowsOf(
-        documentMessagePairsAt(history, INVITATIONS_PREFIX),
     );
 }
 

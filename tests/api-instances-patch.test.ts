@@ -554,10 +554,10 @@ async () => {
 });
 
 // The tenancy fence: an id live in another organization
-// answers exactly as an absent one, and nothing lands on
-// either side.
-Deno.test('PATCH foreign instance id with If-Match → 412, as'
-+ ' absent', async () => {
+// answers exactly as an absent one, even under that
+// document's own tag, and nothing lands on either side.
+Deno.test('PATCH foreign instance id with the foreign head\'s'
++ ' own If-Match → 412, as absent', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
@@ -578,10 +578,7 @@ Deno.test('PATCH foreign instance id with If-Match → 412, as'
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
-        {
-            [IF_MATCH_HEADER]:
-                '"' + WELL_FORMED_TAG + '"',
-        },
+        { [IF_MATCH_HEADER]: '"' + foreign + '"' },
     ));
     assertStrictEquals(res.status, 412);
     assertEquals(await res.json(), {

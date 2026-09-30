@@ -82,8 +82,9 @@ path is never exempt.
 ## Wire contract
 
 A landed answer restores the hoisted credential lines
-onto the stored response (`mergeSecret`, then
-`responseFromLatin1`, both in `api/message-pair.ts`).
+onto the stored response (`mergeSecret`, in
+`shared/http-message/credentials.ts`, then
+`responseFromLatin1`, in `api/message-pair.ts`).
 The statement splices the date into a landed row, and
 the status line in those bytes is the status on the
 wire. A landed PUT stores 201 when no live PUT head
@@ -92,7 +93,9 @@ a DELETE stores 201. A POST or PATCH through the
 former stores 201 when its parent document is a
 genesis and 200 when the parent lands in order. The
 authentication doors keep OAuth's response and store
-200. DELETE stores 204. A landed message carries Date,
+200. DELETE stores 204, except the claim release,
+which stores 200 with the work order's state. A
+landed message carries Date,
 ETag (quoted message-pair identifier), Operation-ID,
 and Request-ID. A document PUT's ETag is its pair id,
 the same value a later GET advertises. A write through
@@ -130,9 +133,10 @@ Status ladder:
 - **409** — domain conflict (a rebind, a live claim by
   another member, an invitation not pending, a
   RESTRICT); a handler's genesis over a live document
-  (`Document already exists at <path><name>`); a blind
-  PUT that loses three times
-  (`Document remained contended at <path><name>`)
+  (`Document already exists at <path><name>`); a
+  never-written latch refused twice with no stated
+  head, the same body; a blind PUT that loses three
+  times (`Document remained contended at <path><name>`)
 - **410** — a retired record instance: its GET, its
   PATCH, and a create over its tombstone (the create's
   body: `Document is gone at <path><name>`)
@@ -354,7 +358,8 @@ POSTs do not re-enter `handleRequest`. One client call
 is one ledger statement: the former runs every row of
 a write together. Token rotation and revocation also
 re-read their heads, so they wrap that re-read and the
-statement in one `db.transaction(fn)` (`api/db.ts`).
+statement in one `backend.transaction('readwrite', …)`,
+reading through `clientOn(tx)` (`api/db-backed.ts`).
 Atomicity is the platform primitive, not a simulated
 HTTP nest. Validators, crypto, hash, and
 `serializeWire` run outside the tx. See `AGENTS.md

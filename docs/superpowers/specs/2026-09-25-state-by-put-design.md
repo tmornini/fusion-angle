@@ -206,7 +206,10 @@ statement judges a latch.
     its rehearsal. The client spec's layout, its
     instance, and its oracle. The retries bullet and
     the two-layer recovery. The bell per inserted
-    row.
+    row. Task 21 (operator) splits the credential
+    hoist into `request_secrets` and
+    `response_secrets`, so a row binds fifteen
+    parameters.
 
 ## Found on the base
 
@@ -1116,7 +1119,7 @@ with no special case.
 | 428 | a required conditional absent, or a tag missing for a document the operation derives from; the body names the document (RFC 6585 §3) |
 | 400 | a malformed entity-tag (RFC 9110 §15.5.1); a body with `organization_id`; a PUT with no body |
 | 412 | a stale `If-Match`; a declared genesis on a live head; both headers sent; a tag naming no head the operation derives from (§13.1.1, §13.1.2, §13.2.2) |
-| 409 | a POST create's taken name (§15.5.10) |
+| 409 | a POST create's taken name (§15.5.10); a never-written latch refused twice with no stated head |
 | 410 | an instance name that is retired: a create over its tombstone, and its GET and PATCH (§15.5.11) |
 | 201 | a genesis, own pair and sibling alike; a POST create's 201 carries `Location` (§15.3.2, §9.3.4) |
 | 200 | a successor; a no-op |
@@ -1129,7 +1132,7 @@ name the document and the fact. A landed answer's
 changes where §4 and §9 say and nowhere else.
 
 Both backends gain the classifier's one nil branch;
-the statement keeps fourteen parameters; `genesis`
+the statement keeps fifteen parameters; `genesis`
 leaves the leading bind's vocabulary.
 
 One deviation stands, inherited. RFC 9110 §9.3.4
