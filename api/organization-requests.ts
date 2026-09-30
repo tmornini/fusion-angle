@@ -1,13 +1,11 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, OrganizationEntity } from '../shared/types.ts';
+import type { HeadSelection } from './head-reads.ts';
 import {
     attemptFor,
     runWrite,
     type MessagePair,
 } from './message-pair.ts';
-import {
-    currentDefaultOrganizationFor,
-} from './authorization.ts';
 import {
     ApiError,
     HTTP_BAD_REQUEST,
@@ -17,7 +15,7 @@ import {
 import { param } from './document-family.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
-    deriveDefaultOrganization,
+    defaultOrganizationPrefix,
 } from './derive-default-organization.ts';
 import {
     deriveMembershipsForIdentity,
@@ -67,15 +65,15 @@ export async function getIdentityOrganizations(
 // PUT/GET /identities/:id/default-organization — a simple
 // document. Authorized by tree ownership (caller === :id).
 // PUT { organization_id } must name a live seat, else 400
-// and nothing is stored. GET returns that document or 404
-// if never SET. No public DELETE. Revoke does not rewrite
-// this document. Self-only stays here: admin-everywhere
-// on `/` is not a substitute.
-export async function getIdentityDefaultOrganization(
+// and nothing is stored. GET serves that document's head
+// or 404s if never SET. No public DELETE. Revoke does not
+// rewrite this document. Self-only stays here:
+// admin-everywhere on `/` is not a substitute.
+export async function selectIdentityDefaultOrganization(
     db: DbAdapter,
     p: string[],
     actor: Id,
-): Promise<{ organization_id: string }> {
+): Promise<HeadSelection> {
     const identityId = param(p, 0);
     if (actor !== identityId) {
         throw new ApiError(
@@ -84,16 +82,19 @@ export async function getIdentityDefaultOrganization(
             HTTP_FORBIDDEN,
         );
     }
-    const rows = await deriveDefaultOrganization(
-        db, identityId,
+    const head = await db.messagePairs.getHeadPair(
+        defaultOrganizationPrefix(identityId), '',
     );
-    const set = currentDefaultOrganizationFor(
-        rows, identityId,
-    );
-    if (set === null) {
+    if (head === null) {
         throw new ApiError('not found', HTTP_NOT_FOUND);
     }
-    return { organization_id: set };
+    return {
+        kind: 'document', head,
+        lifecycle: 'stateless',
+        table: 'identity_default_organization',
+        id: identityId,
+        reader: { sees: 'whole' },
+    };
 }
 
 export async function putIdentityDefaultOrganization(

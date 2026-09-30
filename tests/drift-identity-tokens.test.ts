@@ -278,9 +278,8 @@ Deno.test('identities/:id/tokens/:jti successBody is id-first',
 // -- a LITERAL id-FIRST reconstruction of what was PUT: ----------
 // -- byIdAscending collection order, and the 404 body -------------
 
-Deno.test('GET /identities/:id/tokens + /:jti are wire'
-+ ' byte-identical to a literal id-FIRST reconstruction of'
-+ ' each jti\'s HEAD: byIdAscending collection order and the'
+Deno.test('GET /identities/:id/tokens/:jti serves each jti\'s'
++ ' stored head; byIdAscending collection order and the'
 + ' 404 body',
 async () => {
     const db = await freshDb();
@@ -355,7 +354,12 @@ async () => {
         ));
         assertStrictEquals(singleRes.status, 200);
         assertStrictEquals(
-            await singleRes.text(), JSON.stringify(row),
+            await singleRes.text(),
+            await storedPutBodyText(
+                db,
+                '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
+                row.id,
+            ),
         );
     }
 

@@ -232,10 +232,6 @@ async () => {
         , 'prBESZPjJDiuXCeZLmbiVw');
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.id, id);
-    assertEquals(
-        rows[0],
-        await deriveIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id),
-    );
 });
 
 Deno.test('same event id on both planes — nested wins',
@@ -280,9 +276,4 @@ async () => {
         , 'prBESZPjJDiuXCeZLmbiVw');
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.provider, 'nested-github');
-    assertStrictEquals(
-        (await deriveIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw'
-            , id)).provider,
-        'nested-github',
-    );
 });

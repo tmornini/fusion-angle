@@ -248,7 +248,7 @@ Deno.test('GET identities/:id/default-organization'
         ),
     );
     assert(match);
-    assertStrictEquals(typeof match.route.get, 'function');
+    assertStrictEquals(typeof match.route.select, 'function');
     assertStrictEquals(typeof match.route.put, 'function');
 });
 
@@ -279,7 +279,8 @@ Deno.test(
             db, getDefaultOrganization(token, MEMBER),
         );
         assertEquals(
-            await got.json(), { organization_id: OTHER },
+            await got.json(),
+            { id: MEMBER, organization_id: OTHER },
         );
     },
 );

@@ -1,9 +1,15 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { seededMockDb } from './mock-seed.ts';
-import { organizationToken } from './token-fixtures.ts';
+import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import { apiRequest } from './http-fixtures.ts';
 import { deriveCredentialsFor } from '../api/derive-identity-spine.ts';
+import { bodyOf } from '../api/derive-documents.ts';
+import { generateIdentifier } from '../shared/identifier.ts';
 
 const ME = 'XXZruirZyAOoRpNxaDnpSA';
 
@@ -47,4 +53,44 @@ async () => {
         got.headers.get('content-length'),
         String(new TextEncoder().encode(text).byteLength),
     );
+});
+
+const AT = '2026-01-01T00:00:00.000000Z';
+
+// No body names its identity: the path is the only source,
+// so a writer that stopped stamping it would store none.
+const IDENTITY_EVENT_WRITES = [
+    {
+        collection: 'tokens',
+        body: {
+            action: 'issued', chain_id: generateIdentifier(), at: AT,
+        },
+    },
+    { collection: 'token-revocations', body: { at: AT } },
+    {
+        collection: 'providers',
+        body: {
+            provider: 'google', provider_subject: 'sub-123',
+            action: 'linked', at: AT,
+        },
+    },
+];
+
+Deno.test('every written token, revocation, and provider head'
+    + ' stores its path identity', async () => {
+    const db = await seededMockDb();
+    const stamped: unknown[] = [];
+    for (const { collection, body } of IDENTITY_EVENT_WRITES) {
+        const prefix = '/identities/' + ME + '/' + collection + '/';
+        const name = generateIdentifier();
+        const put = await handleRequest(db, apiRequest({
+            method: 'PUT', path: prefix + name, token: DEV_TOKEN, body,
+        }));
+        assertStrictEquals(put.status, 201);
+        await put.body?.cancel();
+        const head = await db.messagePairs.getHeadPair(prefix, name);
+        assert(head !== null);
+        stamped.push(bodyOf(head.response)['identity_id']);
+    }
+    assertEquals(stamped, [ME, ME, ME]);
 });

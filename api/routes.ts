@@ -256,8 +256,8 @@ import {
     credentialsPrefixFor,
     deriveIdentityKind,
     deriveIdentityProvidersFor,
-    deriveIdentityProvider,
-    deriveTokenRevocation,
+    providersPrefixFor,
+    tokenRevocationsPrefixFor,
     piiEntityOf,
     registrationEntityOf,
     identityProviderEntityOf,
@@ -286,8 +286,9 @@ import {
 } from './derive-organizations.ts';
 import {
     deriveIdentityTokensFor,
-    deriveIdentityToken,
     identityTokenEntityOf,
+    IDENTITY_TOKENS_TABLE,
+    tokensPrefixFor,
 } from './derive-identity-tokens.ts';
 import {
     param,
@@ -309,9 +310,9 @@ import {
     type DocumentFamilyWiring,
 } from './document-family.ts';
 import {
-    getIdentityDefaultOrganization,
     getIdentityOrganizations,
     putIdentityDefaultOrganization,
+    selectIdentityDefaultOrganization,
 } from './organization-requests.ts';
 import {
     getOrganizationInvitations,
@@ -3749,7 +3750,7 @@ export const routes: Route[] = [
     // substitute. Storage prefix stays
     // /identities/:id/default-organization/.
     route('identities/:id/default-organization', {
-        get: getIdentityDefaultOrganization,
+        select: selectIdentityDefaultOrganization,
         put: putIdentityDefaultOrganization,
     }),
     route('identities/:id/organizations/', {
@@ -4016,12 +4017,26 @@ export const routes: Route[] = [
     // keeps it self-only (path identity vs actor). Flat
     // /identity-token-revocations is retired (router 404).
     // EVENT-APPEND: no head-read, no Supersedes. Path
-    // identity is the document — stamped on write and GET.
+    // identity is the document — stamped on write, so the
+    // stored head carries it.
     route('identities/:id/token-revocations/:rid', {
-        get: (db, p) =>
-            deriveTokenRevocation(
-                db, param(p, 0), param(p, 1),
-            ),
+        select: async (db, p) => {
+            const rid = param(p, 1);
+            const head = await db.messagePairs.getHeadPair(
+                tokenRevocationsPrefixFor(param(p, 0)), rid,
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'identity_token_revocations', rid,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'identity_token_revocations', id: rid,
+                reader: { sees: 'whole' },
+            };
+        },
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const id = param(p, 1);
@@ -4066,13 +4081,26 @@ export const routes: Route[] = [
     // Hand-written so PUT can stamp identity_id from the
     // path (the Task 3 hole: omit-PUT must not poison GET)
     // and append its message pair without a row write.
-    // GET is FLIPPED: derived via deriveIdentityToken —
-    // 404 body unchanged. PUT is PAIR-ONLY.
+    // GET serves the stored head — 404 body unchanged. PUT
+    // is PAIR-ONLY.
     route('identities/:id/tokens/:jti', {
-        get: (db, p) =>
-            deriveIdentityToken(
-                db, param(p, 0), param(p, 1),
-            ),
+        select: async (db, p) => {
+            const jti = param(p, 1);
+            const head = await db.messagePairs.getHeadPair(
+                tokensPrefixFor(param(p, 0)), jti,
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    IDENTITY_TOKENS_TABLE, jti,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: IDENTITY_TOKENS_TABLE, id: jti,
+                reader: { sees: 'whole' },
+            };
+        },
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const jti = param(p, 1);
@@ -4166,8 +4194,10 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Nested provider events (credentials shape). Dual-read
-    // still sees leftover /identity-providers/ pairs. No fence:
+    // Nested provider events (credentials shape). The
+    // collection's dual-read still sees leftover
+    // /identity-providers/ pairs; the document reads the
+    // nested prefix alone. No fence:
     // GLOBAL-plane (no organization_id). ADMIN-ONLY — not in
     // MEMBER_VERBS. Flat /identity-providers is retired
     // (router 404).
@@ -4176,10 +4206,23 @@ export const routes: Route[] = [
             deriveIdentityProvidersFor(db, param(p, 0)),
     }),
     route('identities/:id/providers/:eid', {
-        get: (db, p) =>
-            deriveIdentityProvider(
-                db, param(p, 0), param(p, 1),
-            ),
+        select: async (db, p) => {
+            const eid = param(p, 1);
+            const head = await db.messagePairs.getHeadPair(
+                providersPrefixFor(param(p, 0)), eid,
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'identity_providers', eid,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'identity_providers', id: eid,
+                reader: { sees: 'whole' },
+            };
+        },
         put: (db, p, body, actor, messagePair) =>
             postIdentityProviderDocumentOp(
                 db, param(p, 0), param(p, 1),

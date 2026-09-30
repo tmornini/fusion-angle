@@ -225,13 +225,14 @@ export async function deriveCredential(
     return credentialEntityOf(document);
 }
 
-// ---- identity_providers — nested under the identity; dual-read
-// ---- the old flat prefix so leftover seed pairs still derive.
+// ---- identity_providers — nested under the identity; the
+// ---- collection dual-reads the old flat prefix so leftover
+// ---- seed pairs still derive.
 
 const IDENTITY_PROVIDERS_PREFIX =
     canonicalPath(undefined, '/identity-providers/');
 
-function providersPrefixFor(identityId: Id): string {
+export function providersPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined,
         '/identities/' + identityId + '/providers/',
@@ -306,26 +307,13 @@ export async function deriveIdentityProvider(
     identityId: Id,
     eid: Id,
 ): Promise<IdentityProviderEntity> {
-    const nested = await fetchProviderDocumentsAt(
+    const document = (await fetchProviderDocumentsAt(
         db, providersPrefixFor(identityId),
-    );
-    const nestedDocument = nested.get(eid);
-    if (nestedDocument !== undefined) {
-        return nestedProviderEntityOf(
-            identityId, nestedDocument,
-        );
+    )).get(eid);
+    if (document === undefined) {
+        throw new EntityNotFoundError('identity_providers', eid);
     }
-    const flat = await fetchProviderDocumentsAt(
-        db, IDENTITY_PROVIDERS_PREFIX,
-    );
-    const flatDocument = flat.get(eid);
-    if (flatDocument !== undefined) {
-        const entity = identityProviderEntityOf(flatDocument);
-        if (entity.identity_id === identityId) {
-            return entity;
-        }
-    }
-    throw new EntityNotFoundError('identity_providers', eid);
+    return nestedProviderEntityOf(identityId, document);
 }
 
 // ---- identity_token_revocations — nested under the identity.
@@ -336,7 +324,7 @@ export async function deriveIdentityProvider(
 // ---- (tokenRevocationReason's FIRST read) one production
 // ---- reader.
 
-function tokenRevocationsPrefixFor(identityId: Id): string {
+export function tokenRevocationsPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined,
         '/identities/' + identityId + '/token-revocations/',
