@@ -161,8 +161,9 @@ async () => {
         headerFields: [], body,
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const written = await postRecordDocumentOp(
         db, 'rbfHGatkwQzGZJVXKJEeyw', body,
@@ -202,8 +203,9 @@ Deno.test('postRecordDocumentOp with a new state writes a'
         headerFields: [], body: firstBody,
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: firstBody,
+        responseBody: firstBody,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rlBnfIvzDVVZeVSjBECxGg', firstBody, 'XXZruirZyAOoRpNxaDnpSA'
@@ -225,8 +227,9 @@ Deno.test('postRecordDocumentOp with a new state writes a'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: secondBody,
+        responseBody: secondBody,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postRecordDocumentOp(
         db, 'rlBnfIvzDVVZeVSjBECxGg', secondBody, 'XXZruirZyAOoRpNxaDnpSA'

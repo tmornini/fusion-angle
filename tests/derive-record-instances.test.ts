@@ -77,11 +77,11 @@ async function appendInstancePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: ORGANIZATION,
-        responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: method === 'DELETE'
             ? undefined
             : body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

@@ -662,7 +662,7 @@ async () => {
             position: 2,
         },
     ));
-    assertStrictEquals(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 200);
     const putBody = await entityPut.json() as {
         flow_graph: Record<string, unknown>;
     };
@@ -681,7 +681,7 @@ async () => {
             expireAt: claimFreshAt,
         },
     ));
-    assertStrictEquals(claimFresh.status, 201);
+    assertStrictEquals(claimFresh.status, 200);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Repeat-claim by A — idempotent no-op: the pair appends,
@@ -702,7 +702,7 @@ async () => {
             expireAt: claimRepeatAt,
         },
     ));
-    assertStrictEquals(claimRepeat.status, 201);
+    assertStrictEquals(claimRepeat.status, 200);
     assertStrictEquals(
         0 /* states table retired */,
         beforeRepeat,
@@ -884,7 +884,7 @@ async () => {
             position: 2,
         },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertStrictEquals(second.headers.get('Supersedes'), null);
 
     const getRes = await handleRequest(
@@ -1512,7 +1512,7 @@ async () => {
             position: 2,
         },
     ));
-    assertStrictEquals(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 200);
     const putBody = await entityPut.json() as {
         flow_graph: Record<string, unknown>;
     };
@@ -1530,7 +1530,7 @@ async () => {
             expireAt: reclaimAt,
         },
     ));
-    assertStrictEquals(reclaim.status, 201);
+    assertStrictEquals(reclaim.status, 200);
 
     // Leg 4: idempotent re-claim by A — fires milliseconds after
     // leg 3, well within the tiny lockTimeout, same actor — 0
@@ -1546,7 +1546,7 @@ async () => {
             expireAt: idempotentAt,
         },
     ));
-    assertStrictEquals(idempotent.status, 201);
+    assertStrictEquals(idempotent.status, 200);
 
     // Advance the test clock past the tiny lockTimeout so leg
     // 3's claim genuinely reads as expired to the LIVE route's
@@ -1569,7 +1569,7 @@ async () => {
             expireAt: takeoverExpireAt,
         },
     ));
-    assertStrictEquals(takeover.status, 201);
+    assertStrictEquals(takeover.status, 200);
 
     // Leg 6: transition with values, by B.
     // Task 8 CUT: legacy fieldValues below the gate.

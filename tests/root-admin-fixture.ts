@@ -90,11 +90,11 @@ export async function seedOrganizationDocument(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Phase Final Task 2: organizations ROW half stripped.
     await runWrite(
@@ -134,12 +134,12 @@ export async function seatDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [organization, identityId], body,
             SYSTEM_MEMBER_ID, organization,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 

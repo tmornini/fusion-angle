@@ -46,6 +46,7 @@ DENO_PG_TEST=(
 TZ=UTC "${DENO_PG_TEST[@]}" \
     tests/pg-acceptance.test.ts \
     tests/pg-races.test.ts \
+    tests/pg-message-plane.test.ts \
     tests/pg-boot.test.ts \
     tests/pg-seed.test.ts \
     tests/pg-explain.test.ts \

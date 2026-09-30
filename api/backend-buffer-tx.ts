@@ -7,10 +7,6 @@ import {
     type Tx,
     type TxMode,
 } from './db.ts';
-import { HttpMessage } from
-    '../shared/http-message/http-message.ts';
-import { parseWire } from
-    '../shared/http-message/wire-codec.ts';
 import { compareIdentifiers } from
     '../shared/identifier.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
@@ -188,35 +184,6 @@ export function bufferTx(
                 .sort(byResponseAtThenId)
                 .map((row) => ({ ...row })) as T[];
         },
-        async getWhereBody<T extends { id: string }>(
-            path: string,
-            containment: Record<string, unknown>,
-        ): Promise<T[]> {
-            return buffer
-                .filter((row) => {
-                    const rec = row as
-                        Record<string, unknown>;
-                    if (
-                        rec['path']
-                        !== path
-                    ) {
-                        return false;
-                    }
-                    const message = rec['response'];
-                    if (typeof message !== 'string') {
-                        return false;
-                    }
-                    const body = jsonBodyOf(message);
-                    if (body === undefined) {
-                        return false;
-                    }
-                    return containsFact(
-                        body, containment,
-                    );
-                })
-                .sort(byResponseAtThenId)
-                .map((row) => ({ ...row })) as T[];
-        },
         async append<T extends { id: string }>(
             row: T,
         ): Promise<boolean> {
@@ -267,28 +234,3 @@ export function bufferTx(
     };
 }
 
-function jsonBodyOf(message: string): unknown | undefined {
-    const model = parseWire(message);
-    const body = HttpMessage.fromModel(model).body();
-    if (!body.exists()) return undefined;
-    return JSON.parse(body.toText());
-}
-
-function containsFact(
-    body: unknown,
-    containment: Record<string, unknown>,
-): boolean {
-    if (body === null || typeof body !== 'object') {
-        return false;
-    }
-    const record = body as Record<string, unknown>;
-    for (const [key, value] of Object.entries(containment)) {
-        if (
-            JSON.stringify(record[key])
-            !== JSON.stringify(value)
-        ) {
-            return false;
-        }
-    }
-    return true;
-}

@@ -20,6 +20,7 @@ import {
     runWrite,
     attemptFor,
     formAuthMessagePair,
+    formWriteMessagePair,
     responseFromStored,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
@@ -33,6 +34,8 @@ import type { DbAdapter } from '../api/db.ts';
 import {
     apiRequest,
     pairIdOf,
+    framedRequest,
+    withoutCredentialFields,
 } from './http-fixtures.ts';
 import {
     makeAssertionSigner,
@@ -179,7 +182,7 @@ Deno.test('a second PUT to the SAME identity-tokens/:jti id forms'
             action: 'rotated', at: AT2,
         },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertNotStrictEquals(pairIdOf(second), firstId);
     assertStrictEquals(second.headers.get('Supersedes'), null);
     const domainRow = await deriveIdentityToken(
@@ -431,11 +434,21 @@ Deno.test('a reused rotation 409s and a token-revocations PUT'
 function postToken(
     db: MemoryDbAdapter, body: unknown,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
+    return handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+                ...lifted.headers,
+            },
+            body: raw,
         },
     ));
 }
@@ -500,18 +513,60 @@ async function seedAuthorizationCodeMessagePair(
         routePattern: 'authentication/authorize',
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
     const requestBody = {
         method: 'password', username: 'seed@example.com',
         password: 'seed-password', client_id: clientId,
     };
     const messagePair = await formAuthMessagePair(
-        seed, requestBody, identityId, 200, { code },
+        {
+            ...seed,
+            bodyBytes: new TextEncoder().encode(
+                JSON.stringify(requestBody),
+            ),
+        },
+        requestBody, identityId, undefined,
+        seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: 'code="' + code + '"',
+        }],
     );
+    const codeName = await sha256Hex(code);
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/authentication/authorization-codes/'
+            + codeName,
+        routePattern:
+            'authentication/authorization-codes/:hash',
+        routeSegments: [
+            'authentication',
+            'authorization-codes',
+            ':hash',
+        ],
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: identityId,
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: { client_id: clientId },
+        operationId: seed.operationId,
+        requestId: seed.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     await runWrite(
         db,
-        attemptFor([messagePair]),
-        [messagePair],
+        attemptFor([codePair, messagePair]),
+        [codePair, messagePair],
     );
 }
 
@@ -525,29 +580,31 @@ async () => {
         grant_type: 'authorization_code', code: AUTH_CODE,
         client_id: 'web',
     });
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CURRENT_ID);
-    // Issued event is named by its jti; the spend marker is a
-    // different prefix (authorization-codes/:hash).
+    // Issued event is named by its jti. The code document
+    // is /authentication/authorization-codes/:hash.
     const [root] = await deriveIdentityTokensFor(db, CURRENT_ID);
     assertStrictEquals(root!.id, root!.jti);
     assertNotStrictEquals(root!.id, await sha256Hex(AUTH_CODE));
     const derivedId = await sha256Hex(AUTH_CODE);
-    const marker = await db.messagePairs.getDocumentHistory(
-        '/identities/' + CURRENT_ID + '/authorization-codes/',
+    const spent = await db.messagePairs.getDocumentHistory(
+        '/authentication/authorization-codes/',
         derivedId,
     );
-    assert(marker.length > 0, 'marker document');
+    assert(
+        spent.some((row) => row.method === 'DELETE'),
+        'code document deleted',
+    );
     const requests = await db.messagePairs.getAll();
     const operationMessagePair = requests.find(
         r => r.path === '/authentication/token/',
     );
     assert(operationMessagePair);
     assertStrictEquals(operationMessagePair!.name, '');
-    // 3 bootstrap + the seeded authorize pair + the spend
-    // marker + the root's own event pair + the grant's own
-    // operation message pair.
-    assertStrictEquals(requests.length, 7);
+    // 3 bootstrap + seeded authorize + code document
+    // + its DELETE + the issued event + the grant pair.
+    assertStrictEquals(requests.length, 8);
 });
 
 Deno.test('a token-exchange grant (a real /authentication/token'
@@ -559,7 +616,7 @@ Deno.test('a token-exchange grant (a real /authentication/token'
         grant_type: 'token-exchange',
         subject_token: subject, actor_token: subject,
     });
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CURRENT_ID);
 });
 
@@ -583,7 +640,7 @@ Deno.test('a client_credentials grant appends its root\'s own'
         grant_type: 'client_credentials',
         client_id: CLIENT_ID, client_assertion: assertion,
     });
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     await assertRootEventMessagePair(db, CLIENT_ID);
 });
 

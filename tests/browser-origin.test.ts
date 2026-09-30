@@ -9,6 +9,8 @@ import {
 } from './browser/fixtures.ts';
 import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // The list route the API actually exposes: there is no
 // /api/organizations/ collection, so the origin proves
@@ -29,8 +31,12 @@ async () => {
             passwordOf(origin.credentials, ADMIN_EMAIL)
                 .length > 0,
         );
+        const operationId = generateIdentifier();
         const anonymous = await fetchDiscardingBody(
             origin.baseUrl + MEMBERS_PATH,
+            {
+                headers: { 'operation-id': operationId },
+            },
         );
         assertStrictEquals(anonymous.status, 401);
         const bearer = await fetch(
@@ -38,6 +44,7 @@ async () => {
             { headers: {
                 Authorization: 'Bearer '
                     + await adminToken(),
+                'operation-id': generateIdentifier(),
             } },
         );
         assertStrictEquals(bearer.status, 200);

@@ -175,9 +175,9 @@ async function appendTransitionPair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

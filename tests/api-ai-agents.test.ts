@@ -11,6 +11,9 @@ import {
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -120,7 +123,8 @@ Deno.test('PUT /ai-agents/:id writes the four fields; GET'
         description: string;
         skill_focus: string;
         model: string;
-    }>(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN);
+    }>(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN,
+        operationIdHeader());
     assertEquals(got, written);
 });
 
@@ -133,7 +137,8 @@ Deno.test('a flow write with an AI member id in memberIds'
         description: '',
         skill_focus: '',
         model: firstProviderModel().id,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -183,7 +188,7 @@ Deno.test('a flow write with agentIds naming a live'
             nodes: { agentIds?: string[] }[];
         };
     }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + 'aJJKPwIzmbFseMhGUrFyFQ', token);
+        + 'aJJKPwIzmbFseMhGUrFyFQ', token, operationIdHeader());
     const node = flow.graph.nodes[0]!;
     assertEquals(node.agentIds, ['UxpkDaNMmbWLvCTkyrFfGA']);
 });

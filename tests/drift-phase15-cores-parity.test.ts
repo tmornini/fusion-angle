@@ -275,7 +275,7 @@ async () => {
             position: 3,
         },
     ));
-    assertStrictEquals(put2.status, 201);
+    assertStrictEquals(put2.status, 200);
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -905,7 +905,7 @@ Deno.test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
             )
         ).headers.get('ETag')! },
     ));
-    assertStrictEquals(putRemove.status, 201);
+    assertStrictEquals(putRemove.status, 200);
 
     const afterRm = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
@@ -1054,7 +1054,7 @@ Deno.test('residual pin: soft-deleted node drops from'
             )
         ).headers.get('ETag')! },
     ));
-    assertStrictEquals(putDelete.status, 201);
+    assertStrictEquals(putDelete.status, 200);
 
     const afterDel = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,

@@ -34,12 +34,14 @@ import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
-    authorizationCodeSpent, deriveAuthorizationCodeId,
+    basicAuthorization,
+    deriveAuthorizationCodeId,
 } from '../api/authentication.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
-import { sha256Bytes } from '../shared/digest.ts';
+import { sha256Bytes, sha256Hex } from
+    '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import {
     seedClientRegistration,
@@ -48,6 +50,12 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import {
+    framedRequest,
+    presentedFields,
+    withoutCredentialFields,
+} from './http-fixtures.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 const BASE = 'http://localhost';
 
@@ -82,6 +90,9 @@ async function seedAuthorizationCodeMessagePair(
         routePattern: 'authentication/authorize',
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
     const requestBody: Record<string, unknown> = {
         method: 'password', username: 'seed@example.com',
@@ -91,12 +102,57 @@ async function seedAuthorizationCodeMessagePair(
         requestBody.code_challenge = extras.code_challenge;
     }
     const messagePair = await formAuthMessagePair(
-        seed, requestBody, identityId, 200, { code },
+        {
+            ...seed,
+            bodyBytes: new TextEncoder().encode(
+                JSON.stringify(requestBody),
+            ),
+        },
+        requestBody, identityId, undefined,
+        seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: 'code="' + code + '"',
+        }],
     );
+    const codeName = await sha256Hex(code);
+    const codeBody: Record<string, unknown> = {
+        client_id: clientId,
+    };
+    if (extras.code_challenge !== undefined) {
+        codeBody.code_challenge = extras.code_challenge;
+    }
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/authentication/authorization-codes/'
+            + codeName,
+        routePattern:
+            'authentication/authorization-codes/:hash',
+        routeSegments: [
+            'authentication',
+            'authorization-codes',
+            ':hash',
+        ],
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: identityId,
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: codeBody,
+        operationId: seed.operationId,
+        requestId: seed.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     await runWrite(
         db,
-        attemptFor([messagePair]),
-        [messagePair],
+        attemptFor([codePair, messagePair]),
+        [codePair, messagePair],
     );
 }
 
@@ -129,21 +185,28 @@ async function seedMembershipMessagePair(
 
 }
 
-function tokenRequest(body: Record<string, unknown>): Request {
-    return new Request(`${BASE}/authentication/token`, {
+function tokenRequest(
+    body: Record<string, unknown>,
+): Request {
+    const lifted = withoutCredentialFields(body);
+    const raw = JSON.stringify(lifted.body);
+    return framedRequest(`${BASE}/authentication/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+            'Content-Type': 'application/json',
+            ...lifted.headers,
+        },
+        body: raw,
     });
 }
 
 Deno.test('a missing bearer is 401 invalid_token', async () => {
     const db = await freshDb();
     const res = await handleRequest(
-        db, new Request(`${BASE}/members`));
+        db, framedRequest(`${BASE}/members`));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(), { error: 'invalid_token' });
+        await presentedFields(res), { error: 'invalid_token' });
 });
 
 Deno.test('a failed client assertion is 401 invalid_client',
@@ -159,7 +222,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(), { error: 'invalid_client' });
+        await presentedFields(res), { error: 'invalid_client' });
 });
 
 Deno.test('an unknown authorization code is 401 invalid_grant',
@@ -170,7 +233,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(), { error: 'invalid_grant' });
+        await presentedFields(res), { error: 'invalid_grant' });
 });
 
 Deno.test('the token endpoint is reachable without a Bearer',
@@ -212,7 +275,7 @@ async () => {
     }));
     assertStrictEquals(mismatch.status, 401);
     assertEquals(
-        await mismatch.json(),
+        await presentedFields(mismatch),
         { error: INVALID_CODE_ERROR },
     );
     const match = await handleRequest(db, tokenRequest({
@@ -220,7 +283,7 @@ async () => {
         code: 'code-for-match',
         client_id: 'client-a',
     }));
-    assertStrictEquals(match.status, 201);
+    assertStrictEquals(match.status, 200);
 });
 
 // PKCE S256 (RFC 7636): when authorize stored a code_challenge,
@@ -250,7 +313,7 @@ async () => {
         client_id: 'web',
         code_verifier: verifier,
     }));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
 });
 
 Deno.test('authorization_code with PKCE rejects a wrong verifier',
@@ -272,7 +335,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(),
+        await presentedFields(res),
         { error: INVALID_CODE_ERROR },
     );
 });
@@ -295,7 +358,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(),
+        await presentedFields(res),
         { error: INVALID_CODE_ERROR },
     );
 });
@@ -329,10 +392,15 @@ async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as Record<string, unknown>;
+    assertStrictEquals(res.status, 200);
+    const text = await res.text();
+    const body = JSON.parse(text) as Record<string, unknown>;
     assertStrictEquals(body['refresh_token'], undefined);
-    assertStrictEquals(typeof body['access_token'], 'string');
+    assertStrictEquals(body['access_token'], undefined);
+    assert(
+        (res.headers.get('authentication-info') ?? '')
+            .includes('access_token="'),
+    );
     const cookie = setCookieHeader(res);
     assertMatch(cookie, /refresh_token=/);
     assertMatch(cookie, /HttpOnly/i);
@@ -350,8 +418,8 @@ async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as {
+    assertStrictEquals(res.status, 200);
+    const body = await presentedFields(res) as {
         access_token: string;
         token_type: string; expires_in: number;
     };
@@ -375,7 +443,7 @@ async () => {
     );
     // the minted access token passes the SP-3 gate
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', body.access_token);
+        + '', body.access_token, operationIdHeader());
     assert(Array.isArray(rows));
 });
 
@@ -387,7 +455,7 @@ Deno.test('replaying a consumed code is a 401 no-op', async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const before = (await deriveIdentityTokensFor(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     )).length;
@@ -424,7 +492,7 @@ Deno.test(
             })),
         ]);
         assertEquals(
-            [a.status, b.status].sort(), [201, 401],
+            [a.status, b.status].sort(), [200, 401],
         );
         assertStrictEquals(
             (await deriveIdentityTokensFor(
@@ -443,13 +511,8 @@ Deno.test('an unknown code is a 401', async () => {
     assertStrictEquals(res.status, 401);
 });
 
-// GATE 3 (Phase 13 Task 7): the code-spend guard's three 401
-// classes — unknown (never issued), spent (replayed), raced
-// (lost a concurrent exchange) — all carry the SAME byte-exact
-// body. The message-plane guard (authorizeCodeIssuer /
-// authorizationCodeSpent, api/authentication.ts) makes no
-// distinction between them at the wire, exactly as the retired
-// codeState-driven guard never did either.
+// Unknown, spent, and raced codes answer the same 401
+// body. The grant does not distinguish them on the wire.
 Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
 + ' SAME byte-exact body', async () => {
     const db = await freshDb();
@@ -460,7 +523,7 @@ Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
     }));
     assertStrictEquals(unknown.status, 401);
     assertEquals(
-        await unknown.json(), { error: INVALID_CODE_ERROR });
+        await presentedFields(unknown), { error: INVALID_CODE_ERROR });
 
     await seedAuthorizationCodeMessagePair(
         db, 'the-code-spent', 'XXZruirZyAOoRpNxaDnpSA', 'web');
@@ -469,7 +532,7 @@ Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
         code: 'the-code-spent',
         client_id: 'web',
     }));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const spent = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'the-code-spent',
@@ -477,7 +540,7 @@ Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
     }));
     assertStrictEquals(spent.status, 401);
     assertEquals(
-        await spent.json(), { error: INVALID_CODE_ERROR });
+        await presentedFields(spent), { error: INVALID_CODE_ERROR });
 
     await seedAuthorizationCodeMessagePair(
         db, 'the-code-raced', 'XXZruirZyAOoRpNxaDnpSA', 'web');
@@ -493,19 +556,18 @@ Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
             client_id: 'web',
         })),
     ]);
-    assertEquals([a.status, b.status].sort(), [201, 401]);
+    assertEquals([a.status, b.status].sort(), [200, 401]);
     const raced = a.status === 401 ? a : b;
     assertEquals(
-        await raced.json(), { error: INVALID_CODE_ERROR });
+        await presentedFields(raced), { error: INVALID_CODE_ERROR });
 
-    // The derived id itself: a live-minted spend is visible on
-    // the message plane by exactly that id, the SAME value the
-    // guard above already checked internally.
     const derivedId =
         await deriveAuthorizationCodeId('the-code-spent');
-    assertStrictEquals(
-        await authorizationCodeSpent(db, derivedId, 'XXZruirZyAOoRpNxaDnpSA'),
-        true);
+    const spentHead = await db.messagePairs.getHead(
+        '/authentication/authorization-codes/',
+        derivedId,
+    );
+    assertStrictEquals(spentHead?.method, 'DELETE');
 });
 
 Deno.test(
@@ -524,7 +586,7 @@ Deno.test(
                 client_id: 'web',
             }),
         );
-        assertStrictEquals(first.status, 201);
+        assertStrictEquals(first.status, 200);
         const identityId = 'XXZruirZyAOoRpNxaDnpSA';
         const derivedId =
             await deriveAuthorizationCodeId(
@@ -532,19 +594,11 @@ Deno.test(
             );
         const prefix = '/identities/'
             + identityId + '/tokens/';
-        const markerPrefix = '/identities/'
-            + identityId + '/authorization-codes/';
-        const marker = await db.messagePairs
-            .getDocumentHistory(
-                markerPrefix, derivedId,
-            );
-        assert(marker.length > 0, 'marker document');
-        assertStrictEquals(
-            await authorizationCodeSpent(
-                db, derivedId, identityId,
-            ),
-            true,
+        const spentHead = await db.messagePairs.getHead(
+            '/authentication/authorization-codes/',
+            derivedId,
         );
+        assertStrictEquals(spentHead?.method, 'DELETE');
         const issued = (await deriveIdentityTokensFor(
             db, identityId,
         )).filter(r => r.action === 'issued');
@@ -568,7 +622,7 @@ async function initialPair(
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    const body = await res.json() as { access_token: string };
+    const body = await presentedFields(res) as { access_token: string };
     return {
         access_token: body.access_token,
         refresh_token: refreshTokenFromSetCookie(res),
@@ -580,7 +634,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const pair1 = await initialPair(db);
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: {
@@ -589,8 +643,8 @@ async () => {
             },
             body: JSON.stringify({ grant_type: 'refresh' }),
         }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as Record<string, unknown>;
+    assertStrictEquals(res.status, 200);
+    const body = await presentedFields(res) as Record<string, unknown>;
     assertStrictEquals(body['refresh_token'], undefined);
     assert(typeof body['access_token'] === 'string');
     assertNotStrictEquals(
@@ -599,40 +653,50 @@ async () => {
         await GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             body['access_token'] as string,
-        )));
+            operationIdHeader())));
 });
 
-Deno.test('stale body refresh_token loses to a live Cookie',
-async () => {
-    const db = await freshDb();
-    await seedRootAdmin(db);
-    const pair1 = await initialPair(db);
-    const rotated = await handleRequest(db, tokenRequest({
-        grant_type: 'refresh',
-        refresh_token: pair1.refresh_token,
-    }));
-    assertStrictEquals(rotated.status, 201);
-    const liveCookie = refreshTokenFromSetCookie(rotated);
-    const res = await handleRequest(db, new Request(
-        `${BASE}/authentication/token`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Cookie: 'refresh_token=' + liveCookie,
-            },
-            body: JSON.stringify({
-                grant_type: 'refresh',
-                refresh_token: pair1.refresh_token,
-            }),
+Deno.test(
+    'a body refresh_token is refused beside a live cookie',
+    async () => {
+        const db = await freshDb();
+        await seedRootAdmin(db);
+        const pair1 = await initialPair(db);
+        const rotated = await handleRequest(db, tokenRequest({
+            grant_type: 'refresh',
+            refresh_token: pair1.refresh_token,
         }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as {
-        access_token: string;
-    };
-    assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
-});
+        assertStrictEquals(rotated.status, 200);
+        const liveCookie = refreshTokenFromSetCookie(rotated);
+        const before = (
+            await db.messagePairs.getAll()
+        ).length;
+        const res = await handleRequest(db, framedRequest(
+            `${BASE}/authentication/token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Cookie: 'refresh_token=' + liveCookie,
+                },
+                body: JSON.stringify({
+                    grant_type: 'refresh',
+                    refresh_token: pair1.refresh_token,
+                }),
+            }));
+        const body = await presentedFields(res) as {
+            error: string,
+        };
+        assertStrictEquals(res.status, 400);
+        assertStrictEquals(
+            body.error,
+            'refresh_token rides the Cookie line',
+        );
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            before,
+        );
+    },
+);
 
 Deno.test('refresh rotates to a new pair', async () => {
     const db = await freshDb();
@@ -642,15 +706,15 @@ Deno.test('refresh rotates to a new pair', async () => {
         grant_type: 'refresh',
         refresh_token: pair1.refresh_token,
     }));
-    assertStrictEquals(res.status, 201);
-    const pair2 = await res.json() as {
+    assertStrictEquals(res.status, 200);
+    const pair2 = await presentedFields(res) as {
         access_token: string;
     };
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , pair2.access_token)));
+            , pair2.access_token, operationIdHeader())));
 });
 
 Deno.test('replaying a rotated refresh token revokes the chain',
@@ -703,8 +767,8 @@ Deno.test(
             refresh_token: pair1.refresh_token,
             organization,
         }));
-        assertStrictEquals(res.status, 201);
-        const body = await res.json() as {
+        assertStrictEquals(res.status, 200);
+        const body = await presentedFields(res) as {
             access_token: string;
         };
         const claims = decodeAccessToken(body.access_token);
@@ -733,7 +797,7 @@ Deno.test(
             organization: '7',
         }));
         assertStrictEquals(res.status, 403);
-        const body = await res.json() as { error: string };
+        const body = await presentedFields(res) as { error: string };
         assertMatch(body.error, /not a member/);
         assertStrictEquals(
             (await deriveIdentityTokensFor(
@@ -745,7 +809,7 @@ Deno.test(
                 refresh_token: pair1.refresh_token,
             }),
         );
-        assertStrictEquals(stillLive.status, 201);
+        assertStrictEquals(stillLive.status, 200);
     },
 );
 
@@ -759,8 +823,8 @@ Deno.test(
             grant_type: 'refresh',
             refresh_token: pair1.refresh_token,
         }));
-        assertStrictEquals(res.status, 201);
-        const body = await res.json() as {
+        assertStrictEquals(res.status, 200);
+        const body = await presentedFields(res) as {
             access_token: string;
         };
         const claims = decodeAccessToken(body.access_token);
@@ -779,15 +843,15 @@ async () => {
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
     }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as { access_token: string };
+    assertStrictEquals(res.status, 200);
+    const body = await presentedFields(res) as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assertStrictEquals(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
     assertStrictEquals(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
     // the delegated token passes the gate (current = admin)
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
+            , body.access_token, operationIdHeader())));
 });
 
 Deno.test('token-exchange 201 has no refresh Set-Cookie',
@@ -795,7 +859,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const pair = await initialPair(db);
-    const rotated = await handleRequest(db, new Request(
+    const rotated = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
             headers: {
@@ -804,9 +868,9 @@ async () => {
             },
             body: JSON.stringify({ grant_type: 'refresh' }),
         }));
-    assertStrictEquals(rotated.status, 201);
+    assertStrictEquals(rotated.status, 200);
     assertMatch(setCookieHeader(rotated), /refresh_token=/);
-    const access = (await rotated.json() as {
+    const access = (await presentedFields(rotated) as {
         access_token: string;
     }).access_token;
     const exchange = await handleRequest(db, tokenRequest({
@@ -814,8 +878,8 @@ async () => {
         subject_token: access,
         actor_token: access,
     }));
-    assertStrictEquals(exchange.status, 201);
-    const body = await exchange.json() as Record<
+    assertStrictEquals(exchange.status, 200);
+    const body = await presentedFields(exchange) as Record<
         string, unknown
     >;
     assertStrictEquals(body['refresh_token'], undefined);
@@ -835,9 +899,12 @@ async () => {
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('agent-7'),
     }));
-    assertStrictEquals(res.status, 403);
-    const body = await res.json() as { error: string };
-    assertMatch(body.error, /self-delegation/);
+    assertStrictEquals(res.status, 400);
+    const body = await presentedFields(res) as { error: string };
+    assertStrictEquals(
+        body.error,
+        'subject_token rides the Authorization line',
+    );
     // grant-first: a denied exchange mints nothing
     assertStrictEquals(
         (await deriveIdentityTokensFor(
@@ -874,8 +941,8 @@ async () => {
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         organization: 'AjdvjuECVZEgZoFajaIEkg',
     }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as { access_token: string };
+    assertStrictEquals(res.status, 200);
+    const body = await presentedFields(res) as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assertStrictEquals(claims.organization, 'AjdvjuECVZEgZoFajaIEkg');
     assertEquals(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
@@ -923,8 +990,8 @@ async () => {
         subject_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
         actor_token: await devToken('XXZruirZyAOoRpNxaDnpSA'),
     }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as { access_token: string };
+    assertStrictEquals(res.status, 200);
+    const body = await presentedFields(res) as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assertStrictEquals(claims.organization, undefined);
     assertEquals(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
@@ -969,11 +1036,11 @@ Deno.test('client_credentials issues a gate-valid token', async () => {
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assertStrictEquals(res.status, 201);
-    const body = await res.json() as { access_token: string };
+    assertStrictEquals(res.status, 200);
+    const body = await presentedFields(res) as { access_token: string };
     assert(Array.isArray(
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token)));
+            , body.access_token, operationIdHeader())));
     assertNotStrictEquals(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );
@@ -996,7 +1063,7 @@ Deno.test('a second client_credentials grant with the same jti'
         client_id: 'uYaHKbNeVUcsFjuooOjMew',
         client_assertion: assertion,
     }));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const before = await db.messagePairs.getAll();
     const grantCount = before.filter((row) =>
         row.path === '/authentication/token/',
@@ -1011,7 +1078,7 @@ Deno.test('a second client_credentials grant with the same jti'
     }));
     assertStrictEquals(second.status, 401);
     assertEquals(
-        await second.json(), { error: 'invalid_grant' },
+        await presentedFields(second), { error: 'invalid_grant' },
     );
     const after = await db.messagePairs.getAll();
     assertStrictEquals(
@@ -1062,9 +1129,9 @@ async () => {
         requesterIdentityId: 'uYaHKbNeVUcsFjuooOjMew',
         requestAt: nowUtc(),
         organization: undefined,
-        responseStatus: 200,
         responseBody: { exp: now - 60 },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -1084,7 +1151,7 @@ async () => {
     }));
     assertStrictEquals(res.status, 401);
     assertEquals(
-        await res.json(), { error: 'invalid_grant' },
+        await presentedFields(res), { error: 'invalid_grant' },
     );
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
@@ -1111,7 +1178,7 @@ async () => {
         client_assertion: forged,
     }));
     assertStrictEquals(res.status, 401);
-    const body = await res.json() as { error: string };
+    const body = await presentedFields(res) as { error: string };
     assertStrictEquals(body.error, 'invalid_client');
 });
 
@@ -1183,7 +1250,7 @@ async () => {
         client_assertion: assertion,
     }));
     assertStrictEquals(res.status, 401);
-    const body = await res.json() as { error: string };
+    const body = await presentedFields(res) as { error: string };
     assertMatch(body.error, /client is disabled/);
 });
 
@@ -1216,7 +1283,7 @@ async () => {
         client_assertion: assertion,
     }));
     assertStrictEquals(res.status, 401);
-    const body = await res.json() as { error: string };
+    const body = await presentedFields(res) as { error: string };
     assertMatch(body.error, /unknown client/);
 });
 
@@ -1258,23 +1325,24 @@ async () => {
     const challenge = await s256Challenge(verifier);
     const authorized = await handleRequest(
         db,
-        new Request(`${BASE}/authentication/authorize`, {
+        framedRequest(`${BASE}/authentication/authorize`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                authorization: basicAuthorization(
+                    UNSEATED_EMAIL, password,
+                ),
             },
             body: JSON.stringify({
                 method: 'password',
-                username: UNSEATED_EMAIL,
-                password,
                 client_id: 'web',
                 code_challenge: challenge,
                 code_challenge_method: 'S256',
             }),
         }),
     );
-    assertStrictEquals(authorized.status, 201);
-    const { code } = await authorized.json() as {
+    assertStrictEquals(authorized.status, 200);
+    const { code } = await presentedFields(authorized) as {
         code: string;
     };
     const exchanged = await handleRequest(
@@ -1284,8 +1352,8 @@ async () => {
             code_verifier: verifier,
         }),
     );
-    assertStrictEquals(exchanged.status, 201);
-    const exchangedBody = await exchanged.json() as {
+    assertStrictEquals(exchanged.status, 200);
+    const exchangedBody = await presentedFields(exchanged) as {
         access_token: string;
     };
     const exchangedClaims = decodeAccessToken(
@@ -1297,7 +1365,7 @@ async () => {
     assertStrictEquals(
         exchangedClaims.organizations, undefined,
     );
-    const seats = await handleRequest(db, new Request(
+    const seats = await handleRequest(db, framedRequest(
         `${BASE}/identities/` + UNSEATED
             + '/organizations/',
         {
@@ -1312,7 +1380,7 @@ async () => {
     const refreshToken =
         refreshTokenFromSetCookie(exchanged);
     const refreshed = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/authentication/token`, {
                 method: 'POST',
                 headers: {
@@ -1326,8 +1394,8 @@ async () => {
             },
         ),
     );
-    assertStrictEquals(refreshed.status, 201);
-    const refreshedBody = await refreshed.json() as {
+    assertStrictEquals(refreshed.status, 200);
+    const refreshedBody = await presentedFields(refreshed) as {
         access_token: string;
     };
     const refreshedClaims = decodeAccessToken(
@@ -1345,7 +1413,7 @@ async () => {
         organizations: [starkOrganization],
         roles: ['admin:' + starkOrganization],
     });
-    const granted = await handleRequest(db, new Request(
+    const granted = await handleRequest(db, framedRequest(
         `${BASE}/organizations/` + starkOrganization
             + '/invitations/',
         {
@@ -1364,7 +1432,7 @@ async () => {
         },
     ));
     assertStrictEquals(granted.status, 200);
-    const pending = await handleRequest(db, new Request(
+    const pending = await handleRequest(db, framedRequest(
         `${BASE}/identities/` + UNSEATED
             + '/invitations/',
         {

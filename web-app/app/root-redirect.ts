@@ -7,12 +7,24 @@
 // into a self-contained IIFE per ./build.
 
 import { putLocation } from './adapters/location.ts';
+import { createHttpFacade } from
+    './adapters/http-facade.ts';
+import { putClientFacade } from
+    './adapters/facade-holder.ts';
 import {
     probeRefreshSession,
     resolveApexLocation,
 } from './apex-destination.ts';
 
+function probeOrigin(): string {
+    const origin = location.origin;
+    return origin === 'null' ? '' : origin;
+}
+
 void (async function redirectRoot(): Promise<void> {
+    putClientFacade(
+        createHttpFacade(probeOrigin()),
+    );
     const dest = await resolveApexLocation(
         probeRefreshSession,
     );

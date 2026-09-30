@@ -13,7 +13,10 @@ import { handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
+    framedRequest,
 } from './http-fixtures.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 import {
     deriveIdentityPii,
     deriveIdentityPiiRows,
@@ -96,14 +99,17 @@ async function loginPassword(
     db: MemoryDbAdapter,
     username: string,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    return handleRequest(db, framedRequest(
         BASE + '/authentication/authorize', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                authorization: basicAuthorization(
+                    username, 's3cret-password-ok',
+                ),
+            },
             body: JSON.stringify({
                 method: 'password',
-                username,
-                password: 's3cret-password-ok',
                 client_id: 'web',
                 code_challenge: bytesToBase64Url(
                     await sha256Bytes('pkce-verifier-test'),
@@ -129,7 +135,7 @@ Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann Marie'),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const secondId = pairIdOf(second);
     assertNotStrictEquals(secondId, firstId);
     const pairsAt = await pairsAtPii(db, id);
@@ -252,7 +258,7 @@ async () => {
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin Marie'),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     assertNotStrictEquals(pairIdOf(second), firstId);
     const countAfterSecond = (await db.messagePairs.getAll())
         .length;
@@ -260,7 +266,7 @@ async () => {
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Erin'), operationId,
     ));
-    assertStrictEquals(resend.status, 201);
+    assertStrictEquals(resend.status, 200);
     assertNotStrictEquals(pairIdOf(resend), firstId);
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
@@ -340,7 +346,7 @@ async () => {
             phone: EDITED_PHONE, bio: EDITED_BIO,
         },
     ));
-    assertStrictEquals(edit.status, 201);
+    assertStrictEquals(edit.status, 200);
     const erase = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));
@@ -397,7 +403,7 @@ Deno.test('PUT-PUT-DELETE adds exactly three pairs (no document'
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann Marie'),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
     const del = await handleRequest(db, req(
         'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
     ));

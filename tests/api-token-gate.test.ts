@@ -20,6 +20,10 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+import { framedRequest } from './http-fixtures.ts';
+
 
 const BASE = 'http://localhost';
 
@@ -35,7 +39,7 @@ Deno.test('rejects a request with no Authorization header',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg/members/`));
     assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
@@ -45,7 +49,7 @@ async () => {
 Deno.test('protected route accepts a valid token', async () => {
     const db = await freshDb();
     const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', await devToken());
+        + '', await devToken(), operationIdHeader());
     assert(Array.isArray(rows));
 });
 
@@ -53,7 +57,7 @@ Deno.test('rejects an expired token', async () => {
     const db = await freshDb();
     await assertRejects(
         async () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , await expiredToken()),
+            , await expiredToken(), operationIdHeader()),
         Error,
         'invalid_token',
     );
@@ -65,7 +69,7 @@ Deno.test('rejects a not-yet-valid token', async () => {
         async () => GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             await notYetValidToken(),
-        ),
+            operationIdHeader()),
         Error,
         'invalid_token',
     );
@@ -83,7 +87,7 @@ async () => {
     await assertRejects(
         () => GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', anon,
-        ),
+            operationIdHeader()),
         Error,
         'invalid_token',
     );
@@ -117,12 +121,13 @@ async () => {
             at: '2021-01-01T00:00:00.000000Z',
         },
         await devToken(),
-    );
+        operationIdHeader());
     // Still admitted — revocation bites at next mint/exchange.
     assertEquals(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live),
+        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live,
+            operationIdHeader()),
         await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , await devToken()),
+            , await devToken(), operationIdHeader()),
     );
 });
 
@@ -145,10 +150,10 @@ Deno.test('a token minted within a revocation second still'
             + 'rOEPOcVMQdJiiiMuiiEhlg',
         { identity_id: 'XXZruirZyAOoRpNxaDnpSA', at: revokedAt },
         await devToken(),
-    );
+        operationIdHeader());
     const rows = await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', sameSecond,
-    );
+        operationIdHeader());
     assert(Array.isArray(rows));
 });
 
@@ -166,7 +171,7 @@ Deno.test('a jti revoked in the ledger still admits the access'
             at: '2026-01-01T00:00:00.000000Z',
         },
         await devToken(),
-    );
+        operationIdHeader());
     await PUT(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/' + revokedJti,
         {
@@ -176,9 +181,9 @@ Deno.test('a jti revoked in the ledger still admits the access'
             at: '2026-02-01T00:00:00.000000Z',
         },
         await devToken(),
-    );
+        operationIdHeader());
     const rows = await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', await devToken(),
-    );
+        operationIdHeader());
     assert(Array.isArray(rows));
 });

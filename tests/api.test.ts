@@ -25,6 +25,10 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+import { framedRequest } from './http-fixtures.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -35,7 +39,7 @@ async function freshDb() {
 Deno.test('GET on unknown route throws', async () => {
     const db = await freshDb();
     const err = await assertRejects(
-        () => GET(db, 'nonexistent-table', DEV_TOKEN),
+        () => GET(db, 'nonexistent-table', DEV_TOKEN, operationIdHeader()),
     ) as Error;
     assertMatch(
         err.message, /Route not found|404|not found/i,
@@ -46,7 +50,7 @@ Deno.test('GET ideas returns array', async () => {
     const db = await freshDb();
     const ideas =
         await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + '', DEV_TOKEN);
+            + '', DEV_TOKEN, operationIdHeader());
     assertEquals(ideas, []);
 });
 
@@ -56,7 +60,7 @@ Deno.test('GET organizations/:id/ideas/:id throws on missing', async () => {
         () => GET(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + generateIdentifier()
-            , DEV_TOKEN),
+            , DEV_TOKEN, operationIdHeader()),
     ) as Error;
     assertMatch(err.message, /Not found|404/);
 });
@@ -77,12 +81,13 @@ Deno.test('PUT then GET round-trips an entity', async () => {
     };
     await PUT(db
         , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-        + 'fndCYAsXazdzMUlEGMNIZw', payload, DEV_TOKEN);
+        + 'fndCYAsXazdzMUlEGMNIZw', payload, DEV_TOKEN,
+        operationIdHeader());
     const fetched =
         await GET<{ title: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-        );
+                operationIdHeader());
     assertStrictEquals(fetched.title, 'Test');
 });
 
@@ -98,7 +103,8 @@ Deno.test(
                 entity_id: 'YiJPbufDpkyrZcZCYbUJpg',
                 state: 'active',
                 at: '2026-01-01T00:00:00.000000Z',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 404);
@@ -110,7 +116,7 @@ Deno.test('GET organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     const db = await freshDb();
     const result =
         await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + '', DEV_TOKEN);
+            + '', DEV_TOKEN, operationIdHeader());
     assertEquals(result, []);
 });
 
@@ -123,7 +129,7 @@ Deno.test(
         const members =
             await GET<{ id: string }[]>(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
-                await organizationToken());
+                await organizationToken(), operationIdHeader());
         assert(
             members.some(row => row.id === humanId),
         );
@@ -139,7 +145,7 @@ Deno.test(
         );
         const ais =
             await GET<unknown[]>(
-                db, 'ai-agents/', DEV_TOKEN);
+                db, 'ai-agents/', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(ais.length, 1);
     },
 );
@@ -152,7 +158,8 @@ Deno.test(
             () => PUT(db, 'ai-agents/'
                 + generateIdentifier(), {
                 rogue_field: 'extra',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /unexpected key|missing/);
     },
@@ -165,7 +172,8 @@ Deno.test(
         const db = await freshDb();
         const err = await assertRejects(
             () => POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-                , {}, DEV_TOKEN),
+                , {}, DEV_TOKEN,
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /not allowed/i);
     },
@@ -178,7 +186,7 @@ Deno.test(
         const err = await assertRejects(
             () => POST(
                 db, 'no-such-resource', {}, DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /not found|404/i);
     },
@@ -195,7 +203,7 @@ Deno.test(
                 'members/' + generateIdentifier()
                     + '/extra',
                 DEV_TOKEN,
-            ),
+                operationIdHeader()),
         ) as Error;
         assertMatch(err.message, /not found|404/i);
     },
@@ -208,7 +216,7 @@ Deno.test(
         const db = await freshDb();
         const response = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + 'fndCYAsXazdzMUlEGMNIZw',
                 {
@@ -242,7 +250,7 @@ Deno.test(
         const db = await freshDb();
         const response = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/identities/',
                 {
                     method: 'POST',
@@ -297,31 +305,52 @@ Deno.test(
             }
             return original(path);
         };
+        const operationId = generateIdentifier();
         const { result: response, calls } =
             await captureConsole(
                 'error',
                 () => handleRequest(
                     db,
-                    new Request('http://localhost/organizations/'
+                    framedRequest('http://localhost/organizations/'
                         + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
                         headers: {
                             'Authorization':
                                 'Bearer ' + DEV_TOKEN,
+                            'operation-id': operationId,
                         },
                     }),
                 ),
             );
         assertStrictEquals(response.status, 500);
+        const requestId = response.headers.get(
+            'request-id',
+        );
         const { error } =
             (await response.json()) as {
                 error: string;
             };
         assertStrictEquals(error, 'internal error');
+        assertStrictEquals(typeof requestId, 'string');
+        const logged = calls.find(args =>
+            args.includes('request failed'));
         assert(
-            calls.some(args =>
-                args.includes('request failed')),
+            logged !== undefined,
             'the domain-boundary catch must keep'
             + ' console evidence',
+        );
+        const fields = logged[1];
+        assert(
+            fields !== null
+            && typeof fields === 'object',
+        );
+        assertStrictEquals(
+            (fields as { requestId?: unknown }).requestId,
+            requestId,
+        );
+        assertStrictEquals(
+            (fields as { operationId?: unknown })
+                .operationId,
+            operationId,
         );
     },
 );
@@ -336,7 +365,7 @@ Deno.test(
         ]) {
             const response = await handleRequest(
                 db,
-                new Request(
+                framedRequest(
                     'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
                         + 'ideas/fndCYAsXazdzMUlEGMNIZw',
                     {

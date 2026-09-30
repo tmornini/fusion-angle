@@ -15,6 +15,9 @@ import type {
 } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -91,14 +94,15 @@ Deno.test(
         const db = await freshDb();
         const body = createBody();
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            , body, DEV_TOKEN);
+            , body, DEV_TOKEN,
+            operationIdHeader());
 
         const flow = await GET<{
             id: string;
             name: string;
             organization_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN);
+            + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(flow.name, 'My Flow');
         // The fence stamped the bound org — never the body.
         assertStrictEquals(flow.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
@@ -110,7 +114,8 @@ Deno.test(
             project_id: string;
             flow_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN);
+            + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(links.length, 1);
         assertStrictEquals(links[0]!.id, body.projectFlowId);
         assertStrictEquals(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');
@@ -140,11 +145,12 @@ Deno.test(
         // on states/:id PUT).
     // Phase Final Stage B: states table retired.
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            , createBody(), DEV_TOKEN);
+            , createBody(), DEV_TOKEN,
+            operationIdHeader());
         const flow = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
         const flowEvents = await deriveFlowStateHistory(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'aEsGMmBEFaVdWihhHXwCbw',
@@ -166,14 +172,15 @@ Deno.test(
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/', {
             ...createBody(),
             initialStateAt: AT,
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         const events = await GET<StateEntity[]>(
             db,
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.at, AT);
     },

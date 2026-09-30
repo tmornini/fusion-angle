@@ -3,7 +3,6 @@ import { sortFields } from './canonical.ts';
 import {
     CONTENT_LENGTH,
     TRANSFER_ENCODING,
-    isStoredField,
 } from './framing.ts';
 import {
     isHttpVersion,
@@ -42,7 +41,9 @@ export function parseWire(wire: string): MessageModel {
     const lines = head.split(CRLF);
     const startLine = parseStartLine(lines[0]!);
     const allFields = lines.slice(1).map(parseFieldLine);
-    const fields = allFields.filter(isStoredField);
+    const fields = allFields.filter(
+        (field) => field.name !== TRANSFER_ENCODING,
+    );
     const transfer = allFields.find(
         (field) => field.name === TRANSFER_ENCODING,
     );
@@ -159,8 +160,8 @@ function frameBody(
 // Decode the chunked body region. Chunk boundaries are a
 // transport artifact (RFC 9112 §7.1) — they are concatenated
 // away. A trailer survives only when it carries fields; absent
-// fields collapse to undefined so serialization falls back to
-// Content-Length framing.
+// fields collapse to undefined. The transfer-encoding line
+// stays out of the model.
 function decodeChunked(region: string): ChunkedBody {
     let pos = 0;
     let data = '';
@@ -229,20 +230,18 @@ function parseTrailer(region: string, start: number): FieldLine[] {
     return trailer;
 }
 
+// The lines on the model. Computes no content-length and
+// no transfer-encoding. A content-length line is the raw
+// body, never a chunked trailer.
 export function serializeWire(model: MessageModel): string {
-    const fields = [...model.fields];
-    if (model.trailer !== undefined) {
-        fields.push({ name: TRANSFER_ENCODING, value: CHUNKED });
-        return serializeHead(model.startLine, fields)
+    const lengthFramed = model.fields.some(
+        (field) => field.name === CONTENT_LENGTH,
+    );
+    if (model.trailer !== undefined && !lengthFramed) {
+        return serializeHead(model.startLine, model.fields)
             + serializeChunked(model.body, model.trailer);
     }
-    if (model.body !== undefined) {
-        fields.push({
-            name: CONTENT_LENGTH,
-            value: String(model.body.byteLength()),
-        });
-    }
-    let out = serializeHead(model.startLine, fields);
+    let out = serializeHead(model.startLine, model.fields);
     if (model.body !== undefined) {
         out += model.body.toLatin1();
     }
@@ -278,7 +277,8 @@ function serializeChunked(
 
 function serializeStartLine(line: StartLine): string {
     if (line.kind === 'request') {
-        return line.method + SP + line.target + SP + line.version;
+        return line.method + SP + line.target
+            + SP + 'HTTP/1.1';
     }
-    return line.version + SP + line.status + SP + line.reason;
+    return 'HTTP/1.1' + SP + line.status + SP + line.reason;
 }

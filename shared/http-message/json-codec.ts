@@ -4,7 +4,10 @@ import {
     isRawJson,
     parsePreservingNumbers,
 } from './json-numbers.ts';
-import { isStoredField } from './framing.ts';
+import {
+    CONTENT_LENGTH,
+    TRANSFER_ENCODING,
+} from './framing.ts';
 import {
     isHttpVersion,
     isStatusCode,
@@ -47,13 +50,100 @@ export function parseJson(
 ): MessageModel {
     const root = asObject(parseJsonText(json), 'message');
     const startLine = parseJsonStartLine(root);
-    const header = parseJsonFields(root.header, 'header');
-    const fields = header.filter(isStoredField);
-    const body = parseJsonBody(root, fields, registry);
+    const kept = parseJsonFields(root.header, 'header')
+        .filter((field) => field.name !== TRANSFER_ENCODING);
+    const reencoded = reencodesInlineBody(
+        root, kept, registry,
+    );
+    const body = bodyForDeclaredLength(
+        kept,
+        parseJsonBody(root, kept, registry),
+    );
+    const fields = alignContentLength(
+        kept, body, reencoded,
+    );
     const trailer = 'trailer' in root
         ? parseJsonFields(root.trailer, 'trailer')
         : undefined;
     return { startLine, fields, body, trailer };
+}
+
+// transfer-encoding is transport. A re-encoded inline body
+// replaces content-length with the octets actually stored.
+// A byte-exact body must match the line, as wire parse does.
+function alignContentLength(
+    fields: FieldLine[],
+    body: Octets | undefined,
+    reencoded: boolean,
+): FieldLine[] {
+    const declared = fields.find(
+        (field) => field.name === CONTENT_LENGTH,
+    );
+    if (declared === undefined) return fields;
+    const stored = body === undefined ? 0 : body.byteLength();
+    if (reencoded && body !== undefined) {
+        return replaceContentLength(fields, String(stored));
+    }
+    const length = Number(declared.value);
+    if (!Number.isInteger(length) || length < 0) {
+        throw new HttpMessageError(
+            'invalid content-length: ' + declared.value,
+        );
+    }
+    if (stored !== length) {
+        throw new HttpMessageError(
+            'content-length ' + length
+                + ' does not match body of '
+                + stored,
+        );
+    }
+    return fields;
+}
+
+function replaceContentLength(
+    fields: readonly FieldLine[],
+    value: string,
+): FieldLine[] {
+    const kept = fields.filter(
+        (field) => field.name !== CONTENT_LENGTH,
+    );
+    return [...kept, { name: CONTENT_LENGTH, value }];
+}
+
+// A declared length is a present body. "0" with no body
+// key is empty octets. No line and no body stays absent.
+function bodyForDeclaredLength(
+    fields: readonly FieldLine[],
+    body: Octets | undefined,
+): Octets | undefined {
+    if (body !== undefined) return body;
+    const declared = fields.find(
+        (field) => field.name === CONTENT_LENGTH,
+    );
+    if (declared === undefined) return undefined;
+    const length = Number(declared.value);
+    if (!Number.isInteger(length) || length < 0) {
+        throw new HttpMessageError(
+            'invalid content-length: ' + declared.value,
+        );
+    }
+    if (length !== 0) {
+        throw new HttpMessageError(
+            'content-length ' + length
+                + ' does not match body of 0',
+        );
+    }
+    return Octets.fromLatin1('');
+}
+
+function reencodesInlineBody(
+    root: Record<string, unknown>,
+    fields: readonly FieldLine[],
+    registry: BodyRegistry,
+): boolean {
+    if (!('body' in root)) return false;
+    if (typeof root.body === 'string') return false;
+    return jsonCodecFor(fields, registry) !== undefined;
 }
 
 function parseJsonBody(
@@ -179,10 +269,20 @@ function toJsonValue(
         out.status = line.status;
         out.reason = line.reason;
     }
-    out.header = pairs(model.fields);
-    if (model.body !== undefined) {
-        out.body = bodyToJson(model.body, model.fields, registry);
+    const body = model.body;
+    let header = model.fields;
+    if (body !== undefined) {
+        const projected = bodyProjection(
+            body, model.fields, registry,
+        );
+        header = fieldsForProjection(
+            model.fields,
+            body.byteLength(),
+            projected.stored,
+        );
+        out.body = projected.value;
     }
+    out.header = pairs(header);
     if (model.trailer !== undefined) {
         out.trailer = pairs(model.trailer);
     }
@@ -193,23 +293,49 @@ function toJsonValue(
 // decodes to a non-string value; otherwise base64. A malformed
 // or empty body under a JSON content-type falls back to base64
 // (so serialization is total — it never throws on a valid
-// model), and the type-based parse rule round-trips it.
-function bodyToJson(
+// model). stored is the octet length that projection keeps.
+// A changed length replaces a stored content-length.
+function bodyProjection(
     octets: Octets,
     fields: readonly FieldLine[],
     registry: BodyRegistry,
-): unknown {
-    if (jsonCodecFor(fields, registry) !== undefined) {
+): { value: unknown, stored: number } {
+    const codec = jsonCodecFor(fields, registry);
+    if (codec !== undefined) {
         try {
             const value = parsePreservingNumbers(
                 new TextDecoder().decode(octets.asBytes()),
             );
-            if (typeof value !== 'string') return value;
+            if (typeof value !== 'string') {
+                const canonical = codec.encode(
+                    sortJsonKeys(value),
+                );
+                return {
+                    value,
+                    stored: canonical.byteLength(),
+                };
+            }
         } catch {
             // not valid JSON under a JSON content-type
         }
     }
-    return octets.toBase64();
+    return {
+        value: octets.toBase64(),
+        stored: octets.byteLength(),
+    };
+}
+
+function fieldsForProjection(
+    fields: readonly FieldLine[],
+    original: number,
+    stored: number,
+): readonly FieldLine[] {
+    if (stored === original) return fields;
+    const declared = fields.find(
+        (field) => field.name === CONTENT_LENGTH,
+    );
+    if (declared === undefined) return fields;
+    return replaceContentLength(fields, String(stored));
 }
 
 function pairs(fields: readonly FieldLine[]): string[][] {

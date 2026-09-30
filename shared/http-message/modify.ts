@@ -9,9 +9,9 @@ import {
 // Pure model transformations. Each returns a NEW model; the
 // caller never mutates in place. Field names and values are
 // validated here (the modification surface is a gate too — a
-// value with CR/LF would inject a header). Derived framing
-// fields cannot be set directly; they are computed from the
-// body and trailer.
+// value with CR/LF would inject a header). putField refuses
+// content-length and transfer-encoding. putBody writes
+// content-length from the body and drops any trailer.
 
 export function putField(
     model: MessageModel,
@@ -118,7 +118,21 @@ export function putBody(
     body: Octets,
 ): MessageModel {
     const typed = putField(model, 'content-type', mediaType);
-    return { ...typed, body };
+    const fields = typed.fields.filter(
+        (field) => field.name !== CONTENT_LENGTH,
+    );
+    return {
+        ...typed,
+        fields: [
+            ...fields,
+            {
+                name: CONTENT_LENGTH,
+                value: String(body.byteLength()),
+            },
+        ],
+        body,
+        trailer: undefined,
+    };
 }
 
 function settableName(name: string): string {
@@ -128,7 +142,7 @@ function settableName(name: string): string {
     }
     if (lower === CONTENT_LENGTH || lower === TRANSFER_ENCODING) {
         throw new HttpMessageError(
-            lower + ' is derived, not settable',
+            lower + ' is not settable',
         );
     }
     return lower;

@@ -37,6 +37,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Members are a lifecycle-trio family (states-document
 // retirement): PUT /members/:id carries {type} plus the trio
@@ -318,8 +321,9 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Phase Final Task 2: members ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -351,8 +355,9 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const written = await postAiMemberDocumentOp(
         db, 'VLoTvOKjXoNVDjLLBotQXA', body,
@@ -380,8 +385,9 @@ Deno.test('postHumanMemberDocumentOp writes exactly the pair and'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const written = await postHumanMemberDocumentOp(
         db, 'fVrMeaOxbnDcSKMPwtIEZg', body,
@@ -406,7 +412,7 @@ async () => {
         () => PUT(
             db, 'members/' + generateIdentifier(), memberFields(),
             DEV_TOKEN,
-        ),
+            operationIdHeader()),
         Error,
         'Not found',
     );
@@ -420,7 +426,7 @@ async () => {
         () => PUT(
             db, 'ai-members/' + generateIdentifier(),
             aiMemberFields(), DEV_TOKEN,
-        ),
+            operationIdHeader()),
         Error,
         'Not found',
     );

@@ -591,7 +591,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         }),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(saved.status, 201);
+    assertStrictEquals(saved.status, 200);
     derived = await assertStep();
 
     // Further save (versions POST retired Phase 15 Task 7).
@@ -605,7 +605,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         ),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(versionedSave.status, 201);
+    assertStrictEquals(versionedSave.status, 200);
     derived = await assertStep();
 
     // Node delete via save: n2 and YiJPbufDpkyrZcZCYbUJpg are tombstoned.
@@ -635,7 +635,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         ),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(deletedSave.status, 201);
+    assertStrictEquals(deletedSave.status, 200);
     derived = await assertStep();
     assertStrictEquals(
         (derived.graph as { nodes: { id: string }[] })
@@ -685,7 +685,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         }),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(redone.status, 201);
+    assertStrictEquals(redone.status, 200);
     derived = await assertStep();
 
     // Terminal: a state-'deleted' document PUT — vanishes from
@@ -699,7 +699,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         }),
         { 'if-match': await headEtag(db, token, flowId) },
     ));
-    assertStrictEquals(tombstoned.status, 201);
+    assertStrictEquals(tombstoned.status, 200);
 
     await assertRejects(
         () => deriveFlow(db, STARK_ORGANIZATION, flowId),
@@ -1045,7 +1045,7 @@ Deno.test('the lock-head terminal reaches exactly the derived '
             ),
             { 'if-match': await headEtag(db, token, flowId) },
         ));
-        assertStrictEquals(saved.status, 201);
+        assertStrictEquals(saved.status, 200);
         assertStrictEquals(saved.headers.get('Follows'), null);
         headId = pairIdOf(saved)!;
     }

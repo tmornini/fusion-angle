@@ -111,11 +111,11 @@ async function identityDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -142,11 +142,11 @@ async function identityPiiDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], pii, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 
@@ -172,11 +172,11 @@ async function aiAgentDocumentMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: spec.status,
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
 }
 

@@ -792,7 +792,7 @@ async () => {
             state: 'active',
         },
     ));
-    assertStrictEquals(echoed.status, 201);
+    assertStrictEquals(echoed.status, 200);
     assertStrictEquals(
         0 /* states table retired */,
         beforeStatesCount,
@@ -813,7 +813,7 @@ async () => {
             state: 'archived',
         },
     ));
-    assertStrictEquals(archived.status, 201);
+    assertStrictEquals(archived.status, 200);
     await assertRecordWire();
     const afterArchive = await derivedRecords(
         db, STARK_ORGANIZATION,
@@ -832,7 +832,7 @@ async () => {
             state: 'deleted',
         },
     ));
-    assertStrictEquals(deletedTransition.status, 201);
+    assertStrictEquals(deletedTransition.status, 200);
     const deletedGet = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),

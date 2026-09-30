@@ -1,5 +1,4 @@
 import {
-    assertMatch,
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
@@ -23,6 +22,9 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const USER_1 = generateIdentifier();
 const USER_2 = generateIdentifier();
@@ -53,6 +55,23 @@ async function tokenFor(sub: string): Promise<string> {
 // any grant reaches formAuthMessagePair(seed, ...), so the
 // fields never surface in a stored pair — this just satisfies
 // postToken's own required seed parameter honestly.
+function grantRequest(
+    authorization?: string,
+    cookie?: string,
+): Request {
+    const headers = new Headers();
+    if (authorization !== undefined) {
+        headers.set('authorization', authorization);
+    }
+    if (cookie !== undefined) {
+        headers.set('cookie', cookie);
+    }
+    return new Request(
+        'http://localhost/authentication/token',
+        { method: 'POST', headers },
+    );
+}
+
 function tokenRequestSeed(): AuthMessagePairSeed {
     return {
         requestAt: nowUtc(),
@@ -62,6 +81,9 @@ function tokenRequestSeed(): AuthMessagePairSeed {
         routePattern: 'authentication/token',
         routeSegments: ['authentication', 'token'],
         pathSegments: ['authentication', 'token'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
 }
 
@@ -113,7 +135,7 @@ async function seedTokenRevocationPair(
         'identities/' + identityId + '/token-revocations/' + id,
         { identity_id: identityId, at },
         await devToken(),
-    );
+        operationIdHeader());
 }
 
 async function revokedDb(): Promise<MemoryDbAdapter> {
@@ -140,9 +162,10 @@ async () => {
     const token = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'token-exchange',
-        subject_token: token, actor_token: token,
         organization: ORGANIZATION_A,
-    }, tokenRequestSeed());
+    }, tokenRequestSeed(), grantRequest(
+        'Bearer ' + token,
+    ));
     assertStrictEquals(res.ok, false);
     if (!res.ok) {
         assertStrictEquals(res.status, 401);
@@ -161,17 +184,17 @@ async () => {
         db, generateIdentifier(), ORGANIZATION_A, USER_2,
         '2020-01-01T00:00:00.000000Z',
     );
-    const subject = await tokenFor(USER_2);
     const actor = await tokenFor(USER_1);
     const res = await postToken(db, {
         grant_type: 'token-exchange',
-        subject_token: subject, actor_token: actor,
         organization: ORGANIZATION_A,
-    }, tokenRequestSeed());
+    }, tokenRequestSeed(), grantRequest(
+        'Bearer ' + actor,
+    ));
     assertStrictEquals(res.ok, false);
     if (!res.ok) {
-        assertStrictEquals(res.status, 403);
-        assertMatch(res.error, /self-delegation/);
+        assertStrictEquals(res.status, 401);
+        assertStrictEquals(res.error, 'token revoked');
     }
 });
 
@@ -207,13 +230,14 @@ Deno.test(
             action: 'revoked',
             chain_id: generateIdentifier(),
             at: nowUtc(),
-        }, await devToken());
+        }, await devToken(),
+            operationIdHeader());
         const res = await postToken(db, {
             grant_type: 'token-exchange',
-            subject_token: subject,
-            actor_token: actor,
             organization: ORGANIZATION_A,
-        }, tokenRequestSeed());
+        }, tokenRequestSeed(), grantRequest(
+            'Bearer ' + actor,
+        ));
         assertStrictEquals(res.ok, false);
         if (!res.ok) {
             assertStrictEquals(res.status, 401);
@@ -228,8 +252,10 @@ Deno.test('refresh rejects a logged-out token', async () => {
     const db = await revokedDb();
     const token = await tokenFor(USER_1);
     const res = await postToken(db, {
-        grant_type: 'refresh', refresh_token: token,
-    }, tokenRequestSeed());
+        grant_type: 'refresh',
+    }, tokenRequestSeed(), grantRequest(
+        undefined, 'refresh_token=' + token,
+    ));
     assertStrictEquals(res.ok, false);
     if (!res.ok) assertStrictEquals(res.status, 401);
 });
@@ -250,7 +276,8 @@ Deno.test('refresh on a logged-out but live jti is the'
         jti: LIVE_JTI, identity_id: USER_1,
         action: 'issued', chain_id: 'WeXjAaAxGSpLpamfEuvcww',
         at: '2019-01-01T00:00:00.000000Z',
-    }, await devToken());
+    }, await devToken(),
+        operationIdHeader());
     const iat = Math.floor(
         Date.parse('2019-01-01T00:00:00.000000Z') / 1000);
     const token = await mintAccessToken({
@@ -259,8 +286,10 @@ Deno.test('refresh on a logged-out but live jti is the'
         iat, ttlSeconds: 10_000_000_000, jti: LIVE_JTI,
     });
     const res = await postToken(db, {
-        grant_type: 'refresh', refresh_token: token,
-    }, tokenRequestSeed());
+        grant_type: 'refresh',
+    }, tokenRequestSeed(), grantRequest(
+        undefined, 'refresh_token=' + token,
+    ));
     assertStrictEquals(res.ok, false);
     if (!res.ok) {
         assertStrictEquals(res.status, 401);

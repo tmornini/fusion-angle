@@ -226,8 +226,9 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
         pathSegments: ['ideas', 'gZsGVjTnvrgHQLzbKnQckg'],
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody,
+        responseBody,
         operationId,
+        requestId: generateIdentifier(),
     });
     const written = await route.put!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg'], body
@@ -485,7 +486,7 @@ async () => {
             'PUT', path, token, { v: 'second' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
         ));
-        assertStrictEquals(matched.status, 201);
+        assertStrictEquals(matched.status, 200);
         const stale = await handleRequest(db, req(
             'PUT', path, token, { v: 'third' },
             { [IF_MATCH_HEADER]: strongEtagOf(pairId) },
@@ -515,13 +516,13 @@ async () => {
             'PUT', path, token, { v: 'B' },
             { [IF_MATCH_HEADER]: tagA },
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         const tagB = second.headers.get('ETag')!;
         const third = await handleRequest(db, req(
             'PUT', path, token, { v: 'A' },
             { [IF_MATCH_HEADER]: tagB },
         ));
-        assertStrictEquals(third.status, 201);
+        assertStrictEquals(third.status, 200);
         const tagA2 = third.headers.get('ETag')!;
         assertNotStrictEquals(tagA, tagB);
         assertNotStrictEquals(tagB, tagA2);
@@ -547,7 +548,7 @@ Deno.test('locked arm: a sibling route under the SAME family'
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
     });
 });
 
@@ -612,7 +613,7 @@ Deno.test('locked arm: a matching echo stores no predecessor'
             { v: 'second' },
             { [IF_MATCH_HEADER]: firstEtag },
         ));
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertStrictEquals(second.headers.get('Follows'), null);
         assertStrictEquals(second.headers.get('Supersedes'), null);
         const secondId = pairIdOf(second)!;
@@ -643,7 +644,7 @@ async () => {
             { [IF_MATCH_HEADER]: firstEtag },
         );
         const edit = await handleRequest(db, editRequest.clone());
-        assertStrictEquals(edit.status, 201);
+        assertStrictEquals(edit.status, 200);
         const afterEdit = (await db.messagePairs.getAll())
             .length;
         // The edit's If-Match names the genesis head. A resend
@@ -696,9 +697,10 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [], body: { v: 'genesis' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
-        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: { v: 'genesis' },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -719,10 +721,11 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [echo], body: { v: 'a' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
-        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: { v: 'a' },
         latchedHeadMessagePairId: genesis.id,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const writerB = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
@@ -731,10 +734,11 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
         pathSegments: [TEST_FAMILY, 'race'],
         headerFields: [echo], body: { v: 'b' },
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
-        organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: { v: 'b' },
         latchedHeadMessagePairId: genesis.id,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await testDocumentOp(
         db, 'race', { v: 'a' }, 'XXZruirZyAOoRpNxaDnpSA', writerA,
@@ -776,7 +780,7 @@ async () => {
         ]);
         const statuses =
             [first.status, second.status].sort();
-        assertEquals(statuses, [201, 412]);
+        assertEquals(statuses, [200, 412]);
         const loser = first.status === 412 ? first : second;
         const loserBody =
             await loser.json() as { error: string };
@@ -871,9 +875,9 @@ async function putStatelessDocumentMessagePair(
         pathSegments: [STATELESS_FAMILY, id],
         headerFields: [], body, requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200,
         responseBody: { id, ...body },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -895,8 +899,9 @@ async function deleteStatelessDocumentMessagePair(
         headerFields: [], body: {},
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: AT, organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

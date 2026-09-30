@@ -1,12 +1,8 @@
-import { generateIdentifier } from
-    '../../../shared/identifier.ts';
 import {
     UnauthorizedError,
     RequestError,
     HTTP_UNAUTHORIZED,
 } from '../../../api/http-errors.ts';
-import { REQUEST_ID_HEADER } from
-    '../../../api/request-context.ts';
 import { OPERATION_ID_HEADER } from
     '../../../api/message-pair.ts';
 import { putSessionToken } from './session-token.ts';
@@ -15,66 +11,81 @@ import { runSingleFlightRefresh } from
 import { navigateTo } from '../navigation.ts';
 import { principalFromToken } from
     '../../../shared/access-token-decode.ts';
+import { authParam } from './authentication.ts';
 
 // Fetch transport for the server ZIP. Same RequestContext
 // verbs as the in-page facade, over real HTTP. No import of
 // api/api.ts — that graph stays out of the server client.
-// Writes always send Operation-ID. A 401 single-flights a
-// cookie refresh POST, retries once, and bounces to /auth
-// if that refresh fails.
+// The caller supplies operation-id. This facade does not
+// mint one and does not send request-id. A 401
+// single-flights a cookie refresh POST carrying that id,
+// retries once, and bounces to /auth if the refresh fails.
 
 export interface HttpFacade {
     GET<T>(
         resource: string,
         token: string,
-        requestId?: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<T>;
     GETWithEtag<T>(
         resource: string,
         token: string,
-        requestId?: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<{ body: T; etag: string | undefined }>;
     PUT<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?: readonly (readonly [string, string])[],
-        requestId?: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<T>;
     PUTWithEtag<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?: readonly (readonly [string, string])[],
-        requestId?: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<{ body: T; etag: string | undefined }>;
     PATCH<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?: readonly (readonly [string, string])[],
-        requestId?: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<T>;
     PATCHWithEtag<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?: readonly (readonly [string, string])[],
-        requestId?: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<{ body: T; etag: string | undefined }>;
     DELETE(
         resource: string,
         token: string,
-        requestId?: string,
-        headerFields?: readonly (readonly [string, string])[],
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<void>;
     POST<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        requestId?: string,
-        headerFields?: readonly (readonly [string, string])[],
+        headerFields?:
+            readonly (readonly [string, string])[],
     ): Promise<T>;
+    postForHeaders(
+        resource: string,
+        payload: Record<string, unknown>,
+        token: string,
+        headerFields?:
+            readonly (readonly [string, string])[],
+    ): Promise<{
+        readonly status: number;
+        readonly headers: Headers;
+        readonly body: string;
+    }>;
 }
 
 async function unwrapResponse<T>(
@@ -137,9 +148,7 @@ function etagFromHeader(
 
 function requestHeaders(
     token: string,
-    requestId: string | undefined,
     contentType: boolean,
-    write: boolean,
     extra: readonly (readonly [string, string])[]
         | undefined,
 ): Headers {
@@ -150,19 +159,10 @@ function requestHeaders(
     if (contentType) {
         headers.set('Content-Type', 'application/json');
     }
-    if (requestId !== undefined) {
-        headers.set(REQUEST_ID_HEADER, requestId);
-    }
     if (extra !== undefined) {
         for (const [name, value] of extra) {
             headers.set(name, value);
         }
-    }
-    if (write && !headers.has(OPERATION_ID_HEADER)) {
-        headers.set(
-            OPERATION_ID_HEADER,
-            generateIdentifier(),
-        );
     }
     return headers;
 }
@@ -174,20 +174,16 @@ export function createHttpFacade(
         method: string,
         resource: string,
         token: string,
-        requestId: string | undefined,
         payload: Record<string, unknown> | undefined,
         extra: readonly (readonly [string, string])[]
             | undefined,
-        write: boolean,
     ): Promise<Response> {
         return fetch(origin + '/api/' + resource, {
             method,
             credentials: 'same-origin',
             headers: requestHeaders(
                 token,
-                requestId,
                 payload !== undefined,
-                write,
                 extra,
             ),
             ...(payload !== undefined
@@ -197,61 +193,70 @@ export function createHttpFacade(
     }
 
     async function postCookieRefresh(
+        operationId: string | undefined,
     ): Promise<string | null> {
+        const headers = new Headers();
+        headers.set('Content-Type', 'application/json');
+        if (operationId !== undefined) {
+            headers.set(OPERATION_ID_HEADER, operationId);
+        }
         const response = await fetch(
             origin + '/api/authentication/token', {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({
                     grant_type: 'refresh',
                 }),
             },
         );
+        await response.text();
         if (!response.ok) return null;
-        const body = await response.json() as {
-            access_token?: unknown;
-        };
-        return typeof body.access_token === 'string'
-            ? body.access_token
-            : null;
+        return authParam(
+            response.headers.get('authentication-info'),
+            'access_token',
+        );
     }
 
     async function postOrganizationExchange(
         flat: string,
         organization: string,
+        operationId: string | undefined,
     ): Promise<string | null> {
+        const headers = new Headers();
+        headers.set(
+            'Content-Type', 'application/json',
+        );
+        headers.set(
+            'Authorization', 'Bearer ' + flat,
+        );
+        if (operationId !== undefined) {
+            headers.set(OPERATION_ID_HEADER, operationId);
+        }
         const response = await fetch(
             origin + '/api/authentication/token', {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: {
-                    'Content-Type':
-                        'application/json',
-                },
+                headers,
                 body: JSON.stringify({
                     grant_type: 'token-exchange',
-                    subject_token: flat,
-                    actor_token: flat,
                     organization,
                 }),
             },
         );
+        await response.text();
         if (!response.ok) return null;
-        const body = await response.json() as {
-            access_token?: unknown;
-        };
-        return typeof body.access_token === 'string'
-            ? body.access_token
-            : null;
+        return authParam(
+            response.headers.get('authentication-info'),
+            'access_token',
+        );
     }
 
     async function refreshAndScope(
         deadToken: string,
+        operationId: string | undefined,
     ): Promise<string | null> {
-        const flat = await postCookieRefresh();
+        const flat = await postCookieRefresh(operationId);
         if (flat === null) return null;
         const organization =
             organizationToRestore(deadToken);
@@ -259,7 +264,7 @@ export function createHttpFacade(
             return flat;
         }
         return await postOrganizationExchange(
-            flat, organization,
+            flat, organization, operationId,
         ) ?? flat;
     }
 
@@ -267,15 +272,12 @@ export function createHttpFacade(
         method: string,
         resource: string,
         token: string,
-        requestId: string | undefined,
         payload: Record<string, unknown> | undefined,
         extra: readonly (readonly [string, string])[]
             | undefined,
-        write: boolean,
     ): Promise<Response> {
         const first = await exchange(
-            method, resource, token, requestId,
-            payload, extra, write,
+            method, resource, token, payload, extra,
         );
         if (first.status !== HTTP_UNAUTHORIZED) {
             return first;
@@ -283,8 +285,18 @@ export function createHttpFacade(
         if (isCredentialDoor(resource)) {
             return first;
         }
+        let operationId: string | undefined;
+        if (extra !== undefined) {
+            for (const [name, value] of extra) {
+                if (name.toLowerCase()
+                    === OPERATION_ID_HEADER) {
+                    operationId = value;
+                    break;
+                }
+            }
+        }
         const access = await runSingleFlightRefresh(
-            () => refreshAndScope(token),
+            () => refreshAndScope(token, operationId),
         );
         if (access === null) {
             navigateTo('auth');
@@ -292,23 +304,24 @@ export function createHttpFacade(
         }
         putSessionToken(access);
         return exchange(
-            method, resource, access, requestId,
-            payload, extra, write,
+            method, resource, access, payload, extra,
         );
     }
 
     const facade: HttpFacade = {
-        GET: async (resource, token, requestId) =>
+        GET: async (resource, token, headerFields) =>
             unwrapResponse(
                 await exchangeOnce(
-                    'GET', resource, token, requestId,
-                    undefined, undefined, false,
+                    'GET', resource, token,
+                    undefined, headerFields,
                 ),
             ),
-        GETWithEtag: async (resource, token, requestId) => {
+        GETWithEtag: async (
+            resource, token, headerFields,
+        ) => {
             const response = await exchangeOnce(
-                'GET', resource, token, requestId,
-                undefined, undefined, false,
+                'GET', resource, token,
+                undefined, headerFields,
             );
             return {
                 body: await unwrapResponse(response),
@@ -316,21 +329,19 @@ export function createHttpFacade(
             };
         },
         PUT: async (
-            resource, payload, token,
-            headerFields, requestId,
+            resource, payload, token, headerFields,
         ) => unwrapResponse(
             await exchangeOnce(
-                'PUT', resource, token, requestId,
-                payload, headerFields, true,
+                'PUT', resource, token,
+                payload, headerFields,
             ),
         ),
         PUTWithEtag: async (
-            resource, payload, token,
-            headerFields, requestId,
+            resource, payload, token, headerFields,
         ) => {
             const response = await exchangeOnce(
-                'PUT', resource, token, requestId,
-                payload, headerFields, true,
+                'PUT', resource, token,
+                payload, headerFields,
             );
             return {
                 body: await unwrapResponse(response),
@@ -338,21 +349,19 @@ export function createHttpFacade(
             };
         },
         PATCH: async (
-            resource, payload, token,
-            headerFields, requestId,
+            resource, payload, token, headerFields,
         ) => unwrapResponse(
             await exchangeOnce(
-                'PATCH', resource, token, requestId,
-                payload, headerFields, true,
+                'PATCH', resource, token,
+                payload, headerFields,
             ),
         ),
         PATCHWithEtag: async (
-            resource, payload, token,
-            headerFields, requestId,
+            resource, payload, token, headerFields,
         ) => {
             const response = await exchangeOnce(
-                'PATCH', resource, token, requestId,
-                payload, headerFields, true,
+                'PATCH', resource, token,
+                payload, headerFields,
             );
             return {
                 body: await unwrapResponse(response),
@@ -360,24 +369,36 @@ export function createHttpFacade(
             };
         },
         DELETE: async (
-            resource, token, requestId, headerFields,
+            resource, token, headerFields,
         ) => {
             await unwrapResponse(
                 await exchangeOnce(
-                    'DELETE', resource, token, requestId,
-                    undefined, headerFields, true,
+                    'DELETE', resource, token,
+                    undefined, headerFields,
                 ),
             );
         },
         POST: async (
-            resource, payload, token,
-            requestId, headerFields,
+            resource, payload, token, headerFields,
         ) => unwrapResponse(
             await exchangeOnce(
-                'POST', resource, token, requestId,
-                payload, headerFields, true,
+                'POST', resource, token,
+                payload, headerFields,
             ),
         ),
+        postForHeaders: async (
+            resource, payload, token, headerFields,
+        ) => {
+            const response = await exchange(
+                'POST', resource, token,
+                payload, headerFields,
+            );
+            return {
+                status: response.status,
+                headers: response.headers,
+                body: await response.text(),
+            };
+        },
     };
     return facade;
 }

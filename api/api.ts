@@ -22,11 +22,12 @@ import {
     formWriteMessagePair,
     canonicalPath,
     storedPathAndNameOf,
-    hoistedHeaderFields,
+    requestHeaderFields,
+    requestTarget,
     documentHeadAt,
     writeAnswerOf,
     ownWireOf,
-    responseFromLatin1,
+    responseFromHead,
     attemptFor,
     runWrite,
     attachEtag,
@@ -34,11 +35,11 @@ import {
     streamGetFromStored,
     parseIfMatch,
     LATCHED_OPERATION_ROUTE_PATTERNS,
-    requireOperationId,
     OPERATION_ID_HEADER,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
+import type { ReceivedRequest } from './message-pair.ts';
 import {
     bodyOctetsOf,
 } from './message-form.ts';
@@ -86,8 +87,6 @@ import {
 import {
     postToken,
     postAuthorize,
-    attachSetCookie,
-    refreshSetCookie,
     refreshClearCookie,
     refreshTokenFromCookieHeader,
     wireGrantError,
@@ -106,6 +105,7 @@ import {
     HTTP_FORBIDDEN,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
+    errorJson,
 } from './http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
@@ -128,12 +128,13 @@ import {
 } from './routes.ts';
 
 import {
+    framingRefusal,
     incomingContext,
     REQUEST_ID_HEADER,
+    type FramedContext,
     type IncomingContext,
 } from './request-context.ts';
 import {
-    generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
 
@@ -300,27 +301,6 @@ function limitedHeaders(
         : {};
 }
 
-// The revision pair an instance PATCH wrote beside its wire
-// pair: same document, same operation, the other id. An
-// operation id names one write, so the join is an identity.
-async function revisionMessagePairIdForPatch(
-    db: DbAdapter,
-    wireMessagePairId: string,
-): Promise<string | undefined> {
-    const wireReq = await db.messagePairs.getById(
-        wireMessagePairId,
-    );
-    const siblings = await db.messagePairs.getDocumentHistory(
-        wireReq.path, wireReq.name,
-    );
-    const revision = siblings.find(
-        (row) =>
-            row.operation_id === wireReq.operation_id
-            && row.id !== wireMessagePairId,
-    );
-    return revision?.id;
-}
-
 // The one catch shared by both pre-dispatch ownership regions
 // (handleRequest, below) so their redaction discipline cannot
 // diverge: fenceRequest membership/role reads, and the write
@@ -331,7 +311,7 @@ async function revisionMessagePairIdForPatch(
 // the request identity for correlation. A missing table is a
 // failed request; product boot does not recover it.
 function redactedFenceFailure(
-    ctx: IncomingContext,
+    ctx: FramedContext,
     error: unknown,
 ): Response {
     if (error instanceof MissingTableError) {
@@ -339,6 +319,7 @@ function redactedFenceFailure(
     }
     console.error('fence read failed', {
         requestId: ctx.requestId,
+        operationId: ctx.operationId,
         requestAt: ctx.requestAt,
         latencyMs: msSinceUtc(ctx.requestAt),
         method: ctx.method,
@@ -378,11 +359,60 @@ function rejectMalformedIdentifierParams(
     return undefined;
 }
 
+function finish(
+    ctx: IncomingContext,
+    response: Response,
+): Response {
+    response.headers.set(
+        REQUEST_ID_HEADER, ctx.requestId,
+    );
+    return response;
+}
+
 export async function handleRequest(
     adapter: GuardedDbAdapter,
     request: Request,
 ): Promise<Response> {
-    const ctx = incomingContext(adapter, request);
+    const ctx = await incomingContext(adapter, request);
+    const response = await dispatched(ctx, request);
+    return finish(ctx, response);
+}
+
+async function dispatched(
+    arrived: IncomingContext,
+    request: Request,
+): Promise<Response> {
+    const framing = framingRefusal(
+        request.headers, arrived.bodyBytes,
+    );
+    if (framing !== undefined) return framing;
+    if (request.headers.has(REQUEST_ID_HEADER)) {
+        return errorJson(
+            'Request-ID is minted by the server',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const operationId = request.headers.get(
+        OPERATION_ID_HEADER,
+    );
+    if (operationId === null || operationId === '') {
+        return errorJson(
+            'Operation-ID is required',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    if (!isIdentifier(operationId)) {
+        return errorJson(
+            'Operation-ID must be a 22-'
+                + 'character identifier',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const ctx: FramedContext = {
+        ...arrived,
+        operationId,
+    };
+    const adapter = ctx.base;
     const { method, pathname } = ctx;
     const pathSegments = pathSegmentsOf(pathname);
     // Match first (pure, no I/O). Authentication runs before
@@ -433,20 +463,6 @@ export async function handleRequest(
             await authenticateRequest(ctx, request);
         if (typeof authed === 'string') {
             return unauthorizedBearerResponse(authed);
-        }
-        const rawRequestId =
-            request.headers.get(REQUEST_ID_HEADER);
-        if (
-            rawRequestId !== null
-            && !isIdentifier(rawRequestId)
-        ) {
-            return Response.json(
-                {
-                    error: 'Request-ID must be a 22-'
-                        + 'character identifier',
-                },
-                { status: HTTP_BAD_REQUEST },
-            );
         }
         // Auth first; only then admit an unmatched path as
         // 404 (bytes unchanged for authenticated callers).
@@ -629,11 +645,6 @@ export async function handleRequest(
     const { route: matched, params } = match;
     const routePattern = matched.segments.join('/');
 
-    const denied = requireOperationId(
-        request, method, bearerExempt,
-    );
-    if (denied !== undefined) return denied;
-
     // Parse the request body when the method
     // has one. A malformed or non-object JSON
     // body is a client error (400), not a
@@ -646,8 +657,8 @@ export async function handleRequest(
         || method === 'PATCH'
     ) {
         const parse = method === 'PUT'
-            ? await parsePutBody(request)
-            : await parseObjectBody(request);
+            ? parsePutBody(ctx.bodyBytes)
+            : parseObjectBody(ctx.bodyBytes);
         if (!parse.ok) {
             return Response.json(
                 {
@@ -802,15 +813,19 @@ export async function handleRequest(
                 && wiring !== undefined
                 && familyRegistration(wiring.family)
                     ?.concurrency === 'locked';
-            // Advertised ETag is the live PUT's pair id.
-            // DELETE heads have no If-Match target
-            // (documentHeadMessagePairId skips them).
-            // Same-body no-append uses this for both PUT
-            // kinds (simple and locked).
-            const livePut = isDocumentPut
-                ? await documentHeadMessagePairId(
+            // Advertised ETag is the live PUT pair id.
+            // A DELETE head is not live, so If-Match is
+            // not required, and the PUT is not genesis.
+            // Same-body no-append uses livePut for both
+            // PUT kinds (simple and locked).
+            const head = isDocumentPut
+                ? await documentHeadAt(
                     effective, canonicalPrefix, name,
                 )
+                : null;
+            const livePut = head !== null
+                && head.method === 'PUT'
+                ? head.id
                 : undefined;
             const advertised = livePut;
             // The hoisted echo: read If-Match directly so
@@ -880,16 +895,6 @@ export async function handleRequest(
                     + routePattern,
                 );
             }
-            const operationId = request.headers.get(
-                OPERATION_ID_HEADER,
-            );
-            if (
-                operationId === null || operationId === ''
-            ) {
-                throw new Error(
-                    'Operation-ID missing after require',
-                );
-            }
             // DELETE table: never-written 404 stores nothing;
             // already-gone 204 no append; live PUT proceeds.
             if (method === 'DELETE') {
@@ -906,23 +911,26 @@ export async function handleRequest(
                     return new Response(null, {
                         status: HTTP_NO_CONTENT,
                         headers: {
-                            'Operation-ID': operationId,
+                            'Operation-ID': ctx.operationId,
                         },
                     });
                 }
             }
             messagePair = await formWriteMessagePair({
-                method, pathname, routePattern,
+                method,
+                pathname: requestTarget(request),
+                routePattern,
                 routeSegments: matched.segments,
                 pathSegments,
-                headerFields: hoistedHeaderFields(request),
+                headerFields: requestHeaderFields(request),
                 body,
+                bodyBytes: arrived.bodyBytes,
                 requesterIdentityId: actor,
                 requestAt: ctx.requestAt,
                 organization,
-                operationId,
-                responseStatus: spec.status,
-                ...(isDocumentPut && livePut === undefined
+                operationId: ctx.operationId,
+                requestId: ctx.requestId,
+                ...(isDocumentPut && head === null
                     ? { genesis: true as const }
                     : {}),
                 responseBody: method === 'PUT'
@@ -932,6 +940,17 @@ export async function handleRequest(
                         params, body, actor,
                         organization,
                     ),
+                ...(routePattern
+                    === 'identities/:id/token-revocations/:rid'
+                    ? {
+                        responseFields: [{
+                            name: 'set-cookie',
+                            value: refreshClearCookie(
+                                request,
+                            ),
+                        }],
+                    }
+                    : {}),
                 ...(echoMatchesHead
                     && echo !== null
                     && echo !== undefined
@@ -1230,8 +1249,9 @@ export async function handleRequest(
                                 .getById(livePut);
                         if (stored !== undefined) {
                             return attachEtag(
-                                responseFromLatin1(
-                                    stored.response, 200,
+                                responseFromHead(
+                                    stored.response,
+                                    ctx.requestId,
                                 ),
                                 stored.id,
                             );
@@ -1291,6 +1311,12 @@ export async function handleRequest(
                 return written.response;
             }
         }
+        const received: ReceivedRequest = {
+            target: requestTarget(request),
+            headerFields: requestHeaderFields(request),
+            bodyBytes: arrived.bodyBytes,
+            requestId: ctx.requestId,
+        };
         switch (method) {
             case 'GET': {
                 if (!matched.get) {
@@ -1457,6 +1483,7 @@ export async function handleRequest(
                         request.headers.get(
                             OPERATION_ID_HEADER,
                         ) ?? '',
+                        received,
                     );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1473,15 +1500,6 @@ export async function handleRequest(
                         || written.outcome === 'refused'
                     ) {
                         return written.response;
-                    }
-                    if (
-                        routePattern
-                            === 'identities/:id/token-revocations/:rid'
-                    ) {
-                        return attachSetCookie(
-                            written.response,
-                            refreshClearCookie(request),
-                        );
                     }
                     const putWiring = wiringForSegments(
                         matched.segments,
@@ -1540,6 +1558,7 @@ export async function handleRequest(
                         messagePair,
                         organization,
                         roles,
+                        received,
                     );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1561,19 +1580,20 @@ export async function handleRequest(
                     if (
                         routePattern
                             === INSTANCE_DETAIL_PATTERN
-                        && written.answeredId !== null
+                        && written.outcome === 'land'
                     ) {
-                        const revisionId =
-                            await revisionMessagePairIdForPatch(
-                                effective, messagePair.id,
-                            );
-                        if (
-                            revisionId !== undefined
-                        ) {
+                        const revision = written.rows.find(
+                            (row) =>
+                                row.id !== messagePair.id,
+                        );
+                        if (revision !== undefined) {
                             return attachEtag(
-                                written.response, revisionId,
+                                written.response, revision.id,
                             );
                         }
+                        written.response.headers.delete(
+                            'etag',
+                        );
                     }
                     return written.response;
                 }
@@ -1608,6 +1628,7 @@ export async function handleRequest(
                     messagePair,
                     organization,
                     roles,
+                    received,
                 );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1654,24 +1675,36 @@ export async function handleRequest(
                 ) {
                     const seed: AuthMessagePairSeed = {
                         requestAt: ctx.requestAt,
-                        headerFields: hoistedHeaderFields(request),
-                        method, pathname, routePattern,
+                        headerFields: received.headerFields,
+                        bodyBytes: received.bodyBytes,
+                        method,
+                        pathname: received.target,
+                        routePattern,
                         routeSegments: matched.segments,
                         pathSegments,
+                        operationId: ctx.operationId,
+                        requestId: received.requestId,
                     };
+                    const doorBody = body ?? {};
                     const dispatched =
                         routePattern === 'authentication/token'
                             ? await postToken(
-                                effective, body!, seed,
-                                request.headers.get('cookie'))
+                                effective, doorBody, seed,
+                                request,
+                            )
                             : await postAuthorize(
-                                effective, body!, seed);
+                                effective, doorBody, seed,
+                                request,
+                            );
                     if (!dispatched.ok) {
                         if (dispatched.status
                             === HTTP_UNAUTHORIZED) {
                             console.warn(
                                 'authentication failed',
                                 {
+                                    requestId: ctx.requestId,
+                                    operationId:
+                                        ctx.operationId,
                                     reason: dispatched.error,
                                 },
                             );
@@ -1735,29 +1768,7 @@ export async function handleRequest(
                             ],
                         });
                     }
-                    const written = dispatched.wire;
-                    const grantType =
-                        typeof body!.grant_type === 'string'
-                            ? body!.grant_type
-                            : '';
-                    const setsRefreshCookie =
-                        grantType === 'authorization_code'
-                        || grantType === 'refresh'
-                        || grantType === 'client_credentials';
-                    if (
-                        routePattern === 'authentication/token'
-                        && 'refreshToken' in dispatched
-                        && setsRefreshCookie
-                    ) {
-                        return attachSetCookie(
-                            written,
-                            refreshSetCookie(
-                                dispatched.refreshToken,
-                                request,
-                            ),
-                        );
-                    }
-                    return written;
+                    return dispatched.wire;
                 }
                 if (!matched.post) {
                     return Response.json(
@@ -1783,6 +1794,7 @@ export async function handleRequest(
                     request.headers.get(
                         OPERATION_ID_HEADER,
                     ) ?? '',
+                    received,
                 );
                 if (messagePair !== undefined) {
                     const written = requireWrite(
@@ -1871,6 +1883,7 @@ export async function handleRequest(
         // by the request identity so the story correlates.
         console.error('request failed', {
             requestId: ctx.requestId,
+            operationId: ctx.operationId,
             requestAt: ctx.requestAt,
             latencyMs: msSinceUtc(ctx.requestAt),
             method,
@@ -1938,29 +1951,19 @@ async function unwrapResponse<T>(
     );
 }
 
-// Wire-side Authorization (+ optional Content-Type) plus the
-// client vessel's requestId. Absent requestId keeps the prior
-// mint-on-gate path (direct test callers); the client facade
-// always supplies the vessel id so reportFault and the server
-// trace share one identity.
+// Authorization and Content-Type only. operation-id is a
+// caller header. request-id is the server's; this function
+// neither copies nor mints one.
 function facadeHeaders(
     token: string,
-    requestId: string | undefined,
     contentType: boolean,
-    write = false,
 ): Record<string, string> {
-    const headers: Record<string, string> = {
-        'Authorization': 'Bearer ' + token,
-    };
+    const headers: Record<string, string> = {};
+    if (token !== '') {
+        headers['Authorization'] = 'Bearer ' + token;
+    }
     if (contentType) {
         headers['Content-Type'] = 'application/json';
-    }
-    if (requestId !== undefined) {
-        headers[REQUEST_ID_HEADER] = requestId;
-    }
-    if (write) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
     }
     return headers;
 }
@@ -1975,18 +1978,19 @@ async function getResponse(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
+    headerFields?:
+        readonly (readonly [string, string])[],
 ): Promise<Response> {
     await adapter.simulateLatency();
+    const headers = facadeHeaders(token, false);
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
     return handleRequest(
         adapter,
         new Request(
             `${BASE_URL}/${resource}`,
-            {
-                headers: facadeHeaders(
-                    token, requestId, false,
-                ),
-            },
+            { headers },
         ),
     );
 }
@@ -2002,19 +2006,16 @@ async function bodyWriteResponse(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<Response> {
     await adapter.simulateLatency();
-    const headers = facadeHeaders(
-        token, requestId, true, true,
-    );
+    const headers = facadeHeaders(token, true);
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
     }
-    if (headers[OPERATION_ID_HEADER] === undefined) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
-    }
+    const body = JSON.stringify(payload);
+    headers['content-length'] = String(
+        new TextEncoder().encode(body).byteLength,
+    );
     return handleRequest(
         adapter,
         new Request(
@@ -2022,7 +2023,7 @@ async function bodyWriteResponse(
             {
                 method,
                 headers,
-                body: JSON.stringify(payload),
+                body,
             },
         ),
     );
@@ -2174,11 +2175,12 @@ export async function GET<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
+    headerFields?:
+        readonly (readonly [string, string])[],
 ): Promise<T> {
     return unwrapResponse<T>(
         await getResponse(
-            adapter, resource, token, requestId,
+            adapter, resource, token, headerFields,
         ),
     );
 }
@@ -2189,10 +2191,11 @@ export async function GETWithEtag<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
+    headerFields?:
+        readonly (readonly [string, string])[],
 ): Promise<{ body: T; etag: string | undefined }> {
     const response = await getResponse(
-        adapter, resource, token, requestId,
+        adapter, resource, token, headerFields,
     );
     const body = await unwrapResponse<T>(response);
     return {
@@ -2207,12 +2210,11 @@ export async function PUT<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<T> {
     return unwrapResponse<T>(
         await bodyWriteResponse(
             adapter, 'PUT', resource, payload, token,
-            headerFields, requestId,
+            headerFields,
         ),
     );
 }
@@ -2223,11 +2225,10 @@ export async function PUTWithEtag<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<{ body: T; etag: string | undefined }> {
     const response = await bodyWriteResponse(
         adapter, 'PUT', resource, payload, token,
-        headerFields, requestId,
+        headerFields,
     );
     const body = await unwrapResponse<T>(response);
     return {
@@ -2242,12 +2243,11 @@ export async function PATCH<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<T> {
     return unwrapResponse<T>(
         await bodyWriteResponse(
             adapter, 'PATCH', resource, payload, token,
-            headerFields, requestId,
+            headerFields,
         ),
     );
 }
@@ -2258,11 +2258,10 @@ export async function PATCHWithEtag<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
-    requestId?: string,
 ): Promise<{ body: T; etag: string | undefined }> {
     const response = await bodyWriteResponse(
         adapter, 'PATCH', resource, payload, token,
-        headerFields, requestId,
+        headerFields,
     );
     const body = await unwrapResponse<T>(response);
     return {
@@ -2275,19 +2274,12 @@ export async function DELETE(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
-    requestId?: string,
     headerFields?: readonly (readonly [string, string])[],
 ): Promise<void> {
     await adapter.simulateLatency();
-    const headers = facadeHeaders(
-        token, requestId, false, true,
-    );
+    const headers = facadeHeaders(token, false);
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
-    }
-    if (headers[OPERATION_ID_HEADER] === undefined) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
     }
     await unwrapResponse(
         await handleRequest(
@@ -2303,36 +2295,67 @@ export async function DELETE(
     );
 }
 
+async function postResponse(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<Response> {
+    await adapter.simulateLatency();
+    const headers = facadeHeaders(token, true);
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
+    const body = JSON.stringify(payload);
+    headers['content-length'] = String(
+        new TextEncoder().encode(body).byteLength,
+    );
+    return handleRequest(
+        adapter,
+        new Request(
+            `${BASE_URL}/${resource}`,
+            {
+                method: 'POST',
+                headers,
+                body,
+            },
+        ),
+    );
+}
+
 export async function POST<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     payload: Record<string, unknown>,
     token: string,
-    requestId?: string,
     headerFields?: readonly (readonly [string, string])[],
 ): Promise<T> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(
-        token, requestId, true, true,
-    );
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
-    if (headers[OPERATION_ID_HEADER] === undefined) {
-        headers[OPERATION_ID_HEADER] =
-            generateIdentifier();
-    }
     return unwrapResponse<T>(
-        await handleRequest(
-            adapter,
-            new Request(
-                `${BASE_URL}/${resource}`,
-                {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(payload),
-                },
-            ),
+        await postResponse(
+            adapter, resource, payload, token,
+            headerFields,
         ),
     );
+}
+
+export async function postForHeaders(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<{
+    readonly status: number;
+    readonly headers: Headers;
+    readonly body: string;
+}> {
+    const response = await postResponse(
+        adapter, resource, payload, token, headerFields,
+    );
+    return {
+        status: response.status,
+        headers: response.headers,
+        body: await response.text(),
+    };
 }

@@ -27,8 +27,10 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    isIdentifier,
+} from '../shared/identifier.ts';
 
 Deno.test(
     'memberName returns name for known human id',
@@ -114,44 +116,60 @@ Deno.test(
 );
 
 Deno.test(
-    'RequestContext requestId is stable'
+    'RequestContext operationId is stable'
     + ' and unique',
     () => {
         const db = memoryDbAdapter();
         const a = createRequestContext(db, DEV_TOKEN);
         const b = createRequestContext(db, DEV_TOKEN);
         assertStrictEquals(
-            a.requestId, a.requestId,
+            a.operationId, a.operationId,
         );
         assertNotStrictEquals(
-            a.requestId, b.requestId,
+            a.operationId, b.operationId,
         );
-        assert(a.requestId.length > 0);
+        assertStrictEquals(
+            isIdentifier(a.operationId), true,
+        );
+        assertStrictEquals(
+            isIdentifier(b.operationId), true,
+        );
     },
 );
 
-// The client vessel mints one requestId; the wire verbs must
-// hoist it so incomingContext reuses it (message-plane request
-// message carries the header) instead of minting a second
-// unrelated trace that reportFault cannot correlate.
+// One context is one operation. PUT and DELETE store
+// that same operation-id line, and the client sends
+// no request-id.
 Deno.test(
-    'client requestId rides the wire as request-id',
+    'one context sends one operation-id',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, DEV_TOKEN);
-        await ctx.PUT(
-            'identities/' + generateIdentifier(),
-            { kind: 'person' },
-        );
-        const rows = await db.messagePairs.getAll();
-        assert(
-            rows.some(
-                r => r.request.includes(
-                    '\nrequest-id: ' + ctx.requestId,
-                ),
-            ),
-            'stored pair must carry the client requestId',
-        );
+        const pii = 'identities/'
+            + 'XXZruirZyAOoRpNxaDnpSA/pii';
+        await ctx.PUT(pii, {
+            name: 'Ada',
+            email: 'ada@x.io',
+            phone: '555',
+            bio: 'builds',
+        });
+        await ctx.DELETE(pii);
+        const line = '\noperation-id: '
+            + ctx.operationId;
+        const rows = (await db.messagePairs.getAll())
+            .filter((row) => row.request.includes(pii));
+        assertStrictEquals(rows.length, 2);
+        for (const row of rows) {
+            assertStrictEquals(
+                row.request.includes('request-id:'),
+                false,
+            );
+            assert(
+                row.request.includes(line),
+                'stored request must carry the'
+                + ' context operation-id',
+            );
+        }
     },
 );

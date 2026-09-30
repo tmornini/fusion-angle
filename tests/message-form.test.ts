@@ -33,9 +33,9 @@ const validInput = {
     requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
     requestAt: AT,
     organization: 'AjdvjuECVZEgZoFajaIEkg',
-    responseStatus: 204,
     responseBody: undefined,
     operationId: generateIdentifier(),
+    requestId: generateIdentifier(),
 };
 
 Deno.test('canonical JSON is stable across key permutations',

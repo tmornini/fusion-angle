@@ -4,13 +4,14 @@ import { handleRequest } from '../api/api.ts';
 import { routes, route } from '../api/routes.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
 function req(
     method: string, path: string, token?: string,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return framedRequest(`${BASE}${path}`, {
         method,
         headers: {
             'Content-Type': 'application/json',

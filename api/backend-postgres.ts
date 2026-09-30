@@ -246,15 +246,6 @@ function postgresTx(
             );
             return rows.map((row) => entityOf<T>(row));
         },
-        async getWhereBody<T extends { id: string }>(
-            path: string,
-            containment: Record<string, unknown>,
-        ): Promise<T[]> {
-            const rows = await selectWhereBody(
-                sql, path, containment,
-            );
-            return rows.map((row) => entityOf<T>(row));
-        },
         async append<T extends { id: string }>(
             row: T,
         ): Promise<boolean> {
@@ -546,29 +537,6 @@ async function selectCollectionHeadPairs(
         ) heads
         WHERE method = 'PUT'
         ORDER BY heads.response_at, heads.id
-    `;
-}
-
-async function selectWhereBody(
-    sql: SqlClient,
-    path: string,
-    containment: Record<string, unknown>,
-): Promise<Record<string, unknown>[]> {
-    return sql.query`
-        SELECT id, operation_id, path, name, supersedes,
-            requester_identity_id, method,
-            to_char(response_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS response_at,
-            request, request_salt, request_hash,
-            secret, secret_hash,
-            response, response_salt, response_hash,
-            pair_hash
-        FROM fa_message_pairs
-        WHERE path = ${path}
-          AND fa_message_body(response) @>
-              ${containment}::jsonb
-        ORDER BY fa_message_pairs.response_at, fa_message_pairs.id
     `;
 }
 

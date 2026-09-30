@@ -5,6 +5,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -17,7 +18,7 @@ Deno.test('no token + unknown path → 401', async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request(`${BASE}/no-such-route-ever`),
+        framedRequest(`${BASE}/no-such-route-ever`),
     );
     assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
@@ -29,7 +30,7 @@ Deno.test('no token + unknown nested path → 401', async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request(`${BASE}/oRAKQvKtOmSHMZEjhEXaRw/x1`),
+        framedRequest(`${BASE}/oRAKQvKtOmSHMZEjhEXaRw/x1`),
     );
     assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
@@ -42,7 +43,7 @@ Deno.test('bearer + unknown path → 404', async () => {
     const token = await devToken();
     const res = await handleRequest(
         db,
-        new Request(`${BASE}/no-such-door`, {
+        framedRequest(`${BASE}/no-such-door`, {
             headers: {
                 Authorization: 'Bearer ' + token,
             },
@@ -57,7 +58,7 @@ Deno.test('no token + malformed identifier on a real'
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             `${BASE}/organizations/not-an-identifier/`
                 + 'ideas/',
         ),
@@ -81,13 +82,13 @@ Deno.test('authenticated miss ladder: 404 then 400 then'
 
     const unknown = await handleRequest(
         db,
-        new Request(`${BASE}/no-such-door`, auth),
+        framedRequest(`${BASE}/no-such-door`, auth),
     );
     assertStrictEquals(unknown.status, 404);
 
     const malformed = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             `${BASE}/organizations/not-an-identifier/`
                 + 'ideas/',
             auth,
@@ -104,7 +105,7 @@ Deno.test('authenticated miss ladder: 404 then 400 then'
 
     const foreign = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             `${BASE}/organizations/`
                 + generateIdentifier()
                 + '/ideas/',
@@ -123,7 +124,7 @@ Deno.test('authenticated miss ladder: 404 then 400 then'
 
     const absent = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             `${BASE}/organizations/` + org
                 + '/ideas/' + generateIdentifier(),
             auth,

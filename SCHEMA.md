@@ -25,10 +25,10 @@ same rows in an in-process Map keyed by table name.
 
 ## What the DDL buys you
 
-1. **`fa_message_body` and `fa_message_pairs_body`** —
-   `POSTGRES_MESSAGE_BODY_FUNCTION` and the GIN index
-   → `getAllWhereBody` (`api/db.ts`). Both stay until
-   the message-plane spec retires code-document search.
+1. **`fa_message_body_bytes`** — the body search
+   left with the code document. The function remains
+   because the statement's sameness test reads it
+   (`api/ledger-statement-sql.ts`).
 2. **One stamp, `response_at`** — `timestamptz NOT
    NULL`. `request_at` is gone. The type is the
    storage-edge validator (a month-13 stamp is rejected
@@ -65,8 +65,11 @@ same rows in an in-process Map keyed by table name.
    global; the fence and the write authorizer
    (`api/write-authorizer.ts`) enforce organization.
 9. **`operation_id` groups one client operation** —
-   unchanged. Wire `Operation-ID`; the server never
-   mints it for a public write.
+   the client mints operation-id once per operation,
+   on every request, and the server never mints one
+   for a request. The root, a seed write with no
+   supplied id, and a seedless exchange mint an id
+   because that write is not a client request.
 10. **The bell is `pg_notify('fusion_events', …)`**
     from the statement (`api/ledger-statement-sql.ts`),
     and only for a row that inserted. There is no
@@ -75,10 +78,12 @@ same rows in an in-process Map keyed by table name.
     `(path, response_at, id)`, until the next spec's
     walk is the collection read.
 12. **`fa_request_id_of` and
-    `fa_message_pairs_request_id` exist** — the
-    function reads a `request-id` line; the index is
-    on `fa_request_id_of(response)`. Nothing reads
-    them yet.
+    `fa_message_pairs_request_id`** — stored
+    responses carry request-id, so `fa_request_id_of`
+    finds the pairs one request wrote. A seed pair
+    stores one. The root does not. The index is on
+    `fa_request_id_of(response)`. Nothing in the
+    product reads the index yet.
 
 ## Document bodies
 
@@ -102,9 +107,26 @@ to local time for display only.
 
 ## Secrets
 
-Reads expose existence and lifecycle, never the hash.
-`withoutSecret` in `api/routes.ts` projects the opaque
-`secret` out of a credential before it crosses the API
+`secret` is the plaintext credential lines, not a
+digest. Six names, and no name on both sides
+(`shared/http-message/credentials.ts`): a request
+carries `authorization`, `proxy-authorization`, and
+`cookie`; a response carries `set-cookie`,
+`authentication-info`, and
+`proxy-authentication-info`. Every line is
+CRLF-terminated, including the last. A non-empty
+secret is the request block, then one extra CRLF,
+then the response block. Both blocks empty is zero
+bytes. `secret_hash` is sha256 of those bytes, no
+salt. Credential bodies do not carry the eight
+fields `username`, `password`, `code`,
+`code_verifier`, `subject_token`, `actor_token`,
+`client_assertion`, and `refresh_token`.
+
+Reads of an identity credential expose existence and
+lifecycle, never the hash. `withoutSecret` in
+`api/routes.ts` projects the opaque `secret` out of
+a credential document before it crosses the API
 boundary.
 
 ## PII erasure is a tombstone

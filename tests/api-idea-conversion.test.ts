@@ -15,6 +15,9 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 function pairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
@@ -101,7 +104,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         + 'gVvtDIaqhnkXZQcxZeSuiw', {
         ...ideaFields('Source Idea'),
         state: 'approved',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     // Phase Final Stage B: objectives table retired — seed
     // through the live document PUT (states-document
     // retirement) so the message plane owns it.
@@ -110,13 +114,15 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             + OBJ_1, {
         position: 1,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db,
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + OBJ_2, {
         position: 2,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     return db;
 }
 
@@ -152,14 +158,15 @@ Deno.test(
                     fields: baselineFields(OBJ_2, -25),
                 },
             ],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         const project = await GET<{
             title: string;
             organization_id: string;
             state: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
+            + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN, operationIdHeader());
         assertStrictEquals(project.title, 'Promoted Project');
         // The fence stamped the bound org — never the body.
         assertStrictEquals(project.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
@@ -173,7 +180,8 @@ Deno.test(
             id: string;
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN);
+            + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
+                operationIdHeader());
         const ideaCurrent = ideaHistory[0]!;
         assertStrictEquals(ideaCurrent.id, 'gVvtDIaqhnkXZQcxZeSuiw');
         assertStrictEquals(ideaCurrent.state, 'promoted');
@@ -184,7 +192,8 @@ Deno.test(
             state: string;
             member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN);
+            + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(projectVersions.length, 1);
         assertStrictEquals(
             projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
@@ -197,7 +206,7 @@ Deno.test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
             DEV_TOKEN,
-        );
+            operationIdHeader());
         assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [b.objective_id, b.score]),
@@ -235,7 +244,8 @@ Deno.test(
                     fields: baselineFields(OBJ_2, -5),
                 },
             ],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         // Balance invariant: the wire-seeded idea genesis PUT
         // (1) + two objective document PUTs (Stage B: message
@@ -391,17 +401,18 @@ Deno.test(
                     fields: baselineFields(OBJ_1, 50),
                 },
             ],
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
 
         const project = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
-        );
+                operationIdHeader());
         assertStrictEquals(project.id, 'pnXmXrxOWayANgDLdCjuBw');
         const ideaHistory = await GET<{ state: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
-        );
+                operationIdHeader());
         // Family history is DESC — index 0 is current.
         const ideaCurrent = ideaHistory[0]!;
         assertStrictEquals(ideaCurrent.state, 'promoted');

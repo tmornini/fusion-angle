@@ -15,6 +15,7 @@ import {
     reachableToken,
 } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 // End-to-end of the boot-scope + org-switch flow the browser
 // drives: enumerate reachable orgs, exchange a scoped token,
@@ -57,16 +58,20 @@ async () => {
 
     const membersA = idsOf(
         await GET<{ id: string }[]>(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tokA));
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tokA,
+                operationIdHeader()));
     const membersB = idsOf(
         await GET<{ id: string }[]>(
-            db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw/members/', tokB));
+            db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw/members/', tokB,
+                operationIdHeader()));
     const ideasA = idsOf(
         await GET<{ id: string }[]>(db
-            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA));
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA,
+                operationIdHeader()));
     const ideasB = idsOf(
         await GET<{ id: string }[]>(db
-            , 'organizations/BBjWJsjYIDkTRKIIPrzWRw/ideas/', tokB));
+            , 'organizations/BBjWJsjYIDkTRKIIPrzWRw/ideas/', tokB,
+                operationIdHeader()));
 
     assert(
         membersA.length > 0 && membersB.length > 0,
@@ -91,13 +96,15 @@ async () => {
     const flat = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const flatIdeas = idsOf(
         await GET<{ id: string }[]>(db
-            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', flat));
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', flat,
+                operationIdHeader()));
     const ctx = createRequestContext(db, flat);
     const tokA = await postOrganizationSessionExchange(ctx, flat
         , 'AjdvjuECVZEgZoFajaIEkg');
     const organization1Ideas = idsOf(
         await GET<{ id: string }[]>(db
-            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA));
+            , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA,
+                operationIdHeader()));
     // a flat token resolves to its primary org 'AjdvjuECVZEgZoFajaIEkg' (same
     // view)
     assertEquals(flatIdeas, organization1Ideas);

@@ -1,7 +1,6 @@
 import {
     assert,
     assertMatch,
-    assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
@@ -32,6 +31,7 @@ Deno.test('public PUT without Operation-ID is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
+    const raw = JSON.stringify(validIdea);
     const res = await handleRequest(
         db,
         new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -40,8 +40,11 @@ async () => {
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: 'Bearer ' + DEV_TOKEN,
+                'content-length': String(
+                    new TextEncoder().encode(raw).byteLength,
+                ),
             },
-            body: JSON.stringify(validIdea),
+            body: raw,
         }),
     );
     assertStrictEquals(res.status, 400);
@@ -86,7 +89,7 @@ async () => {
     assertMatch(body.error, /identifier/);
 });
 
-Deno.test('GET without Operation-ID is not 400',
+Deno.test('GET without Operation-ID is 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -99,7 +102,12 @@ async () => {
             },
         }),
     );
-    assertNotStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 400);
+    const body = await res.json() as { error: string };
+    assertStrictEquals(
+        body.error,
+        'Operation-ID is required',
+    );
 });
 
 Deno.test('public PUT with Operation-ID stores both columns',
@@ -193,6 +201,7 @@ Deno.test('unauthenticated invitation write is 401, not 400',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
+    const raw = JSON.stringify({});
     const res = await handleRequest(
         db,
         new Request(
@@ -202,8 +211,13 @@ async () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'content-length': String(
+                        new TextEncoder().encode(raw)
+                            .byteLength,
+                    ),
+                    'operation-id': generateIdentifier(),
                 },
-                body: JSON.stringify({}),
+                body: raw,
             },
         ),
     );

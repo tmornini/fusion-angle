@@ -175,6 +175,7 @@ Deno.test(
             id: identifierAt(1),
             responseAt: HEAD_STAMP,
             response: message(imfFixdate(HEAD_STAMP), 'old'),
+            method: 'PUT',
         };
         const suffix = textBytes('\r\n\r\nnew');
         const row = statementRow({
@@ -196,7 +197,7 @@ Deno.test(
         assertEquals(
             landed.response,
             concatBytes(
-                PREFIX,
+                textBytes('HTTP/1.1 200 \r\ndate: '),
                 textBytes(imfFixdate(landed.stamp)),
                 suffix,
             ),
@@ -231,6 +232,7 @@ Deno.test(
             id: headId,
             responseAt: HEAD_STAMP,
             response: headResponse,
+            method: 'PUT',
         };
         const matched = await classifyStatement(
             'blind',
@@ -258,7 +260,9 @@ Deno.test(
                 id: identifierAt(3),
                 operationId: identifierAt(4),
                 ifMatch: null,
-                responsePrefix: textBytes('prefix-'),
+                responsePrefix: textBytes(
+                    'HTTP/1.1 201 ',
+                ),
                 responseSuffix: textBytes('-suffix'),
             })],
             [{
@@ -267,6 +271,7 @@ Deno.test(
                 id: headId,
                 responseAt: HEAD_STAMP,
                 response: bareHead,
+                method: 'PUT',
             }],
             now,
         );
@@ -288,6 +293,7 @@ Deno.test(
                 imfFixdate(HEAD_STAMP),
                 'kept',
             ),
+            method: 'PUT',
         };
         const rows = await classifyStatement(
             'composed',
@@ -340,6 +346,7 @@ Deno.test(
                     imfFixdate(HEAD_STAMP),
                     'hello',
                 ),
+                method: 'PUT',
             }],
             EARLY,
         );
@@ -439,6 +446,7 @@ Deno.test(
             id: headId,
             responseAt: HEAD_STAMP,
             response: message(imfFixdate(HEAD_STAMP), 'old'),
+            method: 'PUT',
         };
         const decoy = {
             path: PATH,
@@ -446,6 +454,7 @@ Deno.test(
             id: identifierAt(2),
             responseAt: HEAD_STAMP,
             response: message(imfFixdate(HEAD_STAMP), 'old'),
+            method: 'PUT',
         };
         const landed = await classifyStatement(
             'in-order',
@@ -497,6 +506,7 @@ Deno.test(
                 imfFixdate(HEAD_STAMP),
                 'kept',
             ),
+            method: 'PUT',
         };
         const rows = await classifyStatement(
             'composed',

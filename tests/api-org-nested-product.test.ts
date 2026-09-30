@@ -10,6 +10,7 @@ import { routes, matchRoute } from
     '../api/routes.ts';
 import { pathSegmentsOf } from
     '../api/path-segments.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 Deno.test('flat GET /ideas/ is not a door', () => {
     assertStrictEquals(
@@ -36,7 +37,7 @@ async () => {
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db,
-        new Request(
+        framedRequest(
             'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg'
                 + '/identities', {
             headers: {
@@ -53,7 +54,7 @@ Deno.test('GET /organizations/:id/authentication/token'
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db,
-        new Request(
+        framedRequest(
             'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg'
                 + '/authentication/token', {
             headers: {

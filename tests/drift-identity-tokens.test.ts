@@ -27,6 +27,9 @@ import {
     storedMessageBodyText,
     storedPutBodyText,
     refreshTokenFromSetCookie,
+    framedRequest,
+    presentedFields,
+    withoutCredentialFields,
 } from './http-fixtures.ts';
 import {
     deriveIdentityToken,
@@ -37,10 +40,9 @@ import {
     formTokenEventMessagePair,
 } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
-import {
-    authorizationCodeSpent,
-    deriveAuthorizationCodeId,
-} from '../api/authentication.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const JTI_ORDER = generateIdentifier();
 const CHAIN_ORDER = generateIdentifier();
@@ -60,17 +62,10 @@ const GHOST_JTI = generateIdentifier();
 const JTI_OMIT = generateIdentifier();
 const CHAIN_OMIT = generateIdentifier();
 
-// Phase 13 Task 6/7 shipped two ledger-derived reads that replace
-// row-plane lookups on Commandment II hot paths: the by-jti fold
-// (deriveIdentityTokenEventsForJti, tokenRevocationReason's
-// SECOND read — now the jti document's PUT history) and the
-// code-spend guard (authorizationCodeSpent,
-// grantAuthorizationCode's PRE-tx fast-fail + IN-TX re-check —
-// now the authorization-codes marker prefix). Both run PRE-TX
-// AND IN-TX — the pre-tx-vs-in-tx PARITY legs below prove the
-// two call sites see identical results (the membershipExistsFor
-// precedent). One head per jti: the issued event is named by
-// its jti; the spend marker is a different prefix.
+// The by-jti fold (deriveIdentityTokenEventsForJti,
+// tokenRevocationReason's second read) is the jti
+// document's PUT history. One head per jti: the issued
+// event is named by its jti.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -99,11 +94,21 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 function tokenGrant(
     db: DbAdapter, body: unknown,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
+    return handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+                ...lifted.headers,
+            },
+            body: raw,
         },
     ));
 }
@@ -126,11 +131,21 @@ async function s256Fields(): Promise<{
 function authorize(
     db: DbAdapter, body: unknown,
 ): Promise<Response> {
-    return handleRequest(db, new Request(
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
+    return handleRequest(db, framedRequest(
         `${BASE}/authentication/authorize`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+                ...lifted.headers,
+            },
+            body: raw,
         },
     ));
 }
@@ -156,7 +171,8 @@ async () => {
         + JTI_ORDER, {
         jti: JTI_ORDER, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_ORDER, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 
     const derived = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_ORDER,
@@ -211,6 +227,7 @@ Deno.test('formTokenEventMessagePair stored body equals '
     };
     const messagePair = await formTokenEventMessagePair(
         JTI_G4_SYNTH, event, generateIdentifier(),
+        generateIdentifier(),
     );
     const stored = JSON.parse(
         storedMessageBodyText(messagePair.responseMessage),
@@ -265,22 +282,26 @@ async () => {
         + JTI_W3, {
         jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W3, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W2, {
         jti: JTI_W2, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_W2, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W1, {
         jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'rotated', chain_id: CHAIN_W, at: AT2,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 
     // The literal id-LAST reconstruction of each document's
     // HEAD body, identifier order (byIdAscending — the
@@ -353,12 +374,14 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         + JTI_TX, {
         jti: JTI_TX, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_TX, at: AT,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_TX, {
         jti: JTI_TX, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'rotated', chain_id: CHAIN_TX, at: AT2,
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
 
     const preTx = await deriveIdentityTokenEventsForJti(
         db, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
@@ -418,16 +441,20 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         code_challenge: pkce.code_challenge,
         code_challenge_method: pkce.code_challenge_method,
     });
-    assertStrictEquals(authorizeRes.status, 201);
-    const { code } = await authorizeRes.json() as { code: string };
+    assertStrictEquals(authorizeRes.status, 200);
+    const { code } = await presentedFields(authorizeRes) as {
+        code: string;
+    };
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
         client_id: 'web',
         code_verifier: pkce.verifier,
     });
-    assertStrictEquals(grantRes.status, 201);
+    assertStrictEquals(grantRes.status, 200);
     const { access_token: accessToken } =
-        await grantRes.json() as { access_token: string };
+        await presentedFields(grantRes) as {
+            access_token: string;
+        };
     const refreshToken = refreshTokenFromSetCookie(grantRes);
     const rootJti = jtiOf(refreshToken);
 
@@ -461,78 +488,6 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         refresh_token: refreshToken,
     });
     assertStrictEquals(refreshRes.status, 401);
-});
-
-// -- 5: GATE 3 (Phase 13 Task 7) — the code-spend guard's -------
-// -- pre-tx-vs-in-tx PARITY ------------------------------------------
-
-const CODE_PASSWORD = 's3cret-gate3';
-const CODE_EMAIL = 'gate3-code@example.com';
-
-async function dbWithCodeLoginUser(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await seedRootAdmin(db);
-    await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
-        name: 'Gate 3', email: CODE_EMAIL,
-        phone: '', bio: '',
-    });
-    await seedIdentityCredential(
-        db, 'XXZruirZyAOoRpNxaDnpSA', 'cred-gate3', {
-            identity_id: 'XXZruirZyAOoRpNxaDnpSA', kind: 'password',
-            status: 'set',
-            secret: await testHashPassword(CODE_PASSWORD),
-            at: AT,
-        },
-    );
-    return db;
-}
-
-Deno.test('authorizationCodeSpent: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' grantAuthorizationCode\'s own table list) — the'
-+ ' membershipExistsFor / deriveIdentityTokenEventsForJti'
-+ ' precedent', async () => {
-    const db = await dbWithCodeLoginUser();
-    const pkce = await s256Fields();
-    const authorizeRes = await authorize(db, {
-        method: 'password', username: CODE_EMAIL,
-        password: CODE_PASSWORD, client_id: 'web',
-        code_challenge: pkce.code_challenge,
-        code_challenge_method: pkce.code_challenge_method,
-    });
-    assertStrictEquals(authorizeRes.status, 201);
-    const { code } = await authorizeRes.json() as { code: string };
-    const derivedId = await deriveAuthorizationCodeId(code);
-
-    const preTxBefore = await authorizationCodeSpent(
-        db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-    );
-    const inTxBefore = await db.readTransaction(
-        (view) => authorizationCodeSpent(
-            view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-        ),
-    );
-    assertStrictEquals(inTxBefore, preTxBefore);
-    assertStrictEquals(preTxBefore, false);
-
-    const grantRes = await tokenGrant(db, {
-        grant_type: 'authorization_code', code,
-        client_id: 'web',
-        code_verifier: pkce.verifier,
-    });
-    assertStrictEquals(grantRes.status, 201);
-
-    const preTxAfter = await authorizationCodeSpent(
-        db, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-    );
-    const inTxAfter = await db.readTransaction(
-        (view) => authorizationCodeSpent(
-            view, derivedId, 'XXZruirZyAOoRpNxaDnpSA',
-        ),
-    );
-    assertStrictEquals(inTxAfter, preTxAfter);
-    assertStrictEquals(preTxAfter, true);
 });
 
 // -- 6: NESTED WIRE — collection under the identity; flat

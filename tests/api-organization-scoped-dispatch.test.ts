@@ -10,6 +10,9 @@ import {
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // A real signed token for `current` (admin, via seedRootAdmin)
 // carrying claim roles + organizations + an active `org` —
@@ -44,7 +47,8 @@ async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
         + 'UQTJZvCoKlFjEoDlDUwekw', {
         ...a1Fields,
         state: 'active',
-    }, await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
+    }, await organizationToken('AjdvjuECVZEgZoFajaIEkg'),
+        operationIdHeader());
     return db;
 }
 
@@ -53,7 +57,8 @@ async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            , await organizationToken('AjdvjuECVZEgZoFajaIEkg'));
+            , await organizationToken('AjdvjuECVZEgZoFajaIEkg'),
+                operationIdHeader());
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
@@ -62,7 +67,7 @@ async () => {
     const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            , await organizationToken(''));
+            , await organizationToken(''), operationIdHeader());
     // No honest unscoped default since SP-6: the token
     // resolves to org 'AjdvjuECVZEgZoFajaIEkg', so the org '7' idea stays
     // hidden.

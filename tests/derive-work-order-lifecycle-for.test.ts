@@ -275,7 +275,7 @@ async () => {
             position: 2,
         },
     ));
-    assertStrictEquals(entityPut.status, 201);
+    assertStrictEquals(entityPut.status, 200);
 
     const claimFreshAt = nowUtc();
     const claimFresh = await handleRequest(db, req(
@@ -288,7 +288,7 @@ async () => {
             expireAt: claimFreshAt,
         },
     ));
-    assertStrictEquals(claimFresh.status, 201);
+    assertStrictEquals(claimFresh.status, 200);
 
     const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
@@ -301,7 +301,7 @@ async () => {
             expireAt: claimRepeatAt,
         },
     ));
-    assertStrictEquals(claimRepeat.status, 201);
+    assertStrictEquals(claimRepeat.status, 200);
 
     // birth(3) + transition1(1) + transition2(2) + PUT(0) +
     // fresh claim(1) + idempotent repeat(0) = 7.

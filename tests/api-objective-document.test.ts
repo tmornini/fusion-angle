@@ -39,6 +39,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Objectives are the FIFTH family (states-document
 // retirement): PUT
@@ -223,8 +226,9 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Phase Final Task 2: objectives ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -257,12 +261,12 @@ Deno.test('a byte-identical PUT resend to'
     const first = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     const second = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + id
             , body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -290,8 +294,9 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -315,8 +320,9 @@ async function deleteDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: at,
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -416,7 +422,7 @@ Deno.test('stored PUT body equals objectiveDocumentEntityOf of'
             , token,
         documentFields(99, 'archived'),
     ));
-    assertStrictEquals(later.status, 201);
+    assertStrictEquals(later.status, 200);
     const after: Record<string, unknown> = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );

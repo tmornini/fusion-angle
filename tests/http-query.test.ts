@@ -78,10 +78,10 @@ Deno.test('content-length is absent without a body', () => {
     );
 });
 
-Deno.test('derives transfer-encoding when chunked', () => {
+Deno.test('transfer-encoding is absent after decode', () => {
     assertStrictEquals(
-        chunked.query('header.transfer-encoding').toText(),
-        'chunked',
+        chunked.query('header.transfer-encoding').exists(),
+        false,
     );
 });
 

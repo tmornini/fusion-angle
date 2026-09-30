@@ -311,16 +311,14 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     ),
     writeExample('post', '/authentication/token', {
         grant_type: 'authorization_code',
-        code: 'code',
-        code_verifier: 'code_verifier',
+        client_id: 'id',
     }),
     writeExample(
         'post',
         '/authentication/authorize',
         {
             method: 'password',
-            username: 'username',
-            password: 'password',
+            client_id: 'id',
             code_challenge: 'code_challenge',
             code_challenge_method: 'S256',
         },

@@ -8,11 +8,12 @@ import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedRootAdmin, seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
 function req(path: string, token: string): Request {
-    return new Request(`${BASE}${path}`, {
+    return framedRequest(`${BASE}${path}`, {
         headers: { 'Authorization': 'Bearer ' + token },
     });
 }
@@ -26,7 +27,7 @@ async function deleteMembership(
     db: MemoryDbAdapter, id: string,
 ): Promise<void> {
     const res = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg/members/${id}`, {
             method: 'DELETE',
             headers: {
@@ -41,7 +42,7 @@ async function deleteMembership(
 function putDefaultOrganization(
     token: string, identityId: string, organization: string,
 ): Request {
-    return new Request(
+    return framedRequest(
         `${BASE}/identities/${identityId}`
             + '/default-organization', {
             method: 'PUT',

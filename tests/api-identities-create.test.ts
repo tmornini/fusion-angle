@@ -22,6 +22,9 @@ import {
 } from '../api/derive-identity-spine.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const MEMBER = generateIdentifier();
 
@@ -78,9 +81,11 @@ Deno.test(
         await POST(db, 'identities/', {
             id: 'pnXmXrxOWayANgDLdCjuBw',
             kind: 'person',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const identity = await GET<{ kind: string }>(
-            db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN);
+            db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(identity.kind, 'person');
         // No PII yet — create body no longer carries pii.
         // Phase Final Task 2: identity spine ROW halves stripped.
@@ -88,7 +93,8 @@ Deno.test(
             () => deriveIdentityPii(db, 'pnXmXrxOWayANgDLdCjuBw'));
         await PUT(
             db, 'identities/pnXmXrxOWayANgDLdCjuBw/pii', pii('Alice')
-                , DEV_TOKEN);
+                , DEV_TOKEN,
+            operationIdHeader());
         const piiRow = await deriveIdentityPii(db, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(piiRow.name, 'Alice');
         // A person carries no credential.
@@ -108,9 +114,11 @@ Deno.test(
             id: 'syWUUcdBSbBgMwBiCrgbDw',
             kind: 'service',
             credential: credential('syWUUcdBSbBgMwBiCrgbDw'),
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         const identity = await GET<{ kind: string }>(
-            db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN);
+            db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
+                operationIdHeader());
         assertStrictEquals(identity.kind, 'service');
         const creds = await deriveCredentialsFor(db
             , 'syWUUcdBSbBgMwBiCrgbDw');
@@ -142,11 +150,13 @@ Deno.test(
                     email: 'doomed@example.com',
                     phone: '', bio: '',
                 },
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         );
         // The unexpected `pii` key 400s before any facet lands.
         await assertRejects(
-            () => GET(db, 'identities/' + doomed, DEV_TOKEN));
+            () => GET(db, 'identities/' + doomed, DEV_TOKEN,
+                operationIdHeader()));
         await assertRejects(
             () => deriveIdentityPii(db, doomed));
     },
@@ -161,18 +171,20 @@ Deno.test(
         const torn = generateIdentifier();
         await POST(db, 'identities/', {
             id: torn, kind: 'person',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         await assertRejects(
             // PII missing the required `bio` key.
             () => PUT(db, 'identities/' + torn + '/pii', {
                 name: 'Torn',
                 email: 'torn@example.com',
                 phone: '',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         );
         // The identity survives; it simply carries no PII yet.
         const identity = await GET<{ kind: string }>(
-            db, 'identities/' + torn, DEV_TOKEN);
+            db, 'identities/' + torn, DEV_TOKEN, operationIdHeader());
         assertStrictEquals(identity.kind, 'person');
         await assertRejects(
             () => deriveIdentityPii(db, torn));
@@ -197,10 +209,12 @@ Deno.test(
                     ...credential(doomed),
                     at: 'not-a-timestamp',
                 },
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         );
         await assertRejects(
-            () => GET(db, 'identities/' + doomed, DEV_TOKEN));
+            () => GET(db, 'identities/' + doomed, DEV_TOKEN,
+                operationIdHeader()));
         const creds = await deriveCredentialsFor(db, doomed);
         assertStrictEquals(creds.length, 0);
     },
@@ -231,7 +245,8 @@ Deno.test(
         // The denied member wrote nothing on the message plane
         // — no identities/prBESZPjJDiuXCeZLmbiVw document.
         await assertRejects(
-            () => GET(memberDb, 'identities/prBESZPjJDiuXCeZLmbiVw', token),
+            () => GET(memberDb, 'identities/prBESZPjJDiuXCeZLmbiVw', token,
+                operationIdHeader()),
         );
     },
 );
@@ -243,7 +258,8 @@ async () => {
     await POST(db, 'identities/', {
         id,
         kind: 'person',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     const stored = JSON.parse(
         await storedPutBodyText(db, '/identities/', id),
     );

@@ -47,10 +47,12 @@ async function seededCtx() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    const ctx = createRequestContext(
-        db, await organizationToken(),
-    );
-    await postRecordChange(ctx, TYPE_ID, {
+    const token = await organizationToken();
+    // One context is one operation. The instance
+    // revision join still keys a write's sibling by
+    // operation-id, so each call mints its own.
+    const ctx = () => createRequestContext(db, token);
+    await postRecordChange(ctx(), TYPE_ID, {
         kind: 'create',
         record: {
             name: 'Rental',
@@ -81,7 +83,7 @@ Deno.test(
 
         // create
         const created = await putRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID, [
+            ctx(), TYPE_ID, INSTANCE_ID, [
                 {
                     attributeId: ATTR_ID,
                     value: 'v0',
@@ -92,7 +94,7 @@ Deno.test(
 
         // list embeds etag
         const list = await getRecordInstances(
-            ctx, TYPE_ID,
+            ctx(), TYPE_ID,
         );
         assertStrictEquals(list.length, 1);
         assertStrictEquals(list[0]!.id, INSTANCE_ID);
@@ -103,7 +105,7 @@ Deno.test(
 
         // detail header etag matches list
         const detail = await getRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID,
+            ctx(), TYPE_ID, INSTANCE_ID,
         );
         assertStrictEquals(detail.etag, created.etag);
         assertStrictEquals(
@@ -112,7 +114,7 @@ Deno.test(
 
         // patch with etag
         const patched = await patchRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID, detail.etag, {
+            ctx(), TYPE_ID, INSTANCE_ID, detail.etag, {
                 set: [
                     {
                         attributeId: ATTR_ID,
@@ -126,7 +128,7 @@ Deno.test(
         // stale If-Match → 412 (no auto-retry)
         const err = await assertRejects(
             () => patchRecordInstance(
-                ctx, TYPE_ID, INSTANCE_ID,
+                ctx(), TYPE_ID, INSTANCE_ID,
                 detail.etag, {
                     set: [
                         {
@@ -142,11 +144,11 @@ Deno.test(
 
         // re-read → retry with fresh etag
         const fresh = await getRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID,
+            ctx(), TYPE_ID, INSTANCE_ID,
         );
         assertStrictEquals(fresh.etag, patched.etag);
         const retried = await patchRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID, fresh.etag, {
+            ctx(), TYPE_ID, INSTANCE_ID, fresh.etag, {
                 set: [
                     {
                         attributeId: ATTR_ID,
@@ -158,7 +160,7 @@ Deno.test(
         assertNotStrictEquals(retried.etag, fresh.etag);
 
         const afterRetry = await getRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID,
+            ctx(), TYPE_ID, INSTANCE_ID,
         );
         assertStrictEquals(
             afterRetry.values.get(ATTR_ID), 'v2',
@@ -167,7 +169,7 @@ Deno.test(
 
         // history DESC: head first
         const history = await getRecordInstanceHistory(
-            ctx, TYPE_ID, INSTANCE_ID,
+            ctx(), TYPE_ID, INSTANCE_ID,
         );
         assert(history.length >= 3);
         assertStrictEquals(history[0]!.etag, retried.etag);
@@ -177,15 +179,15 @@ Deno.test(
 
         // delete → list empty; detail 404
         await deleteRecordInstance(
-            ctx, TYPE_ID, INSTANCE_ID,
+            ctx(), TYPE_ID, INSTANCE_ID,
         );
         const afterDelete = await getRecordInstances(
-            ctx, TYPE_ID,
+            ctx(), TYPE_ID,
         );
         assertStrictEquals(afterDelete.length, 0);
         await assertRejects(
             () => getRecordInstance(
-                ctx, TYPE_ID, INSTANCE_ID,
+                ctx(), TYPE_ID, INSTANCE_ID,
             ),
             Error,
             'Not found',

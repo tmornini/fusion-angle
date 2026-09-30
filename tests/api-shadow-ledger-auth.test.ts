@@ -12,9 +12,13 @@ import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 import { requestHashOfStored } from './ledger-row.ts';
-import { NIL_IDENTIFIER } from
-    '../shared/identifier.ts';
+import {
+    generateIdentifier,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import { testHashPassword } from './mock-seed.ts';
 import {
     seedRootAdmin, seedSeat,
@@ -26,7 +30,6 @@ import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
 import type { NotificationEvent } from '../api/notifications.ts';
-import { REQUEST_ID_HEADER } from '../api/request-context.ts';
 import {
     seedClientRegistration,
     seedIdentityCredential,
@@ -34,8 +37,11 @@ import {
 } from './identity-fixtures.ts';
 import {
     pairIdOf,
+    presentedFields,
     refreshTokenFromSetCookie,
     setCookieHeader,
+    framedRequest,
+    withoutCredentialFields,
 } from './http-fixtures.ts';
 
 // C1 discharge under the verbatim-storage contract: the
@@ -55,15 +61,25 @@ const PASSWORD = 'hunter2-s3cret';
 function jsonPost(
     path: string,
     body: unknown,
-    extraHeaders: Record<string, string> = {},
 ): Request {
-    return new Request(`${BASE}/${path}`, {
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
+    return framedRequest(`${BASE}/${path}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...extraHeaders,
+            'content-length': String(
+                new TextEncoder().encode(raw).byteLength,
+            ),
+            'operation-id': generateIdentifier(),
+            ...lifted.headers,
         },
-        body: JSON.stringify(body),
+        body: raw,
     });
 }
 
@@ -144,8 +160,8 @@ async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
             code_challenge_method:
                 pkce.code_challenge_method,
         }));
-    assertStrictEquals(authorizeRes.status, 201);
-    const { code } = await authorizeRes.json() as {
+    assertStrictEquals(authorizeRes.status, 200);
+    const { code } = await presentedFields(authorizeRes) as {
         code: string;
     };
     const tokenRes = await handleRequest(db, jsonPost(
@@ -154,8 +170,8 @@ async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
             client_id: 'web',
             code_verifier: pkce.verifier,
         }));
-    assertStrictEquals(tokenRes.status, 201);
-    const grant = await tokenRes.json() as {
+    assertStrictEquals(tokenRes.status, 200);
+    const grant = await presentedFields(tokenRes) as {
         access_token: string;
     };
     return {
@@ -181,39 +197,57 @@ async () => {
     const authorizeRequest = requests.find(
         r => r.path === '/authentication/authorize/');
     assert(authorizeRequest);
-    assert(
+    assertStrictEquals(
         authorizeRequest!.request.includes(PASSWORD),
-        'authorize request missing live password',
+        false,
     );
     assert(
-        authorizeRequest!.request.includes('demo@example.com'),
-        'authorize request missing live email',
+        authorizeRequest!.secret.includes('authorization:'),
+        'authorize secret missing the basic line',
     );
     const authorizeResponse = responses.find(
         r => r.path === '/authentication/authorize/');
     assert(authorizeResponse);
-    assert(
+    assertStrictEquals(
         authorizeResponse!.response.includes(code),
-        'authorize response missing live code',
+        false,
+    );
+    assert(
+        authorizeResponse!.secret.includes(
+            'code="' + code + '"',
+        ),
+        'authorize secret missing the code',
     );
     const tokenRequest = requests.find(
         r => r.path === '/authentication/token/');
     assert(tokenRequest);
-    assert(
+    assertStrictEquals(
         tokenRequest!.request.includes(code),
-        'token request missing live code',
+        false,
+    );
+    assert(
+        tokenRequest!.secret.includes('authorization:'),
+        'token secret missing the basic line',
     );
     const tokenResponse = responses.find(
         r => r.path === '/authentication/token/');
     assert(tokenResponse);
-    assert(
+    assertStrictEquals(
         tokenResponse!.response.includes(access_token),
-        'token response missing access_token',
+        false,
+    );
+    assert(
+        tokenResponse!.secret.includes(access_token),
+        'token secret missing access_token',
     );
     assertStrictEquals(
         tokenResponse!.response.includes(refresh_token),
         false,
         'token stored JSON must omit refresh_token',
+    );
+    assert(
+        tokenResponse!.secret.includes('set-cookie:'),
+        'token secret missing the refresh cookie',
     );
 });
 
@@ -226,15 +260,14 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // seedRootAdmin: org + membership (2; role-grants retired)
-    // + identity + pii + credential (3) + authorize + token
-    // + token-event + spend marker + pbkdf2-to-scrypt rehash
-    // (5) = 10.
-    assertStrictEquals(requests.length, 11);
-    // The AUTH hops stay operation documents (name ''); the
-    // token grant's issued event and spend marker ride their
-    // own documents, so they carry non-empty names. Indices
-    // 5–6 are authorize + token.
+    // seedRootAdmin: org + membership (2)
+    // + identity + pii + credential (3)
+    // + rehash + authorize + code document
+    // + code DELETE + issued event + token = 12.
+    assertStrictEquals(requests.length, 12);
+    // The AUTH hops stay operation documents (name '');
+    // the issued event and the code document carry
+    // non-empty names.
     const authHops = requests.slice(5).filter(
         row => row.path === '/authentication/authorize/'
             || row.path === '/authentication/token/',
@@ -269,8 +302,21 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     );
     assert(tokenEventResponse);
     assertNotStrictEquals(tokenEventResponse!.name, '');
-    // Response rows carry no predecessor columns.
+    const codePut = responses.find((row) =>
+        row.path === '/authentication/authorization-codes/'
+        && row.method === 'PUT'
+    );
+    const codeDelete = responses.find((row) =>
+        row.path === '/authentication/authorization-codes/'
+        && row.method === 'DELETE'
+    );
+    assert(codePut !== undefined);
+    assert(codeDelete !== undefined);
+    assertStrictEquals(codeDelete.supersedes, codePut.id);
+    // The code DELETE is the one successor. Every other
+    // row in this slice is a genesis.
     for (const row of responses.slice(6)) {
+        if (row.id === codeDelete.id) continue;
         assertStrictEquals(row.supersedes, NIL_IDENTIFIER);
         assertStrictEquals('follows' in row, false);
     }
@@ -316,17 +362,15 @@ async () => {
     await seedRootAdmin(db);
     const { code } = await fullLoginFlow(db);
     const before = (await db.messagePairs.getAll()).length;
-    // A distinguishing header keeps this replay from being
-    // byte-identical to the original exchange — otherwise
-    // appendMessagePairOnce's same-hash dedup (message-pair.ts)
-    // would mask a regression that mistakenly appended a pair
-    // on a failing branch: the row counts below would stay
-    // flat whether or not a stray append fired.
+    // jsonPost mints a fresh operation-id, so this replay
+    // is not byte-identical to the original exchange.
+    // Otherwise same-hash dedup would mask a regression
+    // that appended a pair on a failing branch.
     const replay = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'authorization_code', code,
             client_id: 'web',
-        }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
+        }));
     assertStrictEquals(replay.status, 401);
     assertStrictEquals((await db.messagePairs.getAll()).length, before);
     assertStrictEquals(
@@ -346,7 +390,7 @@ async () => {
             code_challenge_method:
                 pkce.code_challenge_method,
         }));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     assert(pairIdOf(res));
     assert(res.headers.get('Date'));
 });
@@ -373,8 +417,8 @@ async () => {
             grant_type: 'refresh',
             refresh_token: first.refresh_token,
         }));
-    assertStrictEquals(res.status, 201);
-    const rotatedJson = await res.json() as {
+    assertStrictEquals(res.status, 200);
+    const rotatedJson = await presentedFields(res) as {
         access_token: string;
     };
     const rotated = {
@@ -384,17 +428,21 @@ async () => {
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 13: the fixture's own identity + pii + credential pairs
-    // (3) + seedRootAdmin's 2 fixture pairs + authorize +
-    // token (the token hop's own event pair, spend marker,
-    // plus pbkdf2 rehash, brings fullLoginFlow's count to 10)
-    // + refresh's own operation message pair + refresh's
-    // rotate-branch event pairs (2: the retired root, the
-    // issued successor — Phase 13 Task 5).
-    assertStrictEquals(requests.length, 14);
+    // fullLoginFlow is 12 (code document PUT and DELETE
+    // replace the spend marker). Refresh adds its own
+    // pair plus the retired root and the issued
+    // successor.
+    assertStrictEquals(requests.length, 15);
+    const cookieLine = 'cookie: refresh_token='
+        + first.refresh_token;
     const refreshRequest = requests.find(
-        r => r.path === '/authentication/token/'
-            && r.request.includes(first.refresh_token),
+        (r) => r.path === '/authentication/token/'
+            && (
+                r.secret.startsWith(cookieLine)
+                || r.secret.includes(
+                    '\r\n' + cookieLine,
+                )
+            ),
     );
     assert(refreshRequest);
     const refreshResponse = responses.find(
@@ -402,7 +450,15 @@ async () => {
     );
     assert(refreshResponse);
     assert(
-        refreshResponse!.response.includes(rotated.access_token),
+        refreshResponse!.secret.includes(
+            rotated.access_token,
+        ),
+    );
+    assertStrictEquals(
+        refreshResponse!.response.includes(
+            rotated.access_token,
+        ),
+        false,
     );
     assertStrictEquals(
         refreshResponse!.response.includes(rotated.refresh_token),
@@ -421,8 +477,8 @@ Deno.test('a token-exchange grant stores its own pair with live'
             subject_token: subjectToken,
             actor_token: subjectToken,
         }));
-    assertStrictEquals(res.status, 201);
-    const bodyJson = await res.json() as {
+    assertStrictEquals(res.status, 200);
+    const bodyJson = await presentedFields(res) as {
         access_token: string;
         refresh_token?: unknown;
     };
@@ -439,7 +495,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     assertStrictEquals(requests.length, 8);
     const exchangeRequest = requests.find(
         r => r.path === '/authentication/token/'
-            && r.request.includes(subjectToken),
+            && r.secret.includes(subjectToken),
     );
     assert(exchangeRequest);
     const exchangeResponse = responses.find(
@@ -447,9 +503,15 @@ Deno.test('a token-exchange grant stores its own pair with live'
     );
     assert(exchangeResponse);
     assert(
+        exchangeResponse!.secret.includes(
+            bodyJson.access_token,
+        ),
+    );
+    assertStrictEquals(
         exchangeResponse!.response.includes(
             bodyJson.access_token,
         ),
+        false,
     );
     assertStrictEquals(
         exchangeResponse!.response.includes('refresh_token'),
@@ -505,8 +567,8 @@ Deno.test('a client_credentials grant stores its own pair with live'
             client_id: 'uYaHKbNeVUcsFjuooOjMew',
             client_assertion: assertion,
         }));
-    assertStrictEquals(res.status, 201);
-    const bodyJson = await res.json() as {
+    assertStrictEquals(res.status, 200);
+    const bodyJson = await presentedFields(res) as {
         access_token: string;
     };
     const body = {
@@ -526,7 +588,7 @@ Deno.test('a client_credentials grant stores its own pair with live'
     assertStrictEquals(requests.length, 9);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
-            && r.request.includes(assertion),
+            && r.secret.includes(assertion),
     );
     assert(credRequest);
     const credResponse = responses.find(
@@ -534,7 +596,13 @@ Deno.test('a client_credentials grant stores its own pair with live'
     );
     assert(credResponse);
     assert(
-        credResponse!.response.includes(body.access_token),
+        credResponse!.secret.includes(body.access_token),
+    );
+    assertStrictEquals(
+        credResponse!.response.includes(
+            body.access_token,
+        ),
+        false,
     );
     assertStrictEquals(
         credResponse!.response.includes(body.refresh_token),
@@ -562,8 +630,8 @@ Deno.test('a successful authentication/token POST posts a scoped'
     }]);
 });
 
-Deno.test('an Authorization header sent alongside the token grant is'
-+ ' stored verbatim', async () => {
+Deno.test('the code grant Basic line is stored in secret',
+async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const pkce = await s256Fields();
@@ -575,30 +643,35 @@ Deno.test('an Authorization header sent alongside the token grant is'
             code_challenge_method:
                 pkce.code_challenge_method,
         }));
-    const { code } = await authorizeRes.json() as {
+    const { code } = await presentedFields(authorizeRes) as {
         code: string;
     };
-    const req = new Request(`${BASE}/authentication/token`, {
+    const req = framedRequest(`${BASE}/authentication/token`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer some-stale-caller-token',
+            'authorization': basicAuthorization(
+                code, pkce.verifier,
+            ),
         },
         body: JSON.stringify({
             grant_type: 'authorization_code',
-            code,
             client_id: 'web',
-            code_verifier: pkce.verifier,
         }),
     });
     const res = await handleRequest(db, req);
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.path === '/authentication/token/');
     assert(row);
-    assert(
-        row!.request.includes('some-stale-caller-token'));
+    assert(row!.secret.includes('authorization:'));
+    assertStrictEquals(
+        row!.request.includes(code), false,
+    );
+    assertStrictEquals(
+        row!.response.includes(code), false,
+    );
 });
 
 Deno.test('a reused (already-rotated-away) refresh token grant is a'
@@ -619,15 +692,14 @@ Deno.test('a reused (already-rotated-away) refresh token grant is a'
         r => r.path === '/authentication/token/'
             && r.name === '',
     ).length;
-    // Same reasoning as the double-spent-code test above: a
-    // distinguishing header keeps this reuse attempt from
-    // being byte-identical to the rotation that already
-    // stored a pair with the same body.
+    // Same reasoning as the double-spent-code test above:
+    // a fresh operation-id keeps this reuse from being
+    // byte-identical to the rotation already stored.
     const reused = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'refresh',
             refresh_token: first.refresh_token,
-        }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
+        }));
     assertStrictEquals(reused.status, 401);
     const requests = await db.messagePairs.getAll();
 

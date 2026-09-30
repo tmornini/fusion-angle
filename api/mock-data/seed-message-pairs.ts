@@ -149,7 +149,6 @@ import {
 } from '../../shared/identifier.ts';
 import {
     HTTP_NO_CONTENT,
-    HTTP_OK,
 } from '../http-errors.ts';
 import {
     WRITE_RESPONSE_SPECS,
@@ -1988,8 +1987,11 @@ export function buildMockDataInvocations():
 export async function formSeedMessagePair(
     inv: MockDataInvocation, requestAt: string,
     operationId?: string,
+    requestId?: string,
 ): Promise<MessagePair> {
     const envelopeId = operationId
+        ?? generateIdentifier();
+    const mintedRequestId = requestId
         ?? generateIdentifier();
     const idParams = inv.idParams;
     const routeSegments = inv.routePattern.split('/');
@@ -2037,9 +2039,9 @@ export async function formSeedMessagePair(
         requesterIdentityId: inv.requesterIdentityId,
         requestAt,
         organization: inv.organization,
-        responseStatus: response.status,
         responseBody: response.body,
         operationId: envelopeId,
+        requestId: mintedRequestId,
         // Fresh database: every seed pair is genesis.
     });
 }
@@ -2098,6 +2100,7 @@ export async function formDefaultOrganizationSeedMessagePair(
         'identities', identityId, 'default-organization',
     ];
     const operationId = generateIdentifier();
+    const requestId = generateIdentifier();
     return formWriteMessagePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
@@ -2116,9 +2119,9 @@ export async function formDefaultOrganizationSeedMessagePair(
         requesterIdentityId: identityId,
         requestAt,
         organization: undefined,
-        responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
         operationId,
+        requestId,
     });
 }
 
@@ -2145,6 +2148,7 @@ export async function formInvitationSeedMessagePairs(
     const granterId = 'XXZruirZyAOoRpNxaDnpSA';
     const grantAt = MOCK_SEED_TIMESTAMP;
     const operationId = generateIdentifier();
+    const requestId = generateIdentifier();
     const grantEventId =
         UNAFFILIATED_INVITATION_GRANT_EVENT_ID;
     const messagePairs = new Map<string, MessagePair>();
@@ -2166,7 +2170,6 @@ export async function formInvitationSeedMessagePairs(
             requesterIdentityId: granterId,
             requestAt,
             organization: undefined,
-            responseStatus: HTTP_OK,
             responseBody: {
                 id: invitationId,
                 organization_id: STARK_ORGANIZATION,
@@ -2175,6 +2178,7 @@ export async function formInvitationSeedMessagePairs(
                 state: 'pending',
             },
             operationId,
+            requestId,
         }),
     );
     const documentBody = {
@@ -2198,12 +2202,12 @@ export async function formInvitationSeedMessagePairs(
             requesterIdentityId: granterId,
             requestAt,
             organization: undefined,
-            responseStatus: HTTP_OK,
             responseBody: {
                 id: invitationId,
                 ...documentBody,
             },
             operationId,
+            requestId,
         }),
     );
     return messagePairs;
@@ -2257,6 +2261,7 @@ export async function formInstanceChainMessagePairs():
     // PATCH create would store. Seed writes this one
     // pair only (1498).
     const genesisId = generateIdentifier();
+    const genesisRequestId = generateIdentifier();
     const genesis = await formWriteMessagePair({
         method: 'PUT',
         pathname: instancePathname,
@@ -2268,12 +2273,13 @@ export async function formInstanceChainMessagePairs():
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: genesisAt,
         organization: org,
-        responseStatus: HTTP_OK,
         responseBody: { values: [] },
         operationId: genesisId,
+        requestId: genesisRequestId,
     });
 
     const bindingId = generateIdentifier();
+    const bindingRequestId = generateIdentifier();
     const binding = await formWriteMessagePair({
         method: 'PUT',
         pathname:
@@ -2297,12 +2303,13 @@ export async function formInstanceChainMessagePairs():
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: genesisAt,
         organization: org,
-        responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
         operationId: bindingId,
+        requestId: bindingRequestId,
     });
 
     const reviewOpId = generateIdentifier();
+    const reviewRequestId = generateIdentifier();
     const reviewOp = await formWriteMessagePair({
         method: 'POST',
         pathname:
@@ -2323,9 +2330,9 @@ export async function formInstanceChainMessagePairs():
         requesterIdentityId: review.member_id,
         requestAt: reviewAt,
         organization: org,
-        responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
         operationId: reviewOpId,
+        requestId: reviewRequestId,
     });
 
     const reviewSet = seedSetFor(review.id);
@@ -2343,12 +2350,13 @@ export async function formInstanceChainMessagePairs():
         requesterIdentityId: review.member_id,
         requestAt: reviewAt,
         organization: org,
-        responseStatus: HTTP_OK,
         responseBody: { values: reviewValues },
         operationId: reviewOpId,
+        requestId: reviewRequestId,
     });
 
     const completeOpId = generateIdentifier();
+    const completeRequestId = generateIdentifier();
     const completeOp = await formWriteMessagePair({
         method: 'POST',
         pathname:
@@ -2369,9 +2377,9 @@ export async function formInstanceChainMessagePairs():
         requesterIdentityId: complete.member_id,
         requestAt: completeAt,
         organization: org,
-        responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
         operationId: completeOpId,
+        requestId: completeRequestId,
     });
 
     const completeSet = seedSetFor(complete.id);
@@ -2389,9 +2397,9 @@ export async function formInstanceChainMessagePairs():
         requesterIdentityId: complete.member_id,
         requestAt: completeAt,
         organization: org,
-        responseStatus: HTTP_OK,
         responseBody: { values: completeValues },
         operationId: completeOpId,
+        requestId: completeRequestId,
     });
 
     const messagePairs = new Map<string, MessagePair>();

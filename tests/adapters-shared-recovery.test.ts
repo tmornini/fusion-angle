@@ -56,7 +56,11 @@ import {
     runWrite,
     attemptFor,
     formAuthMessagePair,
+    formWriteMessagePair,
+    OPERATION_ID_HEADER,
 } from '../api/message-pair.ts';
+import type { HttpFacade } from
+    '../web-app/app/adapters/http-facade.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import {
@@ -64,8 +68,12 @@ import {
 } from '../api/derive-identity-tokens.ts';
 import {
     apiRequest,
+    framedRequest,
+    presentedFields,
     refreshTokenFromSetCookie,
 } from './http-fixtures.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import {
     postInvitationAcceptance,
@@ -73,6 +81,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { sha256Hex } from '../shared/digest.ts';
 import { deleteRefreshChannel } from
     '../web-app/app/adapters/session-refresh-mutex.ts';
 import { deleteNotificationChannel } from
@@ -142,18 +151,60 @@ async function seedAuthorizationCodeMessagePair(
         routePattern: 'authentication/authorize',
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
+        bodyBytes: new Uint8Array(),
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     };
     const requestBody = {
         method: 'password', username: 'seed@example.com',
         password: 'seed-password', client_id: 'web',
     };
     const messagePair = await formAuthMessagePair(
-        seed, requestBody, 'XXZruirZyAOoRpNxaDnpSA', 200, { code },
+        {
+            ...seed,
+            bodyBytes: new TextEncoder().encode(
+                JSON.stringify(requestBody),
+            ),
+        },
+        requestBody, 'XXZruirZyAOoRpNxaDnpSA', undefined,
+        seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: 'code="' + code + '"',
+        }],
     );
+    const codeName = await sha256Hex(code);
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/authentication/authorization-codes/'
+            + codeName,
+        routePattern:
+            'authentication/authorization-codes/:hash',
+        routeSegments: [
+            'authentication',
+            'authorization-codes',
+            ':hash',
+        ],
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: { client_id: 'web' },
+        operationId: seed.operationId,
+        requestId: seed.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     await runWrite(
         db,
-        attemptFor([messagePair]),
-        [messagePair],
+        attemptFor([codePair, messagePair]),
+        [codePair, messagePair],
     );
 }
 
@@ -161,17 +212,23 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
     await seedAuthorizationCodeMessagePair(db, 'the-code');
-    const res = await handleRequest(db, new Request(
+    const res = await handleRequest(db, framedRequest(
         `${BASE}/authentication/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                authorization: basicAuthorization(
+                    'the-code', '',
+                ),
+            },
             body: JSON.stringify({
                 grant_type: 'authorization_code',
-                code: 'the-code',
                 client_id: 'web',
             }),
         }));
-    const body = await res.json() as { access_token: string };
+    const body = await presentedFields(res) as {
+        access_token: string;
+    };
     return {
         access_token: body.access_token,
         refresh_token: refreshTokenFromSetCookie(res),
@@ -232,7 +289,7 @@ async function seedOrganizationAdmin(
 async function seedOrganizationDocument(
     db: MemoryDbAdapter, organization: string,
 ): Promise<void> {
-    await handleRequest(db, new Request(
+    await handleRequest(db, framedRequest(
         `${BASE}/organizations/${organization}`, {
             method: 'PUT',
             headers: {
@@ -551,3 +608,163 @@ Deno.test('a concurrent facade refresh and remint present'
     assertStrictEquals(revoked.length, 0);
     assertNotStrictEquals(getSessionCredentials(), null);
 }));
+
+Deno.test(
+    'a 401 recovery carries the failing'
+        + ' operation-id',
+    () => withLocalStorageAsync(
+        freshStorage(),
+        async () => {
+            const organization = 'AjdvjuECVZEgZoFajaIEkg';
+            const dead = await expiredToken();
+            const flat = await devToken();
+            const scoped = await organizationToken();
+            const refresh = await devToken();
+            putSessionCredentials({
+                accessToken: dead,
+                refreshToken: refresh,
+            });
+            putSessionToken(dead);
+            const seen: {
+                kind: string;
+                operationId: string | null;
+                requestId: string | null;
+            }[] = [];
+            let reads = 0;
+            function record(
+                kind: string,
+                fields:
+                    | readonly (readonly [string, string])[]
+                    | undefined,
+            ): void {
+                let operationId: string | null = null;
+                let requestId: string | null = null;
+                for (const [name, value] of fields ?? []) {
+                    const key = name.toLowerCase();
+                    if (key === OPERATION_ID_HEADER) {
+                        operationId = value;
+                    }
+                    if (key === 'request-id') {
+                        requestId = value;
+                    }
+                }
+                seen.push({
+                    kind, operationId, requestId,
+                });
+            }
+            const unused = (): never => {
+                throw new Error('unused verb');
+            };
+            const facade: HttpFacade = {
+                GET: <T>(
+                    resource: string,
+                    _token: string,
+                    fields?:
+                        readonly (readonly [
+                            string,
+                            string,
+                        ])[],
+                ): Promise<T> => {
+                    if (resource.endsWith(
+                        '/organizations/',
+                    )) {
+                        record('re-scope', fields);
+                        return Promise.resolve([{
+                            id: organization,
+                        }] as T);
+                    }
+                    if (resource.endsWith(
+                        '/default-organization',
+                    )) {
+                        record('re-scope', fields);
+                        return Promise.resolve({
+                            organization_id: organization,
+                        } as T);
+                    }
+                    record('read', fields);
+                    reads += 1;
+                    if (reads === 1) {
+                        return Promise.reject(
+                            new UnauthorizedError(
+                                'invalid_token',
+                            ),
+                        );
+                    }
+                    return Promise.resolve([] as T);
+                },
+                GETWithEtag: unused,
+                PUT: unused,
+                PUTWithEtag: unused,
+                PATCH: unused,
+                PATCHWithEtag: unused,
+                DELETE: unused,
+                POST: unused,
+                postForHeaders: (
+                    _resource, payload, _token, fields,
+                ) => {
+                    const grant = payload.grant_type;
+                    const kind = grant === 'refresh'
+                        ? 'refresh'
+                        : 'exchange';
+                    record(kind, fields);
+                    const access = grant === 'refresh'
+                        ? flat
+                        : scoped;
+                    const headers = new Headers();
+                    headers.set(
+                        'authentication-info',
+                        'access_token="' + access + '"',
+                    );
+                    if (grant === 'refresh') {
+                        headers.append(
+                            'set-cookie',
+                            'refresh_token=' + refresh
+                                + '; HttpOnly',
+                        );
+                    }
+                    return Promise.resolve({
+                        status: 200,
+                        headers,
+                        body: '',
+                    });
+                },
+            };
+            const ctx = createRecoveringRequestContext(
+                facade, dead,
+            );
+            const rows = await ctx.GET(
+                'organizations/' + organization
+                    + '/ideas/',
+            );
+            assert(Array.isArray(rows));
+            const kinds = seen.map((row) => row.kind);
+            assertEquals(
+                kinds.filter((kind) => kind === 'read'),
+                ['read', 'read'],
+            );
+            assertEquals(
+                kinds.filter((kind) =>
+                    kind === 'refresh'),
+                ['refresh'],
+            );
+            assertEquals(
+                kinds.filter((kind) =>
+                    kind === 're-scope'),
+                ['re-scope', 're-scope'],
+            );
+            assertEquals(
+                kinds.filter((kind) =>
+                    kind === 'exchange'),
+                ['exchange'],
+            );
+            for (const row of seen) {
+                assertStrictEquals(
+                    row.operationId, ctx.operationId,
+                );
+                assertStrictEquals(
+                    row.requestId, null,
+                );
+            }
+        },
+    ),
+);

@@ -9,7 +9,7 @@ import {
     type Principal,
 } from './access-token.ts';
 import type {
-    IncomingContext,
+    FramedContext,
     AuthenticatedContext,
     RequestContext,
 } from './request-context.ts';
@@ -43,7 +43,7 @@ export const AUTHENTICATION_ROUTES: ReadonlySet<string> =
     ]);
 
 export async function authenticateRequest(
-    ctx: IncomingContext,
+    ctx: FramedContext,
     request: Request,
 ): Promise<AuthenticatedContext | string> {
     const header =
@@ -225,18 +225,20 @@ function parseObjectText(
     };
 }
 
-export async function parseObjectBody(
-    request: Request,
-): Promise<ParsedBody> {
+export function parseObjectBody(
+    bytes: Uint8Array,
+): ParsedBody {
     return parseObjectText(
-        await request.text(), false,
+        new TextDecoder().decode(bytes), false,
     ) as ParsedBody;
 }
 
 // PUT may carry an empty body: a live empty document,
 // never a delete. POST/PATCH still reject empty as 400.
-export async function parsePutBody(
-    request: Request,
-): Promise<ParsedPutBody> {
-    return parseObjectText(await request.text(), true);
+export function parsePutBody(
+    bytes: Uint8Array,
+): ParsedPutBody {
+    return parseObjectText(
+        new TextDecoder().decode(bytes), true,
+    );
 }

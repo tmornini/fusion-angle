@@ -238,11 +238,11 @@ async function appendInstanceMessagePair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization,
-        responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: method === 'DELETE'
             ? undefined
             : (body ?? {}),
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -1001,7 +1001,6 @@ async () => {
         requesterIdentityId: 'nkgaOHZISTQrILTfPThWCA',
         requestAt: nowUtc(),
         organization: ORGANIZATION,
-        responseStatus: 200,
         responseBody: {
             id: INSTANCE_ID,
             organization_id: ORGANIZATION,
@@ -1010,6 +1009,7 @@ async () => {
             clear: [],
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Advance the real head past H0.
     const advance = await handleRequest(db, req(
@@ -1084,6 +1084,7 @@ async () => {
         organization: ORGANIZATION,
         response: { status: 200, body: {} },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     assertStrictEquals('follows' in revision, false);
     assertStrictEquals('supersedes' in revision, false);

@@ -15,6 +15,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
     storedPutBodyText,
+    framedRequest,
 } from './http-fixtures.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -158,7 +159,7 @@ Deno.test('a state-unchanged edit succeeds and the wire reflects'
             + 'YHvbnJSZHECuziaHXcsKpw', token,
         ideaDocument('Second', 'active'),
     ));
-    assertStrictEquals(edit.status, 201);
+    assertStrictEquals(edit.status, 200);
     const getRes = await handleRequest(
         db, req('GET'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -212,7 +213,7 @@ async () => {
     // so this is same-body, not replay.
     const second = await handleRequest(
         db,
-        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        framedRequest('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/tmPPRaXkMetWxTSisIPFLA', {
             method: 'PUT',
             headers: {
@@ -351,7 +352,7 @@ async () => {
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, token,
         ideaDocument('Revised', 'in_review'),
     ));
-    assertStrictEquals(later.status, 201);
+    assertStrictEquals(later.status, 200);
     const after = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );

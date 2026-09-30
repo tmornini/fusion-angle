@@ -4,6 +4,8 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { messageStore } from '../api/message-store.ts';
 import type { DbAdapter } from '../api/db.ts';
+import { basicAuthorization } from
+    '../api/authentication.ts';
 
 const BASE = 'http://localhost';
 
@@ -30,6 +32,81 @@ export function setCookieHeader(res: Response): string {
     return res.headers.get('Set-Cookie') ?? '';
 }
 
+export function withoutCredentialFields(
+    body: Record<string, unknown>,
+): {
+    readonly body: Record<string, unknown>;
+    readonly headers: Record<string, string>;
+} {
+    const next: Record<string, unknown> = { ...body };
+    const headers: Record<string, string> = {};
+    if (
+        typeof next.username === 'string'
+        && typeof next.password === 'string'
+    ) {
+        headers['authorization'] = basicAuthorization(
+            next.username, next.password,
+        );
+        delete next.username;
+        delete next.password;
+    }
+    if (typeof next.code === 'string') {
+        const verifier = typeof next.code_verifier
+            === 'string'
+            ? next.code_verifier
+            : '';
+        headers['authorization'] = basicAuthorization(
+            next.code, verifier,
+        );
+        delete next.code;
+        delete next.code_verifier;
+    }
+    if (typeof next.client_assertion === 'string') {
+        headers['authorization'] = 'Bearer '
+            + next.client_assertion;
+        delete next.client_assertion;
+    }
+    if (
+        typeof next.subject_token === 'string'
+        && (
+            typeof next.actor_token !== 'string'
+            || next.actor_token === next.subject_token
+        )
+    ) {
+        headers['authorization'] = 'Bearer '
+            + next.subject_token;
+        delete next.subject_token;
+        delete next.actor_token;
+    }
+    if (typeof next.refresh_token === 'string') {
+        headers['cookie'] = 'refresh_token='
+            + next.refresh_token;
+        delete next.refresh_token;
+    }
+    return { body: next, headers };
+}
+
+export async function presentedFields(
+    response: Response,
+): Promise<Record<string, unknown>> {
+    const text = await response.text();
+    const body: Record<string, unknown> = text === ''
+        ? {}
+        : JSON.parse(text) as Record<string, unknown>;
+    const info = response.headers.get(
+        'authentication-info',
+    );
+    if (info === null) return body;
+    const code = /(?:^|\s)code="([^"]*)"/.exec(info);
+    const access = /(?:^|\s)access_token="([^"]*)"/
+        .exec(info);
+    if (code !== null) body.code = code[1];
+    if (access !== null) {
+        body.access_token = access[1];
+    }
+    return body;
+}
+
 export function refreshTokenFromSetCookie(
     res: Response,
 ): string {
@@ -41,6 +118,47 @@ export function refreshTokenFromSetCookie(
     return match[1]!.trim();
 }
 
+// In-process tests build Request directly. The gate
+// requires operation-id, and a body requires the
+// UTF-8 content-length fetch would have set. A
+// header the caller already set is left alone.
+export function framedRequest(
+    input: string | URL,
+    init?: RequestInit,
+): Request {
+    const headers = new Headers(init?.headers);
+    const body = init?.body;
+    if (
+        body !== undefined
+        && body !== null
+        && !headers.has('content-length')
+    ) {
+        const length = bodyByteLength(body);
+        if (length !== undefined) {
+            headers.set('content-length', String(length));
+        }
+    }
+    if (!headers.has('operation-id')) {
+        headers.set('operation-id', generateIdentifier());
+    }
+    return new Request(input, {
+        ...init,
+        headers,
+        ...(body !== undefined ? { body } : {}),
+    });
+}
+
+function bodyByteLength(body: BodyInit): number | undefined {
+    if (typeof body === 'string') {
+        return new TextEncoder().encode(body).byteLength;
+    }
+    if (body instanceof Uint8Array) return body.byteLength;
+    if (body instanceof ArrayBuffer) return body.byteLength;
+    if (ArrayBuffer.isView(body)) return body.byteLength;
+    if (body instanceof Blob) return body.size;
+    return undefined;
+}
+
 export function apiRequest(input: {
     readonly method: string;
     readonly path: string;
@@ -49,8 +167,6 @@ export function apiRequest(input: {
     readonly operationId?: string;
     readonly headers?: Readonly<Record<string, string>>;
 }): Request {
-    const write = input.method !== 'GET'
-        && input.method !== 'HEAD';
     const headers: Record<string, string> = {
         ...(input.headers ?? {}),
     };
@@ -58,10 +174,15 @@ export function apiRequest(input: {
         headers['Authorization'] =
             'Bearer ' + input.token;
     }
+    let body: string | undefined;
     if (input.body !== undefined) {
         headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(input.body);
+        headers['content-length'] = String(
+            new TextEncoder().encode(body).byteLength,
+        );
     }
-    if (write && headers['operation-id'] === undefined) {
+    if (headers['operation-id'] === undefined) {
         headers['operation-id'] =
             input.operationId
             ?? generateIdentifier();
@@ -69,9 +190,7 @@ export function apiRequest(input: {
     return new Request(BASE + input.path, {
         method: input.method,
         headers,
-        ...(input.body !== undefined
-            ? { body: JSON.stringify(input.body) }
-            : {}),
+        ...(body !== undefined ? { body } : {}),
     });
 }
 

@@ -65,6 +65,7 @@ export type Head = {
     id: string,
     responseAt: string,
     response: Uint8Array,
+    method: string,
 };
 
 export type ClassifiedRow = {
@@ -105,7 +106,7 @@ export async function classifyStatement(
         const head = headFor(heads, row.path, row.name);
         const stamp = stampFor(attempt, head, now);
         const response = spliceResponse(
-            row.responsePrefix,
+            overlaidPrefix(attempt, row, head),
             stamp,
             row.responseSuffix,
         );
@@ -252,6 +253,24 @@ function reportedOutcome(
         }
     }
     return outcome;
+}
+
+function overlaidPrefix(
+    attempt: Attempt,
+    row: StatementRow,
+    head: Head | null,
+): Uint8Array {
+    if (
+        row.method !== 'PUT'
+        || attempt === 'genesis'
+        || head === null
+        || head.method !== 'PUT'
+    ) {
+        return row.responsePrefix;
+    }
+    const prefix = row.responsePrefix.slice();
+    prefix.set(new TextEncoder().encode('200'), 9);
+    return prefix;
 }
 
 function spliceResponse(

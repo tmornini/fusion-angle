@@ -53,6 +53,7 @@ import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
@@ -91,7 +92,7 @@ async function derivedRecordAttributes(
     );
     const typesRes = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             'http://localhost/organizations/'
             + organization + '/record-types/',
             {
@@ -113,7 +114,7 @@ async function derivedRecordAttributes(
     for (const type of types) {
         const res = await handleRequest(
             db,
-            new Request(
+            framedRequest(
                 'http://localhost/organizations/'
                 + organization + '/record-types/'
                 + type.id + '/attributes/',
@@ -323,7 +324,7 @@ Deno.test('every work order belongs to org 1', async () => {
     );
     const res = await handleRequest(
         db,
-        new Request('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        framedRequest('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'work-orders/', {
             headers: {
                 Authorization: 'Bearer ' + token,
@@ -345,7 +346,7 @@ Deno.test('every work order belongs to org 1', async () => {
     );
     const empty = await handleRequest(
         db,
-        new Request(
+        framedRequest(
             'http://localhost/organizations/'
                 + ORGANIZATION_TWO + '/work-orders/',
             {

@@ -154,7 +154,7 @@ Deno.test('a state-unchanged edit succeeds and the wire reflects'
             + 'YHvbnJSZHECuziaHXcsKpw', token,
         projectDocument('Second', 'submitted'),
     ));
-    assertStrictEquals(edit.status, 201);
+    assertStrictEquals(edit.status, 200);
     const getRes = await handleRequest(
         db, req('GET'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
@@ -249,7 +249,7 @@ Deno.test('stored PUT body equals projectEntityOf of the same'
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + id, token,
         projectDocument('Revised', 'under_review'),
     ));
-    assertStrictEquals(later.status, 201);
+    assertStrictEquals(later.status, 200);
     const after = JSON.parse(
         await storedPutBodyText(db, prefix, id),
     );

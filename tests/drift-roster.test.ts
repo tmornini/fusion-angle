@@ -457,7 +457,7 @@ async () => {
         'PUT', '/ai-agents/' + aiId, token,
         aiMemberDocumentBody('Chain AI Facet'),
     ));
-    assertStrictEquals(facetPut.status, 201);
+    assertStrictEquals(facetPut.status, 200);
     const agent2 = await handleRequest(
         db, req('GET', '/ai-agents/' + aiId, token),
     );
@@ -491,7 +491,7 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assertStrictEquals(humanEdited.status, 201);
+    assertStrictEquals(humanEdited.status, 200);
     const identityGot = await handleRequest(
         db, req('GET', '/identities/' + humanId, token),
     );
@@ -858,7 +858,7 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assertStrictEquals(skewed.status, 201);
+    assertStrictEquals(skewed.status, 200);
 
     const res = await handleRequest(
         db, req('GET', '/identities/' + memberId, token),
@@ -905,7 +905,7 @@ async () => {
             at: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const firstId = pairIdOf(first);
     assert(firstId);
 
@@ -919,7 +919,7 @@ async () => {
             at: '2020-01-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 200);
 
     const derived = await derivedMembership(
         db, STARK_ORGANIZATION, identityId,

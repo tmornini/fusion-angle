@@ -50,6 +50,7 @@ async function putObjective(
     id: string,
     token: string,
     state: string,
+    status: number,
     organization = 'AjdvjuECVZEgZoFajaIEkg',
 ): Promise<void> {
     const res = await handleRequest(
@@ -63,7 +64,7 @@ async function putObjective(
             generateIdentifier(),
         ),
     );
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, status);
 }
 
 Deno.test(
@@ -73,7 +74,9 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const id = generateIdentifier();
-        await putObjective(db, id, DEV_TOKEN, 'active');
+        await putObjective(
+            db, id, DEV_TOKEN, 'active', 201,
+        );
 
         const slashless = await handleRequest(
             db,
@@ -114,10 +117,18 @@ Deno.test(
         await seedAdminSchema(db);
         const id = generateIdentifier();
 
-        await putObjective(db, id, DEV_TOKEN, 'active');
-        await putObjective(db, id, DEV_TOKEN, 'archived');
-        await putObjective(db, id, DEV_TOKEN, 'active');
-        await putObjective(db, id, DEV_TOKEN, 'archived');
+        await putObjective(
+            db, id, DEV_TOKEN, 'active', 201,
+        );
+        await putObjective(
+            db, id, DEV_TOKEN, 'archived', 200,
+        );
+        await putObjective(
+            db, id, DEV_TOKEN, 'active', 200,
+        );
+        await putObjective(
+            db, id, DEV_TOKEN, 'archived', 200,
+        );
 
         const res = await handleRequest(
             db,

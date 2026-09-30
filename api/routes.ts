@@ -104,7 +104,9 @@ import {
     IF_MATCH_HEADER,
     strongEtagOf,
 } from './message-pair.ts';
-import type { MessagePair } from './message-pair.ts';
+import type {
+    MessagePair, ReceivedRequest,
+} from './message-pair.ts';
 import { messageStore } from './message-store.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import {
@@ -590,6 +592,7 @@ export type PutHandler = (
     roles: readonly string[],
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ) => Promise<unknown>;
 
 // Task 10: PATCH joins the verb alphabet. No route carries a
@@ -603,6 +606,7 @@ export type PatchHandler = (
     messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
+    received?: ReceivedRequest,
 ) => Promise<unknown>;
 
 type DeleteHandler = (
@@ -612,6 +616,7 @@ type DeleteHandler = (
     messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
+    received?: ReceivedRequest,
 ) => Promise<void>;
 
 // PostHandler also carries fence organization + roles,
@@ -633,6 +638,7 @@ type PostHandler = (
     roles: readonly string[],
     requestAt: string,
     operationId: string,
+    received?: ReceivedRequest,
 ) => Promise<unknown>;
 
 export interface Route {
@@ -850,6 +856,7 @@ async function formRecordWriteMessagePairs(
         requesterIdentityId: actor,
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
         organization,
     });
     // Covenant: an ACL is set only by the nested
@@ -891,6 +898,7 @@ async function formRecordWriteMessagePairs(
                 requesterIdentityId: actor,
                 requestAt: messagePair.requestAt,
                 operationId: messagePair.operationId,
+                requestId: messagePair.requestId,
                 organization,
             });
         }),
@@ -913,6 +921,7 @@ async function formRecordWriteMessagePairs(
                 requesterIdentityId: actor,
                 requestAt: messagePair.requestAt,
                 operationId: messagePair.operationId,
+                requestId: messagePair.requestId,
                 organization,
                 method: 'DELETE',
                 response: {
@@ -1661,6 +1670,7 @@ export async function postFlowUndoOp(
         requesterIdentityId: actor,
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
         organization,
         latchedHeadMessagePairId: current.id,
     });
@@ -2473,6 +2483,7 @@ export async function postWorkOrderTransitionOp(
         requesterIdentityId: actor,
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
         organization: org,
         response: {
             status: HTTP_OK,
@@ -3588,6 +3599,7 @@ export interface DocumentMessagePairFormInput {
     readonly latchedHeadMessagePairId?: string;
     readonly headerFields?: readonly FieldLine[];
     readonly operationId: string;
+    readonly requestId: string;
 }
 
 // The shared document-pair former (Phase 9 Task 2, Commandment
@@ -3610,14 +3622,11 @@ export async function formDocumentMessagePairFor(
             ? input.params[nextParam++]!
             : segment,
     );
-    let responseStatus: number;
     let responseBody: unknown;
     if (input.response !== undefined) {
-        responseStatus = input.response.status;
         responseBody = input.response.body;
     } else {
         const spec = resolveWriteResponseSpec(input.routePattern);
-        responseStatus = spec.status;
         responseBody = spec.successBody?.(
             [...input.params], input.body,
             input.requesterIdentityId, input.organization,
@@ -3634,9 +3643,9 @@ export async function formDocumentMessagePairFor(
         requesterIdentityId: input.requesterIdentityId,
         requestAt: input.requestAt,
         organization: input.organization,
-        responseStatus,
         responseBody,
         operationId: input.operationId,
+        requestId: input.requestId,
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
             : {}),
@@ -3853,6 +3862,7 @@ async function postInstanceCreateOp(
         requesterIdentityId: actor,
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
         organization: org,
         response: {
             status: HTTP_OK,
@@ -3978,6 +3988,7 @@ export async function postInstancePatchOp(
         requesterIdentityId: actor,
         requestAt: messagePair.requestAt,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
         organization: org,
         response: {
             status: HTTP_OK,
@@ -4052,6 +4063,7 @@ export const routes: Route[] = [
                         requesterIdentityId: actor,
                         requestAt: messagePair.requestAt,
                         operationId: messagePair.operationId,
+                        requestId: messagePair.requestId,
                         organization,
                     });
                 if (b.kind === 'service') {
@@ -4082,6 +4094,7 @@ export const routes: Route[] = [
                             requesterIdentityId: actor,
                             requestAt: messagePair.requestAt,
                             operationId: messagePair.operationId,
+                            requestId: messagePair.requestId,
                             organization,
                         });
                     messagePairs = {
@@ -4648,6 +4661,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 // The idea's OWN document message pair, at its EXISTING
@@ -4664,6 +4678,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 // The per-baseline pairs (Task 4): N synthesized
@@ -4694,6 +4709,7 @@ export const routes: Route[] = [
                             requesterIdentityId: actor,
                             requestAt: messagePair.requestAt,
                             operationId: messagePair.operationId,
+                            requestId: messagePair.requestId,
                             organization,
                         },
                     ));
@@ -4784,6 +4800,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 // The live :pfid PUT's request shape, verified by
@@ -4813,6 +4830,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 messagePairs = { operation: messagePair, document, join };
@@ -5001,6 +5019,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 // The live :woid PUT's request shape, verified
@@ -5031,6 +5050,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 const graph = asWorkOrderFlowGraph(
@@ -5056,6 +5076,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 messagePairs = {
@@ -5979,6 +6000,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 const revisionBody = objectiveRevisionBodyOf(b);
@@ -5994,6 +6016,7 @@ export const routes: Route[] = [
                     requesterIdentityId: actor,
                     requestAt: messagePair.requestAt,
                     operationId: messagePair.operationId,
+                    requestId: messagePair.requestId,
                     organization,
                 });
                 messagePairs = {

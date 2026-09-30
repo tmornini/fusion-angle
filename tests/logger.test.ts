@@ -85,15 +85,15 @@ Deno.test(
             }`,
         );
         assertStrictEquals(
-            fields.requestId,
+            fields.operationId,
             undefined,
-            'unbound log has no requestId',
+            'unbound log has no operationId',
         );
     }),
 );
 
 Deno.test(
-    'log.error without .with has no requestId',
+    'log.error without .with has no operationId',
     () => withLocalStorage(NULL_STORAGE, () => {
         const calls = capture(
             'error',
@@ -105,7 +105,7 @@ Deno.test(
         assertStrictEquals(calls.length, 1);
         const fields = fieldsOf(calls[0]!);
         assertStrictEquals(
-            fields.requestId, undefined,
+            fields.operationId, undefined,
         );
         // No prose prefix either.
         assertStrictEquals(
@@ -120,7 +120,7 @@ Deno.test(
 );
 
 Deno.test(
-    'log.with carries full requestId',
+    'log.with carries full operationId',
     () => withLocalStorage(NULL_STORAGE, () => {
         const fullId =
             'abcdefghijklmnopqrstug';
@@ -134,7 +134,7 @@ Deno.test(
         assertStrictEquals(calls.length, 1);
         const fields = fieldsOf(calls[0]!);
         assertStrictEquals(
-            fields.requestId, fullId,
+            fields.operationId, fullId,
         );
         // Full id must NOT be truncated into
         // a prose [req:] tag.
@@ -162,7 +162,7 @@ Deno.test(
             fields.context, 'mymod',
         );
         assertStrictEquals(
-            fields.requestId,
+            fields.operationId,
             'abcdefghijklmnopqrstug',
         );
         assertStrictEquals(fields.level, 'error');
@@ -189,7 +189,7 @@ Deno.test(
             fields.context, undefined,
         );
         assertStrictEquals(
-            fields.requestId,
+            fields.operationId,
             'abcdefghijklmnopqrstug',
         );
     }),
@@ -236,7 +236,7 @@ Deno.test(
                         ts: 'not-a-ts',
                         level: 'debug',
                         context: 'spoofed',
-                        requestId: 'fake-id',
+                        operationId: 'fake-id',
                         page: 'dashboard',
                     },
                 ),
@@ -252,9 +252,9 @@ Deno.test(
             'envelope context wins',
         );
         assertStrictEquals(
-            fields.requestId,
+            fields.operationId,
             'abcdefghijklmnopqrstug',
-            'envelope requestId wins',
+            'envelope operationId wins',
         );
         assert(
             typeof fields.ts === 'string'

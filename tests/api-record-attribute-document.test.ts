@@ -25,6 +25,9 @@ import {
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const RECORD_ID = generateIdentifier();
 const ATTRIBUTE_ID = generateIdentifier();
@@ -143,8 +146,9 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Phase Final Task 2: record_attributes ROW half stripped
     // — message plane + op return are the oracles.
@@ -181,7 +185,8 @@ async () => {
             + RECORD_ID, {
         name: 'Fixture', description: '', position: 1,
         state: 'active',
-    }, DEV_TOKEN);
+    }, DEV_TOKEN,
+        operationIdHeader());
     const body = {
         name: 'Priority',
         attribute_type: 'text',
@@ -198,13 +203,13 @@ async () => {
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
         body, DEV_TOKEN,
-        opHeaders,
+        operationIdHeader(opHeaders),
     );
     const second = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
         body, DEV_TOKEN,
-        opHeaders,
+        operationIdHeader(opHeaders),
     );
     assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
@@ -248,8 +253,9 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: body,
+        responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -284,8 +290,9 @@ async function deleteDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,

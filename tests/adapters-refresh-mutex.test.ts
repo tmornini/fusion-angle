@@ -69,11 +69,17 @@ async () => {
             nextAccess += 1;
             return new Response(
                 JSON.stringify({
-                    access_token: 'fresh-' + nextAccess,
                     token_type: 'Bearer',
                     expires_in: 900,
                 }),
-                { status: 200 },
+                {
+                    status: 200,
+                    headers: {
+                        'authentication-info':
+                            'access_token="fresh-'
+                            + nextAccess + '"',
+                    },
+                },
             );
         }
         const token = new Headers(init?.headers)
@@ -187,11 +193,17 @@ async () => {
             if (body.grant_type === 'refresh') {
                 return new Response(
                     JSON.stringify({
-                        access_token: flat,
                         token_type: 'Bearer',
                         expires_in: 900,
                     }),
-                    { status: 200 },
+                    {
+                        status: 200,
+                        headers: {
+                            'authentication-info':
+                                'access_token="'
+                                + flat + '"',
+                        },
+                    },
                 );
             }
             if (body.grant_type
@@ -202,13 +214,24 @@ async () => {
                     }
                 ).organization;
                 assertStrictEquals(asked, org);
+                const bearer = new Headers(init?.headers)
+                    .get('Authorization');
+                assertStrictEquals(
+                    bearer, 'Bearer ' + flat,
+                );
                 return new Response(
                     JSON.stringify({
-                        access_token: rescoped,
                         token_type: 'Bearer',
                         expires_in: 900,
                     }),
-                    { status: 200 },
+                    {
+                        status: 200,
+                        headers: {
+                            'authentication-info':
+                                'access_token="'
+                                + rescoped + '"',
+                        },
+                    },
                 );
             }
             return new Response(

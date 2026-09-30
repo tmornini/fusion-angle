@@ -604,7 +604,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
             state: 'active',
         },
     ));
-    assertStrictEquals(reposition.status, 201);
+    assertStrictEquals(reposition.status, 200);
     const repositionResponseId =
         pairIdOf(reposition);
     assert(repositionResponseId);
@@ -672,7 +672,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
             state: 'archived',
         },
     ));
-    assertStrictEquals(archived.status, 201);
+    assertStrictEquals(archived.status, 200);
     {
         const listRes = await handleRequest(
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
@@ -698,7 +698,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
             state: 'active',
         },
     ));
-    assertStrictEquals(reactivated.status, 201);
+    assertStrictEquals(reactivated.status, 200);
     const reactivatedResponseId =
         pairIdOf(reactivated);
     assert(reactivatedResponseId);
@@ -1026,7 +1026,7 @@ async () => {
             + objectiveId, token,
         positionBody, operationId,
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const afterFirst = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterFirst, beforeReposition + 1);
 
@@ -1088,7 +1088,7 @@ async () => {
             state: 'archived',
         },
     ));
-    assertStrictEquals(archived.status, 201);
+    assertStrictEquals(archived.status, 200);
 
     const listRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'

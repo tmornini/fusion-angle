@@ -82,16 +82,6 @@ export class HistoryEntityStore<
         );
     }
 
-    async getAllWhereBody(
-        path: string,
-        containment: Record<string, unknown>,
-    ): Promise<T[]> {
-        return this.#run(
-            'readonly',
-            tx => tx.getWhereBody<T>(path, containment),
-        );
-    }
-
     async getById(id: string): Promise<T> {
         return this.#run(
             'readonly',

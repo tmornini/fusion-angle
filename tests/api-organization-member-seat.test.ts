@@ -27,6 +27,8 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    framedRequest,
+    presentedFields,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -146,7 +148,6 @@ Deno.test('mint bakes claim roles from a seat, not a'
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseStatus: 200,
         responseBody: {
             id: 'XXZruirZyAOoRpNxaDnpSA',
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -154,32 +155,31 @@ Deno.test('mint bakes claim roles from a seat, not a'
             ...body,
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postMembershipDocumentOp(
         db, 'XXZruirZyAOoRpNxaDnpSA', body, SYSTEM_MEMBER_ID,
         messagePair,
     );
 
-    const tokenRequest = new Request(
+    const bearer = await devToken('XXZruirZyAOoRpNxaDnpSA');
+    const tokenRequest = framedRequest(
         'http://localhost/authentication/token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                authorization: 'Bearer ' + bearer,
             },
             body: JSON.stringify({
                 grant_type: 'token-exchange',
-                subject_token: await devToken(
-                    'XXZruirZyAOoRpNxaDnpSA'),
-                actor_token: await devToken(
-                    'XXZruirZyAOoRpNxaDnpSA'),
                 organization: 'AjdvjuECVZEgZoFajaIEkg',
             }),
         },
     );
     const minted = await handleRequest(
         db, tokenRequest);
-    assertStrictEquals(minted.status, 201);
-    const payload = await minted.json() as {
+    assertStrictEquals(minted.status, 200);
+    const payload = await presentedFields(minted) as {
         access_token: string;
     };
     const claims = decodeAccessToken(
@@ -238,25 +238,23 @@ async function mintedOrganizations(
     db: MemoryDbAdapter,
     identity: string,
 ): Promise<readonly string[] | undefined> {
+    const bearer = await devToken(identity);
     const minted = await handleRequest(
-        db, new Request(
+        db, framedRequest(
             'http://localhost/authentication/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    authorization: 'Bearer ' + bearer,
                 },
                 body: JSON.stringify({
                     grant_type: 'token-exchange',
-                    subject_token: await devToken(
-                        identity),
-                    actor_token: await devToken(
-                        identity),
                 }),
             },
         ),
     );
-    assertStrictEquals(minted.status, 201);
-    const payload = await minted.json() as {
+    assertStrictEquals(minted.status, 200);
+    const payload = await presentedFields(minted) as {
         access_token: string;
     };
     return decodeAccessToken(

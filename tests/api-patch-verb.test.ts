@@ -10,12 +10,13 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    framedRequest,
 } from './http-fixtures.ts';
 import { writeAuthorizerFor } from
     '../api/write-authorizer.ts';
 import {
     IF_MATCH_HEADER,
-    hoistedHeaderFields,
+    requestHeaderFields,
 } from '../api/message-pair.ts';
 
 // Task 10: PATCH joins the platform verb alphabet. No route
@@ -118,10 +119,10 @@ Deno.test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
 Deno.test('IF_MATCH_HEADER is if-match and is hoisted',
 () => {
     assertStrictEquals(IF_MATCH_HEADER, 'if-match');
-    const request = new Request('http://x/', {
+    const request = framedRequest('http://x/', {
         headers: { 'if-match': '"pair-head-1"' },
     });
-    const fields = hoistedHeaderFields(request);
+    const fields = requestHeaderFields(request);
     assert(
         fields.some(
             f => f.name === 'if-match'

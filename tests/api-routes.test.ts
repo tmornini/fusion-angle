@@ -10,6 +10,7 @@ import type { OrganizationEntity } from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from './operation-id-header.ts';
 
 // Pin the collection routes that handleRequest
 // must serve. A new top-level resource is added
@@ -59,7 +60,7 @@ for (const route of COLLECTION_ROUTES) {
             await seedAdminSchema(db);
             const rows =
                 await GET<unknown[]>(
-                    db, route, await devToken());
+                    db, route, await devToken(), operationIdHeader());
             assert(
                 Array.isArray(rows),
                 route + ' should return an array',
@@ -81,6 +82,6 @@ async () => {
         'identities/' + singleOrganizationIdentityId
             + '/organizations/',
         await devToken(singleOrganizationIdentityId),
-    );
+        operationIdHeader());
     assertStrictEquals(rows.length, 1);
 });

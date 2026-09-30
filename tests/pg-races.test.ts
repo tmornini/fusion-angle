@@ -297,7 +297,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    Deno.test('If-Match race: one 201, one 412', async () => {
+    Deno.test('If-Match race: one 200, one 412', async () => {
         const token = await organizationToken();
         const id = generateIdentifier();
         const created = await handleRequest(db, req(
@@ -366,7 +366,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             const [left, right] = await raced;
             const statuses = [left.status, right.status];
             assertStrictEquals(
-                statuses.filter((s) => s === 201).length,
+                statuses.filter((s) => s === 200).length,
                 1,
             );
             assertStrictEquals(

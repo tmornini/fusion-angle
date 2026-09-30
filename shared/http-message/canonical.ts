@@ -10,16 +10,35 @@ export function compareAscii(a: string, b: string): number {
     return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// Canonical field order: ascending by name, STABLE within a
-// name so same-name lines keep their relative order (RFC 9110
-// §5.3 — the order of same-name fields is significant).
-// Array.prototype.sort is stable in ES2024 and the comparator
-// returns 0 for equal names, so the stability is what preserves
-// the order. Do not replace with an unstable sort.
+// Join same-name lines other than set-cookie with ", " in
+// the order received, then sort by name, bytewise. The sort
+// is stable, so each set-cookie line keeps its receipt order
+// (RFC 9110 §5.3). A second call is a no-op: names are
+// already joined and the order already ascends. Do not
+// replace the sort with an unstable one.
 export function sortFields(
     fields: readonly FieldLine[],
 ): FieldLine[] {
-    return [...fields].sort(
+    const joined: FieldLine[] = [];
+    const indexOf = new Map<string, number>();
+    for (const field of fields) {
+        if (field.name === 'set-cookie') {
+            joined.push(field);
+            continue;
+        }
+        const index = indexOf.get(field.name);
+        if (index === undefined) {
+            indexOf.set(field.name, joined.length);
+            joined.push(field);
+            continue;
+        }
+        const prior = joined[index]!;
+        joined[index] = {
+            name: prior.name,
+            value: prior.value + ', ' + field.value,
+        };
+    }
+    return joined.sort(
         (x, y) => compareAscii(x.name, y.name),
     );
 }

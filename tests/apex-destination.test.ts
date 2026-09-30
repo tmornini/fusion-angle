@@ -1,12 +1,23 @@
-import { assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     APEX_SIGNED_IN,
     APEX_SIGNED_OUT,
     resolveApexLocation,
     probeRefreshSession,
 } from '../web-app/app/apex-destination.ts';
+import { createHttpFacade } from
+    '../web-app/app/adapters/http-facade.ts';
+import { putClientFacade } from
+    '../web-app/app/adapters/facade-holder.ts';
 import { deleteRefreshChannel } from
     '../web-app/app/adapters/session-refresh-mutex.ts';
+
+function installProbeFacade(): void {
+    putClientFacade(createHttpFacade(''));
+}
 
 const originalFetch = globalThis.fetch;
 
@@ -53,6 +64,7 @@ Deno.test('a probe fault hops to landing', async () => {
 
 Deno.test('probeRefreshSession posts a cookie refresh grant',
 async () => {
+    installProbeFacade();
     let posts = 0;
     globalThis.fetch = async (input, init) => {
         posts += 1;
@@ -62,13 +74,28 @@ async () => {
         );
         assertStrictEquals(init?.method, 'POST');
         assertStrictEquals(init?.credentials, 'same-origin');
+        const headers = new Headers(init?.headers);
+        const operationId = headers.get('operation-id');
+        assert(operationId !== null);
+        assertStrictEquals(
+            headers.get('request-id'), null,
+        );
         const body = JSON.parse(String(init?.body)) as {
             grant_type?: unknown;
         };
         assertStrictEquals(body.grant_type, 'refresh');
         return new Response(
-            JSON.stringify({ access_token: 'fresh-access' }),
-            { status: 200 },
+            JSON.stringify({
+                token_type: 'Bearer',
+                expires_in: 900,
+            }),
+            {
+                status: 200,
+                headers: {
+                    'authentication-info':
+                        'access_token="fresh-access"',
+                },
+            },
         );
     };
     assertStrictEquals(await probeRefreshSession(), true);
@@ -77,6 +104,7 @@ async () => {
 
 Deno.test('probeRefreshSession treats 401 as unsigned',
 async () => {
+    installProbeFacade();
     globalThis.fetch = async () => new Response(
         JSON.stringify({ error: 'invalid_grant' }),
         { status: 401 },
@@ -85,6 +113,7 @@ async () => {
 });
 
 Deno.test('ok without access_token is unsigned', async () => {
+    installProbeFacade();
     globalThis.fetch = async () => new Response(
         JSON.stringify({ token_type: 'Bearer' }),
         { status: 200 },
@@ -94,12 +123,22 @@ Deno.test('ok without access_token is unsigned', async () => {
 
 Deno.test('concurrent probes share one refresh POST',
 async () => {
+    installProbeFacade();
     let posts = 0;
     globalThis.fetch = async () => {
         posts += 1;
         return new Response(
-            JSON.stringify({ access_token: 'fresh-access' }),
-            { status: 200 },
+            JSON.stringify({
+                token_type: 'Bearer',
+                expires_in: 900,
+            }),
+            {
+                status: 200,
+                headers: {
+                    'authentication-info':
+                        'access_token="fresh-access"',
+                },
+            },
         );
     };
     const [a, b] = await Promise.all([

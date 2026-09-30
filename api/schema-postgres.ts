@@ -44,37 +44,6 @@ export const POSTGRES_SCHEMA_MARKER_TABLE =
     "only" boolean PRIMARY KEY CHECK ("only")
 );`;
 
-// Non-JSON is not a containment fact. The cast must
-// not abort the insert: the GIN index evaluates this
-// on every row, and the root body is a hex digest.
-export const POSTGRES_MESSAGE_BODY_FUNCTION =
-    String.raw`CREATE OR REPLACE FUNCTION fa_message_body(message bytea)
-RETURNS jsonb
-IMMUTABLE STRICT PARALLEL SAFE LANGUAGE sql
-RETURN (
-    SELECT CASE
-        WHEN body = ''::bytea THEN NULL
-        WHEN NOT pg_input_is_valid(
-            convert_from(body, 'UTF8'), 'jsonb'
-        )
-            THEN NULL
-        ELSE convert_from(body, 'UTF8')::jsonb
-    END
-    FROM (
-        SELECT CASE
-            WHEN split_at = 0 THEN ''::bytea
-            ELSE substring(
-                message FROM split_at + 4
-            )
-        END AS body
-        FROM (
-            SELECT position(
-                E'\r\n\r\n'::bytea IN message
-            ) AS split_at
-        ) AS located
-    ) AS extracted
-);`;
-
 // Weekday and month are fixed English. to_char
 // Dy and Mon follow lc_time, so those fields are
 // array lookups. The stamp is read in UTC.
@@ -249,15 +218,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS fa_message_pairs_succession
     ON fa_message_pairs (path, name, supersedes)
     WHERE method IN ('PUT', 'DELETE');
 CREATE INDEX IF NOT EXISTS fa_message_pairs_request_id
-    ON fa_message_pairs (fa_request_id_of(response));
-CREATE INDEX IF NOT EXISTS fa_message_pairs_body
-    ON fa_message_pairs
-    USING gin (fa_message_body(response) jsonb_path_ops);`;
+    ON fa_message_pairs (fa_request_id_of(response));`;
 
 export const POSTGRES_SCHEMA_STATEMENTS = [
     POSTGRES_MESSAGE_PAIRS_TABLE,
     POSTGRES_SCHEMA_MARKER_TABLE,
-    POSTGRES_MESSAGE_BODY_FUNCTION,
     POSTGRES_FA_IMF_FIXDATE_FUNCTION,
     POSTGRES_FA_PAIR_ROOT_FUNCTION,
     POSTGRES_FA_MESSAGE_BODY_BYTES_FUNCTION,
@@ -269,8 +234,6 @@ export const POSTGRES_SCHEMA =
     POSTGRES_MESSAGE_PAIRS_TABLE
     + '\n\n'
     + POSTGRES_SCHEMA_MARKER_TABLE
-    + '\n\n'
-    + POSTGRES_MESSAGE_BODY_FUNCTION
     + '\n\n'
     + POSTGRES_FA_IMF_FIXDATE_FUNCTION
     + '\n\n'

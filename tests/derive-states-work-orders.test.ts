@@ -277,7 +277,7 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
             expireAt: expire2At,
         },
     ));
-    assertStrictEquals(claim2.status, 201);
+    assertStrictEquals(claim2.status, 200);
 
     const derived = await workOrderLifecycleStatesFor(
         db, ORGANIZATION_A, workOrderId,
@@ -483,7 +483,7 @@ Deno.test('the MOVING lock_timeout case: an entity PUT changing'
             position: 2,
         },
     ));
-    assertStrictEquals(put2.status, 201);
+    assertStrictEquals(put2.status, 200);
 
     setClockForTest(() =>
         Date.now()
@@ -503,7 +503,7 @@ Deno.test('the MOVING lock_timeout case: an entity PUT changing'
             expireAt: expire2At,
         },
     ));
-    assertStrictEquals(claim2.status, 201);
+    assertStrictEquals(claim2.status, 200);
 
     const derived = await workOrderLifecycleStatesFor(
         db, ORGANIZATION_A, workOrderId,

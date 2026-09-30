@@ -6,6 +6,7 @@ import { reachableToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
+import { framedRequest } from './http-fixtures.ts';
 
 // Phase 12 Task 1: the pre-dispatch fence reads (handleRequest's
 // two ownership-fence regions, api/api.ts) redact a thrown fault
@@ -54,7 +55,7 @@ Deno.test(
                 'error',
                 () => handleRequest(
                     db,
-                    new Request('http://localhost/organizations/'
+                    framedRequest('http://localhost/organizations/'
                         + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
                         headers: {
                             'Authorization':
@@ -98,7 +99,7 @@ Deno.test(
         await assertRejects(
             () => handleRequest(
                 db,
-                new Request('http://localhost/organizations/'
+                framedRequest('http://localhost/organizations/'
                     + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
                     headers: {
                         'Authorization':

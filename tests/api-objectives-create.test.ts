@@ -7,6 +7,9 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -44,7 +47,8 @@ Deno.test(
             revisionId: 'sVWUntTCtQYFCpONjkzAKg',
             revision: revisionFields(id, 'Revenue'),
             initialState: 'active',
-        }, DEV_TOKEN);
+        }, DEV_TOKEN,
+            operationIdHeader());
         // Phase Final Task 2: row halves stripped — GET is
         // pair-derived.
         const objective = await GET<{
@@ -53,7 +57,7 @@ Deno.test(
             organization_id: string;
             state?: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            , DEV_TOKEN);
+            , DEV_TOKEN, operationIdHeader());
         assertStrictEquals(objective.position, 1);
         // The fence stamped the bound org — never the body.
         assertStrictEquals(
@@ -69,7 +73,7 @@ Deno.test(
             objective_id: string;
             name: string;
         }>>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            + '/revisions/', DEV_TOKEN);
+            + '/revisions/', DEV_TOKEN, operationIdHeader());
         const revision = revisions.find(
             r => r.id === 'sVWUntTCtQYFCpONjkzAKg');
         assert(revision);
@@ -97,13 +101,14 @@ Deno.test(
                 revisionId: generateIdentifier(),
                 revision: revisionFields(id, ''),
                 initialState: 'active',
-            }, DEV_TOKEN),
+            }, DEV_TOKEN,
+                operationIdHeader()),
         );
         await assertRejects(
             () => GET(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                     + id, DEV_TOKEN,
-            ),
+                    operationIdHeader()),
         );
     },
 );

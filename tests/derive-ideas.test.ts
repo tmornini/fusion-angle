@@ -134,7 +134,7 @@ Deno.test('an edited idea reads the edit body', async () => {
     const res = await putIdea(
         db, token, ideaId, 'After Edit', 'active',
     );
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
     const document = await getDocument(
         db, 'ideas', STARK_ORGANIZATION, ideaId,
     ) as { title: string };
@@ -153,7 +153,7 @@ Deno.test(
         const res = await putIdea(
             db, token, ideaId, 'Doomed', 'deleted',
         );
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
 
         const ideas = await getCollection(
             db, 'ideas', STARK_ORGANIZATION,
@@ -185,7 +185,7 @@ Deno.test(
             db, token, ideaId, 'Tomb Title',
             'deleted',
         );
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
         const ideas = await getCollection(
             db, 'ideas', STARK_ORGANIZATION,
         );

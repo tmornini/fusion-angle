@@ -29,6 +29,9 @@ import {
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 const N_NEXT = generateIdentifier();
 const TE_1 = generateIdentifier();
@@ -88,7 +91,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     // Phase Final Stage B: record_attributes retired.
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
@@ -97,7 +100,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             state: 'active',
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw'
@@ -108,7 +111,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             write_roles: ['member', 'admin'],
         },
         DEV_TOKEN,
-    );
+        operationIdHeader());
     return db;
 }
 
@@ -133,9 +136,9 @@ async function appendLegacyTransition(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: STARK_ORGANIZATION,
-        responseStatus: 204,
         responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await postWorkOrderTransitionOp(
         db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,

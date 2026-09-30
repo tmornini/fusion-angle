@@ -6,10 +6,6 @@ import { MemoryStorageBackend }
 import { HistoryEntityStore } from
     '../api/store-history-entity.ts';
 import { backendRunner } from '../api/db.ts';
-import { serializeWire } from
-    '../shared/http-message/wire-codec.ts';
-import { Octets } from
-    '../shared/http-message/octets.ts';
 
 interface Row {
     id: string;
@@ -94,62 +90,4 @@ async () => {
             , 'AjdvjuECVZEgZoFajaIEkg',
     );
     assertEquals(got.map((row) => row.id), ['a']);
-});
-
-function jsonWire(body: unknown): string {
-    const json = JSON.stringify(body);
-    return serializeWire({
-        startLine: {
-            kind: 'response',
-            version: 'HTTP/1.1',
-            status: 200,
-            reason: 'OK',
-        },
-        fields: [
-            {
-                name: 'content-type',
-                value: 'application/json',
-            },
-        ],
-        body: Octets.fromLatin1(json),
-        trailer: undefined,
-    });
-}
-
-Deno.test('getWhereBody is collection + JSON containment',
-async () => {
-    const backend = new MemoryStorageBackend();
-    await backend.ensureTable();
-    await backend.transaction('readwrite',
-        async (tx) => {
-            await tx.append({
-                id: 'hit',
-                path: '/authentication/authorize/',
-                name: '',
-                response_at: '2026-01-01T00:00:00.000001Z',
-                response: jsonWire({ code: 'abc' }),
-            });
-            await tx.append({
-                id: 'miss',
-                path: '/authentication/authorize/',
-                name: '',
-                response_at: '2026-01-01T00:00:00.000002Z',
-                response: jsonWire({ code: 'zzz' }),
-            });
-            await tx.append({
-                id: 'other',
-                path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                    + '',
-                name: 'AjdvjuECVZEgZoFajaIEkg',
-                response_at: '2026-01-01T00:00:00.000001Z',
-                response: jsonWire({ code: 'abc' }),
-            });
-        },
-    );
-    const got = await backend.transaction('readonly',
-        (tx) => tx.getWhereBody('/authentication/authorize/',
-            { code: 'abc' },
-        ),
-    );
-    assertEquals(got.map((row) => row.id), ['hit']);
 });

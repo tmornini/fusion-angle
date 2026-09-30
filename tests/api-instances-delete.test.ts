@@ -457,7 +457,6 @@ async () => {
         requesterIdentityId: 'nkgaOHZISTQrILTfPThWCA',
         requestAt: nowUtc(),
         organization: ORGANIZATION,
-        responseStatus: 200,
         responseBody: {
             id: INSTANCE_ID,
             organization_id: ORGANIZATION,
@@ -466,6 +465,7 @@ async () => {
             clear: [],
         },
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     // Concurrent DELETE tombstones the document.
     const del = await handleRequest(db, req(

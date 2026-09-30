@@ -283,12 +283,12 @@ Deno.test(
             requesterIdentityId: SYSTEM_MEMBER_ID,
             requestAt: nowUtc(),
             organization: undefined,
-            responseStatus: spec.status,
             responseBody: spec.successBody?.(
                 [memberId], identityBody,
                 SYSTEM_MEMBER_ID, undefined,
             ),
             operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
         });
         await postIdentityDocumentOp(
             db, memberId, identityBody,

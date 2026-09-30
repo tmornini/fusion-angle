@@ -39,6 +39,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { operationIdHeader } from
+    './operation-id-header.ts';
+
 
 // Phase 10 Task 4 (twelfth registered family): PUT
 // /identities/:id takes `kind` plus, for a person, the
@@ -155,8 +158,9 @@ async () => {
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
-        responseStatus: 200, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     const written = await postIdentityDocumentOp(
         db, 'gTMDzYjclgPKfPUYsUdtoQ', body,
@@ -178,10 +182,10 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
     const id = generateIdentifier();
     const first = await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     const second = await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -213,9 +217,9 @@ async function putDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
-        responseStatus: 200,
         responseBody: body,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -240,8 +244,9 @@ async function deleteDocumentMessagePair(
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt,
         organization: undefined,
-        responseStatus: 204, responseBody: undefined,
+        responseBody: undefined,
         operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
     });
     await runWrite(
         db,
@@ -321,7 +326,7 @@ Deno.test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
     const id = generateIdentifier();
     const written = await PUT<Record<string, unknown>>(
         db, 'identities/' + id, body, DEV_TOKEN,
-    );
+        operationIdHeader());
     assertEquals(
         Object.keys(written).sort(),
         ['id', 'kind'],
@@ -437,7 +442,7 @@ async () => {
         department: string;
         strengths: string[];
         team_dimensions: Record<string, number>;
-    }>(db, 'identities/' + id, DEV_TOKEN);
+    }>(db, 'identities/' + id, DEV_TOKEN, operationIdHeader());
     assertStrictEquals(got.id, id);
     assertStrictEquals(got.kind, 'person');
     assertStrictEquals(got.title, profile.title);
@@ -484,12 +489,12 @@ async () => {
     );
     const pii = await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA/pii', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(pii['name'], 'Ada');
     assertStrictEquals('title' in pii, false);
     const identity = await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
-    );
+        operationIdHeader());
     assertStrictEquals(identity['title'], 'CEO');
     assertStrictEquals('name' in identity, false);
 });

@@ -1,10 +1,13 @@
 import type { GuardedDbAdapter } from './db.ts';
 import { nowUtc, type Id } from './types.ts';
 import type { Principal } from './access-token.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 import {
-    generateIdentifier,
-    isIdentifier,
-} from '../shared/identifier.ts';
+    errorJson,
+    HTTP_BAD_REQUEST,
+    HTTP_LENGTH_REQUIRED,
+} from './http-errors.ts';
 
 // The server half of the request vessel (Office of the
 // Context): one context enters at the gate and rides the
@@ -18,11 +21,12 @@ import {
 // the chosen boundary where the vessel hands the base
 // adapter to the handler.
 
-// The request id travels the whole hop chain: the facade
-// rewrite re-enters handleRequest with this header so the
-// inner hop keeps the outer request's id — one user request,
-// one trace.
+// The server mints request-id. A carried header is refused
+// at the gate; this step does not read one.
 export const REQUEST_ID_HEADER = 'request-id';
+
+const BODY_NEEDS_LENGTH =
+    'A request body requires Content-Length';
 
 export interface IncomingContext {
     readonly requestId: string;
@@ -38,11 +42,19 @@ export interface IncomingContext {
     // row keeps it verbatim (api/message-pair.ts). nowUtc() is
     // synchronous, so minting it here costs nothing async.
     readonly requestAt: string;
+    // Read once, here. Later steps decode these bytes.
+    readonly bodyBytes: Uint8Array;
+}
+
+// operation-id, validated once at the gate. No later step
+// writes it.
+export interface FramedContext extends IncomingContext {
+    readonly operationId: string;
 }
 
 // Enriched by the authentication step (request-auth.ts) —
 // the one place the principal is resolved.
-export interface AuthenticatedContext extends IncomingContext {
+export interface AuthenticatedContext extends FramedContext {
     readonly principal: Principal;
 }
 
@@ -59,19 +71,63 @@ export interface RequestContext extends AuthenticatedContext {
     readonly roles: readonly string[];
 }
 
-export function incomingContext(
+export async function incomingContext(
     base: GuardedDbAdapter,
     request: Request,
-): IncomingContext {
-    const raw = request.headers.get(REQUEST_ID_HEADER);
+): Promise<IncomingContext> {
+    const bodyBytes = new Uint8Array(
+        await request.arrayBuffer(),
+    );
     return {
-        requestId:
-            raw !== null && isIdentifier(raw)
-                ? raw
-                : generateIdentifier(),
+        requestId: generateIdentifier(),
         method: request.method,
         pathname: new URL(request.url).pathname,
         base,
         requestAt: nowUtc(),
+        bodyBytes,
     };
+}
+
+function lengthMatches(
+    value: string,
+    byteLength: number,
+): boolean {
+    if (!/^\d+$/.test(value)) return false;
+    if (value.length > 16) return false;
+    return Number(value) === byteLength;
+}
+
+// First failure wins. A 411 does not inspect operation-id.
+export function framingRefusal(
+    headers: Headers,
+    bodyBytes: Uint8Array,
+): Response | undefined {
+    if (headers.get('transfer-encoding') !== null) {
+        return errorJson(
+            BODY_NEEDS_LENGTH,
+            HTTP_LENGTH_REQUIRED,
+        );
+    }
+    const contentLength = headers.get('content-length');
+    if (
+        bodyBytes.byteLength > 0
+        && contentLength === null
+    ) {
+        return errorJson(
+            BODY_NEEDS_LENGTH,
+            HTTP_LENGTH_REQUIRED,
+        );
+    }
+    if (
+        contentLength !== null
+        && !lengthMatches(
+            contentLength, bodyBytes.byteLength,
+        )
+    ) {
+        return errorJson(
+            'Content-Length does not match the body',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    return undefined;
 }

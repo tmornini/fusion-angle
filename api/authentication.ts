@@ -66,11 +66,10 @@ import {
 } from '../shared/ledger-reduction.ts';
 import {
     attemptFor,
+    documentHeadAt,
     runWrite,
     ownWireOf,
-    canonicalPath,
     formAuthMessagePair,
-    formAuthorizationCodeMarkerPair,
     formTokenEventMessagePair,
     formWriteMessagePair,
 } from './message-pair.ts';
@@ -94,7 +93,6 @@ import {
     deriveIdentityTokenEventsForJti,
 } from './derive-identity-tokens.ts';
 import {
-    HTTP_OK,
     HTTP_BAD_REQUEST,
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
@@ -210,6 +208,138 @@ export function refreshTokenFromCookieHeader(
         return trimmed.slice(eq + 1).trim();
     }
     return '';
+}
+
+export function basicAuthorization(
+    userId: string,
+    password: string,
+): string {
+    if (userId.includes(':')) {
+        throw new Error('user-id contains a colon');
+    }
+    const bytes = new TextEncoder().encode(
+        userId + ':' + password,
+    );
+    let binary = '';
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return 'Basic ' + btoa(binary);
+}
+
+export function parseBasic(
+    header: string | null,
+): {
+    readonly userId: string;
+    readonly password: string;
+} | null {
+    if (header === null || header === '') return null;
+    const space = header.indexOf(' ');
+    if (space <= 0) return null;
+    if (header.slice(0, space).toLowerCase() !== 'basic') {
+        return null;
+    }
+    const token = header.slice(space + 1).trim();
+    if (token === '') return null;
+    let binary: string;
+    try {
+        binary = atob(token);
+    } catch {
+        return null;
+    }
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    const colon = bytes.indexOf(0x3a);
+    if (colon < 0) return null;
+    const decoder = new TextDecoder();
+    return {
+        userId: decoder.decode(bytes.subarray(0, colon)),
+        password: decoder.decode(
+            bytes.subarray(colon + 1),
+        ),
+    };
+}
+
+function bearerCredential(header: string | null): string {
+    if (header === null) return '';
+    const space = header.indexOf(' ');
+    if (space <= 0) return '';
+    if (header.slice(0, space).toLowerCase() !== 'bearer') {
+        return '';
+    }
+    return header.slice(space + 1).trim();
+}
+
+const AUTHORIZATION_BODY_FIELDS = [
+    'username',
+    'password',
+    'code',
+    'code_verifier',
+    'subject_token',
+    'actor_token',
+    'client_assertion',
+] as const;
+
+function credentialRides(
+    body: Record<string, unknown>,
+): string | null {
+    for (const name of AUTHORIZATION_BODY_FIELDS) {
+        if (name in body) {
+            return name + ' rides the Authorization line';
+        }
+    }
+    if ('refresh_token' in body) {
+        return 'refresh_token rides the Cookie line';
+    }
+    return null;
+}
+
+function quotedAuthParam(
+    name: string,
+    value: string,
+): string {
+    if (value.includes('"') || value.includes('\\')) {
+        throw new Error(
+            name + ' contains a quote or backslash',
+        );
+    }
+    return name + '="' + value + '"';
+}
+
+function publicTokenBody(
+    response: TokenResponse,
+): {
+    readonly token_type: 'Bearer';
+    readonly expires_in: number;
+} {
+    return {
+        token_type: response.token_type,
+        expires_in: response.expires_in,
+    };
+}
+
+function tokenAnswerFields(
+    accessToken: string,
+    refreshCookie: string | undefined,
+): { readonly name: string; readonly value: string }[] {
+    const fields: {
+        readonly name: string;
+        readonly value: string;
+    }[] = [{
+        name: 'authentication-info',
+        value: quotedAuthParam(
+            'access_token', accessToken,
+        ),
+    }];
+    if (refreshCookie !== undefined) {
+        fields.push({
+            name: 'set-cookie',
+            value: refreshCookie,
+        });
+    }
+    return fields;
 }
 
 export function attachSetCookie(
@@ -443,7 +573,12 @@ async function issueTokenPair(
     const messagePair = seed === undefined
         ? undefined
         : await formAuthMessagePair(
-            seed, body, identityId, HTTP_OK, response,
+            seed, body, identityId,
+            publicTokenBody(response),
+            seed.operationId, seed.requestId,
+            tokenAnswerFields(
+                response.access_token, undefined,
+            ),
         );
     // Copy the envelope id: hoisted header when the client
     // sent one, else formAuthMessagePair's named mint. Seedless
@@ -451,11 +586,13 @@ async function issueTokenPair(
     // event pair alone.
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const requestId = messagePair?.requestId
+        ?? generateIdentifier();
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
             jti: refreshJti, identity_id: identityId,
             action: 'issued', chain_id: chainId, at,
-        }, operationId,
+        }, operationId, requestId,
     );
     const pairs = [eventMessagePair];
     if (messagePair !== undefined) {
@@ -556,13 +693,14 @@ interface TokenEventWrite {
 async function formTokenEventWrites(
     appends: readonly Omit<IdentityTokenEntity, 'id'>[],
     operationId: string,
+    requestId: string,
 ): Promise<TokenEventWrite[]> {
     const writes: TokenEventWrite[] = [];
     for (const event of appends) {
         writes.push({
             event,
             messagePair: await formTokenEventMessagePair(
-                event.jti, event, operationId,
+                event.jti, event, operationId, requestId,
             ),
         });
     }
@@ -623,6 +761,7 @@ async function planRotationAttempt(
     presentedJti: string,
     newJti: string,
     operationId: string,
+    requestId: string,
 ): Promise<{
     readonly plan: RotationPlan;
     readonly writes: readonly TokenEventWrite[];
@@ -645,7 +784,7 @@ async function planRotationAttempt(
     return {
         plan,
         writes: await formTokenEventWrites(
-            appends, operationId,
+            appends, operationId, requestId,
         ),
     };
 }
@@ -691,6 +830,8 @@ export async function rotateRefreshJti(
 ): Promise<RotationOutcome> {
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const requestId = messagePair?.requestId
+        ?? generateIdentifier();
     const backed = backedWrite(adapter);
     for (
         let attempt = 0;
@@ -699,7 +840,7 @@ export async function rotateRefreshJti(
     ) {
         const provisional = await planRotationAttempt(
             adapter, identityId, presentedJti, newJti,
-            operationId,
+            operationId, requestId,
         );
         try {
             await backed.backend.transaction(
@@ -802,6 +943,7 @@ async function planRevocationAttempt(
     identityId: Id,
     jti: string,
     operationId: string,
+    requestId: string,
 ): Promise<{
     readonly writes: readonly TokenEventWrite[];
 }> {
@@ -813,7 +955,7 @@ async function planRevocationAttempt(
         : revocationAppends(rows, chainId, identityId, nowUtc());
     return {
         writes: await formTokenEventWrites(
-            appends, operationId,
+            appends, operationId, requestId,
         ),
     };
 }
@@ -847,13 +989,15 @@ export async function revokeTokenChain(
 ): Promise<void> {
     const operationId = messagePair?.operationId
         ?? generateIdentifier();
+    const requestId = messagePair?.requestId
+        ?? generateIdentifier();
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
         attempt++
     ) {
         const provisional = await planRevocationAttempt(
-            adapter, identityId, jti, operationId,
+            adapter, identityId, jti, operationId, requestId,
         );
         try {
             await adapter.readTransaction(async (view) => {
@@ -911,15 +1055,11 @@ async function grantRefresh(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
-    cookieHeader?: string | null,
+    request: Request,
 ): Promise<TokenResult> {
-    const fromCookie = refreshTokenFromCookieHeader(
-        cookieHeader ?? null,
+    const token = refreshTokenFromCookieHeader(
+        request.headers.get('cookie'),
     );
-    const fromBody = typeof body.refresh_token === 'string'
-        ? body.refresh_token
-        : '';
-    const token = fromCookie !== '' ? fromCookie : fromBody;
     const now = nowEpochSeconds();
     const verified = await verifyAccessToken(token, now);
     if (!verified.valid) {
@@ -966,7 +1106,15 @@ async function grantRefresh(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, verified.claims.sub, HTTP_OK, response,
+        seed, body, verified.claims.sub,
+        publicTokenBody(response),
+        seed.operationId, seed.requestId,
+        tokenAnswerFields(
+            response.access_token,
+            refreshSetCookie(
+                minted.refreshToken, request,
+            ),
+        ),
     );
     const outcome = await rotateRefreshJti(
         adapter, verified.claims.sub, verified.claims.jti,
@@ -998,16 +1146,12 @@ async function grantRefresh(
 async function grantTokenExchange(
     adapter: DbAdapter,
     body: Record<string, unknown>,
-    seed?: AuthMessagePairSeed,
+    seed: AuthMessagePairSeed | undefined,
+    authorization: string | null,
 ): Promise<TokenResult> {
-    const subjectToken =
-        typeof body.subject_token === 'string'
-            ? body.subject_token
-            : '';
-    const actorToken =
-        typeof body.actor_token === 'string'
-            ? body.actor_token
-            : '';
+    const presented = bearerCredential(authorization);
+    const subjectToken = presented;
+    const actorToken = presented;
     const now = nowEpochSeconds();
     const sameToken = subjectToken === actorToken;
     const subjectV = await verifyAccessToken(
@@ -1098,11 +1242,12 @@ export async function exchangeBearerForOrganization(
     bearer: string,
     organization: Id,
 ): Promise<TokenResult> {
-    return grantTokenExchange(adapter, {
-        subject_token: bearer,
-        actor_token: bearer,
-        organization: organization,
-    });
+    return grantTokenExchange(
+        adapter,
+        { organization },
+        undefined,
+        'Bearer ' + bearer,
+    );
 }
 
 // client_credentials via private_key_jwt: a headless client
@@ -1117,14 +1262,14 @@ async function grantClientCredentials(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<TokenResult> {
     const clientId = typeof body.client_id === 'string'
         ? body.client_id
         : '';
-    const assertion =
-        typeof body.client_assertion === 'string'
-            ? body.client_assertion
-            : '';
+    const assertion = bearerCredential(
+        request.headers.get('authorization'),
+    );
     // FLIPPED (clients elimination): the registration facet
     // derive replaces the raw clients row read. An absent OR
     // tombstoned facet ≡ the old null row -> the same 401
@@ -1177,13 +1322,20 @@ async function grantClientCredentials(
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, clientId, HTTP_OK, response,
+        seed, body, clientId, publicTokenBody(response),
+        seed.operationId, seed.requestId,
+        tokenAnswerFields(
+            response.access_token,
+            refreshSetCookie(
+                minted.refreshToken, request,
+            ),
+        ),
     );
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
             jti: refreshJti, identity_id: clientId,
             action: 'issued', chain_id: chainId, at,
-        }, messagePair.operationId,
+        }, messagePair.operationId, messagePair.requestId,
     );
     const ticketBody = { exp: verdict.exp };
     const ticketMessagePair = await formWriteMessagePair({
@@ -1204,9 +1356,9 @@ async function grantClientCredentials(
         requesterIdentityId: clientId,
         requestAt: at,
         organization: undefined,
-        responseStatus: HTTP_OK,
         responseBody: ticketBody,
         operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
     });
     const existing = await adapter.readTransaction(
         async (view) => messageStore(view).getDocumentHead(
@@ -1234,41 +1386,24 @@ async function grantClientCredentials(
         : replay;
 }
 
-// GATE 3: the presented code's sha256 digest, pre-tx always —
-// formed pre-tx — crypto, hashing, and timers never run inside
-// an open transaction (AGENTS.md § Transaction bodies await
-// only row ops). It names the spend marker document at
-// /identities/<id>/authorization-codes/:hash, not the issued
-// token event (named by its jti). authorizeCodeIssuer matches
-// the LIVE code against the authorize response family's stored
-// `code` field (pairs are stored verbatim).
+// sha256(code), the name of the code document at
+// /authentication/authorization-codes/.
 export async function deriveAuthorizationCodeId(
     code: string,
 ): Promise<string> {
     return sha256Hex(code);
 }
 
-const AUTHORIZE_PREFIX =
-    canonicalPath(undefined, '/authentication/authorize/');
+const AUTHORIZATION_CODES_PATH =
+    '/authentication/authorization-codes/';
+const AUTHORIZATION_CODE_ROUTE =
+    'authentication/authorization-codes/:hash';
+const AUTHORIZATION_CODE_SEGMENTS: readonly string[] = [
+    'authentication',
+    'authorization-codes',
+    ':hash',
+];
 
-function authorizationCodesPrefixFor(
-    identityId: Id,
-): string {
-    return canonicalPath(
-        undefined,
-        '/identities/' + identityId
-            + '/authorization-codes/',
-    );
-}
-
-// A stored message's JSON body — the ONE local decode this file
-// needs for both the request and response side of the authorize
-// scan below. derive-documents.ts's requestBodyOf and derive-
-// identity-spine.ts's responseBodyOf already do these identical
-// three lines, each private to its own module; a third copy here
-// stays below the exploratory-duplication threshold (Commandment
-// IX) rather than forcing a shared extraction across three
-// unrelated modules for a task that touches only this one.
 function decodedBodyOf(message: string): Record<string, unknown> {
     const model = parseWire(message);
     const body = HttpMessage.fromModel(model).body();
@@ -1277,211 +1412,132 @@ function decodedBodyOf(message: string): Record<string, unknown> {
         : {};
 }
 
-interface AuthorizeCodeIssuer {
-    readonly identityId: Id;
-    readonly clientId: Id;
-    readonly issuedAt: string;
-    // Present only when authorize request carried
-    // code_challenge (PKCE S256). Absent means the client
-    // never sent one — grant skips verifier check so the
-    // password-loop demo keeps working without PKCE.
-    readonly codeChallenge?: string;
-}
-
-// PRE-TX (i), gate 3: the code -> identity/client point-match
-// over the WHOLE '/authentication/authorize/' response family.
-// That path holds operation documents (name always ''), so no
-// per-name head reduction applies here — deriveDocumentsAt's
-// latest-per-name would wrongly collapse every distinct code's
-// pair down to a single latest one. Every stored pair at this
-// prefix is a genuine 2xx: authorizePassword forms a pair ONLY on
-// success (grant-first, pinned), so no status re-check is needed.
-// A miss — no stored pair's response `code` field equals the
-// presented code — returns null; the caller's 401 is
-// byte-identical whether the code was never issued or has already
-// been spent (authorizationCodeSpent decides that, second).
-async function authorizeCodeIssuer(
-    adapter: DbAdapter,
-    code: string,
-): Promise<AuthorizeCodeIssuer | null> {
-    const hits = await adapter.messagePairs
-        .getAllWhereBody(AUTHORIZE_PREFIX, { code });
-    const messagePair = hits[0];
-    if (messagePair === undefined) return null;
-    const requestBody = decodedBodyOf(messagePair.request);
-    // code_challenge is optional on authorize (PKCE only when
-    // the client sent one). Soft read — pickString would throw
-    // on the password-loop path that omits it.
-    const challenge = requestBody.code_challenge;
-    const codeChallenge =
-        typeof challenge === 'string' && challenge !== ''
-            ? challenge
-            : undefined;
-    return {
-        identityId: messagePair.requester_identity_id,
-        clientId: pickString(requestBody, 'client_id'),
-        // Issue instant is the authorize pair's response
-        // stamp. The pair is already fetched for
-        // identity and client.
-        issuedAt: messagePair.response_at,
-        ...(codeChallenge !== undefined
-            ? { codeChallenge }
-            : {}),
-    };
-}
-
-// PRE-TX (ii) fast-fail AND the in-tx re-check share this ONE
-// function — adapter-shaped (the membershipExistsFor /
-// deriveIdentityTokenEventsForJti precedent), `dbOrView` is
-// whichever face is in scope: the plain adapter pre-tx, the
-// open transaction view in-tx. A genuine marker already lives
-// at identities/<identityId>/authorization-codes/<derivedId>
-// exactly when this code has been spent. Marker-first append
-// so a crash after the marker still fails a replay closed.
-export async function authorizationCodeSpent(
-    dbOrView: DbAdapter,
-    derivedId: Id,
-    identityId: Id,
-): Promise<boolean> {
-    const spent = await dbOrView.messagePairs
-        .getDocumentHistory(
-            authorizationCodesPrefixFor(identityId),
-            derivedId,
-        );
-    return spent.length > 0;
-}
-
-// authorization_code grant: consume an ISSUED code, then issue a
-// token pair. A consumed (replay), raced, or unknown code is a
-// clean 401 that mints nothing and appends nothing (grant-first).
-// PRE-tx: authorizeCodeIssuer resolves (identity, client) from the
-// matched authorize pair, then authorizationCodeSpent fast-fails
-// an already-spent code — both before mintPair's HMAC signing or
-// formAuthMessagePair/formTokenEventMessagePair's hashing run. Then ONE
-// tx RE-RUNS the spend check on the OPEN VIEW: a concurrent
-// consumer may have won the race between the pre-tx read and
-// here, in which case this call aborts (401, mints nothing
-// further, appends nothing — the pre-minted response and pairs
-// above are simply discarded, wasted crypto on the losing side of
-// the race) exactly as the retired codeState-driven version did.
+// authorization_code grant: one redemption of the code
+// document. No head, or a DELETE head, is 401 before
+// mint. The spend is a latched DELETE in the same
+// statement as the issued event and this grant.
 async function grantAuthorizationCode(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<TokenResult> {
-    const code = typeof body.code === 'string'
-        ? body.code
-        : '';
+    const basic = parseBasic(
+        request.headers.get('authorization'),
+    );
+    const code = basic === null ? '' : basic.userId;
+    const verifier = basic === null
+        ? ''
+        : basic.password;
     const invalid: TokenResult = failure(
         HTTP_UNAUTHORIZED, 'invalid or used authorization code',
     );
     const derivedId = await deriveAuthorizationCodeId(code);
-    const issuer = await authorizeCodeIssuer(adapter, code);
-    if (issuer === null) return invalid;
+    const head = await documentHeadAt(
+        adapter, AUTHORIZATION_CODES_PATH, derivedId,
+    );
+    if (head === null || head.method === 'DELETE') {
+        return invalid;
+    }
+    const stored = await adapter.messagePairs.getById(
+        head.id,
+    );
     if (
-        msSinceUtc(issuer.issuedAt)
+        msSinceUtc(stored.response_at)
         >= AUTHORIZATION_CODE_TTL_SECONDS * MS_PER_SECOND
     ) {
         return invalid;
     }
+    const storedBody = decodedBodyOf(stored.response);
+    const issuerId = stored.requester_identity_id;
+    const clientId = pickString(storedBody, 'client_id');
+    const challenge = storedBody.code_challenge;
+    const codeChallenge =
+        typeof challenge === 'string' && challenge !== ''
+            ? challenge
+            : undefined;
     // Bind the code to the client that issued it (OAuth 2.1
-    // §4.1.3): redeeming client_id must match authorize's.
-    // Absent or wrong client_id is the same shared 401 as
-    // unknown/spent/expired — grant-first, no mint.
+    // §4.1.3). Absent or wrong client_id is the same 401
+    // as unknown, spent, or expired. No mint.
     const redeemingClientId =
         typeof body.client_id === 'string'
             ? body.client_id
             : '';
-    if (redeemingClientId !== issuer.clientId) {
+    if (redeemingClientId !== clientId) {
         return invalid;
     }
-    // PKCE S256 (RFC 7636): when authorize stored a
-    // code_challenge, require code_verifier and verify
-    // base64url(sha256(verifier)) === challenge. Missing or
-    // mismatch is the same shared 401. No challenge stored
-    // preserves pre-PKCE redeem (password-loop demo).
-    if (issuer.codeChallenge !== undefined) {
-        const verifier =
-            typeof body.code_verifier === 'string'
-                ? body.code_verifier
-                : '';
+    // PKCE S256 (RFC 7636): a stored code_challenge requires
+    // code_verifier. Missing or mismatch is the same 401.
+    // No challenge preserves redeem without PKCE.
+    if (codeChallenge !== undefined) {
         if (verifier === '') return invalid;
         const derived = bytesToBase64Url(
             await sha256Bytes(verifier),
         );
-        if (derived !== issuer.codeChallenge) {
+        if (derived !== codeChallenge) {
             return invalid;
         }
-    }
-    if (await authorizationCodeSpent(
-        adapter, derivedId, issuer.identityId,
-    )) {
-        return invalid;
     }
     const refreshJti = generateIdentifier();
     const chainId = generateIdentifier();
     const at = nowUtc();
-    const name = await nameFor(adapter, issuer.identityId);
-    const claims = await subjectClaims(
-        adapter, issuer.identityId,
-    );
-    // act.sub = the acting client (RFC 8693), mirroring
-    // grantTokenExchange's own act:{sub: actor}. sub stays
-    // the user; issuer.clientId is already verified equal to
-    // the redeeming client_id above.
+    const name = await nameFor(adapter, issuerId);
+    const claims = await subjectClaims(adapter, issuerId);
+    // act.sub = the acting client (RFC 8693). sub stays
+    // the user. clientId is already the redeeming client.
     const minted = await mintPair(
-        issuer.identityId, name, refreshJti,
-        { sub: issuer.clientId }, {
+        issuerId, name, refreshJti,
+        { sub: clientId }, {
             organizations: claims.organizations,
             roles: claims.roles,
         },
     );
     const response = minted.response;
     const messagePair = await formAuthMessagePair(
-        seed, body, issuer.identityId, HTTP_OK, response,
+        seed, body, issuerId,
+        publicTokenBody(response),
+        seed.operationId, seed.requestId,
+        tokenAnswerFields(
+            response.access_token,
+            refreshSetCookie(
+                minted.refreshToken, request,
+            ),
+        ),
     );
-    // Marker and issued event formed pre-tx against
-    // `issuer.identityId` — a code's issuer cannot change
-    // between the pre-tx read and the in-tx write below (its
-    // own authorize pair is immutable once appended).
-    const markerMessagePair =
-        await formAuthorizationCodeMarkerPair(
-            derivedId, refreshJti, issuer.identityId, at,
-            messagePair.operationId,
-        );
+    const codePair = await formWriteMessagePair({
+        method: 'DELETE',
+        pathname: AUTHORIZATION_CODES_PATH + derivedId,
+        routePattern: AUTHORIZATION_CODE_ROUTE,
+        routeSegments: AUTHORIZATION_CODE_SEGMENTS,
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            derivedId,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: issuerId,
+        requestAt: at,
+        organization: undefined,
+        responseBody: undefined,
+        operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
+        emptyRequest: true,
+        latchedHeadMessagePairId: head.id,
+    });
     const eventMessagePair = await formTokenEventMessagePair(
         refreshJti, {
-            jti: refreshJti, identity_id: issuer.identityId,
+            jti: refreshJti, identity_id: issuerId,
             action: 'issued', chain_id: chainId, at,
-        }, messagePair.operationId,
+        }, messagePair.operationId, messagePair.requestId,
     );
-    // The spend check and the marker write share one
-    // client. A later grant then observes the marker and
-    // 401s, instead of both reading unspent and both
-    // minting. openClient still fails a row that does
-    // not land.
-    const backed = backedWrite(adapter);
-    const spent = await backed.backend.transaction(
-        'readwrite',
-        async (tx) => {
-            const view = backed.openClient(tx);
-            if (await authorizationCodeSpent(
-                view, derivedId, issuer.identityId,
-            )) {
-                return true;
-            }
-            const pairs = [
-                markerMessagePair,
-                eventMessagePair,
-                messagePair,
-            ];
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-            return false;
-        },
+    const pairs = [
+        codePair, eventMessagePair, messagePair,
+    ];
+    const written = await runWrite(
+        adapter, attemptFor(pairs), pairs,
     );
-    if (spent) return invalid;
+    if (written.outcome !== 'land') return invalid;
     return {
         ok: true,
         response,
@@ -1499,22 +1555,33 @@ export async function postToken(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
-    cookieHeader?: string | null,
+    request: Request,
 ): Promise<TokenResult> {
+    const ridden = credentialRides(body);
+    if (ridden !== null) {
+        return failure(HTTP_BAD_REQUEST, ridden);
+    }
     const grantType = typeof body.grant_type === 'string'
         ? body.grant_type
         : '';
     switch (grantType) {
         case 'authorization_code':
-            return grantAuthorizationCode(adapter, body, seed);
+            return grantAuthorizationCode(
+                adapter, body, seed, request,
+            );
         case 'refresh':
             return grantRefresh(
-                adapter, body, seed, cookieHeader,
+                adapter, body, seed, request,
             );
         case 'token-exchange':
-            return grantTokenExchange(adapter, body, seed);
+            return grantTokenExchange(
+                adapter, body, seed,
+                request.headers.get('authorization'),
+            );
         case 'client_credentials':
-            return grantClientCredentials(adapter, body, seed);
+            return grantClientCredentials(
+                adapter, body, seed, request,
+            );
         default:
             return failure(
                 HTTP_BAD_REQUEST, 'unsupported grant_type: ' + grantType,
@@ -1604,6 +1671,7 @@ async function authorizePassword(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<AuthorizeResult> {
     const challenge =
         typeof body.code_challenge === 'string'
@@ -1620,12 +1688,11 @@ async function authorizePassword(
             error: 'S256 code_challenge is required',
         };
     }
-    const username = typeof body.username === 'string'
-        ? body.username
-        : '';
-    const password = typeof body.password === 'string'
-        ? body.password
-        : '';
+    const basic = parseBasic(
+        request.headers.get('authorization'),
+    );
+    const username = basic === null ? '' : basic.userId;
+    const password = basic === null ? '' : basic.password;
     const denied: AuthorizeResult = {
         ok: false, status: HTTP_UNAUTHORIZED, error: 'invalid credentials',
     };
@@ -1661,8 +1728,45 @@ async function authorizePassword(
     const code = generateSecret();
     const response: AuthorizeResponse = { code };
     const messagePair = await formAuthMessagePair(
-        seed, body, identityId, HTTP_OK, response,
+        seed, body, identityId, undefined,
+        seed.operationId, seed.requestId,
+        [{
+            name: 'authentication-info',
+            value: quotedAuthParam('code', code),
+        }],
     );
+    const codeName = await deriveAuthorizationCodeId(code);
+    const codeBody: Record<string, unknown> = {
+        client_id: pickString(body, 'client_id'),
+    };
+    const presentedChallenge = body.code_challenge;
+    if (
+        typeof presentedChallenge === 'string'
+        && presentedChallenge !== ''
+    ) {
+        codeBody.code_challenge = presentedChallenge;
+    }
+    const codePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: AUTHORIZATION_CODES_PATH + codeName,
+        routePattern: AUTHORIZATION_CODE_ROUTE,
+        routeSegments: AUTHORIZATION_CODE_SEGMENTS,
+        pathSegments: [
+            'authentication',
+            'authorization-codes',
+            codeName,
+        ],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: identityId,
+        requestAt: seed.requestAt,
+        organization: undefined,
+        responseBody: codeBody,
+        operationId: messagePair.operationId,
+        requestId: messagePair.requestId,
+        genesis: true,
+        emptyRequest: true,
+    });
     let rehashMessagePair: MessagePair | undefined;
     if (secret.startsWith('$pbkdf2-sha256$')) {
         const at = nowUtc();
@@ -1693,7 +1797,6 @@ async function authorizePassword(
             requesterIdentityId: identityId,
             requestAt: at,
             organization: undefined,
-            responseStatus: HTTP_OK,
             responseBody: {
                 id: cid,
                 ...validateIdentityCredentialEntity(
@@ -1701,11 +1804,12 @@ async function authorizePassword(
                 ),
             },
             operationId: messagePair.operationId,
+            requestId: messagePair.requestId,
         });
     }
     const pairs = rehashMessagePair === undefined
-        ? [messagePair]
-        : [rehashMessagePair, messagePair];
+        ? [codePair, messagePair]
+        : [rehashMessagePair, codePair, messagePair];
     await runWrite(
         adapter, attemptFor(pairs), pairs,
     );
@@ -1724,13 +1828,24 @@ export async function postAuthorize(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthMessagePairSeed,
+    request: Request,
 ): Promise<AuthorizeResult> {
+    const ridden = credentialRides(body);
+    if (ridden !== null) {
+        return {
+            ok: false,
+            status: HTTP_BAD_REQUEST,
+            error: ridden,
+        };
+    }
     const method = typeof body.method === 'string'
         ? body.method
         : '';
     switch (method) {
         case 'password':
-            return authorizePassword(adapter, body, seed);
+            return authorizePassword(
+                adapter, body, seed, request,
+            );
         case 'passkey':
         case 'provider':
         case 'oidc':

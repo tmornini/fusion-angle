@@ -97,6 +97,27 @@ makes.
   refused, and an invented `supersedes` raises in the
   trigger.
 
+## seed/ (2026-09-23)
+
+Item 0's seed figures. Run from the repository root.
+`landing.ts` also needs Postgres 18.6 in a container named
+`fa-seed-probe`, database `probe`, tmpfs on
+`/var/lib/postgresql`, the compose shape, on host port
+55433, named by `FA_PROBE_POSTGRES_URL`.
+
+- `shape.ts` — the seed on the memory backend: pairs by
+  method, chain depth, re-creations after a DELETE,
+  operation ids, bytes, and the POST whose body equals the
+  document it shares a name with.
+- `landing.ts` — the seed spec's sequence: rehearse the
+  mock-data seed on a scratch memory backend, record each
+  statement, and land the recordings by depth in one
+  Postgres transaction with the DDL, the root, and the
+  marker. `fail` breaks the last batch; `full` pads the
+  first batch to 2,340 rows.
+- `repoint.ts` — a default-organization PUT to a second
+  organization answers 200, and the default stays.
+
 ## serve/ (2026-09-18, 2026-09-22)
 
 - `serve-probe.ts` — item 0: `Deno.serve` keeps a `date` it

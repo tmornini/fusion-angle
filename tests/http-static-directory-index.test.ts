@@ -12,6 +12,8 @@ import {
 } from '../server/http-server.ts';
 import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 async function withServer(
     files: Record<string, string>,
@@ -308,6 +310,11 @@ async () => {
     await withServer({}, undefined, async (base) => {
         const res = await fetch(
             base + '/api/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            {
+                headers: {
+                    'operation-id': generateIdentifier(),
+                },
+            },
         );
         assertStrictEquals(res.status, HTTP_UNAUTHORIZED);
         assertMatch(
