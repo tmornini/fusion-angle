@@ -10,8 +10,27 @@ import { apiRequest } from './http-fixtures.ts';
 import { deriveCredentialsFor } from '../api/derive-identity-spine.ts';
 import { bodyOf } from '../api/derive-documents.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
+import { ORGANIZATION_TWO } from
+    '../api/mock-data/seed-constants.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const ME = 'XXZruirZyAOoRpNxaDnpSA';
+
+// An identity seated in one organization only, with PII: the
+// subject a membership fence judges.
+async function seedSeatedIdentity(
+    db: Awaited<ReturnType<typeof seededMockDb>>,
+    organization: string,
+): Promise<string> {
+    const id = generateIdentifier();
+    await seedPersonIdentity(db, id, {
+        name: 'Seated', email: id.toLowerCase() + '@example.com',
+        phone: '', bio: '',
+    });
+    await seedSeat(db, organization, id, 'member');
+    return id;
+}
 
 Deno.test('an erased PII answers 410', async () => {
     const db = await seededMockDb();
@@ -33,6 +52,38 @@ Deno.test('an erased PII answers 410', async () => {
     assertEquals(await after.json(), {
         error: 'Gone: identity_pii/' + ME,
     });
+});
+
+// The fence runs before the head is read, so a foreign
+// identity's PII answers 403 live or erased: a 410 would tell
+// a stranger the erasure happened.
+Deno.test('a foreign identity\'s erased PII answers 403, never'
+    + ' Gone', async () => {
+    const db = await seededMockDb();
+    const stranger = await organizationToken();
+    const theirAdmin = await organizationToken(ME, ORGANIZATION_TWO);
+    const theirs = await seedSeatedIdentity(db, ORGANIZATION_TWO);
+    const path = '/identities/' + theirs + '/pii';
+    const live = await handleRequest(db, apiRequest({
+        method: 'GET', path, token: stranger,
+    }));
+    assertStrictEquals(live.status, 403);
+    await live.body?.cancel();
+    const erased = await handleRequest(db, apiRequest({
+        method: 'DELETE', path, token: theirAdmin,
+    }));
+    assertStrictEquals(erased.status, 204);
+    const gone = await handleRequest(db, apiRequest({
+        method: 'GET', path, token: theirAdmin,
+    }));
+    assertStrictEquals(gone.status, 410);
+    await gone.body?.cancel();
+    const fenced = await handleRequest(db, apiRequest({
+        method: 'GET', path, token: stranger,
+    }));
+    assertStrictEquals(fenced.status, 403);
+    const { error } = await fenced.json() as { error: string };
+    assertStrictEquals(error.startsWith('Gone:'), false);
 });
 
 Deno.test('a credential GET serves no secret to an admin',
