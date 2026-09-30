@@ -255,11 +255,10 @@ HTTP nest. Validators, crypto, hash, and
 
 ## Seed pair formation
 
-Mock seed
-`EXPECTED_MESSAGE_PAIR_COUNT = 1454`; bootstrap
-exactly 8. Pinned by `tests/mock-data-pairs.test.ts`.
-A seed pair stores a request-id. The root does not
-(`mintRootBind` in `api/ledger-root.ts`).
+Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1455`, root
+included; bootstrap exactly 8 pairs and the root. Pinned by
+`tests/mock-data-pairs.test.ts`. A seed row stores no
+`request-id` line, and neither does the root.
 
 ## How we got here
 
