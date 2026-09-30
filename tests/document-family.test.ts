@@ -13,7 +13,11 @@ import {
 import {
     EntityNotFoundError,
 } from '../api/db.ts';
-import type { DbAdapter } from '../api/db.ts';
+import type {
+    DbAdapter,
+    StorageBackend,
+    Tx,
+} from '../api/db.ts';
 import type { Id } from '../api/types.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -275,26 +279,50 @@ async function testDocumentOp(
 ): Promise<unknown> {
     if (messagePair !== undefined) {
         const latchedId = messagePair.latchedHeadMessagePairId;
-        if (latchedId !== undefined) {
-            const latest = await db.readTransaction(
-                async (view) =>
-                    (await messageStore(view).getDocumentHead(
-                        messagePair.path, messagePair.name,
-                    ))?.id,
+        // The gate's echo check and this write are separate
+        // steps, so two racers can both pass the gate. The
+        // re-read has to share the write's transaction or
+        // the statement answers first, with the stored path.
+        if (
+            !('backend' in db)
+            || !('clientOn' in db)
+        ) {
+            throw new Error(
+                'a racing write requires a backed adapter',
             );
-            if (latest !== latchedId) {
-                throw new ApiError(
-                    'If-Match does not match the current'
-                    + ' document at /'
-                    + TEST_FAMILY + '/' + id,
-                    HTTP_PRECONDITION_FAILED,
-                );
-            }
         }
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
+        const backed = db as DbAdapter & {
+            backend: StorageBackend;
+            clientOn: (tx: Tx) => DbAdapter;
+        };
+        await backed.backend.transaction(
+            'readwrite',
+            async (tx) => {
+                const view = backed.clientOn(tx);
+                if (latchedId !== undefined) {
+                    const latest = (
+                        await messageStore(view)
+                            .getDocumentHead(
+                                messagePair.path,
+                                messagePair.name,
+                            )
+                    )?.id;
+                    if (latest !== latchedId) {
+                        throw new ApiError(
+                            'If-Match does not match'
+                            + ' the current document'
+                            + ' at /'
+                            + TEST_FAMILY + '/' + id,
+                            HTTP_PRECONDITION_FAILED,
+                        );
+                    }
+                }
+                await runWrite(
+                    view,
+                    attemptFor([messagePair]),
+                    [messagePair],
+                );
+            },
         );
     }
     return { id, ...body };
@@ -720,17 +748,11 @@ Deno.test('locked arm: two writers racing the SAME echo — the'
     assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
 });
 
-// The e2e sibling of the storage-level race above: TWO PUTs
-// echoing the SAME valid head, launched together through
-// handleRequest itself — never formWriteMessagePair/appendMessagePairOnce
-// directly — so the in-tx head re-read's 412 is what's under
-// test. On the memory backend, the global transaction
-// serializer (store-serializer.ts) processes the store's
-// document head read (`messageStore(db).getDocumentHead`) and
-// dispatch of each racer as separate queued steps, so
-// BOTH racers observe genesis as their head and pass the
-// pre-dispatch echo check before either's write commits — the
-// SECOND-dispatched racer's in-tx re-read then 412s.
+// Two PUTs echoing the same head, through handleRequest.
+// The gate reads are separate steps, so both can pass
+// before either write commits. The op holds the head
+// re-read and the write in one transaction, so the loser
+// sees the winner and 412s.
 Deno.test('locked arm: two concurrent PUTs echoing the same head —'
 + ' the loser 412s via the in-tx head re-read',
 async () => {

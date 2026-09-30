@@ -114,12 +114,20 @@ export class BackedDbAdapter
         return this.#backend;
     }
 
+    // The open client, with no seed verdict. A route
+    // that must re-read and write as one transaction
+    // uses this. The seed uses openClient, which fails
+    // the phase when a row does not land.
+    clientOn(tx: Tx): DbAdapter {
+        return this.#viewForTx(tx);
+    }
+
     // A view whose statement joins an already-open client.
     // The seed opens backend.transaction and writes through
     // this view. A matched or stale row fails the phase:
     // the seed meant every row to land.
     openClient(tx: Tx): DbAdapter {
-        const client = this.#viewForTx(tx);
+        const client = this.clientOn(tx);
         const run = client.executeLedger.bind(client);
         client.executeLedger = async (attempt, rows, now) => {
             let stated;

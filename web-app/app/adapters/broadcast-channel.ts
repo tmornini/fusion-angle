@@ -59,6 +59,51 @@ export function deleteNotificationChannel(): void {
     channel = undefined;
 }
 
+// A test window names a private bus so another file's
+// post on the shared name cannot wake it. The product
+// window leaves this unset and stays on the singleton.
+const namedBuses = new Map<string, {
+    channel: BroadcastChannel;
+    handlers: Set<(event: NotificationEvent) => void>;
+}>();
+
+export function subscribeNamedNotificationEvents(
+    name: string,
+    handler: (event: NotificationEvent) => void,
+): () => void {
+    let bus = namedBuses.get(name);
+    if (bus === undefined) {
+        const channel = new BroadcastChannel(name);
+        const handlers = new Set<
+            (event: NotificationEvent) => void
+        >();
+        subscribeEventListener(
+            channel, 'message', (event: MessageEvent) => {
+                const decoded =
+                    notificationEventFromWire(event.data);
+                for (const fn of handlers) fn(decoded);
+            },
+        );
+        bus = { channel, handlers };
+        namedBuses.set(name, bus);
+    }
+    const current = bus;
+    current.handlers.add(handler);
+    return () => {
+        current.handlers.delete(handler);
+    };
+}
+
+export function deleteNamedNotificationChannel(
+    name: string,
+): void {
+    const bus = namedBuses.get(name);
+    if (bus === undefined) return;
+    bus.channel.close();
+    bus.handlers.clear();
+    namedBuses.delete(name);
+}
+
 // Announce a scoped (or full) notification event. Other tabs'
 // subscribers fire; BroadcastChannel does not echo to the
 // poster, so the originating tab never double-refreshes.

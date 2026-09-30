@@ -9,7 +9,9 @@ import { organizationToken } from './token-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-const CHANNEL_NAME = 'fusion-angle:data';
+// Private bus: the suite shares one process, and another
+// file's post on fusion-angle:data would wake this page.
+const CHANNEL_NAME = 'fusion-angle:ideas-empty';
 const MEMBER_ID = 'XXZruirZyAOoRpNxaDnpSA';
 const SUBMITTED_AT = '2026-08-25T00:00:00.000000Z';
 
@@ -85,7 +87,8 @@ Deno.test(
         >;
         const listStub = makeListStub();
         const createButton = makeCreateButtonStub();
-        g['window'] = {
+        const win = {
+            fusionAngleDataChannel: CHANNEL_NAME,
             matchMedia: () => ({
                 matches: false,
                 addEventListener: () => {},
@@ -93,10 +96,7 @@ Deno.test(
             }),
             addEventListener: () => {},
         };
-        g['MutationObserver'] = class {
-            observe(): void {}
-        };
-        g['document'] = {
+        const doc = {
             addEventListener: () => {},
             createElement: () => ({
                 className: '',
@@ -110,12 +110,22 @@ Deno.test(
                 return null;
             },
         };
+        g['window'] = win;
+        g['MutationObserver'] = class {
+            observe(): void {}
+        };
+        g['document'] = doc;
         try {
             await import('./in-page-facade.ts');
             const { initAdapter, putSessionToken } =
                 await import(
                     '../web-app/app/adapters/init.ts'
                 );
+            const {
+                getClientFacade, putClientFacade,
+            } = await import(
+                '../web-app/app/adapters/facade-holder.ts'
+            );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
             await seedHumanMember(
@@ -125,12 +135,22 @@ Deno.test(
                 () => db,
             );
             assertStrictEquals(hasSchema, true);
-            putSessionToken(
-                await organizationToken(),
-            );
+            const token = await organizationToken();
+            putSessionToken(token);
+            const facade = getClientFacade();
+            const reclaim = (): void => {
+                g['window'] = win;
+                g['document'] = doc;
+                putClientFacade(facade);
+                putSessionToken(token);
+            };
             const { init } = await import(
                 '../web-app/ideas/index.ts'
             );
+            // Another file may have replaced the globals
+            // during the awaits above. The empty list
+            // reads this window's private bus.
+            reclaim();
             await init();
             assert(
                 listStub.innerHTML.includes(
@@ -205,6 +225,7 @@ Deno.test(
             const poster = new BroadcastChannel(
                 CHANNEL_NAME,
             );
+            reclaim();
             poster.postMessage({ kind: 'full' });
             // BroadcastChannel delivery and the
             // re-run init's fetch/render pipeline
@@ -241,10 +262,13 @@ Deno.test(
             // process when init subscribed; a test process
             // has no unload to reclaim it, so release it
             // here — after the assertion above.
-            const { deleteNotificationChannel } =
-                await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
-                );
+            const {
+                deleteNamedNotificationChannel,
+                deleteNotificationChannel,
+            } = await import(
+                '../web-app/app/adapters/broadcast-channel.ts'
+            );
+            deleteNamedNotificationChannel(CHANNEL_NAME);
             deleteNotificationChannel();
             delete g['window'];
             delete g['MutationObserver'];

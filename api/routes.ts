@@ -4,6 +4,8 @@ import {
 } from './db.ts';
 import type {
     DbAdapter,
+    StorageBackend,
+    Tx,
 } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type {
@@ -3787,6 +3789,26 @@ async function instanceDocumentSpent(
     return messagePairs.length > 0;
 }
 
+function backedClient(
+    adapter: DbAdapter,
+): {
+    readonly backend: StorageBackend;
+    readonly clientOn: (tx: Tx) => DbAdapter;
+} {
+    if (
+        !('backend' in adapter)
+        || !('clientOn' in adapter)
+    ) {
+        throw new Error(
+            'a racing write requires a backed adapter',
+        );
+    }
+    return adapter as DbAdapter & {
+        backend: StorageBackend;
+        clientOn: (tx: Tx) => DbAdapter;
+    };
+}
+
 // Instance PATCH create (Task 20): no live PUT, no
 // If-Match. Body is create-shaped ({set} required,
 // [] legal; clear → 400). Writes the wire PATCH plus
@@ -3839,29 +3861,39 @@ async function postInstanceCreateOp(
         headerFields: [],
     });
     const prefix = instancesUriPrefix(org, typeId);
-    await db.readTransaction(async (view) => {
-        const latest = await documentHeadAt(
-            view, prefix, instanceId,
-        );
-        if (latest?.method === 'DELETE') {
-            throw new ApiError(
-                'instance already exists at '
-                    + pathname,
-                HTTP_CONFLICT,
-            );
-        }
-        if (latest?.method === 'PUT') {
-            throw new ApiError(
-                'If-Match is required to PATCH '
-                    + pathname,
-                HTTP_PRECONDITION_REQUIRED,
-            );
-        }
-    });
     const pairs = [
         messagePair, revisionMessagePair,
     ];
-    await runWrite(db, attemptFor(pairs), pairs);
+    // The gate's 428 ran before either racer wrote.
+    // Re-read on the client that holds the write, so
+    // the second create sees the first head.
+    const backed = backedClient(db);
+    await backed.backend.transaction(
+        'readwrite',
+        async (tx) => {
+            const view = backed.clientOn(tx);
+            const latest = await documentHeadAt(
+                view, prefix, instanceId,
+            );
+            if (latest?.method === 'DELETE') {
+                throw new ApiError(
+                    'instance already exists at '
+                        + pathname,
+                    HTTP_CONFLICT,
+                );
+            }
+            if (latest?.method === 'PUT') {
+                throw new ApiError(
+                    'If-Match is required to PATCH '
+                        + pathname,
+                    HTTP_PRECONDITION_REQUIRED,
+                );
+            }
+            await runWrite(
+                view, attemptFor(pairs), pairs,
+            );
+        },
+    );
 }
 
 // Instance PATCH two-pair append (Task 17 / R5 / R9).
