@@ -1,3 +1,5 @@
+import type { KeyReadRoles } from './served-response.ts';
+
 // The per-family registry: the single source of truth for a
 // family's cross-cutting properties — organization-nesting
 // tier and create-document body field —
@@ -137,3 +139,13 @@ export const ORGANIZATION_MEMBER_DETAIL_PATTERN =
 // read-only, derived, never a family of its own.
 export const ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN =
     'organizations/:organization-id/former-members/';
+// A credential nests under its identity. Its `secret` is
+// read by no role, admin included: the key's read roles
+// are empty (spec §3). Item 2 removes the declaration
+// when the hash leaves the body.
+export const CREDENTIALS_COLLECTION_PATTERN =
+    'identities/:id/credentials/';
+export const CREDENTIAL_DETAIL_PATTERN =
+    CREDENTIALS_COLLECTION_PATTERN + ':cid';
+export const CREDENTIAL_KEY_READ_ROLES: KeyReadRoles =
+    new Map([['secret', []]]);
