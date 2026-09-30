@@ -73,7 +73,7 @@ const IDENTITIES_PREFIX = canonicalPath(
     undefined, '/identities/',
 );
 
-function identityPrefixFor(identityId: Id): string {
+export function identityPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined, '/identities/' + identityId + '/',
     );
@@ -422,7 +422,7 @@ export async function deriveTokenRevocation(
 // ---- module header's readonly-transaction wrapper stays ------
 // ---- pii-only) -----------------------------------------------
 
-function registrationPrefixFor(identityId: Id): string {
+export function registrationPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined,
         '/identities/' + identityId + '/registration/',

@@ -265,7 +265,7 @@ async () => {
     const gone = await handleRequest(db, piiReq(
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/pii',
         await devToken('toccYYkLEABmlbpHJalgtQ')));
-    assertStrictEquals(gone.status, 404);
+    assertStrictEquals(gone.status, 410);
     const id = await GET<{ id: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ', DEV_TOKEN,
             operationIdHeader());

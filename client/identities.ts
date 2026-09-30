@@ -13,6 +13,7 @@ import {
     RequestError,
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
+    HTTP_GONE,
 } from '../shared/http-errors.ts';
 import type { RequestContext } from './request-context.ts';
 import {
@@ -114,8 +115,8 @@ export async function getIdentityRoster(
             }));
 }
 
-// Nested facet only. 404 (absent/erased) and 403
-// (not self, not admin) both surface as erased —
+// Nested facet only. 404 (absent), 410 (erased), and 403
+// (not self, not admin) all surface as erased —
 // the CALLER, not this adapter, decides the display.
 export async function getMemberPii(
     ctx: RequestContext,
@@ -135,6 +136,7 @@ export async function getMemberPii(
     } catch (error) {
         if (error instanceof RequestError
             && (error.status === HTTP_NOT_FOUND
+                || error.status === HTTP_GONE
                 || error.status === HTTP_FORBIDDEN)) {
             return { erased: true };
         }
@@ -205,7 +207,8 @@ export async function getClientRegistration(
     } catch (err) {
         if (
             err instanceof RequestError
-            && err.status === HTTP_NOT_FOUND
+            && (err.status === HTTP_NOT_FOUND
+                || err.status === HTTP_GONE)
         ) {
             return { registered: false };
         }

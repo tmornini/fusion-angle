@@ -250,10 +250,8 @@ import {
     seatEntityOf,
 } from './derive-memberships.ts';
 import {
-    deriveIdentityPii,
     deriveCredentialsFor,
     deriveCredential,
-    deriveClientRegistration,
     deriveIdentityKind,
     deriveIdentityProvidersFor,
     deriveIdentityProvider,
@@ -262,6 +260,8 @@ import {
     registrationEntityOf,
     identityProviderEntityOf,
     tokenRevocationEntityOf,
+    identityPrefixFor,
+    registrationPrefixFor,
 } from './derive-identity-spine.ts';
 import {
     workOrderHeadFor,
@@ -3790,24 +3790,20 @@ export const routes: Route[] = [
     // transaction as the write. DELETE is a marked tombstone.
     // The pattern's last segment ('pii') is not a :param, so
     // pathAndNameOf yields name '' (a singleton document at
-    // a collection-style path). GET is FLIPPED (Phase 10
-    // Task 8): derived via deriveIdentityPii — wire-identical
-    // to the hand-written db.identityPii.getById dispatch it
-    // replaces.
+    // a collection-style path). GET serves the stored head.
     // authorizeIdentityPii (the gate dispatch) restricts a GET
-    // to self or admin. The handler then applies the same
+    // to self or admin. The selector then applies the same
     // viaMembership org fence credentials use: foreign 403,
     // orphan visible. A member never reads another identity's
-    // pii.
+    // pii. The fence runs before the head is read, so a
+    // foreign identity's absent or erased PII answers 403,
+    // never a 404 or 410 that would describe it.
     route('identities/:id/pii', {
-        get: async (db, p, actor, organization) => {
+        select: async (db, p, actor, organization) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
-            const row = await deriveIdentityPii(
-                db, identityId,
-            );
             const memberships =
                 await membershipsAcrossAllOrganizations(
                     db, actor,
@@ -3822,7 +3818,20 @@ export const routes: Route[] = [
                     'identity_pii', identityId,
                 );
             }
-            return row;
+            const head = await db.messagePairs.getHeadPair(
+                identityPrefixFor(identityId), 'pii',
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'identity_pii', identityId,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'identity_pii', id: identityId,
+                reader: { sees: 'whole' },
+            };
         },
         put: (db, p, body, actor, messagePair) =>
             postIdentityPiiDocumentOp(
@@ -3956,10 +3965,23 @@ export const routes: Route[] = [
     // deregistration; the gate forms the 204 pair, the
     // handler appends it — idempotent by construction.
     route('identities/:id/registration', {
-        get: async (db, p) => {
+        select: async (db, p) => {
             const identityId = param(p, 0);
             await requireServiceIdentity(db, identityId);
-            return deriveClientRegistration(db, identityId);
+            const head = await db.messagePairs.getHeadPair(
+                registrationPrefixFor(identityId), '',
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'client_registration', identityId,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'client_registration', id: identityId,
+                reader: { sees: 'whole' },
+            };
         },
         put: async (db, p, body, actor, messagePair) => {
             const identityId = param(p, 0);

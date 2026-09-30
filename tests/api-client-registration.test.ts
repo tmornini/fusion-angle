@@ -159,7 +159,7 @@ Deno.test('GET with no registration yet is 404 (identity'
     );
 });
 
-Deno.test('DELETE deregisters: a marked tombstone, then 404',
+Deno.test('DELETE deregisters: a marked tombstone, then 410',
 async () => {
     const db = await freshDb();
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
@@ -192,7 +192,7 @@ async () => {
     await rejectsWithStatus(
         () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
             DEV_TOKEN, operationIdHeader()),
-        404,
+        410,
     );
 });
 
