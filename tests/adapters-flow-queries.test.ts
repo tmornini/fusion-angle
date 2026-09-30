@@ -579,7 +579,6 @@ Deno.test(
             is_auto_fit: false,
             lock_timeout: 0,
             graph: { nodes: stacked, edges: [] },
-            hasUndoHistory: false,
         };
         const ctx = {
             identity: {

@@ -60,8 +60,9 @@ import {
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import type {
-    FlowGraph,
+import {
+    getFlowVersions,
+    type FlowGraph,
 } from '../client/flow-queries.ts';
 import {
     seedHumanMember,
@@ -146,7 +147,6 @@ function buildGraph(
         isAutoLayout: true,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        hasUndoHistory: false,
         nodes,
         edges,
     };
@@ -1404,6 +1404,24 @@ Deno.test(
             op.freshSnap.interaction
                 .selection.kind,
             'none',
+        );
+    }),
+);
+
+Deno.test(
+    'the ledger answers whether a flow has an undo',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { ctx } = await setupFlow();
+        assertStrictEquals(
+            (await getFlowVersions(ctx, FLOW_ID)).length > 1,
+            false,
+        );
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A), buildNode(NODE_B),
+        ]);
+        assertStrictEquals(
+            (await getFlowVersions(ctx, FLOW_ID)).length > 1,
+            true,
         );
     }),
 );

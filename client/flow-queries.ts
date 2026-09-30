@@ -1,9 +1,11 @@
 import type {
     FlowWithGraph,
+    Id,
     ProjectEntity,
     ProjectFlowEntity,
     GraphNode,
     GraphEdge,
+    StateEntity,
     StoredGraph,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
@@ -24,12 +26,6 @@ export interface FlowGraph {
     lockTimeout: number;
     nodes: GraphNode[];
     edges: GraphEdge[];
-    // Phase 14 Task 8 (undo-as-replay): a cheap, approximate
-    // "has this flow ever been edited past genesis" signal,
-    // carried verbatim from FlowWithGraph.hasUndoHistory — see
-    // that field's own doc comment (api/types.ts) for the
-    // approximation and its degrade-gracefully failure mode.
-    hasUndoHistory: boolean;
 }
 
 function parseGraph(
@@ -168,8 +164,8 @@ export async function getFlowsByProject(
     return result;
 }
 
-// The flow document as stored: its scalar fields, its graph
-// as the wire carries it, and the undo signal.
+// The flow document as stored: its scalar fields and its
+// graph as the wire carries it.
 export async function getFlowWithGraph(
     ctx: RequestContext,
     flowId: string,
@@ -213,6 +209,18 @@ export async function getFlowGraph(
         lockTimeout: flow.lock_timeout,
         nodes: g.nodes,
         edges: g.edges,
-        hasUndoHistory: flow.hasUndoHistory,
     };
+}
+
+// The flow's lifecycle rows, one per distinct state
+// event (api/derive-documents.ts documentLifecycleEvents).
+// More than one row is something to undo (spec §10). The
+// route answers JSON until the fourth spec.
+export async function getFlowVersions(
+    ctx: RequestContext,
+    flowId: Id,
+): Promise<StateEntity[]> {
+    return ctx.GET<StateEntity[]>(
+        organizationItem(ctx, 'flows', flowId) + '/versions/',
+    );
 }

@@ -28,6 +28,7 @@ import {
     getRecordEntities,
     getRecordForFlow,
     getRecordAttributesByRecord,
+    getFlowVersions,
     postFlowRecordBinding,
     deleteFlowRecordForFlow,
     subscribeFlowChanges,
@@ -43,6 +44,7 @@ import type {
     RecordAttributeId,
     RecordEntity,
     RecordId,
+    StateEntity,
 } from '../../shared/types.ts';
 import {
     postBlobDownload,
@@ -1639,23 +1641,19 @@ export async function init(
     });
 }
 
-// Undo-as-replay (Phase 14 Task 8): no longer fetches
-// getFlowVersions to seed hasUndoHistory — flow_versions stops
-// being written on the live path entirely (Step 0), so that
-// list would always be empty. getFlowGraph's own response now
-// carries hasUndoHistory verbatim (FlowGraph.hasUndoHistory,
-// api/derive-flows.ts's cheap document-message-pair-count
-// approximation) — one fewer round-trip at load, not one more.
+// Undo asks the ledger: the flow's versions answer more than
+// one row once there is something to undo (spec §10).
 async function loadFlowDesignerBundle(
     flowId: string,
 ) {
     const ctx = sessionContext();
     const [
-        graph,
+        graph, versions,
         humanMembers, aiMembers,
         records, boundRecordId,
     ] = await Promise.all([
         getRenderableFlowGraph(ctx, flowId),
+        getFlowVersions(ctx, flowId),
         getHumanMembers(ctx),
         getAIMembers(ctx),
         getRecordEntities(ctx),
@@ -1668,7 +1666,7 @@ async function loadFlowDesignerBundle(
             )
             : [];
     return {
-        graph,
+        graph, versions,
         humanMembers, aiMembers,
         records, boundRecordId,
         recordAttributes,
@@ -1685,7 +1683,7 @@ function onFlowLoaded(
     pageState.setCanvasSize(FALLBACK_W, FALLBACK_H);
     pageState.setHistory(
         buildFlowHistorySnapshot(
-            loaded.graph.hasUndoHistory,
+            loaded.versions.length > 1,
         ),
     );
 
@@ -1870,8 +1868,12 @@ async function refreshFlowFromServer(
     let graph: Awaited<
         ReturnType<typeof getRenderableFlowGraph>
     >;
+    let versions: StateEntity[];
     try {
-        graph = await getRenderableFlowGraph(ctx, flowId);
+        [graph, versions] = await Promise.all([
+            getRenderableFlowGraph(ctx, flowId),
+            getFlowVersions(ctx, flowId),
+        ]);
     } catch (err) {
         log.error(
             'flow detail refresh failed',
@@ -1910,7 +1912,7 @@ async function refreshFlowFromServer(
     pageState.panelStateRef().open = isPanelOpen;
     pageState.setHistory(
         buildFlowHistorySnapshot(
-            graph.hasUndoHistory,
+            versions.length > 1,
         ),
     );
     commit({

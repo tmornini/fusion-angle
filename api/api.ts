@@ -46,8 +46,6 @@ import {
 } from './family-registry.ts';
 import {
     documentFamilyWiring,
-    documentHeadMessagePairId,
-    entityIdParam,
     requireOrganization,
 } from './document-family.ts';
 import { servedSelection } from './head-reads.ts';
@@ -1001,55 +999,6 @@ async function dispatched(
                 // with its own response.
                 if (result instanceof Response) {
                     return result;
-                }
-                // ETag attach: the document GET of a family
-                // whose PUT requires a conditional carries the
-                // current head pair id — the client save's
-                // baseline AND its echo source. Keyed through
-                // the SAME wiring consult + exact-pattern match
-                // the write side uses above (never a flows
-                // literal).
-                const readWiring = wiringForSegments(
-                    matched.segments,
-                );
-                if (
-                    readWiring !== undefined
-                    && routePattern
-                        === documentEntityPattern(
-                            readWiring,
-                        )
-                    && conditionalOf(
-                        documentEntityPattern(readWiring),
-                        'PUT',
-                    ) === 'required'
-                ) {
-                    const prefix = canonicalPath(
-                        organization,
-                        '/' + readWiring.family + '/',
-                    );
-                    // The derivation's OWN head pair id (Phase 4
-                    // Task 8) — the SAME reduction the flipped GET
-                    // above just ran to build `result`, not a
-                    // second, divergent one
-                    // (the store's document head read
-                    // (`messageStore(db).getDocumentHead`) — the
-                    // ANY-method LOCK head, still the write path's
-                    // source above). Same value for a document-
-                    // class route (tests/api-flow-document.test.ts
-                    // pins the equality); one mechanism now.
-                    const headMessagePairId =
-                        await documentHeadMessagePairId(
-                            effective, prefix,
-                            entityIdParam(
-                                readWiring, params,
-                            ),
-                        );
-                    if (headMessagePairId !== undefined) {
-                        return attachEtag(
-                            Response.json(result),
-                            headMessagePairId,
-                        );
-                    }
                 }
                 // Document /versions/:etag: ETag is the
                 // path token.

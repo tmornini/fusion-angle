@@ -21,15 +21,8 @@ import { seedIdentifier } from './seed-kit.ts';
 // (flows.graph is retired) — it is the seed input from which the
 // relation rows are derived (buildFlowGraphRelations) and the
 // work-order snapshots are taken. The composition root stores
-// only the scalar fields and discards the literal. `hasUndoHistory`
-// (Phase 14 Task 8) is COMPUTED at derivation time from this
-// flow's own document-message-pair count, never stored or
-// seeded — every freshly-seeded flow gets exactly one genesis
-// document message pair (seed-message-pairs.ts), so it derives
-// to `false` regardless of what a seed literal might have said.
-export type FlowSeed = Omit<
-    FlowWithGraph, 'organization_id' | 'hasUndoHistory'
->;
+// only the scalar fields and discards the literal.
+export type FlowSeed = Omit<FlowWithGraph, 'organization_id'>;
 
 // The five seeded flows and their inline graph definitions.
 // The Lead-to-Close graph reuses the extracted lead-to-close

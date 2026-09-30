@@ -20,6 +20,7 @@ import {
     putFlow,
     enqueueFlowSave,
     notifyFlowChange,
+    getFlowVersions,
 } from '../../client/index.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { nowUtc } from '../../shared/types.ts';
@@ -777,7 +778,7 @@ export async function performUndo(
     const locked = requireFlowNotLocked(snap);
     if (locked) return locked;
     // Undo-as-replay (Phase 14 Task 8): exhaustion is a CLIENT-
-    // side short-circuit against the session/wire hasUndoHistory
+    // side short-circuit against the session's hasUndoHistory
     // flag — no flow_versions fetch, no server round-trip at
     // all, mirroring today's UX shape with the source swapped
     // (see the PINNED Step 0 block,
@@ -821,12 +822,13 @@ export async function performUndo(
         return failOp('Undo failed', 'error');
     }
     notifyFlowChange();
-    const graph = await getRenderableFlowGraph(
-        ctx, snap.flowId,
-    );
+    const [graph, versions] = await Promise.all([
+        getRenderableFlowGraph(ctx, snap.flowId),
+        getFlowVersions(ctx, snap.flowId),
+    ]);
     const newHistory = recordUndoHistoryMark(
         stagedHistory,
-        graph.hasUndoHistory,
+        versions.length > 1,
     );
     return {
         kind: 'ok',
@@ -894,11 +896,12 @@ export async function performRedo(
         return failOp('Redo failed', 'error');
     }
     notifyFlowChange();
-    const graph = await getRenderableFlowGraph(
-        ctx, snap.flowId,
-    );
+    const [graph, versions] = await Promise.all([
+        getRenderableFlowGraph(ctx, snap.flowId),
+        getFlowVersions(ctx, snap.flowId),
+    ]);
     const newHistory = recordUndoHistoryMark(
-        popped.snapshot, graph.hasUndoHistory,
+        popped.snapshot, versions.length > 1,
     );
     return {
         kind: 'ok',

@@ -315,20 +315,6 @@ export function documentSelect(
     };
 }
 
-// Live PUT pair id at this document — the store's document
-// head read (`messageStore(db).getDocumentHead`). A DELETE head or
-// virgin document is undefined.
-export async function documentHeadMessagePairId(
-    db: DbAdapter,
-    path: string,
-    id: Id,
-): Promise<string | undefined> {
-    const stored = await messageStore(db).getDocumentHead(
-        path, id,
-    );
-    return stored?.id;
-}
-
 // The route body is plain dispatch to the documentOp for
 // every conditional: the gate refuses by form before this
 // handler runs, and the statement judges the latch, so

@@ -298,8 +298,7 @@ async function createFlow(
     ));
 }
 
-// Wire-byte GET helper: handleRequest text must equal
-// JSON.stringify(derive) for message-plane oracles.
+// Wire-byte GET helper: the octets a flow GET answers.
 async function wireFlowText(
     db: MemoryDbAdapter,
     organization: string,
@@ -338,11 +337,19 @@ async function wireFlowsText(
     return res.text();
 }
 
-function assertWireEqualsDerived(
+// The flow GET serves its head's stored body octets.
+async function assertWireEqualsDerived(
+    db: MemoryDbAdapter,
+    organization: string,
+    flowId: string,
     wireText: string,
-    derived: FlowWithGraph,
-): void {
-    assertStrictEquals(wireText, JSON.stringify(derived));
+): Promise<void> {
+    assertStrictEquals(
+        wireText,
+        await storedPutBodyText(
+            db, canonicalPath(organization, '/flows/'), flowId,
+        ),
+    );
 }
 
 // The SAME reduction deriveFlow calls internally (derive-
@@ -408,17 +415,18 @@ async () => {
     }
 });
 
-// -- 2. per-flow GET wire equals deriveFlow --------------------
+// -- 2. per-flow GET wire equals the stored head --------------
 
-Deno.test('per-flow GET wire equals deriveFlow for every seed',
-async () => {
+Deno.test('per-flow GET wire equals the stored head for every '
++ 'seed', async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
-        const derived = await deriveFlow(db, organization, id);
         const wireText = await wireFlowText(
             db, organization, id,
         );
-        assertWireEqualsDerived(wireText, derived);
+        await assertWireEqualsDerived(
+            db, organization, id, wireText,
+        );
     }
 });
 
@@ -540,7 +548,9 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         const wireText = await wireFlowText(
             db, STARK_ORGANIZATION, flowId,
         );
-        assertWireEqualsDerived(wireText, derived);
+        await assertWireEqualsDerived(
+            db, STARK_ORGANIZATION, flowId, wireText,
+        );
         return derived;
     }
 
@@ -690,7 +700,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
     derived = await assertStep();
 
     // Terminal: a state-'deleted' document PUT — vanishes from
-    // list, 404s on GET and derive.
+    // list, 410s on GET, 404s on derive.
     const tombstoneAt = '2026-03-07T00:00:00.000000Z';
     const tombstoned = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
@@ -710,7 +720,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
     );
-    assertStrictEquals(gone.status, 404);
+    assertStrictEquals(gone.status, 410);
     const derivedList = await deriveFlows(
         db, STARK_ORGANIZATION,
     );
@@ -827,13 +837,12 @@ async () => {
         (await db.messagePairs.getAll()).length, before,
     );
 
-    const derivedFlow = await deriveFlow(
-        db, STARK_ORGANIZATION, flowId,
-    );
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derivedFlow);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
 
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
@@ -953,13 +962,12 @@ async () => {
     assertStrictEquals(history.length, 1);
     assertStrictEquals(history[0]!.state, 'active');
 
-    const derived = await deriveFlow(
-        db, STARK_ORGANIZATION, flowId,
-    );
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derived);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
 });
 
 // -- 10. sidecar insensitivity ----------------------------------
@@ -1018,7 +1026,9 @@ Deno.test('sidecar insensitivity: graphDelta/revivals disagreeing '
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derived);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
     // graphDelta node never becomes the working graph head.
     assertStrictEquals(
         derivedNodes.some(
@@ -1143,7 +1153,9 @@ async () => {
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derived);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
     // Graph content preserves both members/attrs regardless
     // of insertion order (normalizedGraph order-independence
     // still applies on the message plane).

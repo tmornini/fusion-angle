@@ -153,7 +153,6 @@ function snapOf(
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            hasUndoHistory: true,
             nodes,
             edges,
         },

@@ -221,7 +221,6 @@ Deno.test(
                         nodes: [],
                         edges: [],
                     },
-                    hasUndoHistory: false,
                 };
             },
         } as unknown as RequestContext;

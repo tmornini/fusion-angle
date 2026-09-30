@@ -208,7 +208,6 @@ import {
 import {
     flowEntityOf,
     flowStoredEntityOf,
-    deriveFlow,
     deriveFlows,
     resolveFlowUndoTarget,
     type FlowUndoResolution,
@@ -387,14 +386,9 @@ const PROJECTS_WIRING: DocumentFamilyWiring = {
     documentOp: postProjectDocumentOp,
     entityOf: projectEntityOf,
 };
-// The flows wiring row. entityOf is derive-flows.ts's OWN
-// flowEntityOf. G2 stored PUT is flowStoredEntityOf (that
-// mapper minus hasUndoHistory). Live GET stays on
-// deriveFlow/deriveFlows so a state-'deleted' head 404s
-// (stored PUT has no trio) and hasUndoHistory is stamped
-// from pair count. This slot stays the 2-arg assignability
-// shim (pairCount omitted). flowEntityOf's third param is
-// pairCount (number), not StateEntity.
+// The GET serves the stored head, which carries the flow's
+// state, sidecars, and trio; a state-'deleted' head is Gone
+// (spec §5).
 const FLOWS_WIRING: DocumentFamilyWiring = {
     family: 'flows',
     httpNest: 'organization',
@@ -402,8 +396,7 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'flows',
     validateDocument: validateFlowDocumentBody,
     documentOp: postFlowDocumentOp,
-    entityOf: (document, organization) =>
-        flowEntityOf(document, organization),
+    entityOf: flowEntityOf,
 };
 // The work-orders wiring row — the fourth family, and the
 // FIRST 'stateless' one (Decision 7's state-in-entity design
@@ -4399,8 +4392,8 @@ export const routes: Route[] = [
             postIdeaSubmissionOp(db, param(p, 2), body, messagePair),
     }),
     route('organizations/:id/flows/', {
-        // GET stays deriveFlows: stamps hasUndoHistory from
-        // pair count and omits a state-'deleted' head.
+        // GET stays deriveFlows: it omits a state-'deleted'
+        // head.
         // POST stays this hand-written create — unlike
         // ideas/projects, flows never folded genesis into
         // the document PUT (Decision 6).
@@ -4474,21 +4467,16 @@ export const routes: Route[] = [
             });
         },
     }),
-    // flows/:id takes a conditional PUT ('required').
-    // G2 GET stays deriveFlow (stamp hasUndoHistory; 404
-    // a state-'deleted' head). PUT stays
-    // documentPutHandler; the statement judges its latch.
-    // graphDelta/revivals ride the pair body (SIDECAR-KEEP).
-    // Member-tier PUT.
+    // flows/:id takes a conditional PUT ('required'); the
+    // statement judges its latch. Member-tier PUT.
+    // The GET serves the stored head, which carries the
+    // flow's state, sidecars, and trio; a state-'deleted'
+    // head is Gone (spec §5).
     {
         segments: [
             'organizations', ':id', 'flows', ':id',
         ],
-        get: (db, p, _actor, organization) =>
-            deriveFlow(
-                db, requireOrganization(organization),
-                param(p, 1),
-            ),
+        select: documentSelect(FLOWS_WIRING),
         put: documentPutHandler(FLOWS_WIRING),
     },
     // GET flows/:id/versions/: pair-chain index. Old

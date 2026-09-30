@@ -44,6 +44,7 @@ import {
 } from '../client/flow-mutations.ts';
 import { getRenderableFlowGraph } from
     '../web-app/app/flow-graph-layout.ts';
+import { getFlowVersions } from '../client/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -518,7 +519,6 @@ function snapOf(
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            hasUndoHistory: false,
             nodes,
             edges: [],
         },
@@ -858,7 +858,9 @@ Deno.test(
             return new FlowDesignerPresenter(
                 snap, 800, 600,
                 buildFlowHistorySnapshot(
-                    graph.hasUndoHistory,
+                    (await getFlowVersions(
+                        sessionContext(), flowId,
+                    )).length > 1,
                 ),
                 migrateToCenter,
             );

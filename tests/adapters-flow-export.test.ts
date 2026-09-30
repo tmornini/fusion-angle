@@ -325,7 +325,6 @@ Deno.test(
                     toNodeId: endId,
                 },
             ],
-            hasUndoHistory: false,
         });
         await postFlowFromMermaid(
             ctx, flowId, mmd, generateIdentifier(),
