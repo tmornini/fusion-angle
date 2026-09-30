@@ -656,13 +656,20 @@ async () => {
             ),
         );
         assertStrictEquals(byIdRes.status, 200);
+        const wireById = await byIdRes.text();
         assertStrictEquals(
-            await byIdRes.text(),
+            wireById,
             await storedPutBodyText(
                 db,
                 '/organizations/' + organization
                     + '/flows/' + flowId + '/records/',
                 joinId,
+            ),
+        );
+        assertEquals(
+            JSON.parse(wireById),
+            await deriveFlowRecord(
+                db, organization, flowId, joinId,
             ),
         );
     }
