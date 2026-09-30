@@ -1600,6 +1600,41 @@ Off the critical path; each with its oracle.
   foreign organization's retired document answers what
   its live one does; history and past versions still
   answer 200.
+- Admins act within their organization. The gate's
+  self-or-admin guard (`api/api.ts` Region B,
+  `SELF_ONLY_TOKEN_ROUTES`: the token revocation
+  document's PUT and the rotation and revocation POSTs)
+  lets a member name only its own identity but lets an
+  admin name any identity, whether or not it holds a seat
+  in the admin's organization: `callerIsAdmin` is the
+  organization-scoped `admin` role from the verified
+  claim, and nothing compares the path identity's seats
+  to that organization. An organization's admin can so
+  rotate or revoke the token chain of an identity outside
+  it. Scope the admin arm to identities seated in the
+  claim's organization, keeping the root operator's reach
+  only where its own role says so, and sweep every other
+  admin-reachable `identities/:id/…` write for the same
+  reach. Oracle: on each guarded route, an organization
+  admin naming an identity with no seat in its
+  organization is 403 before any read; naming a seated
+  one is unchanged; the root operator's cross-organization
+  reach, where kept, is pinned by name.
+- Instances and bound work orders name the record-type
+  version they were written against. An instance's state
+  is `{ id, organization_id, record_type_id, values }`
+  (`api/derive-record-instances.ts:20-35`); it gains
+  `record_type_etag`, the type's head etag when the
+  instance's version landed, beside `record_type_id`,
+  which stays, so the body keeps every id in its path. A
+  bound work order's version carries `instance_id` and
+  `record_type_id` (`api/work-order-version.ts:40`,
+  `:72-76`, `:288-295`); it gains `record_type_etag`
+  beside `record_type_id`. Oracle: an instance's GET and a
+  bound work order's GET each carry `record_type_etag`
+  equal to the record type's ETag at the write that
+  produced that version, and a later type write leaves
+  the older version's `record_type_etag` unchanged.
 
 ## Later work
 
@@ -3126,6 +3161,55 @@ Off the critical path; each with its oracle.
   200 and stores nothing; a token issued to another
   client is refused; a real and a guessed token of the
   same length answer byte-identical responses.
+- CRUD verbs out of names, comments, and test titles. This
+  is an HTTP application on a SQL database: a state change
+  is PUT, POST, PATCH, or DELETE at the HTTP layer and
+  INSERT at the store, never "create", "update", "upsert",
+  or "write" standing in for one of them. The case that
+  surfaced it is `postRecordWriteOp` (`api/routes.ts:921`,
+  the seed's record-type POST bundle) and its family:
+  `RecordWriteBody`, `RecordWriteCreateBody`,
+  `RecordWriteEditBody`, `RecordWriteMessagePairs`,
+  `formRecordWriteMessagePairs`, `validateRecordWriteBody`,
+  `validateRecordWriteAttribute`, and
+  `tests/api-records-write.test.ts`. The former's names are
+  ruled, one rename-only commit, the store's `'land'`
+  outcome unchanged:
+  `StateWrite` → `NextStates`,
+  `FormedStateWrite` → `FormedStatement`,
+  `WriteAnswer` → `StatementAnswer`,
+  `formStateWrite` → `formedStatement`,
+  `landStateWrite` → `landedStatement`,
+  `runStateWrite` → `landedStates`,
+  `runWrite` → `landedRows`,
+  `runStatement` → `executeStatement`,
+  `StatementRun` → `StatementExecution`,
+  `runLedgerStatement` → `executeLedgerStatement`.
+  Across `api/`, `client/`, `shared/`, `web-app/`, and
+  `server/`, 53 distinct
+  identifiers contain Create, Update, or Upsert and 41
+  contain Write. Some stay: the DOM's `createElement` and
+  constructors such as `createHttpFacade`. The audit rules
+  on each of the rest, naming by the HTTP-verb convention
+  (`getNoun`, `putNoun`, `deleteNoun`,
+  `postNounOperation`) at the HTTP layer and INSERT at the
+  store. Each rename is its own commit. Oracle: a test
+  sweeps identifiers for the four verbs and fails on any
+  that is not in its named-exception list.
+- The ledger root's body is JSON. `/migrations/0000-root`
+  (`api/ledger-root.ts:16-17`) is the one head whose
+  response body is not a JSON object: 64 hex characters of
+  the empty string's sha256, with no `content-type`, so it
+  carries none of its path's ids. Every other document
+  body carries its id. Form it as a JSON object with `id`
+  `0000-root` and the digest under a named key, with
+  `content-type: application/json` and the
+  `content-length` that follows. Both backends read the
+  root (`api/backend-memory.ts:248`,
+  `api/backend-postgres.ts:117`); every deployment seeds
+  fresh, so nothing stored migrates. Oracle: the root
+  head's response parses as a JSON object whose `id` is
+  `0000-root`, in both backends.
 
 ## Sequencing
 

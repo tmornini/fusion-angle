@@ -7197,6 +7197,91 @@ Step 3, and the families Task 15 had to strip keys for.
 
 ---
 
+### Task 21: Store each message's secrets beside it
+
+**Operator addition**, ordered after the plan was
+approved. It overrides three Global Constraints for this
+task alone: "Untouched: … the schema
+(`api/schema-postgres.ts`), the fourteen per-row
+parameters, … the credential hoist", and the spec's
+Decision 13 ("the credential hoist into `secret`",
+carried in).
+
+**Why.** One `secret` column holds both messages'
+credential lines: the request block, one extra CRLF,
+then the response block (SCHEMA.md `## Secrets`). Putting
+a request back together means finding that separator
+first. Split it: `request_secrets` holds exactly the
+request's hoisted lines and `response_secrets` exactly the
+response's, each stored so that splicing it back into
+its own message's header block is a concatenation. No
+parse, no separator.
+
+**Files:**
+- Modify: `api/schema-postgres.ts` (`secret`,
+  `secret_hash` → `request_secrets`,
+  `request_secrets_hash`, `response_secrets`,
+  `response_secrets_hash`; the hash checks follow)
+- Modify: `api/ledger-statement-sql.ts`,
+  `shared/ledger-statement.ts`, `api/backend-memory.ts`,
+  `api/backend-postgres.ts` (the row's parameters: the one
+  `secret` bind becomes two; the SQL hashes each)
+- Modify: `shared/pair-root.ts` (`pair_hash` covers both
+  hashes, request first)
+- Modify: `shared/http-message/credentials.ts`,
+  `api/message-pair.ts` (the hoist keeps the two blocks
+  apart; `mergeSecret` and every reassembly take their own
+  message's block)
+- Modify: `api/validators.ts` (the storage edge),
+  `shared/types.ts` (the entity), the seed's formers
+  (`api/mock-data/seed-message-pairs.ts`,
+  `api/ledger-seed.ts`), and every other reader
+  `git grep -nw secret -- api shared server client` names
+- Modify: `SCHEMA.md` `## Secrets`; regenerate `SCHEMA.svg`
+- Modify: the pins that read `secret` or `secret_hash`
+
+**Stored form.** Each column is its message's hoisted
+credential lines, each CRLF-terminated, in the order the
+message carried them. It is zero bytes when the message
+carried none. Reassembly inserts the block at the end of
+its message's header fields, before the blank line, so
+the reassembled message has the same bytes the hoist
+started from. Each hash is sha256 of its column's bytes,
+unsalted, as `secret_hash` is today.
+
+**Behavior that must not change.** No credential line
+reaches `request` or `response`. `withoutSecret` still
+projects secrets out of every API answer. The wire answer
+of every write is byte-identical. The per-row parameter
+count goes from fourteen to fifteen, with no other change.
+Every deployment seeds fresh (§4), so nothing stored
+migrates.
+
+**Pins.**
+- A request carrying `authorization` and a response
+  carrying `set-cookie` store each line in its own
+  column, and neither column holds the other's.
+- Reassembly of each message from its stored bytes and
+  its own column equals the message as received or formed.
+- Zero credential lines store zero bytes in both columns,
+  with each hash being sha256 of the empty string.
+- The Postgres twin of the first pin, in
+  `tests/pg-ledger-store.test.ts`.
+- `pair_hash` changes when either column changes.
+
+Every pin that reads `secret`, `secret_hash`, or the
+separator today moves to the two columns and asserts the
+same facts.
+
+**Gates.** `./test validate` (it regenerates nothing;
+`generate-schema-svg --check` must pass after
+`./bin/generate-schema-svg`), then `./test postgres`.
+
+**Commit.** One commit:
+`Store each message's secrets beside it`.
+
+---
+
 ## Spec coverage
 
 | Spec | Task |
