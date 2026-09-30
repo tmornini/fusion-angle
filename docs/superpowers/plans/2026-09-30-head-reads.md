@@ -803,31 +803,18 @@ replaced by one more run.
 - [ ] **Step 2: Ask the operator for the base measure**
 
 The tree must be clean (Task 1 committed). A local
-sweep builds, then seeds through `./bin/postgres-seed
---postgres local --mock-data`, which is `docker compose
-run --rm seed` under the worktree's directory name as
-the compose project: `run` starts compose's `postgres`
-itself (tmpfs, so empty), publishes it on
-127.0.0.1:5432, and leaves it running for the served
-binary, which reaches it at `POSTGRES_URL`. So nothing
-may hold 5432 first, the operator's own compose
-included; the three secrets must agree; compose parses
-the `server` service, so `PORT` must be set, though
-nothing binds it; `CHROME` only if Chrome is not at its
-default path. `down` at both ends clears a stale
-project and the one `run` left. Ask the operator to
+sweep mints its own compose stack (`bin/compose-lib`:
+the secrets, a project named `fusion-measure-<pid>`,
+and `down` on exit), so the operator sets nothing but
+`CHROME`, and that only if Chrome is not at its default
+path. The seed starts compose's `postgres` on
+127.0.0.1:5432, which must be free. Ask the operator to
 run, from the main checkout:
 
 ```bash
 cd .worktrees/head-reads
-export POSTGRES_PASSWORD="$(openssl rand -hex 16)"
-export JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
-export POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}@127.0.0.1:5432/fusion"
-export PORT=8080
-docker compose down --remove-orphans
 ./bin/measure --record --visualize --runs 25 \
     2>&1 | tee .superpowers/measure-base.txt
-docker compose down --remove-orphans
 ```
 
 `--record` refuses `--pages` (a partial record is
