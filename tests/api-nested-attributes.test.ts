@@ -278,7 +278,7 @@ async () => {
     );
 });
 
-Deno.test('DELETE unreferenced → 204; detail 404',
+Deno.test('DELETE unreferenced → 204; detail 410',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
@@ -295,10 +295,10 @@ async () => {
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assertStrictEquals(get.status, 404);
+    assertStrictEquals(get.status, 410);
     assertEquals(await get.json(), {
         error:
-            'Not found: record_attributes/' + ATTR_ID,
+            'Gone: record_attributes/' + ATTR_ID,
     });
 });
 
@@ -470,7 +470,7 @@ async () => {
     const gone = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assertStrictEquals(gone.status, 404);
+    assertStrictEquals(gone.status, 410);
 });
 
 Deno.test('composed-op edit removedAttributeIds with a valued '

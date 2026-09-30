@@ -227,7 +227,7 @@ async () => {
     assertStrictEquals(wire.name, 'Stolen');
 });
 
-Deno.test('DELETE unreferenced type, admin → 204; detail 404; '
+Deno.test('DELETE unreferenced type, admin → 204; detail 410; '
 + 'omitted from collection',
 async () => {
     const { db, adminToken } = await adminDb();
@@ -243,7 +243,7 @@ async () => {
     const detail = await handleRequest(db, req(
         'GET', DETAIL + 'sjWcXwYGlgxxJOHxzMoUow', adminToken,
     ));
-    assertStrictEquals(detail.status, 404);
+    assertStrictEquals(detail.status, 410);
     const collection = await handleRequest(db, req(
         'GET', COLLECTION, adminToken,
     ));

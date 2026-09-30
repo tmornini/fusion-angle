@@ -191,5 +191,5 @@ async () => {
     const detail = await handleRequest(db, req(
         'GET', TYPE_DETAIL, adminToken,
     ));
-    assertStrictEquals(detail.status, 404);
+    assertStrictEquals(detail.status, 410);
 });

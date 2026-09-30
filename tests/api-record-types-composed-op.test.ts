@@ -631,7 +631,7 @@ async () => {
     const absent = await handleRequest(db, req(
         'GET', detail + '/attributes/' + gone, adminToken,
     ));
-    assertStrictEquals(absent.status, 404);
+    assertStrictEquals(absent.status, 410);
 });
 
 Deno.test('an unchanged record edit stores nothing'

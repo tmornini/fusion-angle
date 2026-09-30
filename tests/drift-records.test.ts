@@ -10,6 +10,7 @@ import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
+    RetiredEntityError,
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
@@ -270,6 +271,11 @@ async function derivedRecordAttribute(
             'record_attributes', id,
         );
     }
+    if (res.status === 410) {
+        throw new RetiredEntityError(
+            'record_attributes', id,
+        );
+    }
     if (res.status !== 200) {
         throw new Error(
             'derivedRecordAttribute: GET ' + res.status,
@@ -518,11 +524,15 @@ async () => {
             ),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
-        const derived = await derivedRecord(
-            db, organization, id,
+        assertStrictEquals(
+            await res.text(),
+            await storedPutBodyText(
+                db,
+                '/organizations/' + organization
+                    + '/record-types/',
+                id,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     const attributeOrganizationByRecordId:
@@ -556,7 +566,16 @@ async () => {
         const derived = await derivedRecordAttribute(
             db, organization, attribute.id,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertStrictEquals(
+            wireText,
+            await storedPutBodyText(
+                db,
+                '/organizations/' + organization
+                    + '/record-types/' + attribute.record_id
+                    + '/attributes/',
+                attribute.id,
+            ),
+        );
         assertStrictEquals(derived.name, attribute.name);
     }
 
@@ -681,11 +700,15 @@ async () => {
                 + '/record-types/' + recordId, token),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
-        const derived = await derivedRecord(
-            db, STARK_ORGANIZATION, recordId,
+        assertStrictEquals(
+            await res.text(),
+            await storedPutBodyText(
+                db,
+                '/organizations/' + STARK_ORGANIZATION
+                    + '/record-types/',
+                recordId,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     async function assertAttributeWire(id: string): Promise<void> {
@@ -695,11 +718,16 @@ async () => {
                 + '/attributes/' + id, token),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
-        const derived = await derivedRecordAttribute(
-            db, STARK_ORGANIZATION, id,
+        assertStrictEquals(
+            await res.text(),
+            await storedPutBodyText(
+                db,
+                '/organizations/' + STARK_ORGANIZATION
+                    + '/record-types/' + recordId
+                    + '/attributes/',
+                id,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     async function assertAttributeAbsent(id: string): Promise<void> {
@@ -708,12 +736,12 @@ async () => {
                 + '/record-types/' + recordId
                 + '/attributes/' + id, token),
         );
-        assertStrictEquals(res.status, 404);
+        assertStrictEquals(res.status, 410);
         await assertRejects(
             () => derivedRecordAttribute(
                 db, STARK_ORGANIZATION, id,
             ),
-            EntityNotFoundError,
+            RetiredEntityError,
         );
     }
 
@@ -834,7 +862,7 @@ async () => {
         afterArchive.some((r) => r.id === recordId), true,
     );
 
-    // Step 6: deleted lifecycle — wire + derive 404.
+    // Step 6: deleted lifecycle — wire 410, derive 404.
     const deletedTransition = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token, {
@@ -849,7 +877,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assertStrictEquals(deletedGet.status, 404);
+    assertStrictEquals(deletedGet.status, 410);
     await assertRejects(
         () => derivedRecord(db, STARK_ORGANIZATION, recordId),
         EntityNotFoundError,
@@ -882,7 +910,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + secondRecordId, token),
     );
-    assertStrictEquals(secondGet.status, 404);
+    assertStrictEquals(secondGet.status, 410);
     await assertRejects(
         () => derivedRecord(
             db, STARK_ORGANIZATION, secondRecordId,
@@ -953,7 +981,15 @@ Deno.test('duplicate-create: the second create is 409 and stores'
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(
+        wireText,
+        await storedPutBodyText(
+            db,
+            '/organizations/' + STARK_ORGANIZATION
+                + '/record-types/',
+            recordId,
+        ),
+    );
     assertStrictEquals(derived.name, 'Dup First');
 });
 
@@ -1128,7 +1164,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assertStrictEquals(miss.status, 404);
+    assertStrictEquals(miss.status, 410);
     await assertRejects(
         () => derivedRecord(db, STARK_ORGANIZATION, recordId),
         EntityNotFoundError,
@@ -1155,7 +1191,15 @@ async () => {
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(
+        wireText,
+        await storedPutBodyText(
+            db,
+            '/organizations/' + STARK_ORGANIZATION
+                + '/record-types/',
+            recordId,
+        ),
+    );
     assertStrictEquals(derived.name, 'Second Life');
 
     const listRes = await handleRequest(

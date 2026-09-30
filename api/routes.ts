@@ -106,7 +106,6 @@ import {
     documentHeadAt,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
-    attachEtag,
 } from './message-pair.ts';
 import type {
     MessagePair,
@@ -159,6 +158,7 @@ import {
 } from './derive-projects.ts';
 import {
     deriveRecordTypeCollection,
+    RECORD_TYPES_TABLE,
     recordTypeEntityOf,
     recordTypeHeadFor,
     recordTypesUriPrefix,
@@ -4801,18 +4801,27 @@ export const routes: Route[] = [
         },
     }),
     route(RECORD_TYPE_DETAIL_PATTERN, {
-        // The head's ETag is the tag a composed edit latches.
-        get: async (db, p, _actor, organization) => {
-            const fenced = requireOrganization(organization);
-            const head = await recordTypeHeadFor(
-                db, fenced, param(p, 1),
+        // The stored head's ETag is the tag a composed edit
+        // latches; a deleted type is Gone (spec §5).
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
             );
-            return attachEtag(
-                Response.json(recordTypeEntityOf(
-                    headDocumentOf(head), fenced,
-                )),
-                head.id,
+            const id = param(p, 1);
+            const head = await db.messagePairs.getHeadPair(
+                recordTypesUriPrefix(organizationId), id,
             );
+            if (head === null) {
+                throw await missedReadError(
+                    db, id, organizationId, RECORD_TYPES_TABLE,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'state',
+                table: RECORD_TYPES_TABLE, id,
+                reader: { sees: 'whole' },
+            };
         },
         put: (db, p, body, actor, messagePair) =>
             postRecordDocumentOp(
@@ -4929,27 +4938,34 @@ export const routes: Route[] = [
     // with four-leg RESTRICT. No WRITE_AUTHORIZERS (deep
     // sub-family — parent type 404 + path org gate).
     route(ATTRIBUTE_DETAIL_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
+        // A missing or deleted parent type stays 404; the
+        // stored body already carries the path keys the PUT
+        // stamped, and a removed attribute is Gone (spec §5).
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const attrId = param(p, 2);
-            await requireRecordTypeExists(db, org, typeId);
-            const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getCollectionPairs(
-                prefix,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            const document = deriveDocumentsAt(
-                messagePairs, prefix,
-            ).get(attrId);
-            if (document === undefined) {
+            const head = await db.messagePairs.getHeadPair(
+                attributesUriPrefix(organizationId, typeId),
+                attrId,
+            );
+            if (head === null) {
                 throw await missedReadError(
-                    db, attrId, org, 'record_attributes',
+                    db, attrId, organizationId,
+                    'record_attributes',
                 );
             }
-            return nestedAttributeWireOf(
-                org, typeId, attrId,
-                attributeStateOf(document.body),
-            );
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'record_attributes', id: attrId,
+                reader: { sees: 'whole' },
+            };
         },
         put: async (db, p, body, _actor, messagePair) => {
             const org = param(p, 0);
