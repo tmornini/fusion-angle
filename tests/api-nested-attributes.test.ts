@@ -513,6 +513,10 @@ async () => {
             state: 'active',
             removedAttributeIds: [ATTR_ID],
         },
+        {
+            [IF_MATCH_HEADER]: '"' + (await db.messagePairs
+                .getHeadPair(COLLECTION, TYPE_ID))!.id + '"',
+        },
     ));
     assertStrictEquals(edit.status, 409);
     const err = await edit.json() as { error: string };

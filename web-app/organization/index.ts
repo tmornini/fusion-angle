@@ -30,7 +30,6 @@ import {
     type GeneralInfoDraft,
     getObjectives,
     activeObjectivesOf,
-    objectiveStatesOf,
     getCurrentObjectiveDefinition,
     getCurrentObjectiveDefinitions,
     postObjectiveCreation,
@@ -136,16 +135,12 @@ interface ObjectivesData {
         >
     >;
     archivedAt: Map<string, string>;
-    states: ReturnType<typeof objectiveStatesOf>;
 }
 
 async function fetchObjectivesData(
     ctx: ReturnType<typeof sessionContext>,
 ): Promise<ObjectivesData> {
-    // One collection GET; drag-reorder echoes each id's
-    // state from this map (no per-drag GET).
     const allObjs = await getObjectives(ctx);
-    const states = objectiveStatesOf(allObjs);
     const active = activeObjectivesOf(allObjs);
     const archived = allObjs.filter(
         o => o.state === 'archived',
@@ -161,7 +156,6 @@ async function fetchObjectivesData(
         archived,
         defs,
         archivedAt: new Map<string, string>(),
-        states,
     };
 }
 
@@ -193,21 +187,14 @@ function paintObjectives(
         '[data-list="active"]', box,
     );
     if (!activeList) return;
-    const states = data.states;
     initDragReorder(
         activeList,
         '[data-objective-id]',
         'data-objective-id',
         async (id, newPosition) => {
             const dragCtx = sessionContext();
-            const state = states.get(id);
-            if (state === undefined) {
-                throw new Error(
-                    'no state for objective ' + id,
-                );
-            }
             await putObjectivePosition(
-                dragCtx, id, newPosition, state,
+                dragCtx, id, newPosition,
             );
         },
     );

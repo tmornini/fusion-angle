@@ -156,8 +156,9 @@ export interface WriteMessagePairInput {
     // canonicalPath.
     readonly organization: Id | undefined;
     // Present only for the answering row: the body bytes the
-    // gate read. Synthesized pairs omit it and build a request
-    // from `body`.
+    // gate read. A synthesized pair sets emptyRequest instead;
+    // only the seed's formers build a request from `body`,
+    // and the seed's landing strips it.
     readonly bodyBytes?: Uint8Array;
     readonly responseBody: unknown | undefined;
     // Lines formed onto the response before the split.
@@ -982,6 +983,20 @@ export type ParentSibling = {
     readonly condition: SiblingCondition,
 };
 
+// A parent followed by later siblings is skipped when it
+// equals its head while they land, so it carries the head
+// its handler read: the received pair's etag names that
+// head then, since the parent's new pair never lands.
+export type ReadCondition = {
+    readonly kind: 'in-order',
+    readonly head: Id,
+    readonly read: MessagePairEntity,
+};
+
+export type ReadParent = Omit<ParentSibling, 'condition'> & {
+    readonly condition: ReadCondition,
+};
+
 export type StateSibling =
     | ParentSibling
     | {
@@ -1013,9 +1028,11 @@ export type StateWrite =
     | {
         readonly kind: 'siblings',
         readonly received: MessagePair,
-        readonly siblings: readonly [
-            ParentSibling, ...StateSibling[],
-        ],
+        readonly siblings:
+            | readonly [ParentSibling, ...StateSibling[]]
+            | readonly [
+                ReadParent, StateSibling, ...StateSibling[],
+            ],
         readonly project: StateProjection,
         readonly answer: StateAnswerKind,
     }
@@ -1074,7 +1091,8 @@ export async function formStateWrite(
             write, attemptFor([pair]), [pair], pair.id,
         );
     }
-    const pairs = await Promise.all(write.siblings.map(
+    const siblings: readonly StateSibling[] = write.siblings;
+    const pairs = await Promise.all(siblings.map(
         (sibling) => formSiblingPair(
             write.kind === 'events'
                 ? write.context
@@ -1092,7 +1110,7 @@ export async function formStateWrite(
                     === 'in-order'
                 ? HTTP_OK
                 : HTTP_CREATED,
-            etag: pairs[0]!.id,
+            etag: receivedEtag(write.siblings[0], pairs[0]!.id),
             fields: write.answer.kind === 'created'
                 ? [{
                     name: 'location',
@@ -1107,6 +1125,24 @@ export async function formStateWrite(
         [writeRowOf(received, null), ...pairs],
         pairs[0]!.id,
     );
+}
+
+// A parent equal to the head it latches is skipped, so the
+// received pair names that head; otherwise the parent's new
+// pair. A latch other than the head read is stale.
+function receivedEtag(
+    parent: ParentSibling | ReadParent,
+    formed: Id,
+): Id {
+    const condition = parent.condition;
+    if (
+        'read' in condition
+        && condition.head === condition.read.id
+        && sameAsHead(condition.read, parent.state)
+    ) {
+        return condition.read.id;
+    }
+    return formed;
 }
 
 // Row ops only: safe inside a transaction's body.
@@ -1198,27 +1234,34 @@ async function siblingsAnswer(
             rows: stated,
         };
     }
+    const parent = stated[1]!;
     if (outcome === 'matched') {
-        const head = stated[1]!;
-        if (head.rawOutcome !== 'matched') {
+        // The parent always latches, so it is a document row,
+        // and a matched statement matched it too.
+        if (parent.rawOutcome !== 'matched') {
             throw new Error(
-                'a sibling matched its head while the'
-                    + ' parent did not',
+                'a matched statement did not match its parent',
             );
         }
-        if (head.headResponse === null || head.headId === null) {
-            throw new Error('a matched parent has no head');
-        }
-        const stored = latin1(head.headResponse);
         return {
-            response: projectedResponse(
-                responseFromHead(stored, write.received.requestId),
-                stored,
-                write.project,
-            ),
+            ...parentHeadAnswer(write, parent),
             outcome,
-            answeredId: head.headId,
             bells: [],
+            rows: stated,
+        };
+    }
+    if (parent.rawOutcome === 'matched') {
+        // A received answer's parent is a token genesis, and a
+        // declared genesis never matches.
+        if (write.answer.kind === 'received') {
+            throw new Error(
+                'a received answer skipped its parent',
+            );
+        }
+        return {
+            ...parentHeadAnswer(write, parent),
+            outcome,
+            bells: bellsOf(rows, stated),
             rows: stated,
         };
     }
@@ -1239,9 +1282,28 @@ async function siblingsAnswer(
     };
 }
 
-// A sibling carries its state as its request body until
-// Task 16 empties every synthesized request
-// (Interpretation W).
+// A skipped parent answers its head, as a no-op does.
+function parentHeadAnswer(
+    write: Extract<StateWrite, { kind: 'siblings' }>,
+    parent: StatementAnswer,
+): { response: Response, answeredId: Id } {
+    if (parent.headResponse === null || parent.headId === null) {
+        throw new Error('a matched parent has no head');
+    }
+    const stored = latin1(parent.headResponse);
+    return {
+        response: projectedResponse(
+            responseFromHead(stored, write.received.requestId),
+            stored,
+            write.project,
+        ),
+        answeredId: parent.headId,
+    };
+}
+
+// A sibling is synthesized: nothing was received for it,
+// so it stores an empty request (§8). Its state rides the
+// response.
 async function formSiblingPair(
     context: SiblingContext,
     sibling: StateSibling,
@@ -1253,15 +1315,7 @@ async function formSiblingPair(
     const status = sibling.method === 'PUT'
         ? HTTP_CREATED
         : HTTP_NO_CONTENT;
-    const requestMessage = storedWire(buildRequestModel({
-        method: sibling.method,
-        target: sibling.path + sibling.name,
-        fields: [{
-            name: OPERATION_ID_HEADER,
-            value: context.operationId,
-        }],
-        body,
-    }));
+    const requestMessage = '';
     const response = formedResponse({
         status,
         etag: id,

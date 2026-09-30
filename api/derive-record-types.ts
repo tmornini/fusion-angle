@@ -1,6 +1,9 @@
 import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
-import type { Id } from '../shared/types.ts';
+import type {
+    Id,
+    MessagePairEntity,
+} from '../shared/types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import {
     headDocumentOf,
@@ -63,27 +66,40 @@ export async function deriveRecordTypeCollection(
     return rows;
 }
 
+// The live type's head: the GET answers from it and the
+// composed edit latches on it. No head, or a tombstone, is a
+// miss.
+export async function recordTypeHeadFor(
+    db: DbAdapter,
+    organization: Id,
+    id: Id,
+): Promise<MessagePairEntity> {
+    const prefix = recordTypesUriPrefix(organization);
+    const head = await messageStore(db).getDocumentHead(
+        prefix, id,
+    );
+    if (
+        head === null
+        || documentIsTombstone(headDocumentOf(head))
+    ) {
+        throw await missedReadError(
+            db, id, organization, RECORD_TYPES_TABLE,
+        );
+    }
+    return head;
+}
+
 export async function deriveRecordTypeEntity(
     db: DbAdapter,
     organization: Id,
     id: Id,
 ): Promise<RecordTypeWireRow> {
-    const prefix = recordTypesUriPrefix(organization);
-    const head = await messageStore(db).getDocumentHead(
-        prefix, id,
+    return recordTypeEntityOf(
+        headDocumentOf(
+            await recordTypeHeadFor(db, organization, id),
+        ),
+        organization,
     );
-    if (head === null) {
-        throw await missedReadError(
-            db, id, organization, RECORD_TYPES_TABLE,
-        );
-    }
-    const document = headDocumentOf(head);
-    if (documentIsTombstone(document)) {
-        throw await missedReadError(
-            db, id, organization, RECORD_TYPES_TABLE,
-        );
-    }
-    return recordTypeEntityOf(document, organization);
 }
 
 export async function requireRecordTypeExists(

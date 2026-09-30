@@ -28,23 +28,7 @@ import {
 } from '../api/derive-states.ts';
 import { validateWorkOrderVersion } from '../api/validators.ts';
 import { responseRecordOf } from '../api/message-pair.ts';
-import { HttpMessage } from
-    '../shared/http-message/http-message.ts';
-import { parseWire } from
-    '../shared/http-message/wire-codec.ts';
 import { framedRequest } from './http-fixtures.ts';
-
-function messagePairJsonOf(message: string): {
-    readonly body: Record<string, unknown>;
-} {
-    const body = HttpMessage.fromWire(message).body();
-    return {
-        body: body.exists()
-            ? JSON.parse(body.toText()) as
-                Record<string, unknown>
-            : {},
-    };
-}
 
 // Task 6: WO-instance SoT seed chain — a PATCH create landing
 // its PATCH and PUT together, the binding PUT, then Review and
@@ -151,12 +135,7 @@ async () => {
     const requests = await db.messagePairs.getCollectionPairs(prefix,
     );
     assertStrictEquals(requests.length, 1);
-    const model = parseWire(requests[0]!.request);
-    assertStrictEquals(model.startLine.kind, 'request');
-    if (model.startLine.kind !== 'request') {
-        return;
-    }
-    assertStrictEquals(model.startLine.method, 'PUT');
+    assertStrictEquals(requests[0]!.method, 'PUT');
     const versions = (await db.messagePairs.getDocumentHistory(
         '/organizations/' + STARK_ORGANIZATION + '/work-orders/',
         WO01_ID,
@@ -179,8 +158,7 @@ async () => {
     );
 });
 
-Deno.test('WO01 history: Review 6 new-shape + Complete 1;'
-+ ' other WOs stay legacy',
+Deno.test('WO01 history: Review 6 new-shape + Complete 1',
 async () => {
     const db = await seededDb();
     const history = await workOrderHistoryFor(
@@ -200,35 +178,6 @@ async () => {
         complete.field_values[0]!.id,
         complete.field_values[0]!.attribute_id,
     );
-
-    // Other WO transition pairs keep the LEGACY fieldValues
-    // key (never instance_id/set) — event fidelity.
-    const otherWoId = 'krzCXtfVNOLvbGcYnSrhng';
-    const otherPrefix =
-        '/organizations/' + STARK_ORGANIZATION
-        + '/work-orders/' + otherWoId + '/transition/';
-    const otherReqs = await db.messagePairs.getCollectionPairs(otherPrefix,
-    );
-    assert(otherReqs.length > 0);
-    for (const request of otherReqs) {
-        const embedded = messagePairJsonOf(
-            request.request,
-        ) as {
-            body: Record<string, unknown>;
-        };
-        assert(
-            Object.hasOwn(embedded.body, 'fieldValues'),
-            'legacy body missing fieldValues',
-        );
-        assertStrictEquals(
-            Object.hasOwn(embedded.body, 'instance_id'),
-            false,
-        );
-        assertStrictEquals(
-            Object.hasOwn(embedded.body, 'set'),
-            false,
-        );
-    }
 });
 
 Deno.test('chain provenance: three instance pairs ordered by at;'

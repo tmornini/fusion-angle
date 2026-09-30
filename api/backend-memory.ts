@@ -192,10 +192,10 @@ export class MemoryStorageBackend
                 pairHashHex: item.pairHashHex,
             });
         }
-        if (!answers.every((row) => row.inserted)) {
-            return answers;
-        }
-        for (const row of rows) {
+        const inserting = rows.filter(
+            (_row, i) => classified[i]!.inserted,
+        );
+        for (const row of inserting) {
             if (buffer.some((existing) => existing.id === row.id)) {
                 const error = new Error(
                     'duplicate primary key',
@@ -212,6 +212,7 @@ export class MemoryStorageBackend
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i]!;
             const item = classified[i]!;
+            if (!item.inserted) continue;
             if (!documentMethod(row.method)) continue;
             const key = successionKey(
                 row.path, row.name, item.supersedes,
@@ -224,6 +225,7 @@ export class MemoryStorageBackend
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i]!;
             const item = classified[i]!;
+            if (!item.inserted) continue;
             buffer.push(entityOf(row, item));
         }
         return answers;

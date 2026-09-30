@@ -87,6 +87,21 @@ export async function getRecord(
     );
 }
 
+// The type with the tag of the head it was read from, which
+// a composed edit latches.
+export async function getRecordWithEtag(
+    ctx: RequestContext,
+    id: RecordId,
+): Promise<{ record: RecordEntity, etag: string }> {
+    const read = await ctx.GETWithEtag<RecordEntity>(
+        recordTypePath(ctx, id),
+    );
+    if (read.etag === undefined) {
+        throw new Error('the record type GET carried no ETag');
+    }
+    return { record: read.body, etag: read.etag };
+}
+
 // Domain state rides the RecordEntity GET row; narrow it
 // once, at the wire.
 function recordStateOf(row: RecordEntity): RecordState {
@@ -245,7 +260,11 @@ export async function postRecordChange(
             initialState: change.initialState,
         });
     } else {
-        await ctx.POST(recordTypesPath(ctx), {
+        // The edit is an operation on the type: it names the
+        // head it was read from, so a 412 surfaces as
+        // RequestError.
+        const { etag } = await getRecordWithEtag(ctx, id);
+        await ctx.POSTWithHeaders(recordTypesPath(ctx), {
             kind: 'edit',
             id,
             record,
@@ -253,7 +272,7 @@ export async function postRecordChange(
             state: change.state,
             removedAttributeIds:
                 change.removedAttributeIds,
-        });
+        }, [['If-Match', '"' + etag + '"']]);
     }
     recordChanges.notify();
 }

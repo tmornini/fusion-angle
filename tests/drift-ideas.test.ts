@@ -443,9 +443,16 @@ Deno.test('live approve then convert: the idea reads'
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId, token,
         ideaDocument('Approve Then Convert', 'approved'),
     ));
-    const convert = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
-            + '/conversion', token, {
+    const ideaHead = await db.messagePairs.getHeadPair(
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
+    );
+    const convert = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
+            + '/conversion',
+        token,
+        headers: { 'If-Match': '"' + ideaHead!.id + '"' },
+        body: {
             projectId,
             project: {
                 title: 'Converted Project',
@@ -474,8 +481,14 @@ Deno.test('live approve then convert: the idea reads'
             projectStateAt: '2026-06-03T00:00:01.000000Z',
             baselines: [],
         },
-    ));
-    assertStrictEquals(convert.status, 201);
+    }));
+    assertStrictEquals(convert.status, 200);
+    assertEquals(
+        await convert.json(),
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
+        )),
+    );
 
     const document = await getDocument(
         db, 'ideas', 'AjdvjuECVZEgZoFajaIEkg', ideaId,
@@ -492,5 +505,149 @@ Deno.test('live approve then convert: the idea reads'
         await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
         ),
+    );
+});
+
+// The conversion body the four latch pins below send: an
+// approved idea promoted into a fresh project, no baselines.
+function conversionBody(title: string): Record<string, unknown> {
+    return {
+        projectId: generateIdentifier(),
+        project: {
+            title: 'Converted ' + title,
+            description: 'done when X',
+            progress: 0,
+            start_date: '2026-06-01',
+            target_end_date: '2026-09-01',
+            estimated_cost: 100,
+            actual_cost: 0,
+            position: 1,
+        },
+        idea: {
+            title,
+            position: 1,
+            problem_statement: 'p',
+            target_users: 't',
+            proposed_solution: 's',
+            expected_outcome: 'o',
+            success_metrics: 'm',
+        },
+        ideaStateEventId: generateIdentifier(),
+        ideaState: 'promoted',
+        projectStateEventId: generateIdentifier(),
+        projectState: 'submitted',
+        ideaStateAt: '2026-06-03T00:00:00.000000Z',
+        projectStateAt: '2026-06-03T00:00:01.000000Z',
+        baselines: [],
+    };
+}
+
+const IDEAS = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
+
+async function approvedIdea(
+    db: MemoryDbAdapter,
+    token: string,
+    title: string,
+): Promise<{ id: string, etag: string }> {
+    const id = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'PUT', IDEAS + id, token, ideaDocument(title, 'approved'),
+    ));
+    await res.body?.cancel();
+    const etag = res.headers.get('etag');
+    assert(etag !== null);
+    return { id, etag };
+}
+
+function conversionRequest(
+    ideaId: string,
+    token: string,
+    body: Record<string, unknown>,
+    etag?: string,
+): Request {
+    return apiRequest({
+        method: 'POST',
+        path: IDEAS + ideaId + '/conversion',
+        token,
+        body,
+        ...(etag !== undefined
+            ? { headers: { 'If-Match': etag } }
+            : {}),
+    });
+}
+
+Deno.test('a conversion without If-Match is 428', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const idea = await approvedIdea(db, token, 'Untagged');
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, conversionRequest(
+        idea.id, token, conversionBody('Untagged'),
+    ));
+    assertStrictEquals(res.status, 428);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('a conversion answers the idea\'s state', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const idea = await approvedIdea(db, token, 'Answered');
+    const res = await handleRequest(db, conversionRequest(
+        idea.id, token, conversionBody('Answered'), idea.etag,
+    ));
+    assertStrictEquals(res.status, 200);
+    const head = await db.messagePairs.getHeadPair(
+        IDEAS, idea.id,
+    );
+    assert(head !== null);
+    assertStrictEquals(res.headers.get('etag'), '"' + head.id + '"');
+    const state = await res.json() as { state: string };
+    assertEquals(
+        state,
+        JSON.parse(await storedPutBodyText(db, IDEAS, idea.id)),
+    );
+    assertStrictEquals(state.state, 'promoted');
+});
+
+Deno.test('a conversion of a missing idea is 404', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const missing = generateIdentifier();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, conversionRequest(
+        missing, token, conversionBody('Missing'),
+        '"' + generateIdentifier() + '"',
+    ));
+    assertStrictEquals(res.status, 404);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    assertStrictEquals(
+        await db.messagePairs.getHeadPair(IDEAS, missing), null,
+    );
+});
+
+Deno.test('a stale conversion tag is 412', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const idea = await approvedIdea(db, token, 'Stale');
+    const edited = await handleRequest(db, req(
+        'PUT', IDEAS + idea.id, token,
+        ideaDocument('Stale', 'approved', 2),
+    ));
+    assertStrictEquals(edited.status, 200);
+    await edited.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, conversionRequest(
+        idea.id, token, conversionBody('Stale'), idea.etag,
+    ));
+    assertStrictEquals(res.status, 412);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });

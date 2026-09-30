@@ -303,7 +303,7 @@ function assertConversionFullyScored(
 
 // Idea conversion (idea→project promotion): the LONE
 // cross-aggregate write, composed by the named POST
-// /ideas/:id/conversion into ONE re-entrant transaction. A
+// /ideas/:id/conversion into ONE statement. A
 // new project row, the promoted idea row, two state events
 // (the idea moves to 'promoted', the new project enters at
 // its initial state), and the N per-objective baseline
@@ -347,8 +347,18 @@ export async function postIdeaConversion(
     // The ledger's latest-wins total order requires distinct values.
     const ideaStateAt = nowUtc();
     const projectStateAt = nowUtc();
-    const member = await getCurrentHumanMember(ctx);
-    await ctx.POST(
+    // The conversion is an operation on the idea: it names the
+    // head it was read from, so a 412 surfaces as RequestError.
+    const [member, idea] = await Promise.all([
+        getCurrentHumanMember(ctx),
+        ctx.GETWithEtag<IdeaEntity>(
+            organizationItem(ctx, 'ideas', ideaId),
+        ),
+    ]);
+    if (idea.etag === undefined) {
+        throw new Error('the idea GET carried no ETag');
+    }
+    await ctx.POSTWithHeaders(
         organizationItem(ctx, 'ideas', ideaId)
             + '/conversion',
         {
@@ -371,7 +381,7 @@ export async function postIdeaConversion(
                 at: ideaStateAt,
             },
         })),
-    });
+    }, [['If-Match', '"' + idea.etag + '"']]);
     notifyProjectChange();
     notifyProjectScoreChange();
     ideaChanges.notify();

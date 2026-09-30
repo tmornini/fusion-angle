@@ -13,6 +13,7 @@ import {
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest,
+    pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { identityDocumentEntityOf } from '../api/routes.ts';
@@ -322,3 +323,40 @@ Deno.test(
         );
     },
 );
+
+// One shape per family: the create stores the credential's
+// wire, so the route's identical PUT over it is the
+// statement's match.
+Deno.test('a route PUT of the create\'s credential stores nothing'
++ ' and answers 200', async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const credentialId = generateIdentifier();
+    const created = await handleRequest(db, req(
+        'POST', '/identities/', DEV_TOKEN, {
+            id,
+            kind: 'service',
+            credential: { ...credential(id), id: credentialId },
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const credentials = '/identities/' + id + '/credentials/';
+    const head = await db.messagePairs.getHeadPair(
+        credentials, credentialId,
+    );
+    assert(head !== null);
+    const { id: _id, ...stored } = JSON.parse(
+        await storedPutBodyText(db, credentials, credentialId),
+    ) as Record<string, unknown>;
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, req(
+        'PUT', credentials + credentialId, DEV_TOKEN, stored,
+    ));
+    assertStrictEquals(res.status, 200);
+    assertStrictEquals(pairIdOf(res), head.id);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});

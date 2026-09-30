@@ -571,12 +571,15 @@ export async function putFlow(
                 ctx, id, save, revivalTarget,
             );
         try {
+            // A blind PUT answers 428; name the missing tag here
+            // rather than send one.
+            if (etag === undefined) {
+                throw new Error('the flow GET carried no ETag');
+            }
             await ctx.PUT(
                 organizationItem(ctx, 'flows', id),
                 body,
-                etag === undefined
-                    ? undefined
-                    : [['if-match', '"' + etag + '"']],
+                [['if-match', '"' + etag + '"']],
             );
             flowChanges.notify();
             return;

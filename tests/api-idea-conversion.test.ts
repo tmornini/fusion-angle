@@ -134,6 +134,10 @@ Deno.test(
         const db = await seededDb();
         // Two distinct timestamps — idea strictly before project —
         // to verify each at routes to its own event and not the other.
+        const ideaHead = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'gVvtDIaqhnkXZQcxZeSuiw',
+        );
         await POST(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw/conversion', {
@@ -159,7 +163,9 @@ Deno.test(
                 },
             ],
         }, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader([
+                ['If-Match', '"' + ideaHead!.id + '"'],
+            ]));
 
         const project = await GET<{
             title: string;
@@ -222,6 +228,10 @@ Deno.test(
     + ' and the idea\'s own documents',
     async () => {
         const db = await seededDb();
+        const ideaHead = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'gVvtDIaqhnkXZQcxZeSuiw',
+        );
         await POST(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw/conversion', {
@@ -245,7 +255,9 @@ Deno.test(
                 },
             ],
         }, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader([
+                ['If-Match', '"' + ideaHead!.id + '"'],
+            ]));
 
         // Balance invariant: the wire-seeded idea genesis PUT
         // (1) + two objective document PUTs (Stage B: message
@@ -282,10 +294,14 @@ Deno.test(
             request.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
-        const parsed = pairJsonOf(request.request) as {
+        const parsed = pairJsonOf(request.response) as {
             body: Record<string, unknown>;
         };
+        // The stored response is the project's state, which
+        // leads with its id and organization.
         assertEquals(parsed.body, {
+            id: 'psZcIMMgiSomMHzDxcUnYQ',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             ...projectFields('Promoted Project'),
             state: 'submitted',
         });
@@ -311,7 +327,7 @@ Deno.test(
         // The conversion's idea pair is the one carrying
         // 'promoted' (the seed carried 'approved').
         const ideaRequest = atIdea.find((r) => {
-            const body = (pairJsonOf(r.request) as {
+            const body = (pairJsonOf(r.response) as {
                 body: Record<string, unknown>;
             }).body;
             return body['state'] === 'promoted';
@@ -322,10 +338,12 @@ Deno.test(
             ideaRequest.requester_identity_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
-        const ideaParsed = pairJsonOf(ideaRequest.request) as {
+        const ideaParsed = pairJsonOf(ideaRequest.response) as {
             body: Record<string, unknown>;
         };
         assertEquals(ideaParsed.body, {
+            id: 'gVvtDIaqhnkXZQcxZeSuiw',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             ...ideaFields('Source Idea'),
             state: 'promoted',
         });
@@ -363,13 +381,13 @@ Deno.test(
                 'XXZruirZyAOoRpNxaDnpSA',
             );
             const baselineParsed = pairJsonOf(
-                baselineRequest.request,
+                baselineRequest.response,
             ) as { body: Record<string, unknown> };
-            // KEY-SET spot-check: the wire body is the
-            // baseline's `fields` VERBATIM — exactly
-            // {project_id, objective_id, score, member_id,
-            // at}, no more, no less.
-            assertEquals(baselineParsed.body, fields);
+            // KEY-SET spot-check: the stored body is the
+            // baseline's id and its `fields` VERBATIM —
+            // exactly {id, project_id, objective_id, score,
+            // member_id, at}, no more, no less.
+            assertEquals(baselineParsed.body, { id, ...fields });
         }
     },
 );
@@ -383,6 +401,10 @@ Deno.test(
         // a raw colliding states row no longer aborts the
         // message-plane conversion.
     // Phase Final Stage B: states table retired.
+        const ideaHead = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'gVvtDIaqhnkXZQcxZeSuiw',
+        );
         await POST(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw/conversion', {
@@ -402,7 +424,9 @@ Deno.test(
                 },
             ],
         }, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader([
+                ['If-Match', '"' + ideaHead!.id + '"'],
+            ]));
 
         const project = await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'

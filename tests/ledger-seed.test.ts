@@ -46,9 +46,11 @@ import {
     testHashPassword,
 } from './mock-seed.ts';
 import {
+    postMockDataLoad,
     rehearseBootstrap,
     rehearseMockData,
 } from '../api/mock-data.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import {
     buildRecords,
@@ -866,6 +868,18 @@ Deno.test(
     },
 );
 
+Deno.test('every seeded row stores an empty request',
+async () => {
+    const db = memoryDbAdapter();
+    await postMockDataLoad(db, {
+        hashPassword: testHashPassword,
+    });
+    const nonEmpty = (await db.messagePairs.getAll())
+        .filter((row) => row.request !== '')
+        .map((row) => row.path + row.name);
+    assertEquals(nonEmpty, []);
+});
+
 Deno.test(
     'the seeded invitation is the grant route\'s POST',
     async () => {
@@ -877,18 +891,15 @@ Deno.test(
         const post = at.find((row) => row.method === 'POST');
         const put = at.find((row) => row.method === 'PUT');
         assert(post !== undefined && put !== undefined);
-        assertStrictEquals(
-            post.request.startsWith(
-                'POST /organizations/' + STARK_ORGANIZATION
-                    + '/invitations/ HTTP/1.1\r\n',
-            ),
-            true,
-        );
-        const body = JSON.parse(
-            HttpMessage.fromWire(post.request).body().toText(),
+        const invitation = JSON.parse(
+            HttpMessage.fromWire(post.response).body().toText(),
         ) as Record<string, unknown>;
         assertStrictEquals(
-            body['email'], buildUnaffiliatedIdentity().email,
+            invitation['organization_id'], STARK_ORGANIZATION,
+        );
+        assertStrictEquals(
+            invitation['identity_id'],
+            buildUnaffiliatedIdentity().id,
         );
         assertStrictEquals(post.operation_id, put.operation_id);
     },

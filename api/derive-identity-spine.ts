@@ -165,9 +165,9 @@ function credentialsPrefixFor(identityId: Id): string {
     );
 }
 
-// FULL rows from the REQUEST body — the secret rides the request,
-// unlike role-grants (gate 16 above); the route projects
-// withoutSecret at read time, not here.
+// FULL rows from the stored response (the wire) — the secret
+// rides the wire, unlike role-grants (gate 16 above); the route
+// projects withoutSecret at read time, not here.
 function credentialEntityOf(
     document: DerivedDocument,
 ): IdentityCredentialEntity {
@@ -250,7 +250,7 @@ export function identityProviderEntityOf(
 }
 
 // Nested document is the source of truth — fill or overwrite
-// the request body's identity_id from the path.
+// the stored wire's identity_id from the path.
 function nestedProviderEntityOf(
     identityId: Id,
     document: DerivedDocument,
@@ -355,7 +355,7 @@ export function tokenRevocationEntityOf(
 }
 
 // Nested document is the source of truth — fill or overwrite
-// the request body's identity_id from the path.
+// the stored wire's identity_id from the path.
 function nestedTokenRevocationEntityOf(
     identityId: Id,
     document: DerivedDocument,

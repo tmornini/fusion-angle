@@ -45,7 +45,7 @@ export function identityTokenEntityOf(
 }
 
 // The nested document is the source of truth — fill or
-// overwrite the request body's identity_id from the path.
+// overwrite the stored wire's identity_id from the path.
 function nestedTokenEntityOf(
     identityId: Id,
     document: DerivedDocument,

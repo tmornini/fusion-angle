@@ -1,4 +1,4 @@
-import { assert, assertMatch, assertStrictEquals } from '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -323,17 +323,5 @@ async () => {
             db, MEMBERSHIP_PREFIX, 'yatHlUsoiwxMlkqjKvCVGQ',
         ),
         0,
-    );
-});
-
-// Memory serializes all ops, so the TOCTOU is
-// unreachable here; the pin is the comparison.
-Deno.test('a same-body answer is status 200 from the'
-+ ' stored response',
-() => {
-    const src = Deno.readTextFileSync('api/api.ts');
-    assertMatch(
-        src,
-        /responseFromHead\(/,
     );
 });

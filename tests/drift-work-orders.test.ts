@@ -580,7 +580,7 @@ async () => {
         canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.name === workOrderId
-            && decodeRequestMessage(r.request).method === 'POST',
+            && r.method === 'POST',
     )!;
     const storedCreateFlowGraph = (
         responseRecordOf(storedCreatePostRow.response) as {
@@ -904,7 +904,7 @@ async () => {
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
     const postRow = pairsAt.find(
-        (r) => decodeRequestMessage(r.request).method === 'POST',
+        (r) => r.method === 'POST',
     )!;
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),

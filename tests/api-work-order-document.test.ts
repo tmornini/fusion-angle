@@ -28,8 +28,6 @@ import {
     formWriteMessagePair,
     responseRecordOf,
 } from '../api/message-pair.ts';
-import { parseWire } from '../shared/http-message/wire-codec.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     apiRequest,
     pairIdOf,
@@ -320,31 +318,6 @@ function workOrderCreateBody(
     };
 }
 
-// Decode a stored request row's serializeWire message back into
-// its method + body — the SAME decode
-// tests/api-flow-document.test.ts's own decodeRequestMessage
-// performs, reconstructed here read-only (each test file is
-// an isolated world).
-function decodeRequestMessage(message: string): {
-    readonly method: string;
-    readonly body: Record<string, unknown>;
-} {
-    const model = parseWire(message);
-    if (model.startLine.kind !== 'request') {
-        throw new Error(
-            'stored message carries no request line',
-        );
-    }
-    const body = HttpMessage.fromModel(model).body();
-    return {
-        method: model.startLine.method,
-        body: body.exists()
-            ? JSON.parse(body.toText()) as
-                Record<string, unknown>
-            : {},
-    };
-}
-
 // The PUT-shaped row at a given document, excluding a prior
 // id — never positional (an index-0/AjdvjuECVZEgZoFajaIEkg read is an
 // implicit
@@ -360,8 +333,7 @@ function documentRowAt(
         r => r.path === prefix
             && r.name === name
             && r.id !== excludeId
-            && decodeRequestMessage(r.request).method
-                === 'PUT',
+            && r.method === 'PUT',
     );
 }
 

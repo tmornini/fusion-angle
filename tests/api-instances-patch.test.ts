@@ -19,7 +19,6 @@ import {
 } from './test-fixtures.ts';
 import {
     postInstancePatchOp,
-    formDocumentMessagePairFor,
 } from '../api/routes.ts';
 import {
     runWrite,
@@ -1055,10 +1054,18 @@ async () => {
     await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
-    const revision = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [ORGANIZATION, TYPE_ID, INSTANCE_ID],
+    const revision = await formWriteMessagePair({
         method: 'PUT',
+        pathname: INSTANCE_DETAIL,
+        routePattern: INSTANCE_DETAIL_PATTERN,
+        routeSegments:
+            INSTANCE_DETAIL_PATTERN.split('/'),
+        pathSegments: [
+            'organizations', ORGANIZATION,
+            'record-types', TYPE_ID,
+            'instances', INSTANCE_ID,
+        ],
+        headerFields: [],
         body: {
             values: [
                 {
@@ -1070,9 +1077,10 @@ async () => {
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: ORGANIZATION,
-        response: { status: 200, body: {} },
+        responseBody: {},
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
+        emptyRequest: true,
     });
     assertStrictEquals('follows' in revision, false);
     assertStrictEquals('supersedes' in revision, false);

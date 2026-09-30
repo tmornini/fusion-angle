@@ -880,9 +880,7 @@ Deno.test('a repeated revoke posts no notification',
     const inv = (await deriveInvitations(db))[0]!;
     await postInvitationRevocation(tony, inv.id);
     assertStrictEquals(posted.length, 2);   // grant, revoke
-    await assertRejects(
-        () => postInvitationRevocation(tony, inv.id),
-    );
+    await postInvitationRevocation(tony, inv.id);
     assertStrictEquals(posted.length, 2);
 }));
 

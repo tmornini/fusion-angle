@@ -14,6 +14,7 @@ import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
     framedRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
@@ -328,7 +329,7 @@ async () => {
     assertStrictEquals(grantRes.status, 201);
     const invitationId =
         ((await grantRes.json()) as { id: string }).id;
-    const acceptRes = await handleRequest(db, req(
+    const acceptRes = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + id + '/invitations/' + invitationId,
         await organizationToken(id, 'AjdvjuECVZEgZoFajaIEkg'),
@@ -337,8 +338,8 @@ async () => {
             membershipId: generateIdentifier(),
             eventId: generateIdentifier(), at: AT,
         },
-    ));
-    assertStrictEquals(acceptRes.status, 204);
+    )));
+    assertStrictEquals(acceptRes.status, 200);
     const edit = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         {

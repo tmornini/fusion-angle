@@ -12,6 +12,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -99,7 +100,7 @@ async () => {
     const inviteeId = 'MQFcPtrZPIGjMCRAXtZUnA'; // Sarah Chen
     await grant(db, id, 'sarah.chen@company.com');
 
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
@@ -109,8 +110,8 @@ async () => {
             eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
     assertStrictEquals(scoped.length, 2);
@@ -129,7 +130,7 @@ async () => {
     const inviteeId = 'zyGBRshxOnKHUfcyFRqowg'; // Jessica Park
     await grant(db, id, 'jessica.park@company.com');
 
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
@@ -138,8 +139,8 @@ async () => {
             eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
     assertStrictEquals(scoped.length, 2);
@@ -157,7 +158,7 @@ async () => {
     const id = generateIdentifier();
     await grant(db, id, 'emily.rodriguez@company.com');
 
-    const revoke = await handleRequest(db, req(
+    const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/invitations/' + id,
@@ -167,8 +168,8 @@ async () => {
             eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(revoke.status, 204);
+    )));
+    assertStrictEquals(revoke.status, 200);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
     assertStrictEquals(scoped.length, 2);

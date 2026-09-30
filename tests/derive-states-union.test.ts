@@ -35,6 +35,7 @@ import {
 } from './identity-fixtures.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -403,7 +404,7 @@ async function grantAndAccept(
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
-    const acceptRes = await handleRequest(db, req(
+    const acceptRes = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId
             + '/invitations/' + invitationId,
@@ -414,8 +415,8 @@ async function grantAndAccept(
             eventId: acceptEventId,
             at: acceptAt,
         },
-    ));
-    assertStrictEquals(acceptRes.status, 204, 'accept failed');
+    )));
+    assertStrictEquals(acceptRes.status, 200, 'accept failed');
 }
 
 interface UnionFixture {
@@ -833,7 +834,8 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
-    const firstAccept = await handleRequest(db, req(
+    const firstAccept = await handleRequest(
+        db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/'
             + invitationId,
@@ -844,10 +846,11 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
             eventId: accept1,
             at: '2026-04-02T00:00:00.000001Z',
         },
-    ));
-    assertStrictEquals(firstAccept.status, 204, 'first accept failed');
+    )));
+    assertStrictEquals(firstAccept.status, 200, 'first accept failed');
 
-    const secondAccept = await handleRequest(db, req(
+    const secondAccept = await handleRequest(
+        db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/'
             + invitationId,
@@ -858,9 +861,9 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
             eventId: accept2,
             at: '2026-04-02T00:00:00.000002Z',
         },
-    ));
+    )));
     assertStrictEquals(
-        secondAccept.status, 204, 're-accept is a no-op',
+        secondAccept.status, 200, 're-accept is a no-op',
     );
 
     const rows = await deriveInvitationStates(db);
@@ -905,7 +908,8 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
-    const firstDecline = await handleRequest(db, req(
+    const firstDecline = await handleRequest(
+        db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/'
             + invitationId,
@@ -915,10 +919,11 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
             eventId: decline1,
             at: '2026-04-03T00:00:00.000001Z',
         },
-    ));
-    assertStrictEquals(firstDecline.status, 204, 'first decline failed');
+    )));
+    assertStrictEquals(firstDecline.status, 200, 'first decline failed');
 
-    const secondDecline = await handleRequest(db, req(
+    const secondDecline = await handleRequest(
+        db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/'
             + invitationId,
@@ -928,9 +933,9 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
             eventId: decline2,
             at: '2026-04-03T00:00:00.000002Z',
         },
-    ));
+    )));
     assertStrictEquals(
-        secondDecline.status, 204,
+        secondDecline.status, 200,
         're-decline is a no-op',
     );
 

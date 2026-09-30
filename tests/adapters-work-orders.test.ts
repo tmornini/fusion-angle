@@ -13,6 +13,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    organizationItem,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -24,7 +25,7 @@ import {
     postWorkOrderTransition,
     putWorkOrderBinding,
     putWorkOrderClaim,
-    putWorkOrder,
+    putWorkOrderPosition,
     workOrderIfMatch,
 } from
 '../client/work-orders-mutations.ts';
@@ -76,6 +77,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
 import type {
+    WorkOrderEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
@@ -369,23 +371,84 @@ Deno.test(
 
         const firstId =
             await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
-        // NAMED re-pin (Task 7): putWorkOrder is the wire
-        // PUT — it takes the DOMAIN shape ({displayId,
-        // flowGraph, position} with flowGraph PARSED), not
-        // the raw snake_case row, so the domain object is
-        // fetched first (getWorkOrder) and only its position
-        // is patched.
-        const first = await getWorkOrder(ctx, firstId);
-        await putWorkOrder(ctx, firstId, {
-            ...first,
-            position: 7.5,
-        });
+        await putWorkOrderPosition(ctx, firstId, 7.5);
 
         const secondId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
 
         // Phase Final Task 2: position from message-plane GET.
         const second = await getWorkOrder(ctx, secondId);
         assertStrictEquals(second.position, 8.5);
+    },
+);
+
+// Another writer's display id move: a conditional PUT of the
+// work order's own fields with a new display id.
+async function moveDisplayId(
+    ctx: RequestContext,
+    id: string,
+): Promise<void> {
+    const path = organizationItem(ctx, 'work-orders', id);
+    const { body, etag } =
+        await ctx.GETWithEtag<WorkOrderEntity>(path);
+    await ctx.PUT(path, {
+        display_id: 'ffffffff',
+        flow_graph: body.flow_graph,
+        position: body.position,
+    }, [workOrderIfMatch(etag)]);
+}
+
+Deno.test(
+    'putWorkOrderPosition keeps the head'
+    + ' displayId and flow graph another write moved',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+        );
+        const id = await createWorkOrder(
+            ctx, 'ZOousbbnzpqlxJExVAruYQ',
+        );
+        // The page cached the work order at load; another
+        // write has since moved its displayId.
+        const cached = await getWorkOrder(ctx, id);
+        await moveDisplayId(ctx, id);
+        await putWorkOrderPosition(ctx, id, 7.5);
+        const head = await getWorkOrder(ctx, id);
+        assertStrictEquals(head.displayId, 'ffffffff');
+        assertStrictEquals(head.position, 7.5);
+        assertEquals(head.flowGraph, cached.flowGraph);
+    },
+);
+
+Deno.test(
+    'a stale work order position PUT surfaces 412',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+        );
+        const id = await createWorkOrder(
+            ctx, 'ZOousbbnzpqlxJExVAruYQ',
+        );
+        // Another write moves the head after the reorder's
+        // read and before its PUT.
+        const racing: RequestContext = {
+            ...ctx,
+            GETWithEtag: async <T>(resource: string) => {
+                const read = await ctx.GETWithEtag<T>(resource);
+                await moveDisplayId(ctx, id);
+                return read;
+            },
+        };
+        const error = await assertRejects(
+            () => putWorkOrderPosition(racing, id, 7.5),
+            RequestError,
+        );
+        assertStrictEquals(
+            error.status, HTTP_PRECONDITION_FAILED,
+        );
+        const head = await getWorkOrder(ctx, id);
+        assertStrictEquals(head.displayId, 'ffffffff');
     },
 );
 

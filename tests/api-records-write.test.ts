@@ -143,6 +143,10 @@ Deno.test(
             initialState: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
+        const head = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
+            'rbfHGatkwQzGZJVXKJEeyw',
+        );
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -158,7 +162,9 @@ Deno.test(
             state: 'active',
             removedAttributeIds: [],
         }, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader([
+                ['If-Match', '"' + head!.id + '"'],
+            ]));
         const record = await GET<{
             name: string;
             description: string;
@@ -211,6 +217,10 @@ Deno.test(
             initialState: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
+        const head = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
+            'rbfHGatkwQzGZJVXKJEeyw',
+        );
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -236,7 +246,9 @@ Deno.test(
             state: 'active',
             removedAttributeIds: [oldAttrId],
         }, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader([
+                ['If-Match', '"' + head!.id + '"'],
+            ]));
         const all = await GET<{
             id: string;
             name: string;
@@ -278,6 +290,10 @@ Deno.test(
             initialState: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
+        const head = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
+            'rbfHGatkwQzGZJVXKJEeyw',
+        );
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
             kind: 'edit',
             id: 'rbfHGatkwQzGZJVXKJEeyw',
@@ -302,7 +318,9 @@ Deno.test(
             state: 'active',
             removedAttributeIds: [],
         }, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader([
+                ['If-Match', '"' + head!.id + '"'],
+            ]));
         const stored = await GET<{
             name: string;
             attribute_type: string;

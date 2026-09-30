@@ -742,6 +742,39 @@ Deno.test(
 );
 
 Deno.test(
+    "a POST row at a document's name never matches",
+    async () => {
+        const headId = identifierAt(1);
+        const rows = await classifyStatement(
+            'blind',
+            [statementRow({
+                id: identifierAt(3),
+                operationId: identifierAt(4),
+                ifMatch: null,
+                method: 'POST',
+                responsePrefix: PREFIX,
+                responseSuffix: textBytes('\r\n\r\nkept'),
+            })],
+            [{
+                path: PATH,
+                name: NAME,
+                id: headId,
+                responseAt: HEAD_STAMP,
+                response: message(
+                    imfFixdate(HEAD_STAMP), 'kept',
+                ),
+                method: 'PUT',
+            }],
+            LATER,
+        );
+        assertEquals(rows[0]!.rawOutcome, 'land');
+        assertEquals(rows[0]!.outcome, 'land');
+        assertEquals(rows[0]!.inserted, true);
+        assertEquals(rows[0]!.headId, headId);
+    },
+);
+
+Deno.test(
     'an in-order latch with no head is stale',
     async () => {
         const rows = await classifyStatement(
@@ -906,6 +939,249 @@ Deno.test(
             (await db.messagePairs.getAll()).length,
             before,
         );
+    },
+);
+
+// Two live heads for the skip pins: 'same' and 'old'.
+async function twoHeads(db: BackedDbAdapter): Promise<{
+    same: string,
+    old: string,
+}> {
+    const same = identifierAt(1);
+    const old = identifierAt(2);
+    await runWrite(db, 'composed', [
+        writeRow({
+            id: same,
+            operationId: identifierAt(3),
+            body: 'same',
+            ifMatch: null,
+            name: 'same',
+        }),
+        writeRow({
+            id: old,
+            operationId: identifierAt(3),
+            body: 'old',
+            ifMatch: null,
+            name: 'old',
+        }),
+    ], HEAD_STAMP);
+    return { same, old };
+}
+
+async function storedIds(
+    db: BackedDbAdapter,
+): Promise<string[]> {
+    return (await db.messagePairs.getAll()).map(
+        (row) => row.id,
+    );
+}
+
+Deno.test(
+    'a matched row beside a landing row is skipped, the'
+        + ' rest land',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const heads = await twoHeads(db);
+        const kept = identifierAt(5);
+        const changed = identifierAt(6);
+        const answer = await runWrite(db, 'composed', [
+            writeRow({
+                id: kept,
+                operationId: identifierAt(4),
+                body: 'same',
+                ifMatch: heads.same,
+                name: 'same',
+            }),
+            writeRow({
+                id: changed,
+                operationId: identifierAt(4),
+                body: 'new',
+                ifMatch: heads.old,
+                name: 'old',
+            }),
+        ], LATER);
+        assertStrictEquals(answer.outcome, 'land');
+        assertEquals(
+            answer.rows.map((row) => row.rawOutcome),
+            ['matched', 'land'],
+        );
+        assertEquals(
+            answer.rows.map((row) => row.inserted),
+            [false, true],
+        );
+        const stored = await storedIds(db);
+        assertEquals(stored.includes(changed), true);
+        assertEquals(stored.includes(kept), false);
+        await answer.response.body?.cancel();
+    },
+);
+
+Deno.test(
+    'a received pair alone beside matched rows stores'
+        + ' nothing',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const heads = await twoHeads(db);
+        const before = await storedIds(db);
+        const answer = await runWrite(db, 'composed', [
+            writeRow({
+                id: identifierAt(5),
+                operationId: identifierAt(4),
+                body: 'received',
+                ifMatch: null,
+                method: 'POST',
+                name: 'received',
+            }),
+            writeRow({
+                id: identifierAt(6),
+                operationId: identifierAt(4),
+                body: 'same',
+                ifMatch: heads.same,
+                name: 'same',
+            }),
+            writeRow({
+                id: identifierAt(7),
+                operationId: identifierAt(4),
+                body: 'old',
+                ifMatch: null,
+                name: 'old',
+            }),
+        ], LATER);
+        assertStrictEquals(answer.outcome, 'matched');
+        assertEquals(
+            answer.rows.map((row) => row.rawOutcome),
+            ['land', 'matched', 'matched'],
+        );
+        assertEquals(answer.bells, []);
+        assertEquals(await storedIds(db), before);
+        await answer.response.body?.cancel();
+    },
+);
+
+Deno.test(
+    'stale still beats matched and land',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const heads = await twoHeads(db);
+        const before = await storedIds(db);
+        const answer = await runWrite(db, 'composed', [
+            writeRow({
+                id: identifierAt(5),
+                operationId: identifierAt(4),
+                body: 'next',
+                ifMatch: identifierAt(9),
+                name: 'stale',
+            }),
+            writeRow({
+                id: identifierAt(6),
+                operationId: identifierAt(4),
+                body: 'same',
+                ifMatch: heads.same,
+                name: 'same',
+            }),
+            writeRow({
+                id: identifierAt(7),
+                operationId: identifierAt(4),
+                body: 'new',
+                ifMatch: heads.old,
+                name: 'old',
+            }),
+        ], LATER);
+        assertStrictEquals(answer.outcome, 'stale');
+        assertEquals(
+            answer.rows.map((row) => row.rawOutcome),
+            ['stale', 'matched', 'land'],
+        );
+        assertEquals(
+            answer.rows.map((row) => row.inserted),
+            [false, false, false],
+        );
+        assertEquals(await storedIds(db), before);
+        await answer.response.body?.cancel();
+    },
+);
+
+Deno.test(
+    'a declared genesis beside a matched row lands',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const heads = await twoHeads(db);
+        const born = identifierAt(5);
+        const kept = identifierAt(6);
+        const answer = await runWrite(db, 'composed', [
+            writeRow({
+                id: born,
+                operationId: identifierAt(4),
+                body: 'born',
+                ifMatch: NIL_IDENTIFIER,
+                name: 'born',
+            }),
+            writeRow({
+                id: kept,
+                operationId: identifierAt(4),
+                body: 'same',
+                ifMatch: heads.same,
+                name: 'same',
+            }),
+        ], LATER);
+        assertStrictEquals(answer.outcome, 'land');
+        assertEquals(
+            answer.rows.map((row) => row.rawOutcome),
+            ['land', 'matched'],
+        );
+        const stored = await storedIds(db);
+        assertEquals(stored.includes(born), true);
+        assertEquals(stored.includes(kept), false);
+        await answer.response.body?.cancel();
+    },
+);
+
+Deno.test(
+    'a skipped row rings no bell',
+    async () => {
+        const { db } = openLedger();
+        await db.ensureTable();
+        const heads = await twoHeads(db);
+        const answer = await runWrite(db, 'composed', [
+            writeRow({
+                id: identifierAt(5),
+                operationId: identifierAt(4),
+                body: 'received',
+                ifMatch: null,
+                method: 'POST',
+                name: 'received',
+            }),
+            writeRow({
+                id: identifierAt(6),
+                operationId: identifierAt(4),
+                body: 'same',
+                ifMatch: heads.same,
+                name: 'same',
+            }),
+            writeRow({
+                id: identifierAt(7),
+                operationId: identifierAt(4),
+                body: 'new',
+                ifMatch: heads.old,
+                name: 'old',
+            }),
+        ], LATER);
+        assertStrictEquals(answer.outcome, 'land');
+        const inserted = answer.rows.filter(
+            (row) => row.inserted,
+        );
+        assertEquals(
+            inserted.map((row) => row.name),
+            ['received', 'old'],
+        );
+        assertStrictEquals(
+            answer.bells.length, inserted.length,
+        );
+        await answer.response.body?.cancel();
     },
 );
 

@@ -11,6 +11,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -103,7 +104,7 @@ Deno.test('deriveInvitation: accepted derives \'accepted\','
     const inviteeId = 'MQFcPtrZPIGjMCRAXtZUnA'; // Sarah Chen
     await grant(db, id, 'sarah.chen@company.com');
 
-    const accept = await handleRequest(db, req(
+    const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
@@ -113,8 +114,8 @@ Deno.test('deriveInvitation: accepted derives \'accepted\','
             eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(accept.status, 204);
+    )));
+    assertStrictEquals(accept.status, 200);
 
     assertStrictEquals(
         (await deriveInvitation(db, id))?.state, 'accepted',
@@ -132,7 +133,7 @@ Deno.test('deriveInvitation: declined derives \'declined\','
     const inviteeId = 'zyGBRshxOnKHUfcyFRqowg'; // Jessica Park
     await grant(db, id, 'jessica.park@company.com');
 
-    const decline = await handleRequest(db, req(
+    const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
@@ -141,8 +142,8 @@ Deno.test('deriveInvitation: declined derives \'declined\','
             eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(decline.status, 204);
+    )));
+    assertStrictEquals(decline.status, 200);
 
     assertStrictEquals(
         (await deriveInvitation(db, id))?.state, 'declined',
@@ -159,7 +160,7 @@ Deno.test('deriveInvitation: revoked derives \'revoked\','
     const id = generateIdentifier();
     await grant(db, id, 'emily.rodriguez@company.com');
 
-    const revoke = await handleRequest(db, req(
+    const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + ORGANIZATION_TWO
             + '/invitations/' + id,
@@ -169,8 +170,8 @@ Deno.test('deriveInvitation: revoked derives \'revoked\','
             eventId: generateIdentifier(),
             at: '2026-06-01T00:00:01.000000Z',
         },
-    ));
-    assertStrictEquals(revoke.status, 204);
+    )));
+    assertStrictEquals(revoke.status, 200);
 
     assertStrictEquals(
         (await deriveInvitation(db, id))?.state, 'revoked',

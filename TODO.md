@@ -1635,6 +1635,24 @@ Off the critical path; each with its oracle.
   equal to the record type's ETag at the write that
   produced that version, and a later type write leaves
   the older version's `record_type_etag` unchanged.
+- An idea converts whatever its state. The conversion
+  (`api/routes.ts:4265`) latches the idea on the client's
+  tag and runs one statement: the idea in order, the
+  project and each baseline as declared geneses under the
+  ids the client minted. Nothing reads the idea's state.
+  An idea already promoted converts again: its row
+  matches and is skipped, and a second project and its
+  baselines land under their fresh ids; the answer is
+  200 with the idea's head. An idea whose state is
+  `deleted` converts too. A resent conversion with the
+  same ids is refused only because the project's name is
+  taken (409). The handler already reads the idea's head
+  for its latch, and the latch holds that head through
+  the statement, so the refusal can judge the head it
+  read. Oracle: converting an idea whose head is not
+  `approved` (promoted, deleted, or any other state)
+  answers 409 naming the idea and stores nothing; an
+  approved idea converts as today.
 
 ## Later work
 

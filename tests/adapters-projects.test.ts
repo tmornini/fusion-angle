@@ -7,6 +7,7 @@ import {
 import {
     type RequestContext,
 } from '../client/request-context.ts';
+import { RequestError } from '../shared/http-errors.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -302,10 +303,58 @@ Deno.test(
                 position: 1,
             },
         );
-        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5, STATE);
+        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5);
         const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(stored.position, 9.5);
         assertStrictEquals(stored.title, 'Stay');
+    },
+);
+
+Deno.test(
+    'putProjectPosition keeps the head state',
+    async () => {
+        const { ctx } = await adminContext();
+        await seedProject(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Stay', 'archived',
+        );
+        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5);
+        const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(stored.state, 'archived');
+        assertStrictEquals(stored.position, 9.5);
+    },
+);
+
+Deno.test(
+    'a stale position PUT surfaces 412',
+    async () => {
+        const { ctx } = await adminContext();
+        await seedProject(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Stay', undefined, {
+                position: 1,
+            },
+        );
+        // Another write moves the head after the merge's read
+        // and before its PUT.
+        const racing: RequestContext = {
+            ...ctx,
+            GETWithEtag: async <T>(resource: string) => {
+                const read = await ctx.GETWithEtag<T>(resource);
+                await seedProject(
+                    ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Moved',
+                );
+                return read;
+            },
+        };
+        const error = await assertRejects(
+            () => putProjectPosition(
+                racing, 'pnXmXrxOWayANgDLdCjuBw', 9.5,
+            ),
+            RequestError,
+        );
+        assertStrictEquals(error.status, 412);
+        const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        assertStrictEquals(stored.title, 'Moved');
+        assertStrictEquals(stored.position, 1);
     },
 );
 

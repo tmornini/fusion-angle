@@ -540,6 +540,10 @@ Deno.test(
         );
         const requestsBefore = await db.messagePairs.getAll();
         const responsesBefore = await db.messagePairs.getAll();
+        const head = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
+            'rOEPOcVMQdJiiiMuiiEhlg',
+        );
         const err = await assertRejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
@@ -559,7 +563,9 @@ Deno.test(
                 state: 'active',
                 removedAttributeIds: ['VXTdVVRluJDRBqbXWZBntA'],
             }, DEV_TOKEN,
-                operationIdHeader()),
+                operationIdHeader([
+                    ['If-Match', '"' + head!.id + '"'],
+                ])),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, 409);

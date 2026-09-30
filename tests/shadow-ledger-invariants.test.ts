@@ -467,11 +467,11 @@ Deno.test('every pair\'s response_at is RFC-3339 zulu'
 });
 
 // The first fiber of Phase 2's per-family drift check: a
-// seeded idea's create-pair request message, parsed back, must
-// reproduce the entity's ACTUAL genesis row on the states
-// ledger — proof the shadow-ledger request is not merely
-// present but semantically faithful to what was really written.
-Deno.test('a seeded idea\'s create-pair request reproduces its'
+// seeded idea's create pair stores the idea's state in its
+// response, and that state must reproduce what a GET of the
+// idea answers — proof the stored state is not merely present
+// but semantically faithful to what was really written.
+Deno.test('a seeded idea\'s create-pair state reproduces its'
 + ' GET state', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
@@ -483,7 +483,7 @@ Deno.test('a seeded idea\'s create-pair request reproduces its'
                     + '/ideas/',
     );
     assert(createRow, 'no create pair for the seeded idea');
-    const parsed = messagePairJsonOf(createRow!.request) as {
+    const parsed = messagePairJsonOf(createRow!.response) as {
         body: {
             state: string;
         };

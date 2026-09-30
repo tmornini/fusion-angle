@@ -730,9 +730,16 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     const baselineIdB = generateIdentifier();
     const secondObjectiveId = OBJECTIVE_SEEDS[0]!.id;
     const beforeConversion = (await db.messagePairs.getAll()).length;
-    const conversion = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
-            + '/conversion', token, {
+    const ideaHead = await db.messagePairs.getHeadPair(
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
+    );
+    const conversion = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
+            + '/conversion',
+        token,
+        headers: { 'If-Match': '"' + ideaHead!.id + '"' },
+        body: {
             projectId,
             project: {
                 title: 'Chain Project', description: 'd',
@@ -773,8 +780,14 @@ Deno.test('live-write chain: create, reposition, revision edit,'
                 },
             ],
         },
-    ));
-    assertStrictEquals(conversion.status, 201);
+    }));
+    assertStrictEquals(conversion.status, 200);
+    assertEquals(
+        await conversion.json(),
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', ideaId,
+        )),
+    );
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
         beforeConversion + 5,
@@ -943,15 +956,13 @@ Deno.test('the create-op POST pair is not read as a document message pair —'
     assertStrictEquals(documentMessagePairs.length, 1);
     assertStrictEquals(documentMessagePairs[0]!.method, 'PUT');
 
-    const postRow = pairsAt.find(
-        (r) => decodeRequestMessage(r.request).method === 'POST',
-    )!;
+    // The received create keeps its request; the document's
+    // state rides its response and leads with the id, the
+    // routing key both bodies name.
+    const postRow = pairsAt.find((r) => r.method === 'POST')!;
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
-    // The stored request is the state, which leads with
-    // the document's id until the former stores no request
-    // bytes; the id is the routing key both bodies name.
     const documentBodyKeys = new Set(
         Object.keys(withoutId(documentMessagePairs[0]!.body)),
     );

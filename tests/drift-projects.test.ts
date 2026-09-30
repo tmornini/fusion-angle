@@ -431,12 +431,32 @@ Deno.test('live conversion case: a converted idea\'s project'
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
     const projectId = PROJECT_DRIFT_CONVERSION;
 
-    const conv = await handleRequest(db, req(
-        'POST',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/gnLzxboxuTEQxNBCqOvRRw/'
-            + 'conversion',
+    // A conversion is an operation on a live idea (Found 14).
+    const idea = await handleRequest(db, req(
+        'PUT',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'gnLzxboxuTEQxNBCqOvRRw',
         token,
         {
+            title: 'Source Idea',
+            position: 1,
+            problem_statement: 'p',
+            target_users: 't',
+            proposed_solution: 's',
+            expected_outcome: 'o',
+            success_metrics: 'm',
+            state: 'approved',
+        },
+    ));
+    assertStrictEquals(idea.status, 201);
+    await idea.body?.cancel();
+    const conv = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            + 'gnLzxboxuTEQxNBCqOvRRw/conversion',
+        token,
+        headers: { 'If-Match': idea.headers.get('etag')! },
+        body: {
             projectId,
             project: {
                 title: 'Converted Project',
@@ -465,8 +485,15 @@ Deno.test('live conversion case: a converted idea\'s project'
             projectStateAt: '2026-05-01T00:00:01.000000Z',
             baselines: [],
         },
-    ));
-    assertStrictEquals(conv.status, 201);
+    }));
+    assertStrictEquals(conv.status, 200);
+    assertEquals(
+        await conv.json(),
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            'gnLzxboxuTEQxNBCqOvRRw',
+        )),
+    );
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'

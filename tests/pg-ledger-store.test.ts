@@ -1314,6 +1314,370 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         },
     );
 
+    // Two live heads for the skip pins: 'same' and 'old'.
+    async function skipHeads(prefix: string): Promise<{
+        same: string,
+        old: string,
+    }> {
+        const same = generateIdentifier();
+        const old = generateIdentifier();
+        const operationId = generateIdentifier();
+        await runLedgerStatement(adapter, 'composed', [
+            bindOf({
+                id: same,
+                operationId,
+                path: '/skips/',
+                name: prefix + '-same',
+                method: 'PUT',
+                body: 'same',
+                notify: schema + '-skip-head',
+            }),
+            bindOf({
+                id: old,
+                operationId,
+                path: '/skips/',
+                name: prefix + '-old',
+                method: 'PUT',
+                body: 'old',
+                notify: schema + '-skip-head',
+            }),
+        ]);
+        return { same, old };
+    }
+
+    async function storedAmong(
+        ids: readonly string[],
+    ): Promise<string[]> {
+        const rows = await sql.query<{ id: string }>`
+            SELECT id::text AS id
+            FROM fa_message_pairs
+            WHERE id = ANY(${ids.map(uuidTextOfIdentifier)}::uuid[])
+        `;
+        return rows.map((row) => row.id).sort();
+    }
+
+    Deno.test(
+        'a matched row beside a landing row is skipped,'
+            + ' the rest land',
+        async () => {
+            const prefix = 'mixed-' + generateIdentifier();
+            const heads = await skipHeads(prefix);
+            const kept = generateIdentifier();
+            const changed = generateIdentifier();
+            const operationId = generateIdentifier();
+            const rows = await runLedgerStatement(
+                adapter, 'composed', [
+                    {
+                        ...bindOf({
+                            id: kept,
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-same',
+                            method: 'PUT',
+                            body: 'same',
+                            notify: schema + '-skip-kept',
+                        }),
+                        ifMatch: heads.same,
+                    },
+                    {
+                        ...bindOf({
+                            id: changed,
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-old',
+                            method: 'PUT',
+                            body: 'new',
+                            notify: schema + '-skip-changed',
+                        }),
+                        ifMatch: heads.old,
+                    },
+                ],
+            );
+            assertEquals(
+                rows.map((row) => row.outcome),
+                ['land', 'land'],
+            );
+            assertEquals(
+                rows.map((row) => row.rawOutcome),
+                ['matched', 'land'],
+            );
+            assertEquals(
+                rows.map((row) => row.inserted),
+                [false, true],
+            );
+            assertEquals(
+                await storedAmong([kept, changed]),
+                [uuidTextOfIdentifier(changed)],
+            );
+        },
+    );
+
+    Deno.test(
+        'a received pair alone beside matched rows stores'
+            + ' nothing',
+        async () => {
+            const prefix = 'noop-' + generateIdentifier();
+            const heads = await skipHeads(prefix);
+            const ids = [
+                generateIdentifier(),
+                generateIdentifier(),
+                generateIdentifier(),
+            ] as const;
+            const operationId = generateIdentifier();
+            const rows = await runLedgerStatement(
+                adapter, 'composed', [
+                    bindOf({
+                        id: ids[0],
+                        operationId,
+                        path: '/skips/',
+                        name: prefix + '-received',
+                        method: 'POST',
+                        body: 'received',
+                        notify: schema + '-noop-received',
+                    }),
+                    {
+                        ...bindOf({
+                            id: ids[1],
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-same',
+                            method: 'PUT',
+                            body: 'same',
+                            notify: schema + '-noop-same',
+                        }),
+                        ifMatch: heads.same,
+                    },
+                    bindOf({
+                        id: ids[2],
+                        operationId,
+                        path: '/skips/',
+                        name: prefix + '-old',
+                        method: 'PUT',
+                        body: 'old',
+                        notify: schema + '-noop-old',
+                    }),
+                ],
+            );
+            assertEquals(
+                rows.map((row) => row.outcome),
+                ['matched', 'matched', 'matched'],
+            );
+            assertEquals(
+                rows.map((row) => row.rawOutcome),
+                ['land', 'matched', 'matched'],
+            );
+            assertEquals(await storedAmong(ids), []);
+        },
+    );
+
+    Deno.test(
+        'stale still beats matched and land',
+        async () => {
+            const prefix = 'stale-' + generateIdentifier();
+            const heads = await skipHeads(prefix);
+            const ids = [
+                generateIdentifier(),
+                generateIdentifier(),
+                generateIdentifier(),
+            ] as const;
+            const operationId = generateIdentifier();
+            const rows = await runLedgerStatement(
+                adapter, 'composed', [
+                    {
+                        ...bindOf({
+                            id: ids[0],
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-stale',
+                            method: 'PUT',
+                            body: 'next',
+                            notify: schema + '-stale-stale',
+                        }),
+                        ifMatch: generateIdentifier(),
+                    },
+                    {
+                        ...bindOf({
+                            id: ids[1],
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-same',
+                            method: 'PUT',
+                            body: 'same',
+                            notify: schema + '-stale-same',
+                        }),
+                        ifMatch: heads.same,
+                    },
+                    {
+                        ...bindOf({
+                            id: ids[2],
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-old',
+                            method: 'PUT',
+                            body: 'new',
+                            notify: schema + '-stale-old',
+                        }),
+                        ifMatch: heads.old,
+                    },
+                ],
+            );
+            assertEquals(
+                rows.map((row) => row.outcome),
+                ['stale', 'stale', 'stale'],
+            );
+            assertEquals(
+                rows.map((row) => row.rawOutcome),
+                ['stale', 'matched', 'land'],
+            );
+            assertEquals(await storedAmong(ids), []);
+        },
+    );
+
+    Deno.test(
+        'a declared genesis beside a matched row lands',
+        async () => {
+            const prefix = 'born-' + generateIdentifier();
+            const heads = await skipHeads(prefix);
+            const born = generateIdentifier();
+            const kept = generateIdentifier();
+            const operationId = generateIdentifier();
+            const rows = await runLedgerStatement(
+                adapter, 'composed', [
+                    {
+                        ...bindOf({
+                            id: born,
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-born',
+                            method: 'PUT',
+                            body: 'born',
+                            notify: schema + '-born-born',
+                        }),
+                        ifMatch: NIL_IDENTIFIER,
+                    },
+                    {
+                        ...bindOf({
+                            id: kept,
+                            operationId,
+                            path: '/skips/',
+                            name: prefix + '-same',
+                            method: 'PUT',
+                            body: 'same',
+                            notify: schema + '-born-kept',
+                        }),
+                        ifMatch: heads.same,
+                    },
+                ],
+            );
+            assertEquals(
+                rows.map((row) => row.outcome),
+                ['land', 'land'],
+            );
+            assertEquals(
+                rows.map((row) => row.rawOutcome),
+                ['land', 'matched'],
+            );
+            assertEquals(
+                await storedAmong([born, kept]),
+                [uuidTextOfIdentifier(born)],
+            );
+        },
+    );
+
+    Deno.test(
+        'a skipped row rings no bell',
+        async () => {
+            const prefix = 'bell-' + generateIdentifier();
+            const heads = await skipHeads(prefix);
+            const landed = schema + '-skip-bell-landed';
+            const skipped = schema + '-skip-bell-skipped';
+            const ear = listenFor(POSTGRES_URL);
+            try {
+                await ear.opened();
+                const heard = ear.expect(landed, LAND_WAIT_MS);
+                const quiet = ear.expect(
+                    skipped, MATCH_WAIT_MS,
+                );
+                const operationId = generateIdentifier();
+                const rows = await runLedgerStatement(
+                    adapter, 'composed', [
+                        {
+                            ...bindOf({
+                                id: generateIdentifier(),
+                                operationId,
+                                path: '/skips/',
+                                name: prefix + '-same',
+                                method: 'PUT',
+                                body: 'same',
+                                notify: skipped,
+                            }),
+                            ifMatch: heads.same,
+                        },
+                        {
+                            ...bindOf({
+                                id: generateIdentifier(),
+                                operationId,
+                                path: '/skips/',
+                                name: prefix + '-old',
+                                method: 'PUT',
+                                body: 'new',
+                                notify: landed,
+                            }),
+                            ifMatch: heads.old,
+                        },
+                    ],
+                );
+                assertEquals(
+                    rows.map((row) => row.inserted),
+                    [false, true],
+                );
+                assertEquals(await heard, landed);
+                assertEquals(await quiet, null);
+                assertEquals(ear.pendingCount(skipped), 0);
+            } finally {
+                await ear.close();
+            }
+        },
+    );
+
+    Deno.test(
+        "a POST row at a document's name never matches",
+        async () => {
+            const name = 'post-' + generateIdentifier();
+            await runLedgerStatement(adapter, 'blind', [
+                bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'PUT',
+                    body: 'kept',
+                    notify: schema + '-post-head',
+                }),
+            ]);
+            const posted = generateIdentifier();
+            const row = only(await runLedgerStatement(
+                adapter, 'blind', [bindOf({
+                    id: posted,
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'POST',
+                    body: 'kept',
+                    notify: schema + '-post-row',
+                })],
+            ));
+            assertEquals(
+                [row.outcome, row.rawOutcome, row.inserted],
+                ['land', 'land', true],
+            );
+            assertEquals(
+                await storedAmong([posted]),
+                [uuidTextOfIdentifier(posted)],
+            );
+        },
+    );
+
     Deno.test(
         'the head read is an index scan on'
             + ' fa_message_pairs_document',
