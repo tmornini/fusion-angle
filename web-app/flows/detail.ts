@@ -376,6 +376,7 @@ async function handleDeleteSelectedNodes(
     commit(next, {
         advanceHistory: op.advanceHistory,
     });
+    closePanel();
     commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );

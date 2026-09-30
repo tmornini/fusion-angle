@@ -4,9 +4,9 @@ import {
     type Page, type Point,
 } from './fixtures.ts';
 import {
-    CANVAS, EDGE, LAYOUT_TEST, ONBOARDING, WRAP,
+    CANVAS, EDGE, LAYOUT_TEST, NODE, ONBOARDING, WRAP,
     openFlow, doubleClick, edgeCount, edgeLabelSelector,
-    nodeIdNamed, nodeSelector,
+    nodeCount, nodeIdNamed, nodeSelector,
 } from './canvas.ts';
 
 const browser = useBrowser();
@@ -246,6 +246,40 @@ Deno.test(
                     `document.querySelectorAll('${EDGE}')`
                     + `.length === ${edges - 1}`,
                     'one fewer edge',
+                );
+                await page.until(
+                    PANEL_ABSENT, 'panel gone',
+                );
+                await assertEmptyClickKeepsZoom(page);
+            },
+        );
+    },
+);
+
+Deno.test(
+    'An empty-canvas click after deleting the open'
+    + ' node keeps the zoomed viewBox (F29)',
+    async () => {
+        await withAdminPage(
+            browser.get(),
+            async (page, origin) => {
+                await openFlow(
+                    page, origin, LAYOUT_TEST,
+                );
+                await page.click(AUTO_FIT);
+                const panelA = await nodeIdNamed(
+                    page, 'Panel A',
+                );
+                const nodes = await nodeCount(page);
+                await doubleClick(
+                    page, nodeSelector(panelA),
+                );
+                await page.waitFor('.flow-props-panel');
+                await page.click(DELETE_SELECTED);
+                await page.until(
+                    `document.querySelectorAll('${NODE}')`
+                    + `.length === ${nodes - 1}`,
+                    'one fewer node',
                 );
                 await page.until(
                     PANEL_ABSENT, 'panel gone',
