@@ -276,3 +276,49 @@ async () => {
         ),
     );
 });
+
+Deno.test(
+    'POST identities/ answers 201 with the document\'s state'
+    + ' and its location',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const res = await handleRequest(db, req(
+            'POST', '/identities/', DEV_TOKEN,
+            { id, kind: 'person' },
+        ));
+        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.headers.get('location'), id);
+        assertEquals(
+            await res.json(),
+            JSON.parse(
+                await storedPutBodyText(db, '/identities/', id),
+            ),
+        );
+    },
+);
+
+Deno.test(
+    'a resent POST identities/ is 409 and stores nothing',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const body = { id, kind: 'person' };
+        const first = await handleRequest(db, req(
+            'POST', '/identities/', DEV_TOKEN, body,
+        ));
+        assertStrictEquals(first.status, 201);
+        await first.body?.cancel();
+        const before = (await db.messagePairs.getAll()).length;
+        const second = await handleRequest(db, req(
+            'POST', '/identities/', DEV_TOKEN, body,
+        ));
+        assertStrictEquals(second.status, 409);
+        assertEquals(await second.json(), {
+            error: 'Document already exists at /identities/' + id,
+        });
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+    },
+);

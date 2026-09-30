@@ -1,7 +1,9 @@
-import { assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
-import { GET, POST } from '../api/api.ts';
+import { GET, POST, handleRequest } from '../api/api.ts';
+import { apiRequest, pairIdOf } from './http-fixtures.ts';
+import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -236,3 +238,89 @@ Deno.test(
         assertStrictEquals(woEvents.length, 3);
     },
 );
+
+function createRequest(
+    body: Record<string, unknown>,
+    operationId: string,
+): Request {
+    return apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
+        token: DEV_TOKEN,
+        body,
+        operationId,
+    });
+}
+
+Deno.test(
+    'a work-order create lands one version with three births',
+    async () => {
+        const db = await freshDb();
+        const body = createBody();
+        const res = await handleRequest(
+            db, createRequest(body, generateIdentifier()),
+        );
+        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.headers.get('location'), WO_ID);
+        const at = body.stateEventAts;
+        assertEquals(await res.json(), {
+            id: WO_ID,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            display_id: 'abcd',
+            flow_graph: flowGraph(),
+            position: 1,
+            state: NODE_MIDDLE,
+            claim: {
+                member_id: 'XXZruirZyAOoRpNxaDnpSA',
+                at: at[2],
+                expires_at: addUtcSeconds(
+                    at[2]!, DEFAULT_LOCK_TIMEOUT,
+                ),
+            },
+            events: [
+                [EV_1, NODE_START, at[0]],
+                [EV_2, NODE_MIDDLE, at[1]],
+                [EV_3, 'claimed', at[2]],
+            ].map(([id, state, eventAt]) => ({
+                id,
+                state,
+                member_id: 'XXZruirZyAOoRpNxaDnpSA',
+                at: eventAt,
+                field_values: [],
+            })),
+        });
+        const head = await db.messagePairs.getHeadPair(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
+            WO_ID,
+        );
+        assertStrictEquals(head?.id, pairIdOf(res));
+        const claims = await db.messagePairs.getCollectionPairs(
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+                + WO_ID + '/claim/',
+        );
+        assertStrictEquals(claims.length, 0);
+    },
+);
+
+Deno.test('a resent work-order create is 409', async () => {
+    const db = await freshDb();
+    const body = createBody();
+    const first = await handleRequest(
+        db, createRequest(body, generateIdentifier()),
+    );
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const second = await handleRequest(
+        db, createRequest(body, generateIdentifier()),
+    );
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at '
+            + '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + WO_ID,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});

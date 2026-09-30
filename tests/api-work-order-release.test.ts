@@ -1,6 +1,11 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     PUT,
+    GETWithEtag,
     handleRequest,
 } from '../api/api.ts';
 import {
@@ -14,13 +19,14 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
     apiRequest,
+    pairIdOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 
 const OTHER = generateIdentifier();
-import { workOrderClaimHistoryFor } from
+import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
@@ -35,13 +41,43 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
+}
+
+// An operation on a work order names the head it read.
+async function headTag(
+    db: MemoryDbAdapter,
+    workOrderId = WO_ID,
+): Promise<string> {
+    const { etag } = await GETWithEtag(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId,
+        DEV_TOKEN, operationIdHeader(),
+    );
+    if (etag === undefined) {
+        throw new Error('the work order GET carried no ETag');
+    }
+    return etag;
+}
+
+async function ifMatch(
+    db: MemoryDbAdapter,
+): Promise<Record<string, string>> {
+    return { 'If-Match': '"' + await headTag(db) + '"' };
+}
+
+async function latched(
+    db: MemoryDbAdapter,
+): Promise<readonly (readonly [string, string])[]> {
+    return operationIdHeader(Object.entries(await ifMatch(db)));
 }
 
 const LOCK_TIMEOUT_SECONDS = 300;
@@ -71,7 +107,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
     return db;
 }
 
@@ -83,7 +119,7 @@ function claimEventsFor(
     member_id: string;
     at: string;
 }[]> {
-    return workOrderClaimHistoryFor(
+    return workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, WO_ID,
     );
 }
@@ -99,12 +135,13 @@ function freshClaimBody() {
     };
 }
 
-// DELETE organizations/:id/work-orders/:id/claim releases. DELETE head =
-// unclaimed. Never-written and unknown documents 404.
-// A second DELETE is 204 (already-gone).
+// DELETE organizations/:id/work-orders/:id/claim releases:
+// an operation on the work order, answering its state. With
+// no live claim it answers the head and stores nothing. An
+// unknown work order 404s.
 
 Deno.test(
-    'release of a live claim is 204 and the claim history'
+    'release of a live claim is 200 and the claim history'
     + ' shows claim_released',
     async () => {
         const db = await seededDb();
@@ -112,14 +149,16 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             freshClaimBody(), DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const res = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             DEV_TOKEN,
+            undefined, await ifMatch(db),
         ));
-        assertStrictEquals(res.status, 204);
+        assertStrictEquals(res.status, 200);
+        await res.body?.cancel();
         const events = await claimEventsFor(db);
         const released = events.find(
             (ev) => ev.state === 'claim_released',
@@ -130,8 +169,8 @@ Deno.test(
 );
 
 Deno.test(
-    'DELETE claim with no row is 404; a second DELETE'
-    + ' after release is 204',
+    'DELETE claim with no claim is 200; a second DELETE'
+    + ' after release is 200',
     async () => {
         const db = await seededDb();
         const missing = await handleRequest(db, req(
@@ -139,27 +178,33 @@ Deno.test(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             DEV_TOKEN,
+            undefined, await ifMatch(db),
         ));
-        assertStrictEquals(missing.status, 404);
+        assertStrictEquals(missing.status, 200);
+        await missing.body?.cancel();
         await PUT(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             freshClaimBody(), DEV_TOKEN,
-            operationIdHeader());
+            await latched(db));
         const first = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             DEV_TOKEN,
+            undefined, await ifMatch(db),
         ));
-        assertStrictEquals(first.status, 204);
+        assertStrictEquals(first.status, 200);
+        await first.body?.cancel();
         const second = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             DEV_TOKEN,
+            undefined, await ifMatch(db),
         ));
-        assertStrictEquals(second.status, 204);
+        assertStrictEquals(second.status, 200);
+        await second.body?.cancel();
         const events = await claimEventsFor(db);
         assertStrictEquals(
             events.filter(
@@ -180,14 +225,16 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             freshClaimBody(), await devToken(OTHER),
-            operationIdHeader());
+            await latched(db));
         const res = await handleRequest(db, req(
             'DELETE',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
                 + '/claim',
             DEV_TOKEN,
+            undefined, await ifMatch(db),
         ));
-        assertStrictEquals(res.status, 204);
+        assertStrictEquals(res.status, 200);
+        await res.body?.cancel();
         // claim_released authored by the releasing actor
         // (current), not the prior claimant (other).
         const events = await claimEventsFor(db);
@@ -208,7 +255,56 @@ Deno.test(
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + 'oWslHMRoFMtRnPHtccdMeA/claim',
             DEV_TOKEN,
+            undefined,
+            { 'If-Match': '"' + generateIdentifier() + '"' },
         ));
         assertStrictEquals(res.status, 404);
+    },
+);
+
+const CLAIM_PATH = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+    + WO_ID + '/claim';
+
+Deno.test('a release lands one version', async () => {
+    const db = await seededDb();
+    await PUT(
+        db, CLAIM_PATH.slice(1), freshClaimBody(), DEV_TOKEN,
+        await latched(db),
+    );
+    const res = await handleRequest(db, req(
+        'DELETE', CLAIM_PATH, DEV_TOKEN,
+        undefined, await ifMatch(db),
+    ));
+    assertStrictEquals(res.status, 200);
+    const version = await res.json() as Record<string, unknown>;
+    assertStrictEquals(Object.hasOwn(version, 'claim'), false);
+    const deletes = (await db.messagePairs.getCollectionPairs(
+        CLAIM_PATH + '/',
+    )).filter((pair) => pair.method === 'DELETE');
+    assertStrictEquals(deletes.length, 1);
+    assertEquals(
+        (version['events'] as { id: string; state: string }[])
+            .map((event) => [event.id, event.state]),
+        [[deletes[0]!.id, 'claim_released']],
+    );
+    assertStrictEquals(await headTag(db), pairIdOf(res));
+});
+
+Deno.test(
+    'a release with no live claim answers the head',
+    async () => {
+        const db = await seededDb();
+        const tag = await headTag(db);
+        const before = (await db.messagePairs.getAll()).length;
+        const res = await handleRequest(db, req(
+            'DELETE', CLAIM_PATH, DEV_TOKEN,
+            undefined, { 'If-Match': '"' + tag + '"' },
+        ));
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(pairIdOf(res), tag);
+        await res.body?.cancel();
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
     },
 );

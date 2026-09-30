@@ -9,6 +9,8 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 // Pins the CURRENT status of every deliberate work-orders-family
 // verb gap, through handleRequest, so the fourth-family
@@ -28,14 +30,20 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
+
+// An operation names a head; none was ever read here, so any
+// well-formed tag reaches the handler.
+const ANY_TAG = { 'If-Match': '"' + generateIdentifier() + '"' };
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -119,19 +127,20 @@ async () => {
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA/claim', token, {},
+            + 'yNSSnbrpacodQTzUEcdEVA/claim', token, {}, ANY_TAG,
     ));
     assertStrictEquals(res.status, 400);
 });
 
-Deno.test('DELETE organizations/:id/work-orders/:id/claim 404s when'
-+ ' unclaimed', async () => {
+Deno.test('DELETE organizations/:id/work-orders/:id/claim 404s for'
++ ' a work order that does not exist', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA/claim', token),
+            + 'yNSSnbrpacodQTzUEcdEVA/claim', token,
+            undefined, ANY_TAG),
     );
     assertStrictEquals(res.status, 404);
 });
@@ -212,7 +221,7 @@ Deno.test('PUT organizations/:id/work-orders/:id/binding on a missing WO'
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token, {},
+            + 'xdaJyuuPyHfffCGLhqDrOQ/binding', token, {}, ANY_TAG,
     ));
     assertStrictEquals(res.status, 404);
 });

@@ -56,9 +56,8 @@ const EMPTY_GRAPH_DELTA = {
     attributeEvents: [],
 };
 
-// organizations/:id/flows/:id is locked-class (Task 3): a raw ctx.PUT that
-// hand-
-// crafts its wire body (rather than riding putFlow's own C6
+// organizations/:id/flows/:id takes a conditional PUT: a raw
+// ctx.PUT that hand-crafts its wire body (rather than riding putFlow's own C6
 // retry loop) must echo the current head itself, or a
 // non-genesis save 428s. Read once via GETWithEtag and
 // thread the echo through PUT's headerFields.

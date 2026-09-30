@@ -6,6 +6,7 @@ import {
     PATCH as httpPatch,
     PATCHWithEtag as httpPatchWithEtag,
     DELETE as httpDelete,
+    DELETEWithEtag as httpDeleteWithEtag,
     POST as httpPost,
     postForHeaders as httpPostForHeaders,
     type ClientFacadeAdapter,
@@ -58,6 +59,10 @@ export function wrapInPageAdapter(
         ),
         DELETE: (resource, token, headerFields) =>
             httpDelete(
+                adapter, resource, token, headerFields,
+            ),
+        DELETEWithEtag: (resource, token, headerFields) =>
+            httpDeleteWithEtag(
                 adapter, resource, token, headerFields,
             ),
         POST: (

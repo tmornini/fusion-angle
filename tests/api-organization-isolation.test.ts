@@ -22,7 +22,7 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
-    postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
@@ -392,12 +392,13 @@ async function seedChain(
         organization_id: _flowOrganizationId,
         ...flowFields
     } = flowBody(organization);
-    const flowWrite = await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + organization
+    const flowWrite = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + organization
             + '/flows/' + ids.flow,
-        await organizationToken(identity, organization),
-        {
+        token: await organizationToken(identity, organization),
+        headers: { 'if-none-match': '*' },
+        body: {
             ...flowFields,
             state: 'active',
             state_at: T8_AT,
@@ -412,7 +413,7 @@ async function seedChain(
                 attributeEvents: [],
             },
         },
-    ));
+    }));
     assertStrictEquals(flowWrite.status, 201);
     // Phase Final Task 2: objectives row half stripped — seed
     // through the live document PUT (states-document
@@ -456,13 +457,14 @@ async function seedChain(
         organization_id: _woOrganizationId,
         ...woFields
     } = workOrderBody(organization);
-    const woWrite = await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + organization
+    const woWrite = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + organization
             + '/work-orders/' + ids.workOrder,
-        await organizationToken(identity, organization),
-        woFields,
-    ));
+        token: await organizationToken(identity, organization),
+        headers: { 'if-none-match': '*' },
+        body: woFields,
+    }));
     assertStrictEquals(woWrite.status, 201);
     // Phase Final Stage B: flow_versions table retired with
     // flows (no residual seed).
@@ -615,9 +617,8 @@ async function seedChain(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postWorkOrderTransitionOp(
-        db, woId, body, identity,
-        undefined, [], messagePair,
+    await postSeedWorkOrderTransitionOp(
+        db, organization, woId, body, identity, messagePair,
     );
     return ids;
 }

@@ -95,7 +95,7 @@ async function identityDocumentMessagePair(
     requestAt: string,
 ): Promise<MessagePair> {
     const spec = WRITE_RESPONSE_SPECS['identities/:id'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for identities/:id',
         );
@@ -125,7 +125,7 @@ async function identityPiiDocumentMessagePair(
     requestAt: string,
 ): Promise<MessagePair> {
     const spec = WRITE_RESPONSE_SPECS['identities/:id/pii'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for'
             + ' identities/:id/pii',
@@ -156,7 +156,7 @@ async function aiAgentDocumentMessagePair(
     requestAt: string,
 ): Promise<MessagePair> {
     const spec = WRITE_RESPONSE_SPECS['ai-agents/:id'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for ai-agents/:id',
         );

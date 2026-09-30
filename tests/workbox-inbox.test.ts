@@ -320,7 +320,10 @@ Deno.test(
         // Hand-stitch a transition onto the complete node
         // via the named op (states/:id retired). Dated after
         // the create events so the inbox sees a finished WO.
-        await ctx.POST(
+        const { etag } = await ctx.GETWithEtag(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId,
+        );
+        await ctx.POSTWithHeaders(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
                 + '/transition', {
                 transitionEventId: 'extra',
@@ -328,6 +331,7 @@ Deno.test(
                 release: null,
                 transitionAt: '2030-01-01T00:00:00.000000Z',
             },
+            [['If-Match', '"' + etag + '"']],
         );
         const {
             workOrders, transitionsByWo, memberMap,

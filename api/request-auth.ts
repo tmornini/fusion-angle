@@ -193,18 +193,11 @@ type ParsedBody =
     | { ok: true; body: Record<string, unknown> }
     | { ok: false };
 
-type ParsedPutBody =
-    | { ok: true; body: Record<string, unknown> | undefined }
-    | { ok: false };
-
 function parseObjectText(
     text: string,
-    allowEmpty: boolean,
-): ParsedPutBody {
+): ParsedBody {
     if (text === '') {
-        return allowEmpty
-            ? { ok: true, body: undefined }
-            : { ok: false };
+        return { ok: false };
     }
     let parsed: unknown;
     try {
@@ -229,16 +222,6 @@ export function parseObjectBody(
     bytes: Uint8Array,
 ): ParsedBody {
     return parseObjectText(
-        new TextDecoder().decode(bytes), false,
-    ) as ParsedBody;
-}
-
-// PUT may carry an empty body: a live empty document,
-// never a delete. POST/PATCH still reject empty as 400.
-export function parsePutBody(
-    bytes: Uint8Array,
-): ParsedPutBody {
-    return parseObjectText(
-        new TextDecoder().decode(bytes), true,
+        new TextDecoder().decode(bytes),
     );
 }

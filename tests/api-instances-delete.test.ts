@@ -1,7 +1,6 @@
 import {
     assertEquals,
     assertInstanceOf,
-    assertMatch,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
@@ -24,11 +23,9 @@ import {
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
-import {
-    ApiError,
-    HTTP_PRECONDITION_FAILED,
-} from '../shared/http-errors.ts';
+import { RetiredEntityError } from '../api/db.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
@@ -184,6 +181,7 @@ async function putInstance(
     return handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
 }
 
@@ -219,8 +217,8 @@ async function countDeleteMessagePairs(
 }
 
 Deno.test('DELETE live instance → 204; then collection omit, '
-+ 'detail 404, PATCH+pin 404, PATCH no pin 409, second '
-+ 'DELETE appends tombstone (R4)',
++ 'detail 410, PATCH+pin 410, PATCH create 410, second '
++ 'DELETE appends nothing (R4)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -255,10 +253,9 @@ async () => {
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
-    assertStrictEquals(detail.status, 404);
+    assertStrictEquals(detail.status, 410);
     assertEquals(await detail.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'Gone: record_instances/' + INSTANCE_ID,
     });
 
     // History GET (Task 19): tombstone → 404 R2, same body
@@ -279,10 +276,9 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assertStrictEquals(patch.status, 404);
+    assertStrictEquals(patch.status, 410);
     assertEquals(await patch.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'Gone: record_instances/' + INSTANCE_ID,
     });
 
     const putAgain = await handleRequest(db, req(
@@ -295,11 +291,11 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
-    assertStrictEquals(putAgain.status, 409);
+    assertStrictEquals(putAgain.status, 410);
     assertEquals(await putAgain.json(), {
-        error: 'instance already exists at '
-            + INSTANCE_DETAIL,
+        error: 'Document is gone at ' + INSTANCE_DETAIL,
     });
 
     // New bytes: different Authorization → not a replay.
@@ -394,30 +390,35 @@ async () => {
     assertStrictEquals(head, undefined);
 });
 
-Deno.test('DELETE with If-Match header → 204 (header ignored)',
+Deno.test('a malformed If-Match on an instance DELETE is 400',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
     const put = await putInstance(db, memberToken, []);
     assertStrictEquals(put.status, 201);
+    const before = await countInstanceMessagePairs(db);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
         undefined,
         { [IF_MATCH_HEADER]: '"stale-or-anything"' },
     ));
-    assertStrictEquals(del.status, 204);
+    assertStrictEquals(del.status, 400);
+    await del.body?.cancel();
+    assertStrictEquals(
+        await countInstanceMessagePairs(db), before,
+    );
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
-    assertStrictEquals(head, undefined);
+    assertStrictEquals(head?.id, INSTANCE_ID);
 });
 
 // R9 resurrect-hole: tombstone interleaved after a PATCH
 // wire pair was formed (gate-equivalent) but before its tx.
 // PATCH must 412 (or honest miss) — never revive the head.
 Deno.test('R9 resurrect-hole: DELETE between PATCH form and '
-+ 'append → 412; head stays tombstoned',
++ 'append → 410; head stays tombstoned',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -488,10 +489,12 @@ async () => {
             ORGANIZATION,
             ['member'],
         ),
-    ) as ApiError;
-    assertInstanceOf(err, ApiError);
-    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
-    assertMatch(err.message, /If-Match does not match/);
+    );
+    assertInstanceOf(err, RetiredEntityError);
+    assertStrictEquals(
+        err.message,
+        'Gone: record_instances/' + INSTANCE_ID,
+    );
     const after = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );

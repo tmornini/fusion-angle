@@ -1,8 +1,7 @@
 import {
     assert,
     assertEquals,
-    assertInstanceOf,
-    assertRejects,
+    assertMatch,
     assertStrictEquals,
 } from '@std/assert';
 import { generateIdentifier } from
@@ -12,8 +11,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ApiError, HTTP_PRECONDITION_FAILED,
+    HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
+import type { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
 import { handleRequest, RequestError } from '../api/api.ts';
 import { postFlowUndoOp } from '../api/routes.ts';
 import {
@@ -23,7 +24,8 @@ import {
     resolveFlowUndoTarget,
 } from '../api/derive-flows.ts';
 import {
-    formWriteMessagePair, canonicalPath,
+    formWriteMessagePair, canonicalPath, responseRecordOf,
+    writeAnswerOf,
 } from '../api/message-pair.ts';
 import {
     organizationToken, DEV_TOKEN,
@@ -272,7 +274,7 @@ Deno.test(
         const res = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assertStrictEquals(res.status, 201);
+        assertStrictEquals(res.status, 200);
         assertStrictEquals(
             await currentGraphName(db, token, flowId), 'A',
         );
@@ -299,7 +301,7 @@ Deno.test(
         const first = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assertStrictEquals(first.status, 201);
+        assertStrictEquals(first.status, 200);
         assertStrictEquals(
             await currentGraphName(db, token, flowId), 'A',
             'first undo lands on A',
@@ -309,7 +311,7 @@ Deno.test(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
             'second consecutive undo reaches genesis, not'
@@ -360,7 +362,7 @@ Deno.test(
             db, token, flowId, FLOWID_U3,
             '2026-01-01T00:00:02.000000Z',
         );
-        assertStrictEquals(third.status, 201);
+        assertStrictEquals(third.status, 200);
         assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
             'undo after the save reverts to genesis (D\'s own'
@@ -371,45 +373,46 @@ Deno.test(
 
 // -- 4. undo at history exhaustion -------------
 
+// Interpretation Y: with nothing to undo, the flow's
+// current state is the sibling, so the statement matches
+// its head and stores nothing.
 Deno.test(
-    'undo cursor: undo at exhaustion (nothing before'
-    + ' genesis) is a graceful no-op — 204, no document'
-    + ' pair, no graph change',
+    'an undo at exhaustion stores nothing and answers the'
+    + ' head',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = generateIdentifier();
         await createFlow(db, token, flowId);
+        const head = await handleRequest(db, req(
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId, token,
+        ));
+        const etag = head.headers.get('ETag');
+        await head.body?.cancel();
+        assert(etag, 'no ETag on the flow GET');
 
         const before = await db.messagePairs.getAll();
         const res = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assertStrictEquals(res.status, 201);
-
+        assertStrictEquals(res.status, 200);
+        assertStrictEquals(res.headers.get('etag'), etag);
+        const body = await res.json() as { name: string };
+        assertStrictEquals(body.name, 'genesis');
         const after = await db.messagePairs.getAll();
-        assertStrictEquals(
-            after.length, before.length + 1,
-            'exhaustion appends exactly the operation message'
-            + ' pair — no document message pair',
-        );
-        assertStrictEquals(
-            await currentGraphName(db, token, flowId), 'genesis',
-        );
+        assertStrictEquals(after.length, before.length);
 
-        // A SECOND exhausted undo must ALSO no-op (the first
-        // exhausted attempt's own operation message pair must not
-        // desync a later replay).
         const again = await undo(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assertStrictEquals(again.status, 201);
-        const afterAgain = await db.messagePairs.getAll();
+        assertStrictEquals(again.status, 200);
+        assertStrictEquals(again.headers.get('etag'), etag);
+        await again.body?.cancel();
         assertStrictEquals(
-            afterAgain.length, after.length + 1,
-            'a second exhausted undo ALSO appends only its'
-            + ' own operation message pair',
+            (await db.messagePairs.getAll()).length,
+            before.length,
         );
         assertStrictEquals(
             await currentGraphName(db, token, flowId), 'genesis',
@@ -525,16 +528,13 @@ function snapOf(
 
 // -- 5b. stale resolution basis (fix wave) -----
 
-// Review finding, fix wave: the undo write's in-tx latch MUST
-// be the SAME read that produced the diff basis
-// (resolveFlowUndoTarget's own `current`), never a second
-// independent head-read — otherwise a save landing AFTER the
-// snapshot was captured lets the undo write succeed against
-// the FRESH head while its own delta/revivals still reflect
-// the STALE snapshot, silently discarding the concurrent
-// save instead of 412ing. This drives postFlowUndoOp DIRECTLY
-// with a DELIBERATELY stale resolution, bypassing the live
-// route's always-fresh resolveFlowUndoTarget call.
+// Review finding, fix wave: a save landing AFTER the
+// snapshot was captured must never be silently discarded
+// by an undo whose delta/revivals reflect the STALE
+// snapshot. The client's tag names the head it read, and
+// the statement judges it. This drives postFlowUndoOp
+// DIRECTLY with a DELIBERATELY stale resolution, bypassing
+// the live route's always-fresh resolveFlowUndoTarget call.
 Deno.test(
     'undo cursor (fix wave): a write driven by a STALE'
     + ' resolution snapshot 412s — it must never silently'
@@ -571,9 +571,9 @@ Deno.test(
         // is now stale.
         await save(db, token, flowId, 'B', FLOWID_B);
 
-        // Drive the write with the STALE resolution. The
-        // in-tx head re-read sees B as the live lock head
-        // and 412s — it must never silently discard B.
+        // Drive the write with the STALE resolution and the
+        // tag the client read. The statement finds B at the
+        // head and refuses — it must never silently discard B.
         const messagePair = await formWriteMessagePair({
             method: 'POST',
             pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -581,7 +581,10 @@ Deno.test(
             routePattern: 'organizations/:id/flows/:id/undo',
             routeSegments: ['flows', ':id', 'undo'],
             pathSegments: ['flows', flowId, 'undo'],
-            headerFields: [],
+            headerFields: [{
+                name: 'if-match',
+                value: '"' + staleResolution!.current.id + '"',
+            }],
             body: { eventId: FLOWID_STALE_EV, at: AT },
             requesterIdentityId: actor,
             requestAt: AT,
@@ -590,15 +593,15 @@ Deno.test(
             operationId: generateIdentifier(),
             requestId: generateIdentifier(),
         });
-        const err = await assertRejects(
-            () => postFlowUndoOp(
-                db, flowId, actor, organization, messagePair,
-                staleResolution!,
-                { eventId: FLOWID_STALE_EV, at: AT },
-            ),
-        ) as ApiError;
-        assertInstanceOf(err, ApiError);
-        assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
+        await postFlowUndoOp(
+            db, flowId, organization, messagePair,
+            staleResolution!,
+            { eventId: FLOWID_STALE_EV, at: AT },
+        );
+        assertStrictEquals(
+            writeAnswerOf(messagePair)!.response.status,
+            HTTP_PRECONDITION_FAILED,
+        );
 
         // B's content survives untouched — the whole stale-basis
         // transaction landed nothing (atomicity).
@@ -686,7 +689,7 @@ Deno.test(
         const undone = await undo(
             db, token, flowId, FLOWID_UNDO_EV, undoAt,
         );
-        assertStrictEquals(undone.status, 201);
+        assertStrictEquals(undone.status, 200);
 
         const prefix = canonicalPath('AjdvjuECVZEgZoFajaIEkg'
             , '/flows/');
@@ -797,7 +800,7 @@ Deno.test(
         const first = await undo(
             db, token, flowId, FLOWID_U1, AT,
         );
-        assertStrictEquals(first.status, 201);
+        assertStrictEquals(first.status, 200);
         const afterFirst = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId, token,
@@ -816,7 +819,7 @@ Deno.test(
             db, token, flowId, FLOWID_U2,
             '2026-01-01T00:00:01.000000Z',
         );
-        assertStrictEquals(second.status, 201);
+        assertStrictEquals(second.status, 200);
         const afterSecond = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId, token,
@@ -917,7 +920,7 @@ Deno.test(
                 db, token, flowId,
                 generateIdentifier(), AT,
             );
-            assertStrictEquals(res.status, 201);
+            assertStrictEquals(res.status, 200);
             assertStrictEquals(
                 await currentGraphName(
                     db, token, flowId,
@@ -929,12 +932,83 @@ Deno.test(
             db, token, flowId,
             generateIdentifier(), AT,
         );
-        assertStrictEquals(last.status, 201);
+        assertStrictEquals(last.status, 200);
         assertStrictEquals(
             await currentGraphName(
                 db, token, flowId,
             ),
             'genesis',
+        );
+    }),
+);
+
+Deno.test(
+    'an undo answers the flow\'s state at 200',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = await freshDb();
+        const token = await organizationToken();
+        const flowId = generateIdentifier();
+        await createFlow(db, token, flowId);
+        await save(db, token, flowId, 'A', FLOWID_A);
+
+        const res = await undo(
+            db, token, flowId, FLOWID_U1, AT,
+        );
+        assertStrictEquals(res.status, 200);
+        const head = await db.messagePairs.getHeadPair(
+            canonicalPath('AjdvjuECVZEgZoFajaIEkg', '/flows/'),
+            flowId,
+        );
+        assert(head, 'the undo leaves a flow head');
+        assertStrictEquals(
+            res.headers.get('etag'), '"' + head.id + '"',
+        );
+        const body = await res.json() as Record<string, unknown>;
+        assertEquals(body, responseRecordOf(head.response));
+        assertStrictEquals(body['name'], 'genesis');
+        assertStrictEquals(body['state_event_id'], FLOWID_U1);
+        assert('graphDelta' in body, 'the state has graphDelta');
+        assert('revivals' in body, 'the state has revivals');
+    }),
+);
+
+Deno.test(
+    'a stale undo tag is 412 from the statement',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = await freshDb();
+        const backend = db.backend as MemoryStorageBackend;
+        const token = await organizationToken();
+        const flowId = generateIdentifier();
+        await createFlow(db, token, flowId);
+        await save(db, token, flowId, 'A', FLOWID_A);
+        const read = await handleRequest(db, req(
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId, token,
+        ));
+        const stale = read.headers.get('ETag');
+        await read.body?.cancel();
+        assert(stale, 'no ETag on the flow GET');
+        await save(db, token, flowId, 'B', FLOWID_B);
+
+        const before = (await db.messagePairs.getAll()).length;
+        const statements = backend.statementExecutions();
+        const res = await handleRequest(db, req(
+            'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId + '/undo', token,
+            { eventId: FLOWID_U1, at: AT },
+            { 'if-match': stale },
+        ));
+        assertStrictEquals(res.status, 412);
+        const refusal = await res.json() as { error: string };
+        assertMatch(refusal.error, /^If-Match does not match/);
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+        assertStrictEquals(
+            backend.statementExecutions(), statements + 1,
+        );
+        assertStrictEquals(
+            await currentGraphName(db, token, flowId), 'B',
         );
     }),
 );

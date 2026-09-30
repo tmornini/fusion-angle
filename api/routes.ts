@@ -1,19 +1,18 @@
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
+    RetiredEntityError,
 } from './db.ts';
 import type {
     DbAdapter,
-    StorageBackend,
-    Tx,
 } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type {
     FlowCreateBody,
     FlowUndoBody,
-    WorkOrderCreateBody,
     RecordWriteBody,
     ObjectiveCreateBody,
+    WorkOrderTransitionRelease,
 } from './validators.ts';
 import type {
     Id,
@@ -30,7 +29,6 @@ import type {
     ClientRegistrationEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
-    StateEntity,
     ObjectiveEntity,
     ProjectEntity,
     ProjectObjectiveBaselineScoreEntity,
@@ -39,8 +37,9 @@ import type {
     RecordAttributeEntity,
     MembershipEntity,
     IdentityProviderEntity,
-    WorkOrderEntity,
     WorkOrderFlowGraph,
+    MessagePairEntity,
+    TransitionFieldValueEntity,
     MemberEntity,
     AttributeType,
     Constraint,
@@ -48,6 +47,7 @@ import type {
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
+    nowUtc,
 } from '../shared/types.ts';
 import { hashPassword } from
     '../shared/password-hash.ts';
@@ -83,6 +83,7 @@ import {
     validateWorkOrderCreateBody,
     validateWorkOrderDocumentBody,
     validateWorkOrderTransitionBody,
+    validateDefaultOrganizationBody,
     pickString,
     pickStringArray,
     pickBoolean,
@@ -96,31 +97,31 @@ import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
     runWrite,
+    runStateWrite,
+    unprojected,
+    sameAsHead,
+    entityTagsOf,
+    latchesOf,
     canonicalPath,
     documentHeadAt,
     formWriteMessagePair,
-    messagePairResponseBody,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
-    parseIfMatch,
-    IF_MATCH_HEADER,
-    strongEtagOf,
+    responseRecordOf,
 } from './message-pair.ts';
 import type {
-    MessagePair, ReceivedRequest,
+    MessagePair,
+    ParentSibling,
+    ReceivedRequest,
+    StateProjection,
+    StateSibling,
 } from './message-pair.ts';
 import { messageStore } from './message-store.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
-import {
-    latestClaimEvent,
-    isClaimEventExpired,
-    isClaimState,
-    isExpiresAtPassed,
-    addUtcSeconds,
-} from '../shared/work-order-claims.ts';
+import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -138,7 +139,6 @@ import {
 } from './authentication.ts';
 import {
     ApiError,
-    HTTP_OK,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_CONFLICT,
@@ -192,7 +192,6 @@ import {
     deriveInstanceCollection,
     deriveInstanceRevisions,
     mergeInstanceValues,
-    instanceGetBody,
     revisionValuesOf,
     type InstanceValue,
 } from './derive-record-instances.ts';
@@ -206,6 +205,7 @@ import {
 } from '../shared/record-constraints.ts';
 import {
     flowEntityOf,
+    flowStoredEntityOf,
     deriveFlow,
     deriveFlows,
     resolveFlowUndoTarget,
@@ -264,13 +264,19 @@ import {
     tokenRevocationEntityOf,
 } from './derive-identity-spine.ts';
 import {
-    workOrderBindingFor,
-    workOrderClaimDocumentFor,
-    workOrderClaimHistoryFor,
-    workOrderDocumentHeadFor,
+    workOrderHeadFor,
     workOrderHistoryFor,
-    workOrderLifecycleStatesFor,
 } from './derive-states.ts';
+import {
+    boundVersion,
+    claimedVersion,
+    createdVersion,
+    fieldsVersion,
+    isClaimLive,
+    releasedVersion,
+    transitionedVersion,
+    type WorkOrderVersion,
+} from './work-order-version.ts';
 import {
     deriveOrganization,
     deriveOrganizations,
@@ -318,7 +324,9 @@ import {
     getInvitationVersionsOnIdentityNest,
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
-import type { DerivedDocument } from './derive-documents.ts';
+import type {
+    DerivedDocument, DocumentMessagePair,
+} from './derive-documents.ts';
 // Re-exported: param/requireOrganization/withoutId moved to
 // document-family.ts (see the import above and its own
 // comment), but api.ts and existing tests still import them
@@ -396,19 +404,12 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
 };
 // The work-orders wiring row — the fourth family, and the
 // FIRST 'stateless' one (Decision 7's state-in-entity design
-// does not apply to a work-order document; see
-// postWorkOrderDocumentOp's own comment for why). Both PUT
-// (Task 2/3) and GET (Task 7)
-// now ride the generic machinery, so entityOf serves a live GET
-// reader (documentGetHandler / documentCollectionGetHandler)
-// exactly as ideaEntityOf/projectEntityOf/flowEntityOf each
-// serve their OWN family's GET path: the head pair's body,
-// stamped with id and organization_id, already carries exactly
-// the {display_id, flow_graph, position} keys
-// validateWorkOrderDocumentBody's gate admits, so no per-field
-// picking is needed. notFoundTable is 'work_orders' — the first
-// family whose storage table name (db-backed.ts's EntityStore
-// key) differs from its family name.
+// does not apply to a work-order document: its lifecycle rides
+// its operations). The GETs stream the stored head, which is
+// the whole version (api/api.ts), so no per-field picking is
+// needed. notFoundTable is 'work_orders' — the first family
+// whose storage table name (db-backed.ts's EntityStore key)
+// differs from its family name.
 function workOrderDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
@@ -754,10 +755,9 @@ function ownerOrganizationViaMembershipPairPlane(
 // requestAt (the write's own origination) yet strictly-later
 // RESPONSE `at` stamps (appendMessagePairOnce's nowUtc() is
 // monotonic), so the document message pair — appended after the
-// operation message pair — becomes the document's head; a duplicate
-// create's Supersedes therefore resolves against the prior
-// DOCUMENT message pair, not the prior operation message pair (the Phase 5
-// shared-document mechanism, re-pinned here).
+// operation message pair — becomes the document's head. A live
+// create lands through the former instead; the edit and the
+// seed's creates form this bundle.
 export interface RecordWriteMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -1038,6 +1038,25 @@ async function requestDiffers(
     );
 }
 
+// The record-type document is judged by its stored state.
+// A former-born head's request carries the entity's `id`
+// and `organization_id`, which the edit's request lacks,
+// so a request comparison always reads changed, submits a
+// row that matches, and the statement drops the edit.
+async function stateDiffers(
+    db: DbAdapter,
+    pair: MessagePair,
+): Promise<boolean> {
+    const head = await messageStore(db).getDocumentHead(
+        pair.path, pair.name,
+    );
+    if (head === null) return true;
+    return !sameValue(
+        responseRecordOf(head.response),
+        responseRecordOf(pair.responseMessage),
+    );
+}
+
 function sameValue(left: unknown, right: unknown): boolean {
     if (Object.is(left, right)) return true;
     if (
@@ -1089,7 +1108,7 @@ async function recordRowsToSubmit(
     db: DbAdapter,
     formed: RecordWriteMessagePairs,
 ): Promise<MessagePair[]> {
-    const recordChanged = await requestDiffers(
+    const recordChanged = await stateDiffers(
         db, formed.document,
     );
     const changedPuts: MessagePair[] = [];
@@ -1140,14 +1159,13 @@ async function deleteAlreadyApplied(
 // document + attribute pairs; states.postEvent on create/edit
 // stays until the states-trace group. Removed attributes are
 // RESTRICTED inside the same tx (message-plane referrers; 409
-// bytes preserved). `messagePairs` is optional so the seed's below-
-// facade call keeps compiling; the route always supplies the
-// bundle.
+// bytes preserved). The live route lands a create through
+// the former; the seed's below-facade creates land here.
 export async function postRecordWriteOp(
     db: DbAdapter,
     payload: Record<string, unknown>,
     _actor: Id,
-    messagePairs?: RecordWriteMessagePairs,
+    messagePairs: RecordWriteMessagePairs,
     // Verified token organization scoping the RESTRICT
     // referrer sweep (collectAttributeReferrers). Optional so
     // the below-facade seed path (creates only; never removes
@@ -1161,9 +1179,14 @@ export async function postRecordWriteOp(
             ? body.removedAttributeIds
             : [];
     // Choose rows before the read. RESTRICT runs first;
-    // the statement is the write.
-    const rows = messagePairs === undefined
-        ? undefined
+    // the statement is the write. A create submits every
+    // row.
+    const rows = body.kind === 'create'
+        ? [
+            messagePairs.operation,
+            messagePairs.document,
+            ...messagePairs.attributePuts,
+        ]
         : await recordRowsToSubmit(db, messagePairs);
     // Phase Final Task 2: states ROW half stripped —
     // document/attribute pairs alone carry truth.
@@ -1195,9 +1218,7 @@ export async function postRecordWriteOp(
             }
         });
     }
-    if (rows !== undefined) {
-        await runWrite(db, attemptFor(rows), rows);
-    }
+    await runWrite(db, attemptFor(rows), rows);
 }
 
 // Phase Final Task 2: writeFlowGraphDelta RETIRED. The four
@@ -1445,75 +1466,35 @@ export function flowCreateDocumentBody(
     };
 }
 
-// The three pairs a live POST /flows forms (Task 5): the gate's
-// own operation message pair (204, at the flows/:id document per Task 1's
-// createdEntityName override — POST 'flows' and PUT 'flows/:id'
-// collapse onto the SAME (path, name), see derive-
-// documents.ts's DOCUMENT_METHODS filter for why the two never
-// collide as documents), plus the document and join pairs the
-// route pre-forms below. All three share ONE requestAt (the
-// create's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePairOnce's nowUtc() is monotonic), so the
-// document message pair — appended after the
-// operation message pair — becomes the document's head.
+// The three pairs the seed forms for one flow (pass 1,
+// seed-message-pairs.ts): the operation pair, the flow
+// document, and its project join, sharing one requestAt.
 export interface FlowCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
     readonly join: MessagePair;
 }
 
-// Flow creation. Phase Final Task 2: flows + graph relation
-// + project_flows ROW halves stripped — message plane carries
-// the document (graphDelta SIDECAR-KEEP) and the join; only
-// the initial 'active' states.postEvent remains until the
-// states-trace group. graphDelta is still validated at the
-// HTTP gate and stored on the document message pair. Exported so the
-// seed can drive flow creation through the same gate the
-// route uses (Decision 6's below-facade carve-out). `messagePairs`
-// is optional so the seed's below-facade call keeps
-// compiling; the route always supplies the triple.
-// An unchanged document is left out when the join
-// changes. A resend of every body is what matches.
-async function flowRowsToSubmit(
-    db: DbAdapter,
-    formed: FlowCreationMessagePairs,
-): Promise<MessagePair[]> {
-    const documentChanged = await requestDiffers(
-        db, formed.document,
-    );
-    const joinChanged = await requestDiffers(
-        db, formed.join,
-    );
-    const hasChange = documentChanged || joinChanged;
-    const rows = [formed.operation];
-    if (documentChanged || !hasChange) {
-        rows.push(formed.document);
-    }
-    if (joinChanged || !hasChange) {
-        rows.push(formed.join);
-    }
-    return rows;
-}
-
+// The seed's below-facade flow creation (Decision 6's
+// carve-out): its pairs were formed before the rehearsal's
+// writes, so it lands them as formed. A create submits
+// every row; the live route lands through the former.
 export async function postFlowCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     _actor: Id,
-    messagePairs?: FlowCreationMessagePairs,
+    messagePairs: FlowCreationMessagePairs,
 ): Promise<void> {
     validateFlowCreateBody(body);
-    const rows = messagePairs === undefined
-        ? undefined
-        : await flowRowsToSubmit(db, messagePairs);
-    if (rows !== undefined) {
-        await runWrite(
-            db, attemptFor(rows), rows,
-        );
-    }
-    return;
+    const rows = [
+        messagePairs.operation,
+        messagePairs.document,
+        messagePairs.join,
+    ];
+    await runWrite(db, attemptFor(rows), rows);
 }
 
-// Flow document write (Decision 7, the LOCKED class). Phase
+// Flow document write (Decision 7, class B). Phase
 // Final Task 2: flows + graph relation ROW halves stripped —
 // the pair + states.postEvent (flow lifecycle + revivals)
 // commit as ONE transaction. graphDelta/revivals stay in the
@@ -1553,28 +1534,13 @@ export async function postFlowDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<FlowEntity, 'id'>;
-    const latchedId = messagePair?.latchedHeadMessagePairId;
     // Phase Final Task 2: flows + graph ROW halves
     // stripped; states ROW half stripped (message plane only).
     // Revival states events dual-write until the
     // states-trace strip; pair body also carries
     // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
+    // The statement judges the received PUT's own tag.
     if (messagePair !== undefined) {
-        if (latchedId !== undefined) {
-            const latest = await db.readTransaction(
-                async (view) =>
-                    (await messageStore(view).getDocumentHead(
-                        messagePair.path, messagePair.name,
-                    ))?.id,
-            );
-            if (latest !== latchedId) {
-                throw new ApiError(
-                    'If-Match does not match the current'
-                    + ' document at /flows/' + id,
-                    HTTP_PRECONDITION_FAILED,
-                );
-            }
-        }
         await runWrite(
             db,
             attemptFor([messagePair]),
@@ -1584,40 +1550,66 @@ export async function postFlowDocumentOp(
     return { id, ...entity };
 }
 
-// Undo-as-replay (Phase 14 Task 8): given a resolution
-// ALREADY produced by resolveFlowUndoTarget, perform the
-// restore write. Phase Final Task 2: flows + graph ROW
-// halves stripped — the 'updated' state event, revivals
-// states events, and the operation + synthesized document
-// message pairs (graphDelta/revivals SIDECAR-KEEP on the document
-// body) commit as ONE transaction. Exhaustion appends only
-// the operation message pair. `current.id` is the in-tx latch so a
-// racing save 412s when the lock head has moved.
+// Undo-as-replay through the former (§1 C): the flow's
+// restored state lands in-order on the client's tag. At
+// exhaustion the flow's current state is the sibling, so
+// the statement answers the head and stores nothing.
 export async function postFlowUndoOp(
     db: DbAdapter,
     id: Id,
-    actor: Id,
     organization: Id,
     messagePair: MessagePair,
     resolution: FlowUndoResolution,
     b: FlowUndoBody,
-): Promise<unknown> {
+): Promise<void> {
     const { current, target } = resolution;
-    if (target === undefined) {
-        // Exhaustion: the gate still requires this wired write's
-        // own operation message pair to land (api.ts's post-dispatch
-        // "wired write stored no pair" guard, true for every
-        // pair-wired route), so it is appended ALONE — no
-        // document message pair, no domain writes — a genuine no-op a
-        // LATER resolution walk correctly ignores (it carries no
-        // correlated document message pair to displace anything).
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
+    const latches = latchesOf(
+        entityTagsOf(messagePair), [current.id],
+    );
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for /flows/' + id,
+            HTTP_PRECONDITION_REQUIRED,
         );
-        return;
     }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const body = target === undefined
+        ? current.body
+        : undoneFlowBody(id, current, target, b);
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: canonicalPath(organization, '/flows/'),
+            name: id,
+            state: flowStoredEntityOf({
+                name: id,
+                messagePairId: current.id,
+                method: 'PUT',
+                body,
+            }, organization),
+            condition: {
+                kind: 'in-order', head: latches.heads[0]!,
+            },
+        }],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
+}
+
+function undoneFlowBody(
+    id: Id,
+    current: DocumentMessagePair,
+    target: DocumentMessagePair,
+    b: FlowUndoBody,
+): Record<string, unknown> {
     const currentGraph = asStoredGraph(
         current.body['graph'],
         'flows/:id/undo current.graph',
@@ -1665,61 +1657,12 @@ export async function postFlowUndoOp(
         revivals,
     };
     validateFlowDocumentBody(documentBody);
-    const documentMessagePair = await formDocumentMessagePairFor({
-        routePattern: 'organizations/:id/flows/:id',
-        params: [organization, id],
-        body: documentBody,
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization,
-        latchedHeadMessagePairId: current.id,
-    });
-    // Phase Final Task 2: flows + graph ROW halves stripped.
-    const latest = await db.readTransaction(
-        async (view) =>
-            (await messageStore(view).getDocumentHead(
-                documentMessagePair.path,
-                documentMessagePair.name,
-            ))?.id,
-    );
-    // The CLIENT's pin, not this walk's own read:
-    // the gate proved it matched the head before
-    // dispatch, so a mismatch here means a racer
-    // committed in between — a real conflict, never
-    // a scheduling artifact of our own resolution.
-    const pinned =
-        messagePair.pinnedDocumentMessagePairId
-            ?? current.id;
-    if (latest !== pinned) {
-        throw new ApiError(
-            'If-Match does not match the current'
-            + ' document at /flows/' + id,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const pairs = [
-        messagePair, documentMessagePair,
-    ];
-    await runWrite(db, attemptFor(pairs), pairs);
-    return;
+    return documentBody;
 }
 
-// The three pairs a live POST /objectives forms (Task 3): the
-// gate's own operation message pair (204, at the objectives/:id document
-// per the create-body-id-field override — POST 'objectives' and
-// PUT 'objectives/:id' collapse onto the SAME (path,
-// name), the flows/records precedent), the synthesized document
-// message pair (objectives/:id), and the synthesized revision pair
-// (objectives/:id/revisions/:rid) the route pre-forms below. All
-// three share ONE requestAt (the create's own origination) yet
-// strictly-later RESPONSE `at` stamps (appendMessagePairOnce's
-// nowUtc() is monotonic), so the document message pair — appended after
-// the operation message pair — becomes the shared document's head; the
-// revision pair lives at its OWN distinct document (a fresh
-// revision id per create), so it is always genesis there unless
-// a live PUT had already visited that exact revision id.
+// The three pairs the seed forms for one objective (pass 1,
+// seed-message-pairs.ts): the operation pair, the objective
+// document, and its first revision, sharing one requestAt.
 export interface ObjectiveCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
@@ -1763,38 +1706,23 @@ export function objectiveRevisionBodyOf(
     return createBody.revision;
 }
 
-// Objective creation: operation + document + first-revision
-// pairs commit as ONE transaction. Phase Final Task 2:
-// objectives + objective_revisions ROW halves stripped —
-// pure message-plane write. The genesis state folds onto
-// the document message pair via objectiveDocumentBodyOf
-// (states-document retirement); no separate states/:id event
-// is written. Exported so the seed can drive objective
-// creation through the same gate the route uses (Decision
-// 6's below-facade carve-out). `messagePairs` is optional so the
-// seed's below-facade shape keeps compiling; the route
-// always supplies the bundle, since 'objectives' is pair-
-// wired and never bearer-exempt. Create appends THREE pairs
-// — operation, document, revision — in that order, LAST.
+// The seed's below-facade objective creation (Decision 6's
+// carve-out): its pairs were formed before the rehearsal's
+// writes, so it lands them as formed. The genesis state
+// folds onto the document via objectiveDocumentBodyOf; the
+// live route lands through the former.
 export async function postObjectiveCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    messagePairs?: ObjectiveCreationMessagePairs,
+    messagePairs: ObjectiveCreationMessagePairs,
 ): Promise<void> {
     validateObjectiveCreateBody(body);
-    // Phase Final Task 2: objectives +
-    // objective_revisions ROW halves stripped.
-    if (messagePairs !== undefined) {
-        const pairs = [
-            messagePairs.operation,
-            messagePairs.document,
-            messagePairs.revision,
-        ];
-        await runWrite(
-            db, attemptFor(pairs), pairs,
-        );
-    }
-    return;
+    const pairs = [
+        messagePairs.operation,
+        messagePairs.document,
+        messagePairs.revision,
+    ];
+    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Objective document write — the fifth lifecycle-state family
@@ -1855,319 +1783,232 @@ export function identityDocumentBodyOf(
     return { kind, ...profile };
 }
 
-// Identity creation: Phase Final Task 2 strips the
-// identities + identity_credentials ROW halves — pure
-// message-plane write. A person's PII enters later via PUT
-// identities/:id/pii. NO state event (an identity carries
-// no lifecycle event at creation). The pairs a live POST
-// /identities forms: operation (204 at identities/:id) +
-// identities/:id document ({kind} alone). A service ALSO
-// forms the credential-document message pair at
-// identities/:id/credentials/:cid, appended last.
-export type IdentityWriteMessagePairs =
-    | {
-        readonly kind: 'person';
-        readonly operation: MessagePair;
-        readonly identityDocument: MessagePair;
+// A wired route forms its pair before dispatch; only a
+// below-facade caller could arrive without one.
+function requirePair(
+    messagePair: MessagePair | undefined,
+): MessagePair {
+    if (messagePair === undefined) {
+        throw new Error('a wired route formed no pair');
     }
-    | {
-        readonly kind: 'service';
-        readonly operation: MessagePair;
-        readonly identityDocument: MessagePair;
-        readonly credentialDocument: MessagePair;
-    };
+    return messagePair;
+}
 
-// Exported so the seed can drive identity creation through
-// the same gate the route uses. `messagePairs` is optional so the
-// seed's below-facade shape keeps compiling; the route always
-// supplies the bundle. Create appends operation + identity
-// document (+ credential document for service), LAST.
-export async function postIdentityCreationOp(
+// Work-order creation (§5): one version carrying its three
+// births (start, post-start, and the creator's claim) and
+// the flow join, in one statement. Both declare their
+// genesis, so a resent create answers 409 and stores
+// nothing. Every event is authored by the verified caller.
+async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    messagePairs?: IdentityWriteMessagePairs,
+    actor: Id,
+    messagePair: MessagePair | undefined,
+    organization: Id | undefined,
 ): Promise<void> {
-    validateIdentityCreateBody(body);
-    // Phase Final Task 2: identities + identity_credentials
-    // ROW halves stripped.
-    if (messagePairs !== undefined) {
-        const pairs = [
-            messagePairs.operation,
-            messagePairs.identityDocument,
-        ];
-        if (messagePairs.kind === 'service') {
-            pairs.push(
-                messagePairs.credentialDocument,
-            );
-        }
-        await runWrite(
-            db, attemptFor(pairs), pairs,
+    const org = requireOrganization(organization);
+    const b = validateWorkOrderCreateBody(body);
+    const fields = validateWorkOrderDocumentBody(
+        withoutId(b.workOrder),
+    ).entity;
+    const graph = asWorkOrderFlowGraph(
+        fields.flow_graph, 'WorkOrderCreateBody',
+    );
+    validateFlowWorkOrderEntity(b.flowWorkOrder);
+    const flowId = pickString(b.flowWorkOrder, 'flow_id');
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: requirePair(messagePair),
+        siblings: [
+            {
+                method: 'PUT',
+                path: canonicalPath(org, '/work-orders/'),
+                name: b.id,
+                state: createdVersion({
+                    id: b.id,
+                    organization_id: org,
+                    fields,
+                    births: b.stateEventIds.map(
+                        (id, i) => ({
+                            id,
+                            state: b.states[i]!,
+                            at: b.stateEventAts[i]!,
+                        }),
+                    ),
+                    creator: actor,
+                    lockTimeoutSeconds: graph.lockTimeout,
+                }),
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            },
+            {
+                method: 'PUT',
+                path: canonicalPath(
+                    org, '/flows/' + flowId + '/work-orders/',
+                ),
+                name: b.flowWorkOrderId,
+                state: {
+                    ...flowWorkOrderEntityOf({
+                        name: b.flowWorkOrderId,
+                        messagePairId: b.flowWorkOrderId,
+                        method: 'PUT',
+                        body: b.flowWorkOrder,
+                    }),
+                },
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            },
+        ],
+        project: unprojected,
+        answer: { kind: 'created', location: b.id },
+    });
+}
+
+// Claim, release, and binding (§5): each reads the head,
+// matches the client's tag to it, and lands the next
+// version in order on that head. The statement judges the
+// latch. `validate` forms the operation's input once the
+// fence has passed, so a malformed body answers 400 whatever
+// its tag; `next` may refuse from the head it is given. A
+// tag naming another head was read from a head this one
+// replaced: the statement refuses it, so no rule of this
+// head is asked.
+async function workOrderOperation<Input>(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+    messagePair: MessagePair,
+    validate: () => Input,
+    next: (
+        head: WorkOrderVersion,
+        input: Input,
+    ) => WorkOrderVersion | Promise<WorkOrderVersion>,
+): Promise<void> {
+    const head = await workOrderHeadFor(
+        db, organization, workOrderId,
+    );
+    if (head === null) {
+        throw await missedReadError(
+            db, workOrderId, organization, 'work_orders',
         );
     }
-    return;
-}
-
-// The create's synthesized document body (Task 3, the
-// flow-creation-triple precedent): the SAME shape a live
-// genesis PUT /work-orders/:id would carry — the work
-// order's own three fields, picked directly from b.workOrder
-// (never spread verbatim) so a below-facade caller's
-// tolerated organization_id (validateWorkOrderCreateBody
-// never restricts workOrder's own keys) never leaks into the
-// byte-compared document. The ONE construction both the
-// route's pre-tx pair body and this comment's own covenant
-// describe — never a second, divergently-picked literal.
-function workOrderCreateDocumentBody(
-    b: WorkOrderCreateBody,
-): Record<string, unknown> {
-    return {
-        display_id: pickString(b.workOrder, 'display_id'),
-        flow_graph: asObject(
-            b.workOrder['flow_graph'], 'flow_graph',
-        ),
-        position: pickNumber(b.workOrder, 'position'),
-    };
-}
-
-// The three pairs a live POST /work-orders forms (Task 3):
-// the gate's own operation message pair (204, at the work-orders/:id
-// document per the registry's createBodyIdField — POST
-// 'work-orders' and PUT 'work-orders/:id' collapse onto the
-// SAME (path, name), exactly as flows/:id did for its
-// own create), plus the document and join pairs the route
-// pre-forms below. All three share ONE requestAt (the
-// create's own origination) yet strictly-later RESPONSE `at`
-// stamps (appendMessagePairOnce's nowUtc() is monotonic), so the
-// document message pair — appended after the
-// operation message pair — becomes the document's head.
-export interface WorkOrderCreationMessagePairs {
-    readonly operation: MessagePair;
-    readonly document: MessagePair;
-    readonly join: MessagePair;
-    readonly claim: MessagePair;
-}
-
-// Work-order creation. Phase Final Task 2: work_orders +
-// flow_work_orders ROW halves stripped — THREE initial state
-// events (start, post-start, creation-time 'claimed') and
-// the operation/document/join pairs commit as ONE
-// transaction. Events are applied IN ORDER and authored by
-// the verified caller (actor), never the body. Seed drives
-// work-order genesis through postWorkOrderDocumentOp /
-// postFlowWorkOrderDocumentOp instead; states traces stay
-// direct until the states-trace group. The route always
-// supplies the triple and forms all three pairs pre-tx.
-// An unchanged document, join, or claim is left out
-// when another row changes. A resend of every body
-// is what matches, and the statement stores nothing.
-async function workOrderRowsToSubmit(
-    db: DbAdapter,
-    formed: WorkOrderCreationMessagePairs,
-): Promise<MessagePair[]> {
-    const documentChanged = await requestDiffers(
-        db, formed.document,
+    const input = validate();
+    const latches = latchesOf(
+        entityTagsOf(messagePair), [head.pair.id],
     );
-    const joinChanged = await requestDiffers(
-        db, formed.join,
-    );
-    const claimChanged = await requestDiffers(
-        db, formed.claim,
-    );
-    const hasChange = documentChanged
-        || joinChanged
-        || claimChanged;
-    const rows = [formed.operation];
-    if (documentChanged || !hasChange) {
-        rows.push(formed.document);
-    }
-    if (joinChanged || !hasChange) {
-        rows.push(formed.join);
-    }
-    if (claimChanged || !hasChange) {
-        rows.push(formed.claim);
-    }
-    return rows;
-}
-
-export async function postWorkOrderCreationOp(
-    db: DbAdapter,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePairs?: WorkOrderCreationMessagePairs,
-): Promise<void> {
-    validateWorkOrderCreateBody(body);
-    const rows = messagePairs === undefined
-        ? undefined
-        : await workOrderRowsToSubmit(db, messagePairs);
-    // Phase Final Task 2: work_orders + flow_work_orders
-    // ROW halves stripped.
-    if (rows !== undefined) {
-        await runWrite(
-            db, attemptFor(rows), rows,
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for '
+                + head.pair.path + workOrderId,
+            HTTP_PRECONDITION_REQUIRED,
         );
     }
-    return;
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const latch = latches.heads[0]!;
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: head.pair.path,
+            name: workOrderId,
+            state: latch === head.pair.id
+                ? await next(head.version, input)
+                : head.version,
+            condition: { kind: 'in-order', head: latch },
+        }],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
 }
 
-// Claim a work order. A live claim by another member is
-// a 409 before any write. The same actor's repeat whose
-// body matches answers 200 and stores nothing. A claim
-// aged past the flow's lockTimeout is superseded.
-//
-// The decision read and the write are separate, so two
-// callers can both observe no claim head. That write is
-// genesis: the nil succession slot admits one PUT, and
-// the other answers 409. A present head — expired, the
-// same actor, or a DELETE — is in-order with If-Match
-// set to that head. Stale and succession refusal are the
-// same 409. A reclaim after DELETE matches that DELETE,
-// never a second genesis: the nil slot already holds
-// the first claim.
-//
-// Exported so the seed can drive a claim through the
-// same gate the route uses. `messagePair` is optional.
-// A wired return must run the statement, matched no-op
-// included: the gate crashes when the answer is absent.
-//
-// PHASE 14 TASK 4: the prior-claim decision read is re-
-// anchored onto the message plane (workOrderClaimHistoryFor,
-// api/derive-states.ts) — ENTITY-SCOPED indexed reads inside
-// this SAME transaction, never a nested tx — in place of the
-// row-plane view.states.getAllFor(workOrderId). Author gate 3:
-// latestClaimEvent and isClaimEventExpired (the live Date.now
-// clock) stay byte-identical — ONLY the event SOURCE flips.
-//
-// PHASE 15 TASK 2: the claim-gate graph read is re-anchored
-// onto workOrderDocumentHeadFor (message-plane document head)
-// in place of view.workOrders.getById. isClaimEventExpired +
-// 409 bytes + EntityNotFoundError mapping stay byte-identical
-// — ONLY the row source flips. Phase Final Task 2: work_orders
-// dropped from the tx list (no dual-write half remains).
+// Claim a work order. A live claim by another member is a
+// 409 from the head; the holder resending its claim is the
+// head, so nothing lands. A lapsed claim is recorded as
+// expired, authored by its holder, before the new claim.
 export async function postWorkOrderClaimOp(
     db: DbAdapter,
     workOrderId: Id,
     body: Record<string, unknown>,
     actor: Id,
     organization: Id,
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    validateWorkOrderClaimBody(body);
-    // Phase Final Task 2: work_orders ROW half stripped.
-    // claim_expired + claimed live on the operation
-    // message pair body (workOrderClaimHistoryFor reads
-    // them back).
-    const claimRead = await db.readTransaction(async (view) => {
-        const wo = await workOrderDocumentHeadFor(
-            view, organization, workOrderId,
-        );
-        if (wo === null) {
-            throw await missedReadError(
-                view, workOrderId, organization,
-                'work_orders',
-            );
-        }
-        const graph = asWorkOrderFlowGraph(
-            wo.flow_graph,
-            'work_orders.flow_graph',
-        );
-        const events = await workOrderClaimHistoryFor(
-            view, organization, workOrderId,
-        );
-        const prior = latestClaimEvent(
-            events, workOrderId,
-        );
-        const claimDoc = await workOrderClaimDocumentFor(
-            view, organization, workOrderId,
-        );
-        const priorExpired = claimDoc !== null
-            ? isExpiresAtPassed(claimDoc.expiresAt)
-            : prior !== null
-                && isClaimEventExpired(
-                    prior, graph.lockTimeout,
+    const claim = validateWorkOrderClaimBody(body);
+    const received = requirePair(messagePair);
+    await workOrderOperation(
+        db, organization, workOrderId, received,
+        () => claim,
+        (head) => {
+            const change = claimedVersion(head, {
+                member: actor,
+                claimEventId: claim.claimEventId,
+                claimAt: claim.claimAt,
+                expireEventId: claim.expireEventId,
+                expireAt: claim.expireAt,
+                expiresAt: claim.expiresAt !== undefined
+                    ? claim.expiresAt
+                    : addUtcSeconds(
+                        claim.claimAt,
+                        asWorkOrderFlowGraph(
+                            head.flow_graph,
+                            'work_orders.flow_graph',
+                        ).lockTimeout,
+                    ),
+                now: received.requestAt,
+            });
+            if (change.kind === 'held') {
+                throw new ApiError(
+                    'work order is already claimed',
+                    HTTP_CONFLICT,
                 );
-        const head = messagePair === undefined
-            ? null
-            : await documentHeadAt(
-                view, messagePair.path, messagePair.name,
-            );
-        return {
-            claimed: prior !== null
-                && prior.state === 'claimed'
-                && !priorExpired
-                && prior.member_id !== actor,
-            headId: head === null ? null : head.id,
-        };
-    });
-    if (claimRead.claimed) {
-        throw new ApiError(
-            'work order is already claimed',
-            HTTP_CONFLICT,
-        );
-    }
-    if (messagePair !== undefined) {
-        // The gate's answer map is keyed by this object,
-        // so the attempt latch has to land on it.
-        if (claimRead.headId === null) {
-            Object.assign(messagePair, {
-                genesis: true as const,
-            });
-        } else {
-            Object.assign(messagePair, {
-                latchedHeadMessagePairId: claimRead.headId,
-            });
-        }
-        const answer = await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-        if (
-            answer.outcome === 'refused'
-            || answer.outcome === 'stale'
-        ) {
-            throw new ApiError(
-                'work order is already claimed',
-                HTTP_CONFLICT,
-            );
-        }
-    }
+            }
+            return change.version;
+        },
+    );
 }
 
-// DELETE work-orders/:id/claim — tombstone the claim
-// document. The gate's DELETE table already 404s a never-
-// written document and 204s an already-DELETE head without
-// dispatch. A PUT head proceeds here; append the DELETE
-// pair. applyReleaseMessagePair synthesizes claim_released from
-// the pair (id/at/actor) — no caller-minted body.
+// DELETE work-orders/:id/claim releases the live claim: an
+// operation on the work order, answering its state. The
+// release event takes the DELETE's own id and arrival. With
+// no live claim the version is the head, and nothing lands.
 export async function deleteWorkOrderClaimOp(
     db: DbAdapter,
-    _workOrderId: Id,
-    _actor: Id,
-    _organization: Id,
-    messagePair?: MessagePair,
+    workOrderId: Id,
+    actor: Id,
+    organization: Id,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return;
+    const received = requirePair(messagePair);
+    await workOrderOperation(
+        db, organization, workOrderId, received,
+        () => ({
+            eventId: received.id,
+            member: actor,
+            at: received.requestAt,
+            now: received.requestAt,
+        }),
+        (head, release) => releasedVersion(head, release),
+    );
 }
 
-// Current node id from lifecycle ASC + frozen graph.
-// Latest non-claim event's state; none → isCreate node;
-// undefined when neither exists (empty graph residual).
+// The node a work order sits at: its version's state, or
+// its graph's create node before any event sets one;
+// undefined only for a graph with neither.
 function currentNodeIdFor(
-    lifecycle: readonly StateEntity[],
+    version: WorkOrderVersion,
     graph: WorkOrderFlowGraph,
 ): string | undefined {
-    for (let i = lifecycle.length - 1; i >= 0; i--) {
-        const event = lifecycle[i]!;
-        if (!isClaimState(event.state)) {
-            return event.state;
-        }
+    if (version.state !== undefined) {
+        return version.state;
     }
     const create = graph.nodes.find(
         (node) => node.isCreate,
@@ -2178,13 +2019,12 @@ function currentNodeIdFor(
 // W10 required-at-exit: every gate-tier leave of a node
 // with isRequired refs validates MERGED state (head +
 // this delta). Unbound → 400 naming the bind (A3).
-// Preloaded head/bind/schema reuse the value-bearing
+// Preloaded values and schema reuse the value-bearing
 // path's already-read rows (ONE head read).
 async function assertRequiredAttributesAtExit(
     db: DbAdapter,
     organization: Id,
-    workOrderId: Id,
-    flowGraph: Record<string, unknown>,
+    version: WorkOrderVersion,
     delta: {
         readonly set: readonly {
             readonly attribute_id: string;
@@ -2193,7 +2033,6 @@ async function assertRequiredAttributesAtExit(
         readonly clear: readonly string[];
     },
     preloaded?: {
-        bind: { instanceId: Id; recordTypeId: Id };
         headValues: readonly InstanceValue[];
         attributesById: ReadonlyMap<
             string, AttributeSchemaRow
@@ -2201,12 +2040,9 @@ async function assertRequiredAttributesAtExit(
     },
 ): Promise<void> {
     const graph = asWorkOrderFlowGraph(
-        flowGraph, 'work_orders.flow_graph',
+        version.flow_graph, 'work_orders.flow_graph',
     );
-    const lifecycle = await workOrderLifecycleStatesFor(
-        db, organization, workOrderId,
-    );
-    const nodeId = currentNodeIdFor(lifecycle, graph);
+    const nodeId = currentNodeIdFor(version, graph);
     if (nodeId === undefined) {
         return;
     }
@@ -2222,12 +2058,10 @@ async function assertRequiredAttributesAtExit(
     if (required.length === 0) {
         return;
     }
-    const bind = preloaded !== undefined
-        ? preloaded.bind
-        : await workOrderBindingFor(
-            db, organization, workOrderId,
-        );
-    if (bind === null) {
+    if (
+        version.instance_id === undefined
+        || version.record_type_id === undefined
+    ) {
         throw new ValidationError(
             'work order has no instance binding',
         );
@@ -2237,13 +2071,13 @@ async function assertRequiredAttributesAtExit(
     if (headValues === undefined) {
         const head = await deriveInstanceHead(
             db, organization,
-            bind.recordTypeId, bind.instanceId,
+            version.record_type_id, version.instance_id,
         );
         headValues = head?.values ?? [];
     }
     if (attributesById === undefined) {
         attributesById = await loadAttributeSchemaById(
-            db, organization, bind.recordTypeId,
+            db, organization, version.record_type_id,
         );
     }
     const merged = mergeInstanceValues(
@@ -2278,374 +2112,370 @@ async function assertRequiredAttributesAtExit(
     }
 }
 
-// Transition a work order along an edge. Dual-tolerant
-// below the facade (seed tier + stored-data fidelity):
-// legacy pure-append OR instance set/clear against the
-// bound instance head. organization === undefined is the
-// below-facade seed tier (validate + append only). The
-// live gate rejects the legacy key in the dispatch arrow
-// (Task 8 CUT). Gate tier fences the WO (404/403); value-
-// bearing instance shape adds bind assert + If-Match
-// ladder + ACL/constraints + W10 required-at-exit + one
-// tx of op + revision. Authorship is stamped from the
-// verified caller (actor). `messagePair` is optional.
+// One transition lands one work-order version and, when it
+// bears values, the bound instance's revision, in one
+// statement (§5). The work order is the parent; the tags
+// latch the documents the transition derives from, parent
+// first (Interpretation J). An instance revision equal to
+// its head is left out.
+async function landWorkOrderTransition(
+    db: DbAdapter,
+    head: {
+        readonly version: WorkOrderVersion,
+        readonly pair: MessagePairEntity,
+    },
+    messagePair: MessagePair,
+    event: Parameters<typeof transitionedVersion>[1],
+    instance:
+        | { readonly kind: 'none' }
+        | {
+            readonly kind: 'revised',
+            readonly head: MessagePairEntity,
+            readonly state: Record<string, unknown>,
+        },
+    tags: readonly string[],
+): Promise<void> {
+    const documents = instance.kind === 'none'
+        ? [head.pair.id]
+        : [head.pair.id, instance.head.id];
+    const latches = latchesOf(tags, documents);
+    if (latches.kind === 'missing') {
+        throw new ApiError(
+            'If-Match is required for '
+                + latches.documents.map((index) => index === 0
+                    ? head.pair.path + head.version.id
+                    : 'the bound instance').join(' and '),
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    if (latches.kind === 'extra') {
+        throw new ApiError(
+            'If-Match names no document this operation'
+                + ' derives from',
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const workOrder: ParentSibling = {
+        method: 'PUT',
+        path: head.pair.path,
+        name: head.version.id,
+        state: transitionedVersion(head.version, event),
+        condition: { kind: 'in-order', head: latches.heads[0]! },
+    };
+    const revision: readonly StateSibling[] =
+        instance.kind === 'none'
+            || sameAsHead(instance.head, instance.state)
+            ? []
+            : [{
+                method: 'PUT',
+                path: instance.head.path,
+                name: instance.head.name,
+                state: instance.state,
+                condition: {
+                    kind: 'in-order', head: latches.heads[1]!,
+                },
+            }];
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [workOrder, ...revision],
+        project: unprojected,
+        answer: { kind: 'parent' },
+    });
+}
+
+// The release a transition carries, as the version records
+// it.
+function transitionReleaseOf(
+    release: WorkOrderTransitionRelease | null,
+): Parameters<typeof transitionedVersion>[1]['release'] {
+    return release === null
+        ? { kind: 'kept' }
+        : { kind: 'released', id: release.id, at: release.at };
+}
+
+// The event's field values, from the instance delta it
+// carries: a set row per value, a clear row per attribute.
+function deltaFieldValueEntities(
+    set: readonly { attribute_id: string, value: string }[],
+    clear: readonly string[],
+): TransitionFieldValueEntity[] {
+    return [
+        ...set.map((entry) => ({
+            id: entry.attribute_id,
+            attribute_id: entry.attribute_id,
+            value: entry.value,
+        })),
+        ...clear.map((attributeId) => ({
+            id: attributeId,
+            attribute_id: attributeId,
+            cleared: true,
+        } as TransitionFieldValueEntity)),
+    ].sort(byIdAscending);
+}
+
+// The work order's head, or its miss.
+async function requireWorkOrderHead(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+): Promise<{
+    readonly version: WorkOrderVersion,
+    readonly pair: MessagePairEntity,
+}> {
+    const head = await workOrderHeadFor(
+        db, organization, workOrderId,
+    );
+    if (head === null) {
+        throw await missedReadError(
+            db, workOrderId, organization, 'work_orders',
+        );
+    }
+    return head;
+}
+
+// Transition a work order along an edge (§5). A pure move
+// latches the work order; a value-bearing one also latches
+// the bound instance and revises it in the same statement.
+// The checks run in their covenant order: the fence, the
+// binding, ACL, constraints, then required-at-exit against
+// the head's own frozen graph. Authorship is the verified
+// caller's.
 export async function postWorkOrderTransitionOp(
     db: DbAdapter,
     workOrderId: Id,
     body: Record<string, unknown>,
     actor: Id,
-    organization: Id | undefined,
+    organization: Id,
     roles: readonly string[],
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    const validated =
-        validateWorkOrderTransitionBody(body);
-    if (organization === undefined) {
-        // Below-facade tier (seed): no gate, no fence —
-        // validate + append, the WO-create precedent.
-        // Historical seed moves are not re-gated (W10).
-        if (messagePair !== undefined) {
-            await runWrite(
-                db,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        }
-        return;
-    }
-    const valueBearing =
-        validated.kind === 'instance'
-        && (validated.set.length
-            + validated.clear.length > 0);
-    if (!valueBearing) {
-        // Pure move: legacy kind OR instance-kind empty
-        // delta. Pre-tx fence + W10 required-at-exit;
-        // one-dialect If-Match reject; then append.
-        const wo = await workOrderDocumentHeadFor(
-            db, organization, workOrderId,
+    const validated = validateWorkOrderTransitionBody(body);
+    if (validated.kind !== 'instance') {
+        throw new Error(
+            'the gate admitted a retired transition body',
         );
-        if (wo === null) {
-            throw await missedReadError(
-                db, workOrderId, organization,
-                'work_orders',
-            );
-        }
-        if (
-            validated.kind === 'instance'
-            && messagePair !== undefined
-            && rawIfMatchFromMessagePair(messagePair)
-                !== undefined
-        ) {
-            throw new ValidationError(
-                'If-Match is forbidden on a'
-                + ' pure-move transition',
-            );
-        }
+    }
+    const received = requirePair(messagePair);
+    const head = await requireWorkOrderHead(
+        db, organization, workOrderId,
+    );
+    const event = {
+        eventId: validated.transitionEventId,
+        targetState: validated.targetState,
+        member: actor,
+        at: validated.transitionAt,
+        fieldValueEntities: deltaFieldValueEntities(
+            validated.set, validated.clear,
+        ),
+        release: transitionReleaseOf(validated.release),
+    };
+    const valueBearing =
+        validated.set.length + validated.clear.length > 0;
+    if (!valueBearing) {
         await assertRequiredAttributesAtExit(
-            db, organization, workOrderId,
-            wo.flow_graph,
+            db, organization, head.version,
             { set: [], clear: [] },
         );
-        if (messagePair !== undefined) {
-            await runWrite(
-                db,
-                attemptFor([messagePair]),
-                [messagePair],
-            );
-        }
+        await landWorkOrderTransition(
+            db, head, received, event, { kind: 'none' },
+            entityTagsOf(received),
+        );
         return;
     }
-    // Value-bearing instance-kind. PRE-TX after fence
-    // (instance-PATCH shape: tx wraps only the appends).
-    const wo = await workOrderDocumentHeadFor(
-        db, organization, workOrderId,
-    );
-    if (wo === null) {
-        throw await missedReadError(
-            db, workOrderId, organization,
-            'work_orders',
-        );
-    }
-    if (validated.kind !== 'instance') {
-        // Exhaustiveness: valueBearing implies instance.
-        throw new Error(
-            'value-bearing transition is not instance',
-        );
-    }
-    const bind = await workOrderBindingFor(
-        db, organization, workOrderId,
-    );
-    if (bind === null) {
+    const typeId = head.version.record_type_id;
+    const instanceId = head.version.instance_id;
+    if (typeId === undefined || instanceId === undefined) {
         throw new ValidationError(
             'work order has no instance binding',
         );
     }
     if (
-        bind.instanceId !== validated.instanceId
-        || bind.recordTypeId !== validated.recordTypeId
+        instanceId !== validated.instanceId
+        || typeId !== validated.recordTypeId
     ) {
         throw new ValidationError(
             'instance_id/record_type_id do not match'
             + ' the work order\'s binding',
         );
     }
-    if (messagePair === undefined) {
-        throw new Error(
-            'value-bearing transition requires a'
-            + ' formed pair',
-        );
-    }
-    const transitionPath =
-        '/organizations/' + organization
-        + '/work-orders/' + workOrderId
-        + '/transition';
-    const rawIfMatch = rawIfMatchFromMessagePair(messagePair);
-    if (rawIfMatch === undefined) {
-        throw new ApiError(
-            'If-Match is required to transition with'
-            + ' set/clear at ' + transitionPath,
-            HTTP_PRECONDITION_REQUIRED,
-        );
-    }
-    const ifMatchTarget = parseIfMatch(rawIfMatch);
-    if (ifMatchTarget === undefined) {
-        throw new ValidationError(
-            'If-Match must carry exactly one strong'
-            + ' validator',
-        );
-    }
-    // Compose postInstancePatchOp pipeline against the
-    // bound instance (org, bind.recordTypeId,
-    // bind.instanceId). COPY head-assert blocks inline
-    // (A5 — do not extract).
-    const org = organization;
-    const typeId = bind.recordTypeId;
-    const instanceId = bind.instanceId;
-    const pathname = '/organizations/' + org
-        + '/record-types/' + typeId
-        + '/instances/' + instanceId;
-    const head = await deriveInstanceHead(
-        db, org, typeId, instanceId,
+    const instanceHead = await db.messagePairs.getHeadPair(
+        instancesUriPrefix(organization, typeId), instanceId,
     );
-    if (head === undefined) {
+    if (instanceHead === null || instanceHead.method !== 'PUT') {
         throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
+            'If-Match does not match the current instance at '
+                + '/organizations/' + organization
+                + '/record-types/' + typeId
+                + '/instances/' + instanceId,
             HTTP_PRECONDITION_FAILED,
         );
     }
+    const headValues = revisionValuesOf(
+        requestBodyOf(instanceHead.request),
+    );
     const attributesById = await loadAttributeSchemaById(
-        db, org, typeId,
+        db, organization, typeId,
     );
-    if (ifMatchTarget !== head.messagePairId) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const aclIds = [
-        ...validated.set.map(
-            (entry) => entry.attribute_id,
-        ),
-        ...validated.clear,
-    ];
     assertWritableAttributeIds(
-        aclIds, attributesById, roles,
+        [
+            ...validated.set.map((entry) => entry.attribute_id),
+            ...validated.clear,
+        ],
+        attributesById,
+        roles,
     );
-    validateInstanceValues(
-        validated.set, attributesById,
-    );
-    // W10 required-at-exit AFTER ACL 403 + constraints
-    // 400 (ladder pin 7). Reuse head — ONE read.
+    validateInstanceValues(validated.set, attributesById);
     await assertRequiredAttributesAtExit(
-        db, organization, workOrderId,
-        wo.flow_graph,
-        {
-            set: validated.set,
-            clear: validated.clear,
-        },
-        {
-            bind,
-            headValues: head.values,
-            attributesById,
-        },
+        db, organization, head.version,
+        { set: validated.set, clear: validated.clear },
+        { headValues, attributesById },
     );
-    const mergedValues = mergeInstanceValues(
-        head.values, {
-            set: validated.set,
-            clear: validated.clear,
+    await landWorkOrderTransition(
+        db, head, received, event,
+        {
+            kind: 'revised',
+            head: instanceHead,
+            state: instanceStateOf(
+                organization, typeId, instanceId,
+                mergeInstanceValues(headValues, {
+                    set: validated.set,
+                    clear: validated.clear,
+                }),
+            ),
         },
+        entityTagsOf(received),
     );
-    const revisionMessagePair = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [org, typeId, instanceId],
-        method: 'PUT',
-        body: { values: mergedValues },
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization: org,
-        response: {
-            status: HTTP_OK,
-            body: { values: mergedValues },
-        },
-        headerFields: [{
-            name: IF_MATCH_HEADER,
-            value: strongEtagOf(ifMatchTarget),
-        }],
-    });
-    const latchedMessagePairId = head.messagePairId;
-    await db.readTransaction(async (view) => {
-        const liveWo =
-            await workOrderDocumentHeadFor(
-                view, organization, workOrderId,
-            );
-        if (liveWo === null) {
-            throw await missedReadError(
-                view, workOrderId, organization,
-                'work_orders',
-            );
-        }
-        // The latched pair must still be the head.
-        const latest = (await messageStore(view)
-            .getDocumentHead(
-                revisionMessagePair.path,
-                revisionMessagePair.name,
-            ))?.id;
-        if (latest !== latchedMessagePairId) {
-            throw new ApiError(
-                'If-Match does not match the current '
-                    + 'instance at ' + pathname,
-                HTTP_PRECONDITION_FAILED,
-            );
-        }
-    });
-    const pairs = [
-        messagePair, revisionMessagePair,
-    ];
-    await runWrite(db, attemptFor(pairs), pairs);
 }
 
-// Bind a work order to one org-owned instance of one
-// record type (spec W1). Member tier rides the
-// /work-orders MEMBER_VERBS segment prefix — no policy
-// edit (the /claim precedent). Claim-AGNOSTIC (A7).
-// Rebind is forbidden in v1: a prior binding pair
-// naming a different (instance, type) → 409 in-tx;
-// a byte-identical resend replays via message_hash.
-// Covenant ladder: fence → body → instance → join →
-// in-tx 409 (NOT claim's body-first order).
+// A seeded historical move (W10: historical seed moves are
+// not re-gated): no ACL, constraint, or required-at-exit
+// check, and no instance read. No client sends the seed a
+// tag, so the handler latches the head it read
+// (Interpretation N). A legacy body's values are recorded
+// on its own event, as the history fold assigned them.
+export async function postSeedWorkOrderTransitionOp(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+    body: Record<string, unknown>,
+    actor: Id,
+    messagePair: MessagePair,
+): Promise<void> {
+    const validated = validateWorkOrderTransitionBody(body);
+    const head = await requireWorkOrderHead(
+        db, organization, workOrderId,
+    );
+    await landWorkOrderTransition(
+        db, head, messagePair,
+        {
+            eventId: validated.transitionEventId,
+            targetState: validated.targetState,
+            member: actor,
+            at: validated.transitionAt,
+            fieldValueEntities: validated.kind === 'legacy'
+                ? validated.fieldValues.map((row) => ({
+                    id: row.id,
+                    attribute_id: pickString(
+                        row.fields, 'attribute_id',
+                    ),
+                    value: pickString(row.fields, 'value'),
+                })).sort(byIdAscending)
+                : deltaFieldValueEntities(
+                    validated.set, validated.clear,
+                ),
+            release: transitionReleaseOf(validated.release),
+        },
+        { kind: 'none' },
+        [head.pair.id],
+    );
+}
+
+// Bind a work order to one org-owned instance of one record
+// type (spec W1). Claim-agnostic (A7). The covenant ladder
+// is fence → body → instance → join → 409: the instance
+// miss is EntityNotFoundError, never missedReadError (a
+// foreign 403 would be an existence oracle; W1 / W7). A
+// rebind to another instance is 409; the same binding is
+// the head, so nothing lands.
 export async function postWorkOrderBindingOp(
     db: DbAdapter,
     workOrderId: Id,
     body: Record<string, unknown>,
     _actor: Id,
     organization: Id,
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
 ): Promise<void> {
-    await db.readTransaction(async (view) => {
-        const wo = await workOrderDocumentHeadFor(
-            view, organization, workOrderId,
-        );
-        if (wo === null) {
-            throw await missedReadError(
-                view, workOrderId, organization,
-                'work_orders',
+    await workOrderOperation(
+        db, organization, workOrderId,
+        requirePair(messagePair),
+        () => validateWorkOrderBindingBody(body),
+        async (head, bind) => {
+            const instance = await deriveInstanceHead(
+                db, organization,
+                bind.recordTypeId, bind.instanceId,
             );
-        }
-        const bind = validateWorkOrderBindingBody(body);
-        // Instance miss is EntityNotFoundError (404)
-        // — never missedReadError (would 403 foreign
-        // and create an existence oracle; W1 / W7).
-        const head = await deriveInstanceHead(
-            view, organization,
-            bind.recordTypeId, bind.instanceId,
-        );
-        if (head === undefined) {
-            throw new EntityNotFoundError(
-                'record_instances',
-                bind.instanceId,
+            if (instance === undefined) {
+                throw new EntityNotFoundError(
+                    'record_instances', bind.instanceId,
+                );
+            }
+            const chain = await recordTypeIdsForWorkOrder(
+                db, organization, workOrderId,
             );
-        }
-        const chain =
-            await recordTypeIdsForWorkOrder(
-                view, organization, workOrderId,
+            if (
+                chain === null
+                || !chain.recordTypeIds.includes(
+                    bind.recordTypeId,
+                )
+            ) {
+                throw new ValidationError(
+                    'record_type_id is not joined to'
+                    + ' the work order\'s flow',
+                );
+            }
+            const change = boundVersion(
+                head, bind.instanceId, bind.recordTypeId,
             );
-        if (
-            chain === null
-            || !chain.recordTypeIds.includes(
-                bind.recordTypeId,
-            )
-        ) {
-            throw new ValidationError(
-                'record_type_id is not joined to'
-                + ' the work order\'s flow',
-            );
-        }
-        const prior = await workOrderBindingFor(
-            view, organization, workOrderId,
-        );
-        if (
-            prior !== null
-            && (prior.instanceId
-                    !== bind.instanceId
-                || prior.recordTypeId
-                    !== bind.recordTypeId)
-        ) {
-            throw new ApiError(
-                'work order is already bound to'
-                + ' a different instance',
-                HTTP_CONFLICT,
-            );
-        }
-    });
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
+            if (change.kind === 'rebound') {
+                throw new ApiError(
+                    'work order is already bound to'
+                    + ' a different instance',
+                    HTTP_CONFLICT,
+                );
+            }
+            return change.version;
+        },
+    );
 }
 
-// Work-order document write — the fourth family's evidence for
-// the 'stateless' lifecycle class (Decision 7 does NOT apply
-// here): a work order's lifecycle is written ONLY by the
-// create/claim/transition ops above and the states/:id unclaim
-// path, never by a document PUT, so this op posts NO states
-// event of its own. Phase Final Task 2: the work_orders ROW
-// half is stripped — pure message-plane write
-// (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
-// successBody forms the wire bytes; the reconstructed return
-// is for below-facade callers and type parity.
-// validateWorkOrderDocumentBody rejects a body carrying
-// state at the gate. Exported so the seed can drive a work-
-// order document write through the same op the route uses.
-// `messagePair` is optional. The actor parameter is spelled `_actor`:
-// no state event here to author.
+// Work-order document PUT (§5): the received PUT is the
+// version, the request's fields over the head's facets
+// with no event of its own. Its own tag, or If-None-Match:
+// *, latches it; the statement judges it.
 export async function postWorkOrderDocumentOp(
     db: DbAdapter,
-    _id: Id,
+    id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<WorkOrderEntity, 'id'>> {
-    const doc = validateWorkOrderDocumentBody(withoutId(body));
-    const entity = {
-        ...doc.entity,
-        ...documentOperationOrganization(body),
-    } as unknown as Omit<WorkOrderEntity, 'id'>;
-    // Phase Final Task 2: work_orders ROW half stripped.
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return entity;
+    messagePair: MessagePair | undefined,
+    organization: Id | undefined,
+): Promise<void> {
+    const org = requireOrganization(organization);
+    const fields = validateWorkOrderDocumentBody(
+        withoutId(body),
+    ).entity;
+    const head = await workOrderHeadFor(db, org, id);
+    await runStateWrite(db, {
+        kind: 'own',
+        received: requirePair(messagePair),
+        state: fieldsVersion(
+            head === null
+                ? { id, organization_id: org }
+                : head.version,
+            fields,
+        ),
+    });
 }
 
 // Flow work-order join document write. Phase Final Task 2:
@@ -3116,20 +2946,30 @@ export async function postIdentityProviderDocumentOp(
     return entity;
 }
 
+// The conditional a write takes (§2): optional for class A
+// and every DELETE, required (If-Match or If-None-Match: *)
+// for class B, in-order (If-Match) for class C, none for
+// class D creates and class E operations.
+export type Conditional =
+    | 'optional'
+    | 'required'
+    | 'in-order'
+    | 'none';
+
+export type WriteMethod = 'PUT' | 'POST' | 'PATCH' | 'DELETE';
+
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
 // the message plane's stored response (WRITE_RESPONSE_SPECS +
-// responseFromStored). A pattern absent here, or present with
-// no successBody, returns 204 with no body. Keyed by route
-// pattern, not verb — but ONLY for the pattern's PUT or POST
-// verb: a DELETE on a wired pattern never consults this map
-// (the gate hardcodes 204 for every DELETE — see api/api.ts),
-// so a pattern that carries both a PUT (200, its written row)
-// and a DELETE (204) needs exactly one entry here, describing
-// the PUT alone.
+// responseFromStored). A spec with no successBody forms no
+// response body. Keyed by route pattern, not verb: a DELETE
+// never consults its successBody (the gate forms no body for
+// any DELETE — see api/api.ts), so a pattern that carries both
+// a PUT and a DELETE needs exactly one entry here, and its
+// conditional governs both.
 export interface WriteResponseSpec {
-    readonly status: number;
+    readonly conditional: Conditional;
     readonly successBody?: (
         params: string[],
         body: Record<string, unknown> | undefined,
@@ -3145,12 +2985,13 @@ export interface WriteResponseSpec {
 // and a POST (the composed members + ai_members edit, 204, no
 // body) — their response shapes genuinely diverge, so that one
 // entry supplies a spec per verb instead. Distinguished from a
-// plain WriteResponseSpec by the absence of `status` at the top
-// level (see isPerVerbWriteResponseSpec in api.ts).
+// plain WriteResponseSpec by the absence of `conditional` at
+// the top level (see writeResponseSpecFor in api.ts).
 export interface PerVerbWriteResponseSpec {
     readonly put?: WriteResponseSpec;
     readonly patch?: WriteResponseSpec;
     readonly post?: WriteResponseSpec;
+    readonly delete?: WriteResponseSpec;
 }
 
 export const WRITE_RESPONSE_SPECS:
@@ -3167,10 +3008,10 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/ideas/:id':
         documentWriteResponseSpec(IDEAS_WIRING),
     'organizations/:id/ideas/:id/conversion': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
     },
     'organizations/:id/ideas/:id/submissions/:sid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             ideaSubmissionEntityOf({
                 name: param(params, 2),
@@ -3185,7 +3026,7 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/projects/:id':
         documentWriteResponseSpec(PROJECTS_WIRING),
     'organizations/:id/projects/:id/flows/:pfid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             projectFlowEntityOf({
                 name: param(params, 2),
@@ -3195,51 +3036,41 @@ export const WRITE_RESPONSE_SPECS:
             }),
     },
     'organizations/:id/flows/': {
-        status: HTTP_NO_CONTENT,
-        // The receipt shares the document name. An empty
-        // body matches a DELETE tombstone, so a recreate
-        // would store nothing.
-        successBody: (_params, body) => body ?? {},
+        conditional: 'none',
     },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
-    // entry above for the shared rationale. flows/:id is the
-    // FIRST locked-class entry (Task 3): the response shape is
-    // unchanged either way (RESPONSE-BYTE PARITY, verified at
-    // plan time) — only the gate's pre-dispatch four-outcome
-    // table (api.ts) differs for a locked family, never this
-    // successBody.
-    'organizations/:id/flows/:id':
-        documentWriteResponseSpec(FLOWS_WIRING),
+    // entry above for the shared rationale. A flow is class B:
+    // every PUT names the head it replaces or declares its
+    // genesis.
+    'organizations/:id/flows/:id': {
+        ...documentWriteResponseSpec(FLOWS_WIRING),
+        conditional: 'required',
+    },
     'organizations/:id/flows/:id/undo': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'in-order',
     },
     // flows/:id/versions[+/:vid] WRITE_RESPONSE_SPECS RETIRED
     // (Phase 15 Task 7): ZERO seed pairs at those documents.
+    // A work order's writes answer its version, which the
+    // former writes; none echoes its request (§5).
     'organizations/:id/work-orders/': {
-        status: HTTP_NO_CONTENT,
-        // The receipt shares the document name. An empty
-        // body matches a DELETE tombstone, so a recreate
-        // would store nothing.
-        successBody: (_params, body) => body ?? {},
+        conditional: 'none',
     },
-    'organizations/:id/work-orders/:id':
-        documentWriteResponseSpec(WORK_ORDERS_WIRING),
+    'organizations/:id/work-orders/:id': {
+        conditional: 'required',
+    },
     'organizations/:id/work-orders/:id/claim': {
-        status: HTTP_NO_CONTENT,
-        // The response is the claim document. An empty
-        // body matches every other empty claim, so a
-        // new claim would store nothing.
-        successBody: (_params, body) => body ?? {},
+        conditional: 'in-order',
     },
     'organizations/:id/work-orders/:id/transition': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'in-order',
     },
     'organizations/:id/work-orders/:id/binding': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'in-order',
     },
     'organizations/:id/flows/:id/work-orders/:woid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             flowWorkOrderEntityOf({
                 name: param(params, 2),
@@ -3248,13 +3079,16 @@ export const WRITE_RESPONSE_SPECS:
                 body: withoutId(body ?? {}),
             }),
     },
-    // Nested composed POST (Task 9 / Task 23): 204 op response;
-    // document + attribute pairs form at nested documents.
+    // Nested composed POST: a create lands through the
+    // former, which writes its own answer. The composed edit
+    // does not ride the former yet, so the gate still forms
+    // its receipt from this successBody. The receipt shares
+    // the document name, and an empty body would match a
+    // DELETE tombstone, so an edit after a delete would
+    // store nothing. It retires when the edit rides the
+    // former.
     [RECORD_TYPES_COLLECTION_PATTERN]: {
-        status: HTTP_NO_CONTENT,
-        // The receipt shares the document name. An empty
-        // body matches a DELETE tombstone, so a recreate
-        // would store nothing.
+        conditional: 'optional',
         successBody: (_params, body) => body ?? {},
     },
     // Nested record-types detail (Task 3): put-only per-verb
@@ -3262,7 +3096,7 @@ export const WRITE_RESPONSE_SPECS:
     // is param 0 (path org, already org-matched at the gate).
     [RECORD_TYPE_DETAIL_PATTERN]: {
         put: {
-            status: HTTP_OK,
+            conditional: 'optional',
             successBody: (params, body) => {
                 const raw = withoutId(body ?? {});
                 validateRecordDocumentBody(raw);
@@ -3279,6 +3113,7 @@ export const WRITE_RESPONSE_SPECS:
                 );
             },
         },
+        delete: { conditional: 'optional' },
     },
     // Nested attributes detail (Task 7): put-only. Params:
     // 0=org, 1=type, 2=attribute. Path-derived echoes for
@@ -3288,7 +3123,7 @@ export const WRITE_RESPONSE_SPECS:
     // shape; the handler re-checks against head presence.
     [ATTRIBUTE_DETAIL_PATTERN]: {
         put: {
-            status: HTTP_OK,
+            conditional: 'optional',
             successBody: (params, body) =>
                 nestedAttributeWireOf(
                     param(params, 0),
@@ -3297,38 +3132,16 @@ export const WRITE_RESPONSE_SPECS:
                     withoutId(body ?? {}),
                 ),
         },
+        delete: { conditional: 'optional' },
     },
-    // Nested instances detail (Task 20): public PUT is
-    // 405; PATCH creates and updates. Wire success body
-    // echoes the request delta only — never the merged
-    // head. PATCH successBody must NOT validate the
-    // delta. Pair formation runs before the gate's
-    // table (replay needs the hash first); body shape
-    // 400 is the handler's job so 428/412/409 answer
-    // first. On the 201 path the body is already valid,
-    // so the echo matches the handler's re-validated
-    // set/clear.
+    // Instances: PATCH creates with If-None-Match: * and
+    // updates with If-Match; the former answers the state.
     [INSTANCE_DETAIL_PATTERN]: {
-        patch: {
-            status: HTTP_OK,
-            successBody: (params, body) => {
-                const raw = body ?? {};
-                return {
-                    id: param(params, 2),
-                    organization_id: param(params, 0),
-                    record_type_id: param(params, 1),
-                    set: Array.isArray(raw['set'])
-                        ? raw['set']
-                        : [],
-                    clear: Array.isArray(raw['clear'])
-                        ? raw['clear']
-                        : [],
-                };
-            },
-        },
+        patch: { conditional: 'required' },
+        delete: { conditional: 'optional' },
     },
     'organizations/:id/flows/:id/records/:frid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             flowRecordEntityOf({
                 name: param(params, 2),
@@ -3346,7 +3159,7 @@ export const WRITE_RESPONSE_SPECS:
     // never re-validate the name (route comment); `flow_id` is
     // stamped from the document here, never a client body key.
     'organizations/:id/flows/:id/tags/:name': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             flowTagEntityOf(param(params, 1), {
                 name: validateFlowTagName(param(params, 2)),
@@ -3356,7 +3169,7 @@ export const WRITE_RESPONSE_SPECS:
             }),
     },
     'organizations/:id/objectives/': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'none',
     },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
@@ -3365,7 +3178,7 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/objectives/:id':
         documentWriteResponseSpec(OBJECTIVES_WIRING),
     'organizations/:id/objectives/:id/revisions/:rid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             objectiveRevisionEntityOf({
                 name: param(params, 2),
@@ -3376,7 +3189,7 @@ export const WRITE_RESPONSE_SPECS:
     },
     ['organizations/:id/projects/:id'
         + '/objective-baseline-scores/:sid']: {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => {
             const raw = withoutId(body ?? {});
             validateBaselineScoreEntity(raw);
@@ -3390,7 +3203,7 @@ export const WRITE_RESPONSE_SPECS:
     },
     ['organizations/:id/projects/:id'
         + '/objective-actual-scores/:sid']: {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => {
             const raw = withoutId(body ?? {});
             validateActualScoreEntity(raw);
@@ -3402,7 +3215,7 @@ export const WRITE_RESPONSE_SPECS:
             });
         },
     },
-    'identities/': { status: HTTP_NO_CONTENT },
+    'identities/': { conditional: 'none' },
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive). Creation and the human-member half share
     // this spec via formDocumentMessagePairFor.
@@ -3411,7 +3224,7 @@ export const WRITE_RESPONSE_SPECS:
     // G5: piiEntityOf (GET derive). DELETE is a marked
     // tombstone pair; PUT appends.
     'identities/:id/pii': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
@@ -3427,7 +3240,7 @@ export const WRITE_RESPONSE_SPECS:
     // above 'identities/:id/credentials/:cid' in the routes
     // array).
     'identities/:id/credentials/:cid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateIdentityCredentialEntity(
@@ -3438,7 +3251,7 @@ export const WRITE_RESPONSE_SPECS:
     // G5: registrationEntityOf (GET derive). DELETE is a
     // marked tombstone (append), not a slot replace.
     'identities/:id/registration': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             registrationEntityOf(param(params, 0), {
                 name: '',
@@ -3447,16 +3260,21 @@ export const WRITE_RESPONSE_SPECS:
                 body: withoutId(body ?? {}),
             }),
     },
-    // Stored 204 empty; sendWriteResponse maps an
-    // appended PUT to 201.
+    // The default organization's state: the identity's id
+    // and the organization it names (§4), the singleton
+    // shape pii and registration use.
     'identities/:id/default-organization': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'optional',
+        successBody: (params, body) => ({
+            id: param(params, 0),
+            ...validateDefaultOrganizationBody(body ?? {}),
+        }),
     },
     // Seat document: path is the relationship. Body is
     // type + at. organization_id / identity_id are
     // reconstructed from the path for the wire entity.
     [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => {
             const organization = param(params, 0);
             const identityId = param(params, 1);
@@ -3472,11 +3290,11 @@ export const WRITE_RESPONSE_SPECS:
             };
         },
     },
-    // G4: GET wins. identityTokenEntityOf is id-last;
+    // G4: GET wins. identityTokenEntityOf is id-first;
     // identity_id is stamped from the path so stored PUT
     // = GET (omit-PUT cannot poison GET).
     'identities/:id/tokens/:jti': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             identityTokenEntityOf({
                 name: param(params, 1),
@@ -3493,7 +3311,7 @@ export const WRITE_RESPONSE_SPECS:
     // is stamped from the path so stored PUT = GET
     // (omit-PUT cannot poison GET).
     'identities/:id/token-revocations/:rid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             tokenRevocationEntityOf({
                 name: param(params, 1),
@@ -3505,26 +3323,15 @@ export const WRITE_RESPONSE_SPECS:
                 },
             }),
     },
-    // The gate PRE-MINTS the successor jti here — the ONE
-    // mint site for a fresh write (this route is REPLAY_
-    // EXEMPT_ROUTE_PATTERNS-wired, so a resend never bypasses
-    // this resolver the way a document/event-append route's
-    // idempotent replay would). The route handler reads this
-    // exact value back off the formed pair (messagePairResponseBody)
-    // rather than minting a second one.
     'identities/:id/tokens/:jti/rotation': {
-        status: HTTP_OK,
-        successBody: () => ({
-            jti: generateIdentifier(),
-        }),
+        conditional: 'none',
     },
     'identities/:id/tokens/:jti/revocation': {
-        status: HTTP_NO_CONTENT,
+        conditional: 'none',
     },
-    // G3: GET wins. organizationEntityOf is id-last; the
-    // prior successBody was id-first. Stored PUT = GET.
+    // G3: GET wins. Stored PUT = GET, `id` first.
     'organizations/:id': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) => organizationEntityOf({
             name: param(params, 0),
             messagePairId: param(params, 0),
@@ -3535,7 +3342,7 @@ export const WRITE_RESPONSE_SPECS:
     // G4: identityProviderEntityOf (GET derive). identity_id
     // is stamped from the path so stored PUT = GET.
     'identities/:id/providers/:eid': {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body) =>
             identityProviderEntityOf({
                 name: param(params, 1),
@@ -3547,11 +3354,56 @@ export const WRITE_RESPONSE_SPECS:
                 },
             }),
     },
+    // The grants and the invitation routes form their own
+    // pairs; their conditional is still the gate's.
+    'authentication/token': { conditional: 'none' },
+    'authentication/authorize': { conditional: 'none' },
+    'organizations/:id/invitations/': {
+        conditional: 'none',
+    },
+    'identities/:id/invitations/:id': {
+        conditional: 'optional',
+    },
+    'organizations/:id/invitations/:id': {
+        conditional: 'optional',
+    },
 };
+
+// Every write route declares its conditional. A route that
+// does not is a fault in this table, never an unguarded
+// write.
+export function conditionalOf(
+    routePattern: string,
+    method: WriteMethod,
+): Conditional {
+    const entry = WRITE_RESPONSE_SPECS[routePattern];
+    if (entry === undefined) {
+        throw new Error(
+            'no conditional for write route: ' + routePattern,
+        );
+    }
+    if ('conditional' in entry) {
+        return entry.conditional;
+    }
+    const spec = method === 'PUT'
+        ? entry.put
+        : method === 'PATCH'
+            ? entry.patch
+            : method === 'DELETE'
+                ? entry.delete
+                : entry.post;
+    if (spec === undefined) {
+        throw new Error(
+            'no conditional for ' + method + ' '
+                + routePattern,
+        );
+    }
+    return spec.conditional;
+}
 
 // The plain/PerVerb resolution every route-inline document-pair
 // block shares (Phase 9 Task 2): a plain WriteResponseSpec
-// answers for itself ('status' at the top level); a
+// answers for itself ('conditional' at the top level); a
 // PerVerbWriteResponseSpec answers through its `.put` arm — the
 // SAME two shapes the hand-written call sites checked one at a
 // time, folded into one shape-driven lookup. The guard-throw
@@ -3564,7 +3416,7 @@ function resolveWriteResponseSpec(
     const entry = WRITE_RESPONSE_SPECS[routePattern];
     const spec = entry === undefined
         ? undefined
-        : 'status' in entry ? entry : entry.put;
+        : 'conditional' in entry ? entry : entry.put;
     if (spec === undefined) {
         throw new Error(
             'no per-write response spec for'
@@ -3594,10 +3446,9 @@ export interface DocumentMessagePairFormInput {
         readonly status: number;
         readonly body: unknown;
     };
-    // Locked-class synthesized PUTs (flow undo) must
-    // carry the document head they restored from, or
-    // coordinateWrite 412s an unlatched PUT at a live
-    // locked document.
+    // A synthesized PUT that restores a flow (undo)
+    // latches the head it restored from; the statement
+    // judges that latch.
     readonly latchedHeadMessagePairId?: string;
     readonly headerFields?: readonly FieldLine[];
     readonly operationId: string;
@@ -3732,13 +3583,12 @@ export async function postInstanceDeleteOp(
 
 // Org WOs whose CURRENT bind names `instanceId` AND
 // whose current node is non-terminal in that WO's own
-// frozen flow_graph. Cost-ordered, entity-scoped in-tx
-// reads only (collectAttributeReferrers shape): ONE
-// collection-prefix WO-heads read; binding/lifecycle
-// only for candidates that still bind this instance.
-// Current node = latest non-claim lifecycle state's
-// `state`; a WO with no transition yet sits at its
-// graph's isCreate node. Terminal = no outgoing edge.
+// frozen flow_graph. Entity-scoped in-tx reads only
+// (collectAttributeReferrers shape): ONE collection-prefix
+// read names the work orders; each head version carries
+// its binding and its node. A WO with no transition yet
+// sits at its graph's isCreate node. Terminal = no
+// outgoing edge.
 async function inFlightPlacementBlockersFor(
     view: DbAdapter,
     organization: Id,
@@ -3754,26 +3604,22 @@ async function inFlightPlacementBlockersFor(
         woMessagePairs, workOrdersPrefix,
     );
     const blockers: string[] = [];
-    for (const [woId, doc] of woHeads) {
-        const bind = await workOrderBindingFor(
+    for (const woId of woHeads.keys()) {
+        const head = await workOrderHeadFor(
             view, organization, woId,
         );
         if (
-            bind === null
-            || bind.instanceId !== instanceId
+            head === null
+            || head.version.instance_id !== instanceId
         ) {
             continue;
         }
         const graph = asWorkOrderFlowGraph(
-            doc.body['flow_graph'],
+            head.version.flow_graph,
             'work_orders.flow_graph',
         );
-        const lifecycle =
-            await workOrderLifecycleStatesFor(
-                view, organization, woId,
-            );
         const nodeId = currentNodeIdFor(
-            lifecycle, graph,
+            head.version, graph,
         );
         if (nodeId === undefined) {
             continue;
@@ -3800,36 +3646,44 @@ async function instanceDocumentSpent(
     return messagePairs.length > 0;
 }
 
-function backedClient(
-    adapter: DbAdapter,
-): {
-    readonly backend: StorageBackend;
-    readonly clientOn: (tx: Tx) => DbAdapter;
-} {
-    if (
-        !('backend' in adapter)
-        || !('clientOn' in adapter)
-    ) {
-        throw new Error(
-            'a racing write requires a backed adapter',
-        );
-    }
-    return adapter as DbAdapter & {
-        backend: StorageBackend;
-        clientOn: (tx: Tx) => DbAdapter;
+// An instance's whole state (§4): the GET's shape with
+// every value, stored on each revision.
+export function instanceStateOf(
+    organization: Id,
+    typeId: Id,
+    instanceId: Id,
+    values: readonly InstanceValue[],
+): Record<string, unknown> {
+    return {
+        id: instanceId,
+        organization_id: organization,
+        record_type_id: typeId,
+        values,
     };
 }
 
-// Instance PATCH create (Task 20): no live PUT, no
-// If-Match. Body is create-shaped ({set} required,
-// [] legal; clear → 400). Writes the wire PATCH plus
-// an inner PUT {values} so derive still reads PUT|
-// DELETE heads.
+// What this requester may read of an instance's state.
+export function instanceProjection(
+    attributesById: ReadonlyMap<string, AttributeSchemaRow>,
+    roles: readonly string[],
+): StateProjection {
+    return (state) => ({
+        ...state,
+        values: projectReadableValues(
+            revisionValuesOf(state), attributesById, roles,
+        ),
+    });
+}
+
+// Instance create: PATCH with If-None-Match: * (§3). The
+// client declares the genesis; the statement judges it.
+// Tombstone-wins is this family's rule, not the ledger's:
+// the statement refuses a never-written create over a
+// tombstone, so a retired name never comes back.
 async function postInstanceCreateOp(
     db: DbAdapter,
     p: string[],
     body: Record<string, unknown>,
-    actor: Id,
     messagePair: MessagePair,
     organization: Id | undefined,
     roles: readonly string[],
@@ -3837,9 +3691,6 @@ async function postInstanceCreateOp(
     const org = requireOrganization(organization);
     const typeId = param(p, 1);
     const instanceId = param(p, 2);
-    const pathname = '/organizations/' + org
-        + '/record-types/' + typeId
-        + '/instances/' + instanceId;
     await requireRecordTypeExists(db, org, typeId);
     const validated = validateInstancePutBody(body);
     const attributesById = await loadAttributeSchemaById(
@@ -3850,176 +3701,121 @@ async function postInstanceCreateOp(
         attributesById,
         roles,
     );
-    validateInstanceValues(
-        validated.set, attributesById,
-    );
-    const mergedValues = mergeInstanceValues(
-        [], { set: validated.set },
-    );
-    const revisionMessagePair = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [org, typeId, instanceId],
-        method: 'PUT',
-        body: { values: mergedValues },
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization: org,
-        response: {
-            status: HTTP_OK,
-            body: { values: mergedValues },
-        },
-        headerFields: [],
-    });
+    validateInstanceValues(validated.set, attributesById);
     const prefix = instancesUriPrefix(org, typeId);
-    const pairs = [
-        messagePair, revisionMessagePair,
-    ];
-    // The gate's 428 ran before either racer wrote.
-    // Re-read on the client that holds the write, so
-    // the second create sees the first head.
-    const backed = backedClient(db);
-    await backed.backend.transaction(
-        'readwrite',
-        async (tx) => {
-            const view = backed.clientOn(tx);
-            const latest = await documentHeadAt(
-                view, prefix, instanceId,
-            );
-            if (latest?.method === 'DELETE') {
-                throw new ApiError(
-                    'instance already exists at '
-                        + pathname,
-                    HTTP_CONFLICT,
-                );
-            }
-            if (latest?.method === 'PUT') {
-                throw new ApiError(
-                    'If-Match is required to PATCH '
-                        + pathname,
-                    HTTP_PRECONDITION_REQUIRED,
-                );
-            }
-            await runWrite(
-                view, attemptFor(pairs), pairs,
-            );
-        },
-    );
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: prefix,
+            name: instanceId,
+            state: instanceStateOf(
+                org, typeId, instanceId,
+                mergeInstanceValues([], { set: validated.set }),
+            ),
+            condition: {
+                kind: 'never-written', declarer: 'client',
+            },
+        }],
+        project: instanceProjection(attributesById, roles),
+        answer: { kind: 'parent' },
+    });
 }
 
-// Instance PATCH two-pair append (Task 17 / R5 / R9).
-// Create (no If-Match, never written) is Task 20: set
-// required, [] legal; clear → 400. ifMatchTarget is the
-// CLIENT's gate-verified If-Match recovered from the
-// formed wire pair — never a live re-derived head.
+// Gone only after the owner check passes: a foreign
+// organization's retired instance answers as its live one
+// does, so a 410 never reveals that it existed.
+async function retiredInstanceError(
+    db: DbAdapter,
+    instanceId: Id,
+    organization: Id,
+): Promise<RetiredEntityError | ForeignOrganizationError> {
+    const missed = await missedReadError(
+        db, instanceId, organization, 'record_instances',
+    );
+    if (missed instanceof ForeignOrganizationError) {
+        return missed;
+    }
+    return new RetiredEntityError('record_instances', instanceId);
+}
+
+// Instance update: PATCH with If-Match (§1 C). The handler
+// reads the head to merge; the statement judges the tag.
 export async function postInstancePatchOp(
     db: DbAdapter,
     p: string[],
     body: Record<string, unknown>,
-    actor: Id,
+    _actor: Id,
     messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
 ): Promise<void> {
-    const org = requireOrganization(organization);
-    const typeId = param(p, 1);
-    const instanceId = param(p, 2);
-    const pathname = '/organizations/' + org
-        + '/record-types/' + typeId
-        + '/instances/' + instanceId;
     if (messagePair === undefined) {
         throw new Error(
             'instance PATCH requires a formed pair',
         );
     }
-    const ifMatchTarget = ifMatchFromMessagePair(messagePair);
-    if (ifMatchTarget === undefined) {
+    if (messagePair.genesis === 'client') {
         return postInstanceCreateOp(
-            db, p, body, actor, messagePair, organization,
-            roles,
+            db, p, body, messagePair, organization, roles,
         );
     }
+    const tag = ifMatchFromMessagePair(messagePair);
+    if (tag === undefined) {
+        throw new Error(
+            'the gate admitted an instance PATCH with no'
+                + ' conditional',
+        );
+    }
+    const org = requireOrganization(organization);
+    const typeId = param(p, 1);
+    const instanceId = param(p, 2);
+    const prefix = instancesUriPrefix(org, typeId);
     const head = await deriveInstanceHead(
         db, org, typeId, instanceId,
     );
-    if (head === undefined) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
+    if (
+        head === undefined
+        && await documentHeadAt(db, prefix, instanceId) !== null
+    ) {
+        throw await retiredInstanceError(db, instanceId, org);
     }
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
     );
-    if (ifMatchTarget !== head.messagePairId) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
     const validated = validateInstancePatchBody(body);
-    const aclIds = [
-        ...validated.set.map(
-            (entry) => entry.attribute_id,
-        ),
-        ...validated.clear,
-    ];
     assertWritableAttributeIds(
-        aclIds, attributesById, roles,
+        [
+            ...validated.set.map((entry) => entry.attribute_id),
+            ...validated.clear,
+        ],
+        attributesById,
+        roles,
     );
-    validateInstanceValues(
-        validated.set, attributesById,
-    );
-    const mergedValues = mergeInstanceValues(
-        head.values, {
-            set: validated.set,
-            clear: validated.clear,
-        },
-    );
-    // Revision: If-Match target is the in-tx latch.
-    // Wire is operation-plane; ghost-replay closed via
-    // headerFields: [] on the synthetic revision.
-    const revisionMessagePair = await formDocumentMessagePairFor({
-        routePattern: INSTANCE_DETAIL_PATTERN,
-        params: [org, typeId, instanceId],
-        method: 'PUT',
-        body: { values: mergedValues },
-        requesterIdentityId: actor,
-        requestAt: messagePair.requestAt,
-        operationId: messagePair.operationId,
-        requestId: messagePair.requestId,
-        organization: org,
-        response: {
-            status: HTTP_OK,
-            body: { values: mergedValues },
-        },
-        headerFields: [{
-            name: IF_MATCH_HEADER,
-            value: strongEtagOf(ifMatchTarget),
+    validateInstanceValues(validated.set, attributesById);
+    // A never-written instance merges onto no values; the
+    // tag names no head, so the statement answers 412.
+    const values = head === undefined ? [] : head.values;
+    await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: prefix,
+            name: instanceId,
+            state: instanceStateOf(
+                org, typeId, instanceId,
+                mergeInstanceValues(values, {
+                    set: validated.set,
+                    clear: validated.clear,
+                }),
+            ),
+            condition: { kind: 'in-order', head: tag },
         }],
+        project: instanceProjection(attributesById, roles),
+        answer: { kind: 'parent' },
     });
-    const latchedMessagePairId = head.messagePairId;
-    const latest = await db.readTransaction(
-        async (view) => (await messageStore(view)
-            .getDocumentHead(
-                revisionMessagePair.path,
-                revisionMessagePair.name,
-            ))?.id,
-    );
-    if (latest !== latchedMessagePairId) {
-        throw new ApiError(
-            'If-Match does not match the current '
-                + 'instance at ' + pathname,
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const pairs = [
-        messagePair, revisionMessagePair,
-    ];
-    await runWrite(db, attemptFor(pairs), pairs);
 }
 
 // Offer only: the dedicated arm in handleRequest
@@ -4073,76 +3869,72 @@ export const routes: Route[] = [
         get: documentCollectionGetHandler(IDENTITIES_WIRING),
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
-        // ROUTE_POLICY. Task 5: forms the identities/:id
-        // document message pair (+ the credential-document
-        // message pair for a service) INLINE PRE-TX, beside
-        // the gate's own operation message pair. See
-        // postIdentityCreationOp for the transaction shape.
+        // ROUTE_POLICY. The identity and, for a service, its
+        // client_secret credential are declared geneses in one
+        // statement, so a resent create answers 409 and stores
+        // nothing. A person's PII enters later via PUT
+        // identities/:id/pii.
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
-            let messagePairs: IdentityWriteMessagePairs | undefined;
-            if (
-                messagePair !== undefined && organization !== undefined
-            ) {
-                const b = validateIdentityCreateBody(body);
-                const identityDocument =
-                    await formDocumentMessagePairFor({
-                        routePattern: 'identities/:id',
-                        params: [b.id],
+            const org = requireOrganization(organization);
+            const b = validateIdentityCreateBody(body);
+            const identity: ParentSibling = {
+                method: 'PUT',
+                path: canonicalPath(org, '/identities/'),
+                name: b.id,
+                state: {
+                    ...identityDocumentEntityOf({
+                        name: b.id,
+                        messagePairId: b.id,
+                        method: 'PUT',
                         body: identityDocumentBodyOf(b.kind),
-                        requesterIdentityId: actor,
-                        requestAt: messagePair.requestAt,
-                        operationId: messagePair.operationId,
-                        requestId: messagePair.requestId,
-                        organization,
-                    });
-                if (b.kind === 'service') {
-                    const { id: credId, ...fields } =
-                        b.credential as {
-                            id: string;
-                            secret: string;
-                        } & Record<string, unknown>;
-                    if (typeof fields.secret !== 'string'
-                        || fields.secret === '') {
-                        throw new ValidationError(
-                            'IdentityCreateServiceBody'
-                            + '.credential.secret must'
-                            + ' be a non-empty string',
-                        );
-                    }
-                    const credentialDocument =
-                        await formDocumentMessagePairFor({
-                            routePattern:
-                                'identities/:id/credentials/:cid',
-                            params: [b.id, credId],
-                            body: {
-                                ...fields,
-                                secret: await hashPassword(
-                                    fields.secret,
-                                ),
-                            },
-                            requesterIdentityId: actor,
-                            requestAt: messagePair.requestAt,
-                            operationId: messagePair.operationId,
-                            requestId: messagePair.requestId,
-                            organization,
-                        });
-                    messagePairs = {
-                        kind: 'service',
-                        operation: messagePair,
-                        identityDocument,
-                        credentialDocument,
-                    };
-                } else {
-                    messagePairs = {
-                        kind: 'person',
-                        operation: messagePair,
-                        identityDocument,
-                    };
+                    }, org),
+                },
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            };
+            const credentials: StateSibling[] = [];
+            if (b.kind === 'service') {
+                const { id: credId, ...fields } =
+                    b.credential as {
+                        id: string;
+                        secret: string;
+                    } & Record<string, unknown>;
+                if (typeof fields.secret !== 'string'
+                    || fields.secret === '') {
+                    throw new ValidationError(
+                        'IdentityCreateServiceBody'
+                        + '.credential.secret must'
+                        + ' be a non-empty string',
+                    );
                 }
+                const credential = {
+                    ...fields,
+                    secret: await hashPassword(fields.secret),
+                };
+                validateIdentityCredentialEntity(credential);
+                credentials.push({
+                    method: 'PUT',
+                    path: canonicalPath(
+                        org,
+                        '/identities/' + b.id + '/credentials/',
+                    ),
+                    name: credId,
+                    state: credential,
+                    condition: {
+                        kind: 'genesis', declarer: 'handler',
+                    },
+                });
             }
-            return postIdentityCreationOp(db, body, messagePairs);
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received: requirePair(messagePair),
+                siblings: [identity, ...credentials],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
@@ -4502,55 +4294,50 @@ export const routes: Route[] = [
     // Rotate a refresh jti. The path identity's own tokens
     // collection is the only ledger this reads: a jti outside
     // it is unknown — 409, the same status as reuse (spec
-    // 2026-09-15 § 1). The ledger read, the
-    // rotation plan, and its appends ride ONE transaction
-    // (rotateRefreshJti — the same body the refresh grant
-    // runs), so two concurrent rotations of one chain
-    // cannot both observe the live jti (the lost-rotation
-    // TOCTOU). A live jti returns its successor; a
-    // known-but-not-live jti is reuse — the whole chain's
-    // revocation has already landed atomically — then 409.
-    // Operation path (name ''); REPLAY_EXEMPT_ROUTE_
-    // PATTERNS-wired (message-pair.ts) — the gate never serves
-    // a stored response for a byte-identical resend of this
-    // route, so this handler always re-enters and re-checks
-    // the reuse guard for real. The gate's successBody
-    // resolver PRE-MINTS the successor jti so the pair IS the
-    // response; this handler reads that SAME value back off
-    // the pair (messagePairResponseBody) and threads it into
-    // rotateRefreshJti, which appends the pair as the LAST act
-    // of its own transaction — only on the 'rotate' branch, so
-    // a 409 (reuse or unknown) stores no pair even though the
-    // reuse branch still revokes the chain for real. When pair
-    // is undefined (unreachable for this wired, fenced route)
-    // a fresh jti is minted here instead — crash-free.
+    // 2026-09-15 § 1). The heads are re-read and the
+    // rotation lands in ONE transaction (rotateRefreshJti —
+    // the same body the refresh grant runs), so two
+    // concurrent rotations of one chain cannot both observe
+    // the live jti (the lost-rotation TOCTOU). A live jti
+    // answers its successor's state; a known-but-not-live
+    // jti is reuse — the whole chain's revocation has already
+    // landed atomically — then 409. Operation path (name
+    // ''). The gate never serves a stored response for a
+    // byte-identical resend of this route, so this handler
+    // always re-enters and re-checks the reuse guard for
+    // real. The received pair lands only on the 'rotate'
+    // branch, so a 409 (reuse, unknown, or contention)
+    // stores no pair even though the reuse branch still
+    // revokes the chain for real.
     route('identities/:id/tokens/:jti/rotation', {
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
-            const newJti = messagePair === undefined
-                ? generateIdentifier()
-                : (messagePairResponseBody(messagePair)?.['jti'] as
-                    string | undefined)
-                    ?? generateIdentifier();
             const outcome = await rotateRefreshJti(
-                db, identityId, presented, newJti, messagePair,
+                db, identityId, presented, generateIdentifier(),
+                messagePair === undefined
+                    ? undefined
+                    : {
+                        received: messagePair,
+                        answer: { kind: 'parent' },
+                    },
             );
-            if (outcome.kind === 'rotate') {
-                return { jti: outcome.newJti };
-            }
+            if (outcome.kind === 'rotate') return;
             throw new ApiError(
-                'refresh token is not live (reuse): '
-                    + presented,
+                outcome.kind === 'contended'
+                    ? 'refresh token rotation remained'
+                        + ' contended: ' + presented
+                    : 'refresh token is not live (reuse): '
+                        + presented,
                 HTTP_CONFLICT,
             );
         },
     }),
     // Revoke the whole chain a jti belongs to (log out one
-    // session). A jti outside the path identity's own
-    // collection is unknown: an idempotent no-op that still
-    // appends its pair. Read and appends ride one
-    // transaction (revokeTokenChain guards both exit paths).
+    // session), answering the presented token's state. A jti
+    // outside the path identity's own collection is unknown:
+    // 404, and nothing lands. The re-read and the revocation
+    // ride one transaction (revokeTokenChain).
     route('identities/:id/tokens/:jti/revocation', {
         post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
@@ -4802,78 +4589,77 @@ export const routes: Route[] = [
         get: (db, _p, _actor, organization) =>
             deriveFlows(db, requireOrganization(organization)),
         // Member-tier POST — /flows carries POST in
-        // MEMBER_VERBS. Forms the document + join pairs pre-tx
-        // (Task 5) beside the gate's own operation message pair — the
-        // SAME shape a live genesis PUT /flows/:id and a live
-        // PUT /projects/:id/flows/:pfid would each carry — ONLY
-        // when the gate supplied both a pair and a fence
-        // organization (the Phase 3 condition verbatim); a
-        // below-facade caller (api/mock-data.ts, no gate) skips
-        // all three, preserving dual-write discipline. See
-        // postFlowCreationOp for the transaction shape.
+        // MEMBER_VERBS. The flow and its project join are
+        // declared geneses in one statement, the shape a
+        // genesis PUT /flows/:id and a PUT
+        // /projects/:id/flows/:pfid would each carry, so a
+        // resent create answers 409 and stores nothing. The
+        // seed forms its own pairs (postFlowCreationOp).
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
-            let messagePairs: FlowCreationMessagePairs | undefined;
-            if (messagePair !== undefined && organization !== undefined) {
-                const b = validateFlowCreateBody(body);
-                const documentBody = flowCreateDocumentBody(b);
-                validateFlowDocumentBody(documentBody);
-                await assertLiveFlowGraphWriteLaw(
-                    db, documentBody.graph as
-                        Record<string, unknown>,
-                );
-                const document = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/flows/:id',
-                    params: [organization, b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                // The live :pfid PUT's request shape, verified by
-                // content: validateProjectFlowEntity accepts
-                // EXACTLY project_id/flow_id/at
-                // (api/validators.ts) — the same three keys
-                // b.projectFlow already carries, so it doubles as
-                // the join pair's body verbatim.
-                validateProjectFlowEntity(b.projectFlow);
-                const projectId = pickString(
-                    b.projectFlow, 'project_id',
-                );
-                // Genesis-undefined (chain 'none'): a flow's
-                // create-time join is always fresh (design
-                // decision — no duplicate-create carve-out at this
-                // document through this task; pinned by the same-
-                // join-id retry test in tests/drift-flows.test.ts).
-                const join = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/projects/:id'
-                        + '/flows/:pfid',
-                    params: [
-                        organization, projectId,
-                        b.projectFlowId,
-                    ],
-                    body: b.projectFlow,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                messagePairs = { operation: messagePair, document, join };
-            }
-            return postFlowCreationOp(db, body, actor, messagePairs);
+            const org = requireOrganization(organization);
+            const b = validateFlowCreateBody(body);
+            const documentBody = flowCreateDocumentBody(b);
+            validateFlowDocumentBody(documentBody);
+            await assertLiveFlowGraphWriteLaw(
+                db, documentBody.graph as
+                    Record<string, unknown>,
+            );
+            // validateProjectFlowEntity accepts EXACTLY
+            // project_id/flow_id/at — the keys b.projectFlow
+            // already carries, so it is the join's body
+            // verbatim.
+            validateProjectFlowEntity(b.projectFlow);
+            const projectId = pickString(
+                b.projectFlow, 'project_id',
+            );
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received: requirePair(messagePair),
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(org, '/flows/'),
+                        name: b.id,
+                        state: flowStoredEntityOf({
+                            name: b.id,
+                            messagePairId: b.id,
+                            method: 'PUT',
+                            body: documentBody,
+                        }, org),
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(
+                            org, '/projects/' + projectId + '/flows/',
+                        ),
+                        name: b.projectFlowId,
+                        state: {
+                            ...projectFlowEntityOf({
+                                name: b.projectFlowId,
+                                messagePairId: b.projectFlowId,
+                                method: 'PUT',
+                                body: b.projectFlow,
+                            }),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                ],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
-    // flows/:id is the FIRST locked-class route (Task 3).
+    // flows/:id takes a conditional PUT ('required').
     // G2 GET stays deriveFlow (stamp hasUndoHistory; 404
-    // a state-'deleted' head — stored PUT has no trio).
-    // PUT stays documentPutHandler; the gate's four-
-    // outcome table resolves genesis/412 BEFORE dispatch.
+    // a state-'deleted' head). PUT stays
+    // documentPutHandler; the statement judges its latch.
     // graphDelta/revivals ride the pair body (SIDECAR-KEEP).
     // Member-tier PUT.
     {
@@ -4893,18 +4679,14 @@ export const routes: Route[] = [
     // flow document. Do not change the flow payload.
     documentVersionListRoute(FLOWS_WIRING),
     documentVersionRoute(FLOWS_WIRING),
-    // Undo-as-replay (Phase 14 Task 8). Phase Final Task 2:
-    // flows + graph ROW halves stripped; restore writes the
-    // 'updated' state event, revival states events, and the
-    // operation + document message pairs. graphDelta/revivals are
-    // server-computed into the document message pair body
-    // (SIDECAR-KEEP → deriveFlowGraphStates). No flow_versions
-    // row is read or written. Exhaustion appends only the
-    // operation message pair. A moved lock head → 412 via the
-    // in-tx head re-read.
+    // Undo-as-replay (Phase 14 Task 8): the restored state,
+    // graphDelta/revivals server-computed into it
+    // (SIDECAR-KEEP → deriveFlowGraphStates), lands through
+    // the former on the client's tag. No flow_versions row
+    // is read or written.
     route('organizations/:id/flows/:id/undo', {
         post: async (
-            db, p, body, actor, messagePair, organization,
+            db, p, body, _actor, messagePair, organization,
         ) => {
             const id = param(p, 1);
             const b = validateFlowUndoBody(body);
@@ -4924,9 +4706,10 @@ export const routes: Route[] = [
                     db, id, organization, 'flows',
                 );
             }
-            return postFlowUndoOp(
-                db, id, actor, organization, messagePair, resolution, b,
+            await postFlowUndoOp(
+                db, id, organization, messagePair, resolution, b,
             );
+            return undefined;
         },
     }),
     // Pair-chain GET flows/:id/versions[/]:etag is
@@ -4981,197 +4764,53 @@ export const routes: Route[] = [
             }
         },
     }),
-    // GET list: generic documentCollectionGetHandler rows
-    // plus a per-row workOrderBindingFor attach (instance_id
-    // + record_type_id when bound; keys ABSENT when unbound
-    // so unbound wire bytes stay unchanged). Browser-tier N
-    // on a read-only route — Task 7 measure is the evidence
-    // gate. POST stays this hand-written create — unlike
+    // The collection and entity GETs stream the stored heads
+    // (api/api.ts): a work order's head is its whole state.
+    // POST stays this hand-written create — unlike
     // ideas/projects, work-orders never folded genesis into
     // the document PUT (Decision 6), mirroring flows' own
     // precedent, so a separate create verb remains here.
+    // Member-tier POST — /work-orders carries POST in
+    // MEMBER_VERBS.
     route('organizations/:id/work-orders/', {
-        get: async (db, p, actor, organization, roles) => {
-            const org = requireOrganization(organization);
-            const rows = await documentCollectionGetHandler(
-                WORK_ORDERS_WIRING,
-            )(db, p, actor, organization, roles) as {
-                id: string;
-            }[];
-            const binds = await Promise.all(
-                rows.map(row => workOrderBindingFor(
-                    db, org, row.id,
-                )),
-            );
-            const out: unknown[] = [];
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i]!;
-                const bind = binds[i]!;
-                out.push({
-                    ...row,
-                    ...(bind === null
-                        ? {}
-                        : {
-                            instance_id:
-                                bind.instanceId,
-                            record_type_id:
-                                bind.recordTypeId,
-                        }),
-                });
-            }
-            return out;
-        },
-        // Member-tier POST — /work-orders carries POST in
-        // MEMBER_VERBS (the claim sub-route is also a member
-        // POST). Forms the document + join pairs pre-tx
-        // (Task 3) beside the gate's own operation message pair — the
-        // SAME shape a live genesis PUT /work-orders/:id and a
-        // live PUT /flows/:id/work-orders/:woid would each
-        // carry — ONLY when the gate supplied both a pair and
-        // a fence organization (the Phase 3 condition
-        // verbatim); a below-facade caller (api/mock-data.ts,
-        // no gate) skips all three, preserving dual-write
-        // discipline. See postWorkOrderCreationOp for the
-        // transaction shape.
-        post: async (
+        get: documentCollectionGetHandler(WORK_ORDERS_WIRING),
+        post: (
             db, _p, body, actor, messagePair, organization,
-        ) => {
-            let messagePairs: WorkOrderCreationMessagePairs | undefined;
-            if (messagePair !== undefined && organization !== undefined) {
-                const b = validateWorkOrderCreateBody(body);
-                const documentBody =
-                    workOrderCreateDocumentBody(b);
-                validateWorkOrderDocumentBody(documentBody);
-                const document = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/work-orders/:id',
-                    params: [organization, b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                // The live :woid PUT's request shape, verified
-                // by content: validateFlowWorkOrderEntity
-                // accepts EXACTLY flow_id/work_order_id/at —
-                // the same three keys b.flowWorkOrder already
-                // carries, so it doubles as the join pair's
-                // body verbatim.
-                validateFlowWorkOrderEntity(b.flowWorkOrder);
-                const flowId = pickString(
-                    b.flowWorkOrder, 'flow_id',
-                );
-                // Genesis-undefined (chain 'none'): a work
-                // order's create-time join is always fresh
-                // (design decision — no duplicate-create carve-
-                // out at this document through this task; pinned
-                // by the same-join-id retry test in
-                // tests/drift-work-orders.test.ts).
-                const join = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/flows/:id'
-                        + '/work-orders/:woid',
-                    params: [
-                        organization, flowId,
-                        b.flowWorkOrderId,
-                    ],
-                    body: b.flowWorkOrder,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                const graph = asWorkOrderFlowGraph(
-                    b.workOrder['flow_graph'],
-                    'workOrder.flow_graph',
-                );
-                const claimAt = b.stateEventAts[2]!;
-                const claim = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/work-orders/:id'
-                        + '/claim',
-                    params: [organization, b.id],
-                    body: {
-                        claimEventId: b.stateEventIds[2]!,
-                        claimAt,
-                        expireEventId:
-                            b.stateEventIds[2]! + '-exp',
-                        expireAt: claimAt,
-                        expires_at: addUtcSeconds(
-                            claimAt, graph.lockTimeout,
-                        ),
-                    },
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                messagePairs = {
-                    operation: messagePair, document, join, claim,
-                };
-            }
-            return postWorkOrderCreationOp(
-                db, body, actor, messagePairs,
-            );
-        },
+        ) => postWorkOrderCreationOp(
+            db, body, actor, messagePair, organization,
+        ),
     }),
-    // work-orders/:id is the fourth family. GET exits the
-    // generic documentEntityRoute path deliberately: the
-    // derivedDocumentEntity shape (via documentGetHandler)
-    // plus ONE workOrderBindingFor read that embeds
-    // instance_id + record_type_id when bound (keys ABSENT
-    // when unbound — unbound wire bytes unchanged). PUT
-    // still rides documentPutHandler(WORK_ORDERS_WIRING)
-    // — 'simple' concurrency, member-tier via
-    // MEMBER_VERBS['/work-orders']. Verbs stay {get, put}
-    // — no DELETE.
+    // work-orders/:id is the fourth family. PUT rides
+    // documentPutHandler(WORK_ORDERS_WIRING) — member-tier
+    // via MEMBER_VERBS['/work-orders']. Verbs stay
+    // {get, put} — no DELETE.
     route('organizations/:id/work-orders/:id', {
-        get: async (db, p, actor, organization, roles) => {
-            const org = requireOrganization(organization);
-            const id = param(p, 1);
-            const entity = await documentGetHandler(
-                WORK_ORDERS_WIRING,
-            )(db, p, actor, organization, roles);
-            const bind = await workOrderBindingFor(
-                db, org, id,
-            );
-            return {
-                ...(entity as object),
-                ...(bind === null
-                    ? {}
-                    : {
-                        instance_id: bind.instanceId,
-                        record_type_id: bind.recordTypeId,
-                    }),
-            };
-        },
+        get: documentGetHandler(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
-    // PUT claims, GET returns facts (404 only when
-    // unclaimed), DELETE releases (DELETE head =
-    // unclaimed). Member-tier via MEMBER_VERBS
+    // PUT claims and DELETE releases: operations on the work
+    // order, answering its state. GET reads the head's live
+    // claim (404 when none). Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.
     route('organizations/:id/work-orders/:id/claim', {
         get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(
-                organization,
-            );
             const workOrderId = param(p, 1);
-            const claim = await workOrderClaimDocumentFor(
-                db, org, workOrderId,
+            const head = await workOrderHeadFor(
+                db, requireOrganization(organization),
+                workOrderId,
             );
-            if (claim === null) {
+            const claim = head?.version.claim;
+            if (
+                claim === undefined
+                || !isClaimLive(claim, nowUtc())
+            ) {
                 throw new EntityNotFoundError(
                     'work_order_claims', workOrderId,
                 );
             }
             return {
-                member_id: claim.memberId,
-                expires_at: claim.expiresAt,
+                member_id: claim.member_id,
+                expires_at: claim.expires_at,
             };
         },
         put: (db, p, body, actor, messagePair, organization) =>
@@ -5188,12 +4827,8 @@ export const routes: Route[] = [
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS, and isPermitted matches on the segment
     // prefix, so the sub-route is member-permitted like
-    // /claim. See postWorkOrderTransitionOp for the
-    // transaction shape. organization is NOT
-    // requireOrganization — the op discriminates the
-    // below-facade seed tier (undefined) from the gate.
-    // Task 8 CUT: gate rejects the legacy fieldValues key
-    // here only; the op stays dual-tolerant for seed.
+    // /claim. Task 8 CUT: the gate rejects the legacy
+    // fieldValues key here; only the seed lands it.
     route('organizations/:id/work-orders/:id/transition', {
         post: (
             db, p, body, actor, messagePair,
@@ -5208,12 +4843,13 @@ export const routes: Route[] = [
             }
             return postWorkOrderTransitionOp(
                 db, param(p, 1), body, actor,
-                organization, roles, messagePair,
+                requireOrganization(organization), roles,
+                messagePair,
             );
         },
     }),
-    // Create-only PUT — first bind 201; rebind 409;
-    // no DELETE. POST is gone. Member-tier via
+    // A bind answers the work order's state; a rebind to
+    // another instance is 409; no DELETE. Member-tier via
     // MEMBER_VERBS PUT on /work-orders.
     route('organizations/:id/work-orders/:id/binding', {
         put: (db, p, body, actor, messagePair, organization) =>
@@ -5223,7 +4859,7 @@ export const routes: Route[] = [
             ),
     }),
     // GET work-orders/:id/history (states-URI elimination A1):
-    // lifecycle + inline field_values fold, (at, id) DESC.
+    // the version chain's events, newest first.
     // Miss posture lives inside workOrderHistoryFor (empty →
     // missedReadError). No api.ts pre-dispatch guard — the
     // derive reads only this org's paths.
@@ -5287,28 +4923,84 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
             ),
         // Admin-only composed create/edit (MEMBER_VERBS has
-        // GET only). Same transaction / RESTRICT discipline
-        // as flat POST /records; document message pair at the nested
-        // detail document, attributes at ATTRIBUTE_DETAIL_
-        // PATTERN.
+        // GET only). A create lands the type and each
+        // attribute as declared geneses in one statement, so a
+        // resent create answers 409 and stores nothing. An
+        // edit keeps the flat POST /records RESTRICT
+        // discipline: document at the nested detail document,
+        // attributes at ATTRIBUTE_DETAIL_PATTERN.
         post: async (
             db, _p, body, actor, messagePair, organization,
         ) => {
-            let messagePairs: RecordWriteMessagePairs | undefined;
-            if (
-                messagePair !== undefined
-                && organization !== undefined
-            ) {
-                const b = validateRecordWriteBody(body);
-                messagePairs = await formRecordWriteMessagePairs(
-                    db, b, actor, messagePair, organization,
-                    RECORD_TYPE_DETAIL_PATTERN,
-                    [organization, b.id],
+            const org = requireOrganization(organization);
+            const received = requirePair(messagePair);
+            const b = validateRecordWriteBody(body);
+            if (b.kind === 'edit') {
+                return postRecordWriteOp(
+                    db, body, actor,
+                    await formRecordWriteMessagePairs(
+                        db, b, actor, received, org,
+                        RECORD_TYPE_DETAIL_PATTERN,
+                        [org, b.id],
+                    ),
+                    org,
                 );
             }
-            return postRecordWriteOp(
-                db, body, actor, messagePairs, organization,
+            // Interpretation T: the one presence check a
+            // handler makes. A create names no head.
+            if (rawIfMatchFromMessagePair(received) !== undefined) {
+                throw new ApiError(
+                    'POST ' + recordTypesUriPrefix(org)
+                        + ' takes no If-Match on a create',
+                    HTTP_BAD_REQUEST,
+                );
+            }
+            const documentBody = recordDocumentBodyOf(b);
+            validateRecordDocumentBody(documentBody);
+            const attributes: StateSibling[] = b.attributes.map(
+                (attr) => {
+                    const attributeBody =
+                        recordAttributeDocumentBodyOf(
+                            attr as unknown as
+                                Record<string, unknown>,
+                        );
+                    validateAttributeDocument(attributeBody);
+                    return {
+                        method: 'PUT',
+                        path: attributesUriPrefix(org, b.id),
+                        name: attr.id,
+                        state: attributeBody,
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    };
+                },
             );
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received,
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: recordTypesUriPrefix(org),
+                        name: b.id,
+                        state: {
+                            ...recordTypeEntityOf({
+                                name: b.id,
+                                messagePairId: b.id,
+                                method: 'PUT',
+                                body: documentBody,
+                            }, org),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    ...attributes,
+                ],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     route(RECORD_TYPE_DETAIL_PATTERN, {
@@ -5611,27 +5303,29 @@ export const routes: Route[] = [
                 attributesById,
                 roles,
             );
-            return instanceGetBody(
-                instanceId, org, typeId, values,
+            return instanceStateOf(
+                org, typeId, instanceId, values,
             );
         },
     }),
     // Nested instance detail (Task 20): public PUT is
-    // 405. PATCH creates (no pin, never written) and
-    // updates (If-Match). Task 16 GET projection +
+    // 405. PATCH creates (If-None-Match: *) and updates
+    // (If-Match). Task 16 GET projection +
     // missedReadError R2. Task 18 DELETE tombstone-wins
     // R4/R9. Ladder PATCH create: parent type 404 →
     // body 400 (set required; clear forbidden) → write-
-    // ACL 403 → value 400 → two-pair tx (wire + inner
-    // PUT). Ladder PATCH update: shape → unknown attr
-    // → ACL on set∪clear → value on set → two-pair tx.
+    // ACL 403 → value 400 → tombstone 409 → one
+    // statement (received PATCH + revision PUT). Ladder
+    // PATCH update: tombstone 404 → shape → unknown attr
+    // → ACL on set∪clear → value on set → one statement,
+    // which judges the tag.
     // Ladder DELETE: parent type 404 → document spent
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-
     // complete). No WRITE_AUTHORIZERS (deep sub-family).
-    // Not in DOCUMENT_CLASS (R10). GET/write ETag attaches
-    // in api.ts. DELETE is out of WRITE_RESPONSE_SPECS
-    // (gate hardcodes 204).
+    // GET/write ETag attaches in api.ts. DELETE takes its
+    // conditional from the spec's delete slot and forms no
+    // response body.
     route(INSTANCE_DETAIL_PATTERN, {
         get: async (
             db, p, _actor, organization, roles,
@@ -5644,10 +5338,18 @@ export const routes: Route[] = [
                 db, org, typeId, instanceId,
             );
             if (head === undefined) {
-                throw await missedReadError(
-                    db, instanceId, org,
-                    'record_instances',
-                );
+                const retired = await documentHeadAt(
+                    db, instancesUriPrefix(org, typeId),
+                    instanceId,
+                ) !== null;
+                throw retired
+                    ? await retiredInstanceError(
+                        db, instanceId, org,
+                    )
+                    : await missedReadError(
+                        db, instanceId, org,
+                        'record_instances',
+                    );
             }
             const attributesById =
                 await loadAttributeSchemaById(
@@ -5718,15 +5420,10 @@ export const routes: Route[] = [
     // backing table, no dual-write, derived entirely from message
     // pairs. Bespoke route() wiring reusing deriveDocumentsAt/
     // documentMessagePairsAt exactly like the identities/:id/pii analog
-    // (gate 8), SIMPLE class (a repeat PUT records Supersedes —
-    // 'organizations/:id/flows/:id/tags/:name' is registered
-    // in message-pair.ts's DOCUMENT_CLASS_ROUTE_PATTERNS):
-    // the locked class flows itself rides is structurally
-    // MOOT here — api.ts's isLockedWrite is routePattern ===
-    // documentEntityPattern(wiring), which for flows is
-    // organizations/:id/flows/:id — this tags document never
-    // equals that entity pattern, so it never rides that arm
-    // no matter what family-registry.ts declares for 'flows'. The
+    // (gate 8); a repeat PUT records Supersedes. The tags
+    // route takes its own entry's conditional, never the
+    // flow entity's: its pattern never equals
+    // organizations/:id/flows/:id. The
     // tag NAME (param 2) is the document's own name — the FIRST
     // user-authored path segment in this codebase
     // (validateFlowTagName, api/validators.ts), validated ONLY at
@@ -5773,7 +5470,7 @@ export const routes: Route[] = [
     // none. Phase Final Task 2: the organizations ROW half is
     // stripped — pure message-plane write (postFlowTagDocumentOp
     // shape). WRITE_RESPONSE_SPECS successBody forms the wire
-    // bytes via organizationEntityOf (id-last; GET wins).
+    // bytes via organizationEntityOf (id-first; GET wins).
     route('organizations/:id', {
         get: (db, p) => deriveOrganization(db, param(p, 0)),
         put: postOrganizationDocumentOp,
@@ -5982,61 +5679,69 @@ export const routes: Route[] = [
     // the generic documentCollectionGetHandler —
     // objectiveDocumentEntityOf reads entity fields and `state`
     // alike from the head body. POST stays this hand-written
-    // bundle — objectives' own create forms the document PLUS
-    // its first revision pair in one pass
-    // (postObjectiveCreationOp), mirroring records'/work-
-    // orders' own precedent.
+    // create — objectives' own create lands the document PLUS
+    // its first revision in one statement, mirroring
+    // records'/work-orders' own precedent.
     route('organizations/:id/objectives/', {
         get: documentCollectionGetHandler(OBJECTIVES_WIRING),
-        // Forms the document + revision pairs pre-tx (Task 3)
-        // beside the gate's own operation message pair — the SAME shape
-        // a live genesis PUT /objectives/:id and a live PUT
-        // /objectives/:id/revisions/:rid would each carry — ONLY
-        // when the gate supplied both a pair and a fence
-        // organization (the route('flows') condition verbatim);
-        // a below-facade caller (api/mock-data.ts, no gate) skips
-        // both, preserving dual-write discipline. See
-        // postObjectiveCreationOp for the transaction shape.
+        // The objective and its first revision are declared
+        // geneses in one statement, the shape a genesis PUT
+        // /objectives/:id and a PUT
+        // /objectives/:id/revisions/:rid would each carry, so
+        // a resent create answers 409 and stores nothing. The
+        // seed forms its own pairs (postObjectiveCreationOp).
         post: async (
-            db, _p, body, actor, messagePair, organization,
+            db, _p, body, _actor, messagePair, organization,
         ) => {
-            let messagePairs: ObjectiveCreationMessagePairs | undefined;
-            if (messagePair !== undefined && organization !== undefined) {
-                const b = validateObjectiveCreateBody(body);
-                const documentBody = objectiveDocumentBodyOf(b);
-                validateObjectiveDocumentBody(documentBody);
-                const document = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/objectives/:id',
-                    params: [organization, b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                const revisionBody = objectiveRevisionBodyOf(b);
-                validateObjectiveRevisionEntity(revisionBody);
-                const revision = await formDocumentMessagePairFor({
-                    routePattern:
-                        'organizations/:id/objectives/:id'
-                        + '/revisions/:rid',
-                    params: [
-                        organization, b.id, b.revisionId,
-                    ],
-                    body: revisionBody,
-                    requesterIdentityId: actor,
-                    requestAt: messagePair.requestAt,
-                    operationId: messagePair.operationId,
-                    requestId: messagePair.requestId,
-                    organization,
-                });
-                messagePairs = {
-                    operation: messagePair, document, revision,
-                };
-            }
-            return postObjectiveCreationOp(db, body, messagePairs);
+            const org = requireOrganization(organization);
+            const b = validateObjectiveCreateBody(body);
+            const documentBody = objectiveDocumentBodyOf(b);
+            validateObjectiveDocumentBody(documentBody);
+            const revisionBody = objectiveRevisionBodyOf(b);
+            validateObjectiveRevisionEntity(revisionBody);
+            await runStateWrite(db, {
+                kind: 'siblings',
+                received: requirePair(messagePair),
+                siblings: [
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(org, '/objectives/'),
+                        name: b.id,
+                        state: {
+                            ...objectiveDocumentEntityOf({
+                                name: b.id,
+                                messagePairId: b.id,
+                                method: 'PUT',
+                                body: documentBody,
+                            }, org),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                    {
+                        method: 'PUT',
+                        path: canonicalPath(
+                            org,
+                            '/objectives/' + b.id + '/revisions/',
+                        ),
+                        name: b.revisionId,
+                        state: {
+                            ...objectiveRevisionEntityOf({
+                                name: b.revisionId,
+                                messagePairId: b.revisionId,
+                                method: 'PUT',
+                                body: revisionBody,
+                            }),
+                        },
+                        condition: {
+                            kind: 'genesis', declarer: 'handler',
+                        },
+                    },
+                ],
+                project: unprojected,
+                answer: { kind: 'created', location: b.id },
+            });
         },
     }),
     // objectives/:id is the seventh family. GET is FLIPPED

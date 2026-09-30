@@ -10,7 +10,6 @@ import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
     workOrderLifecycleStatesFor,
-    workOrderClaimHistoryFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import { EntityNotFoundError } from '../api/db.ts';
@@ -48,17 +47,10 @@ const WORKORDERID_CE2 = generateIdentifier();
 const WORKORDERID_EE2 = generateIdentifier();
 const WORKORDERID_FV2 = generateIdentifier();
 
-// The Phase 14 Task 1 core: workOrderLifecycleStatesFor is the
-// work-order lifecycle read — it runs the pure replay core
-// (replayWorkOrderOperations, private to api/derive-states.ts)
-// over INDEXED reads scoped to ONE known (organization,
-// workOrderId) pair — name for the create/document message
-// pairs (they share ONE name at the work-orders collection
-// path), path for the claim/transition sub-resource documents
-// (the whole-plane bulk fold retired — spec 2026-09-15 § 5).
-// This file proves each replay against the live route's own
-// wire/handleRequest outcome. No write path reads this core
-// yet — Task 1 flips nothing.
+// workOrderLifecycleStatesFor is the work-order lifecycle
+// read: the version chain's own events, oldest first (§5).
+// This file proves it against the live routes' own
+// handleRequest outcomes.
 
 // A real seeded flow carrying zero work-order joins (drift-work-
 // orders.test.ts's own EMPTY_FLOW_ID) — the join itself is
@@ -71,13 +63,31 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
+}
+
+// An operation on a work order names the head it read.
+async function headTag(
+    db: MemoryDbAdapter,
+    token: string,
+    workOrderId: string,
+): Promise<Record<string, string>> {
+    const read = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId,
+        token,
+    ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    return { 'If-Match': read.headers.get('ETag')! };
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
@@ -202,8 +212,8 @@ Deno.test('workOrderLifecycleStatesFor: birth-claimed create alone'
 
 Deno.test('workOrderLifecycleStatesFor: a full chain — birth, a'
 + ' transition with field values, a releasing transition, an'
-+ ' entity PUT, a fresh re-claim, and an idempotent re-claim —'
-+ ' ends at seven events',
++ ' entity PUT, a fresh re-claim, and a renewing re-claim —'
++ ' ends at eight events',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -264,8 +274,10 @@ async () => {
             },
             transitionAt: transition2At,
         },
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(transition2.status, 201);
+    assertStrictEquals(transition2.status, 200);
+    await transition2.body?.cancel();
 
     const entityPut = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -274,6 +286,7 @@ async () => {
             flow_graph: graph,
             position: 2,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(entityPut.status, 200);
 
@@ -287,6 +300,7 @@ async () => {
             expireEventId: WORKORDERID_EE1,
             expireAt: claimFreshAt,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(claimFresh.status, 200);
 
@@ -300,30 +314,26 @@ async () => {
             expireEventId: WORKORDERID_EE2,
             expireAt: claimRepeatAt,
         },
+        await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(claimRepeat.status, 200);
 
     // birth(3) + transition1(1) + transition2(2) + PUT(0) +
-    // fresh claim(1) + idempotent repeat(0) = 7.
+    // fresh claim(1) + renewing repeat(1) = 8.
     const scoped = sortByAtId(
         await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assertStrictEquals(scoped.length, 7);
+    assertStrictEquals(scoped.length, 8);
     // Phase Final Task 2: states ROW half stripped — no
     // row-plane oracle.
 });
 
-// Named unclaim via POST organizations/:id/work-orders/:id/release — an
-// operation-message-pair
-// leg of the lifecycle replay (applyReleasePair), so
-// workOrderLifecycleStatesFor INCLUDES the claim_released
-// event. Claim history sees the same row (it rides the
-// replayed half, not gate 5a's states document).
+// A release lands a version recording claim_released, so
+// workOrderLifecycleStatesFor INCLUDES the event.
 Deno.test('workOrderLifecycleStatesFor: a release op\'s'
-+ ' claim_released is INCLUDED — claim-history'
-+ ' sees it too', async () => {
++ ' claim_released is INCLUDED', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = generateIdentifier();
@@ -352,8 +362,11 @@ Deno.test('workOrderLifecycleStatesFor: a release op\'s'
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim',
         token,
+        undefined,
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(release.status, 204);
+    assertStrictEquals(release.status, 200);
+    await release.body?.cancel();
 
     const scoped = sortByAtId(
         await workOrderLifecycleStatesFor(
@@ -366,101 +379,6 @@ Deno.test('workOrderLifecycleStatesFor: a release op\'s'
     );
     assert(released !== undefined);
     assertStrictEquals(released!.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-    const claimHistory = sortByAtId(
-        await workOrderClaimHistoryFor(
-            db, STARK_ORGANIZATION, workOrderId,
-        ),
-    );
-    assertStrictEquals(claimHistory.length, 4);
-    assert(
-        claimHistory.some(
-            (row) => row.state === 'claim_released',
-        ),
-        'claim history must include the release',
-    );
-});
-
-// The claim gate's OWN source (Phase 14 Task 4): release rides
-// the replayed half, so claim history includes it; a later
-// reclaim sees the release and appends a fresh claimed.
-Deno.test('workOrderClaimHistoryFor: a release op\'s claim_released'
-+ ' is included, and a later reclaim sees the release',
-async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const workOrderId = generateIdentifier();
-    const graph = workOrderFlowGraph(8 * 60 * 60);
-
-    const created = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
-        createWorkOrderBody(
-            workOrderId, WORKORDERID_FWO, graph,
-            {
-                ids: [
-                    WORKORDERID_EV1,
-                    WORKORDERID_EV2,
-                    WORKORDERID_EV3,
-                ],
-                ats: [nowUtc(), nowUtc(), nowUtc()],
-                states: [N_START, N_MIDDLE, 'claimed'],
-            },
-            nowUtc(),
-        ),
-    ));
-    assertStrictEquals(created.status, 201);
-
-    const release = await handleRequest(db, req(
-        'DELETE',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/claim',
-        token,
-    ));
-    assertStrictEquals(release.status, 204);
-
-    const afterRelease = sortByAtId(
-        await workOrderClaimHistoryFor(
-            db, STARK_ORGANIZATION, workOrderId,
-        ),
-    );
-    assertStrictEquals(afterRelease.length, 4);
-    assertEquals(
-        afterRelease.slice(0, 3).map((row) => row.id),
-        [
-            WORKORDERID_EV1,
-            WORKORDERID_EV2,
-            WORKORDERID_EV3,
-        ],
-    );
-    assertStrictEquals(afterRelease.at(-1)?.state, 'claim_released');
-    assertStrictEquals(
-        afterRelease.at(-1)?.member_id, 'XXZruirZyAOoRpNxaDnpSA',
-    );
-
-    const claimAt = nowUtc();
-    const reclaim = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId + '/claim',
-        token, {
-            claimEventId: WORKORDERID_CE1,
-            claimAt,
-            expireEventId: WORKORDERID_EE1,
-            expireAt: claimAt,
-        },
-    ));
-    assertStrictEquals(reclaim.status, 201);
-
-    const afterReclaim = sortByAtId(
-        await workOrderClaimHistoryFor(
-            db, STARK_ORGANIZATION, workOrderId,
-        ),
-    );
-    assertEquals(
-        afterReclaim.map((row) => row.state),
-        [
-            N_START, N_MIDDLE, 'claimed',
-            'claim_released', 'claimed',
-        ],
-    );
 });
 
 Deno.test('workOrderLifecycleStatesFor: a never-created work-order id'
@@ -541,8 +459,11 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
             + '/claim',
         token,
+        undefined,
+        await headTag(db, token, workOrderId),
     ));
-    assertStrictEquals(release.status, 204);
+    assertStrictEquals(release.status, 200);
+    await release.body?.cancel();
 
     const history = await workOrderHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,

@@ -16,6 +16,7 @@ import {
     attemptFor,
     formWriteMessagePair,
     strongEtagOf,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -180,12 +181,13 @@ async function putInstance(
         value: string;
     }[],
 ): Promise<Response> {
-    return handleRequest(db, req(
-        'PATCH',
-        detailPath(instanceId),
+    return handleRequest(db, apiRequest({
+        method: 'PATCH',
+        path: detailPath(instanceId),
         token,
-        { set: [...set] },
-    ));
+        body: { set: [...set] },
+        headers: { [IF_NONE_MATCH_HEADER]: '*' },
+    }));
 }
 
 // Below-gate revision / tombstone seeds — PATCH and DELETE
@@ -447,7 +449,7 @@ async () => {
     });
 });
 
-Deno.test('GET detail tombstoned → 404 record_instances',
+Deno.test('a retired instance GET is 410',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -471,10 +473,9 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
-    assertStrictEquals(res.status, 404);
+    assertStrictEquals(res.status, 410);
     assertEquals(await res.json(), {
-        error:
-            'Not found: record_instances/' + INSTANCE_A,
+        error: 'Gone: record_instances/' + INSTANCE_A,
     });
 });
 
@@ -508,6 +509,41 @@ async () => {
         error:
             'Not found: record_instances/' + INSTANCE_A,
     });
+});
+
+Deno.test('a retired foreign instance GET answers as a live'
++ ' one does, never 410',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
+    await appendInstanceMessagePair(
+        db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_A,
+        'PUT', {
+            set: [
+                {
+                    attribute_id: ATTR_PUBLIC,
+                    value: 'foreign',
+                },
+            ],
+        },
+        AT,
+    );
+    const live = await handleRequest(db, req(
+        'GET', detailPath(INSTANCE_A), memberToken,
+    ));
+    const liveBody = await live.json();
+    await appendInstanceMessagePair(
+        db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_A,
+        'DELETE', undefined, AT2,
+    );
+    const retired = await handleRequest(db, req(
+        'GET', detailPath(INSTANCE_A), memberToken,
+    ));
+    assertStrictEquals(retired.status, live.status);
+    assertEquals(await retired.json(), liveBody);
+    assertStrictEquals(retired.status, 404);
 });
 
 Deno.test('GET list → 200 identifier order ASC; tombstones'

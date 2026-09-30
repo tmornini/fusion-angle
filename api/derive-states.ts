@@ -5,33 +5,29 @@ import {
 } from './db.ts';
 import type {
     Id, MessagePairEntity, StateEntity,
-    TransitionFieldValueEntity,
-    WorkOrderEntity,
     WorkOrderHistoryEventEntity,
 } from '../shared/types.ts';
-import { MS_PER_SECOND } from '../shared/types.ts';
 import {
-    pickString, pickNumber,
+    pickString,
+    validateWorkOrderVersion,
 } from './validators.ts';
-import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
-import { asObject } from '../shared/json-assert.ts';
-import { canonicalPath } from './message-pair.ts';
+import {
+    canonicalPath,
+    responseRecordOf,
+} from './message-pair.ts';
 import {
     documentMessagePairsAt,
     deriveDocumentsAt,
     byIdAscending,
     type DocumentMessagePair,
 } from './derive-documents.ts';
-import { latestByKey } from '../shared/ledger-reduction.ts';
-import { compareIdentifiers } from
-    '../shared/identifier.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
-import {
-    latestClaimEvent,
-    addUtcSeconds,
-} from '../shared/work-order-claims.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
+import {
+    historyOf,
+    type WorkOrderVersion,
+} from './work-order-version.ts';
 
 // Message-plane lifecycle derives and ownership resolution
 // (Phase 11
@@ -46,8 +42,8 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 //       /members/ document-trio history; nothing reads
 //       that collection.
 //   (c) workOrderLifecycleStatesFor / workOrderHistoryFor — the
-//       work-order operation-message-pair replay (gate 5d; the
-//       whole-plane bulk fold retired — spec 2026-09-15 § 5).
+//       work order's version chain: each version records only
+//       its own events.
 //   (d) flow-graph node/edge sidecars — live on the flow
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
@@ -490,892 +486,99 @@ export async function missedReadError(
 // collection history routes fence via
 // resolveOwningOrganization / missedReadError directly.
 
-// ---- workOrderLifecycleStatesFor — the operation-message-pair
-// reader (gate 5d) ---
+// ---- the work-order head and its version chain (§5) ------
 
-// Source (c) of the states-log union — the only one that reads
-// work-order CREATE/CLAIM/TRANSITION/RELEASE operation message pairs.
-// Seeded work orders (buildWorkOrders/buildLeadToCloseWorkload)
-// form via a bare document PUT with ZERO operation message pairs, so
-// this function emits NOTHING for them; their births ride the
-// work-order document trio (state_event_id on the document
-// body) once the seed stage embeds them there. Output
-// materializes ONLY for a work order created, claimed,
-// transitioned, or released through the LIVE route
-// (postWorkOrderCreationOp/postWorkOrderClaimOp/
-// postWorkOrderTransitionOp/postWorkOrderReleaseOp).
-//
-// THE CREATE-PAIR RELAXATION (EDGE 1): a work order's create pair
-// is a DOMAIN fact, not a defensive fallback — seeded work
-// orders lack one (they were never created through this route),
-// so its absence NEVER throws; it simply means this reader
-// contributes no births for that id. Only a LIVE creation —
-// and a caller's RETRY of one, each landing its OWN create pair
-// at the same work-order id — contributes birth events, one
-// three-slot array PER create pair found.
-//
-// THE REFERENCE-CLOCK RESIDUAL (EDGE 2 — a SERVER-TIER TODO): the
-// live claim route (postWorkOrderClaimOp) decides expiry against
-// REAL Date.now() at the moment the NEXT claim happens to be
-// processed — an instant NEVER stored in any pair body. This
-// replay instead compares the claim pair's own body `claimAt`
-// against the prior claim's `at`, with the route's exact `>=`
-// boundary (isExpiredAsOf below) — a PURE, Date.now-free
-// comparator, deliberately never isClaimEventExpired (api/
-// work-order-claims.ts), which IS Date.now-coupled. Byte-exact
-// replay holds ONLY where `claimAt` and the decision
-// instant coincide in one process; a multi-process
-// deployment must record the actual expiry decision as
-// its own event rather than lean on this replay trick.
-
-// One decoded 2xx POST pair — an OPERATION path (create/claim/
-// transition are POST-only), the documentMessagePairsAt (derive-
-// documents.ts) twin restricted to the OTHER method: that reader
-// deliberately EXCLUDES POST (the DOCUMENT head is PUT/DELETE
-// only); this one deliberately admits POST ALONE, since a work
-// order's operations are never PUT/DELETE. Production
-// genericization of tests/drift-work-orders.test.ts case 9's
-// AnyPair/allPairsAt, narrowed to exactly what a work-order
-// replay ever consumes — never a configurable multi-method reader
-// nobody asked for.
-interface OperationMessagePair {
-    readonly id: Id;
-    readonly at: string;
-    readonly name: Id;
-    readonly body: Record<string, unknown>;
-    readonly requesterIdentityId: Id;
-}
-
-// requestMethodOf/requestBodyOf's own twin (api/derive-
-// documents.ts), needed here ONLY because operationMessagePairsAt reads
-// POST — mirrors derive-identity-spine.ts's own responseBodyOf,
-// which duplicates the same decode plumbing for its OWN reason
-// (the response side, there; the POST method, here) rather than
-// exporting derive-documents.ts's private helpers across a module
-// boundary they were never meant to cross.
-function decodeRequestOperation(message: string): {
-    readonly method: string;
-    readonly body: Record<string, unknown>;
-} {
-    const model = parseWire(message);
-    if (model.startLine.kind !== 'request') {
-        throw new Error(
-            'stored request message carries no request line',
-        );
-    }
-    const body = HttpMessage.fromModel(model).body();
-    return {
-        method: model.startLine.method,
-        body: body.exists()
-            ? JSON.parse(body.toText()) as
-                Record<string, unknown>
-            : {},
-    };
-}
-
-// (at, id) ascending — the total order every replay step below
-// orders its actions by, and the order workOrderLifecycleStatesFor
-// returns rows in: these rows are SYNTHESIZED (no document of
-// their own to read 1:1), so there is no raw-store scan order to
-// reproduce — chronological (at, id) is the meaningful order.
-function atIdCompare(
-    a: { readonly at: string; readonly id: string },
-    b: { readonly at: string; readonly id: string },
-): number {
-    return a.at < b.at ? -1
-        : a.at > b.at ? 1
-            : compareIdentifiers(a.id, b.id);
-}
-
-// Every successful (2xx) POST pair at `path`, (at, id)
-// ascending. Source (c)'s work-order replay is the only
-// consumer left: source (e) once shared this scan, and the
-// invitation-document fold (spec 2026-09-15 § 2) moved
-// deriveInvitationStates onto documentMessagePairsAt; the
-// states-document retirement had already moved
-// deriveMemberGenesis onto the document-trio walk. Module-
-// private: this module's own transition-fold readers below
-// reuse this SAME decode over the work-orders/:id/transition
-// document, rather than re-implementing the POST-only,
-// (at, id)-sorted read.
-const POST_ONLY: ReadonlySet<string> = new Set(['POST']);
-const POST_OR_PUT: ReadonlySet<string> = new Set([
-    'POST', 'PUT',
-]);
-
-function operationMessagePairsAt(
-    messagePairs: readonly MessagePairEntity[],
-    path: string,
-    methods: ReadonlySet<string> = POST_ONLY,
-): OperationMessagePair[] {
-    const out: OperationMessagePair[] = [];
-    for (const messagePair of messagePairs) {
-        if (messagePair.path !== path) {
-            continue;
-        }
-        const decoded = decodeRequestOperation(
-            messagePair.request,
-        );
-        if (!methods.has(decoded.method)) continue;
-        out.push({
-            id: messagePair.id,
-            at: messagePair.response_at,
-            name: messagePair.name,
-            body: decoded.body,
-            requesterIdentityId:
-                messagePair.requester_identity_id,
-        });
-    }
-    return out.sort(atIdCompare);
-}
-
-function documentDeletesAsOperations(
-    messagePairs: readonly DocumentMessagePair[],
-): OperationMessagePair[] {
-    const out: OperationMessagePair[] = [];
-    for (const messagePair of messagePairs) {
-        if (messagePair.method !== 'DELETE') continue;
-        out.push({
-            id: messagePair.id,
-            at: messagePair.at,
-            name: messagePair.name,
-            body: messagePair.body,
-            requesterIdentityId:
-                messagePair.requesterIdentityId,
-        });
-    }
-    return out;
-}
-
-// A pure Date-parse subtraction — never Date.now() (EDGE 2).
-function msBetween(laterIso: string, earlierIso: string): number {
-    return Date.parse(laterIso) - Date.parse(earlierIso);
-}
-
-// The route's EXACT `>=` boundary (postWorkOrderClaimOp's own
-// `isClaimEventExpired` call), reproduced as a pure comparator
-// over two body timestamps instead of one body timestamp and
-// Date.now().
-function isExpiredAsOf(
-    claimAt: string,
-    priorAt: string,
-    lockTimeoutSeconds: number,
-): boolean {
-    return msBetween(claimAt, priorAt)
-        >= lockTimeoutSeconds * MS_PER_SECOND;
-}
-
-// LOCKTIMEOUT SOURCING: the work order's DOCUMENT HEAD as of
-// `momentAt` — the (at, id) winner among PUT/DELETE pairs whose
-// response `at` strictly precedes it. `entityMessagePairs` is ascending
-// by (at, id) already (documentMessagePairsAt's own contract), so the
-// last entry passing the filter IS that winner.
-function documentHeadBefore(
-    entityMessagePairs: readonly DocumentMessagePair[],
-    momentAt: string,
-): DocumentMessagePair | undefined {
-    const before = entityMessagePairs.filter((p) => p.at < momentAt);
-    return before[before.length - 1];
-}
-
-// lock_timeout is a MOVING TARGET — an entity PUT can change it
-// mid-history — so every claim sources it FRESH from the document
-// head as of that claim's OWN response.at, never a single graph
-// read cached across the whole replay.
-function lockTimeoutAsOf(
-    entityMessagePairs: readonly DocumentMessagePair[],
-    momentAt: string,
-): number {
-    const head = documentHeadBefore(entityMessagePairs, momentAt);
-    if (head === undefined) {
-        // A genuine invariant violation, not a defensive
-        // fallback: postWorkOrderClaimOp requires the work order
-        // to already exist (view.workOrders.getById), and every
-        // path that can create one also writes a document message pair
-        // beside it — so a claim/transition pair can never
-        // legitimately precede every document message pair at this id.
-        throw new Error(
-            'no document head before ' + momentAt,
-        );
-    }
-    return asWorkOrderFlowGraph(
-        head.body['flow_graph'],
-        'work-order lifecycle document head flow_graph',
-    ).lockTimeout;
-}
-
-// Every candidate event a claim pair's prior-claim decision may
-// draw from: the replay's OWN emitted events so far (create
-// births, prior claims/releases/transitions). Releases ride
-// the release operation message pair now (postWorkOrderReleaseOp) — the
-// retired standalone PUT states/:id path is no longer a
-// candidate source. The `replayed` half is already bounded to
-// "earlier" by the caller's own (at, id)-ordered processing;
-// the strictly-before filter is kept so a future out-of-order
-// merge cannot leak later events into the prior-claim decision.
-function priorClaimCandidates(
-    replayed: readonly StateEntity[],
-    claim: OperationMessagePair,
-): StateEntity[] {
-    return replayed
-        .filter((row) => atIdCompare(row, claim) < 0)
-        .sort(atIdCompare);
-}
-
-// Each claim pair re-runs the route's own 0/1/2-event decision
-// with the pair BODY's claimAt as the reference clock (EDGE 2).
-// PRIOR state reduces from priorClaimCandidates above (never
-// old-plane rows) via latestClaimEvent's own CLAIM_STATES filter +
-// (at, id) max.
-function applyClaimMessagePair(
-    replayed: StateEntity[],
-    entityMessagePairs: readonly DocumentMessagePair[],
-    claim: OperationMessagePair,
-    workOrderId: Id,
-): void {
-    const claimEventId = pickString(claim.body, 'claimEventId');
-    const claimAt = pickString(claim.body, 'claimAt');
-    const expireEventId = pickString(
-        claim.body, 'expireEventId',
-    );
-    const expireAt = pickString(claim.body, 'expireAt');
-    // Genesis claim document reuses the create pair's
-    // claimed event id so GET/DELETE have a row; do not
-    // emit a second claimed event.
-    if (replayed.some((row) => row.id === claimEventId)) {
-        return;
-    }
-    const lockTimeout = lockTimeoutAsOf(entityMessagePairs, claim.at);
-    const prior = latestClaimEvent(
-        priorClaimCandidates(replayed, claim),
-        workOrderId,
-    );
-    const priorLive = prior !== null
-        && prior.state === 'claimed'
-        && !isExpiredAsOf(claimAt, prior.at, lockTimeout);
-
-    if (priorLive) {
-        // Idempotent re-claim by the same actor — zero events,
-        // matching postWorkOrderClaimOp's own early return (a
-        // foreign live claim 409s before any pair ever forms, so
-        // it never reaches a replay at all).
-        return;
-    }
-    if (prior !== null && prior.state === 'claimed') {
-        replayed.push({
-            id: expireEventId,
-            entity_id: workOrderId,
-            state: 'claim_expired',
-            // Recovered from the PRIOR claim's OWN replayed
-            // author, never the current pair's.
-            member_id: prior.member_id,
-            at: expireAt,
-        });
-    }
-    replayed.push({
-        id: claimEventId,
-        entity_id: workOrderId,
-        state: 'claimed',
-        member_id: claim.requesterIdentityId,
-        at: claimAt,
-    });
-}
-
-// A transition pair's own target-state event, plus its OPTIONAL
-// release event — field values ride a SEPARATE table
-// (state_field_values), outside this states-log derivation's own
-// contract (StateEntity rows only).
-function applyTransitionMessagePair(
-    replayed: StateEntity[],
-    transition: OperationMessagePair,
-    workOrderId: Id,
-): void {
-    replayed.push({
-        id: pickString(transition.body, 'transitionEventId'),
-        entity_id: workOrderId,
-        state: pickString(transition.body, 'targetState'),
-        member_id: transition.requesterIdentityId,
-        at: pickString(transition.body, 'transitionAt'),
-    });
-
-    const release = transition.body['release'];
-    if (release !== null) {
-        const releaseFields = release as {
-            readonly id: string;
-            readonly state: string;
-            readonly at: string;
-        };
-        replayed.push({
-            id: releaseFields.id,
-            entity_id: workOrderId,
-            // VERBATIM from the pair body — the gate does not
-            // constrain release.state to 'claim_released'.
-            state: releaseFields.state,
-            member_id: transition.requesterIdentityId,
-            at: releaseFields.at,
-        });
-    }
-}
-
-// Replays postWorkOrderReleaseOp's own decision from the pair
-// body: a live unexpired claim as of releaseAt → the
-// claim_released event; otherwise zero events (the gate's
-// idempotent no-op — its pair still exists, and derives
-// nothing). Deciding here, not at the gate, keeps gate and
-// derive from ever disagreeing about liveness.
-function applyReleaseMessagePair(
-    replayed: StateEntity[],
-    entityMessagePairs: readonly DocumentMessagePair[],
-    release: OperationMessagePair,
-    workOrderId: Id,
-): void {
-    const legacy = Object.hasOwn(
-        release.body, 'releaseEventId',
-    );
-    const releaseEventId = legacy
-        ? pickString(release.body, 'releaseEventId')
-        : release.id;
-    const releaseAt = legacy
-        ? pickString(release.body, 'releaseAt')
-        : release.at;
-    const prior = latestClaimEvent(
-        priorClaimCandidates(replayed, release),
-        workOrderId,
-    );
-    if (legacy) {
-        const lockTimeout = lockTimeoutAsOf(
-            entityMessagePairs, release.at,
-        );
-        const priorLive = prior !== null
-            && prior.state === 'claimed'
-            && !isExpiredAsOf(
-                releaseAt, prior.at, lockTimeout,
-            );
-        if (!priorLive) return;
-    } else if (
-        prior === null
-        || prior.state !== 'claimed'
-    ) {
-        // DELETE head only forms after a PUT claim;
-        // a stray delete with no claimed prior is a
-        // no-op, matching the legacy empty derive.
-        return;
-    }
-    replayed.push({
-        id: releaseEventId,
-        entity_id: workOrderId,
-        state: 'claim_released',
-        member_id: release.requesterIdentityId,
-        at: releaseAt,
-    });
-}
-
-type WorkOrderAction =
-    | {
-        readonly kind: 'claim';
-        readonly messagePair: OperationMessagePair;
-    }
-    | {
-        readonly kind: 'release';
-        readonly messagePair: OperationMessagePair;
-    }
-    | {
-        readonly kind: 'transition';
-        readonly messagePair: OperationMessagePair;
-    };
-
-// One work order's full replay: its births (EDGE 1 — zero or
-// more three-slot arrays, one per create pair found), then its
-// claim/release/transition actions applied in (at, id) order so
-// each claim's prior-claim lookup only ever sees
-// chronologically earlier events.
-function replayWorkOrderOperations(
-    createMessagePairs: readonly OperationMessagePair[],
-    entityMessagePairs: readonly DocumentMessagePair[],
-    claimMessagePairs: readonly OperationMessagePair[],
-    releaseMessagePairs: readonly OperationMessagePair[],
-    transitionMessagePairs: readonly OperationMessagePair[],
-    workOrderId: Id,
-): StateEntity[] {
-    const events: StateEntity[] = [];
-    for (const createMessagePair of createMessagePairs) {
-        const ids = createMessagePair.body['stateEventIds'] as
-            readonly string[];
-        const ats = createMessagePair.body['stateEventAts'] as
-            readonly string[];
-        const states = createMessagePair.body['states'] as
-            readonly string[];
-        for (let i = 0; i < ids.length; i++) {
-            events.push({
-                id: ids[i]!,
-                entity_id: workOrderId,
-                state: states[i]!,
-                member_id: createMessagePair.requesterIdentityId,
-                at: ats[i]!,
-            });
-        }
-    }
-
-    const actions: WorkOrderAction[] = [
-        ...claimMessagePairs.map((messagePair) => (
-            { kind: 'claim' as const, messagePair }
-        )),
-        ...releaseMessagePairs.map((messagePair) => (
-            { kind: 'release' as const, messagePair }
-        )),
-        ...transitionMessagePairs.map((messagePair) => (
-            { kind: 'transition' as const, messagePair }
-        )),
-    ].sort((a, b) => atIdCompare(
-        a.messagePair, b.messagePair,
-    ));
-
-    for (const action of actions) {
-        if (action.kind === 'claim') {
-            applyClaimMessagePair(
-                events, entityMessagePairs,
-                action.messagePair, workOrderId,
-            );
-        } else if (action.kind === 'release') {
-            applyReleaseMessagePair(
-                events, entityMessagePairs,
-                action.messagePair, workOrderId,
-            );
-        } else {
-            applyTransitionMessagePair(
-                events, action.messagePair, workOrderId,
-            );
-        }
-    }
-
-    return events;
-}
-
-// The work-order lifecycle read (gate 5d): reads INDEXED,
-// scoped to ONE known (organization, workOrderId) pair, then
-// replays with the pure replay core (replayWorkOrderOperations)
-// the retired whole-plane fold once shared with this reader
-// (spec 2026-09-15 § 5) —
-//   * create + document message pairs: document read at the
-//     work-orders prefix + this workOrderId (both
-//     a create's response and its later document PUT/DELETE
-//     share ONE name — drift-work-orders.test.ts case 8);
-//   * claim/release/transition: path at each sub-resource's
-//     own per-id document, its prefix constructed directly
-//     (canonicalPath + the known workOrderId) since the id is
-//     already known — no pattern match needed to discover it.
-// dbOrView-shaped and opens no nested transaction — callable from
-// WITHIN an already-open write-gate transaction. Phase 14 Task 4
-// wires the claim gate to workOrderClaimHistoryFor below; with
-// the states/:id document retired both readers below return the
-// SAME operation-message-pair replay (releases ride the release
-// op, not a standalone event-append).
-interface WorkOrderClaimSources {
-    readonly replayed: readonly StateEntity[];
-    readonly transitionMessagePairs:
-        readonly OperationMessagePair[];
-}
-
-// The reads + replay shared by workOrderLifecycleStatesFor,
-// workOrderClaimHistoryFor, and workOrderHistoryFor. History
-// consumes the transition pairs so it does not re-read that
-// prefix. Four independent reads run together; decode once.
-async function workOrderClaimSourcesFor(
-    dbOrView: DbAdapter,
+// The work order's head version, from its stored response
+// (§5). Null when it was never written or is gone.
+export async function workOrderHeadFor(
+    db: DbAdapter,
     organization: Id,
     workOrderId: Id,
-): Promise<WorkOrderClaimSources> {
-    const collectionPrefix = canonicalPath(
-        organization, '/work-orders/',
+): Promise<{
+    readonly version: WorkOrderVersion,
+    readonly pair: MessagePairEntity,
+} | null> {
+    const pair = await db.messagePairs.getHeadPair(
+        canonicalPath(organization, '/work-orders/'),
+        workOrderId,
     );
-    const claimPrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/claim/',
-    );
-    const releasePrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId
-            + '/release/',
-    );
-    const transitionPrefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId
-            + '/transition/',
-    );
-    const [
-        collectionMessagePairs,
-        claimStored,
-        releaseStored,
-        transitionStored,
-    ] = await Promise.all([
-        dbOrView.messagePairs.getDocumentHistory(
-            collectionPrefix, workOrderId,
-        ),
-        dbOrView.messagePairs.getCollectionPairs(
-            claimPrefix,
-        ),
-        dbOrView.messagePairs.getCollectionPairs(
-            releasePrefix,
-        ),
-        dbOrView.messagePairs.getCollectionPairs(
-            transitionPrefix,
-        ),
-    ]);
-    const createMessagePairs = operationMessagePairsAt(
-        collectionMessagePairs, collectionPrefix,
-    );
-    const entityMessagePairs = documentMessagePairsAt(
-        collectionMessagePairs, collectionPrefix,
-    );
-    const claimMessagePairs = operationMessagePairsAt(
-        claimStored, claimPrefix, POST_OR_PUT,
-    );
-    const releaseDeletes = documentDeletesAsOperations(
-        documentMessagePairsAt(claimStored, claimPrefix),
-    );
-    const releaseMessagePairs = [
-        ...operationMessagePairsAt(
-            releaseStored, releasePrefix,
-        ),
-        ...releaseDeletes,
-    ];
-    const transitionMessagePairs = operationMessagePairsAt(
-        transitionStored, transitionPrefix,
-    );
-
-    return {
-        replayed: replayWorkOrderOperations(
-            createMessagePairs, entityMessagePairs,
-            claimMessagePairs, releaseMessagePairs,
-            transitionMessagePairs,
-            workOrderId,
-        ),
-        transitionMessagePairs,
-    };
+    if (pair === null || pair.method !== 'PUT') {
+        return null;
+    }
+    return { version: versionOf(pair), pair };
 }
 
+function versionOf(pair: MessagePairEntity): WorkOrderVersion {
+    const body = responseRecordOf(pair.response);
+    if (body === undefined) {
+        throw new Error(
+            'a work-order version carries no state: ' + pair.id,
+        );
+    }
+    return validateWorkOrderVersion(body);
+}
+
+// Every version the work order's PUTs stored, oldest first.
+// The create's received POST shares the document's name and
+// echoes its version, so only the PUT rows are versions.
+async function workOrderVersionsFor(
+    db: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+): Promise<WorkOrderVersion[]> {
+    const pairs = await db.messagePairs.getDocumentHistory(
+        canonicalPath(organization, '/work-orders/'),
+        workOrderId,
+    );
+    return pairs
+        .filter((pair) => pair.method === 'PUT')
+        .map(versionOf);
+}
+
+// The lifecycle, oldest first: each version's own events in
+// chain order.
 export async function workOrderLifecycleStatesFor(
-    dbOrView: DbAdapter,
+    db: DbAdapter,
     organization: Id,
     workOrderId: Id,
 ): Promise<StateEntity[]> {
-    const { replayed } = await workOrderClaimSourcesFor(
-        dbOrView, organization, workOrderId,
+    const versions = await workOrderVersionsFor(
+        db, organization, workOrderId,
     );
-    return [...replayed].sort(atIdCompare);
+    return historyOf(versions).toReversed().map((event) => ({
+        id: event.id,
+        entity_id: workOrderId,
+        state: event.state,
+        member_id: event.member_id,
+        at: event.at,
+    }));
 }
 
-// Same fold as transitionFieldValueCandidates +
-// stateFieldValuesFrom for LEGACY bags: candidates keyed by
-// fv row id, latestByKey head reduction, DELETE heads dropped.
-// New-shape pairs (no fieldValues key) render per-event from
-// set/clear — shape-disjoint; they never enter latestByKey.
-// Shared by workOrderHistoryFor (per-item /history).
-function fieldValuesByTransitionEvent(
-    transitionMessagePairs: readonly OperationMessagePair[],
-): Map<Id, TransitionFieldValueEntity[]> {
-    const candidates: DocumentMessagePair[] = [];
-    const newShapeRows =
-        new Map<Id, TransitionFieldValueEntity[]>();
-    for (const transition of transitionMessagePairs) {
-        const raw = transition.body['fieldValues'];
-        if (raw !== undefined) {
-            // Legacy shape: pool candidates for head-reduce.
-            const fieldValues = raw as
-                readonly {
-                    readonly id: string;
-                    readonly fields: Record<string, unknown>;
-                }[];
-            for (const fieldValue of fieldValues) {
-                candidates.push({
-                    id: transition.id,
-                    at: transition.at,
-                    name: fieldValue.id,
-                    method: 'PUT',
-                    body: fieldValue.fields,
-                    requesterIdentityId:
-                        transition.requesterIdentityId,
-                });
-            }
-            continue;
-        }
-        // New-shape: set/clear → rows for THIS event only.
-        const eventId = pickString(
-            transition.body, 'transitionEventId',
-        );
-        const rows: TransitionFieldValueEntity[] = [];
-        const set = transition.body['set'];
-        if (Array.isArray(set)) {
-            for (const entry of set) {
-                const row = entry as
-                    Record<string, unknown>;
-                const attributeId = pickString(
-                    row, 'attribute_id',
-                );
-                rows.push({
-                    id: attributeId,
-                    attribute_id: attributeId,
-                    value: pickString(row, 'value'),
-                });
-            }
-        }
-        const clear = transition.body['clear'];
-        if (Array.isArray(clear)) {
-            for (const attributeId of clear) {
-                // No value key on the wire; cast covers the
-                // type's required value used by legacy set rows.
-                rows.push({
-                    id: String(attributeId),
-                    attribute_id: String(attributeId),
-                    cleared: true,
-                } as TransitionFieldValueEntity);
-            }
-        }
-        if (rows.length > 0) {
-            rows.sort(byIdAscending);
-            newShapeRows.set(eventId, rows);
-        }
-    }
-    const heads = latestByKey(
-        candidates, (messagePair) => messagePair.name,
-    );
-    const byEvent = new Map<Id, TransitionFieldValueEntity[]>();
-    for (const [name, head] of heads) {
-        if (head.method === 'DELETE') continue;
-        const stateEventId = pickString(
-            head.body, 'state_event_id',
-        );
-        const list = byEvent.get(stateEventId) ?? [];
-        list.push({
-            id: name,
-            attribute_id: pickString(
-                head.body, 'attribute_id',
-            ),
-            value: pickString(head.body, 'value'),
-        });
-        byEvent.set(stateEventId, list);
-    }
-    for (const list of byEvent.values()) {
-        list.sort(byIdAscending);
-    }
-    // Merge new-shape AFTER legacy reduction (disjoint event
-    // ids by construction — a new-shape event never minted
-    // legacy candidates).
-    for (const [eventId, rows] of newShapeRows) {
-        byEvent.set(eventId, rows);
-    }
-    return byEvent;
-}
-
-// Attach folded field_values and reverse ASC lifecycle to
-// (at, id) DESC (index 0 = current). Claim/birth/release rows
-// carry field_values: [].
-function historyEventsWithFieldValues(
-    lifecycleAsc: readonly StateEntity[],
-    transitionMessagePairs: readonly OperationMessagePair[],
-): WorkOrderHistoryEventEntity[] {
-    const byEvent = fieldValuesByTransitionEvent(
-        transitionMessagePairs,
-    );
-    return lifecycleAsc.map((event) => ({
-        ...event,
-        field_values: byEvent.get(event.id) ?? [],
-    })).toReversed();
-}
-
-// GET work-orders/:id/history (states-URI elimination A1):
-// claim-sources replay (ASC) with an inline field-values
-// fold from the same transition prefix pairs the replay
-// already read, returned (at, id) DESC so index 0 is
-// current. Head-reduction per field-value row id uses the
-// same latestByKey pooling fieldValuesByTransitionEvent
-// applies above; claim/birth/release rows carry
-// field_values: []. Empty lifecycle → missedReadError
-// (404 miss at this document). Entity-scoped indexed
-// reads only — no whole-plane getAll.
+// GET work-orders/:id/history: the version chain's events,
+// newest first, each naming its work order. No event is a
+// miss (403 foreign, 404 absent).
 export async function workOrderHistoryFor(
     db: DbAdapter,
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderHistoryEventEntity[]> {
-    const { replayed, transitionMessagePairs } =
-        await workOrderClaimSourcesFor(
-            db, organization, workOrderId,
-        );
-    const lifecycle = [...replayed].sort(atIdCompare);
-    if (lifecycle.length === 0) {
+    const versions = await workOrderVersionsFor(
+        db, organization, workOrderId,
+    );
+    const events = historyOf(versions);
+    if (events.length === 0) {
         throw await missedReadError(
             db, workOrderId, organization, 'work_orders',
         );
     }
-    return historyEventsWithFieldValues(
-        lifecycle, transitionMessagePairs,
-    );
-}
-
-// THE CLAIM GATE'S OWN SOURCE (Phase 14 Task 4): the work-
-// order operation-message-pair replay, over INDEXED entity-scoped reads
-// workOrderClaimSourcesFor already performs, rather than
-// deriveStatesFor's own whole-plane getAll (forbidden inside
-// a write-gate transaction — AGENTS.md's tx-body gotcha:
-// entity-scoped in-tx reads only, never a whole-plane getAll of
-// pairs). With the states/:id document retired this
-// is the sole claim-history source — create/claim/transition/
-// release operation message pairs cover every live writer.
-// postWorkOrderClaimOp (api/routes.ts) is its only live caller.
-export async function workOrderClaimHistoryFor(
-    dbOrView: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<StateEntity[]> {
-    const { replayed } = await workOrderClaimSourcesFor(
-        dbOrView, organization, workOrderId,
-    );
-    return [...replayed].sort(atIdCompare);
-}
-
-// The CURRENT bind: latest binding pair wins under
-// (at, id). Reads PUT (locked verb). POST still
-// accepted for pre-lock pairs.
-// Entity-scoped indexed reads; in-tx safe (dbOrView).
-export async function workOrderBindingFor(
-    dbOrView: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<
-    { instanceId: Id; recordTypeId: Id } | null
-> {
-    const prefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/binding/',
-    );
-    const stored = await dbOrView.messagePairs.getCollectionPairs(prefix,
-    );
-    const messagePairs = operationMessagePairsAt(
-        stored, prefix, POST_OR_PUT,
-    );
-    const latest = messagePairs[messagePairs.length - 1];
-    if (latest === undefined) {
-        return null;
-    }
-    return {
-        instanceId: pickString(
-            latest.body, 'instance_id',
-        ),
-        recordTypeId: pickString(
-            latest.body, 'record_type_id',
-        ),
-    };
-}
-
-// GET work-orders/:id/claim facts. 404 only when
-// unclaimed: no row or DELETE head. An expired claim
-// is still a row — "claimed now" is judged at read.
-export interface WorkOrderClaimDocument {
-    readonly memberId: Id;
-    readonly expiresAt: string;
-    readonly claimedAt: string;
-}
-
-export async function workOrderClaimDocumentFor(
-    dbOrView: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<WorkOrderClaimDocument | null> {
-    const prefix = canonicalPath(
-        organization,
-        '/work-orders/' + workOrderId + '/claim/',
-    );
-    const fetched = await dbOrView.messagePairs.getCollectionPairs(prefix,
-    );
-    const messagePairs = documentMessagePairsAt(
-        fetched, prefix,
-    );
-    const latest = messagePairs[messagePairs.length - 1];
-    if (
-        latest === undefined
-        || latest.method === 'DELETE'
-    ) {
-        return null;
-    }
-    const claimedAt = pickString(
-        latest.body, 'claimAt',
-    );
-    const stored = latest.body['expires_at'];
-    let expiresAt: string;
-    if (typeof stored === 'string' && stored !== '') {
-        expiresAt = stored;
-    } else {
-        const wo = await workOrderDocumentHeadFor(
-            dbOrView, organization, workOrderId,
-        );
-        const lockTimeout = wo === null
-            ? 0
-            : asWorkOrderFlowGraph(
-                wo.flow_graph,
-                'work-order claim document'
-                    + ' flow_graph',
-            ).lockTimeout;
-        expiresAt = addUtcSeconds(
-            claimedAt, lockTimeout,
-        );
-    }
-    return {
-        memberId: latest.requesterIdentityId,
-        expiresAt,
-        claimedAt,
-    };
-}
-
-// ---- workOrderDocumentHeadFor — the claim-gate graph head -----
-// ---- (Phase 15 Task 1, Author gate 4) --------------------------
-
-// Derives the work order's CURRENT document head
-// ({display_id, flow_graph, position, …}) from the entity's
-// OWN document message pairs — the message-plane successor of
-// view.workOrders.getById that postWorkOrderClaimOp still
-// reads for flow_graph (Task 2 re-anchors the call site).
-//
-// REUSE TARGET: the entity-scoped entityMessagePairs computation
-// inside workOrderClaimSourcesFor (document read) — NOT
-// derivedDocumentEntity / documentGetHandler, whose
-// collection-wide prefix scan is the forbidden whole-plane
-// shape inside a write gate.
-//
-// HEAD REDUCTION: documentMessagePairsAt already sorts by (at, id)
-// ascending and admits only PUT/DELETE, so the last pair IS
-// the document head; a DELETE head (or no pairs) yields null
-// so the claim gate can map absent to the same
-// EntityNotFoundError bytes as workOrders.getById.
-// dbOrView-shaped and opens no nested transaction — callable
-// from WITHIN an already-open write-gate transaction.
-export async function workOrderDocumentHeadFor(
-    dbOrView: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<WorkOrderEntity | null> {
-    const collectionPrefix = canonicalPath(
-        organization, '/work-orders/',
-    );
-    const collectionMessagePairs =
-        await dbOrView.messagePairs.getDocumentHistory(
-            collectionPrefix, workOrderId,
-        );
-    const entityMessagePairs = documentMessagePairsAt(
-        collectionMessagePairs, collectionPrefix,
-    );
-    if (entityMessagePairs.length === 0) return null;
-    const head = entityMessagePairs[entityMessagePairs.length - 1]!;
-    if (head.method === 'DELETE') return null;
-    return {
-        id: workOrderId,
-        organization_id: organization,
-        display_id: pickString(head.body, 'display_id'),
-        flow_graph: asObject(
-            head.body['flow_graph'], 'flow_graph',
-        ),
-        position: pickNumber(head.body, 'position'),
-    };
+    return events.map((event) => ({
+        id: event.id,
+        entity_id: workOrderId,
+        state: event.state,
+        member_id: event.member_id,
+        at: event.at,
+        field_values: [...event.field_values],
+    }));
 }
 
 // deriveMemberStates / MEMBERS_DOCUMENT_PREFIX RETIRED

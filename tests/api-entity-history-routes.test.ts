@@ -596,7 +596,7 @@ Deno.test(
     },
 );
 
-// -- Flows (locked concurrency) -----------------------------
+// -- Flows (conditional required) --------------------------
 
 function flowDocBody(
     name: string,
@@ -644,6 +644,7 @@ async function seedFlowLifecycle(
                 '2026-03-01T00:00:00.000000Z',
                 ev1,
             ),
+            { 'if-none-match': '*' },
         ),
     );
     assertStrictEquals(g.status, 201);
@@ -721,6 +722,7 @@ Deno.test(
                     '2026-03-01T00:00:00.000000Z',
                     generateIdentifier(),
                 ),
+                { 'if-none-match': '*' },
             ),
         );
         assertStrictEquals(genesis.status, 201);
@@ -768,6 +770,7 @@ Deno.test(
                     '2026-03-01T00:00:00.000000Z',
                     generateIdentifier(),
                 ),
+                { 'if-none-match': '*' },
             ),
         );
         assertStrictEquals(first.status, 201);

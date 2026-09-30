@@ -74,9 +74,13 @@ Deno.test('a flow write with an AI agent id in memberIds'
     const { DEFAULT_LOCK_TIMEOUT } = await import(
         '../shared/types.ts'
     );
-    const res = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aJVLTHvDCMwaHWIrPvPlkA', token, {
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aJVLTHvDCMwaHWIrPvPlkA',
+        token,
+        headers: { 'if-none-match': '*' },
+        body: {
             name: 'Blocked',
             is_locked: false,
             is_auto_layout: false,
@@ -108,6 +112,6 @@ Deno.test('a flow write with an AI agent id in memberIds'
             },
             revivals: [],
         },
-    ));
+    }));
     assertStrictEquals(res.status, 400);
 });

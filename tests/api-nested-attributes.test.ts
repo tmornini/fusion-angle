@@ -12,6 +12,7 @@ import {
 } from './test-fixtures.ts';
 import {
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -405,6 +406,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(putInst.status, 201);
     const del = await handleRequest(db, req(
@@ -451,6 +453,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(putInst.status, 201);
     const etag = putInst.headers.get('ETag')!;
@@ -459,7 +462,7 @@ async () => {
         { clear: [ATTR_ID] },
         { [IF_MATCH_HEADER]: etag },
     ));
-    assertStrictEquals(clear.status, 201);
+    assertStrictEquals(clear.status, 200);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
@@ -491,6 +494,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(putInst.status, 201);
     const requestsBefore = await db.messagePairs.getAll();

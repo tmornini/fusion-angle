@@ -120,7 +120,7 @@ export class MemoryStorageBackend
         }
         if (hasRoot(this.#rows)) return;
         await this.executeLedger(
-            'genesis',
+            'blind',
             [mintRootBind()],
             undefined,
             undefined,
@@ -165,7 +165,7 @@ export class MemoryStorageBackend
         const classified = await classifyStatement(
             attempt,
             rows,
-            headsOf(buffer),
+            headsOf(buffer, rows),
             clock,
         );
         const answers: StatementAnswer[] = [];
@@ -178,10 +178,12 @@ export class MemoryStorageBackend
                 name: row.name,
                 method: row.method,
                 outcome: item.outcome,
+                rawOutcome: item.rawOutcome,
                 stamp: item.stamp,
                 response: item.response,
                 headId: item.headId,
                 headResponse: item.headResponse,
+                headMethod: item.headMethod,
                 inserted: item.inserted,
                 supersedes: item.supersedes,
                 requestHashHex: item.requestHashHex,
@@ -297,9 +299,16 @@ function laterHead(
     ) > 0;
 }
 
+// The heads of the statement's own documents: a whole
+// table's heads would decode every stored response on
+// every statement.
 function headsOf(
     rows: readonly { id: string }[],
+    statement: readonly StatementBind[],
 ): Head[] {
+    const documents = new Set(statement.map(
+        (bind) => bind.path + '\u0000' + bind.name,
+    ));
     const best = new Map<string, Record<string, unknown>>();
     for (const row of rows) {
         const rec = row as Record<string, unknown>;
@@ -316,6 +325,7 @@ function headsOf(
             continue;
         }
         const key = path + '\u0000' + name;
+        if (!documents.has(key)) continue;
         const prev = best.get(key);
         if (prev === undefined || laterHead(rec, prev)) {
             best.set(key, rec);

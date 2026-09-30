@@ -1,4 +1,5 @@
 import type {
+    Id,
     StoredGraph,
     AttributeType,
     Constraint,
@@ -47,7 +48,13 @@ import type {
     ProjectObjectiveActualScoreEntity,
     MessagePairEntity,
     StateEntity,
+    TransitionFieldValueEntity,
 } from '../shared/types.ts';
+import type {
+    WorkOrderClaim,
+    WorkOrderEvent,
+    WorkOrderVersion,
+} from './work-order-version.ts';
 import {
     assertAttributeType,
     assertConstraintAppliesTo,
@@ -645,6 +652,26 @@ export function validateIdentityDefaultOrganizationEntity(
     };
 }
 
+const DEFAULT_ORGANIZATION_BODY_KEYS: readonly string[] = [
+    'organization_id',
+];
+
+// The wire body of PUT identities/:id/default-organization.
+export function validateDefaultOrganizationBody(
+    body: Record<string, unknown>,
+): { readonly organization_id: Id } {
+    assertOnlyKeys(
+        body,
+        DEFAULT_ORGANIZATION_BODY_KEYS,
+        'DefaultOrganizationBody',
+    );
+    return {
+        organization_id: pickIdentifier(
+            body, 'organization_id',
+        ),
+    };
+}
+
 const ROLE_GRANT_BODY_KEYS: readonly string[] = [
     'organization_id', 'identity_id', 'role', 'action',
     'by_member_id', 'at',
@@ -677,12 +704,17 @@ const IDENTITY_TOKEN_BODY_KEYS: readonly string[] = [
     'jti', 'identity_id', 'action', 'chain_id', 'at',
 ];
 
+// A root token has no parent.
+const IDENTITY_TOKEN_OPTIONAL_KEYS: readonly string[] = [
+    'parent_jti',
+];
+
 export function validateIdentityTokenEntity(
     body: Record<string, unknown>,
 ): Omit<IdentityTokenEntity, 'id'> {
     assertOnlyKeys(
         body, IDENTITY_TOKEN_BODY_KEYS,
-        'IdentityTokenEntity',
+        'IdentityTokenEntity', IDENTITY_TOKEN_OPTIONAL_KEYS,
     );
     const action = validateEnumField(
         body, 'action', ['issued', 'rotated', 'revoked'],
@@ -697,6 +729,9 @@ export function validateIdentityTokenEntity(
         action,
         chain_id: pickIdentifier(body, 'chain_id'),
         at,
+        ...(body['parent_jti'] === undefined
+            ? {}
+            : { parent_jti: pickIdentifier(body, 'parent_jti') }),
     };
 }
 
@@ -1294,8 +1329,8 @@ export interface FlowDocumentBody {
     readonly revivals: readonly GraphRevival[];
 }
 
-// The HTTP-body gate for PUT /flows/:id (Decision 7, the
-// LOCKED class — Task 3): the full wire document — the
+// The HTTP-body gate for PUT /flows/:id (Decision 7, a
+// conditional PUT): the full wire document — the
 // entity's own fields, the lifecycle trio, the client-
 // authored post-save graph snapshot, and the two transitional
 // decomposition sidecars. organization_id is deliberately
@@ -1533,23 +1568,16 @@ export interface WorkOrderDocumentBody {
 // state/state_at/state_event_id are absent from BOTH the
 // expected and optional sets: a body carrying any of them 400s
 // here (the stateless covenant is validator-enforced, not
-// caller discipline). organization_id is deliberately absent
-// from the expected set (like every other org-owned write, the
-// client never supplies it; the org fence stamps it downstream
-// when view.workOrders.put re-validates through
-// validateWorkOrderEntity) yet rides the `optional` allowance
-// rather than `expected` — a caller-forged organization_id is
-// tolerated-but-ignored, not rejected, because the fence's
-// stamp always overrides whatever key it finds. Entity fields
+// caller discipline). Entity fields
 // are picked directly rather than delegated to
 // validateWorkOrderEntity — that function REQUIRES
-// organization_id, which this body never carries pre-stamp.
+// organization_id, which this body never carries.
 export function validateWorkOrderDocumentBody(
     body: Record<string, unknown>,
 ): WorkOrderDocumentBody {
     assertOnlyKeys(
         body, WORK_ORDER_DOCUMENT_BODY_KEYS,
-        'WorkOrderDocumentBody', ['organization_id'],
+        'WorkOrderDocumentBody',
     );
     const flowGraph = asObject(
         body['flow_graph'], 'flow_graph',
@@ -1563,6 +1591,153 @@ export function validateWorkOrderDocumentBody(
             flow_graph: flowGraph,
             position: pickNumber(body, 'position'),
         },
+    };
+}
+
+const WORK_ORDER_VERSION_KEYS: readonly string[] = [
+    'id', 'organization_id', 'display_id', 'flow_graph',
+    'position', 'events',
+];
+
+// Absent until an event, a binding, or a claim sets them;
+// never null (Interpretation K).
+const WORK_ORDER_VERSION_OPTIONAL: readonly string[] = [
+    'state', 'instance_id', 'record_type_id', 'claim',
+];
+
+const WORK_ORDER_CLAIM_FACT_KEYS: readonly string[] = [
+    'member_id', 'at', 'expires_at',
+];
+
+const WORK_ORDER_EVENT_KEYS: readonly string[] = [
+    'id', 'state', 'member_id', 'at', 'field_values',
+];
+
+const TRANSITION_FIELD_VALUE_ENTITY_KEYS: readonly string[] = [
+    'id', 'attribute_id',
+];
+
+// A set row carries its value; a clear row carries
+// `cleared: true` and no value.
+function validateTransitionFieldValueEntity(
+    value: unknown,
+    label: string,
+): TransitionFieldValueEntity {
+    const row = asObject(value, label);
+    assertOnlyKeys(
+        row, TRANSITION_FIELD_VALUE_ENTITY_KEYS, label,
+        ['value', 'cleared'],
+    );
+    // A clear names its attribute as any non-empty string
+    // (validateValueDelta), so neither key is an identifier
+    // here.
+    const id = pickString(row, 'id');
+    const attributeId = pickString(row, 'attribute_id');
+    if ('cleared' in row) {
+        if (row['cleared'] !== true || 'value' in row) {
+            throw new ValidationError(
+                label + ' clears with cleared: true'
+                    + ' and no value',
+            );
+        }
+        return {
+            id, attribute_id: attributeId, cleared: true,
+        } as TransitionFieldValueEntity;
+    }
+    return {
+        id,
+        attribute_id: attributeId,
+        value: pickString(row, 'value'),
+    };
+}
+
+function validateWorkOrderEvent(
+    value: unknown,
+    label: string,
+): WorkOrderEvent {
+    const event = asObject(value, label);
+    assertOnlyKeys(event, WORK_ORDER_EVENT_KEYS, label);
+    // A transition's event id is the caller's string
+    // (validateWorkOrderTransitionBody), not always an
+    // identifier.
+    return {
+        id: pickString(event, 'id'),
+        state: pickString(event, 'state'),
+        member_id: pickIdentifier(event, 'member_id'),
+        at: validateTimestampField(event, 'at', label),
+        field_values: asArray(
+            event['field_values'], label + '.field_values',
+        ).map((row, i) => validateTransitionFieldValueEntity(
+            row, label + '.field_values[' + i + ']',
+        )),
+    };
+}
+
+function validateWorkOrderClaimFact(
+    value: unknown,
+): WorkOrderClaim {
+    const label = 'WorkOrderVersion.claim';
+    const claim = asObject(value, label);
+    assertOnlyKeys(claim, WORK_ORDER_CLAIM_FACT_KEYS, label);
+    return {
+        member_id: pickIdentifier(claim, 'member_id'),
+        at: validateTimestampField(claim, 'at', label),
+        expires_at: validateTimestampField(
+            claim, 'expires_at', label,
+        ),
+    };
+}
+
+// A stored work-order version (the storage edge, §5), in
+// Interpretation K's key order.
+export function validateWorkOrderVersion(
+    body: Record<string, unknown>,
+): WorkOrderVersion {
+    assertOnlyKeys(
+        body, WORK_ORDER_VERSION_KEYS, 'WorkOrderVersion',
+        WORK_ORDER_VERSION_OPTIONAL,
+    );
+    if (('instance_id' in body) !== ('record_type_id' in body)) {
+        throw new ValidationError(
+            'WorkOrderVersion binds instance_id and'
+                + ' record_type_id together',
+        );
+    }
+    const flowGraph = asObject(
+        body['flow_graph'], 'flow_graph',
+    );
+    asWorkOrderFlowGraph(
+        flowGraph, 'WorkOrderVersion.flow_graph',
+    );
+    return {
+        id: pickIdentifier(body, 'id'),
+        organization_id: pickIdentifier(
+            body, 'organization_id',
+        ),
+        display_id: pickString(body, 'display_id'),
+        flow_graph: flowGraph,
+        position: pickNumber(body, 'position'),
+        ...('state' in body
+            ? { state: pickString(body, 'state') }
+            : {}),
+        ...('instance_id' in body
+            ? {
+                instance_id: pickIdentifier(
+                    body, 'instance_id',
+                ),
+                record_type_id: pickString(
+                    body, 'record_type_id',
+                ),
+            }
+            : {}),
+        ...('claim' in body
+            ? { claim: validateWorkOrderClaimFact(body['claim']) }
+            : {}),
+        events: asArray(
+            body['events'], 'WorkOrderVersion.events',
+        ).map((event, i) => validateWorkOrderEvent(
+            event, 'WorkOrderVersion.events[' + i + ']',
+        )),
     };
 }
 
@@ -3295,7 +3470,7 @@ const FLOW_UNDO_KEYS: readonly string[] = ['eventId', 'at'];
 // element is the deletion/revival triple, so the route can
 // post a 'restored' event that supersedes a prior tombstone.
 // `label` names the enclosing body.
-function validateRevivals(
+export function validateRevivals(
     value: unknown,
     label: string,
 ): GraphRevival[] {
@@ -3601,9 +3776,9 @@ function parseTransitionRelease(
         );
     }
     const state = asString(obj['state'], label + '.state');
-    if (state === '') {
+    if (state !== 'claim_released') {
         throw new ValidationError(
-            label + '.state must be non-empty',
+            label + '.state must be claim_released',
         );
     }
     const at = validateTimestampField(
@@ -3914,8 +4089,8 @@ export interface WorkOrderBindingBody {
 }
 
 // Gate for PUT /work-orders/:id/binding. Two opaque ids only —
-// no timestamps, no event ids. The CURRENT bind derives from
-// the pair prefix (workOrderBindingFor); rebind is 409.
+// no timestamps, no event ids. The CURRENT bind is the work
+// order's head; rebind is 409.
 export function validateWorkOrderBindingBody(
     body: Record<string, unknown>,
 ): WorkOrderBindingBody {

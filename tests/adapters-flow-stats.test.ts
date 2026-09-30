@@ -118,7 +118,11 @@ async function transitionWorkOrder(
     targetState: string,
     at: string,
 ): Promise<void> {
-    await ctx.POST(
+    const { etag } = await ctx.GETWithEtag(
+        'organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/work-orders/' + workOrderId,
+    );
+    await ctx.POSTWithHeaders(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId
         + '/transition',
@@ -127,7 +131,7 @@ async function transitionWorkOrder(
         targetState,
         release: null,
         transitionAt: at,
-    });
+    }, [['If-Match', '"' + etag + '"']]);
 }
 
 // c→a→z graph: c isCreate, z isArchive, a regular
@@ -282,7 +286,7 @@ Deno.test(
                 lockTimeout: 0, nodes: [], edges: [],
             },
             position: 1,
-        });
+        }, [['If-None-Match', '*']]);
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw', {
             display_id: 'WO-2',
@@ -291,7 +295,7 @@ Deno.test(
                 lockTimeout: 0, nodes: [], edges: [],
             },
             position: 2,
-        });
+        }, [['If-None-Match', '*']]);
 
         // yNSSnbrpacodQTzUEcdEVA belongs to ZOousbbnzpqlxJExVAruYQ;
         // yNXXsTEwShOozlQCEWKIIw belongs to OTHER. NAMED re-pin
@@ -404,7 +408,7 @@ Deno.test(
                 lockTimeout: 0, nodes: [], edges: [],
             },
             position: 1,
-        });
+        }, [['If-None-Match', '*']]);
         // NAMED re-pin (Task 7): same reason as above.
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/'

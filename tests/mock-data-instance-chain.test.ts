@@ -23,9 +23,11 @@ import {
     instancesUriPrefix,
 } from '../api/derive-record-instances.ts';
 import {
-    workOrderBindingFor,
+    workOrderHeadFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
+import { validateWorkOrderVersion } from '../api/validators.ts';
+import { responseRecordOf } from '../api/message-pair.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { parseWire } from
@@ -115,13 +117,13 @@ async () => {
 Deno.test('WO01 bind names instance + type; detail GET embeds',
 async () => {
     const db = await seededDb();
-    const bind = await workOrderBindingFor(
+    const head = await workOrderHeadFor(
         db, STARK_ORGANIZATION, WO01_ID,
     );
-    assertEquals(bind, {
-        instanceId: SEED_INSTANCE_ID,
-        recordTypeId: SEED_RECORD_TYPE_ID,
-    });
+    assertEquals(
+        [head?.version.instance_id, head?.version.record_type_id],
+        [SEED_INSTANCE_ID, SEED_RECORD_TYPE_ID],
+    );
 
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -140,7 +142,7 @@ async () => {
     );
 });
 
-Deno.test('WO01 bind seed pair is PUT (locked verb)',
+Deno.test('WO01 bind lands a work-order version',
 async () => {
     const db = await seededDb();
     const prefix =
@@ -155,6 +157,26 @@ async () => {
         return;
     }
     assertStrictEquals(model.startLine.method, 'PUT');
+    const versions = (await db.messagePairs.getDocumentHistory(
+        '/organizations/' + STARK_ORGANIZATION + '/work-orders/',
+        WO01_ID,
+    )).filter((pair) => pair.method === 'PUT')
+        .map((pair) => validateWorkOrderVersion(
+            responseRecordOf(pair.response)!,
+        ));
+    const bound = versions.findIndex(
+        (version) => version.instance_id !== undefined,
+    );
+    assert(bound > 0);
+    assertStrictEquals(versions[bound - 1]!.instance_id, undefined);
+    assertEquals(
+        [
+            versions[bound]!.instance_id,
+            versions[bound]!.record_type_id,
+            versions[bound]!.events,
+        ],
+        [SEED_INSTANCE_ID, SEED_RECORD_TYPE_ID, []],
+    );
 });
 
 Deno.test('WO01 history: Review 6 new-shape + Complete 1;'

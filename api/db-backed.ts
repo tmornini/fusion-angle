@@ -116,16 +116,14 @@ export class BackedDbAdapter
 
     // The open client, with no seed verdict. A route
     // that must re-read and write as one transaction
-    // uses this. The refresh rotation uses openClient,
-    // which fails the body when a row does not land.
+    // uses this; token rotation and revocation read a
+    // refusal from the answer.
     clientOn(tx: Tx): DbAdapter {
         return this.#viewForTx(tx);
     }
 
     // A view whose statement joins an already-open client.
-    // The refresh rotation (rotateRefreshJti) opens
-    // backend.transaction and writes through this view. A
-    // matched, stale, or refused row fails the body: the
+    // A matched, stale, or refused row fails the body: the
     // caller meant every row to land. The seed keeps the
     // same verdict in RehearsalBackend and assertLanded.
     openClient(tx: Tx): DbAdapter {

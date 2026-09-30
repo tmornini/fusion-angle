@@ -19,6 +19,7 @@ import {
 import {
     IF_MATCH_HEADER,
     strongEtagOf,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -174,6 +175,7 @@ async function putInstance(
     return handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
 }
 
@@ -234,6 +236,7 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, adminToken,
         { set: [] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(res.status, 404);
     assertEquals(await res.json(), {
@@ -241,8 +244,7 @@ async () => {
     });
 });
 
-Deno.test('5 PATCH absent instance w/o If-Match → 201 '
-+ 'create (not 428)',
+Deno.test('5 PATCH absent instance w/o a conditional → 428',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -251,11 +253,10 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [] },
     ));
-    assertStrictEquals(res.status, 201);
-    assertNotStrictEquals(res.status, 428);
+    assertStrictEquals(res.status, 428);
 });
 
-// --- Step 6–7: If-Match before body shape ---
+// --- Step 6–7: the gate's form, then body shape ---
 
 Deno.test('6 PATCH live, no If-Match, garbage body → 428 '
 + '(before body shape)',
@@ -275,12 +276,13 @@ async () => {
     assertStrictEquals(res.status, 428);
     assertStrictEquals(
         (await res.json()).error,
-        'If-Match is required to PATCH ' + INSTANCE_DETAIL,
+        'If-Match or If-None-Match is required to PATCH '
+            + INSTANCE_DETAIL,
     );
 });
 
-Deno.test('7 PATCH stale If-Match + garbage body → 412 '
-+ '(before 400)',
+Deno.test('7 PATCH stale If-Match + garbage body → 400 '
++ '(validation first)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -302,21 +304,21 @@ async () => {
         },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assertStrictEquals(pnXmXrxOWayANgDLdCjuBw.status, 201);
+    assertStrictEquals(pnXmXrxOWayANgDLdCjuBw.status, 200);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { not_a_valid_patch: true },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assertStrictEquals(res.status, 412);
+    assertStrictEquals(res.status, 400);
     assertStrictEquals(
         (await res.json()).error,
-        'If-Match does not match the current '
-            + 'instance at ' + INSTANCE_DETAIL,
+        'unexpected key "not_a_valid_patch" for'
+            + ' InstancePatchBody',
     );
 });
 
-// --- Step 8–11: body / ACL / value after fresh match ---
+// --- Step 8–11: body / ACL / value before the statement ---
 
 Deno.test('8 PATCH fresh If-Match + set∩clear → 400 shape',
 async () => {
@@ -451,10 +453,10 @@ async () => {
     );
 });
 
-// --- Step 12: spent-document 409 is last (in-tx) ---
+// --- Step 12: the statement judges a racing create last ---
 
-Deno.test('12 PATCH create race at one document → 201/428 '
-+ '(in-tx, last)',
+Deno.test('12 PATCH create race at one document → 201/412 '
++ '(the statement, last)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -471,6 +473,7 @@ async () => {
                     },
                 ],
             },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         )),
         handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, memberToken,
@@ -482,11 +485,12 @@ async () => {
                     },
                 ],
             },
+            { [IF_NONE_MATCH_HEADER]: '*' },
         )),
     ]);
     assertEquals(
         [a.status, b.status].sort(),
-        [201, 428],
+        [201, 412],
     );
 });
 
@@ -514,7 +518,7 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
         operationId,
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
     const firstId = pairIdOf(first)!;
     const YiJPbufDpkyrZcZCYbUJpg = first.headers.get('ETag')!;
     assertNotStrictEquals(YiJPbufDpkyrZcZCYbUJpg, e0);

@@ -25,6 +25,23 @@ export class EntityNotFoundError extends Error {
     }
 }
 
+// A retired id: the entity existed and its removal is for
+// good, so the wire answers 410, not 404 (RFC 9110
+// §15.5.11). HTTP-agnostic like EntityNotFoundError.
+export class RetiredEntityError extends Error {
+    readonly table: string;
+    readonly id: string;
+    constructor(
+        table: string,
+        id: string,
+    ) {
+        super(`Gone: ${table}/${id}`);
+        this.name = 'RetiredEntityError';
+        this.table = table;
+        this.id = id;
+    }
+}
+
 // Cross-tenant ownership breach: the entity exists, but under
 // a different organization. Mapped once at the domain-boundary
 // catch to HTTP 403. HTTP-agnostic like EntityNotFoundError.

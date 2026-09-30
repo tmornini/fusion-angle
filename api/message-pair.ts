@@ -1,8 +1,10 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    Id, IdentityTokenEntity, MessagePairEntity,
+    Id, MessagePairEntity,
 } from '../shared/types.ts';
 import {
+    NEVER_WRITTEN_IDENTIFIER,
+    NIL_IDENTIFIER,
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
@@ -14,7 +16,6 @@ import {
     storedWire,
     requestMessageHash,
 } from './message-form.ts';
-import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
@@ -33,6 +34,7 @@ import {
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
+    HTTP_CONFLICT, HTTP_GONE, HTTP_PRECONDITION_FAILED,
     errorJson,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from
@@ -56,6 +58,15 @@ import {
 } from './ledger-statement.ts';
 import { DATE_PLACEHOLDER } from './ledger-root.ts';
 import { notifyPayload } from './advisory-lock.ts';
+import { sortJsonKeys } from
+    '../shared/http-message/canonical.ts';
+
+// Who declared a genesis: the client, by If-None-Match: *,
+// or the handler, for a document it names itself. The
+// statement judges both the same way. Over a live head the
+// refusal says which (409 for the handler's, 412 for the
+// client's); over a spent name it is 409 for either.
+export type GenesisDeclarer = 'client' | 'handler';
 
 // The shadow-ledger message pair: one `message_pairs` put. Formed
 // pre-tx — crypto, hashing, and timers never run
@@ -85,18 +96,15 @@ export interface MessagePair {
     readonly method: string;
     readonly operationId: string;
     readonly requestId: string;
-    // A document create: no head, so the statement is
-    // genesis rather than blind.
-    readonly genesis?: true;
-    // Pre-tx lock-head pair id, latched when If-Match
-    // matches the advertised ETag. In-tx re-query only.
+    // A document create: it may not land over a live head,
+    // so the row latches nil unless neverWritten is set.
+    readonly genesis?: GenesisDeclarer;
+    // Only beside genesis: the create may not land over a
+    // tombstone either, so the row latches never-written.
+    readonly neverWritten?: true;
+    // The head pair id a handler read; this row latches it
+    // and the statement judges the latch.
     readonly latchedHeadMessagePairId?: string;
-    // A latched OPERATION's pin: the head of the PARENT
-    // document this operation acts on, not of this pair's
-    // own document. coordinateWrite never reads it — its
-    // latch is same-document by definition — the handler
-    // re-verifies it in-tx against the document.
-    readonly pinnedDocumentMessagePairId?: string;
 }
 
 // The gate's seed for the two /authentication/* grant routes
@@ -159,14 +167,13 @@ export interface WriteMessagePairInput {
     // stores 201. Auth doors pass 200.
     readonly responseStatus?: number;
     readonly latchedHeadMessagePairId?: string;
-    readonly pinnedDocumentMessagePairId?: string;
     // Required on every formed pair. Public writes supply
     // the hoisted Operation-ID; seed and inner PUTs pass
     // the envelope id here. Never minted for a public write.
     readonly operationId: string;
     // The id the server minted for this request. Missing throws.
     readonly requestId: string;
-    readonly genesis?: true;
+    readonly genesis?: GenesisDeclarer;
     // The stored request is zero bytes. buildRequestModel
     // is not called. Callers that received a request leave
     // this unset.
@@ -282,6 +289,37 @@ function receivedRequestWire(
     });
 }
 
+// The response half of every formed pair: its status, the
+// four lines every pair carries, any extra lines, and the
+// body. Credential lines are hoisted for the secret.
+function formedResponse(input: {
+    readonly status: number,
+    readonly etag: Id,
+    readonly operationId: string,
+    readonly requestId: string,
+    readonly fields: readonly FieldLine[],
+    readonly body: unknown,
+}): {
+    readonly message: string,
+    readonly hoisted: readonly FieldLine[],
+} {
+    const split = splitCredentials([
+        { name: 'date', value: DATE_PLACEHOLDER },
+        { name: 'etag', value: strongEtagOf(input.etag) },
+        { name: 'operation-id', value: input.operationId },
+        { name: 'request-id', value: input.requestId },
+        ...input.fields,
+    ]);
+    return {
+        message: storedWire(buildResponseModel({
+            status: input.status,
+            fields: split.kept,
+            body: input.body,
+        })),
+        hoisted: split.hoisted,
+    };
+}
+
 export async function formWriteMessagePair(
     input: WriteMessagePairInput,
 ): Promise<MessagePair> {
@@ -321,32 +359,22 @@ export async function formWriteMessagePair(
     const storedStatus = input.method === 'DELETE'
         ? HTTP_NO_CONTENT
         : (input.responseStatus ?? HTTP_CREATED);
-    const responseLines: FieldLine[] = [
-        { name: 'date', value: DATE_PLACEHOLDER },
-        { name: 'etag', value: strongEtagOf(id) },
-        {
-            name: 'operation-id',
-            value: input.operationId,
-        },
-        { name: 'request-id', value: input.requestId },
-    ];
-    if (input.responseFields !== undefined) {
-        for (const field of input.responseFields) {
-            responseLines.push(field);
-        }
-    }
-    const responseSplit = splitCredentials(responseLines);
-    const responseModel = buildResponseModel({
+    const response = formedResponse({
         status: storedStatus,
-        fields: responseSplit.kept,
+        etag: id,
+        operationId: input.operationId,
+        requestId: input.requestId,
+        fields: input.responseFields === undefined
+            ? []
+            : input.responseFields,
         body: input.method === 'DELETE'
             ? undefined
             : input.responseBody,
     });
-    const responseMessage = storedWire(responseModel);
+    const responseMessage = response.message;
     const secret = secretOfLines([
         ...requestSplit.hoisted,
-        ...responseSplit.hoisted,
+        ...response.hoisted,
     ]);
     return {
         id,
@@ -363,17 +391,11 @@ export async function formWriteMessagePair(
         method: input.method,
         operationId: input.operationId,
         requestId: input.requestId,
-        ...(input.genesis === true
-            ? { genesis: true as const }
+        ...(input.genesis !== undefined
+            ? { genesis: input.genesis }
             : {}),
         ...(input.latchedHeadMessagePairId !== undefined
             ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
-            : {}),
-        ...(input.pinnedDocumentMessagePairId !== undefined
-            ? {
-                pinnedDocumentMessagePairId:
-                    input.pinnedDocumentMessagePairId,
-            }
             : {}),
     };
 }
@@ -409,64 +431,6 @@ export async function formAuthMessagePair(
     });
 }
 
-// The literal 'identities/:id/tokens/:jti' route pattern: the
-// wired PUT's own document family and response spec (routes.ts,
-// WRITE_RESPONSE_SPECS['identities/:id/tokens/:jti']), reused
-// byte-for-byte by every synthesized identity_tokens row-write
-// pair (Phase 13 Task 5, Gate 7) — one derivation later serves
-// fixture pairs, real PUT pairs, and these synthesized
-// grant/rotation/revocation pairs uniformly. Kept as a literal
-// here rather than imported from routes.ts: routes.ts imports
-// FROM message-pair.ts (formWriteMessagePair), never the
-// reverse — the import graph stays acyclic (see
-// formDocumentMessagePairFor's own comment, routes.ts).
-const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:jti';
-const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
-    TOKEN_EVENT_ROUTE_PATTERN.split('/');
-
-// Synthesizes ONE token event pair at the jti's own
-// document — `name` is always the jti. The SAME document,
-// method, and response shape a real PUT
-// identities/:id/tokens/:jti stores; the response `id` is
-// the name (identityTokenEntityOf: GET wins). Formed PRE-TX
-// — crypto, hashing, and timers never run inside an open
-// transaction. requesterIdentityId is the event's OWN
-// identity_id — the named convention for a write with no
-// authenticated actor in view at this depth. A jti is an
-// identifier, not a bearer secret.
-export async function formTokenEventMessagePair(
-    name: Id,
-    event: Omit<IdentityTokenEntity, 'id'>,
-    operationId: string,
-    requestId: string,
-): Promise<MessagePair> {
-    const pathSegments = [
-        TOKEN_EVENT_ROUTE_SEGMENTS[0]!,
-        event.identity_id,
-        TOKEN_EVENT_ROUTE_SEGMENTS[2]!,
-        name,
-    ];
-    const body = event as unknown as Record<string, unknown>;
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: TOKEN_EVENT_ROUTE_PATTERN,
-        routeSegments: TOKEN_EVENT_ROUTE_SEGMENTS,
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: event.identity_id,
-        requestAt: event.at,
-        organization: undefined,
-        responseBody: {
-            ...validateIdentityTokenEntity(body),
-            id: name,
-        },
-        operationId,
-        requestId,
-    });
-}
-
 // The head of a document: its latest PUT or DELETE, or
 // null. A DELETE head is a gone document, not a miss.
 export async function documentHeadAt(
@@ -487,7 +451,7 @@ export function httpDateOf(at: string): string {
     return new Date(at).toUTCString();
 }
 
-// Locked PUT and PATCH concurrency dialect: If-Match carries
+// A conditional PUT or PATCH names its head: If-Match carries
 // the strong ETag. Not a credential — stored verbatim so two
 // writes differing only in If-Match are different messages
 // for replay identity.
@@ -512,6 +476,84 @@ export function parseIfMatch(
         return undefined;
     }
     return inner;
+}
+
+export const IF_NONE_MATCH_HEADER = 'if-none-match';
+
+// A wire If-Match as its strong validators: one or more
+// quoted identifiers, comma-separated (RFC 9110 §13.1.1).
+// Anything else yields undefined; the gate answers 400.
+export function parseEntityTags(
+    header: string,
+): readonly string[] | undefined {
+    const tags: string[] = [];
+    for (const part of header.split(',')) {
+        const tag = parseIfMatch(part.trim());
+        if (tag === undefined) return undefined;
+        tags.push(tag);
+    }
+    return tags;
+}
+
+// The strong validators the client's If-Match named, after
+// the gate checked their form; none when absent.
+export function entityTagsOf(
+    pair: MessagePair,
+): readonly string[] {
+    const raw = rawIfMatchFromMessagePair(pair);
+    if (raw === undefined) {
+        return [];
+    }
+    const tags = parseEntityTags(raw);
+    if (tags === undefined) {
+        throw new Error(
+            'the gate admitted a malformed If-Match',
+        );
+    }
+    return tags;
+}
+
+export type Latches =
+    | { readonly kind: 'latched', readonly heads: readonly Id[] }
+    | {
+        readonly kind: 'missing',
+        readonly documents: readonly number[],
+    }
+    | { readonly kind: 'extra' };
+
+// Interpretation J: match a class C operation's tags to
+// the documents it derives from, parent first.
+export function latchesOf(
+    tags: readonly string[],
+    heads: readonly (Id | null)[],
+): Latches {
+    if (tags.length > heads.length) {
+        return { kind: 'extra' };
+    }
+    const assigned: (Id | undefined)[] = heads.map(
+        (head) => head !== null && tags.includes(head)
+            ? head
+            : undefined,
+    );
+    const spare = tags.filter(
+        (tag) => !assigned.includes(tag),
+    );
+    const missing: number[] = [];
+    const latched = assigned.map((head, index) => {
+        if (head !== undefined) return head;
+        const next = spare.shift();
+        if (next === undefined) missing.push(index);
+        return next;
+    });
+    if (missing.length > 0) {
+        return { kind: 'missing', documents: missing };
+    }
+    return {
+        kind: 'latched',
+        heads: latched.filter(
+            (head): head is Id => head !== undefined,
+        ),
+    };
 }
 
 // Recover the client's If-Match target from a formed wire
@@ -698,17 +740,6 @@ export function streamGetFromStored(
     return attachEtag(response, stored.id);
 }
 
-// The pre-store body of a just-formed pair's own response
-// message — a handler that must act on a value the gate's
-// successBody resolver already minted (token rotation's
-// pre-minted jti) reads it back HERE rather than deriving a
-// second, possibly divergent, value. The pair IS the response.
-export function messagePairResponseBody(
-    messagePair: MessagePair,
-): Record<string, unknown> | undefined {
-    return responseRecordOf(messagePair.responseMessage);
-}
-
 export function responseBodyText(
     message: string,
 ): string {
@@ -773,12 +804,9 @@ export function attemptFor(
 ): Attempt {
     if (pairs.length !== 1) return 'composed';
     const pair = pairs[0]!;
-    if (pair.genesis === true) return 'genesis';
+    if (pair.genesis !== undefined) return 'in-order';
     if (pair.latchedHeadMessagePairId !== undefined) {
         return 'in-order';
-    }
-    if (pair.pinnedDocumentMessagePairId !== undefined) {
-        return 'blind';
     }
     if (ifMatchFromMessagePair(pair) !== undefined) {
         return 'in-order';
@@ -802,52 +830,558 @@ export async function runWrite(
         (row): row is MessagePair =>
             'requestMessage' in row,
     );
+    const ran = await runStatement(
+        adapter, attempt, binds, now,
+    );
+    if (ran.kind === 'refused') {
+        const answer = refusedAnswer(rows, binds, attempt);
+        for (const pair of pairs) {
+            answers.set(pair, answer);
+            ownWires.set(pair, answer.response);
+        }
+        return answer;
+    }
+    const answer = answerOf(rows, binds, ran.stated);
+    for (const pair of pairs) {
+        answers.set(pair, answer);
+        ownWires.set(
+            pair,
+            wireForPair(pair, ran.stated, answer),
+        );
+    }
+    return answer;
+}
+
+export type StatementRun =
+    | {
+        readonly kind: 'stated',
+        readonly stated: readonly StatementAnswer[],
+    }
+    | { readonly kind: 'refused' };
+
+// Runs past a refusal only to learn which row lost.
+const NON_BLIND_RUNS = 2;
+
+// A blind refusal runs the statement again, up to three
+// times. Any other refusal runs it once more with the same
+// binds: the re-run classifies against the row that won, so
+// the answer can name the row it refused.
+export async function runStatement(
+    adapter: DbAdapter,
+    attempt: Attempt,
+    binds: readonly StatementBind[],
+    now: string | undefined,
+): Promise<StatementRun> {
     let conflicts = 0;
-    const document = refusalDocument(rows);
     for (;;) {
         try {
             const stated = await runLedgerStatement(
                 adapter, attempt, binds, now,
             );
-            const answer = answerOf(
-                rows, stated, document,
-            );
-            for (const pair of pairs) {
-                answers.set(pair, answer);
-                ownWires.set(
-                    pair,
-                    wireForPair(pair, stated, answer),
-                );
-            }
-            return answer;
+            return { kind: 'stated', stated };
         } catch (error) {
             if (!(error instanceof SuccessionConflict)) {
                 throw error;
             }
             conflicts += 1;
-            const refusal = refusalOf(
-                attempt,
-                conflicts,
-                document.path,
-                document.name,
-            );
-            if (refusal === 'retry') continue;
-            const answer: WriteAnswer = {
-                response: errorJson(
-                    refusal.error, refusal.status,
-                ),
-                outcome: 'refused',
-                answeredId: null,
-                bells: [],
-                rows: [],
-            };
-            for (const pair of pairs) {
-                answers.set(pair, answer);
-                ownWires.set(pair, answer.response);
+            const again = attempt === 'blind'
+                ? refusalOf(attempt, conflicts, '', '')
+                    === 'retry'
+                : conflicts < NON_BLIND_RUNS;
+            if (!again) {
+                return { kind: 'refused' };
             }
-            return answer;
         }
     }
+}
+
+// The refused row names its document and the fact. A
+// statement refused twice states no row, so its head is
+// unknown (null), and a never-written name refused there is
+// a conflict: it cannot know the name is retired. Over a
+// stated tombstone the name is retired for good, so a
+// create there is Gone (RFC 9110 §15.5.11), whoever
+// declared it, not a failed precondition.
+export function refusalOfRow(
+    row: WriteRow | MessagePair,
+    bind: StatementBind,
+    stated: StatementAnswer | null,
+): Response {
+    const document = bind.path + bind.name;
+    const neverWritten = bind.ifMatch === NEVER_WRITTEN_IDENTIFIER;
+    if (
+        neverWritten
+        && stated !== null
+        && stated.headMethod === 'DELETE'
+    ) {
+        return errorJson(
+            'Document is gone at ' + document, HTTP_GONE,
+        );
+    }
+    if (neverWritten || bind.ifMatch === NIL_IDENTIFIER) {
+        const spent = neverWritten && stated === null;
+        const handler = 'requestMessage' in row
+            && row.genesis === 'handler';
+        return errorJson(
+            'Document already exists at ' + document,
+            spent || handler
+                ? HTTP_CONFLICT
+                : HTTP_PRECONDITION_FAILED,
+        );
+    }
+    return errorJson(
+        'If-Match does not match the current document at '
+            + document,
+        HTTP_PRECONDITION_FAILED,
+    );
+}
+
+function refusedAnswer(
+    rows: readonly (WriteRow | MessagePair)[],
+    binds: readonly StatementBind[],
+    attempt: Attempt,
+): WriteAnswer {
+    const latched = binds.findIndex(
+        (bind) => bind.ifMatch !== null,
+    );
+    const document = refusalDocument(rows);
+    // A statement no row latched names no header: it was
+    // contended, as a blind one is after three attempts.
+    const response = attempt !== 'blind' && latched >= 0
+        ? refusalOfRow(rows[latched]!, binds[latched]!, null)
+        : errorJson(
+            'Document remained contended at '
+                + document.path + document.name,
+            HTTP_CONFLICT,
+        );
+    return {
+        response,
+        outcome: 'refused',
+        answeredId: null,
+        bells: [],
+        rows: [],
+    };
+}
+
+export type SiblingCondition =
+    | { readonly kind: 'in-order', readonly head: Id }
+    | {
+        readonly kind: 'genesis',
+        readonly declarer: GenesisDeclarer,
+    }
+    | {
+        readonly kind: 'never-written',
+        readonly declarer: GenesisDeclarer,
+    };
+
+export type ParentSibling = {
+    readonly method: 'PUT',
+    readonly path: string,
+    readonly name: string,
+    readonly state: Record<string, unknown>,
+    readonly condition: SiblingCondition,
+};
+
+export type StateSibling =
+    | ParentSibling
+    | {
+        readonly method: 'DELETE',
+        readonly path: string,
+        readonly name: string,
+        readonly condition: SiblingCondition,
+    };
+
+export type StateProjection = (
+    state: Record<string, unknown>,
+) => Record<string, unknown>;
+
+export type StateAnswerKind =
+    | { readonly kind: 'parent' }
+    | { readonly kind: 'created', readonly location: string }
+    | { readonly kind: 'received' };
+
+// The request, author, and stamp every sibling of one
+// write shares.
+export type SiblingContext = {
+    readonly operationId: string,
+    readonly requestId: string,
+    readonly requesterIdentityId: Id,
+    readonly requestAt: string,
+};
+
+export type StateWrite =
+    | {
+        readonly kind: 'siblings',
+        readonly received: MessagePair,
+        readonly siblings: readonly [
+            ParentSibling, ...StateSibling[],
+        ],
+        readonly project: StateProjection,
+        readonly answer: StateAnswerKind,
+    }
+    | {
+        readonly kind: 'own',
+        readonly received: MessagePair,
+        readonly state: Record<string, unknown>,
+    }
+    | {
+        readonly kind: 'events',
+        readonly context: SiblingContext,
+        readonly siblings: readonly [
+            StateSibling, ...StateSibling[],
+        ],
+    };
+
+// A write formed outside a transaction, so its body awaits
+// only the statement (AGENTS.md).
+export type FormedStateWrite = {
+    readonly write: StateWrite,
+    readonly attempt: Attempt,
+    readonly rows: readonly (WriteRow | MessagePair)[],
+    readonly binds: readonly StatementBind[],
+    readonly parentId: Id,
+};
+
+export const unprojected: StateProjection = (state) => state;
+
+// The store sorts JSON keys on write, so state is compared
+// in that same canonical form.
+export function sameAsHead(
+    head: MessagePairEntity,
+    state: Record<string, unknown>,
+): boolean {
+    return responseBodyText(head.response)
+        === JSON.stringify(sortJsonKeys(state));
+}
+
+// The one former for class C, D, and E writes (§3). Every
+// answer is registered under the received object the gate
+// formed, which is the one it reads the answer by.
+export async function runStateWrite(
+    adapter: DbAdapter,
+    write: StateWrite,
+): Promise<WriteAnswer> {
+    return landStateWrite(adapter, await formStateWrite(write));
+}
+
+// Hashes and salts: everything before the statement.
+export async function formStateWrite(
+    write: StateWrite,
+): Promise<FormedStateWrite> {
+    if (write.kind === 'own') {
+        const pair = await ownPair(write);
+        return formedOf(
+            write, attemptFor([pair]), [pair], pair.id,
+        );
+    }
+    const pairs = await Promise.all(write.siblings.map(
+        (sibling) => formSiblingPair(
+            write.kind === 'events'
+                ? write.context
+                : write.received,
+            sibling,
+        ),
+    ));
+    if (write.kind === 'events') {
+        return formedOf(write, 'composed', pairs, pairs[0]!.id);
+    }
+    const received = write.answer.kind === 'received'
+        ? write.received
+        : await completedPair(write.received, {
+            status: write.siblings[0].condition.kind
+                    === 'in-order'
+                ? HTTP_OK
+                : HTTP_CREATED,
+            etag: pairs[0]!.id,
+            fields: write.answer.kind === 'created'
+                ? [{
+                    name: 'location',
+                    value: write.answer.location,
+                }]
+                : [],
+            state: write.siblings[0].state,
+        });
+    return formedOf(
+        write,
+        'composed',
+        [writeRowOf(received, null), ...pairs],
+        pairs[0]!.id,
+    );
+}
+
+// Row ops only: safe inside a transaction's body.
+export async function landStateWrite(
+    adapter: DbAdapter,
+    formed: FormedStateWrite,
+): Promise<WriteAnswer> {
+    const write = formed.write;
+    if (write.kind === 'events') {
+        return statedAnswer(adapter, formed);
+    }
+    const answer = write.kind === 'own'
+        ? await statedAnswer(adapter, formed)
+        : await siblingsAnswer(adapter, write, formed);
+    answers.set(write.received, answer);
+    ownWires.set(write.received, answer.response);
+    return answer;
+}
+
+function formedOf(
+    write: StateWrite,
+    attempt: Attempt,
+    rows: readonly (WriteRow | MessagePair)[],
+    parentId: Id,
+): FormedStateWrite {
+    return {
+        write,
+        attempt,
+        rows,
+        binds: rows.map((row) => bindOf(attempt, row)),
+        parentId,
+    };
+}
+
+// A PUT naming the head it replaces is its successor, 200,
+// as an in-order parent is below; any other lands a new
+// document, 201.
+function ownPair(
+    write: Extract<StateWrite, { kind: 'own' }>,
+): Promise<MessagePair> {
+    return completedPair(write.received, {
+        status: ifMatchFromMessagePair(write.received)
+                === undefined
+            ? HTTP_CREATED
+            : HTTP_OK,
+        etag: write.received.id,
+        fields: [],
+        state: write.state,
+    });
+}
+
+async function statedAnswer(
+    adapter: DbAdapter,
+    formed: FormedStateWrite,
+): Promise<WriteAnswer> {
+    const ran = await runStatement(
+        adapter, formed.attempt, formed.binds, undefined,
+    );
+    return ran.kind === 'refused'
+        ? refusedAnswer(formed.rows, formed.binds, formed.attempt)
+        : answerOf(formed.rows, formed.binds, ran.stated);
+}
+
+async function siblingsAnswer(
+    adapter: DbAdapter,
+    write: Extract<StateWrite, { kind: 'siblings' }>,
+    formed: FormedStateWrite,
+): Promise<WriteAnswer> {
+    const { rows, binds } = formed;
+    const ran = await runStatement(
+        adapter, 'composed', binds, undefined,
+    );
+    if (ran.kind === 'refused') {
+        return refusedAnswer(rows, binds, 'composed');
+    }
+    const stated = ran.stated;
+    const outcome = stated[0]!.outcome;
+    if (outcome === 'stale') {
+        const at = stated.findIndex(
+            (row) => row.rawOutcome === 'stale',
+        );
+        return {
+            response: refusalOfRow(
+                rows[at]!, binds[at]!, stated[at]!,
+            ),
+            outcome,
+            answeredId: null,
+            bells: [],
+            rows: stated,
+        };
+    }
+    if (outcome === 'matched') {
+        const head = stated[1]!;
+        if (head.rawOutcome !== 'matched') {
+            throw new Error(
+                'a sibling matched its head while the'
+                    + ' parent did not',
+            );
+        }
+        if (head.headResponse === null || head.headId === null) {
+            throw new Error('a matched parent has no head');
+        }
+        const stored = latin1(head.headResponse);
+        return {
+            response: projectedResponse(
+                responseFromHead(stored, write.received.requestId),
+                stored,
+                write.project,
+            ),
+            outcome,
+            answeredId: head.headId,
+            bells: [],
+            rows: stated,
+        };
+    }
+    const own = responseFromLatin1(mergeSecret(
+        latin1(stated[0]!.response),
+        secretBytes(rows[0]!),
+    ));
+    return {
+        response: write.answer.kind === 'received'
+            ? own
+            : projectedResponse(
+                own, latin1(stated[0]!.response), write.project,
+            ),
+        outcome,
+        answeredId: formed.parentId,
+        bells: bellsOf(rows, stated),
+        rows: stated,
+    };
+}
+
+// A sibling carries its state as its request body until
+// Task 16 empties every synthesized request
+// (Interpretation W).
+async function formSiblingPair(
+    context: SiblingContext,
+    sibling: StateSibling,
+): Promise<MessagePair> {
+    const id = generateIdentifier();
+    const body = sibling.method === 'PUT'
+        ? sibling.state
+        : undefined;
+    const status = sibling.method === 'PUT'
+        ? HTTP_CREATED
+        : HTTP_NO_CONTENT;
+    const requestMessage = storedWire(buildRequestModel({
+        method: sibling.method,
+        target: sibling.path + sibling.name,
+        fields: [{
+            name: OPERATION_ID_HEADER,
+            value: context.operationId,
+        }],
+        body,
+    }));
+    const response = formedResponse({
+        status,
+        etag: id,
+        operationId: context.operationId,
+        requestId: context.requestId,
+        fields: [],
+        body,
+    });
+    return {
+        id,
+        requestAt: context.requestAt,
+        path: sibling.path,
+        name: sibling.name,
+        requesterIdentityId: context.requesterIdentityId,
+        requestMessage,
+        requestHash: await requestMessageHash(requestMessage),
+        secret: secretOfLines(response.hoisted),
+        responseStatus: status,
+        responseMessage: response.message,
+        responseHash: await requestMessageHash(
+            response.message,
+        ),
+        method: sibling.method,
+        operationId: context.operationId,
+        requestId: context.requestId,
+        ...(sibling.condition.kind === 'in-order'
+            ? {
+                latchedHeadMessagePairId:
+                    sibling.condition.head,
+            }
+            : { genesis: sibling.condition.declarer }),
+        ...(sibling.condition.kind === 'never-written'
+            ? { neverWritten: true as const }
+            : {}),
+    };
+}
+
+// The received pair's response, written once after
+// formation (Interpretation G): the parent's whole state,
+// its etag, and a created document's location.
+async function completedPair(
+    received: MessagePair,
+    input: {
+        readonly status: number,
+        readonly etag: Id,
+        readonly fields: readonly FieldLine[],
+        readonly state: Record<string, unknown>,
+    },
+): Promise<MessagePair> {
+    const response = formedResponse({
+        status: input.status,
+        etag: input.etag,
+        operationId: received.operationId,
+        requestId: received.requestId,
+        fields: input.fields,
+        body: input.state,
+    });
+    return {
+        ...received,
+        responseStatus: input.status,
+        responseMessage: response.message,
+        responseHash: await requestMessageHash(
+            response.message,
+        ),
+    };
+}
+
+// The received row judges nothing in a sibling write; its
+// siblings do (Interpretation U).
+function writeRowOf(
+    pair: MessagePair,
+    ifMatch: string | null,
+): WriteRow {
+    return {
+        id: pair.id,
+        operationId: pair.operationId,
+        path: pair.path,
+        name: pair.name,
+        requesterIdentityId: pair.requesterIdentityId,
+        method: pair.method,
+        request: requestBytes(pair),
+        secret: pair.secret,
+        response: responseBytes(pair),
+        ifMatch,
+    };
+}
+
+// The wire answer carries the requester's view; the stored
+// response keeps the whole state.
+function projectedResponse(
+    response: Response,
+    stored: string,
+    project: StateProjection,
+): Response {
+    const state = responseRecordOf(stored);
+    if (state === undefined) {
+        return response;
+    }
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(JSON.stringify(project(state)), {
+        status: response.status,
+        headers,
+    });
+}
+
+function bellsOf(
+    rows: readonly (WriteRow | MessagePair)[],
+    stated: readonly StatementAnswer[],
+): string[] {
+    const bells: string[] = [];
+    for (let i = 0; i < stated.length; i++) {
+        if (!stated[i]!.inserted) continue;
+        const source = rows[i]!;
+        bells.push(notifyPayload(eventForMessagePair({
+            path: source.path,
+            requesterIdentityId: source.requesterIdentityId,
+        })));
+    }
+    return bells;
 }
 
 function wireForPair(
@@ -923,17 +1457,17 @@ function currentRequestId(
 
 function answerOf(
     rows: readonly (WriteRow | MessagePair)[],
+    binds: readonly StatementBind[],
     stated: readonly StatementAnswer[],
-    document: { path: string, name: string },
 ): WriteAnswer {
     const outcome = stated[0]!.outcome;
     if (outcome === 'stale') {
+        const at = stated.findIndex(
+            (row) => row.rawOutcome === 'stale',
+        );
         return {
-            response: errorJson(
-                'If-Match does not match the current'
-                    + ' document at '
-                    + document.path + document.name,
-                412,
+            response: refusalOfRow(
+                rows[at]!, binds[at]!, stated[at]!,
             ),
             outcome,
             answeredId: null,
@@ -961,15 +1495,6 @@ function answerOf(
             rows: stated,
         };
     }
-    const bells: string[] = [];
-    for (let i = 0; i < stated.length; i++) {
-        if (!stated[i]!.inserted) continue;
-        const source = rows[i]!;
-        bells.push(notifyPayload(eventForMessagePair({
-            path: source.path,
-            requesterIdentityId: source.requesterIdentityId,
-        })));
-    }
     return {
         response: responseFromLatin1(mergeSecret(
             latin1(row.response),
@@ -977,7 +1502,7 @@ function answerOf(
         )),
         outcome,
         answeredId: row.id,
-        bells,
+        bells: bellsOf(rows, stated),
         rows: stated,
     };
 }
@@ -1070,7 +1595,7 @@ function ifMatchOf(
     attempt: Attempt,
     row: WriteRow | MessagePair,
 ): string | null {
-    if (attempt === 'blind' || attempt === 'genesis') {
+    if (attempt === 'blind') {
         return null;
     }
     if ('requestMessage' in row) {
@@ -1084,11 +1609,14 @@ function ifMatchOf(
         ) {
             return null;
         }
+        if (pair.neverWritten !== undefined) {
+            return NEVER_WRITTEN_IDENTIFIER;
+        }
+        if (pair.genesis !== undefined) {
+            return NIL_IDENTIFIER;
+        }
         if (pair.latchedHeadMessagePairId !== undefined) {
             return pair.latchedHeadMessagePairId;
-        }
-        if (pair.pinnedDocumentMessagePairId !== undefined) {
-            return null;
         }
         // A zero-byte request has no If-Match line.
         if (pair.requestMessage === '') return null;
@@ -1158,8 +1686,8 @@ export function eventForMessagePair(
 // family-registry.ts createBodyIdField. 'invitations' is the
 // ONE entry this table keeps PERMANENTLY — the invitations side
 // channel is never a family-registry.ts registrant (it has no
-// organization-nesting tier, no concurrency class, no document
-// of its own to register), so this literal table stays
+// organization-nesting tier, no document of its own to
+// register), so this literal table stays
 // its one consult forever, not a waypoint to registration.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     // Not gate-dispatched (the invitations side channel forms
@@ -1227,20 +1755,6 @@ export function createdEntityName(
         ? value : undefined;
 }
 
-// A latched operation is a sub-resource write that REVERTS or
-// REPLACES the document it hangs off — it names the head it
-// intends to act on, exactly as a locked PUT names the head it
-// intends to overwrite. Without the echo the server would act
-// on whatever its own pre-transaction resolution happened to
-// read, so the same request would 412 or succeed by scheduling
-// alone — a verdict the caller can neither predict nor retry
-// into. The latch target is the PARENT document: the
-// route's segments minus its trailing literal.
-export const LATCHED_OPERATION_ROUTE_PATTERNS:
-    Set<string> = new Set([
-        'organizations/:id/flows/:id/undo',
-    ]);
-
 // The coverage gate: pairs, wire headers, and the idempotency
 // fast-path fire ONLY for wired route patterns. Seeded with the
 // ideas patterns in Task 1; every Task 2/3 family commit
@@ -1293,105 +1807,10 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     // Nested attributes detail (Task 7): admin PUT/DELETE.
     ATTRIBUTE_DETAIL_PATTERN,
     // Nested instances detail: PATCH create/update +
-    // DELETE (MESSAGE_PAIR_WIRED only — R10 keeps DOCUMENT_CLASS
-    // clear). Public PUT is 405 (Task 20).
+    // DELETE. Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
     // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.
 ]);
-
-// Route patterns wired for pair STORAGE (MESSAGE_PAIR_WIRED_
-// ROUTE_PATTERNS above) whose gate dispatch must NEVER take the
-// pre-tx idempotency fast path (getPairByRequestHash in api.ts) —
-// a byte-identical resend still re-enters the handler instead
-// of returning the first call's cached response. Membership
-// here is a promise: the route's OWN domain guard already
-// prevents a double-success on two identical requests, so the
-// fast path would be redundant at best — at worst it would
-// SERVE STALE TRUTH the domain guard exists to prevent.
-// rotation's guard is the 409 reuse check (rotateRefreshJti):
-// a resent rotation of an already-rotated-away jti must fail
-// again, not silently replay the first success. The two
-// /authentication/* grant routes join this set for a related
-// reason: a stored authorize response holds a LIVE single-use
-// code (replay re-hands a possibly-spent credential and locks
-// out identical re-logins); a stored token response replayed
-// hands back stale/revoked tokens AND bypasses the rotation
-// reuse-detection and code double-spend guards, which only
-// fire when the handler re-runs. Auth pairs are also keyed by
-// id (appendMessagePairAlways), not hash, so two identical logins each
-// land — message_hash is no longer per-call-unique on these
-// routes. Grown family by family; never remove a pattern
-// without re-deriving why its domain guard still makes the
-// fast path safe to skip.
-export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
-    new Set([
-        'identities/:id/tokens/:jti/rotation',
-        'authentication/token',
-        'authentication/authorize',
-    ]);
-
-// The head-read class, PER ROUTE PATTERN — never inferred from
-// a request's own name. A document is revisited
-// (create then update, or repeated PUT) and takes a pre-tx
-// head-read; an operation document (name always '') and an
-// event-append document (a fresh, client-minted id every write,
-// e.g. states/:id) never head-read, even though an event-
-// append name is never ''. Grown family by family alongside
-// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.
-export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
-    new Set([
-        'organizations/:id/ideas/:id',
-        'organizations/:id/ideas/:id/submissions/:sid',
-        'organizations/:id/projects/:id',
-        'organizations/:id/projects/:id/flows/:pfid',
-        'organizations/:id/flows/',
-        'organizations/:id/flows/:id',
-        // flows/:id/versions/:vid RETIRED (Phase 15 Task 7).
-        // SIMPLE class (Phase 14 Task 9, gate 8): the locked
-        // class 'flows' itself rides is structurally MOOT here —
-        // api.ts's isLockedWrite is routePattern ===
-        // documentEntityPattern(wiring), which for flows is
-        // organizations/:id/flows/:id — a tags document
-        // never equals that, so registering tags here
-        // safely opts that document into the ordinary
-        // head-read, never the locked four-outcome table.
-        'organizations/:id/flows/:id/tags/:name',
-        'organizations/:id/work-orders/',
-        'organizations/:id/work-orders/:id',
-        'organizations/:id/work-orders/:id/claim',
-        'organizations/:id/flows/:id/work-orders/:woid',
-        // Flat records + record-attributes retired (Task 23).
-        'organizations/:id/flows/:id/records/:frid',
-        'organizations/:id/objectives/',
-        'organizations/:id/objectives/:id',
-        'organizations/:id/objectives/:id/revisions/:rid',
-        'organizations/:id/projects/:id'
-            + '/objective-baseline-scores/:sid',
-        'organizations/:id/projects/:id'
-            + '/objective-actual-scores/:sid',
-        'ai-agents/:id',
-        'identities/',
-        'identities/:id',
-        'identities/:id/pii',
-        'identities/:id/credentials/:cid',
-        'identities/:id/registration',
-        'identities/:id/default-organization',
-        'organizations/:id',
-        // Nested record-types collection POST (Task 9): same
-        // head-read class as flat `records` so op + document
-        // share the supersession chain at the type name.
-        RECORD_TYPES_COLLECTION_PATTERN,
-        // Nested record-types detail (Task 3): simple class —
-        // no If-Match required on types.
-        RECORD_TYPE_DETAIL_PATTERN,
-        // Nested attributes detail (Task 7): simple class —
-        // attributes never join the If-Match dialect.
-        ATTRIBUTE_DETAIL_PATTERN,
-        ORGANIZATION_MEMBER_DETAIL_PATTERN,
-        // states/:id/field-values/:fvid RETIRED from live wire
-        // (Phase 15 Task 7); seed still forms pairs at that
-        // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.
-    ]);

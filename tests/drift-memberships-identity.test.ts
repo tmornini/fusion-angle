@@ -253,7 +253,7 @@ Deno.test('leg 6: LIVE accept — grant + accept an invitation through'
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
 
     const membershipId = MS_DRIFT_IDENTITY_SARAH;
     const accept = await handleRequest(db, req(

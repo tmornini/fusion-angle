@@ -4,6 +4,7 @@ import {
     assertMatch,
     assertStrictEquals,
 } from '@std/assert';
+import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -85,6 +86,28 @@ async function messagePairCount(
     db: MemoryDbAdapter,
 ): Promise<number> {
     return (await db.messagePairs.getAll()).length;
+}
+
+// An operation on a work order names the head it read.
+async function ifMatch(
+    db: MemoryDbAdapter,
+    token: string,
+    workOrderId: string = WO_ID,
+): Promise<Record<string, string>> {
+    const res = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + workOrderId,
+        token,
+    ));
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
+    return { 'If-Match': res.headers.get('ETag')! };
+}
+
+// A work order that was never read has no tag; any
+// well-formed one reaches the miss.
+function anyTag(): Record<string, string> {
+    return { 'If-Match': '"' + generateIdentifier() + '"' };
 }
 
 function graphJson(): Record<string, unknown> {
@@ -176,6 +199,7 @@ async function seedWorkOrder(
             flow_graph: graphJson(),
             position: 1,
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
     const join = await handleRequest(db, req(
@@ -244,6 +268,7 @@ async function seedInstance(
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(put.status, 201);
 }
@@ -307,6 +332,7 @@ async () => {
             + '/work-orders/' + WO_ID + '/binding',
         tokenB,
         { not_a_key: true },
+        anyTag(),
     ));
     assertStrictEquals(res.status, 404);
     assertEquals(await res.json(), {
@@ -322,7 +348,7 @@ async () => {
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'xuMWXmMtPdenikPwsAUujg/binding',
-        token, bindBody(),
+        token, bindBody(), anyTag(),
     ));
     assertStrictEquals(res.status, 404);
 });
@@ -335,6 +361,7 @@ async () => {
     const missing = await handleRequest(db, req(
         'PUT', BINDING, token,
         { instance_id: INSTANCE_ID },
+        await ifMatch(db, token),
     ));
     assertStrictEquals(missing.status, 400);
 
@@ -344,6 +371,7 @@ async () => {
             record_type_id: TYPE_ID,
             extra: true,
         },
+        await ifMatch(db, token),
     ));
     assertStrictEquals(unknown.status, 400);
 
@@ -352,6 +380,7 @@ async () => {
             instance_id: '',
             record_type_id: TYPE_ID,
         },
+        await ifMatch(db, token),
     ));
     assertStrictEquals(empty.status, 400);
 });
@@ -365,6 +394,7 @@ async () => {
     const absent = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(INSTANCE_MISSING, TYPE_ID),
+        await ifMatch(db, token),
     ));
     assertStrictEquals(absent.status, 404);
     assertEquals(await absent.json(), {
@@ -382,6 +412,7 @@ async () => {
     const tomb = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(INSTANCE_TOMB, TYPE_ID),
+        await ifMatch(db, token),
     ));
     assertStrictEquals(tomb.status, 404);
     assertEquals(await tomb.json(), {
@@ -436,6 +467,7 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(putInstB.status, 201);
     // Bind under org A with the foreign instance id + the
@@ -444,6 +476,7 @@ async () => {
     const foreign = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(foreignInst, TYPE_ID),
+        await ifMatch(db, token),
     ));
     assertStrictEquals(foreign.status, 404);
     assertEquals(await foreign.json(), {
@@ -494,12 +527,14 @@ async () => {
                 },
             ],
         },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
     assertStrictEquals(inst.status, 201);
     const before = await messagePairCount(db);
     const res = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(otherInst, TYPE_OTHER),
+        await ifMatch(db, token),
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -510,15 +545,17 @@ async () => {
     assertStrictEquals(await messagePairCount(db), before);
 });
 
-// 6. fresh bind → 201 + GET embed; unbound omits keys
-Deno.test('fresh bind → 201; detail + list embed; unbound'
+// 6. fresh bind → 200 + GET embed; unbound omits keys
+Deno.test('fresh bind → 200; detail + list embed; unbound'
 + ' omits keys',
 async () => {
     const { db, token } = await seededDb();
     const res = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        await ifMatch(db, token),
     ));
-    assertStrictEquals(res.status, 201);
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 
     const detail = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
@@ -556,23 +593,24 @@ async () => {
     );
 });
 
-// 7. re-bind same pair → 201 replay (pair count stable)
-Deno.test('re-bind same pair byte-identically → 200'
-+ ' replay (pair count unchanged)',
+// 7. a resent bind names the head it superseded → 412
+Deno.test('a resent bind after it landed is 412 and stores'
++ ' nothing',
 async () => {
     const { db, token } = await seededDb();
     const operationId = generateIdentifier();
+    const tag = await ifMatch(db, token);
     const first = await handleRequest(db, req(
-        'PUT', BINDING, token, bindBody(),
-        undefined, operationId,
+        'PUT', BINDING, token, bindBody(), tag, operationId,
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
     const before = await messagePairCount(db);
     const second = await handleRequest(db, req(
-        'PUT', BINDING, token, bindBody(),
-        undefined, operationId,
+        'PUT', BINDING, token, bindBody(), tag, operationId,
     ));
-    assertStrictEquals(second.status, 200);
+    assertStrictEquals(second.status, 412);
+    await second.body?.cancel();
     assertStrictEquals(await messagePairCount(db), before);
 });
 
@@ -583,11 +621,14 @@ async () => {
     await seedInstance(db, token, INSTANCE_2);
     const first = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
+        await ifMatch(db, token),
     ));
-    assertStrictEquals(first.status, 201);
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
     const res = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(INSTANCE_2, TYPE_ID),
+        await ifMatch(db, token),
     ));
     assertStrictEquals(res.status, 409);
     assertEquals(await res.json(), {
@@ -595,4 +636,43 @@ async () => {
             'work order is already bound to a'
             + ' different instance',
     });
+});
+
+Deno.test('two racing binds answer 200 and 412', async () => {
+    const { db, token } = await seededDb();
+    const tag = await ifMatch(db, token);
+    const first = await handleRequest(db, req(
+        'PUT', BINDING, token, bindBody(), tag,
+    ));
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
+    const before = await messagePairCount(db);
+    const second = await handleRequest(db, req(
+        'PUT', BINDING, token, bindBody(), tag,
+    ));
+    assertStrictEquals(second.status, 412);
+    await second.body?.cancel();
+    assertStrictEquals(await messagePairCount(db), before);
+});
+
+Deno.test('a rebind to another instance is 409', async () => {
+    const { db, token } = await seededDb();
+    await seedInstance(db, token, INSTANCE_2);
+    const first = await handleRequest(db, req(
+        'PUT', BINDING, token, bindBody(),
+        await ifMatch(db, token),
+    ));
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
+    const before = await messagePairCount(db);
+    const rebind = await handleRequest(db, req(
+        'PUT', BINDING, token, bindBody(INSTANCE_2, TYPE_ID),
+        await ifMatch(db, token),
+    ));
+    assertStrictEquals(rebind.status, 409);
+    assertEquals(await rebind.json(), {
+        error: 'work order is already bound to a'
+            + ' different instance',
+    });
+    assertStrictEquals(await messagePairCount(db), before);
 });

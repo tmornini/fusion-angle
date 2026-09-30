@@ -21,7 +21,7 @@ import { workOrderHistoryFor } from
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
-    postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
@@ -91,7 +91,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
     // Phase Final Stage B: record_attributes retired.
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
@@ -140,9 +140,9 @@ async function appendLegacyTransition(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postWorkOrderTransitionOp(
-        db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,
-        undefined, [], messagePair,
+    await postSeedWorkOrderTransitionOp(
+        db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA', body,
+        SYSTEM_MEMBER_ID, messagePair,
     );
 }
 

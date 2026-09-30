@@ -140,10 +140,12 @@ Deno.test('a flow write with an AI member id in memberIds'
     }, DEV_TOKEN,
         operationIdHeader());
     const token = await organizationToken();
-    const res = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aMyiZpZbsEboXnIrwnEjNA', token,
-        flowDocument(
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aMyiZpZbsEboXnIrwnEjNA',
+        token,
+        body: flowDocument(
             'Blocked',
             generateIdentifier(),
             {
@@ -151,7 +153,8 @@ Deno.test('a flow write with an AI member id in memberIds'
                 edges: [],
             },
         ),
-    ));
+        headers: { 'if-none-match': '*' },
+    }));
     assertStrictEquals(res.status, 400);
 });
 
@@ -167,10 +170,12 @@ Deno.test('a flow write with agentIds naming a live'
         minted.status === 201 || minted.status === 200,
     );
     const token = await organizationToken();
-    const res = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aJJKPwIzmbFseMhGUrFyFQ', token,
-        flowDocument(
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aJJKPwIzmbFseMhGUrFyFQ',
+        token,
+        body: flowDocument(
             'With agent',
             generateIdentifier(),
             {
@@ -178,7 +183,8 @@ Deno.test('a flow write with agentIds naming a live'
                 edges: [],
             },
         ),
-    ));
+        headers: { 'if-none-match': '*' },
+    }));
     assert(
         res.status === 201 || res.status === 200,
         'expected 201 or 200, got ' + res.status,

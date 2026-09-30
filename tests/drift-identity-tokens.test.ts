@@ -33,12 +33,10 @@ import {
 } from './http-fixtures.ts';
 import {
     deriveIdentityToken,
-    deriveIdentityTokenEventsForJti,
     identityTokenEntityOf,
+    tokenHeadFor,
 } from '../api/derive-identity-tokens.ts';
-import {
-    formTokenEventMessagePair,
-} from '../api/message-pair.ts';
+import { formStateWrite } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
@@ -62,10 +60,9 @@ const GHOST_JTI = generateIdentifier();
 const JTI_OMIT = generateIdentifier();
 const CHAIN_OMIT = generateIdentifier();
 
-// The by-jti fold (deriveIdentityTokenEventsForJti,
-// tokenRevocationReason's second read) is the jti
-// document's PUT history. One head per jti: the issued
-// event is named by its jti.
+// The jti's head (tokenHeadFor, tokenRevocationReason's
+// second read) is its whole state. One head per jti: the
+// issued event is named by its jti.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -161,10 +158,11 @@ function jtiOf(token: string): string {
     return claims.jti;
 }
 
-// -- 1: KEY ORDER — derived + stored PUT are id-LAST (G4) ------
+// -- 1: KEY ORDER — derived + stored PUT are id-FIRST (G4) -----
 
-Deno.test('KEY ORDER: the derived row is id-LAST — matching'
-+ ' validateIdentityTokenEntity\'s own return-literal order',
+Deno.test('KEY ORDER: the derived row is id-FIRST — matching'
++ ' validateIdentityTokenEntity\'s own return-literal order'
++ ' after it',
 async () => {
     const db = await freshDb();
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
@@ -178,14 +176,14 @@ async () => {
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_ORDER,
     );
     const expectedOrder = [
-        'jti', 'identity_id', 'action', 'chain_id', 'at', 'id',
+        'id', 'jti', 'identity_id', 'action', 'chain_id', 'at',
     ];
     assertEquals(Object.keys(derived), expectedOrder);
 });
 
-// G4: stored PUT = identityTokenEntityOf (id-last). GET wins.
-// The id-first writer pin is deleted — writer matches GET.
-Deno.test('stored PUT body equals identityTokenEntityOf id-last',
+// G4: stored PUT = identityTokenEntityOf (id-first). GET wins.
+// The id-last writer pin is deleted — writer matches GET.
+Deno.test('stored PUT body equals identityTokenEntityOf id-first',
 async () => {
     const db = await freshDb();
     const fields = {
@@ -208,7 +206,7 @@ async () => {
         method: 'PUT',
         body: fields,
     });
-    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
     const derived = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', JTI_G4,
@@ -218,19 +216,33 @@ async () => {
     assertEquals(stored, wire);
 });
 
-Deno.test('formTokenEventMessagePair stored body equals '
-+ 'identityTokenEntityOf id-last', async () => {
+Deno.test('a token event\'s stored body equals '
++ 'identityTokenEntityOf id-first', async () => {
     const event = {
         jti: JTI_G4_SYNTH, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued' as const,
         chain_id: CHAIN_G4_SYNTH, at: AT,
     };
-    const messagePair = await formTokenEventMessagePair(
-        JTI_G4_SYNTH, event, generateIdentifier(),
-        generateIdentifier(),
-    );
+    const formed = await formStateWrite({
+        kind: 'events',
+        context: {
+            operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
+            requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+            requestAt: AT,
+        },
+        siblings: [{
+            method: 'PUT',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
+            name: JTI_G4_SYNTH,
+            state: { id: JTI_G4_SYNTH, ...event },
+            condition: { kind: 'genesis', declarer: 'handler' },
+        }],
+    });
+    const row = formed.rows[0];
+    assert(row !== undefined && 'responseMessage' in row);
     const stored = JSON.parse(
-        storedMessageBodyText(messagePair.responseMessage),
+        storedMessageBodyText(row.responseMessage),
     );
     const expected = identityTokenEntityOf({
         name: JTI_G4_SYNTH,
@@ -238,13 +250,13 @@ Deno.test('formTokenEventMessagePair stored body equals '
         method: 'PUT',
         body: event,
     });
-    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
 });
 
 // Writer matches GET: successBody is identityTokenEntityOf
-// (id-last). The id-first pin is deleted.
-Deno.test('identities/:id/tokens/:jti successBody is id-last',
+// (id-first). The id-last pin is deleted.
+Deno.test('identities/:id/tokens/:jti successBody is id-first',
 () => {
     const entry =
         WRITE_RESPONSE_SPECS['identities/:id/tokens/:jti'];
@@ -258,16 +270,16 @@ Deno.test('identities/:id/tokens/:jti successBody is id-last',
         'XXZruirZyAOoRpNxaDnpSA',
         undefined,
     ) as { id: string };
-    assertStrictEquals(Object.keys(body).at(-1), 'id');
+    assertStrictEquals(Object.keys(body).at(0), 'id');
     assertStrictEquals(body.id, JTI_G4);
 });
 
 // -- 2: GET wire byte-parity — the ACTUAL flipped route against --
-// -- a LITERAL id-LAST reconstruction of what was PUT: -----------
+// -- a LITERAL id-FIRST reconstruction of what was PUT: ----------
 // -- byIdAscending collection order, and the 404 body -------------
 
 Deno.test('GET /identities/:id/tokens + /:jti are wire'
-+ ' byte-identical to a literal id-LAST reconstruction of'
++ ' byte-identical to a literal id-FIRST reconstruction of'
 + ' each jti\'s HEAD: byIdAscending collection order and the'
 + ' 404 body',
 async () => {
@@ -303,25 +315,25 @@ async () => {
     }, DEV_TOKEN,
         operationIdHeader());
 
-    // The literal id-LAST reconstruction of each document's
+    // The literal id-FIRST reconstruction of each document's
     // HEAD body, identifier order (byIdAscending — the
     // derivation's own order, never the backend's) — the
     // expected wire text, independent of any stored row.
     const expected = [
         {
+            id: JTI_W1,
             jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'rotated', chain_id: CHAIN_W, at: AT2,
-            id: JTI_W1,
         },
         {
+            id: JTI_W2,
             jti: JTI_W2, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_W2, at: AT,
-            id: JTI_W2,
         },
         {
+            id: JTI_W3,
             jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
             action: 'issued', chain_id: CHAIN_W3, at: AT,
-            id: JTI_W3,
         },
     ].sort((a, b) => compareIdentifiers(a.id, b.id));
 
@@ -361,12 +373,12 @@ async () => {
     );
 });
 
-// -- 3: deriveIdentityTokenEventsForJti — pre-tx vs in-tx -------
+// -- 3: tokenHeadFor — pre-tx vs in-tx -------------------------
 // -- PARITY (the membershipExistsFor precedent, api/derive- -----
 // -- memberships.ts's own leg-5 shape) -------------------------------
 
-Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
-+ ' (the plain adapter) vs in-tx (an open db.transaction view'
+Deno.test('tokenHeadFor: the later event is the head, identical'
++ ' pre-tx (the plain adapter) vs in-tx (an open db.transaction view'
 + ' sharing rotateRefreshJti/revokeTokenChain\'s own table'
 + ' list) — the membershipExistsFor precedent', async () => {
     const db = await freshDb();
@@ -383,29 +395,29 @@ Deno.test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
     }, DEV_TOKEN,
         operationIdHeader());
 
-    const preTx = await deriveIdentityTokenEventsForJti(
-        db, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
+    const preTx = await tokenHeadFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA', JTI_TX,
     );
     const inTx = await db.readTransaction(
-        (view) => deriveIdentityTokenEventsForJti(
-            view, JTI_TX, 'XXZruirZyAOoRpNxaDnpSA',
+        (view) => tokenHeadFor(
+            view, 'XXZruirZyAOoRpNxaDnpSA', JTI_TX,
         ),
     );
     assertEquals(inTx, preTx);
-    assertStrictEquals(preTx.length, 2);
-    assertStrictEquals(preTx[0]!.action, 'issued');
-    assertStrictEquals(preTx[1]!.action, 'rotated');
+    assert(preTx !== null);
+    assertStrictEquals(preTx.entity.action, 'rotated');
+    assertStrictEquals(preTx.entity.at, AT2);
 
-    const preTxMissing = await deriveIdentityTokenEventsForJti(
-        db, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
+    const preTxMissing = await tokenHeadFor(
+        db, 'XXZruirZyAOoRpNxaDnpSA', GHOST_JTI,
     );
     const inTxMissing = await db.readTransaction(
-        (view) => deriveIdentityTokenEventsForJti(
-            view, GHOST_JTI, 'XXZruirZyAOoRpNxaDnpSA',
+        (view) => tokenHeadFor(
+            view, 'XXZruirZyAOoRpNxaDnpSA', GHOST_JTI,
         ),
     );
     assertEquals(inTxMissing, preTxMissing);
-    assertEquals(preTxMissing, []);
+    assertStrictEquals(preTxMissing, null);
 });
 
 // -- 4: THE SECURITY PIN — mint via a real grant, revoke the ----
@@ -472,7 +484,7 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
         `/identities/XXZruirZyAOoRpNxaDnpSA/tokens/${rootJti}/revocation`,
         accessToken, {},
     ));
-    assertStrictEquals(revokeRes.status, 201);
+    assertStrictEquals(revokeRes.status, 200);
 
     // ACCESS still passes the gate (≤15-min staleness covenant).
     const afterAccess = await handleRequest(

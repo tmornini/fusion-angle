@@ -312,7 +312,7 @@ async function seedInstanceReferrer(
         db, TYPE_PATH + '/instances/' + INSTANCE_ID,
         { set: [{ attribute_id: attributeId, value }] },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
 }
 
 Deno.test(

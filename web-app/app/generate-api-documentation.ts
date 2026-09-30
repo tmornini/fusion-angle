@@ -4,8 +4,12 @@
 // Output is deterministic — no clocks, no randomness,
 // stable ordering — so `--check` can gate staleness.
 import { dirname, join } from '@std/path';
-import { routes } from '../../api/routes.ts';
-import type { Route } from '../../api/routes.ts';
+import { conditionalOf, routes } from '../../api/routes.ts';
+import type {
+    Conditional,
+    Route,
+    WriteMethod,
+} from '../../api/routes.ts';
 import {
     HTTP_VERBS,
     offeredVerbs,
@@ -23,8 +27,6 @@ import type { StatusDocument } from
     '../../api/http-status-documents.ts';
 import { AUTHENTICATION_ROUTES } from
     '../../api/request-auth.ts';
-import { familyRegistration } from
-    '../../api/family-registry.ts';
 
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
@@ -598,41 +600,23 @@ function isOrganizationNested(row: Route): boolean {
     return row.segments[0] === 'organizations';
 }
 
-function documentFamilyOf(
-    row: Route,
-): string | undefined {
-    const segs = row.segments;
-    if (
-        segs[0] === 'organizations'
-        && segs.length === 4
-        && segs[1] !== undefined
-        && segs[1].startsWith(':')
-        && segs[2] !== undefined
-        && !segs[2].startsWith(':')
-        && segs[3] === ':id'
-    ) {
-        return segs[2];
-    }
-    if (
-        segs.length === 2
-        && segs[0] !== undefined
-        && !segs[0].startsWith(':')
-        && segs[1] === ':id'
-    ) {
-        return segs[0];
-    }
-    return undefined;
-}
+const WRITE_METHODS: Readonly<Record<string, WriteMethod>> = {
+    put: 'PUT',
+    post: 'POST',
+    patch: 'PATCH',
+    delete: 'DELETE',
+};
 
-function isLockedDocumentPut(row: Route): boolean {
-    const family = documentFamilyOf(row);
-    if (family === undefined) return false;
-    return familyRegistration(family)?.concurrency
-        === 'locked';
-}
-
-function isLockedPutUri(uri: string): boolean {
-    return uri === '/organizations/:id/flows/:id';
+// A GET takes no conditional; every write route's entry
+// names the one its verb takes. The room's URI is the
+// route pattern behind a leading slash.
+function conditionalFor(
+    verb: string,
+    uri: string,
+): Conditional | undefined {
+    const method = WRITE_METHODS[verb];
+    if (method === undefined) return undefined;
+    return conditionalOf(uri.slice(1), method);
 }
 
 function statusCodesFor(
@@ -647,8 +631,15 @@ function statusCodesFor(
     codes.push(401);
     if (isOrganizationNested(row)) codes.push(403);
     if (!isAuthGrant(row)) codes.push(404);
-    if (verb === 'put' && isLockedDocumentPut(row)) {
-        codes.push(412, 428);
+    const conditional = conditionalFor(verb, uriOf(row));
+    if (conditional !== undefined && conditional !== 'none') {
+        codes.push(412);
+    }
+    if (
+        conditional === 'required'
+        || conditional === 'in-order'
+    ) {
+        codes.push(428);
     }
     return codes.map(String);
 }
@@ -686,8 +677,15 @@ function headersFor(
         headers.push('Authorization: Bearer …');
     }
     headers.push('Operation-ID: on writes');
-    if (lower === 'put' && isLockedPutUri(uri)) {
+    const conditional = conditionalFor(lower, uri);
+    if (conditional === 'in-order') {
         headers.push('If-Match: strong etag');
+    }
+    if (conditional === 'required') {
+        headers.push('If-Match or If-None-Match: *');
+    }
+    if (conditional === 'optional') {
+        headers.push('If-Match or If-None-Match: * (optional)');
     }
     return headers;
 }

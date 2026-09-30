@@ -104,7 +104,7 @@ async () => {
     assertStrictEquals(res.status, 405);
 });
 
-// Task 4 (R1/E5): redo folds into the locked save — the
+// Task 4 (R1/E5): redo folds into the conditional PUT — the
 // POST /organizations/:id/flows/:id/redo route leaves the URI tree entirely,
 // so a request against it now finds no matching pattern at
 // all (404), not a method-absent 405 against a still-live

@@ -17,6 +17,7 @@ import {
     formWriteMessagePair,
     strongEtagOf,
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -180,6 +181,7 @@ async function putInstance(
     return handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
+        { [IF_NONE_MATCH_HEADER]: '*' },
     ));
 }
 
@@ -268,7 +270,7 @@ async () => {
             ],
         },
     );
-    assertStrictEquals(patch1.status, 201);
+    assertStrictEquals(patch1.status, 200);
     const etag1 = patch1.headers.get('ETag')!;
 
     const patch2 = await patchInstance(
@@ -281,7 +283,7 @@ async () => {
             ],
         },
     );
-    assertStrictEquals(patch2.status, 201);
+    assertStrictEquals(patch2.status, 200);
     const etag2 = patch2.headers.get('ETag')!;
 
     const detail = await handleRequest(db, req(
@@ -496,7 +498,7 @@ async () => {
             ],
         },
     );
-    assertStrictEquals(patch1.status, 201);
+    assertStrictEquals(patch1.status, 200);
 
     const memberHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
@@ -687,7 +689,7 @@ async () => {
     const cleared = await patchInstance(
         db, memberToken, etag0, { clear: [ATTR_RETIRED] },
     );
-    assertStrictEquals(cleared.status, 201);
+    assertStrictEquals(cleared.status, 200);
 
     const del = await handleRequest(db, req(
         'DELETE', ATTRS + ATTR_RETIRED, adminToken,

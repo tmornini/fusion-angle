@@ -20,8 +20,11 @@ import {
 } from './validators.ts';
 import {
     attemptFor,
+    canonicalPath,
     formWriteMessagePair,
+    runStateWrite,
     runWrite,
+    unprojected,
 } from './message-pair.ts';
 import type {
     MessagePair, ReceivedRequest,
@@ -295,8 +298,10 @@ export async function getInvitationOnOrganizationNest(
 }
 
 // POST /organizations/:id/invitations/ — grant pending.
-// Path org is the invitation org. Answers 200 for fresh
-// and duplicate. Pair formation stays inside the handler.
+// Path org is the invitation org. A fresh grant answers
+// 201 with the invitation; a pending duplicate answers 200
+// with the pending one. Pair formation stays inside the
+// handler.
 export async function postOrganizationInvitationGrant(
     db: DbAdapter,
     params: string[],
@@ -392,8 +397,10 @@ export async function putInvitationOnOrganizationNest(
 }
 
 // Grant: an admin invites an EXISTING identity by email.
-// The org is the path organization. Idempotent on an
-// outstanding pending invite for the (org, identity) pair.
+// The organization is the path organization. A pending
+// invitation for the (organization, identity) pair under
+// another id answers 200 and stores nothing; a resend
+// naming a taken invitation id answers 409.
 async function grantInvitation(
     db: DbAdapter,
     organization: Id,
@@ -446,27 +453,32 @@ async function grantInvitation(
             'no identity with that email', HTTP_NOT_FOUND);
     }
     const identityId = match.id;
-    const preOutcome = await grantOutcomeFor(
+    const outcome = await grantOutcomeFor(
         db, organization, identityId);
-    if (preOutcome.kind === 'member') {
+    if (outcome.kind === 'member') {
         throw new ApiError(
             'that identity is already a member of this'
             + ' organization', HTTP_CONFLICT);
     }
-    const responseBody = preOutcome.kind === 'existing'
-        ? {
-            id: preOutcome.id, organization_id: organization,
-            identity_id: identityId, at: preOutcome.at,
+    // A pending invitation under another id is the one this
+    // grant would repeat, so it answers and nothing lands. A
+    // resend names its own invitation, a taken name the
+    // statement refuses.
+    if (outcome.kind === 'existing' && outcome.id !== invitationId) {
+        return {
+            id: outcome.id, organization_id: organization,
+            identity_id: identityId, at: outcome.at,
             state: 'pending',
-        }
-        : {
-            id: invitationId, organization_id: organization,
-            identity_id: identityId,
-            at: grantAt, state: 'pending',
         };
+    }
     if (received === undefined) {
         throw new Error('requestId is required');
     }
+    const invitation = {
+        id: invitationId, organization_id: organization,
+        identity_id: identityId,
+        at: grantAt, state: 'pending',
+    };
     const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: received.target,
@@ -479,51 +491,31 @@ async function grantInvitation(
         requesterIdentityId: actor,
         requestAt,
         organization: undefined,
-        responseBody,
+        responseBody: invitation,
         operationId,
         requestId: received.requestId,
     });
-    const document = preOutcome.kind === 'fresh'
-        ? await formInvitationDocumentMessagePair(
-            actor, requestAt, operationId,
-            received.requestId, invitationId,
-            {
-                organization_id: organization,
-                identity_id: identityId,
-                at: grantAt,
-                state: 'pending',
-            },
-        )
-        : undefined;
-    await db.readTransaction(async (view) => {
-        const outcome = await grantOutcomeFor(
-            view, organization, identityId);
-        const agrees = outcome.kind === preOutcome.kind
-            && (outcome.kind !== 'existing'
-                || (preOutcome.kind === 'existing'
-                    && outcome.id === preOutcome.id));
-        if (!agrees) {
-            throw new Error(
-                'grantInvitation: the duplicate-grant'
-                + ' check raced between its pre-tx read'
-                + ' and its transaction — retry the'
-                + ' request',
-            );
-        }
+    const answer = await runStateWrite(db, {
+        kind: 'siblings',
+        received: messagePair,
+        siblings: [{
+            method: 'PUT',
+            path: canonicalPath(undefined, '/invitations/'),
+            name: invitationId,
+            state: invitation,
+            condition: { kind: 'genesis', declarer: 'handler' },
+        }],
+        project: unprojected,
+        answer: { kind: 'created', location: invitationId },
     });
-    const pairs = [messagePair];
-    if (document !== undefined) {
-        pairs.push(document);
-    }
-    await runWrite(db, attemptFor(pairs), pairs);
-    if (preOutcome.kind === 'fresh') {
+    if (answer.outcome === 'land') {
         db.postNotification({
             kind: 'scoped',
             organizationIds: [organization],
             identityIds: [identityId],
         });
     }
-    return responseBody;
+    return answer.response;
 }
 
 type GrantOutcome =

@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertNotStrictEquals,
     assertStrictEquals,
     assertThrows,
@@ -33,9 +34,11 @@ import { HttpMessageError } from
 import {
     attemptFor,
     documentHeadAt,
-    formTokenEventMessagePair,
     formWriteMessagePair,
+    IF_NONE_MATCH_HEADER,
+    responseRecordOf,
     IF_MATCH_HEADER,
+    runStateWrite,
     runWrite,
     writeAnswerOf,
 } from '../api/message-pair.ts';
@@ -1080,6 +1083,20 @@ Deno.test(
         const id = generateIdentifier();
         const raw =
             '{"n":9007199254740993,"z":1,"a":2}';
+        const seeded = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
+                + id,
+            token,
+            body: {
+                jti: id,
+                identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+                action: 'issued',
+                chain_id: generateIdentifier(),
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        }));
+        await seeded.text();
         const target = '/identities/'
             + 'XXZruirZyAOoRpNxaDnpSA/tokens/'
             + id + '/revocation?kept=1';
@@ -1096,9 +1113,11 @@ Deno.test(
         const requestId = response.headers.get(
             'request-id',
         );
-        assertStrictEquals(response.status, 201);
+        assertStrictEquals(response.status, 200);
         const stored = (await db.messagePairs.getAll())
-            .find((row) => row.request.includes(id));
+            .find((row) => row.request.includes(
+                'POST ' + target,
+            ));
         if (stored === undefined) {
             throw new Error('revocation was not stored');
         }
@@ -1139,7 +1158,7 @@ Deno.test(
 );
 
 Deno.test(
-    'one request\'s answering row keeps the'
+    'one request\'s received row keeps the'
         + ' received body and both ids',
     async () => {
         const db = memoryDbAdapter();
@@ -1167,15 +1186,17 @@ Deno.test(
         const fresh = (await db.messagePairs.getAll())
             .filter((row) => !before.has(row.id));
         assertStrictEquals(fresh.length, 2);
-        const etag = response.headers.get('etag');
-        const answering = fresh.find(
-            (row) => '"'+ row.id + '"' === etag,
+        // The answer's etag names the created document
+        // (Interpretation G); the received pair is the one
+        // POST the request stored.
+        const received = fresh.find(
+            (row) => row.method === 'POST',
         );
-        if (answering === undefined) {
-            throw new Error('answering row missing');
+        if (received === undefined) {
+            throw new Error('received row missing');
         }
         assertStrictEquals(
-            wireBody(answering.request), raw,
+            wireBody(received.request), raw,
         );
         for (const row of fresh) {
             assertStrictEquals(
@@ -1196,7 +1217,7 @@ Deno.test(
             );
         }
         const sibling = fresh.find(
-            (row) => row.id !== answering.id,
+            (row) => row.id !== received.id,
         );
         if (sibling === undefined) {
             throw new Error('sibling row missing');
@@ -1205,29 +1226,55 @@ Deno.test(
             wireBody(sibling.request) === raw,
             false,
         );
+        assertStrictEquals(sibling.method, 'PUT');
+        assertStrictEquals(
+            response.headers.get('etag'),
+            '"' + sibling.id + '"',
+        );
     },
 );
 
 Deno.test(
     'a token event stores the ids it was given',
     async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
         const operationId = generateIdentifier();
         const requestId = generateIdentifier();
         const name = generateIdentifier();
-        const messagePair =
-            await formTokenEventMessagePair(
+        const answer = await runStateWrite(db, {
+            kind: 'events',
+            context: {
+                operationId,
+                requestId,
+                requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+                requestAt: '2026-01-01T00:00:00.000000Z',
+            },
+            siblings: [{
+                method: 'PUT',
+                path: '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
                 name,
-                {
+                state: {
+                    id: name,
                     jti: name,
                     identity_id: 'XXZruirZyAOoRpNxaDnpSA',
                     action: 'issued',
                     chain_id: generateIdentifier(),
                     at: '2026-01-01T00:00:00.000000Z',
                 },
-                operationId,
-                requestId,
-            );
-        const wire = messagePair.responseMessage;
+                condition: {
+                    kind: 'genesis', declarer: 'handler',
+                },
+            }],
+        });
+        assertStrictEquals(answer.outcome, 'land');
+        const stored = (await db.messagePairs.getAll()).find(
+            (row) => row.name === name,
+        );
+        if (stored === undefined) {
+            throw new Error('token event not stored');
+        }
+        const wire = stored.response;
         assertStrictEquals(
             wire.includes(
                 'operation-id: ' + operationId,
@@ -1544,6 +1591,7 @@ Deno.test(
                     generateIdentifier(),
                     '2026-01-01T00:00:00.000000Z',
                 ),
+                headers: { 'if-none-match': '*' },
             }),
         );
         const firstEtag = first.headers.get('etag');
@@ -2354,13 +2402,14 @@ Deno.test(
         const INSTANCES = typePath + '/instances/';
         async function landed(
             request: Request,
+            status: number,
         ): Promise<Response> {
             const response = await handleRequest(
                 db, request,
             );
             const text = await response.text();
             assertStrictEquals(
-                response.status, 201, text,
+                response.status, status, text,
             );
             return response;
         }
@@ -2374,7 +2423,7 @@ Deno.test(
                 position: 1,
                 state: 'active',
             },
-        }));
+        }), 201);
         await landed(apiRequest({
             method: 'PUT',
             path: typePath + '/attributes/'
@@ -2393,7 +2442,7 @@ Deno.test(
                     ...DEFAULT_ATTRIBUTE_ACL_ROLES,
                 ],
             },
-        }));
+        }), 201);
         const created = await landed(apiRequest({
             method: 'PATCH',
             path: INSTANCES + instanceId,
@@ -2404,7 +2453,8 @@ Deno.test(
                     value: 'Hello',
                 }],
             },
-        }));
+            headers: { [IF_NONE_MATCH_HEADER]: '*' },
+        }), 201);
         const headEtag = created.headers.get('etag');
         if (headEtag === null) {
             throw new Error('create omitted an etag');
@@ -2455,6 +2505,7 @@ Deno.test(
                         [IF_MATCH_HEADER]: headEtag,
                     },
                 }),
+                200,
             );
             const pair = wire;
             if (pair === undefined) {
@@ -2483,6 +2534,24 @@ Deno.test(
                 response.headers.get('etag'),
                 '"' + revision.id + '"',
             );
+            const stored = await db.messagePairs.getById(
+                pair.id,
+            );
+            assertStrictEquals(
+                parseWire(stored.response).fields.find(
+                    (field) => field.name === 'etag',
+                )?.value,
+                '"' + revision.id + '"',
+            );
+            assertEquals(responseRecordOf(stored.response), {
+                id: instanceId,
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                record_type_id: typeId,
+                values: [{
+                    attribute_id: attributeId,
+                    value: 'World',
+                }],
+            });
             revisionEtag = response.headers.get('etag');
             const src = Deno.readTextFileSync(
                 'api/api.ts',
@@ -2533,7 +2602,7 @@ Deno.test(
                 headers: {
                     [IF_MATCH_HEADER]: revisionEtag,
                 },
-            }));
+            }), 201);
             const pair = lone;
             if (pair === undefined) {
                 throw new Error(
@@ -2554,7 +2623,8 @@ Deno.test(
             }
             assertStrictEquals(only.id, pair.id);
             assertStrictEquals(
-                alone.headers.get('etag'), null,
+                alone.headers.get('etag'),
+                '"' + pair.id + '"',
             );
         } finally {
             detail.patch = patch;

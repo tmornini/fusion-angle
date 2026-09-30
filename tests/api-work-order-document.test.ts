@@ -4,7 +4,7 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { PUT, handleRequest } from '../api/api.ts';
+import { GETWithEtag, PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -21,9 +21,13 @@ import type {
 import { ValidationError } from '../shared/types.ts';
 import {
     validateWorkOrderDocumentBody,
+    validateWorkOrderVersion,
 } from '../api/validators.ts';
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
+import {
+    formWriteMessagePair,
+    responseRecordOf,
+} from '../api/message-pair.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
@@ -112,13 +116,30 @@ function documentFields() {
 
 // -- 1. validateWorkOrderDocumentBody -----------------------
 
-Deno.test('validateWorkOrderDocumentBody accepts the entity fields'
-+ ' plus an optional organization_id', () => {
-    const doc = validateWorkOrderDocumentBody({
-        ...documentFields(),
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+Deno.test('a work-order body with organization_id is 400', async () => {
+    assertThrows(
+        () => validateWorkOrderDocumentBody({
+            ...documentFields(),
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        }),
+        ValidationError,
+    );
+    const db = await freshDb();
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: ENTITY_PREFIX + generateIdentifier(),
+        token: DEV_TOKEN,
+        body: {
+            ...documentFields(),
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
+        error: 'unexpected key "organization_id" for'
+            + ' WorkOrderDocumentBody',
     });
-    assertEquals(doc.entity, documentFields());
 });
 
 Deno.test('validateWorkOrderDocumentBody accepts the entity fields'
@@ -154,16 +175,13 @@ Deno.test('validateWorkOrderDocumentBody rejects a trio key at the'
 
 // -- 2. postWorkOrderDocumentOp (below-gate, MemoryDbAdapter) --
 
-// Phase Final Task 2: work_orders ROW half stripped — op
-// returns a reconstructed entity + appends the pair only.
-Deno.test('postWorkOrderDocumentOp returns the entity and the'
+// The received PUT is the version: the op lands one pair,
+// its whole state.
+Deno.test('postWorkOrderDocumentOp lands the version as the'
 + ' pair; work_orders row plane stays empty', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const body = {
-        ...documentFields(),
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-    };
+    const body = documentFields();
     const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -179,13 +197,20 @@ Deno.test('postWorkOrderDocumentOp returns the entity and the'
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    const written = await postWorkOrderDocumentOp(
+    await postWorkOrderDocumentOp(
         db, 'yAhMcJGxllmQkLemOQjCmA', body,
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
+        'AjdvjuECVZEgZoFajaIEkg',
     );
-    assertEquals(written, {
+    const head = await db.messagePairs.getHeadPair(
+        ENTITY_PREFIX, 'yAhMcJGxllmQkLemOQjCmA',
+    );
+    assert(head !== null);
+    assertEquals(responseRecordOf(head.response), {
+        id: 'yAhMcJGxllmQkLemOQjCmA',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         ...documentFields(),
+        events: [],
     });
     // Phase Final Stage B: work_orders table retired.
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
@@ -210,12 +235,16 @@ Deno.test('a byte-identical PUT resend to'
     const first = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO_RESEND, body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
+    const { etag } = await GETWithEtag(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + WO_RESEND, DEV_TOKEN, operationIdHeader(),
+    );
     const second = await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO_RESEND
             , body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-Match', '"' + etag + '"']]));
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -253,13 +282,7 @@ function req(
 // never two divergent literals. `displayId` defaults to
 // documentFields()'s own value; a duplicate-create test
 // overrides it so the SECOND create's document sub-body
-// genuinely differs from the first's — the document message
-// pair's hash covers ONLY {display_id, flow_graph, position}
-// (workOrderCreateDocumentBody's own three picked keys), so
-// two creates sharing that sub-body would collide on
-// appendMessagePairOnce's concurrent-retry guard and the second
-// pair would never land, an artifact of the test fixture, not
-// the create op.
+// genuinely differs from the first's.
 function workOrderCreateBody(
     id: string,
     flowWorkOrderId: string,
@@ -355,18 +378,24 @@ async () => {
         workOrderCreateBody(WO_C1, WO_C1_FWO, 'aNoIDzecmwfawmsLSsDsPw'),
     ));
     assertStrictEquals(res.status, 201);
+    await res.body?.cancel();
     const messagePairs = await db.messagePairs.getAll();
-    assertStrictEquals(messagePairs.length, 7);
+    assertStrictEquals(messagePairs.length, 6);
 
     const documentRow =
         documentRowAt(messagePairs, ENTITY_PREFIX, WO_C1);
     assert(
         documentRow, 'no document message pair at the WO document',
     );
+    const version = validateWorkOrderVersion(
+        responseRecordOf(documentRow!.response)!,
+    );
     assertEquals(
-        validateWorkOrderDocumentBody(
-            decodeRequestMessage(documentRow!.request).body,
-        ).entity,
+        {
+            display_id: version.display_id,
+            flow_graph: version.flow_graph,
+            position: version.position,
+        },
         documentFields(),
     );
 
@@ -386,8 +415,8 @@ async () => {
     assertStrictEquals(requestAts.size, 1);
 });
 
-Deno.test('a duplicate work-order create (same WO id) records'
-+ ' Supersedes on its NEW document message pair, never Follows',
+Deno.test('a duplicate work-order create (same WO id) is 409'
++ ' and records no second document message pair',
 async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
@@ -411,19 +440,13 @@ async () => {
             WO_C2, WO_C2_FWO_B, FLOW_C2, 'wo-c2-revised',
         ),
     ));
-    assertStrictEquals(second.status, 201);
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
     const secondDocumentRow = documentRowAt(
         await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C2,
         firstDocumentId,
     );
-    assert(secondDocumentRow, 'no second document message pair');
-    const secondDocumentResponse = await db.messagePairs.getById(
-        secondDocumentRow!.id,
-    );
-    assertStrictEquals(
-        secondDocumentResponse.supersedes,
-        firstDocumentId,
-    );
+    assertStrictEquals(secondDocumentRow, undefined);
 
     for (const response of await db.messagePairs.getAll()) {
         assertStrictEquals('follows' in response, false);
@@ -431,7 +454,7 @@ async () => {
 });
 
 Deno.test('a duplicate work-order create\'s operation shares'
-+ ' the document name and supersedes that head', async () => {
++ ' the document name and is 409 over that head', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -444,8 +467,8 @@ Deno.test('a duplicate work-order create\'s operation shares'
     );
     assert(firstDocumentRow);
 
-    // A same document body matches and stores nothing.
-    // A different display_id still lands the create.
+    // The create declares its genesis, so a taken name
+    // refuses whatever the body.
     const second = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             , DEV_TOKEN,
@@ -453,16 +476,15 @@ Deno.test('a duplicate work-order create\'s operation shares'
             WO_C3, WO_C3_FWO_B, FLOW_C3, 'wo-c3-revised',
         ),
     ));
-    assertStrictEquals(second.status, 201);
-    const secondOperationId = pairIdOf(second);
-    assert(secondOperationId);
-    const secondOperationResponse = await db.messagePairs.getById(
-        secondOperationId!,
+    assertStrictEquals(second.status, 409);
+    assertEquals(await second.json(), {
+        error: 'Document already exists at ' + ENTITY_PREFIX
+            + WO_C3,
+    });
+    const head = await db.messagePairs.getHeadPair(
+        ENTITY_PREFIX, WO_C3,
     );
-    assertStrictEquals(
-        secondOperationResponse.supersedes,
-        firstDocumentRow!.id,
-    );
+    assertStrictEquals(head?.id, firstDocumentRow!.id);
 });
 
 Deno.test('a work-order create ignores a raw colliding states'
@@ -480,8 +502,182 @@ Deno.test('a work-order create ignores a raw colliding states'
         ),
     ));
     assertStrictEquals(res.status, 201);
-    // 2 seed pairs (org+membership) + 4 create pairs
-    // (operation, document, join, genesis claim).
-    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
+    await res.body?.cancel();
+    // The fixture's pairs + 3 create pairs (operation,
+    // version, join).
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+});
+
+// -- 5. the PUT is its own version ---------------------------
+
+Deno.test('a work-order PUT with neither conditional is 428',
+async () => {
+    const db = await freshDb();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: ENTITY_PREFIX + generateIdentifier(),
+        token: DEV_TOKEN,
+        body: documentFields(),
+    }));
+    assertStrictEquals(res.status, 428);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+const KEEP_FLOW = generateIdentifier();
+const KEEP_TYPE = generateIdentifier();
+const KEEP_ATTRIBUTE = generateIdentifier();
+const KEEP_INSTANCE = generateIdentifier();
+const KEEP_WO = generateIdentifier();
+
+// A work order with a state and a claim (its create) and a
+// binding, through the live routes.
+async function claimedBoundWorkOrder(
+    db: Awaited<ReturnType<typeof freshDb>>,
+): Promise<void> {
+    const at = '2026-01-01T00:00:00.000000Z';
+    const typePath = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/record-types/' + KEEP_TYPE;
+    const writes: [string, string, unknown, Record<string, string>][] = [
+        ['POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', {
+            id: KEEP_FLOW,
+            flow: {
+                name: 'Keep Flow',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            },
+            projectFlowId: generateIdentifier(),
+            projectFlow: {
+                project_id: generateIdentifier(),
+                flow_id: KEEP_FLOW,
+                at,
+            },
+            initialState: 'active',
+            initialStateEventId: generateIdentifier(),
+            initialStateAt: at,
+            graphDelta: {
+                nodes: [],
+                edges: [],
+                deletions: [],
+                memberEvents: [],
+                attributeEvents: [],
+            },
+        }, {}],
+        ['PUT', typePath, {
+            name: 'Keep Type',
+            description: '',
+            position: 1,
+            state: 'active',
+        }, {}],
+        ['PUT', typePath + '/attributes/' + KEEP_ATTRIBUTE, {
+            name: 'Title',
+            attribute_type: 'text',
+            sort_order: 0,
+            options: [],
+            constraints: [],
+            read_roles: ['admin', 'member'],
+            write_roles: ['admin', 'member'],
+        }, {}],
+        ['PATCH', typePath + '/instances/' + KEEP_INSTANCE, {
+            set: [{ attribute_id: KEEP_ATTRIBUTE, value: 'x' }],
+        }, { 'If-None-Match': '*' }],
+        ['PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + KEEP_FLOW + '/records/' + generateIdentifier(), {
+            flow_id: KEEP_FLOW,
+            record_id: KEEP_TYPE,
+            at,
+        }, {}],
+        ['POST', ENTITY_PREFIX, workOrderCreateBody(
+            KEEP_WO, generateIdentifier(), KEEP_FLOW,
+        ), {}],
+    ];
+    for (const [method, path, body, headers] of writes) {
+        const res = await handleRequest(db, apiRequest({
+            method, path, token: DEV_TOKEN, body, headers,
+        }));
+        assertStrictEquals(res.status, 201, method + ' ' + path);
+        await res.body?.cancel();
+    }
+    const { etag } = await GETWithEtag(
+        db, ENTITY_PREFIX.slice(1) + KEEP_WO, DEV_TOKEN,
+        operationIdHeader(),
+    );
+    const bound = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: ENTITY_PREFIX + KEEP_WO + '/binding',
+        token: DEV_TOKEN,
+        body: {
+            instance_id: KEEP_INSTANCE,
+            record_type_id: KEEP_TYPE,
+        },
+        headers: { 'If-Match': '"' + etag + '"' },
+    }));
+    assertStrictEquals(bound.status, 200);
+    await bound.body?.cancel();
+}
+
+Deno.test('a work-order PUT keeps the head\'s facets', async () => {
+    const db = await freshDb();
+    await claimedBoundWorkOrder(db);
+    const read = await GETWithEtag<Record<string, unknown>>(
+        db, ENTITY_PREFIX.slice(1) + KEEP_WO, DEV_TOKEN,
+        operationIdHeader(),
+    );
+    const fields = { ...documentFields(), position: 7 };
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: ENTITY_PREFIX + KEEP_WO,
+        token: DEV_TOKEN,
+        body: fields,
+        headers: { 'If-Match': '"' + read.etag + '"' },
+    }));
+    assertStrictEquals(res.status, 200);
+    assertEquals(await res.json(), {
+        ...read.body,
+        ...fields,
+        events: [],
+    });
+    const head = read.body as {
+        state?: string;
+        claim?: unknown;
+        instance_id?: string;
+        record_type_id?: string;
+    };
+    assertStrictEquals(head.state, NODE_FINISH);
+    assert(head.claim !== undefined);
+    assertStrictEquals(head.instance_id, KEEP_INSTANCE);
+    assertStrictEquals(head.record_type_id, KEEP_TYPE);
+});
+
+Deno.test('a work-order GET streams its head with its ETag',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: ENTITY_PREFIX + id,
+        token: DEV_TOKEN,
+        body: documentFields(),
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(put.status, 201);
+    await put.body?.cancel();
+    const get = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: ENTITY_PREFIX + id,
+        token: DEV_TOKEN,
+    }));
+    assertStrictEquals(get.status, 200);
+    const head = await db.messagePairs.getHeadPair(
+        ENTITY_PREFIX, id,
+    );
+    assert(head !== null);
+    assertStrictEquals(pairIdOf(get), head.id);
+    assertEquals(await get.json(), responseRecordOf(head.response));
 });

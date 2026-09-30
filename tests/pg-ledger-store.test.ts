@@ -23,6 +23,8 @@ import {
     POSTGRES_FA_REQUEST_ID_OF_FUNCTION,
 } from '../api/schema-postgres.ts';
 import {
+    NEVER_WRITTEN_IDENTIFIER,
+    NIL_IDENTIFIER,
     generateIdentifier,
     uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
@@ -1007,6 +1009,247 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 answer.stamp,
                 stampOfMicros(microsOf(moved.stamp) + 1n),
             );
+        },
+    );
+
+    Deno.test(
+        'a nil latch lands, then is stale over its head',
+        async () => {
+            const name = 'nil-' + generateIdentifier();
+            const born = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'born',
+                        notify: schema + '-nil-born',
+                    }),
+                    ifMatch: NIL_IDENTIFIER,
+                }],
+            ));
+            assertEquals(
+                [born.outcome, born.rawOutcome,
+                    born.supersedes],
+                ['land', 'land', NIL_IDENTIFIER],
+            );
+            const again = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'born',
+                        notify: schema + '-nil-again',
+                    }),
+                    ifMatch: NIL_IDENTIFIER,
+                }],
+            ));
+            assertEquals(
+                [again.outcome, again.rawOutcome],
+                ['stale', 'stale'],
+            );
+        },
+    );
+
+    Deno.test(
+        'a nil latch over a tombstone lands at 201',
+        async () => {
+            const name = 'tomb-' + generateIdentifier();
+            await runLedgerStatement(adapter, 'blind', [
+                bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'PUT',
+                    body: 'live',
+                    notify: schema + '-tomb-live',
+                }),
+            ]);
+            const gone = only(await runLedgerStatement(
+                adapter, 'blind', [bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'DELETE',
+                    body: '',
+                    notify: schema + '-tomb-gone',
+                })],
+            ));
+            const reborn = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'reborn',
+                        notify: schema + '-tomb-reborn',
+                    }),
+                    ifMatch: NIL_IDENTIFIER,
+                }],
+            ));
+            assertEquals(reborn.outcome, 'land');
+            assertEquals(reborn.supersedes, gone.id);
+            assertEquals(
+                new TextDecoder().decode(
+                    reborn.response.subarray(0, 13),
+                ),
+                'HTTP/1.1 201 ',
+            );
+        },
+    );
+
+    Deno.test(
+        'the sql twin reports each row its own outcome',
+        async () => {
+            const name = 'raw-' + generateIdentifier();
+            await runLedgerStatement(adapter, 'blind', [
+                bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'PUT',
+                    body: 'head',
+                    notify: schema + '-raw-head',
+                }),
+            ]);
+            const operationId = generateIdentifier();
+            const rows = await runLedgerStatement(
+                adapter, 'composed', [
+                    {
+                        ...bindOf({
+                            id: generateIdentifier(),
+                            operationId,
+                            path: '/pins/',
+                            name,
+                            method: 'PUT',
+                            body: 'x',
+                            notify: schema + '-raw-x',
+                        }),
+                        ifMatch: generateIdentifier(),
+                    },
+                    bindOf({
+                        id: generateIdentifier(),
+                        operationId,
+                        path: '/pins/',
+                        name: name + '-other',
+                        method: 'PUT',
+                        body: 'y',
+                        notify: schema + '-raw-y',
+                    }),
+                ],
+            );
+            assertEquals(
+                rows.map((row) => row.outcome),
+                ['stale', 'stale'],
+            );
+            assertEquals(
+                rows.map((row) => row.rawOutcome),
+                ['stale', 'land'],
+            );
+        },
+    );
+
+    Deno.test(
+        'a never-written latch lands, then is stale over'
+            + ' its head',
+        async () => {
+            const name = 'never-' + generateIdentifier();
+            const born = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'born',
+                        notify: schema + '-never-born',
+                    }),
+                    ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                }],
+            ));
+            assertEquals(
+                [born.outcome, born.rawOutcome,
+                    born.supersedes, born.headMethod],
+                ['land', 'land', NIL_IDENTIFIER, null],
+            );
+            const again = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'born',
+                        notify: schema + '-never-again',
+                    }),
+                    ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                }],
+            ));
+            assertEquals(
+                [again.outcome, again.rawOutcome,
+                    again.headMethod],
+                ['stale', 'stale', 'PUT'],
+            );
+        },
+    );
+
+    Deno.test(
+        'a never-written latch over a tombstone is stale',
+        async () => {
+            const name = 'spent-' + generateIdentifier();
+            await runLedgerStatement(adapter, 'blind', [
+                bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'PUT',
+                    body: 'live',
+                    notify: schema + '-spent-live',
+                }),
+            ]);
+            const gone = only(await runLedgerStatement(
+                adapter, 'blind', [bindOf({
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    path: '/pins/',
+                    name,
+                    method: 'DELETE',
+                    body: '',
+                    notify: schema + '-spent-gone',
+                })],
+            ));
+            const refused = only(await runLedgerStatement(
+                adapter, 'in-order', [{
+                    ...bindOf({
+                        id: generateIdentifier(),
+                        operationId: generateIdentifier(),
+                        path: '/pins/',
+                        name,
+                        method: 'PUT',
+                        body: 'reborn',
+                        notify: schema + '-spent-reborn',
+                    }),
+                    ifMatch: NEVER_WRITTEN_IDENTIFIER,
+                }],
+            ));
+            assertEquals(refused.rawOutcome, 'stale');
+            assertEquals(refused.outcome, 'stale');
+            assertEquals(refused.inserted, false);
+            assertEquals(refused.headId, gone.id);
+            assertEquals(refused.headMethod, 'DELETE');
         },
     );
 

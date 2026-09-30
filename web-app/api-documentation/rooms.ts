@@ -24,12 +24,14 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
             '204',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -41,12 +43,14 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
             '204',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -58,6 +62,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -65,6 +70,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -76,6 +82,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -83,6 +90,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -94,6 +102,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -101,6 +110,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -112,6 +122,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -119,6 +130,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -130,6 +143,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -137,6 +151,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -152,6 +167,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -159,6 +175,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -174,6 +191,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -181,6 +199,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -196,6 +215,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -203,6 +223,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -1570,6 +1591,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: *',
         ],
         statuses:
         [
@@ -1578,6 +1600,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -1703,6 +1727,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -1711,6 +1736,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -1727,6 +1754,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1735,6 +1763,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -1816,6 +1845,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -1824,6 +1854,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -1839,6 +1871,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1847,6 +1880,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -1861,6 +1895,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1868,6 +1903,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -1882,6 +1918,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1889,6 +1926,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -1903,6 +1941,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1910,6 +1949,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -1921,6 +1961,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1928,6 +1969,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -1941,6 +1983,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1948,6 +1991,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -1961,6 +2005,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1968,6 +2013,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -1982,6 +2028,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -1989,6 +2036,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -2003,6 +2051,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2010,6 +2059,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -2023,6 +2073,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2030,6 +2081,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -2044,6 +2096,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2051,6 +2104,7 @@ export const API_DOC_ROOMS:
             '400',
             '401',
             '404',
+            '412',
         ],
     },
     {
@@ -2065,6 +2119,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2073,6 +2128,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2091,7 +2147,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match: strong etag',
+            'If-Match or If-None-Match: *',
         ],
         statuses:
         [
@@ -2115,6 +2171,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2123,6 +2180,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2134,6 +2192,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2142,6 +2201,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2155,6 +2215,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2163,6 +2224,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2179,6 +2241,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2187,6 +2250,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2200,6 +2264,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2208,6 +2273,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2221,6 +2287,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2229,6 +2296,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2240,6 +2308,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2248,6 +2317,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2262,6 +2332,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2270,6 +2341,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2285,6 +2357,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2293,6 +2366,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2306,6 +2380,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2314,6 +2389,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2330,6 +2406,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2338,6 +2415,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2355,6 +2433,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2363,6 +2442,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2377,6 +2457,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: *',
         ],
         statuses:
         [
@@ -2385,6 +2466,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -2396,6 +2479,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -2404,6 +2488,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -2418,6 +2504,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match: strong etag',
         ],
         statuses:
         [
@@ -2426,6 +2513,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
+            '428',
         ],
     },
     {
@@ -2437,6 +2526,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2445,6 +2535,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2460,6 +2551,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2468,6 +2560,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
     {
@@ -2486,6 +2579,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
+            'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
         [
@@ -2494,6 +2588,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '412',
         ],
     },
 ];

@@ -8,6 +8,11 @@ export const IDENTIFIER_ASCII_LENGTH = 22;
 
 export const NIL_IDENTIFIER = 'AAAAAAAAAAAAAAAAAAAAAA';
 
+// The all-ones id is reserved as a latch: a create that may
+// land only on a name never written. A minted id that
+// equalled it would read as that latch.
+export const NEVER_WRITTEN_IDENTIFIER = '_____________________w';
+
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{21}[AQgw]$/;
 
 const IDENTIFIER_DIGIT_VALUE = new Int16Array(128);
@@ -79,7 +84,10 @@ export function generateIdentifier(): string {
     do {
         crypto.getRandomValues(bytes);
         text = encodeIdentifier(bytes);
-    } while (text === NIL_IDENTIFIER);
+    } while (
+        text === NIL_IDENTIFIER
+        || text === NEVER_WRITTEN_IDENTIFIER
+    );
     return text;
 }
 

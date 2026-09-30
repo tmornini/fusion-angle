@@ -707,9 +707,9 @@ function applyServerGraph(
 const MAX_UNDO_ATTEMPTS = 3;
 
 // Drive POST /flows/:id/undo with its own jittered 412-absorb:
-// the undo op's synthesized document message pair takes the LOCKED
-// family's lock head, so a save racing this undo for the SAME
-// head 412s the whole transaction (the in-tx head re-read).
+// the undo lands in-order on the tag this attempt read, so a
+// save racing this undo for the SAME head makes the statement
+// answer 412 and store nothing.
 // Undo-as-replay (Phase 14 Task 8)
 // resolves the restore target SERVER-SIDE from the message plane
 // (api/derive-flows.ts's resolveFlowUndoTarget), so this loop
@@ -850,7 +850,7 @@ export async function performRedo(
         };
     }
     const v = popped.version;
-    // Redo folds into the locked save (R1/E5): the retired
+    // Redo folds into the conditional PUT (R1/E5): the retired
     // POST /flows/:id/redo's ONE write is now just putFlow,
     // passing the TARGET graph itself as the revival intent —
     // putFlow's own C6 retry loop derives the actual revivals

@@ -13,7 +13,6 @@ import {
 } from './http-fixtures.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
-import { messageStore } from '../api/message-store.ts';
 import {
     generateIdentifier,
     isIdentifier,
@@ -325,37 +324,6 @@ async () => {
         ),
         0,
     );
-});
-
-Deno.test('empty-body PUT is a live document, not a delete',
-async () => {
-    const db = await freshDb();
-    const token = await organizationToken();
-    const res = await handleRequest(
-        db,
-        framedRequest('http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'ideas/yXVKeCiguypnNcNelXVldQ', {
-            method: 'PUT',
-            headers: {
-                Authorization: 'Bearer ' + token,
-                'operation-id': generateIdentifier(),
-            },
-        }),
-    );
-    assertStrictEquals(res.status, 201);
-    const responseId = pairIdOf(res);
-    assert(
-        responseId !== null && isIdentifier(responseId),
-    );
-    const stored = await storedResponseAt(
-        db, IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
-    );
-    assertStrictEquals(stored.method, 'PUT');
-    assertStrictEquals(stored.status, 201);
-    const live = await messageStore(db).getDocumentHead(
-        IDEA_PREFIX, 'yXVKeCiguypnNcNelXVldQ',
-    );
-    assert(live !== null, 'empty PUT must live');
 });
 
 // Memory serializes all ops, so the TOCTOU is

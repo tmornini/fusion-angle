@@ -2,6 +2,7 @@
 // Heads and the clock are arguments. No row is written.
 
 import {
+    NEVER_WRITTEN_IDENTIFIER,
     NIL_IDENTIFIER,
     uuidTextOfIdentifier,
 } from './identifier.ts';
@@ -14,7 +15,6 @@ import {
 } from './pair-root.ts';
 
 export type Attempt =
-    | 'genesis'
     | 'blind'
     | 'in-order'
     | 'composed';
@@ -47,10 +47,12 @@ export type StatementAnswer = {
     name: string,
     method: string,
     outcome: Outcome,
+    rawOutcome: Outcome,
     stamp: string,
     response: Uint8Array,
     headId: string | null,
     headResponse: Uint8Array | null,
+    headMethod: string | null,
     inserted: boolean,
     supersedes: string,
     requestHashHex: string,
@@ -70,12 +72,14 @@ export type Head = {
 
 export type ClassifiedRow = {
     outcome: Outcome,
+    rawOutcome: Outcome,
     inserted: boolean,
     supersedes: string,
     stamp: string,
     response: Uint8Array,
     headId: string | null,
     headResponse: Uint8Array | null,
+    headMethod: string | null,
     requestHashHex: string,
     secretHashHex: string,
     responseHashHex: string,
@@ -106,7 +110,7 @@ export async function classifyStatement(
         const head = headFor(heads, row.path, row.name);
         const stamp = stampFor(attempt, head, now);
         const response = spliceResponse(
-            overlaidPrefix(attempt, row, head),
+            overlaidPrefix(row, head),
             stamp,
             row.responseSuffix,
         );
@@ -115,10 +119,8 @@ export async function classifyStatement(
             head,
             stamp,
             response,
-            supersedes: supersedesOf(attempt, head),
-            outcome: rawOutcome(
-                attempt, row, head, response,
-            ),
+            supersedes: supersedesOf(head),
+            outcome: rawOutcome(row, head, response),
         });
     }
     const outcome = reportedOutcome(prepared);
@@ -139,13 +141,6 @@ export function refusalOf(
     name: string,
 ): Refusal {
     const document = path + name;
-    if (attempt === 'genesis') {
-        return {
-            status: CONFLICT,
-            error: 'Document already exists at '
-                + document,
-        };
-    }
     if (attempt === 'blind') {
         if (conflicts < BLIND_ATTEMPTS) {
             return 'retry';
@@ -191,10 +186,7 @@ function stampFor(
     head: Head | null,
     now: string,
 ): string {
-    if (
-        attempt === 'genesis'
-        || (attempt === 'blind' && head === null)
-    ) {
+    if (attempt === 'blind' && head === null) {
         return now;
     }
     return laterStamp(
@@ -203,24 +195,29 @@ function stampFor(
     );
 }
 
-function supersedesOf(
-    attempt: Attempt,
-    head: Head | null,
-): string {
-    if (attempt === 'genesis' || head === null) {
+function supersedesOf(head: Head | null): string {
+    if (head === null) {
         return NIL_IDENTIFIER;
     }
     return head.id;
 }
 
+// A nil latch is a declared genesis: it may not land over
+// a live document, and it never matches one. A
+// never-written latch may not land over a tombstone either:
+// the name is spent.
 function rawOutcome(
-    attempt: Attempt,
     row: StatementRow,
     head: Head | null,
     response: Uint8Array,
 ): Outcome {
-    if (attempt === 'genesis') {
-        return 'land';
+    if (row.ifMatch === NEVER_WRITTEN_IDENTIFIER) {
+        return head === null ? 'land' : 'stale';
+    }
+    if (row.ifMatch === NIL_IDENTIFIER) {
+        return head !== null && head.method === 'PUT'
+            ? 'stale'
+            : 'land';
     }
     if (
         row.ifMatch !== null
@@ -256,13 +253,11 @@ function reportedOutcome(
 }
 
 function overlaidPrefix(
-    attempt: Attempt,
     row: StatementRow,
     head: Head | null,
 ): Uint8Array {
     if (
         row.method !== 'PUT'
-        || attempt === 'genesis'
         || head === null
         || head.method !== 'PUT'
     ) {
@@ -350,6 +345,7 @@ async function hashedRow(
     });
     return {
         outcome,
+        rawOutcome: item.outcome,
         inserted,
         supersedes: item.supersedes,
         stamp: item.stamp,
@@ -358,6 +354,9 @@ async function hashedRow(
         headResponse: item.head === null
             ? null
             : item.head.response.slice(),
+        headMethod: item.head === null
+            ? null
+            : item.head.method,
         requestHashHex,
         secretHashHex: secretHash,
         responseHashHex,

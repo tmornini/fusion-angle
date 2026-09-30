@@ -23,6 +23,7 @@ import {
     documentGetHandler,
     documentCollectionGetHandler,
     type DocumentFamilyWiring,
+    withoutId,
 } from '../api/document-family.ts';
 import {
     pickString,
@@ -879,11 +880,10 @@ async () => {
     );
 });
 
-// -- 6. duplicate-create supersession ----------------------------
+// -- 6. duplicate-create refusal ---------------------------------
 
-Deno.test('duplicate-create supersession: second document message pair'
-+ ' Supersedes the first document message pair; wire equals derive',
-async () => {
+Deno.test('duplicate-create: the second create is 409 and stores'
++ ' nothing; wire equals derive', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = generateIdentifier();
@@ -905,13 +905,8 @@ async () => {
         ),
     ));
     assertStrictEquals(first.status, 201);
-
-    const firstDocumentMessagePairs = documentMessagePairsAt(
-        await db.messagePairs.getCollectionPairs(prefix,
-        ),
-        prefix,
-    ).filter((messagePair) => messagePair.name === recordId);
-    assertStrictEquals(firstDocumentMessagePairs.length, 1);
+    await first.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
@@ -926,25 +921,17 @@ async () => {
             ],
         ),
     ));
-    assertStrictEquals(second.status, 201);
-
-    const allRequests =
-        await db.messagePairs.getCollectionPairs(prefix);
-    const allResponses =
-        await db.messagePairs.getCollectionPairs(prefix);
-    const secondDocumentMessagePairs = documentMessagePairsAt(
-        allRequests, prefix,
-    ).filter((messagePair) => messagePair.name === recordId);
-    assertStrictEquals(secondDocumentMessagePairs.length, 2);
-    const secondDocumentMessagePairId =
-        secondDocumentMessagePairs[1]!.id;
-    const secondDocumentResponseRow = allResponses.find(
-        (r) => r.id === secondDocumentMessagePairId,
-    )!;
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
     assertStrictEquals(
-        secondDocumentResponseRow.supersedes,
-        firstDocumentMessagePairs[0]!.id,
+        (await db.messagePairs.getAll()).length, before,
     );
+
+    const documentMessagePairs = documentMessagePairsAt(
+        await db.messagePairs.getCollectionPairs(prefix),
+        prefix,
+    ).filter((messagePair) => messagePair.name === recordId);
+    assertStrictEquals(documentMessagePairs.length, 1);
 
     const res = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
@@ -956,8 +943,7 @@ async () => {
         db, STARK_ORGANIZATION, recordId,
     );
     assertStrictEquals(wireText, JSON.stringify(derived));
-    assertStrictEquals(derived.name, 'Dup Second');
-    // Phase Final Stage B: records table retired.
+    assertStrictEquals(derived.name, 'Dup First');
 });
 
 // -- 7. method-filter --------------------------------------------
@@ -1010,8 +996,11 @@ async () => {
     const createBodyKeys = new Set(
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
+    // The stored request is the state, which leads with
+    // the document's id until the former stores no request
+    // bytes; the id is the routing key both bodies name.
     const documentBodyKeys = new Set(
-        Object.keys(recordDocumentMessagePairs[0]!.body),
+        Object.keys(withoutId(recordDocumentMessagePairs[0]!.body)),
     );
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),

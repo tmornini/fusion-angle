@@ -1,6 +1,6 @@
 import type { DbAdapter } from '../api/db.ts';
 import {
-    postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
@@ -13,7 +13,7 @@ import { generateIdentifier } from
 
 // Task 8 CUT: live gate rejects fieldValues. Census pins
 // that need a STORED legacy fold seed via the below-facade
-// dual-tolerant path (organization === undefined).
+// dual-tolerant seed op.
 
 const PATTERN = 'organizations/:id/work-orders/:id/transition';
 
@@ -51,8 +51,7 @@ export async function appendLegacyTransition(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postWorkOrderTransitionOp(
-        db, workOrderId, body, actor,
-        undefined, [], messagePair,
+    await postSeedWorkOrderTransitionOp(
+        db, organization, workOrderId, body, actor, messagePair,
     );
 }

@@ -18,6 +18,7 @@ import {
     postFlowDocumentOp,
     postWorkOrderDocumentOp,
     postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
     postWorkOrderBindingOp,
     postInstancePatchOp,
     postFlowWorkOrderDocumentOp,
@@ -43,7 +44,11 @@ import type {
     RecordWriteMessagePairs,
     ObjectiveCreationMessagePairs,
 } from './routes.ts';
-import type { Id } from '../shared/types.ts';
+import type {
+    Id,
+    MessagePairEntity,
+    StateEntity,
+} from '../shared/types.ts';
 import {
     SYSTEM_MEMBER_ID,
     nowUtc,
@@ -126,11 +131,11 @@ import {
     humanMemberPiiSeedBody,
     bootstrapCurrentMemberPiiBody,
     identityCredentialSeedBody,
-    VALUE_BEARING_TRANSITION_EVENT_IDS,
     SEED_INSTANCE_ID,
     SEED_RECORD_TYPE_ID,
     WO01_ID,
     formInstanceChainSeedInput,
+    formInstanceBindingSeedPair,
     formInstanceTransitionSeedPair,
     flowRecordOrganizationFor,
     defaultOrganizationSeedBody,
@@ -140,10 +145,14 @@ import {
 } from './mock-data/seed-message-pairs.ts';
 import type {
     InstanceChainSeedInput,
+    InstanceTransitionSeedInput,
     InvitationGrantSeedInput,
 } from './mock-data/seed-message-pairs.ts';
-import { deriveInstanceHead } from
+import { instancesUriPrefix } from
     './derive-record-instances.ts';
+import { workOrderHeadFor } from './derive-states.ts';
+import { compareIdentifiers } from
+    '../shared/identifier.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
@@ -441,14 +450,11 @@ function starkRolesOf(identityId: Id): readonly string[] {
         : ['member'];
 }
 
-// The WO01 chain through the live ops, after the flow
-// records land: the binding op reads the flow's record
-// joins. Each transition's POST latches the head the
-// previous op wrote.
-async function postInstanceChainIn(
+// The seeded instance WO01 binds, through the live PATCH
+// create.
+async function postSeedInstanceIn(
     adapter: DbAdapter,
     chain: InstanceChainSeedInput,
-    requestAt: string,
 ): Promise<void> {
     await postInstancePatchOp(
         adapter,
@@ -460,6 +466,29 @@ async function postInstanceChainIn(
         STARK_ORGANIZATION,
         [],
     );
+}
+
+async function requireWorkOrderHeadIn(
+    adapter: DbAdapter,
+    workOrderId: Id,
+): Promise<MessagePairEntity> {
+    const head = await workOrderHeadFor(
+        adapter, STARK_ORGANIZATION, workOrderId,
+    );
+    if (head === null) {
+        throw new Error('a seeded work order has no head');
+    }
+    return head.pair;
+}
+
+// WO01's binding through the live op, naming the head it
+// read; the op reads the flow's record joins.
+async function postSeedBindingIn(
+    adapter: DbAdapter,
+    chain: InstanceChainSeedInput,
+    requestAt: string,
+): Promise<void> {
+    const head = await requireWorkOrderHeadIn(adapter, WO01_ID);
     await postWorkOrderBindingOp(
         adapter,
         WO01_ID,
@@ -469,28 +498,101 @@ async function postInstanceChainIn(
         },
         SYSTEM_MEMBER_ID,
         STARK_ORGANIZATION,
-        chain.binding,
+        await formInstanceBindingSeedPair(
+            chain.bindingOperationId, head.id, requestAt,
+        ),
     );
-    for (const transition of [chain.review, chain.complete]) {
-        const head = await deriveInstanceHead(
-            adapter, STARK_ORGANIZATION,
-            SEED_RECORD_TYPE_ID, SEED_INSTANCE_ID,
-        );
-        if (head === undefined) {
-            throw new Error('the seed instance has no head');
-        }
-        await postWorkOrderTransitionOp(
-            adapter,
-            WO01_ID,
-            transitionSeedBody(transition.event),
-            transition.event.member_id,
-            STARK_ORGANIZATION,
-            starkRolesOf(transition.event.member_id),
-            await formInstanceTransitionSeedPair(
-                transition, head.messagePairId, requestAt,
-            ),
-        );
+}
+
+// A value-bearing move through the live op, with both tags
+// taken from the heads it read: the work order's, then the
+// instance's.
+async function postValueBearingTransitionIn(
+    adapter: DbAdapter,
+    transition: InstanceTransitionSeedInput,
+    requestAt: string,
+): Promise<void> {
+    const workOrder = await requireWorkOrderHeadIn(
+        adapter, WO01_ID,
+    );
+    const instance = await adapter.messagePairs.getHeadPair(
+        instancesUriPrefix(
+            STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
+        ),
+        SEED_INSTANCE_ID,
+    );
+    if (instance === null) {
+        throw new Error('the seed instance has no head');
     }
+    await postWorkOrderTransitionOp(
+        adapter,
+        WO01_ID,
+        transitionSeedBody(transition.event),
+        transition.event.member_id,
+        STARK_ORGANIZATION,
+        starkRolesOf(transition.event.member_id),
+        await formInstanceTransitionSeedPair(
+            transition, [workOrder.id, instance.id], requestAt,
+        ),
+    );
+}
+
+function atIdAscending(a: StateEntity, b: StateEntity): number {
+    return a.at < b.at ? -1
+        : a.at > b.at ? 1
+            : compareIdentifiers(a.id, b.id);
+}
+
+// Each work order's trace is one chain in (at, id) order: a
+// transition lands a version, so no wave holds two writers
+// of one document (Interpretation R). Chains run
+// concurrently. WO01 binds before its first value-bearing
+// move, and those moves ride the live op.
+async function postWorkOrderChainsIn(
+    adapter: DbAdapter,
+    messagePairs: ReadonlyMap<string, MessagePair>,
+    chain: InstanceChainSeedInput,
+    requestAt: string,
+    events: readonly StateEntity[],
+): Promise<void> {
+    const traces = Map.groupBy(events, (event) => event.entity_id);
+    const valueBearing = new Map([
+        [chain.review.event.id, chain.review],
+        [chain.complete.event.id, chain.complete],
+    ]);
+    await Promise.all([...traces.values()].map(async (trace) => {
+        const ordered = trace.toSorted(atIdAscending);
+        const firstValueBearing = ordered.find(
+            (event) => valueBearing.has(event.id),
+        );
+        for (const event of ordered) {
+            const transition = valueBearing.get(event.id);
+            if (transition !== undefined) {
+                if (event === firstValueBearing) {
+                    await postSeedBindingIn(
+                        adapter, chain, requestAt,
+                    );
+                }
+                await postValueBearingTransitionIn(
+                    adapter, transition, requestAt,
+                );
+                continue;
+            }
+            await postSeedWorkOrderTransitionOp(
+                adapter,
+                STARK_ORGANIZATION,
+                event.entity_id,
+                transitionSeedBody(event),
+                event.member_id,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'work-orders/:id/transition', event.id,
+                    ),
+                ),
+            );
+        }
+    }));
 }
 
 async function postMockDataLoadIn(
@@ -877,6 +979,7 @@ async function postMockDataLoadIn(
                         'work-orders/:id', r.id,
                     ),
                 ),
+                STARK_ORGANIZATION,
             ),
         ),
         ...mockFlowWorkOrders.map(r =>
@@ -893,33 +996,6 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        // States-document retirement Task 12: every historical
-        // trace drives through the live transition op — body
-        // validates via validateWorkOrderTransitionBody. WO-
-        // instance SoT Task 6: value-bearing WO01 events leave
-        // this loop (they drive the instance chain below).
-        ...mockStateEvents
-            .filter((r) =>
-                !VALUE_BEARING_TRANSITION_EVENT_IDS.has(
-                    r.id,
-                ))
-            .map(r =>
-                postWorkOrderTransitionOp(
-                    adapter,
-                    r.entity_id,
-                    transitionSeedBody(r),
-                    r.member_id,
-                    undefined,
-                    [],
-                    requireMessagePair(
-                        messagePairs,
-                        seedMessagePairKey(
-                            'work-orders/:id/transition',
-                            r.id,
-                        ),
-                    ),
-                ),
-            ),
         ...aiMembers.map(m => {
             const { id: _id, ...fields } = m;
             return postAiAgentDocumentOp(
@@ -944,6 +1020,7 @@ async function postMockDataLoadIn(
                         'work-orders/:id', r.id,
                     ),
                 ),
+                STARK_ORGANIZATION,
             ),
         ),
         ...leadToCloseData.flowWorkOrders.map(r =>
@@ -960,28 +1037,6 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        ...leadToCloseData.stateEvents
-            .filter((r) =>
-                !VALUE_BEARING_TRANSITION_EVENT_IDS.has(
-                    r.id,
-                ))
-            .map(r =>
-                postWorkOrderTransitionOp(
-                    adapter,
-                    r.entity_id,
-                    transitionSeedBody(r),
-                    r.member_id,
-                    undefined,
-                    [],
-                    requireMessagePair(
-                        messagePairs,
-                        seedMessagePairKey(
-                            'work-orders/:id/transition',
-                            r.id,
-                        ),
-                    ),
-                ),
-            ),
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -1049,8 +1104,13 @@ async function postMockDataLoadIn(
             ),
         ),
     );
-    await postInstanceChainIn(
-        adapter, input.instanceChain, input.requestAt,
+    await postSeedInstanceIn(adapter, input.instanceChain);
+    await postWorkOrderChainsIn(
+        adapter,
+        messagePairs,
+        input.instanceChain,
+        input.requestAt,
+        [...mockStateEvents, ...leadToCloseData.stateEvents],
     );
 
     // A score or revision author is always a member of the

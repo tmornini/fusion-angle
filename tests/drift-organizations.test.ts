@@ -289,7 +289,7 @@ Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
         method: 'PUT',
         body: updatedFields,
     });
-    assertStrictEquals(Object.keys(expected).at(-1), 'id');
+    assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
     // Phase Final Stage B: organizations table retired.
 });
@@ -311,8 +311,8 @@ Deno.test('leg 5: SEED-STATE — no organizations states event'
 // ---- leg 6: the key-order pin -----------------------------------
 
 Deno.test('leg 6: key-order pin — derived entity JSON key order is'
-+ ' id-LAST (organizationEntityOf departs from the'
-+ ' seven-sibling id-first entityOf convention on purpose)',
++ ' id-FIRST (organizationEntityOf matches the'
++ ' seven-sibling id-first entityOf convention)',
 async () => {
     const db = await seededDb();
     for (const organizationId of [
@@ -321,13 +321,13 @@ async () => {
         const derived = await deriveOrganization(
             db, organizationId,
         );
-        assertStrictEquals(Object.keys(derived).at(-1), 'id');
+        assertStrictEquals(Object.keys(derived).at(0), 'id');
     }
 });
 
 // Writer matches GET: successBody is organizationEntityOf
-// (id-last). The id-first pin is deleted.
-Deno.test('leg 6b: organizations/:id successBody is id-last',
+// (id-first). The id-last pin is deleted.
+Deno.test('leg 6b: organizations/:id successBody is id-first',
 () => {
     const entry = WRITE_RESPONSE_SPECS['organizations/:id'];
     assert(entry !== undefined && 'successBody' in entry);
@@ -337,6 +337,6 @@ Deno.test('leg 6b: organizations/:id successBody is id-last',
         'XXZruirZyAOoRpNxaDnpSA',
         undefined,
     ) as { id: string };
-    assertStrictEquals(Object.keys(body).at(-1), 'id');
+    assertStrictEquals(Object.keys(body).at(0), 'id');
     assertStrictEquals(body.id, STARK_ORGANIZATION);
 });

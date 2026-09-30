@@ -15,7 +15,7 @@ import { generateIdentifier } from
 function specsOf(
     entry: (typeof WRITE_RESPONSE_SPECS)[string],
 ): WriteResponseSpec[] {
-    if ('status' in entry) return [entry];
+    if ('conditional' in entry) return [entry];
     return [
         entry.put, entry.patch, entry.post,
     ].filter(
@@ -132,6 +132,7 @@ const DUMMY_BODIES: Readonly<
         redirect_uris: '', jwks: '', aud: 'a',
         status: 'active',
     },
+    'identities/:id/default-organization': { organization_id: ID },
     [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
         type: 'member', at: AT,
     },

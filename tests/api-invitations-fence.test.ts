@@ -187,7 +187,7 @@ async function grantSarahToWayne(
             grantEventId: EV_GRANT,
             grantAt: AT,
         }));
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 201);
     return (await deriveInvitations(db))[0]!.id;
 }
 
@@ -361,11 +361,11 @@ async () => {
     const r1 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
             tok, body, operationId));
-    assertStrictEquals(r1.status, 200);
+    assertStrictEquals(r1.status, 201);
     const r2 = await handleRequest(
         db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
             tok, body, operationId));
-    assertStrictEquals(r2.status, 200);
+    assertStrictEquals(r2.status, 409);
     assertStrictEquals((await deriveInvitations(db)).length, 1);
     assertStrictEquals(
         (await invitationLifecycleStatesFor(db, INV_IDEM)).length, 1,

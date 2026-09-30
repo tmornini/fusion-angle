@@ -401,7 +401,7 @@ async function grantAndAccept(
         adminToken,
         { email: inviteeEmail, invitationId, grantEventId, grantAt },
     ));
-    assertStrictEquals(grantRes.status, 200, 'grant failed');
+    assertStrictEquals(grantRes.status, 201, 'grant failed');
 
     const acceptRes = await handleRequest(db, req(
         'PUT',
@@ -766,7 +766,7 @@ Deno.test('deriveInvitationStates: a duplicate grant on the same'
             grantAt: '2026-04-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(first.status, 200, 'first grant failed');
+    assertStrictEquals(first.status, 201, 'first grant failed');
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/' + organizationA + '/invitations/',
@@ -831,7 +831,7 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
             grantAt: '2026-04-02T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grantRes.status, 200, 'grant failed');
+    assertStrictEquals(grantRes.status, 201, 'grant failed');
 
     const firstAccept = await handleRequest(db, req(
         'PUT',
@@ -903,7 +903,7 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
             grantAt: '2026-04-03T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grantRes.status, 200, 'grant failed');
+    assertStrictEquals(grantRes.status, 201, 'grant failed');
 
     const firstDecline = await handleRequest(db, req(
         'PUT',

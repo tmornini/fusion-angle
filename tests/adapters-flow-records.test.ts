@@ -14,12 +14,10 @@ import {
 import {
     postFlowCreation,
 } from '../client/flow-mutations.ts';
-import {
-    putWorkOrder,
-} from '../client/work-orders-mutations.ts';
 import { putRecord } from '../client/records.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    storedWorkOrderFlowGraph,
     type WorkOrderFlowGraph,
 } from '../shared/types.ts';
 import { generateIdentifier } from
@@ -71,11 +69,15 @@ async function seedWorkOrder(
     // commit) — a raw db.workOrders.put leaves no message pair
     // at this document, so the entity must land through the
     // SAME wire-reachable PUT the live route serves.
-    await putWorkOrder(ctx, id, {
-        displayId,
-        flowGraph,
-        position,
-    });
+    await ctx.PUT(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
+        {
+            display_id: displayId,
+            flow_graph: storedWorkOrderFlowGraph(flowGraph),
+            position,
+        },
+        [['If-None-Match', '*']],
+    );
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
     // organizations/:id/flows/:id/work-orders through the flipped GET too —
     // same

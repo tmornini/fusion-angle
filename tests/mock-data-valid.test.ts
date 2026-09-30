@@ -9,7 +9,10 @@ import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
-import { canonicalPath } from '../api/message-pair.ts';
+import {
+    canonicalPath,
+    responseRecordOf,
+} from '../api/message-pair.ts';
 import {
     validateIdeaEntity,
     validateProjectEntity,
@@ -17,7 +20,7 @@ import {
     validateOrganizationEntity,
     validateIdeaSubmissionEntity,
     validateProjectFlowEntity,
-    validateWorkOrderEntity,
+    validateWorkOrderVersion,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
     validateStateEntity,
@@ -478,13 +481,12 @@ async () => {
 Deno.test('mock-data seeds non-empty derived work orders',
 async () => {
     const db = await seededDb();
-    const derived = await documentCollectionGetHandler(
-        WORK_ORDERS_WIRING,
-    )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, []) as
-        WorkOrderEntity[];
-    assert(derived.length > 0, 'work orders empty');
-    for (const wo of derived) {
-        validateWorkOrderEntity(withoutId(wo));
+    const heads = await db.messagePairs.getCollectionHeadPairs(
+        canonicalPath(STARK_ORGANIZATION, '/work-orders/'),
+    );
+    assert(heads.length > 0, 'work orders empty');
+    for (const head of heads) {
+        validateWorkOrderVersion(responseRecordOf(head.response)!);
     }
 });
 

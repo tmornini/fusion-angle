@@ -1,15 +1,10 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import {
-    FAMILY_REGISTRY,
-    familyRegistration,
-} from '../api/family-registry.ts';
+import { assertEquals, assertStrictEquals } from '@std/assert';
+import { familyRegistration } from '../api/family-registry.ts';
 
-Deno.test('ideas registers organization-nested, simple concurrency',
-() => {
+Deno.test('ideas registers organization-nested', () => {
     assertEquals(familyRegistration('ideas'), {
         family: 'ideas',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
@@ -18,57 +13,50 @@ Deno.test('projects is the second registered family', () => {
     assertEquals(familyRegistration('projects'), {
         family: 'projects',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
 
-Deno.test('flows is the third registered family, the first'
-+ ' locked one', () => {
+Deno.test('flows is the third registered family', () => {
     assertEquals(familyRegistration('flows'), {
         family: 'flows',
         organizationNested: true,
-        concurrency: 'locked',
         createBodyIdField: 'id',
     });
 });
 
-Deno.test('work-orders is the fourth registered family,'
-+ ' simple like ideas and projects', () => {
+Deno.test('work-orders is the fourth registered family',
+() => {
     assertEquals(familyRegistration('work-orders'), {
         family: 'work-orders',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
 
-Deno.test('record-types is the fifth registered family, simple'
-+ ' like ideas, projects, and work-orders', () => {
+Deno.test('record-types is the fifth registered family',
+() => {
     assertEquals(familyRegistration('record-types'), {
         family: 'record-types',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
 
-Deno.test('record-attributes is the sixth registered family,'
-+ ' simple like record-types', () => {
+Deno.test('record-attributes is the sixth registered family',
+() => {
     assertEquals(familyRegistration('record-attributes'), {
         family: 'record-attributes',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
 
-Deno.test('objectives is the seventh registered family, simple'
-+ ' like record-types and record-attributes', () => {
+Deno.test('objectives is the seventh registered family',
+() => {
     assertEquals(familyRegistration('objectives'), {
         family: 'objectives',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
@@ -92,7 +80,6 @@ Deno.test('identities is a live global-plane family', () => {
     assertEquals(familyRegistration('identities'), {
         family: 'identities',
         organizationNested: false,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
@@ -103,7 +90,6 @@ Deno.test('organizations is the tenant root — global-plane'
     assertEquals(familyRegistration('organizations'), {
         family: 'organizations',
         organizationNested: false,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
@@ -114,21 +100,10 @@ Deno.test('ai-agents is a live global-plane family,'
     assertEquals(familyRegistration('ai-agents'), {
         family: 'ai-agents',
         organizationNested: false,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     });
 });
 
 Deno.test('an unregistered family returns undefined', () => {
     assertStrictEquals(familyRegistration('not-a-family'), undefined);
-});
-
-Deno.test('every registered family names a concurrency class',
-() => {
-    for (const entry of FAMILY_REGISTRY) {
-        assert(
-            entry.concurrency === 'simple'
-                || entry.concurrency === 'locked',
-        );
-    }
 });

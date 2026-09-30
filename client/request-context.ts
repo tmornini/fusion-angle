@@ -140,6 +140,11 @@ export interface RequestContext {
         headerFields?: readonly (readonly [string, string])[],
     ): Promise<{ body: T; etag: string | undefined }>;
     DELETE(resource: string): Promise<void>;
+    // DELETE plus the strong ETag of the state it answers.
+    DELETEWithEtag(
+        resource: string,
+        headerFields: readonly (readonly [string, string])[],
+    ): Promise<{ etag: string | undefined }>;
     POST<T>(
         resource: string,
         body: Record<string, unknown>,
@@ -330,6 +335,18 @@ function openRequestContext(
             const headers = writeHeaders();
             return run<void>(
                 tok => verbs.DELETE(
+                    resource, tok, headers,
+                ));
+        },
+        DELETEWithEtag: (
+            resource: string,
+            headerFields:
+                readonly (readonly [string, string])[],
+        ) => {
+            core.recordRequest('DELETE', resource);
+            const headers = writeHeaders(headerFields);
+            return run<{ etag: string | undefined }>(
+                tok => verbs.DELETEWithEtag(
                     resource, tok, headers,
                 ));
         },

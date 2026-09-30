@@ -7,6 +7,7 @@ import {
     ForeignOrganizationError,
     foreignOrganizationMessage,
     MissingTableError,
+    RetiredEntityError,
     UniqueConstraintError,
 } from './db.ts';
 import type { LatencySimulation } from './latency.ts';
@@ -16,7 +17,6 @@ import {
     nowUtc,
 } from '../shared/types.ts';
 import type { Id } from '../shared/types.ts';
-import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
@@ -28,15 +28,13 @@ import {
     writeAnswerOf,
     ownWireOf,
     responseFromHead,
-    attemptFor,
-    runWrite,
     attachEtag,
     attachDate,
     streamGetFromStored,
-    parseIfMatch,
-    LATCHED_OPERATION_ROUTE_PATTERNS,
+    parseEntityTags,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
 } from './message-pair.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { ReceivedRequest } from './message-pair.ts';
@@ -48,7 +46,6 @@ import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
 import {
-    familyRegistration,
     INSTANCE_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
 } from './family-registry.ts';
@@ -66,7 +63,6 @@ import {
 import {
     deriveInstanceHead,
     projectionOmitsStored,
-    instancesUriPrefix,
 } from './derive-record-instances.ts';
 import { projectReadableValues } from './attribute-acl.ts';
 import {
@@ -78,7 +74,6 @@ import {
 } from '../shared/notifications.ts';
 import {
     resolveGlobalOwner,
-    missedReadError,
 } from './derive-states.ts';
 import {
     writeAuthorizerFor,
@@ -98,7 +93,7 @@ import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
-    HTTP_CONFLICT,
+    HTTP_GONE,
     HTTP_METHOD_NOT_ALLOWED,
     HTTP_INTERNAL_ERROR,
     HTTP_UNAUTHORIZED,
@@ -115,7 +110,6 @@ import {
     authorizeRequest,
     authorizeIdentityPii,
     parseObjectBody,
-    parsePutBody,
 } from './request-auth.ts';
 import {
     routes,
@@ -123,7 +117,10 @@ import {
     param,
     WRITE_RESPONSE_SPECS,
     loadAttributeSchemaById,
+    conditionalOf,
+    type Conditional,
     type Route,
+    type WriteMethod,
     type WriteResponseSpec,
 } from './routes.ts';
 
@@ -233,7 +230,7 @@ function postWriteNotification(
 // WriteResponseSpec, applying regardless of which non-DELETE
 // verb hit it (no prior pattern wired both a PUT and a POST at
 // once). A PerVerbWriteResponseSpec — recognized by the absence
-// of `status` at its top level — supplies one spec per verb
+// of `conditional` at its top level — supplies one spec per verb
 // instead; 'ai-members/:id' needs this because it wires a real
 // PUT alongside its composed-edit POST, and 'human-members/:id'
 // joins it (Phase 8 Task 4) for a DIFFERENT reason — its `put`
@@ -246,12 +243,89 @@ function writeResponseSpecFor(
     method: string,
 ): WriteResponseSpec | undefined {
     const entry = WRITE_RESPONSE_SPECS[routePattern];
-    if (entry === undefined || 'status' in entry) {
+    if (entry === undefined || 'conditional' in entry) {
         return entry;
     }
     if (method === 'PUT') return entry.put;
     if (method === 'PATCH') return entry.patch;
     return entry.post;
+}
+
+function isWriteMethod(method: string): method is WriteMethod {
+    return method === 'PUT' || method === 'POST'
+        || method === 'PATCH' || method === 'DELETE';
+}
+
+// Presence and form only (§2): the gate never reads a head
+// to decide a latch; the statement judges the value.
+function preconditionRefusal(
+    headers: Headers,
+    conditional: Conditional,
+    method: string,
+    pathname: string,
+): Response | undefined {
+    const ifMatch = headers.get(IF_MATCH_HEADER);
+    const ifNoneMatch = headers.get(IF_NONE_MATCH_HEADER);
+    if (conditional === 'none') {
+        return ifMatch === null && ifNoneMatch === null
+            ? undefined
+            : errorJson(
+                method + ' ' + pathname
+                    + ' takes no precondition',
+                HTTP_BAD_REQUEST,
+            );
+    }
+    if (ifMatch !== null && ifNoneMatch !== null) {
+        return errorJson(
+            'If-Match and If-None-Match cannot both hold'
+                + ' at ' + pathname,
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    if (ifNoneMatch !== null) {
+        if (conditional === 'in-order') {
+            return errorJson(
+                method + ' ' + pathname
+                    + ' requires If-Match',
+                HTTP_BAD_REQUEST,
+            );
+        }
+        return ifNoneMatch.trim() === '*'
+            ? undefined
+            : errorJson(
+                'If-None-Match must be *',
+                HTTP_BAD_REQUEST,
+            );
+    }
+    if (ifMatch !== null) {
+        const tags = parseEntityTags(ifMatch);
+        if (
+            tags === undefined
+            || (conditional !== 'in-order' && tags.length !== 1)
+        ) {
+            return errorJson(
+                'If-Match must carry exactly one strong'
+                    + ' validator',
+                HTTP_BAD_REQUEST,
+            );
+        }
+        return undefined;
+    }
+    if (conditional === 'required') {
+        return errorJson(
+            'If-Match or If-None-Match is required to '
+                + method + ' ' + pathname,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    if (conditional === 'in-order') {
+        return errorJson(
+            'If-Match is required to ' + method + ' '
+                + pathname,
+            HTTP_PRECONDITION_REQUIRED,
+        );
+    }
+    return undefined;
 }
 
 function octetsEqual(
@@ -359,6 +433,16 @@ function rejectMalformedIdentifierParams(
     return undefined;
 }
 
+// WP8 self-only token-chain guard (below): the route-and-
+// method pairs it covers — the token revocation document's
+// PUT and both token operations' POSTs. `:id` in each pattern
+// names the identity whose chain the route acts on.
+const SELF_ONLY_TOKEN_ROUTES: ReadonlySet<string> = new Set([
+    'PUT identities/:id/token-revocations/:rid',
+    'POST identities/:id/tokens/:jti/rotation',
+    'POST identities/:id/tokens/:jti/revocation',
+]);
+
 function finish(
     ctx: IncomingContext,
     response: Response,
@@ -441,9 +525,10 @@ async function dispatched(
     let organization: Id | undefined;
     // Whether the caller holds the admin role in the fenced
     // organization — threaded out of Region A (below) alongside
-    // effective/actor/organization for WP8's self-only revocation
-    // guard (Region B, below): MEMBER_VERBS widens PUT
-    // /identities/:id/token-revocations to the member tier, but
+    // effective/actor/organization for WP8's self-only token-
+    // chain guard (Region B, below, SELF_ONLY_TOKEN_ROUTES):
+    // MEMBER_VERBS widens the token revocation document's PUT
+    // and both token operations' POSTs to the member tier, but
     // an admin may still name any identity. False for a bearer-
     // exempt route (no fence ran, so no role to hold) — the
     // guard below only ever runs on an authenticated route.
@@ -656,9 +741,7 @@ async function dispatched(
         || method === 'POST'
         || method === 'PATCH'
     ) {
-        const parse = method === 'PUT'
-            ? parsePutBody(ctx.bodyBytes)
-            : parseObjectBody(ctx.bodyBytes);
+        const parse = parseObjectBody(ctx.bodyBytes);
         if (!parse.ok) {
             return Response.json(
                 {
@@ -672,9 +755,36 @@ async function dispatched(
         }
         body = parse.body;
     }
+    // A route pattern can be pair-wired for one verb (PUT,
+    // say) while exposing no handler for another (DELETE) —
+    // ideas/:id is exactly this today. Requiring the matched
+    // verb's handler to exist keeps that combination 405ing
+    // exactly as it did before pairs existed, rather than
+    // running the pair machinery (and its successBody
+    // validation) against a request no handler will ever see.
+    // Task 10: PATCH joins the write alphabet the same way.
+    const hasWriteHandler =
+        (method === 'PUT' && matched.put !== undefined)
+        || (method === 'POST' && matched.post !== undefined)
+        || (method === 'PATCH'
+            && matched.patch !== undefined)
+        || (method === 'DELETE'
+            && matched.delete !== undefined);
+    if (isWriteMethod(method) && hasWriteHandler) {
+        const refused = preconditionRefusal(
+            request.headers,
+            conditionalOf(routePattern, method),
+            method,
+            pathname,
+        );
+        if (refused !== undefined) {
+            return refused;
+        }
+    }
 
     // Region B of the pre-dispatch write authorizer (Phase 12
-    // Task 1, joined by WP8's self-only revocation guard below):
+    // Task 1, joined by WP8's self-only token-chain guard
+    // below):
     // the one UNCONDITIONAL write guard below runs after body-
     // parse regardless of bearerExempt, mirroring Region A above.
     // The states/:id ownership authorizer RETIRED with the route
@@ -682,18 +792,19 @@ async function dispatched(
     // write authorizer RETIRED with the leaf routes (Phase 15
     // Task 7).
     try {
-        // WP8 self-only revocation guard. MEMBER_VERBS widens
-        // PUT /identities/:id/token-revocations to the member
-        // tier (Region A's route-policy check already cleared
-        // it). The path identity IS the document — compare it
-        // to the actor. A member may revoke only its OWN
-        // chain; an admin may name any identity. The 403 body
-        // reuses authorizeRequest's OWN wording
-        // (request-auth.ts).
+        // WP8 self-only token-chain guard. MEMBER_VERBS widens
+        // the token revocation document's PUT and both token
+        // operations' POSTs to the member tier (Region A's
+        // route-policy check already cleared each). The path
+        // identity IS the document, or owns the chain the
+        // operation acts on — compare it to the actor. A
+        // member may act only on its OWN chain; an admin may
+        // name any identity. The 403 body reuses
+        // authorizeRequest's OWN wording (request-auth.ts).
         if (
-            method === 'PUT'
-            && routePattern
-                === 'identities/:id/token-revocations/:rid'
+            SELF_ONLY_TOKEN_ROUTES.has(
+                method + ' ' + routePattern,
+            )
         ) {
             const targetIdentityId = params[0];
             if (
@@ -718,21 +829,6 @@ async function dispatched(
 
     const isWrite = method === 'PUT' || method === 'POST'
         || method === 'DELETE' || method === 'PATCH';
-    // A route pattern can be pair-wired for one verb (PUT,
-    // say) while exposing no handler for another (DELETE) —
-    // ideas/:id is exactly this today. Requiring the matched
-    // verb's handler to exist keeps that combination 405ing
-    // exactly as it did before pairs existed, rather than
-    // running the pair machinery (and its successBody
-    // validation) against a request no handler will ever see.
-    // Task 10: PATCH joins the write alphabet the same way.
-    const hasWriteHandler =
-        (method === 'PUT' && matched.put !== undefined)
-        || (method === 'POST' && matched.post !== undefined)
-        || (method === 'PATCH'
-            && matched.patch !== undefined)
-        || (method === 'DELETE'
-            && matched.delete !== undefined);
 
     try {
         // Pre-write ownership authorizer for the 9 org-scoped
@@ -786,22 +882,10 @@ async function dispatched(
                     organization,
                     body,
                 });
-            // The locked/simple divide (spec §The two PUT classes): keyed by
-            // the route's family registration THROUGH THE WIRING CONSULT —
-            // never a blanket family-registry or
-            // DOCUMENT_CLASS_ROUTE_PATTERNS read — so a family whose
-            // registration says 'locked' but has no row in
-            // document-family.ts's wiring table never rides this arm; only a
-            // route actually served via documentPutHandler can — flows is
-            // the live family that rides the locked arm today (registered in
-            // document-family.ts's wiring table AND 'locked' in
-            // family-registry.ts). The routePattern check (not merely the
-            // first segment) matters once a family's OTHER routes share its
-            // prefix (e.g. a future locked family's own :id/sub-resource PUT
-            // must never inherit the entity route's four-outcome table) —
-            // documentEntityRoute's own pattern is always exactly
-            // `${family}/:id`. PUT-only: the two PUT classes govern PUT,
-            // never POST/DELETE.
+            // Keyed through the wiring consult and the exact
+            // entity pattern, so a family's sub-resource PUT
+            // under the same prefix never reads the entity's
+            // head.
             const wiring = wiringForSegments(
                 matched.segments,
             );
@@ -809,15 +893,9 @@ async function dispatched(
                 && wiring !== undefined
                 && routePattern
                     === documentEntityPattern(wiring);
-            const isLockedWrite = isDocumentPut
-                && wiring !== undefined
-                && familyRegistration(wiring.family)
-                    ?.concurrency === 'locked';
-            // Advertised ETag is the live PUT pair id.
-            // A DELETE head is not live, so If-Match is
-            // not required, and the PUT is not genesis.
-            // Same-body no-append uses livePut for both
-            // PUT kinds (simple and locked).
+            // Advertised ETag is the live PUT pair id. A
+            // DELETE head is not live, so the same-body
+            // no-append never answers over one.
             const head = isDocumentPut
                 ? await documentHeadAt(
                     effective, canonicalPrefix, name,
@@ -827,49 +905,6 @@ async function dispatched(
                 && head.method === 'PUT'
                 ? head.id
                 : undefined;
-            const advertised = livePut;
-            // The hoisted echo: read If-Match directly so
-            // the gate can compare the parsed validator
-            // against the advertised ETag BEFORE dispatch.
-            const rawIfMatch = isLockedWrite
-                ? request.headers.get(IF_MATCH_HEADER)
-                : null;
-            const echo = rawIfMatch === null
-                ? null
-                : parseIfMatch(rawIfMatch);
-            const echoMatchesHead = isLockedWrite
-                && echo !== undefined
-                && echo !== null
-                && advertised !== undefined
-                && echo === advertised;
-            // The latched operation arm: a sub-resource
-            // write that acts ON the parent document (undo).
-            // Its precondition target is that parent's head —
-            // the route's segments minus the trailing literal
-            // — so the caller pins what it saw, not what the
-            // server's own resolution walk later reads.
-            const isLatchedOperation =
-                LATCHED_OPERATION_ROUTE_PATTERNS
-                    .has(routePattern);
-            const latchPathAndName = isLatchedOperation
-                ? pathAndNameOf(
-                    matched.segments.slice(0, -1),
-                    pathSegments.slice(0, -1),
-                )
-                : undefined;
-            const latchHead = latchPathAndName === undefined
-                ? undefined
-                : await documentHeadMessagePairId(
-                    effective,
-                    canonicalPath(
-                        organization,
-                        latchPathAndName.path,
-                    ),
-                    latchPathAndName.name,
-                );
-            const latchEcho = isLatchedOperation
-                ? request.headers.get(IF_MATCH_HEADER)
-                : null;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
             // (message-pair.ts resolution: DELETEs join their
@@ -887,9 +922,9 @@ async function dispatched(
             // PerVerbWriteResponseSpec instead — see
             // writeResponseSpecFor.
             const spec = method === 'DELETE'
-                ? { status: HTTP_NO_CONTENT }
+                ? undefined
                 : writeResponseSpecFor(routePattern, method);
-            if (spec === undefined) {
+            if (method !== 'DELETE' && spec === undefined) {
                 throw new Error(
                     'no write response spec for wired route: '
                     + routePattern,
@@ -897,7 +932,13 @@ async function dispatched(
             }
             // DELETE table: never-written 404 stores nothing;
             // already-gone 204 no append; live PUT proceeds.
-            if (method === 'DELETE') {
+            // An in-order DELETE is an operation on another
+            // document (a release), which answers its state.
+            if (
+                method === 'DELETE'
+                && conditionalOf(routePattern, method)
+                    !== 'in-order'
+            ) {
                 const head = await documentHeadAt(
                     effective, canonicalPrefix, name,
                 );
@@ -930,16 +971,13 @@ async function dispatched(
                 organization,
                 operationId: ctx.operationId,
                 requestId: ctx.requestId,
-                ...(isDocumentPut && head === null
-                    ? { genesis: true as const }
+                ...(request.headers.get(IF_NONE_MATCH_HEADER)
+                    !== null
+                    ? { genesis: 'client' as const }
                     : {}),
-                responseBody: method === 'PUT'
-                    && body === undefined
-                    ? undefined
-                    : spec.successBody?.(
-                        params, body, actor,
-                        organization,
-                    ),
+                responseBody: spec?.successBody?.(
+                    params, body, actor, organization,
+                ),
                 ...(routePattern
                     === 'identities/:id/token-revocations/:rid'
                     ? {
@@ -951,251 +989,7 @@ async function dispatched(
                         }],
                     }
                     : {}),
-                ...(echoMatchesHead
-                    && echo !== null
-                    && echo !== undefined
-                    && livePut !== undefined
-                    ? {
-                        latchedHeadMessagePairId: echo,
-                    }
-                    : {}),
-                ...(isLatchedOperation
-                    && latchEcho !== null
-                    ? {
-                        pinnedDocumentMessagePairId:
-                            parseIfMatch(latchEcho)
-                                ?? latchEcho,
-                    }
-                    : {}),
             });
-            // The latched-operation table, the locked
-            // table's sibling for sub-resource writes:
-            // absent → 428; malformed → 400; ≠ parent head
-            // → 412; == head → proceed with the echo latched
-            // onto the operation pair, re-verified in-tx by
-            // the handler. Returns BEFORE dispatch, so a
-            // rejected operation stores nothing.
-            // Absence is NOT a precondition failure: with no
-            // parent head there is nothing to pin, so the
-            // gate stands aside and the handler's own
-            // missedReadError speaks the 404 (AGENTS.md
-            // "Genuine absence still 404s"). Gating first
-            // would answer a foreign or never-written id
-            // with 428/412 and bury the real verdict.
-            if (isLatchedOperation && latchHead !== undefined) {
-                if (latchEcho === null) {
-                    return Response.json(
-                        {
-                            error: 'If-Match is required to '
-                                + 'POST ' + pathname,
-                        },
-                        {
-                            status:
-                                HTTP_PRECONDITION_REQUIRED,
-                        },
-                    );
-                }
-                const parsed = parseIfMatch(latchEcho);
-                if (parsed === undefined) {
-                    return Response.json(
-                        {
-                            error: 'If-Match must carry '
-                                + 'exactly one strong '
-                                + 'validator',
-                        },
-                        { status: HTTP_BAD_REQUEST },
-                    );
-                }
-                if (parsed !== latchHead) {
-                    return Response.json(
-                        {
-                            error: 'If-Match does not '
-                                + 'match the current document '
-                                + 'at ' + pathname,
-                        },
-                        { status: HTTP_PRECONDITION_FAILED },
-                    );
-                }
-            }
-            // The locked six-outcome table, applied ONLY after
-            // the replay fast-path MISSES: live + absent → 428;
-            // live + malformed → 400; live + ≠ head → 412; live
-            // + == head → echoMatchesHead, proceed;
-            // none + absent → genesis; none + present → 412.
-            // A 412 here returns BEFORE dispatch, and
-            // appendMessagePairOnce only ever runs inside the op's
-            // own tx, so NOTHING is stored.
-            if (isLockedWrite) {
-                if (
-                    livePut !== undefined
-                    && rawIfMatch === null
-                ) {
-                    return Response.json(
-                        {
-                            error: 'If-Match is required to PUT '
-                                + pathname,
-                        },
-                        {
-                            status:
-                                HTTP_PRECONDITION_REQUIRED,
-                        },
-                    );
-                }
-                if (
-                    livePut !== undefined
-                    && echo === undefined
-                ) {
-                    return Response.json(
-                        {
-                            error: 'If-Match must carry '
-                                + 'exactly one strong '
-                                + 'validator',
-                        },
-                        { status: HTTP_BAD_REQUEST },
-                    );
-                }
-                if (
-                    rawIfMatch !== null
-                    && !echoMatchesHead
-                ) {
-                    return Response.json(
-                        {
-                            error: 'If-Match does not '
-                                + 'match the current document '
-                                + 'at ' + pathname,
-                        },
-                        { status: HTTP_PRECONDITION_FAILED },
-                    );
-                }
-            }
-            // Instance PATCH table (Task 20). AFTER replay.
-            // Malformed If-Match is 400 before create/404/
-            // 412. Never-written + no pin → create. DELETE
-            // head + no pin → 409 spent; + pin → 404.
-            if (
-                method === 'PATCH'
-                && routePattern
-                    === INSTANCE_DETAIL_PATTERN
-            ) {
-                const pathOrganization = param(params, 0);
-                const typeId = param(params, 1);
-                const instanceId = param(params, 2);
-                const prefix = instancesUriPrefix(
-                    pathOrganization, typeId,
-                );
-                const raw = request.headers
-                    .get(IF_MATCH_HEADER);
-                if (raw !== null) {
-                    const parsed = parseIfMatch(raw);
-                    if (parsed === undefined) {
-                        return Response.json(
-                            {
-                                error: 'If-Match must '
-                                    + 'carry exactly '
-                                    + 'one strong '
-                                    + 'validator',
-                            },
-                            {
-                                status:
-                                    HTTP_BAD_REQUEST,
-                            },
-                        );
-                    }
-                }
-                const head = await deriveInstanceHead(
-                    effective,
-                    pathOrganization,
-                    typeId,
-                    instanceId,
-                );
-                const docHead = await documentHeadAt(
-                    effective, prefix, instanceId,
-                );
-                if (head === undefined) {
-                    if (docHead?.method === 'DELETE') {
-                        if (raw === null) {
-                            return Response.json(
-                                {
-                                    error:
-                                        'instance '
-                                        + 'already '
-                                        + 'exists at '
-                                        + pathname,
-                                },
-                                {
-                                    status:
-                                        HTTP_CONFLICT,
-                                },
-                            );
-                        }
-                        throw await missedReadError(
-                            effective,
-                            instanceId,
-                            organization
-                                ?? pathOrganization,
-                            'record_instances',
-                        );
-                    }
-                    if (raw !== null) {
-                        return Response.json(
-                            {
-                                error: 'If-Match does '
-                                    + 'not match the '
-                                    + 'current '
-                                    + 'instance at '
-                                    + pathname,
-                            },
-                            {
-                                status:
-                                    HTTP_PRECONDITION_FAILED,
-                            },
-                        );
-                    }
-                    // Never written, no pin → create.
-                } else {
-                    const advertisedNow =
-                        await instanceAdvertised(
-                            effective,
-                            pathOrganization,
-                            typeId,
-                            instanceId,
-                            roles,
-                        );
-                    if (raw === null) {
-                        return Response.json(
-                            {
-                                error: 'If-Match is '
-                                    + 'required to '
-                                    + 'PATCH '
-                                    + pathname,
-                            },
-                            {
-                                status:
-                                    HTTP_PRECONDITION_REQUIRED,
-                            },
-                        );
-                    }
-                    const ifMatch = parseIfMatch(raw);
-                    if (
-                        advertisedNow === undefined
-                        || ifMatch !== advertisedNow.tag
-                    ) {
-                        return Response.json(
-                            {
-                                error: 'If-Match does '
-                                    + 'not match the '
-                                    + 'current '
-                                    + 'instance at '
-                                    + pathname,
-                            },
-                            {
-                                status:
-                                    HTTP_PRECONDITION_FAILED,
-                            },
-                        );
-                    }
-                }
-            }
             // Same-body as live PUT head → 200, no append.
             // Body equality is octets, not ETag. The no-op
             // still takes the in-tx latch so it cannot
@@ -1203,10 +997,9 @@ async function dispatched(
             if (
                 method === 'PUT'
                 && livePut !== undefined
-                && (
-                    !isLockedWrite
-                    || echoMatchesHead
-                )
+                && request.headers.get(IF_MATCH_HEADER) === null
+                && request.headers.get(IF_NONE_MATCH_HEADER)
+                    === null
             ) {
                 const liveReq = await effective.messagePairs
                     .getById(livePut);
@@ -1259,57 +1052,6 @@ async function dispatched(
                     }
                 }
             }
-            // Empty-body PUT is a live empty document. Skip
-            // the family validator; store GET-shaped 200.
-            if (
-                method === 'PUT'
-                && body === undefined
-                && messagePair !== undefined
-            ) {
-                const emptyMessagePair = messagePair;
-                const latchedId =
-                    emptyMessagePair.latchedHeadMessagePairId;
-                if (latchedId !== undefined) {
-                    const latest =
-                        await effective.readTransaction(
-                            (view) =>
-                                documentHeadMessagePairId(
-                                    view,
-                                    emptyMessagePair.path,
-                                    emptyMessagePair.name,
-                                ),
-                        );
-                    if (latest !== latchedId) {
-                        throw new ApiError(
-                            'If-Match does not match'
-                            + ' the current document'
-                            + ' at ' + pathname,
-                            HTTP_PRECONDITION_FAILED,
-                        );
-                    }
-                }
-                await runWrite(
-                    effective,
-                    attemptFor([emptyMessagePair]),
-                    [emptyMessagePair],
-                );
-                const written = writeAnswerOf(
-                    emptyMessagePair,
-                );
-                if (written === undefined) {
-                    throw new Error(
-                        'wired write stored no pair: '
-                        + routePattern,
-                    );
-                }
-                if (written.outcome === 'land') {
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                }
-                return written.response;
-            }
         }
         const received: ReceivedRequest = {
             target: requestTarget(request),
@@ -1356,19 +1098,13 @@ async function dispatched(
                     organization,
                     roles,
                 );
-                // ETag attach (spec §The two PUT
-                // classes): a locked-family document GET
-                // carries the current head pair id as
-                // provenance — the C6 client save's baseline
-                // AND its echo source. Keyed through the SAME
-                // wiring consult + exact-pattern match the
-                // write side's four-outcome table uses above
-                // (never a blanket family-registry or
-                // DOCUMENT_CLASS_ROUTE_PATTERNS read, never a
-                // flows literal). Below the three-instance
-                // threshold with the write side's own inline
-                // check (Commandment IX Generality) — kept
-                // duplicated rather than prematurely shared.
+                // ETag attach: the document GET of a family
+                // whose PUT requires a conditional carries the
+                // current head pair id — the client save's
+                // baseline AND its echo source. Keyed through
+                // the SAME wiring consult + exact-pattern match
+                // the write side uses above (never a flows
+                // literal).
                 const readWiring = wiringForSegments(
                     matched.segments,
                 );
@@ -1378,8 +1114,10 @@ async function dispatched(
                         === documentEntityPattern(
                             readWiring,
                         )
-                    && familyRegistration(readWiring.family)
-                        ?.concurrency === 'locked'
+                    && conditionalOf(
+                        documentEntityPattern(readWiring),
+                        'PUT',
+                    ) === 'required'
                 ) {
                     const prefix = canonicalPath(
                         organization,
@@ -1532,12 +1270,16 @@ async function dispatched(
                         status: HTTP_NO_CONTENT,
                     });
                 }
+                // An unwired handler forms its own pair,
+                // so the former's answer is already whole.
+                if (result instanceof Response) {
+                    return result;
+                }
                 return Response.json(result);
             }
             case 'PATCH': {
-                // Instance PATCH (Task 20): create and
-                // update. Pair + replay + ETag. Table ran
-                // pre-dispatch above.
+                // Instance PATCH: create and update. The
+                // former's answer already names the revision.
                 if (!matched.patch) {
                     return Response.json(
                         {
@@ -1568,31 +1310,6 @@ async function dispatched(
                         postWriteNotification(
                             adapter, routePattern, params,
                             body, organization, actor,
-                        );
-                    }
-                    if (
-                        written.outcome === 'stale'
-                        || written.outcome === 'refused'
-                        || written.outcome === 'matched'
-                    ) {
-                        return written.response;
-                    }
-                    if (
-                        routePattern
-                            === INSTANCE_DETAIL_PATTERN
-                        && written.outcome === 'land'
-                    ) {
-                        const revision = written.rows.find(
-                            (row) =>
-                                row.id !== messagePair.id,
-                        );
-                        if (revision !== undefined) {
-                            return attachEtag(
-                                written.response, revision.id,
-                            );
-                        }
-                        written.response.headers.delete(
-                            'etag',
                         );
                     }
                     return written.response;
@@ -1821,6 +1538,11 @@ async function dispatched(
                         status: HTTP_NO_CONTENT,
                     });
                 }
+                // An unwired handler forms its own pair,
+                // so the former's answer is already whole.
+                if (result instanceof Response) {
+                    return result;
+                }
                 return Response.json(result);
             }
             default:
@@ -1852,6 +1574,14 @@ async function dispatched(
             return Response.json(
                 { error: error.message },
                 { status: HTTP_NOT_FOUND },
+            );
+        }
+        if (
+            error instanceof RetiredEntityError
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: HTTP_GONE },
             );
         }
         if (
@@ -2048,8 +1778,8 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-// Stream families read the stored head. Work-orders
-// assemble (binding). Flows stay on derive for
+// Stream families read the stored head: a work order's is
+// its whole state. Flows stay on derive for
 // hasUndoHistory.
 function streamFamilyWiring(
     routePattern: string,
@@ -2057,7 +1787,6 @@ function streamFamilyWiring(
     const family = idFamilyOf(routePattern);
     if (
         family === undefined
-        || family === 'work-orders'
         || family === 'flows'
     ) {
         return undefined;
@@ -2087,7 +1816,6 @@ function streamCollectionWiring(
     const family = collectionFamilyOf(routePattern);
     if (
         family === undefined
-        || family === 'work-orders'
         || family === 'flows'
         || family === 'members'
     ) {
@@ -2185,8 +1913,8 @@ export async function GET<T>(
     );
 }
 
-// Locked / instance sibling of GET: body plus the strong
-// ETag (quotes stripped) for If-Match on a later PUT/PATCH.
+// GET plus the strong ETag (quotes stripped), for the
+// If-Match of a later conditional PUT or PATCH.
 export async function GETWithEtag<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
@@ -2270,29 +1998,58 @@ export async function PATCHWithEtag<T>(
     };
 }
 
+// The ONE await site for a DELETE-shaped facade call —
+// DELETE and DELETEWithEtag share it so the latency pin
+// stays 4.
+async function deleteResponse(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<Response> {
+    await adapter.simulateLatency();
+    const headers = facadeHeaders(token, false);
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
+    return handleRequest(
+        adapter,
+        new Request(
+            `${BASE_URL}/${resource}`,
+            {
+                method: 'DELETE',
+                headers,
+            },
+        ),
+    );
+}
+
 export async function DELETE(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
 ): Promise<void> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, false);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
     await unwrapResponse(
-        await handleRequest(
-            adapter,
-            new Request(
-                `${BASE_URL}/${resource}`,
-                {
-                    method: 'DELETE',
-                    headers,
-                },
-            ),
+        await deleteResponse(
+            adapter, resource, token, headerFields,
         ),
     );
+}
+
+// DELETE plus the strong ETag of the state it answers: a
+// release answers its work order's version.
+export async function DELETEWithEtag(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+): Promise<{ etag: string | undefined }> {
+    const response = await deleteResponse(
+        adapter, resource, token, headerFields,
+    );
+    await unwrapResponse(response);
+    return { etag: etagFromHeader(response) };
 }
 
 async function postResponse(

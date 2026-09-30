@@ -9,6 +9,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import type { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -20,6 +22,7 @@ import {
     attemptFor,
     formWriteMessagePair,
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
@@ -174,6 +177,7 @@ function setBody(
 }
 
 const WELL_FORMED_TAG = generateIdentifier();
+const DECLARED = { [IF_NONE_MATCH_HEADER]: '*' };
 
 Deno.test('public instance PUT is 405', async () => {
     const { db, adminToken, memberToken } =
@@ -194,6 +198,7 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [] },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 201);
 });
@@ -207,11 +212,12 @@ Deno.test('PATCH create with clear is 400', async () => {
             set: [],
             clear: [],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 400);
 });
 
-Deno.test('PATCH create with If-Match is 412', async () => {
+Deno.test('PATCH create with If-Match is 400', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
@@ -220,7 +226,7 @@ Deno.test('PATCH create with If-Match is 412', async () => {
         { set: [] },
         { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
     ));
-    assertStrictEquals(res.status, 412);
+    assertStrictEquals(res.status, 400);
 });
 
 Deno.test('PATCH {set:[…]} member, type exists → 201 + ETag; '
@@ -235,6 +241,7 @@ async () => {
     ]);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
+        DECLARED,
     ));
     assertStrictEquals(res.status, 201);
     const responseId = pairIdOf(res);
@@ -242,21 +249,13 @@ async () => {
         responseId !== null && isIdentifier(responseId),
         'ETag present',
     );
-    const echo = await res.json() as {
-        id: string;
-        organization_id: string;
-        record_type_id: string;
-        set: { attribute_id: string; value: string }[];
-        clear: string[];
-    };
-    assertEquals(echo, {
+    assertEquals(await res.json(), {
         id: INSTANCE_ID,
         organization_id: ORGANIZATION,
         record_type_id: TYPE_ID,
-        set: [
+        values: [
             { attribute_id: ATTR_ID, value: 'Hello' },
         ],
-        clear: [],
     });
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
@@ -275,10 +274,11 @@ async () => {
     await putLiveType(db, adminToken);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, { set: [] },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 201);
-    const echo = await res.json() as { set: unknown[] };
-    assertEquals(echo.set, []);
+    const state = await res.json() as { values: unknown[] };
+    assertEquals(state.values, []);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -294,6 +294,7 @@ async () => {
         setBody([
             { attribute_id: ATTR_ID, value: 'x' },
         ]),
+        DECLARED,
     ));
     assertStrictEquals(res.status, 404);
     assertEquals(await res.json(), {
@@ -328,6 +329,7 @@ async () => {
             set: [],
             clear: [ATTR_ID],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -350,6 +352,7 @@ async () => {
                 { attribute_id: ATTR_ID, value: 'b' },
             ],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -368,6 +371,7 @@ async () => {
                 { attribute_id: ATTR_ID, value: '' },
             ],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -398,6 +402,7 @@ async () => {
                 },
             ],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 403);
     assertEquals(await res.json(), {
@@ -430,6 +435,7 @@ async () => {
                 },
             ],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 201);
 });
@@ -458,6 +464,7 @@ async () => {
                 },
             ],
         },
+        DECLARED,
     ));
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -479,6 +486,7 @@ async () => {
         setBody([
             { attribute_id: ATTR_ID, value: 'one' },
         ]),
+        DECLARED,
     ));
     assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
@@ -490,7 +498,7 @@ async () => {
     assertStrictEquals(second.status, 428);
 });
 
-Deno.test('PATCH create at a tombstoned document → 409 spent',
+Deno.test('PATCH create at a tombstoned document → 410 gone',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -526,11 +534,11 @@ async () => {
         setBody([
             { attribute_id: ATTR_ID, value: 'after' },
         ]),
+        DECLARED,
     ));
-    assertStrictEquals(res.status, 409);
+    assertStrictEquals(res.status, 410);
     assertEquals(await res.json(), {
-        error: 'instance already exists at '
-            + INSTANCE_DETAIL,
+        error: 'Document is gone at ' + INSTANCE_DETAIL,
     });
 });
 
@@ -547,7 +555,7 @@ async () => {
     const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
-        undefined, operationId,
+        DECLARED, operationId,
     ));
     assertStrictEquals(first.status, 201);
     const second = await handleRequest(db, req(
@@ -559,7 +567,8 @@ async () => {
     assertStrictEquals(second.status, 428);
     assertStrictEquals(
         (await second.json()).error,
-        'If-Match is required to PATCH ' + INSTANCE_DETAIL,
+        'If-Match or If-None-Match is required to PATCH '
+            + INSTANCE_DETAIL,
     );
     const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
@@ -584,6 +593,7 @@ async () => {
     ]);
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, body,
+        DECLARED,
     ));
     assertStrictEquals(first.status, 201);
     const headEtag = first.headers.get('ETag');
@@ -611,7 +621,7 @@ async () => {
 });
 
 Deno.test('two creates racing one document → first 201, '
-+ 'second 428',
++ 'second 412',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -623,17 +633,19 @@ async () => {
             setBody([
                 { attribute_id: ATTR_ID, value: 'race-a' },
             ]),
+            DECLARED,
         )),
         handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, memberToken,
             setBody([
                 { attribute_id: ATTR_ID, value: 'race-b' },
             ]),
+            DECLARED,
         )),
     ]);
     assertEquals(
         [a.status, b.status].sort(),
-        [201, 428],
+        [201, 412],
     );
     const responses = await db.messagePairs.getCollectionPairs(
         '/organizations/' + ORGANIZATION
@@ -683,6 +695,119 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         setBody([{ attribute_id: ATTR_ID, value: 'Hello' }]),
+        DECLARED,
     ));
     assertStrictEquals(res.status, 201);
+});
+
+async function pairsAtInstance(
+    db: MemoryDbAdapter,
+    instanceId: string,
+): Promise<number> {
+    const pairs = await db.messagePairs.getCollectionPairs(
+        INSTANCES,
+    );
+    return pairs.filter((pair) => pair.name === instanceId)
+        .length;
+}
+
+Deno.test('a headerless instance create is 428', async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    const instanceId = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCES + instanceId, memberToken,
+        { set: [] },
+    ));
+    assertStrictEquals(res.status, 428);
+    assertStrictEquals(await pairsAtInstance(db, instanceId), 0);
+});
+
+Deno.test('a declared instance create answers its whole state',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const instanceId = generateIdentifier();
+    const value = { attribute_id: ATTR_ID, value: 'Hello' };
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCES + instanceId, memberToken,
+        setBody([value]), DECLARED,
+    ));
+    assertStrictEquals(res.status, 201);
+    assertEquals(await res.json(), {
+        id: instanceId,
+        organization_id: ORGANIZATION,
+        record_type_id: TYPE_ID,
+        values: [value],
+    });
+    const head = await deriveInstanceHead(
+        db, ORGANIZATION, TYPE_ID, instanceId,
+    );
+    assert(head !== undefined);
+    assertStrictEquals(pairIdOf(res), head.messagePairId);
+});
+
+Deno.test('a declared create over a live instance is 412',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    const instanceId = generateIdentifier();
+    const first = await handleRequest(db, req(
+        'PATCH', INSTANCES + instanceId, memberToken,
+        { set: [] }, DECLARED,
+    ));
+    assertStrictEquals(first.status, 201);
+    const second = await handleRequest(db, req(
+        'PATCH', INSTANCES + instanceId, memberToken,
+        { set: [] }, DECLARED,
+    ));
+    assertStrictEquals(second.status, 412);
+});
+
+Deno.test('a declared create over a tombstone is 410',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    const instanceId = generateIdentifier();
+    const created = await handleRequest(db, req(
+        'PATCH', INSTANCES + instanceId, memberToken,
+        { set: [] }, DECLARED,
+    ));
+    assertStrictEquals(created.status, 201);
+    const deleted = await handleRequest(db, req(
+        'DELETE', INSTANCES + instanceId, adminToken,
+    ));
+    assertStrictEquals(deleted.status, 204);
+    const backend = db.backend as MemoryStorageBackend;
+    const before = backend.statementExecutions();
+    const again = await handleRequest(db, req(
+        'PATCH', INSTANCES + instanceId, memberToken,
+        { set: [] }, DECLARED,
+    ));
+    assertStrictEquals(again.status, 410);
+    assertEquals(await again.json(), {
+        error: 'Document is gone at ' + INSTANCES + instanceId,
+    });
+    assertStrictEquals(
+        backend.statementExecutions(), before + 1,
+    );
+});
+
+Deno.test('a PATCH naming a never-written instance is 412',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const res = await handleRequest(db, req(
+        'PATCH', INSTANCES + generateIdentifier(), memberToken,
+        setBody([{ attribute_id: ATTR_ID, value: 'x' }]),
+        { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
+    ));
+    assertStrictEquals(res.status, 412);
 });

@@ -12,8 +12,7 @@ import {
 } from '../api/db.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
-    workOrderDocumentHeadFor,
-    workOrderClaimHistoryFor,
+    workOrderHeadFor,
     workOrderHistoryFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
@@ -30,7 +29,7 @@ import {
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
 import type {
-    GraphEdge, WorkOrderEntity,
+    GraphEdge,
 } from '../shared/types.ts';
 import {
     collectAttributeReferrers,
@@ -42,10 +41,7 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
-import {
-    latestClaimEvent,
-    isClaimEventExpired,
-} from '../shared/work-order-claims.ts';
+import type { DbAdapter } from '../api/db.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
@@ -96,6 +92,17 @@ const WOID_EV3 = generateIdentifier();
 // pins (Task 4) + pre-dispatch fence re-anchor parity
 // (Task 5). Pre-tx-vs-in-tx parity and residual drift
 // against the dual-write row plane.
+
+// The work order's head version, as the ops read it.
+async function headVersionOf(
+    db: DbAdapter,
+    workOrderId: string,
+): Promise<Record<string, unknown> | null> {
+    const head = await workOrderHeadFor(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    return head === null ? null : { ...head.version };
+}
 
 function req(
     method: string,
@@ -171,11 +178,11 @@ function workOrderFlowGraph(
 
 const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
-// -- workOrderDocumentHeadFor ------------------------------------
+// -- workOrderHeadFor --------------------------------------------
 
 // Phase Final Task 2: work_orders ROW half stripped — wire +
 // message-plane head are the oracles (row plane empty).
-Deno.test('workOrderDocumentHeadFor: wire GET equals head for a'
+Deno.test('workOrderHeadFor: wire GET equals head for a'
 + ' live create; null for absent; pre-tx vs in-tx parity',
 async () => {
     const db = await seededDb();
@@ -214,13 +221,9 @@ async () => {
     );
     assertStrictEquals(getRes.status, 200);
     const wire = await getRes.json();
-    const preTx = await workOrderDocumentHeadFor(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
+    const preTx = await headVersionOf(db, workOrderId);
     const inTx = await db.readTransaction(
-        (view) => workOrderDocumentHeadFor(
-            view, STARK_ORGANIZATION, workOrderId,
-        ),
+        (view) => headVersionOf(view, workOrderId),
     );
     assertEquals(preTx, inTx);
     assertEquals(preTx, wire);
@@ -228,13 +231,9 @@ async () => {
 
     // Absent id: message plane returns null (Task 2 maps to the
     // same EntityNotFoundError bytes as workOrders.getById).
-    const preTxMissing = await workOrderDocumentHeadFor(
-        db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
-    );
+    const preTxMissing = await headVersionOf(db, 'oYnbiWXzroVnyolOhmkBIQ');
     const inTxMissing = await db.readTransaction(
-        (view) => workOrderDocumentHeadFor(
-            view, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
-        ),
+        (view) => headVersionOf(view, 'oYnbiWXzroVnyolOhmkBIQ'),
     );
     assertStrictEquals(preTxMissing, null);
     assertStrictEquals(inTxMissing, null);
@@ -246,7 +245,7 @@ async () => {
     assertStrictEquals(missRes.status, 404);
 });
 
-Deno.test('workOrderDocumentHeadFor: tracks a later document PUT'
+Deno.test('workOrderHeadFor: tracks a later document PUT'
 + ' (head, not create-time body) on wire + message plane',
 async () => {
     const db = await seededDb();
@@ -262,8 +261,10 @@ async () => {
             flow_graph: graph1,
             position: 1,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(put1.status, 201);
+    await put1.body?.cancel();
 
     const put2 = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -272,8 +273,10 @@ async () => {
             flow_graph: graph2,
             position: 3,
         },
+        { 'If-Match': put1.headers.get('ETag')! },
     ));
     assertStrictEquals(put2.status, 200);
+    await put2.body?.cancel();
 
     const getRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -284,12 +287,10 @@ async () => {
         display_id: string;
         position: number;
     };
-    const derived = await workOrderDocumentHeadFor(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
+    const derived = await headVersionOf(db, workOrderId);
     assertEquals(derived, wire);
-    assertStrictEquals(derived!.display_id, 'after');
-    assertStrictEquals(derived!.position, 3);
+    assertStrictEquals(derived!['display_id'], 'after');
+    assertStrictEquals(derived!['position'], 3);
 });
 
 // -- claim graph parity (Phase 15 Task 2) ------------------------
@@ -313,36 +314,25 @@ async () => {
             flow_graph: graph,
             position: 2,
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(put.status, 201);
+    await put.body?.cancel();
 
-    const preTx = await workOrderDocumentHeadFor(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
+    const preTx = await headVersionOf(db, workOrderId);
     const inTx = await db.readTransaction(
-        (view) => workOrderDocumentHeadFor(
-            view, STARK_ORGANIZATION, workOrderId,
-        ),
+        (view) => headVersionOf(view, workOrderId),
     );
     assertEquals(preTx, inTx);
-    assertEquals(preTx!.flow_graph, graph);
+    assertEquals(preTx!['flow_graph'], graph);
 
     const headGraph = asWorkOrderFlowGraph(
-        preTx!.flow_graph, 'work_orders.flow_graph',
+        preTx!['flow_graph'], 'work_orders.flow_graph',
     );
     assertStrictEquals(headGraph.lockTimeout, lockTimeoutSeconds);
 
-    // Fresh PUT: no live claim → priorLive is false.
-    const history = await workOrderClaimHistoryFor(
-        db, STARK_ORGANIZATION, workOrderId,
-    );
-    const prior = latestClaimEvent(history, workOrderId);
-    const priorLiveFromHead = prior !== null
-        && prior.state === 'claimed'
-        && !isClaimEventExpired(
-            prior, headGraph.lockTimeout,
-        );
-    assertStrictEquals(priorLiveFromHead, false);
+    // Fresh PUT: the head carries no claim.
+    assertStrictEquals(Object.hasOwn(preTx!, 'claim'), false);
 
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
@@ -355,19 +345,17 @@ async () => {
             expireEventId: generateIdentifier(),
             expireAt: nowUtc(),
         },
+        { 'If-Match': put.headers.get('ETag')! },
     ));
-    assertStrictEquals(claimResponse.status, 201);
+    assertStrictEquals(claimResponse.status, 200);
+    await claimResponse.body?.cancel();
 
     // Absent id: document head null pre-tx and in-tx; wire
     // 404 carries the same Not found: work_orders/:id bytes.
     const missingId = NO_SUCH_CLAIM_GRAPH_WO;
-    const preMissing = await workOrderDocumentHeadFor(
-        db, STARK_ORGANIZATION, missingId,
-    );
+    const preMissing = await headVersionOf(db, missingId);
     const inMissing = await db.readTransaction(
-        (view) => workOrderDocumentHeadFor(
-            view, STARK_ORGANIZATION, missingId,
-        ),
+        (view) => headVersionOf(view, missingId),
     );
     assertStrictEquals(preMissing, null);
     assertStrictEquals(inMissing, null);
@@ -532,7 +520,7 @@ Deno.test('prove-impossible: attribute bindings cannot reach'
 
 // -- residual cross-core pins (Phase 15 Task 1 final) ----------
 
-Deno.test('residual pin: workOrderDocumentHeadFor matches wire'
+Deno.test('residual pin: workOrderHeadFor matches wire'
 + ' GET for every seeded Stark work order',
 async () => {
     const db = await seededDb();
@@ -555,23 +543,13 @@ async () => {
                 + row.id, token),
         );
         assertStrictEquals(getRes.status, 200);
-        // Wire GET attaches bind embeds (instance_id /
-        // record_type_id); document-head derive is bind-
-        // free — strip embeds before comparing heads.
+        // The wire GET streams the head: its binding rides
+        // the version itself.
         const wire = await getRes.json() as Record<
             string, unknown
         >;
-        const {
-            instance_id: _i,
-            record_type_id: _r,
-            ...wireHead
-        } = wire;
-        const derived = await workOrderDocumentHeadFor(
-            db, STARK_ORGANIZATION, row.id,
-        );
-        assertEquals(
-            derived, wireHead as unknown as WorkOrderEntity, row.id,
-        );
+        const derived = await headVersionOf(db, row.id);
+        assertEquals(derived, wire, row.id);
     }
     // Phase Final Stage B: work_orders table retired.
 });

@@ -175,7 +175,8 @@ Deno.test(
             history[0]!.values.get(ATTR_ID), 'v2',
         );
 
-        // delete → list empty; detail 404
+        // delete → list empty; a retired instance's detail
+        // answers 410
         await deleteRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
@@ -188,7 +189,7 @@ Deno.test(
                 ctx(), TYPE_ID, INSTANCE_ID,
             ),
             Error,
-            'Not found',
+            'Gone',
         );
     },
 );

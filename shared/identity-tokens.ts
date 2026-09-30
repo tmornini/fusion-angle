@@ -3,136 +3,66 @@ import type {
     IdentityTokenAction,
     IdentityTokenEntity,
 } from './types.ts';
-import {
-    latestByKey,
-    findFirstByKey,
-} from './ledger-reduction.ts';
-import { compareIdentifiers } from
-    './identifier.ts';
 
-// Pure reductions over the append-only identity_tokens ledger.
-// The store is a dumb log; current validity is derived here.
+// Pure reads over token heads. The head of tokens/<jti> is
+// the token's whole state (§6); succession orders one
+// jti's events, so no rank breaks a tie.
 
-// On an equal-`at` tie the FAIL-CLOSED action wins regardless
-// of row order — a revoke beats a co-timestamped rotate or
-// issue on every backend. Equal actions fall to the id tail
-// for determinism.
-const ACTION_RANK: Record<IdentityTokenAction, number> = {
-    revoked: 2,
-    rotated: 1,
-    issued: 0,
-};
-
-function failClosed(
-    candidate: IdentityTokenEntity,
-    incumbent: IdentityTokenEntity,
-): boolean {
-    if (candidate.at !== incumbent.at) {
-        return candidate.at > incumbent.at;
-    }
-    const c = ACTION_RANK[candidate.action];
-    const i = ACTION_RANK[incumbent.action];
-    if (c !== i) return c > i;
-    return compareIdentifiers(candidate.id, incumbent.id)
-        > 0;
+function headOf(
+    heads: readonly IdentityTokenEntity[],
+    jti: string,
+): IdentityTokenEntity | undefined {
+    return heads.find((head) => head.jti === jti);
 }
 
-// The latest lifecycle action for a jti, or null if it has no
-// events. A same-`at` tie falls to the fail-closed rank above.
 export function latestActionForJti(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     jti: string,
 ): IdentityTokenAction | null {
-    const latest = latestByKey(
-        rows, row => row.jti, failClosed,
-    ).get(jti);
-    return latest === undefined ? null : latest.action;
+    const head = headOf(heads, jti);
+    return head === undefined ? null : head.action;
 }
 
-// The chain_id a jti belongs to (null if unknown). Every event
-// for a jti carries the same chain_id, so the first match wins.
 export function chainIdForJti(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     jti: string,
 ): string | null {
-    return findFirstByKey(
-        rows, row => row.jti === jti, row => row.chain_id,
-    );
+    const head = headOf(heads, jti);
+    return head === undefined ? null : head.chain_id;
 }
 
-// Every distinct jti that has ever appeared in a chain — the
-// set a chain-wide revocation must mark revoked.
 export function jtisInChain(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     chainId: string,
 ): string[] {
-    const seen = new Set<string>();
-    for (const row of rows) {
-        if (row.chain_id === chainId) seen.add(row.jti);
-    }
-    return [...seen];
+    return heads
+        .filter((head) => head.chain_id === chainId)
+        .map((head) => head.jti);
 }
 
-// The gate's check: a presented token is denied iff its jti's
-// latest action is 'revoked'. Unknown jtis (session / dev tokens
-// never recorded here) and live ('issued') tokens pass; coarse
-// log-out-everywhere is the SEPARATE identity_token_revocations
-// ledger.
+// A presented token is denied iff its head is revoked.
 export function isTokenRevoked(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     jti: string,
 ): boolean {
-    return latestActionForJti(rows, jti) === 'revoked';
+    return latestActionForJti(heads, jti) === 'revoked';
 }
 
-// The identity that owns a jti (null if unknown). A chain
-// belongs to one identity, so any row for the jti answers.
 export function identityForJti(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     jti: string,
 ): Id | null {
-    return findFirstByKey(
-        rows, row => row.jti === jti, row => row.identity_id,
-    );
+    const head = headOf(heads, jti);
+    return head === undefined ? null : head.identity_id;
 }
 
-// The predecessor of each successor jti, DERIVED from the
-// ledger for display only: a rotation appends a 'rotated' (old)
-// and an 'issued' (new) at one shared `at` within a chain, so a
-// successor's parent is the jti 'rotated' at its 'issued'
-// instant. A root 'issued' has no co-`at` 'rotated', so it gets
-// no entry — absence IS root-of-chain (the value `parent_jti`
-// once stored as ''). Scoped per chain so the pairing needs
-// only a per-chain-unique `at`, not a global one.
-//
-// This drives no computation today; it feeds one display line.
-// Promote to a STORED lineage relation only when a path must
-// traverse or query lineage — when the parent would drive
-// computation. Until then, deriving honors derive-from-ledger.
-export function parentJtiByJti(
-    rows: readonly IdentityTokenEntity[],
-): Map<string, string> {
-    const rotatedByChainAt =
-        new Map<string, Map<string, string>>();
-    for (const row of rows) {
-        if (row.action !== 'rotated') continue;
-        let byAt = rotatedByChainAt.get(row.chain_id);
-        if (byAt === undefined) {
-            byAt = new Map<string, string>();
-            rotatedByChainAt.set(row.chain_id, byAt);
-        }
-        byAt.set(row.at, row.jti);
-    }
-    const parent = new Map<string, string>();
-    for (const row of rows) {
-        if (row.action !== 'issued') continue;
-        const predecessor =
-            rotatedByChainAt.get(row.chain_id)?.get(row.at);
-        if (predecessor !== undefined) {
-            parent.set(row.jti, predecessor);
-        }
-    }
-    return parent;
+// A later version keeps the parent its jti was issued with.
+function parentOf(
+    heads: readonly IdentityTokenEntity[],
+    jti: string,
+): { readonly parent_jti?: string } {
+    const parent = headOf(heads, jti)?.parent_jti;
+    return parent === undefined ? {} : { parent_jti: parent };
 }
 
 // The chain-wide revocation rows: one 'revoked' event per jti
@@ -140,14 +70,15 @@ export function parentJtiByJti(
 // replay path of planRotation and the explicit revocation
 // operation — one truth for what "revoke the chain" appends.
 export function revocationAppends(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     chainId: string,
     identityId: Id,
     at: string,
 ): Omit<IdentityTokenEntity, 'id'>[] {
-    return jtisInChain(rows, chainId).map(jti => ({
+    return jtisInChain(heads, chainId).map(jti => ({
         jti, identity_id: identityId,
         action: 'revoked' as const, chain_id: chainId, at,
+        ...parentOf(heads, jti),
     }));
 }
 
@@ -192,17 +123,17 @@ export function jtiSetsEqual(
 }
 
 export function planRotation(
-    rows: readonly IdentityTokenEntity[],
+    heads: readonly IdentityTokenEntity[],
     presentedJti: string,
     newJti: string,
     at: string,
 ): RotationPlan {
-    const chainId = chainIdForJti(rows, presentedJti);
-    const identityId = identityForJti(rows, presentedJti);
+    const chainId = chainIdForJti(heads, presentedJti);
+    const identityId = identityForJti(heads, presentedJti);
     if (chainId === null || identityId === null) {
         return { kind: 'unknown' };
     }
-    if (latestActionForJti(rows, presentedJti) === 'issued') {
+    if (latestActionForJti(heads, presentedJti) === 'issued') {
         return {
             kind: 'rotate',
             newJti,
@@ -210,10 +141,12 @@ export function planRotation(
                 {
                     jti: presentedJti, identity_id: identityId,
                     action: 'rotated', chain_id: chainId, at,
+                    ...parentOf(heads, presentedJti),
                 },
                 {
                     jti: newJti, identity_id: identityId,
                     action: 'issued', chain_id: chainId, at,
+                    parent_jti: presentedJti,
                 },
             ],
         };
@@ -221,7 +154,7 @@ export function planRotation(
     return {
         kind: 'replay',
         appends: revocationAppends(
-            rows, chainId, identityId, at,
+            heads, chainId, identityId, at,
         ),
     };
 }

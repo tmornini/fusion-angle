@@ -23,6 +23,9 @@ import {
     deriveMembershipsForIdentity,
     membershipExistsFor,
 } from './derive-memberships.ts';
+import {
+    validateDefaultOrganizationBody,
+} from './validators.ts';
 
 // GET /identities/:id/organizations/ — the path
 // identity's live seats. Self or admin. Caller
@@ -108,13 +111,8 @@ export async function putIdentityDefaultOrganization(
             HTTP_FORBIDDEN,
         );
     }
-    const organization = payload.organization_id;
-    if (typeof organization !== 'string') {
-        throw new ApiError(
-            'organization_id is required',
-            HTTP_BAD_REQUEST,
-        );
-    }
+    const { organization_id: organization } =
+        validateDefaultOrganizationBody(payload);
     if (
         !await membershipExistsFor(
             db, organization, identityId,

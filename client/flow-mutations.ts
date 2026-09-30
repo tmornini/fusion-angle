@@ -526,7 +526,7 @@ export function awaitFlowSave(
 }
 
 // Save a flow: the flow row PUT, its 'updated' state event, and
-// the graph delta — written atomically through the locked-class
+// the graph delta — written atomically through the conditional
 // PUT /flows/:id. The client echoes the baseline it just read
 // (buildFlowPutBody's etag) as If-Match; a save racing another
 // writer's save finds the head has moved and 412s. This loop

@@ -19,6 +19,7 @@ import {
 } from '../api/derive-identity-spine.ts';
 import { GET } from '../api/api.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
+import { RequestError } from '../shared/http-errors.ts';
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -76,8 +77,8 @@ Deno.test('postIdentityCreation mints a service identity'
     );
 });
 
-Deno.test('postIdentityCreation is idempotent on re-put',
-async () => {
+Deno.test('a resent postIdentityCreation is 409 and leaves'
+    + ' the first identity', async () => {
     const { db, ctx } = await setup();
     const spec = {
         kind: 'person' as const,
@@ -87,7 +88,13 @@ async () => {
         },
     };
     await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
-    await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
+    const resent = await assertRejects(
+        () => postIdentityCreation(
+            ctx, 'fndCYAsXazdzMUlEGMNIZw', spec,
+        ),
+        RequestError,
+    );
+    assertStrictEquals(resent.status, 409);
     // Message-plane document at identities/:id is one head.
     const identity = await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
@@ -97,14 +104,20 @@ async () => {
     assertStrictEquals(pii.email, 'a@example.com');
 });
 
-Deno.test('two service creations for the same id leave'
-    + ' exactly one client_secret head', async () => {
+Deno.test('a second service creation for the same id is 409'
+    + ' and leaves exactly one client_secret head', async () => {
     const { db, ctx } = await setup();
     const spec = {
         kind: 'service' as const, secret: 'top-secret',
     };
     await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', spec);
-    await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', spec);
+    const second = await assertRejects(
+        () => postIdentityCreation(
+            ctx, 'syWUUcdBSbBgMwBiCrgbDw', spec,
+        ),
+        RequestError,
+    );
+    assertStrictEquals(second.status, 409);
     const creds = (await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw'))
         .filter(r => r.kind === 'client_secret');
     assertStrictEquals(creds.length, 1);

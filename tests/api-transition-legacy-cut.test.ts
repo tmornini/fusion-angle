@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { fromFileUrl, join, relative } from '@std/path';
-import { handleRequest, PUT } from '../api/api.ts';
+import { GETWithEtag, handleRequest, PUT } from '../api/api.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -11,7 +11,7 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
-    postWorkOrderTransitionOp,
+    postSeedWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
     formWriteMessagePair,
@@ -34,9 +34,9 @@ import { operationIdHeader } from
 
 // Task 8 CUT — hard-cut at the gate for the legacy
 // fieldValues transition wire. Spec W2 / plan Task 8:
-// POST with the fieldValues key → 400; below-facade
-// postWorkOrderTransitionOp (organization === undefined)
-// stays dual-tolerant for the seed's ~859 pure-moves.
+// POST with the fieldValues key → 400; the below-facade
+// postSeedWorkOrderTransitionOp stays dual-tolerant for the
+// seed's ~859 pure-moves.
 // Gate-path rejection lives ONLY in the dispatch arrow.
 
 const ORGANIZATION = STARK_ORGANIZATION;
@@ -64,7 +64,6 @@ const repoRoot = fromFileUrl(
 // history entry shape is fold presentation, not the wire.
 const NAMED_EXCEPTIONS: ReadonlySet<string> = new Set([
     'api/validators.ts',
-    'api/derive-states.ts',
     'api/mock-data/seed-message-pairs.ts',
     'api/routes.ts',
     'client/work-orders-queries.ts',
@@ -76,13 +75,26 @@ function req(
     path: string,
     token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
+}
+
+// An operation on a work order names the head it read.
+async function workOrderTag(
+    db: MemoryDbAdapter,
+): Promise<Record<string, string>> {
+    const { etag } = await GETWithEtag(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID,
+        DEV_TOKEN, operationIdHeader(),
+    );
+    return { 'If-Match': '"' + etag + '"' };
 }
 
 function graphJson(): Record<string, unknown> {
@@ -105,7 +117,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
             position: 1,
         },
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader([['If-None-Match', '*']]));
     return db;
 }
 
@@ -140,7 +152,10 @@ async () => {
     const db = await seededDb();
     const res = await handleRequest(
         db,
-        req('POST', TRANSITION, DEV_TOKEN, legacyBody()),
+        req(
+            'POST', TRANSITION, DEV_TOKEN, legacyBody(),
+            await workOrderTag(db),
+        ),
     );
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
@@ -176,6 +191,7 @@ async () => {
                 instance_id: INSTANCE_ID,
                 record_type_id: 'sjWcXwYGlgxxJOHxzMoUow',
             }),
+            await workOrderTag(db),
         ),
     );
     assertStrictEquals(res.status, 400);
@@ -183,7 +199,7 @@ async () => {
     assertStrictEquals(err.error, RETIRED_MESSAGE);
 });
 
-Deno.test('below-facade postWorkOrderTransitionOp still'
+Deno.test('below-facade postSeedWorkOrderTransitionOp still'
 + ' appends a legacy body',
 async () => {
     const db = await seededDb();
@@ -209,13 +225,12 @@ async () => {
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postWorkOrderTransitionOp(
+    await postSeedWorkOrderTransitionOp(
         db,
+        ORGANIZATION,
         WO_ID,
         body,
         SYSTEM_MEMBER_ID,
-        undefined,
-        [],
         messagePair,
     );
     // Below-facade appends the pair; lifecycle derives from

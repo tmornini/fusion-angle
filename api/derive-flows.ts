@@ -8,7 +8,14 @@ import {
     pickString, pickNumber, pickBoolean,
     validateFlowNodeAttributeEntity,
     validateFlowNodeMemberEntity,
+    validateFlowGraphDelta,
+    validateRevivals,
 } from './validators.ts';
+import { asObject } from '../shared/json-assert.ts';
+import type {
+    FlowGraphDelta,
+    GraphRevival,
+} from '../shared/flow-graph-body.ts';
 import { canonicalPath } from './message-pair.ts';
 import { normalizedStoredGraph } from
     './flow-graph-relations.ts';
@@ -43,9 +50,9 @@ import { liveHeadId, messageStore } from
 // and must never be conflated (IV Logic):
 //   - The LOCK head: the latest pair at the document by envelope
 //     (at, id), ANY method — the store's document head read
-//     (`messageStore(db).get`), serving Supersedes/Follows
-//     provenance for the locked class. A DAG under races;
-//     provenance-only, never consulted here.
+//     (`messageStore(db).get`), serving Supersedes
+//     provenance. A DAG under races; provenance-only,
+//     never consulted here.
 //   - The DOCUMENT head: the latest PUT/DELETE pair by envelope
 //     (at, id) — documentMessagePairsAt/deriveDocumentsAt's own
 //     reduction (derive-documents.ts). THIS is what `graph`
@@ -113,7 +120,10 @@ export function flowEntityOf(
 // hasUndoHistory is COUNT(*) > 1 of PUT+DELETE pairs at the
 // flow document — GET adds it; the stored blob never carries
 // it. The lifecycle trio stays, so a state change does not
-// match the previous response and fail to land.
+// match the previous response and fail to land. The
+// graphDelta/revivals sidecars are part of the flow's whole
+// state, so the stored PUT carries them; GET (flowEntityOf)
+// still drops them.
 export function flowStoredEntityOf(
     document: DerivedDocument,
     organization: Id,
@@ -121,6 +131,8 @@ export function flowStoredEntityOf(
     readonly state?: string;
     readonly state_at?: string;
     readonly state_event_id?: string;
+    readonly graphDelta: FlowGraphDelta;
+    readonly revivals: readonly GraphRevival[];
 } {
     const {
         hasUndoHistory: _hasUndoHistory,
@@ -130,18 +142,27 @@ export function flowStoredEntityOf(
     const state = body['state'];
     const stateAt = body['state_at'];
     const stateEventId = body['state_event_id'];
+    const sidecars = {
+        graphDelta: validateFlowGraphDelta(asObject(
+            body['graphDelta'], 'flow.graphDelta',
+        )),
+        revivals: validateRevivals(
+            body['revivals'], 'flow.revivals',
+        ),
+    };
     if (
         typeof state !== 'string'
         || typeof stateAt !== 'string'
         || typeof stateEventId !== 'string'
     ) {
-        return stored;
+        return { ...stored, ...sidecars };
     }
     return {
         ...stored,
         state,
         state_at: stateAt,
         state_event_id: stateEventId,
+        ...sidecars,
     };
 }
 

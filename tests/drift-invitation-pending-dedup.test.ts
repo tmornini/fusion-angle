@@ -69,7 +69,7 @@ async () => {
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
     const afterGrant = await pendingInvitationFor(
         db, ORGANIZATION_TWO, inviteeId);
     assertStrictEquals(afterGrant?.id, 'hhLDowecKAZZsoTcnjSQrg');
@@ -109,7 +109,7 @@ async () => {
             grantAt: '2026-06-01T00:00:02.000000Z',
         },
     ));
-    assertStrictEquals(regrant.status, 200);
+    assertStrictEquals(regrant.status, 201);
     const candidates = (await deriveInvitations(db))
         .filter(inv => inv.organization_id === ORGANIZATION_TWO
             && inv.identity_id === inviteeId);

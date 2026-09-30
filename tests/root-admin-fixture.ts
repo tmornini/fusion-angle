@@ -74,7 +74,7 @@ export async function seedOrganizationDocument(
     }
     const body = organizationRow(name);
     const spec = WRITE_RESPONSE_SPECS['organizations/:id'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for organizations/:id',
         );
@@ -113,7 +113,7 @@ export async function seatDocumentMessagePair(
     const spec = WRITE_RESPONSE_SPECS[
         ORGANIZATION_MEMBER_DETAIL_PATTERN
     ];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for seat',
         );

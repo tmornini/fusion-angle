@@ -96,10 +96,12 @@ function fakeClient(): {
                     name: '0000-root',
                     method: 'PUT',
                     outcome: 'land',
+                    raw_outcome: 'land',
                     stamp: '2026-01-01T00:00:00.000000Z',
                     response: new Uint8Array(),
                     head_id: null,
                     head_response: null,
+                    head_method: null,
                     supersedes: '00000000-0000-0000-0000-'
                         + '000000000000',
                     request_hash: '00'.repeat(32),

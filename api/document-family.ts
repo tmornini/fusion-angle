@@ -22,7 +22,6 @@ import type {
     PutHandler,
     WriteResponseSpec,
 } from './routes.ts';
-import { HTTP_OK } from '../shared/http-errors.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
@@ -116,11 +115,14 @@ export interface DocumentFamilyWiring {
     // family extras]); throws ValidationError.
     readonly validateDocument:
         (body: Record<string, unknown>) => unknown;
-    // The family's decompose op (old-plane rows + pair).
+    // The family's decompose op (old-plane rows + pair). The
+    // fenced organization is for a family whose version
+    // carries it; the others ignore it.
     readonly documentOp: (
         db: DbAdapter, id: Id,
         body: Record<string, unknown>, actor: Id,
-        messagePair?: MessagePair,
+        messagePair: MessagePair | undefined,
+        organization: Id | undefined,
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
     // stamped by the caller). A 'state' family's mapper reads
@@ -134,17 +136,10 @@ export interface DocumentFamilyWiring {
 // The per-family wiring table — grown family by family (ideas,
 // projects, flows, work-orders, records, record-attributes) —
 // never consulted through anything but documentFamilyWiring: the
-// gate's locked/simple keying (api.ts) treats membership here,
-// ANDed with a 'locked' registration, as "this route is served
-// via documentPutHandler" — never a blanket family-registry or
-// DOCUMENT_CLASS_ROUTE_PATTERNS consult, so an unregistered-here
-// family never rides the locked arm no matter what
-// family-registry.ts declares. Exported (a mutable table, like
-// FAMILY_REGISTRY) so the locked-arm's own tests can register a
-// SYNTHETIC family for the duration of a test — flows is the
-// live family that rides the locked arm today (registered here
-// AND 'locked' in family-registry.ts); every other registered
-// family is 'simple'.
+// gate (api.ts) treats membership here as "this route is
+// served via documentPutHandler". Exported (a mutable table,
+// like FAMILY_REGISTRY) so tests can register a SYNTHETIC
+// family for the duration of a test.
 export const DOCUMENT_FAMILY_WIRINGS:
     Record<string, DocumentFamilyWiring> = {};
 
@@ -298,19 +293,18 @@ export async function documentHeadMessagePairId(
     return stored?.id;
 }
 
-// The route body is UNCHANGED dispatch to the documentOp for
-// BOTH concurrency classes — the locked/simple divide is
-// resolved entirely upstream, at the gate (api.ts's four-outcome
-// table decides genesis/412 BEFORE this handler ever
-// runs), so documentPutHandler carries no concurrency branch of
-// its own.
+// The route body is plain dispatch to the documentOp for
+// every conditional: the gate refuses by form before this
+// handler runs, and the statement judges the latch, so
+// documentPutHandler carries no conditional branch of its
+// own.
 export function documentPutHandler(
     wiring: DocumentFamilyWiring,
 ): PutHandler {
-    return (db, params, body, actor, messagePair) =>
+    return (db, params, body, actor, messagePair, organization) =>
         wiring.documentOp(
             db, entityIdParam(wiring, params),
-            body, actor, messagePair,
+            body, actor, messagePair, organization,
         );
 }
 
@@ -680,7 +674,7 @@ export function documentWriteResponseSpec(
         familyRegistration(wiring.family)?.organizationNested
             !== false;
     return {
-        status: HTTP_OK,
+        conditional: 'optional',
         successBody: (params, body, _actor, organization) => {
             const raw = withoutId(body ?? {});
             const doc = wiring.validateDocument(raw) as {

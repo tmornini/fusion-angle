@@ -80,7 +80,7 @@ Deno.test('accept writes the seat at the invitation'
             grantAt: '2026-06-05T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
 
     const operationId = generateIdentifier();
     const accept = await handleRequest(db, req(

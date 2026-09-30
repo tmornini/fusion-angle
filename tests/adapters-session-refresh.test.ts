@@ -107,7 +107,7 @@ async function seedAuthorizationCodeMessagePair(
         responseBody: { client_id: 'web' },
         operationId: seed.operationId,
         requestId: seed.requestId,
-        genesis: true,
+        genesis: 'handler',
         emptyRequest: true,
     });
     await runWrite(

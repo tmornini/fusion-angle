@@ -36,7 +36,7 @@ async function identityDocumentMessagePair(
     requestAt: string,
 ): Promise<MessagePair> {
     const spec = WRITE_RESPONSE_SPECS['identities/:id'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for identities/:id',
         );
@@ -67,7 +67,7 @@ async function identityPiiDocumentMessagePair(
     requestAt: string,
 ): Promise<MessagePair> {
     const spec = WRITE_RESPONSE_SPECS['identities/:id/pii'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for'
             + ' identities/:id/pii',
@@ -100,7 +100,7 @@ async function identityCredentialDocumentMessagePair(
 ): Promise<MessagePair> {
     const spec =
         WRITE_RESPONSE_SPECS['identities/:id/credentials/:cid'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for'
             + ' identities/:id/credentials/:cid',
@@ -135,7 +135,7 @@ async function identityProviderDocumentMessagePair(
 ): Promise<MessagePair> {
     const spec =
         WRITE_RESPONSE_SPECS['identities/:id/providers/:eid'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for'
             + ' identities/:id/providers/:eid',
@@ -262,7 +262,7 @@ async function clientRegistrationDocumentMessagePair(
 ): Promise<MessagePair> {
     const spec =
         WRITE_RESPONSE_SPECS['identities/:id/registration'];
-    if (spec === undefined || !('status' in spec)) {
+    if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
             'no per-write response spec for'
             + ' identities/:id/registration',

@@ -1,6 +1,6 @@
 // The per-family registry: the single source of truth for a
 // family's cross-cutting properties — organization-nesting
-// tier, PUT concurrency class, and create-document body field —
+// tier and create-document body field —
 // that Phase 1 spread across parallel literal tables in
 // message-pair.ts (ORGANIZATION_NESTED_FIRST_SEGMENTS,
 // CREATE_BODY_ID_FIELDS). Ideas is the FIRST registered family
@@ -15,14 +15,9 @@
 // among others) wait for their own demand before a slot, a
 // registration, or a helper is added on their behalf.
 
-export type ConcurrencyClass = 'simple' | 'locked';
-
 export interface FamilyRegistration {
     readonly family: string;        // first path segment
     readonly organizationNested: boolean; // path tier
-    readonly concurrency: ConcurrencyClass; // REQUIRED —
-        // no default; every PUT family declares its class
-        // before it ships (spec: the two PUT classes)
     readonly createBodyIdField: string; // genesis document
 }
 
@@ -30,31 +25,26 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
     {
         family: 'ideas',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
         family: 'projects',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
         family: 'flows',
         organizationNested: true,
-        concurrency: 'locked',
         createBodyIdField: 'id',
     },
     {
         family: 'work-orders',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
         family: 'record-types',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
@@ -63,13 +53,11 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         // completeness (stateless sub-family).
         family: 'record-attributes',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
         family: 'objectives',
         organizationNested: true,
-        concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
@@ -77,7 +65,6 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         organizationNested: false, // GLOBAL plane: the
             // identity spine spans every organization,
             // never scoped to one.
-        concurrency: 'simple',
         createBodyIdField: 'id', // LIVE — POST /identities
             // consults this slot for its bare collection-
             // POST create route.
@@ -88,11 +75,6 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
             // itself: an organization can never be nested
             // under another organization — global plane,
             // like identities.
-        concurrency: 'simple', // routes.ts's own PUT
-            // organizations/:id comment: "a repeat PUT
-            // records Supersedes" — the simple-class chain
-            // (spec §The two PUT classes), never
-            // If-Match/Follows.
         createBodyIdField: 'id', // INERT — no collection
             // POST exists for organizations (route(
             // 'organizations', {get}) is GET-only).
@@ -103,7 +85,6 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
             // standing agent is not a member and not an
             // identity, and is not nested under an
             // organization.
-        concurrency: 'simple',
         createBodyIdField: 'id', // INERT — no collection
             // POST exists; genesis is PUT /ai-agents/:id.
     },

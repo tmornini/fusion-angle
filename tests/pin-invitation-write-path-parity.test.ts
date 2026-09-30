@@ -32,9 +32,9 @@ const ID_GRANT = generateIdentifier();
 
 // Phase 14 Task 2 commit 3: the write-path pre-tx-vs-in-tx
 // parity pin. grantInvitation calls pendingInvitationFor (via
-// grantOutcomeFor) BOTH pre-tx (to decide the response) and
-// in-tx (the `agrees` re-check); acceptInvitation/
-// declineInvitation/revokeInvitation each call
+// grantOutcomeFor) pre-tx alone, to decide the response; the
+// statement's nil latch judges a taken invitation id.
+// acceptInvitation/declineInvitation/revokeInvitation each call
 // currentInvitationState only in-tx today. This file proves
 // BOTH flipped functions return the SAME result pre-tx (the
 // plain adapter) and in-tx (an open db.transaction view sharing
@@ -74,8 +74,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// The exact table lists grantInvitation/acceptInvitation/
-// declineInvitation/revokeInvitation open their own write-gate
+// The exact table lists acceptInvitation/declineInvitation/
+// revokeInvitation open their own write-gate
 // transaction over (api/invitations-domain.ts). Phase Final
 // Task 2: invitations + memberships ROW halves stripped;
 // states stays until states-trace.
@@ -94,9 +94,9 @@ async function assertPendingWritePathParity(
     return preTx;
 }
 
-Deno.test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
-+ ' own table list) agree across a fresh grant, a decline, and'
-+ ' a declined-reinvite (multi-candidate)', async () => {
+Deno.test('pendingInvitationFor: pre-tx vs in-tx agree across'
++ ' a fresh grant, a decline, and a declined-reinvite'
++ ' (multi-candidate)', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
@@ -119,7 +119,7 @@ Deno.test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
     const afterGrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
     assertStrictEquals(afterGrant?.id, 'iUFAcBfktmuASnGGNrPCKw');
@@ -154,7 +154,7 @@ Deno.test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
             grantAt: '2026-06-02T00:00:02.000000Z',
         },
     ));
-    assertStrictEquals(regrant.status, 200);
+    assertStrictEquals(regrant.status, 201);
     const afterRegrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
     assertStrictEquals(afterRegrant?.id, INV_PARITY_WRITE_SECOND);
@@ -177,7 +177,7 @@ Deno.test('currentInvitationState: pre-tx vs in-tx agree across'
                 grantEventId: ID_GRANT, grantAt: at,
             },
         ));
-        assertStrictEquals(res.status, 200);
+        assertStrictEquals(res.status, 201);
     }
 
     async function assertStateWritePathParity(
@@ -330,7 +330,7 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
             grantAt: '2026-06-04T00:00:00.000000Z',
         },
     ));
-    assertStrictEquals(grant.status, 200);
+    assertStrictEquals(grant.status, 201);
 
     const operationId = generateIdentifier();
     const accept = await handleRequest(db, req(

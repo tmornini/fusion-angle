@@ -912,20 +912,19 @@ export function flowOrg2SeedBody(): Record<string, unknown> {
 
 // The genesis case of the document PUT work-orders/:id
 // (Phase 5 Task 4): the flat entity fields, no `id` (a route
-// param, not a body field). organization_id rides along as
-// the validator's tolerated-but-ignored extra — load-bearing
-// here since the seed drives postWorkOrderDocumentOp below the
-// org fence (no scoping wrapper to stamp it). Every seeded work
-// order is Stark (finding 7) — hand-authored rows omit
-// organization_id entirely (the composition root's own job);
-// generated rows already carry it (STARK_ORGANIZATION, set by
-// generateFlowWorkload) — either way the merge below re-asserts
-// the same value, so ONE construction serves both sources.
+// param, not a body field) and no organization_id — the op
+// takes the organization as the fence would hand it
+// (Interpretation R). Generated rows carry organization_id
+// (STARK_ORGANIZATION, set by generateFlowWorkload), so it is
+// dropped here with the id.
 export function workOrderDocumentSeedBody(
-    row: Omit<WorkOrderEntity, 'organization_id'>,
+    row: Omit<WorkOrderEntity, 'organization_id'>
+        & { readonly organization_id?: string },
 ): Record<string, unknown> {
-    const { id: _id, ...fields } = row;
-    return { ...fields, organization_id: STARK_ORGANIZATION };
+    const {
+        id: _id, organization_id: _organization, ...fields
+    } = row;
+    return fields;
 }
 
 // The genesis case of the document PUT
@@ -2089,14 +2088,14 @@ export async function formSeedMessagePair(
     const method = inv.op === true || idParams === undefined
         ? 'POST'
         : 'PUT';
-    // Every bare collection-POST family here is a create route,
-    // all {status: 204} in WRITE_RESPONSE_SPECS (routes.ts) — no
-    // successBody. An op-shaped POST at an id-carrying pattern
-    // (op: true) is the same 204/no-body voice. A document-class
-    // genesis PUT reads its OWN spec from the same table
-    // (documentSeedResponse) so a seeded pair's stored response
-    // can never drift from what the live gate would have stored
-    // for the identical request.
+    // Every bare collection-POST family here is a create route
+    // and forms no response body; an op-shaped POST at an
+    // id-carrying pattern (op: true) forms none either. Only the
+    // body reaches formWriteMessagePair, which stores 201 for
+    // both. A document-class genesis PUT reads its OWN spec
+    // from the same table (documentSeedResponse) so a seeded
+    // pair's stored response can never drift from what the live
+    // gate would have stored for the identical request.
     const response =
         inv.op === true || idParams === undefined
             ? { status: HTTP_NO_CONTENT, body: undefined }
@@ -2147,9 +2146,9 @@ function documentSeedResponse(
     inv: MockDataInvocation,
     routeSegments: readonly string[],
     pathSegments: readonly string[],
-): { readonly status: number; readonly body: unknown } {
+): { readonly body: unknown } {
     const entry = WRITE_RESPONSE_SPECS[inv.routePattern];
-    const spec = entry === undefined || 'status' in entry
+    const spec = entry === undefined || 'conditional' in entry
         ? entry
         : entry.put;
     if (spec === undefined) {
@@ -2163,7 +2162,6 @@ function documentSeedResponse(
             segment.startsWith(':') ? pathSegments[i] : undefined)
         .filter((value): value is string => value !== undefined);
     return {
-        status: spec.status,
         body: spec.successBody?.(
             params, inv.body, inv.requesterIdentityId,
             inv.organization,
@@ -2202,7 +2200,10 @@ export async function formDefaultOrganizationSeedMessagePair(
         requesterIdentityId: identityId,
         requestAt,
         organization: undefined,
-        responseBody: undefined,
+        responseBody: {
+            id: identityId,
+            organization_id: organizationId,
+        },
         operationId,
         requestId: operationId,
     });
@@ -2269,7 +2270,7 @@ export interface InstanceTransitionSeedInput {
 
 export interface InstanceChainSeedInput {
     readonly create: MessagePair;
-    readonly binding: MessagePair;
+    readonly bindingOperationId: string;
     readonly review: InstanceTransitionSeedInput;
     readonly complete: InstanceTransitionSeedInput;
 }
@@ -2283,7 +2284,9 @@ const TRANSITION_ROUTE =
     'organizations/:id/work-orders/:id/transition';
 
 // The WO01 chain as the app writes it: a PATCH create,
-// the binding PUT, then two value-bearing transitions.
+// the binding PUT, then two value-bearing transitions. The
+// binding and the transitions form in the rehearsal, once
+// the heads they latch have landed.
 export async function formInstanceChainSeedInput(
     requestAt: string,
 ): Promise<InstanceChainSeedInput> {
@@ -2295,12 +2298,6 @@ export async function formInstanceChainSeedInput(
         }
         return event;
     };
-    const createBody = { set: [] };
-    const entry = WRITE_RESPONSE_SPECS[INSTANCE_DETAIL_PATTERN];
-    if (entry === undefined || 'status' in entry
-        || entry.patch === undefined) {
-        throw new Error('no PATCH spec for the seed instance');
-    }
     const createOperationId = generateIdentifier();
     const create = await formWriteMessagePair({
         method: 'PATCH',
@@ -2308,53 +2305,19 @@ export async function formInstanceChainSeedInput(
         routePattern: INSTANCE_DETAIL_PATTERN,
         routeSegments: INSTANCE_DETAIL_PATTERN.split('/'),
         pathSegments: INSTANCE_PATH_SEGMENTS,
-        headerFields: [],
-        body: createBody,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt,
-        organization: STARK_ORGANIZATION,
-        responseBody: entry.patch.successBody?.(
-            [
-                STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
-                SEED_INSTANCE_ID,
-            ],
-            createBody,
-            SYSTEM_MEMBER_ID,
-            STARK_ORGANIZATION,
-        ),
-        operationId: createOperationId,
-        requestId: createOperationId,
-    });
-    const bindingOperationId = generateIdentifier();
-    const bindingSegments = [
-        'organizations', STARK_ORGANIZATION,
-        'work-orders', WO01_ID, 'binding',
-    ];
-    const binding = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/' + bindingSegments.join('/'),
-        routePattern:
-            'organizations/:id/work-orders/:id/binding',
-        routeSegments: [
-            'organizations', ':id',
-            'work-orders', ':id', 'binding',
-        ],
-        pathSegments: bindingSegments,
-        headerFields: [],
-        body: {
-            instance_id: SEED_INSTANCE_ID,
-            record_type_id: SEED_RECORD_TYPE_ID,
-        },
+        headerFields: [{ name: 'if-none-match', value: '*' }],
+        body: { set: [] },
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: STARK_ORGANIZATION,
         responseBody: undefined,
-        operationId: bindingOperationId,
-        requestId: bindingOperationId,
+        genesis: 'client',
+        operationId: createOperationId,
+        requestId: createOperationId,
     });
     return {
         create,
-        binding,
+        bindingOperationId: generateIdentifier(),
         review: {
             event: eventOf(WO01_REVIEW_EVENT_ID),
             operationId: generateIdentifier(),
@@ -2366,11 +2329,57 @@ export async function formInstanceChainSeedInput(
     };
 }
 
-// The transition's POST, formed after the head it latches
-// lands: a client reads the etag, then sends If-Match.
+// A client latches the heads it read: If-Match names each
+// tag, the work order's first.
+function ifMatchLine(
+    tags: readonly string[],
+): { name: string, value: string } {
+    return {
+        name: IF_MATCH_HEADER,
+        value: tags.map(strongEtagOf).join(', '),
+    };
+}
+
+// The binding's PUT, formed after the work order's head
+// lands: it names that head.
+export async function formInstanceBindingSeedPair(
+    operationId: string,
+    workOrderHeadId: string,
+    requestAt: string,
+): Promise<MessagePair> {
+    const segments = [
+        'organizations', STARK_ORGANIZATION,
+        'work-orders', WO01_ID, 'binding',
+    ];
+    return formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/' + segments.join('/'),
+        routePattern:
+            'organizations/:id/work-orders/:id/binding',
+        routeSegments: [
+            'organizations', ':id',
+            'work-orders', ':id', 'binding',
+        ],
+        pathSegments: segments,
+        headerFields: [ifMatchLine([workOrderHeadId])],
+        body: {
+            instance_id: SEED_INSTANCE_ID,
+            record_type_id: SEED_RECORD_TYPE_ID,
+        },
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt,
+        organization: STARK_ORGANIZATION,
+        responseBody: undefined,
+        operationId,
+        requestId: operationId,
+    });
+}
+
+// The transition's POST, formed after the heads it latches
+// land: a client reads both tags, then sends If-Match.
 export async function formInstanceTransitionSeedPair(
     input: InstanceTransitionSeedInput,
-    headMessagePairId: string,
+    tags: readonly string[],
     requestAt: string,
 ): Promise<MessagePair> {
     const segments = [
@@ -2383,10 +2392,7 @@ export async function formInstanceTransitionSeedPair(
         routePattern: TRANSITION_ROUTE,
         routeSegments: TRANSITION_ROUTE.split('/'),
         pathSegments: segments,
-        headerFields: [{
-            name: IF_MATCH_HEADER,
-            value: strongEtagOf(headMessagePairId),
-        }],
+        headerFields: [ifMatchLine(tags)],
         body: transitionSeedBody(input.event),
         requesterIdentityId: input.event.member_id,
         requestAt,

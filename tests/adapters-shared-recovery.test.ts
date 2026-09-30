@@ -193,7 +193,7 @@ async function seedAuthorizationCodeMessagePair(
         responseBody: { client_id: 'web' },
         operationId: seed.operationId,
         requestId: seed.requestId,
-        genesis: true,
+        genesis: 'handler',
         emptyRequest: true,
     });
     await runWrite(
@@ -591,7 +591,7 @@ Deno.test('a concurrent facade refresh and remint present'
             grantAt: '2026-06-04T00:00:01.000000Z',
         },
     }));
-    assertStrictEquals(granted.status, 200);
+    assertStrictEquals(granted.status, 201);
     const pair = await issuePair(db);
     client.putSessionCredentials({
         accessToken: pair.access_token,
@@ -706,6 +706,7 @@ Deno.test(
                 PATCH: unused,
                 PATCHWithEtag: unused,
                 DELETE: unused,
+                DELETEWithEtag: unused,
                 POST: unused,
                 postForHeaders: (
                     _resource, payload, _token, fields,

@@ -19,10 +19,11 @@ import { generateIdentifier } from
 // The flows sibling of tests/derive-ideas.test.ts/derive-
 // projects.test.ts: unit-level lifecycle-reduction guarantees
 // that tests/drift-flows.test.ts (parity-against-old-plane
-// only) does not exercise. MECHANISM: flows are the LOCKED
-// class (Decision 7) — a SECOND PUT to an existing flow is
-// non-genesis and must thread If-Match via a header-
-// capable req helper (echo the first PUT's pair-id ETag),
+// only) does not exercise. MECHANISM: a flow PUT's
+// conditional is 'required' — a SECOND PUT to an existing
+// flow is a conditional PUT and must thread If-Match via a
+// header-capable req helper (echo the first PUT's pair-id
+// ETag),
 // unlike the bare-req idiom the
 // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew tests
 // use.
@@ -138,7 +139,7 @@ Deno.test(
         const genesis = await putFlow(
             db, token, id, 'Genesis Title', 'active',
             '2026-06-01T00:00:00.000000Z', genesisEventId,
-            genesisGraph,
+            genesisGraph, { 'if-none-match': '*' },
         );
         assertStrictEquals(genesis.status, 201);
         const head = await handleRequest(db, req(
@@ -149,8 +150,8 @@ Deno.test(
             , 'no ETag on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + id);
 
-        // The locked class: this second PUT is non-genesis, so
-        // it must echo the current head's ETag rather
+        // A conditional PUT: this second PUT is not a genesis,
+        // so it must echo the current head's ETag rather
         // than the bare-req idiom the
         // organizations/AjdvjuECVZEgZoFajaIEkg/ideas/projects skew
         // tests
@@ -235,6 +236,7 @@ Deno.test('ordering is oldest live head (at, id)', async () => {
         const res = await putFlow(
             db, token, id, 'Order ' + id, 'active',
             AT, generateIdentifier(), emptyGraph(),
+            { 'if-none-match': '*' },
         );
         assertStrictEquals(res.status, 201);
     }

@@ -3,6 +3,7 @@ import {
     assertMatch,
     assertStrictEquals,
 } from '@std/assert';
+import { IF_NONE_MATCH_HEADER } from '../api/message-pair.ts';
 import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
@@ -227,10 +228,9 @@ async () => {
 // Two helper-shaped writes with identical method, path, and
 // body are two requests: apiRequest mints an operation id
 // for each, the hashes differ, and the second reaches the
-// domain — here an instance create over a live instance,
-// which the handler refuses (428, If-Match required on a
-// live instance) rather than the ledger serving the
-// first's stored 201.
+// domain — here a declared instance create over a live
+// instance, which the statement refuses (412) rather than
+// the ledger serving the first's stored 201.
 Deno.test('identical helper-shaped writes each reach the'
 + ' domain',
 async () => {
@@ -262,9 +262,10 @@ async () => {
         path: instanceDetail,
         token: admin,
         body: { set: [] },
+        headers: { [IF_NONE_MATCH_HEADER]: '*' },
     });
     const first = await handleRequest(db, write());
     const second = await handleRequest(db, write());
     assertStrictEquals(first.status, 201);
-    assertStrictEquals(second.status, 428);
+    assertStrictEquals(second.status, 412);
 });

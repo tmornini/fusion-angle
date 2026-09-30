@@ -700,6 +700,30 @@ skew tests, which went with item 8's trio.
    by its jti, from `## Later work`, whose oracle — one
    head per jti on every chain kind — the token document
    keeps. Follows item 0.
+   Work-order events become a sub-collection of an
+   immutable document type. State by PUT keeps each
+   version's own lifecycle events inside the work-order
+   head (`events`, `api/work-order-version.ts`), a
+   collection embedded in a document. Each event is its
+   own document, written once at
+   `…/work-orders/:id/events/:eventId` by a sibling PUT
+   with a handler genesis in the operation's statement;
+   the work-order head keeps its fields, node, binding,
+   and claim, and history reads the events collection.
+   Immutable document types make that a rule, not a
+   habit: a family declares itself immutable where it
+   declares its conditional, and then every write to it
+   is a genesis landed with the never-written latch, so
+   the statement refuses a second write at a written name
+   (412 for a client's declaration, 409 for a handler's)
+   and at a retired one (410); its DELETE route answers
+   405, and only erasure removes its pairs (the erasure
+   bullet), leaving the tombstone. Oracle: no work-order
+   version carries `events`; every event is a head with
+   exactly one version; a second write at an event's
+   name stores nothing; the history route answers
+   `tests/fixtures/work-order-histories.json`'s rows from
+   the collection, one statement per operation.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
@@ -1556,6 +1580,26 @@ Off the critical path; each with its oracle.
   everything the system needs, and a test finds every
   environment read in product code and scripts and fails
   on a name without the prefix outside the two edges
+- Gone for every document. State by PUT retires a
+  record instance's id for good: the never-written latch
+  makes tombstone-wins the statement's rule, and a
+  retired instance's read, update, and re-create answer
+  410 Gone (RFC 9110 §15.5.11). Every other family
+  re-creates over its tombstone (the nil latch lands over
+  a DELETE head) and answers 404 after a delete. An id is
+  an identity: reusing one lets a stale reference — a
+  binding, an export, an audit line, a client's cache —
+  name a different document, as two customers sharing an
+  id would. Consider tombstone-wins, and so 410, for
+  every document. It costs re-creation by PUT for the
+  class A families and `If-None-Match: *` over a
+  tombstone for flows and work orders; the POST creates
+  already mint fresh ids. Oracle: for each family,
+  create, DELETE, then GET answers 410 and a declared
+  create answers 410; a never-written id answers 404; a
+  foreign organization's retired document answers what
+  its live one does; history and past versions still
+  answer 200.
 
 ## Later work
 
@@ -2857,9 +2901,22 @@ Off the critical path; each with its oracle.
   "removed", never "erased" (item 2). `DELETE` is logical
   until `VACUUM`, and WAL and point-in-time backups hold
   the bytes until the host's retention expires — state the
-  window. Oracle: `tests/api-pii-tombstone.test.ts`
+  window. The brainstorm also settles two questions this
+  bullet inherits. Cascade: erasing a document's pairs
+  follows the DELETE cascade policy (its bullet below),
+  because a dependent that copied the erased values into
+  its own state — a revision, an operation's response —
+  still holds them, so erasure walks the same reference
+  table the cascade does. Tombstones: the suspicion is that an erased
+  document keeps exactly one version, its tombstone — the
+  DELETE head the view already refuses to delete — so its
+  id still reads retired (the Gone bullet), its
+  succession still has a head, and the erasure pair names
+  every predecessor the tombstone's `supersedes` chain
+  lost. Oracle: `tests/api-pii-tombstone.test.ts`
   'erased PII remains in superseded pairs; login is 401'
-  inverted for the erased pairs.
+  inverted for the erased pairs, and each erased
+  document's one remaining pair is its tombstone.
 - The code's word `erased` becomes `deleted`: this is an
   HTTP application, and the state it names is a DELETE
   head at `identities/:id/pii`. Its own change: the PII
@@ -3030,6 +3087,45 @@ Off the critical path; each with its oracle.
   Reword each to the statement that writes today, or
   delete it where the code now says it. Oracle:
   `grep -rn appendMessagePair api/` finds nothing
+- DELETE cascade. No one policy says what a delete does
+  to the documents that name the deleted one. Four
+  references refuse the delete today (the last admin
+  seat, the record-type and attribute RESTRICTs, and the
+  instance placement RESTRICT under a work-order
+  binding), each checked in a read that closes before
+  the write; no audit lists the rest. Consider one
+  policy per reference, named in one place: RESTRICT
+  (refuse while referenced), CASCADE (tombstone the
+  dependents in the same statement as the parent), or
+  ORPHAN (leave the reference, which then reads 410 or
+  404). Oracle: a table of every cross-document
+  reference with its policy; each CASCADE lands parent
+  and dependents in one statement and a GET of each
+  dependent reads it gone; each RESTRICT refuses a
+  racing delete under one statement; no reference is
+  unlisted.
+- An RFC 7009 revocation endpoint for OAuth clients.
+  Revocation today is
+  `identities/:id/tokens/:jti/revocation`: the identity
+  names its own token by `jti`, revokes the whole chain,
+  and an unknown jti answers 404, which reveals nothing
+  the identity cannot already list. A third-party client
+  holding only a token string has no standard way to
+  revoke it. Add `POST authentication/revocation`
+  (`application/x-www-form-urlencoded`: `token`, and the
+  optional `token_type_hint`), which authenticates the
+  client as `authentication/token` does, checks the token
+  was issued to that client, and revokes through the same
+  chain revocation. It answers 200 for a revoked or an
+  unknown token (RFC 7009 §2.2), so a guessed string
+  learns nothing; `unsupported_token_type` for a kind it
+  does not revoke; and 503 with `Retry-After` while
+  revocation is unavailable. Oracle: a client revokes its
+  refresh token and every jti in that chain then reads
+  revoked; an unknown or already-revoked token answers
+  200 and stores nothing; a token issued to another
+  client is refused; a real and a guessed token of the
+  same length answer byte-identical responses.
 
 ## Sequencing
 
