@@ -1272,11 +1272,6 @@ Off the critical path; each with its oracle.
     I19) — Layer 2; `tests/command-palette-init.test.ts`
     is a does-not-throw smoke test and the key-index
     logic is unexported inside the DOM listeners
-  - The loading skeleton before a fetch settles (I21) —
-    the walk pauses `Fetch` on `/api/organizations/*`
-    so the pending skeleton is observable; a Layer 1
-    pin can still read `innerHTML` between calling
-    `loadInto` and awaiting it
   - The toast's top-center position and its ~6-second
     auto-dismiss (I23) — Layer 2, reading computed
     position and waiting out `TOAST_DURATION_MS`
