@@ -206,7 +206,8 @@ Deno.test(
     async () => {
         // Mirrors the boot-time race: another tab posts before
         // this tab's postSessionSeed() has run.
-        deleteBellSession();
+        client.deleteSessionToken();
+        putBellSession(client);
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });
@@ -222,7 +223,8 @@ Deno.test(
     'a scoped event during an unseeded session does not throw'
     + ' and does not fire',
     async () => {
-        deleteBellSession();
+        client.deleteSessionToken();
+        putBellSession(client);
         const ch = createSubscriptionChannel();
         let fired = 0;
         ch.subscribe(() => { fired += 1; });

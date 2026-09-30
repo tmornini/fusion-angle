@@ -1275,6 +1275,83 @@ skew tests, which went with item 8's trio.
 
 Off the critical path; each with its oracle.
 
+- Three fixed `setImmediate` drains guard negative
+  assertions after an asynchronous delivery: the raw-PUT
+  "must not wake the page" checks in
+  `tests/flow-stats-subscribe.test.ts:182-190` and
+  `tests/ideas-empty-subscribe.test.ts:190-203`, and the
+  "idle tab ignores a peer refresh broadcast" check in
+  `tests/adapters-refresh-mutex.test.ts:153-155`. A late
+  delivery can only pass them wrongly, never fail them —
+  but this branch saw `tests/ideas-empty-subscribe.test.ts`
+  fail three times under `--parallel` (the file itself
+  untouched; `BroadcastChannel` is process-global) and
+  `tests/adapters-flow-stats.test.ts` fail once, and
+  `ledger-decisions` saw the ideas file fail a fourth
+  and a fifth time, TODO.md its only change and a
+  second gate
+  running beside it, so the
+  fixed count still proves less than it reads as proving;
+  the ideas comment still says its drain matches the
+  post-bell assert, which 90f5c722 turned into a deadline
+  wait.
+  The ledger arc saw four more suites fail under
+  `--parallel`, each green on re-run, three failures in
+  ten `./test` runs on 2026-09-24:
+  `tests/adapters-shared-recovery.test.ts:546`
+  ("malformed token: expected 3 segments") and its
+  `recovery re-scopes to the vessel org claim, not the
+  cross-tab preference`;
+  `tests/apex-destination.test.ts:65`
+  (`probeRefreshSession posts a cookie refresh grant`,
+  one expected and none seen at `:102`) and its 401
+  probe; `tests/adapters-invitations.test.ts:1076` (`a
+  re-minted token without the seat earns one more
+  attempt`: the re-minted token did not list the
+  organization), `:1131`, `the remint waits for an
+  in-flight facade refresh`, and `a failed re-mint after
+  accept surfaces, seat kept`; and (the next bullet)
+  `tests/api-shadow-ledger-tokens.test.ts:860`. The
+  first three are session and token races, not drains,
+  and share a confirmed cause: under `--parallel` every
+  test file is a worker in one process, and
+  `navigator.locks` and `BroadcastChannel` are shared
+  across those workers, so a refresh in one file waits
+  on another file's `fusion-refresh` lock and adopts
+  its `fusion-angle:refresh` broadcast (signatures: a
+  missing seat after remint, refresh counts below
+  expected, "malformed token"); the harness fix is a
+  `--preload` that gives lock and channel names a
+  per-worker prefix, as
+  `subscribeNamedNotificationEvents` gives the bell a
+  private bus.
+  Oracle: each check reads after a signal that the
+  delivery was processed — a render count on the host
+  stub for the two page tests, a second listener on
+  `fusion-angle:refresh` for the mutex test — and no
+  fixed-count drain remains at those three sites; and
+  each of the three suites above passes ten consecutive
+  `./test` runs, or its failure has a named cause and a
+  fix
+- `tests/api-shadow-ledger-tokens.test.ts:860`
+  (`revokeTokenChain racing a concurrent
+  rotateRefreshJti`: a rotated jti read `issued` where
+  every jti should read `revoked`) — named in the bullet
+  above's 2026-09-24 ten-run sample — is a separate,
+  unexplained mechanism: its test
+  ("revokeTokenChain racing a concurrent
+  rotateRefreshJti on the chain's live successor…",
+  `:860`) deliberately races two server-side ledger
+  operations; nothing it runs touches `navigator.locks`
+  or `BroadcastChannel` (none under `api/`), and it
+  fails under `--parallel` load with "revoked" expected,
+  "issued" got (at `:901`) — an interleaving the test
+  does not pin; it needs its own investigation, and the
+  per-worker prefix preload above will not fix it.
+  Oracle: ten consecutive `./test` runs under
+  `--parallel` with no failure in
+  `tests/api-shadow-ledger-tokens.test.ts`, or its
+  failure has a named cause and a fix
 - An inner pair of a composed operation skipped while the
   top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
@@ -1522,6 +1599,53 @@ Off the critical path; each with its oracle.
   insert-threshold behavior on the insert-only table. Oracle:
   numbers in the sweep's JSON and a backup-size line item 6
   can plan against.
+- Request statistics in `./bin/measure`, with
+  visualizations. `handleRequest` (`api/api.ts`) is the one
+  seam: the in-page transport and `server/http-server.ts`
+  both route through it, and `simulateLatency()` runs before
+  it, so a timer there measures the handler alone. Record
+  per request: method, route family (ids folded to `:id`),
+  status, handler ms, wall stamp. A throwaway probe on
+  `packageable-client` (`ffa73bf4`, memory suite,
+  `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
+  peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
+  p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
+  `work-orders/:id/history` clusters at 100-102 ms (p90
+  100.7, max 102.3), unexplained. The probe's synchronous
+  per-request append cost ~1.3 s on a 45 s suite. Suite
+  throughput through the memory backend is not a load test;
+  the Postgres origin (`--base-url`) is where a rate means
+  something. Visualize beside readyMs in `measure-viz`: a
+  log-bucket latency histogram, per-route p50/p90/p99, and a
+  requests-per-second timeline. Oracle: `--record` writes the
+  per-route figures to `measurements/`; `--visualize` draws
+  the three charts; `--check` gates per-route p90 against
+  `measurements/budgets.json`.
+- The work-order history list ends in a slash:
+  `organizations/:id/work-orders/:id/history` becomes
+  `…/history/`, as every other list route does
+  (`identities/:id/invitations/:id/versions/`). A wire
+  change: the route (`api/routes.ts:5232`), its two client
+  reads (`client/work-orders-queries.ts:175`, `:292`), and
+  the generated API documentation. Oracle: no route in
+  `api/routes.ts` that returns a list lacks the slash.
+- The refresh lock `fusion-refresh`, the peer channel
+  `fusion-angle:refresh`
+  (`client/session-refresh-mutex.ts:8-9`), and the
+  credential key `STORAGE_KEY_AUTHORIZATION`
+  (`client/session-storage-keys.ts`) are per page
+  origin, not per client. Two clients in one realm
+  refreshing at once wait on one lock and adopt each
+  other's broadcast token, across API origins too — the
+  spec's "two origins or two sessions cannot coexist" is
+  met for the token, flight, cookie flag, and recovery,
+  but not for cross-tab coordination; no product path
+  builds two clients in one document today. Fix: scope
+  the lock name, channel name, and credential key by a
+  key the client is built with (the transport origin).
+  Oracle: two clients over different origins refresh
+  concurrently in one realm and each keeps its own
+  token.
 - Stamp parameters stay text until Postgres parses
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
@@ -1738,54 +1862,6 @@ Off the critical path; each with its oracle.
   the records list renders Try Again, zero unhandled
   rejection — the same pin shape as
   `tests/ideas-empty-subscribe.test.ts`
-- Three fixed `setImmediate` drains guard negative
-  assertions after an asynchronous delivery: the raw-PUT
-  "must not wake the page" checks in
-  `tests/flow-stats-subscribe.test.ts:182-190` and
-  `tests/ideas-empty-subscribe.test.ts:190-203`, and the
-  "idle tab ignores a peer refresh broadcast" check in
-  `tests/adapters-refresh-mutex.test.ts:153-155`. A late
-  delivery can only pass them wrongly, never fail them —
-  but this branch saw `tests/ideas-empty-subscribe.test.ts`
-  fail three times under `--parallel` (the file itself
-  untouched; `BroadcastChannel` is process-global) and
-  `tests/adapters-flow-stats.test.ts` fail once, and
-  `ledger-decisions` saw the ideas file fail a fourth
-  and a fifth time, TODO.md its only change and a
-  second gate
-  running beside it, so the
-  fixed count still proves less than it reads as proving;
-  the ideas comment still says its drain matches the
-  post-bell assert, which 90f5c722 turned into a deadline
-  wait.
-  The ledger arc saw four more suites fail under
-  `--parallel`, each green on re-run, three failures in
-  ten `./test` runs on 2026-09-24:
-  `tests/adapters-shared-recovery.test.ts:546`
-  ("malformed token: expected 3 segments");
-  `tests/apex-destination.test.ts:65`
-  (`probeRefreshSession posts a cookie refresh grant`,
-  one expected and none seen at `:102`) and its 401
-  probe; `tests/adapters-invitations.test.ts:1076` (`a
-  re-minted token without the seat earns one more
-  attempt`: the re-minted token did not list the
-  organization) and `:1131`; and
-  `tests/api-shadow-ledger-tokens.test.ts:860`
-  (`revokeTokenChain racing a concurrent
-  rotateRefreshJti`: a rotated jti read `issued` where
-  every jti should read `revoked`). These are session
-  and token races, not drains; the seed cycle's
-  hypothesis is that heavier seeding widened their
-  timing windows, and the last asserts a product
-  invariant, so it may be a real race and not a test's.
-  Oracle: each check reads after a signal that the
-  delivery was processed — a render count on the host
-  stub for the two page tests, a second listener on
-  `fusion-angle:refresh` for the mutex test — and no
-  fixed-count drain remains at those three sites;
-  and each of the four suites above passes ten
-  consecutive `./test` runs, or its failure has a named
-  cause and a fix
 - Objective lifecycle history compares two clocks:
   `revision.at` is client-minted while the lifecycle `at`
   is the server-stamped pair fact. A browser clock ahead of
@@ -2959,7 +3035,10 @@ Off the critical path; each with its oracle.
 
 - The examination report
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
-  → 0–2, 6, 9, 11, 13 (its findings are their oracles)
+  → 0–2, 6, 9, 11, 13 (its findings are their oracles).
+  The two parallel-race bullets (Critical functionality
+  path, first two) land next, after packageable-client
+  lands
 - 0–2 → 5 (its link token is a secret at rest: item 0
   hoists it, item 2 fences it); item 2 no longer orders
   item 6, since a backup carries the table whole

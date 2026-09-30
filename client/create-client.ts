@@ -50,7 +50,7 @@ export function createClient(deps: ClientDeps): Client {
         facade: deps.facade({
             runSingleFlightRefresh: session.runSingleFlightRefresh,
             putSessionToken: session.putSessionToken,
-            navigateToAuth: navigation.navigateToAuth,
+            navigateToAuth: () => navigation.navigateToAuth(),
         }),
         session,
         navigation,

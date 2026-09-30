@@ -26,6 +26,8 @@ import {
     inPageClient,
     wrapInPageAdapter,
 } from './in-page-facade.ts';
+import { withoutCrossTabRefresh } from
+    './fixtures/cross-tab-refresh.ts';
 import { withLocalStorageAsync } from
     './fixtures/local-storage.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -40,36 +42,37 @@ const quiet = {
     recordRequest: () => {},
 };
 
-Deno.test('two clients hold two sessions', async () => {
-    const ada = 'XXZruirZyAOoRpNxaDnpSA';
-    const bea = generateIdentifier();
-    const a = inPageClient(memoryDbAdapter());
-    const b = inPageClient(memoryDbAdapter());
-    a.putSessionToken(await reachableToken(ada, []));
-    b.putSessionToken(await reachableToken(bea, []));
-    assertStrictEquals(a.sessionContext().identity.id, ada);
-    assertStrictEquals(b.sessionContext().identity.id, bea);
-    a.deleteSessionToken();
-    assertStrictEquals(a.sessionTokenIsSeeded(), false);
-    assertStrictEquals(b.sessionTokenIsSeeded(), true);
-    let release: (token: string) => void = () => {};
-    const pending = a.runSingleFlightRefresh(
-        () => new Promise((resolve) => {
-            release = resolve;
-        }),
-    );
-    let ranB = false;
-    const pendingB = b.runSingleFlightRefresh(async () => {
-        ranB = true;
-        return 'b-access';
-    });
-    release('a-access');
-    await pendingB;
-    assertStrictEquals(ranB, true);
-    assertStrictEquals(await pending, 'a-access');
-    a.deleteRefreshChannel();
-    b.deleteRefreshChannel();
-});
+Deno.test('two clients hold two sessions', () =>
+    withoutCrossTabRefresh(async () => {
+        const ada = 'XXZruirZyAOoRpNxaDnpSA';
+        const bea = generateIdentifier();
+        const a = inPageClient(memoryDbAdapter());
+        const b = inPageClient(memoryDbAdapter());
+        a.putSessionToken(await reachableToken(ada, []));
+        b.putSessionToken(await reachableToken(bea, []));
+        assertStrictEquals(a.sessionContext().identity.id, ada);
+        assertStrictEquals(b.sessionContext().identity.id, bea);
+        a.deleteSessionToken();
+        assertStrictEquals(a.sessionTokenIsSeeded(), false);
+        assertStrictEquals(b.sessionTokenIsSeeded(), true);
+        let release: (token: string) => void = () => {};
+        const pending = a.runSingleFlightRefresh(
+            () => new Promise((resolve) => {
+                release = resolve;
+            }),
+        );
+        let ranB = false;
+        const pendingB = b.runSingleFlightRefresh(async () => {
+            ranB = true;
+            return 'b-access';
+        });
+        release('a-access');
+        await pendingB;
+        assertStrictEquals(ranB, true);
+        assertStrictEquals(await pending, 'a-access');
+        a.deleteRefreshChannel();
+        b.deleteRefreshChannel();
+    }));
 
 Deno.test('a failed recovery calls the injected navigation',
 async () => {
@@ -142,7 +145,7 @@ async () => {
 
 Deno.test(
     'the transport and the context share one refresh flight',
-    async () => {
+    () => withoutCrossTabRefresh(async () => {
         const original = globalThis.fetch;
         const fresh = await reachableToken(
             generateIdentifier(), [],
@@ -205,12 +208,12 @@ Deno.test(
             globalThis.fetch = original;
             client.deleteRefreshChannel();
         }
-    },
+    }),
 );
 
 Deno.test(
     'the cookie refresh and the exchange ride the transport',
-    async () => {
+    () => withoutCrossTabRefresh(async () => {
         const flat = await reachableToken(
             'XXZruirZyAOoRpNxaDnpSA',
             ['AjdvjuECVZEgZoFajaIEkg'],
@@ -298,11 +301,11 @@ Deno.test(
         for (const s of seen) {
             assertStrictEquals(s.receiver, undefined);
         }
-    },
+    }),
 );
 
 Deno.test('a failed cookie refresh calls the injected navigation',
-async () => {
+() => withoutCrossTabRefresh(async () => {
     const calls: string[] = [];
     const client = createClient({
         facade: createHttpFacade('', (_input, init) =>
@@ -336,10 +339,10 @@ async () => {
         client.deleteRefreshChannel();
     }
     assertEquals(calls, ['navigateToAuth']);
-});
+}));
 
 Deno.test('a cookie refresh on one client leaves another',
-async () => {
+() => withoutCrossTabRefresh(async () => {
     const other = inPageClient(memoryDbAdapter());
     const kept = await reachableToken(generateIdentifier(), []);
     other.putSessionToken(kept);
@@ -375,4 +378,4 @@ async () => {
     }
     assertStrictEquals(client.getSessionToken(), fresh);
     assertStrictEquals(other.getSessionToken(), kept);
-});
+}));

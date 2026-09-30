@@ -3,7 +3,7 @@ import {
     principalFromToken,
 } from '../shared/access-token-decode.ts';
 
-// Per-tab bearer holder. No mint — the test composition
+// Per-client bearer holder. No mint — the test composition
 // root (`adapters/init.ts`) seeds an anonymous token; the
 // server entry installs a login token.
 

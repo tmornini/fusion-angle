@@ -264,6 +264,9 @@ codebase already does. Comments that name a moved path
 are not forced and stay; they are counted at Task 30 for
 the operator. `SCHEMA.svg` and `web-app/api-documentation/`
 name no moved path, so neither `--check` regenerates.
+Step 5's grep counts 13 such comments across `api/`,
+`client/`, `shared/`, `server/`, `tests/`, and `web-app/`
+at `c11cb4bc`, left for the operator.
 
 **(D) What an extraction may touch.** Cut the named
 declarations with their leading comment blocks; paste
@@ -422,6 +425,20 @@ racing a concurrent rotateRefreshJti…"). Two earlier runs
 failed once each in `tests/adapters-invitations.test.ts`
 and `tests/adapters-shared-recovery.test.ts`. All three
 are named racy files.
+
+The after is measured too. `./test` at `c11cb4bc`, three
+runs: 44.97 s red, 43.70 s red, 44.85 s red (median 44.85 s,
+against the base's 44.29 s), passing 3,724, 3,723, and
+3,724 respectively, all with 11 ignored. Run 1 failed in
+`tests/adapters-invitations.test.ts` ("a re-minted token
+without the seat earns one more attempt"). Run 2 failed
+twice: `tests/adapters-invitations.test.ts` ("two re-minted
+tokens without the seat surface a named failure") and
+`tests/apex-destination.test.ts` ("probeRefreshSession
+posts a cookie refresh grant"). Run 3 failed in
+`tests/adapters-invitations.test.ts` ("two re-minted tokens
+without the seat surface a named failure"). All failures
+are in named racy files.
 
 **(P) Base.** The brief named `2280c128`.
 `ledger-store` moved to `667d601d` when the
@@ -878,9 +895,11 @@ console.log(`rewired ${touched} file(s) to ${to}`);
   `client.deleteRefreshChannel()`, in `finally` or
   `afterEach`, as tests call `deleteRefreshChannel()`
   today.
-- `navigator.locks` is absent under Deno, so the refresh
-  mutex runs its work at once there; the browser
-  serializes it across tabs.
+- `navigator.locks` is present under Deno 2.9.6, so the
+  refresh mutex serializes on its module-level lock name
+  there as the browser does across tabs; two clients in
+  one worker queue on it (Task 23's two-clients pin starts
+  `b` before releasing `a`).
 - Call an injected `fetch` as a local binding
   (`const send = fetch; send(url, init)`), never as a
   property (`deps.fetch(url)`). A property call passes a
