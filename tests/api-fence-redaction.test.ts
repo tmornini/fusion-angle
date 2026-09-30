@@ -6,6 +6,7 @@ import { reachableToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
+import { withPerformanceNow } from './fixtures/performance-now.ts';
 import { framedRequest } from './http-fixtures.ts';
 
 // Phase 12 Task 1: the pre-dispatch fence reads (handleRequest's
@@ -45,33 +46,44 @@ Deno.test(
         }).getCollectionPairs = async (path) => {
             if (path === '/identities/XXZruirZyAOoRpNxaDnpSA/'
                 + 'default-organization/') {
+                nowMs = 2.381417;
                 throw new Error('secret fence fault detail');
             }
             return original(path);
         };
         const flatToken = await reachableToken();
+        let nowMs = 2.286459;
         const { result: response, calls } =
-            await captureConsole(
-                'error',
-                () => handleRequest(
-                    db,
-                    framedRequest('http://localhost/organizations/'
-                        + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
-                        headers: {
-                            'Authorization':
-                                'Bearer ' + flatToken,
-                        },
-                    }),
+            await withPerformanceNow(() => nowMs, () =>
+                captureConsole(
+                    'error',
+                    () => handleRequest(
+                        db,
+                        framedRequest(
+                            'http://localhost/organizations/'
+                            + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
+                                headers: {
+                                    'Authorization':
+                                        'Bearer ' + flatToken,
+                                },
+                            },
+                        ),
+                    ),
                 ),
             );
         assertStrictEquals(response.status, 500);
         const { error } =
             (await response.json()) as { error: string };
         assertStrictEquals(error, 'internal error');
+        const logged = calls.find(args =>
+            args.includes('fence read failed'));
         assert(
-            calls.some(args =>
-                args.includes('fence read failed')),
+            logged !== undefined,
             'the fence catch must keep console evidence',
+        );
+        assertStrictEquals(
+            (logged[1] as { latencyMs?: unknown }).latencyMs,
+            0.095,
         );
     },
 );

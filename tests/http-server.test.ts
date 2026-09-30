@@ -23,8 +23,15 @@ import {
 } from '../server/http-server.ts';
 import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
+import { withPerformanceNow } from
+    './fixtures/performance-now.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+
+// The Office of Time: RFC-3339 zulu at the fullest
+// resolution the environment provides — six digits here.
+const ZULU_6 =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
 async function gzipBytes(
     text: string,
@@ -204,6 +211,41 @@ async () => {
         );
     });
 });
+
+Deno.test(
+    'the request log keeps sub-millisecond latency',
+    async () => {
+        let nowMs = 2.286459;
+        const handle: RequestHandler = async () => {
+            nowMs = 2.381417;
+            return new Response('handled', { status: 200 });
+        };
+        await withPerformanceNow(() => nowMs, () =>
+            withServer({}, handle, async (base, logs) => {
+                const res = await fetch(base + '/api/ideas');
+                assertStrictEquals(await res.text(), 'handled');
+                const last = logs[logs.length - 1];
+                assert(last !== undefined);
+                assertStrictEquals(last['latencyMs'], 0.095);
+            }),
+        );
+    },
+);
+
+Deno.test(
+    'the request log stamps RFC-3339 zulu microseconds',
+    async () => {
+        await withServer({}, undefined, async (base, logs) => {
+            const res = await fetchDiscardingBody(
+                base + '/missing.html',
+            );
+            assertStrictEquals(res.status, HTTP_NOT_FOUND);
+            const last = logs[logs.length - 1];
+            assert(last !== undefined);
+            assertMatch(String(last['at']), ZULU_6);
+        });
+    },
+);
 
 Deno.test('HTML is no-store and hashed assets are immutable',
 async () => {

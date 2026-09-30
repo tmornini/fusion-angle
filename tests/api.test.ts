@@ -20,6 +20,7 @@ import {
     DEV_TOKEN, organizationToken,
 } from './token-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
+import { withPerformanceNow } from './fixtures/performance-now.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -301,24 +302,30 @@ Deno.test(
             ) => ReturnType<typeof original>;
         }).getCollectionHeadPairs = async (path) => {
             if (path === '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/') {
+                nowMs = 2.381417;
                 throw new Error('secret fault detail');
             }
             return original(path);
         };
         const operationId = generateIdentifier();
+        let nowMs = 2.286459;
         const { result: response, calls } =
-            await captureConsole(
-                'error',
-                () => handleRequest(
-                    db,
-                    framedRequest('http://localhost/organizations/'
-                        + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
-                        headers: {
-                            'Authorization':
-                                'Bearer ' + DEV_TOKEN,
-                            'operation-id': operationId,
-                        },
-                    }),
+            await withPerformanceNow(() => nowMs, () =>
+                captureConsole(
+                    'error',
+                    () => handleRequest(
+                        db,
+                        framedRequest(
+                            'http://localhost/organizations/'
+                            + 'AjdvjuECVZEgZoFajaIEkg/ideas/', {
+                                headers: {
+                                    'Authorization':
+                                        'Bearer ' + DEV_TOKEN,
+                                    'operation-id': operationId,
+                                },
+                            },
+                        ),
+                    ),
                 ),
             );
         assertStrictEquals(response.status, 500);
@@ -351,6 +358,10 @@ Deno.test(
             (fields as { operationId?: unknown })
                 .operationId,
             operationId,
+        );
+        assertStrictEquals(
+            (fields as { latencyMs?: unknown }).latencyMs,
+            0.095,
         );
     },
 );
