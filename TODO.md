@@ -295,13 +295,6 @@ Off the critical path; each with its oracle.
     Oracle: `tests/browser/canvas-pan.test.ts` 'An
     empty-canvas click after deleting the open edge
     keeps the zoomed viewBox (F29)' green
-  - I21, `2026-09-29-i21-members-skeleton` — the
-    members skeleton the walk did not see while its
-    organization GETs were paused
-    (`docs/superpowers/test-plan-mitigations/2026-09-29-I-I21.md`).
-    Oracle: `tests/members-pending-skeleton.test.ts`
-    'members paints the table skeleton while its GETs
-    are held (I21)' lands, red or green
 - A dragged objective slider's readout speaks a second
   voice: `web-app/projects/detail.ts`'s input handler
   writes `sign + String(v)` (ASCII `-100`) where the
