@@ -650,9 +650,7 @@
   <rect class="empty" x="149" y="1415" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1415" width="10" height="10" fill="none"/>
   <text class="uri" x="224" y="1423">/api/organizations/:id/work-orders/:id/binding</text>
-  <a href="#get/organizations/id/work-orders/id/claim">
-    <circle class="filled" cx="34" cy="1438" r="5"/>
-  </a>
+  <rect class="empty" x="29" y="1433" width="10" height="10" fill="none"/>
   <a href="#put/organizations/id/work-orders/id/claim">
     <circle class="filled" cx="74" cy="1438" r="5"/>
   </a>

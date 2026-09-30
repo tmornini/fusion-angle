@@ -35,7 +35,6 @@ import {
 
 const OTHER = generateIdentifier();
 const PRIOR_HOLDER = generateIdentifier();
-const STALE = generateIdentifier();
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
@@ -90,8 +89,8 @@ async function latched(
 // claim is a 409; the holder's fresh claim records a renewal,
 // and an exact resend stores nothing; an expired claim is
 // superseded by 'claim_expired' + 'claimed' in one version.
-// GET returns the live claim's facts, and 404 when there is
-// none, an expired claim included. DELETE releases.
+// The claim offers no GET: the work order's head carries
+// its claim. DELETE releases.
 
 const LOCK_TIMEOUT_SECONDS = 300;
 
@@ -431,19 +430,17 @@ Deno.test(
     },
 );
 
-Deno.test('GET claim 404s when unclaimed', async () => {
+Deno.test('GET claim is not a route', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
     ));
-    assertStrictEquals(res.status, 404);
-    assertEquals(await res.json(), {
-        error: 'Not found: work_order_claims/yNSSnbrpacodQTzUEcdEVA',
-    });
+    assertStrictEquals(res.status, 405);
+    await res.body?.cancel();
 });
 
-Deno.test('GET claim returns facts; an expired claim is 404',
+Deno.test('the work order carries a live claim\'s facts',
 async () => {
     const db = await seededDb();
     const expiresAt = '2099-12-31T00:00:00.000000Z';
@@ -454,48 +451,27 @@ async () => {
             expires_at: expiresAt,
         }, DEV_TOKEN,
         await latched(db));
-    const live = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
-    ));
-    assertStrictEquals(live.status, 200);
-    assertEquals(await live.json(), {
-        member_id: 'XXZruirZyAOoRpNxaDnpSA',
-        expires_at: expiresAt,
-    });
-
-    await seedOrganizationMember(db, STALE);
-    await PUT(
+    const head = await GETWithEtag<{
+        claim: { member_id: string; expires_at: string };
+    }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNXXsTEwShOozlQCEWKIIw', {
-            display_id: 'efgh',
-            flow_graph: graphJson(),
-            position: 2,
+            + 'yNSSnbrpacodQTzUEcdEVA',
+        DEV_TOKEN, operationIdHeader(),
+    );
+    assertEquals(
+        {
+            member_id: head.body.claim.member_id,
+            expires_at: head.body.claim.expires_at,
         },
-        DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNXXsTEwShOozlQCEWKIIw/claim', {
-            claimEventId: generateIdentifier(),
-            claimAt: '2020-01-01T00:00:00.000000Z',
-            expireEventId: generateIdentifier(),
-            expireAt: '2020-01-01T00:00:00.000000Z',
-            expires_at: '2020-01-01T00:05:00.000000Z',
+        {
+            member_id: 'XXZruirZyAOoRpNxaDnpSA',
+            expires_at: expiresAt,
         },
-        await devToken(STALE),
-        await latched(db, 'yNXXsTEwShOozlQCEWKIIw'));
-    const expired = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNXXsTEwShOozlQCEWKIIw/claim', DEV_TOKEN,
-    ));
-    assertStrictEquals(expired.status, 404);
-    assertEquals(await expired.json(), {
-        error: 'Not found: work_order_claims/yNXXsTEwShOozlQCEWKIIw',
-    });
+    );
 });
 
-Deno.test('DELETE claim releases; GET then 404s', async () => {
+Deno.test('DELETE claim releases; the work order carries no claim',
+async () => {
     const db = await seededDb();
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -509,11 +485,12 @@ Deno.test('DELETE claim releases; GET then 404s', async () => {
     ));
     assertStrictEquals(del.status, 200);
     await del.body?.cancel();
-    const get = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA/claim', DEV_TOKEN,
-    ));
-    assertStrictEquals(get.status, 404);
+    const head = await GETWithEtag<Record<string, unknown>>(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'yNSSnbrpacodQTzUEcdEVA',
+        DEV_TOKEN, operationIdHeader(),
+    );
+    assertStrictEquals(Object.hasOwn(head.body, 'claim'), false);
 });
 
 
@@ -661,42 +638,3 @@ Deno.test(
         }
     },
 );
-
-Deno.test('the claim GET reads the head\'s live claim', async () => {
-    const db = await seededDb();
-    const body = freshClaimBody();
-    await PUT(
-        db, CLAIM_PATH.slice(1), body, DEV_TOKEN,
-        await latched(db),
-    );
-    const live = await handleRequest(db, req(
-        'GET', CLAIM_PATH, DEV_TOKEN,
-    ));
-    assertStrictEquals(live.status, 200);
-    const claim = await live.json() as {
-        member_id: string;
-        expires_at: string;
-    };
-    const head = await GETWithEtag<{
-        claim: { expires_at: string };
-    }>(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA',
-        DEV_TOKEN, operationIdHeader(),
-    );
-    assertEquals(claim, {
-        member_id: 'XXZruirZyAOoRpNxaDnpSA',
-        expires_at: head.body.claim.expires_at,
-    });
-    const lapsed = Date.parse(claim.expires_at);
-    setClockForTest(() => lapsed);
-    try {
-        const expired = await handleRequest(db, req(
-            'GET', CLAIM_PATH, DEV_TOKEN,
-        ));
-        assertStrictEquals(expired.status, 404);
-        await expired.body?.cancel();
-    } finally {
-        resetClock();
-    }
-});

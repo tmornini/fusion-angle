@@ -48,7 +48,6 @@ import type {
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
-    nowUtc,
 } from '../shared/types.ts';
 import { hashPassword } from
     '../shared/password-hash.ts';
@@ -272,7 +271,6 @@ import {
     claimedVersion,
     createdVersion,
     fieldsVersion,
-    isClaimLive,
     releasedVersion,
     transitionedVersion,
     type WorkOrderVersion,
@@ -4593,30 +4591,9 @@ export const routes: Route[] = [
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
     // PUT claims and DELETE releases: operations on the work
-    // order, answering its state. GET reads the head's live
-    // claim (404 when none). Member-tier via MEMBER_VERBS
+    // order, answering its state. Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.
     route('organizations/:id/work-orders/:id/claim', {
-        get: async (db, p, _actor, organization) => {
-            const workOrderId = param(p, 1);
-            const head = await workOrderHeadFor(
-                db, requireOrganization(organization),
-                workOrderId,
-            );
-            const claim = head?.version.claim;
-            if (
-                claim === undefined
-                || !isClaimLive(claim, nowUtc())
-            ) {
-                throw new EntityNotFoundError(
-                    'work_order_claims', workOrderId,
-                );
-            }
-            return {
-                member_id: claim.member_id,
-                expires_at: claim.expires_at,
-            };
-        },
         put: (db, p, body, actor, messagePair, organization) =>
             postWorkOrderClaimOp(
                 db, param(p, 1), body, actor,
