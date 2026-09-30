@@ -63,6 +63,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -630,11 +631,15 @@ async () => {
             ),
         );
         assertStrictEquals(byIdRes.status, 200);
-        const wireById = await byIdRes.text();
-        const derivedById = await deriveFlowRecord(
-            db, organization, flowId, joinId,
+        assertStrictEquals(
+            await byIdRes.text(),
+            await storedPutBodyText(
+                db,
+                '/organizations/' + organization
+                    + '/flows/' + flowId + '/records/',
+                joinId,
+            ),
         );
-        assertStrictEquals(wireById, JSON.stringify(derivedById));
     }
 
     const token = await organizationToken();

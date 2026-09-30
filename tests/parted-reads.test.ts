@@ -25,8 +25,6 @@ const PARTED = [
     'organizations/:id',
     'organizations/:id/flows/',
     'organizations/:id/flows/:id/records/',
-    'organizations/:id/flows/:id/records/:frid',
-    'organizations/:id/flows/:id/tags/:name',
     'organizations/:id/flows/:id/versions/',
     'organizations/:id/flows/:id/versions/:etag',
     'organizations/:id/flows/:id/work-orders/',

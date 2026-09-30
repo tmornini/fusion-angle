@@ -22,7 +22,7 @@ import { missedReadError } from './derive-states.ts';
 
 const FLOW_TAGS_TABLE = 'flow_tags';
 
-function flowTagsUriPrefix(
+export function flowTagsUriPrefix(
     organization: Id,
     flowId: Id,
 ): string {
@@ -44,8 +44,8 @@ export function flowTagEntityOf(
     };
 }
 
-// Serves the live GET flows/:id/tags/:name route: the head
-// document body (the pinned response id) plus the tag's own
+// The head document body (the pinned response id) plus the
+// tag's own
 // name/flow_id; absent or a DELETE head throws
 // EntityNotFoundError(FLOW_TAGS_TABLE, name) — deriveDocumentsAt's
 // own DELETE-head exclusion already collapses both cases into

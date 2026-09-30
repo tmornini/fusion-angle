@@ -226,13 +226,13 @@ import {
 } from './derive-flow-work-orders.ts';
 import {
     deriveFlowRecords,
-    deriveFlowRecord,
     flowRecordEntityOf,
+    flowRecordsUriPrefix,
     recordTypeIdsForWorkOrder,
 } from './derive-flow-records.ts';
 import {
-    deriveFlowTag,
     flowTagEntityOf,
+    flowTagsUriPrefix,
 } from './derive-flow-tags.ts';
 import {
     deriveObjectiveRevisions,
@@ -5188,14 +5188,14 @@ export const routes: Route[] = [
     // Flow↔record bindings nest under their parent flow:
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
-    // id is param 2. GET is FLIPPED (Task 7): both
-    // the collection and the by-id read now ride deriveFlowRecords
-    // / deriveFlowRecord — a bespoke derivation (not a
-    // DocumentFamilyWiring family; a join row carries no lifecycle
-    // state of its own), so this calls it directly rather than
-    // through a generic constructor, mirroring deriveFlowWorkOrders'
-    // own precedent above. flows/:id/versions table-backed
-    // nested read RETIRED Phase 15 Task 7 (zero callers).
+    // id is param 2. The collection rides deriveFlowRecords
+    // — a bespoke derivation (not a DocumentFamilyWiring
+    // family; a join row carries no lifecycle state of its
+    // own), mirroring deriveFlowWorkOrders' own precedent
+    // above. The by-id GET serves the join's stored head; a
+    // DELETE head is Gone (spec §5). flows/:id/versions
+    // table-backed nested read RETIRED Phase 15 Task 7 (zero
+    // callers).
     route('organizations/:id/flows/:id/records/', {
         get: (db, p, _actor, organization) =>
             deriveFlowRecords(
@@ -5204,11 +5204,32 @@ export const routes: Route[] = [
             ),
     }),
     route('organizations/:id/flows/:id/records/:frid', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowRecord(
-                db, requireOrganization(organization),
-                param(p, 1), param(p, 2),
-            ),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const flowId = param(p, 1);
+            const joinId = param(p, 2);
+            const head = await db.messagePairs.getHeadPair(
+                flowRecordsUriPrefix(organizationId, flowId),
+                joinId,
+            );
+            if (head === null) {
+                // Probe the parent flow: a foreign flow's
+                // join 403s; a miss on an own or absent flow
+                // stays 404.
+                throw await missedReadError(
+                    db, joinId, organizationId, 'flow_records',
+                    flowId,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'flow_records', id: joinId,
+                reader: { sees: 'whole' },
+            };
+        },
         put: (db, p, body, actor, messagePair, organization) =>
             postFlowRecordDocumentOp(
                 db, param(p, 2), body, actor,
@@ -5243,9 +5264,9 @@ export const routes: Route[] = [
     // param is unchecked on read (a document that never validly
     // wrote can never be found either way). DELETE is MARKED, not
     // physical: postFlowTagDocumentOp appends a DELETE pair at the
-    // SAME document, and deriveFlowTag's own deriveDocumentsAt call
-    // already excludes a DELETE head, exactly like every other
-    // document family. PUT and DELETE share ONE op
+    // SAME document, and the GET serves the tag's stored head,
+    // so a DELETE head is Gone (spec §5), exactly like every
+    // other document family. PUT and DELETE share ONE op
     // (postFlowTagDocumentOp) since NEITHER needs `id` or `body` —
     // the pair alone (formed by the gate from the matched route)
     // carries the document and the method; a hand-written DELETE
@@ -5256,11 +5277,30 @@ export const routes: Route[] = [
     // MEMBER_VERBS (api/authorization.ts), mirroring
     // '/flows/:id/records'.
     route('organizations/:id/flows/:id/tags/:name', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowTag(
-                db, requireOrganization(organization),
-                param(p, 1), param(p, 2),
-            ),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const flowId = param(p, 1);
+            const name = param(p, 2);
+            const head = await db.messagePairs.getHeadPair(
+                flowTagsUriPrefix(organizationId, flowId), name,
+            );
+            if (head === null) {
+                // Probe the parent flow: a foreign flow's tag
+                // 403s; a miss on an own or absent flow stays
+                // 404.
+                throw await missedReadError(
+                    db, name, organizationId, 'flow_tags', flowId,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'flow_tags', id: name,
+                reader: { sees: 'whole' },
+            };
+        },
         put: (db, _p, _body, _actor, messagePair) =>
             postFlowTagDocumentOp(db, messagePair),
         delete: (db, _p, _actor, messagePair) =>
