@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 821 582" width="821" height="582">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 821 638" width="821" height="638">
   <defs>
     <marker id="fk-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
       <path d="M 0 0 L 8 4 L 0 8 z" fill="hsl(217 34% 60%)" />
@@ -40,10 +40,10 @@
         stroke-width: 1.5; }
     </style>
   </defs>
-  <rect x="0" y="0" width="821" height="582" fill="hsl(217 30% 97%)" />
-  <path class="slink" d="M 347 291 H 375" />
+  <rect x="0" y="0" width="821" height="638" fill="hsl(217 30% 97%)" />
+  <path class="slink" d="M 347 319 H 375" />
   <g class="table">
-    <rect class="box" x="56" y="40" width="291" height="502" rx="6" />
+    <rect class="box" x="56" y="40" width="291" height="558" rx="6" />
     <rect class="head" x="56" y="40" width="291" height="26" rx="6" />
     <text class="thead" x="66" y="58">fa_message_pairs</text>
     <text class="pk" x="88" y="80">id</text>
@@ -80,9 +80,9 @@
     <text class="type" x="271" y="332">text</text>
     <text class="col" x="88" y="360">request_hash</text>
     <text class="type" x="271" y="360">text</text>
-    <text class="col" x="88" y="388">secret</text>
+    <text class="col" x="88" y="388">request_secrets</text>
     <text class="type" x="271" y="388">text</text>
-    <text class="col" x="88" y="416">secret_hash</text>
+    <text class="col" x="88" y="416">request_secrets_hash</text>
     <text class="type" x="271" y="416">text</text>
     <text class="col" x="88" y="444">response</text>
     <text class="type" x="271" y="444">text</text>
@@ -91,27 +91,31 @@
     <text class="type" x="271" y="472">text</text>
     <text class="col" x="88" y="500">response_hash</text>
     <text class="type" x="271" y="500">text</text>
-    <text class="col" x="88" y="528">pair_hash</text>
+    <text class="col" x="88" y="528">response_secrets</text>
     <text class="type" x="271" y="528">text</text>
+    <text class="col" x="88" y="556">response_secrets_hash</text>
+    <text class="type" x="271" y="556">text</text>
+    <text class="col" x="88" y="584">pair_hash</text>
+    <text class="type" x="271" y="584">text</text>
   </g>
   <g class="sidecar">
-    <rect class="sbox" x="375" y="233" width="406" height="116" rx="6" />
-    <rect class="shead" x="375" y="233" width="406" height="26" rx="6" />
-    <text class="sthead" x="385" y="251">indexes</text>
-    <text class="diamond diamond-pk" x="391" y="268" fill="hsl(217 45% 15%)">◆</text>
-    <text class="sname" x="405" y="268">pk btree</text>
-    <text class="skeys" x="771" y="268">id</text>
-    <text class="diamond" x="391" y="286" fill="hsl(217 36% 46%)">◆</text>
-    <text class="sname" x="405" y="286">document btree</text>
-    <text class="skeys" x="771" y="286">path, name, response_at, id</text>
-    <text class="diamond" x="391" y="304" fill="hsl(173 42% 32%)">◆</text>
-    <text class="sname" x="405" y="304">collection btree</text>
-    <text class="skeys" x="771" y="304">path, response_at, id</text>
-    <text class="diamond" x="391" y="322" fill="hsl(32 70% 42%)">◆</text>
-    <text class="sname" x="405" y="322">succession unique btree</text>
-    <text class="skeys" x="771" y="322">path, name, supersedes</text>
-    <text class="diamond" x="391" y="340" fill="hsl(262 40% 46%)">◆</text>
-    <text class="sname" x="405" y="340">request_id btree</text>
-    <text class="skeys" x="771" y="340">fa_request_id_of(response)</text>
+    <rect class="sbox" x="375" y="261" width="406" height="116" rx="6" />
+    <rect class="shead" x="375" y="261" width="406" height="26" rx="6" />
+    <text class="sthead" x="385" y="279">indexes</text>
+    <text class="diamond diamond-pk" x="391" y="296" fill="hsl(217 45% 15%)">◆</text>
+    <text class="sname" x="405" y="296">pk btree</text>
+    <text class="skeys" x="771" y="296">id</text>
+    <text class="diamond" x="391" y="314" fill="hsl(217 36% 46%)">◆</text>
+    <text class="sname" x="405" y="314">document btree</text>
+    <text class="skeys" x="771" y="314">path, name, response_at, id</text>
+    <text class="diamond" x="391" y="332" fill="hsl(173 42% 32%)">◆</text>
+    <text class="sname" x="405" y="332">collection btree</text>
+    <text class="skeys" x="771" y="332">path, response_at, id</text>
+    <text class="diamond" x="391" y="350" fill="hsl(32 70% 42%)">◆</text>
+    <text class="sname" x="405" y="350">succession unique btree</text>
+    <text class="skeys" x="771" y="350">path, name, supersedes</text>
+    <text class="diamond" x="391" y="368" fill="hsl(262 40% 46%)">◆</text>
+    <text class="sname" x="405" y="368">request_id btree</text>
+    <text class="skeys" x="771" y="368">fa_request_id_of(response)</text>
   </g>
 </svg>

@@ -1107,10 +1107,10 @@ async function postRecordTypeEditOp(
 // instead, and this helper reads it straight back so the seed's
 // write still carries it — inert for the fenced route
 // (overwritten either way regardless of what this returns),
-// load-bearing for the seed. Seven sites now share this exact
-// shape (ideas, projects, flows, work-orders, records,
-// record-attributes, objectives) — past the rule-of-three, so
-// it is extracted once rather than duplicated a seventh time.
+// load-bearing for the seed. Six sites now share this exact
+// shape (ideas, projects, flows, records, record-attributes,
+// objectives) — past the rule-of-three, so it is extracted
+// once rather than duplicated a sixth time.
 function documentOperationOrganization(
     body: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -1988,7 +1988,8 @@ async function assertRequiredAttributesAtExit(
 // statement (§5). The work order is the parent; the tags
 // latch the documents the transition derives from, parent
 // first (Interpretation J). An instance revision equal to
-// its head is left out.
+// its head still latches it: the statement judges its tag
+// and skips the matched row (§7).
 async function landWorkOrderTransition(
     db: DbAdapter,
     head: {
@@ -2037,7 +2038,6 @@ async function landWorkOrderTransition(
         kind: 'siblings',
         received: messagePair,
         siblings: instance.kind === 'none'
-                || sameAsHead(instance.head, instance.state)
             ? [{
                 ...workOrder,
                 condition: { kind: 'in-order', head: latch },
@@ -3010,8 +3010,9 @@ export const WRITE_RESPONSE_SPECS:
         },
         delete: { conditional: 'optional' },
     },
-    // Instances: PATCH creates with If-None-Match: * and
-    // updates with If-Match; the former answers the state.
+    // Instances: a PATCH declares a create with
+    // If-None-Match: *; If-Match names the head it follows.
+    // The former answers the state.
     [INSTANCE_DETAIL_PATTERN]: {
         patch: { conditional: 'required' },
         delete: { conditional: 'optional' },
@@ -3280,7 +3281,7 @@ export function conditionalOf(
 // Spent document = any prior response at the instance
 // name (live head OR existing tombstone). Virgin
 // document → missedReadError (R2). Spent → append the
-// gate-formed DELETE pair in one tx (R4 tombstone-wins
+// gate-formed DELETE pair in one statement (R4 tombstone-wins
 // is ledger-complete — every non-replay DELETE appends,
 // including over an already-tombstoned head). In-tx
 // re-probe (R9) closes a concurrent un-spend race:
@@ -3289,8 +3290,8 @@ export function conditionalOf(
 // names this instance AND whose current node is
 // non-terminal in its OWN frozen flow_graph → 409.
 // No attribute ACL — path-tier only (existence, not
-// values). If-Match on DELETE is not a dialect (gate
-// ignores it).
+// values). If-Match is optional: the gate checks its
+// form, and the statement judges its value.
 export async function postInstanceDeleteOp(
     db: DbAdapter,
     p: string[],
@@ -4075,10 +4076,9 @@ export const routes: Route[] = [
     // answers its successor's state; a known-but-not-live
     // jti is reuse — the whole chain's revocation has already
     // landed atomically — then 409. Operation path (name
-    // ''). The gate never serves a stored response for a
-    // byte-identical resend of this route, so this handler
-    // always re-enters and re-checks the reuse guard for
-    // real. The received pair lands only on the 'rotate'
+    // ''). A byte-identical resend re-enters this handler,
+    // which re-checks the reuse guard for real. The
+    // received pair lands only on the 'rotate'
     // branch, so a 409 (reuse, unknown, or contention)
     // stores no pair even though the reuse branch still
     // revokes the chain for real.
@@ -5039,16 +5039,20 @@ export const routes: Route[] = [
         },
     }),
     // Nested instance detail (Task 20): public PUT is
-    // 405. PATCH creates (If-None-Match: *) and updates
-    // (If-Match). Task 16 GET projection +
-    // missedReadError R2. Task 18 DELETE tombstone-wins
-    // R4/R9. Ladder PATCH create: parent type 404 →
-    // body 400 (set required; clear forbidden) → write-
-    // ACL 403 → value 400 → tombstone 409 → one
-    // statement (received PATCH + revision PUT). Ladder
-    // PATCH update: tombstone 404 → shape → unknown attr
-    // → ACL on set∪clear → value on set → one statement,
-    // which judges the tag.
+    // 405. A PATCH with If-None-Match: * declares a new
+    // instance; one with If-Match names the head it
+    // follows. Task 16 GET projection: never written
+    // 404 (missedReadError R2), retired 410. Task 18
+    // DELETE tombstone-wins R4/R9. Ladder PATCH
+    // declared: parent type 404 → body 400 (set
+    // required; clear forbidden) → write-ACL 403 →
+    // value 400 → one statement (received PATCH +
+    // revision PUT), whose never-written latch answers
+    // 412 over a live instance and 410 over a
+    // tombstone. Ladder PATCH in order: tombstone 410
+    // → shape → unknown attr → ACL on set∪clear →
+    // value on set → one statement, which judges the
+    // tag.
     // Ladder DELETE: parent type 404 → document spent
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-

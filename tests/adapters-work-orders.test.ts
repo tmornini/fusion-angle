@@ -13,7 +13,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    ifMatchField,
     organizationItem,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -26,7 +28,6 @@ import {
     putWorkOrderBinding,
     putWorkOrderClaim,
     putWorkOrderPosition,
-    workOrderIfMatch,
 } from
 '../client/work-orders-mutations.ts';
 import {
@@ -271,7 +272,7 @@ async function seedClaim(
         claimAt,
         expireEventId: generateIdentifier(),
         expireAt: claimAt,
-    }, [workOrderIfMatch(etag)]);
+    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
 }
 
 async function seedRelease(
@@ -285,7 +286,7 @@ async function seedRelease(
     await ctx.DELETEWithEtag(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId + '/claim',
-        [workOrderIfMatch(etag)],
+        [ifMatchField(requiredEtag(etag, 'the work order GET'))],
     );
 }
 
@@ -394,7 +395,7 @@ async function moveDisplayId(
         display_id: 'ffffffff',
         flow_graph: body.flow_graph,
         position: body.position,
-    }, [workOrderIfMatch(etag)]);
+    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
 }
 
 Deno.test(

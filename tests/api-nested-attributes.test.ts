@@ -209,7 +209,7 @@ async () => {
 });
 
 Deno.test('PUT replace with both ACL keys, no precondition '
-+ '→ 200 (simple class)',
++ '→ 200 (a blind PUT)',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);

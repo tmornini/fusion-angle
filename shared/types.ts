@@ -1014,11 +1014,13 @@ export interface MessagePairEntity {
     request: string;
     request_salt: string;
     request_hash: string;
-    secret: string;
-    secret_hash: string;
+    request_secrets: string;
+    request_secrets_hash: string;
     response: string;
     response_salt: string;
     response_hash: string;
+    response_secrets: string;
+    response_secrets_hash: string;
     pair_hash: string;
 }
 

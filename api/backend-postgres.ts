@@ -329,11 +329,17 @@ function entityOf<T extends { id: string }>(
         request: latin1OfBytea(row.request),
         request_salt: hexOfBytea(row.request_salt),
         request_hash: hexOfBytea(row.request_hash),
-        secret: latin1OfBytea(row.secret),
-        secret_hash: hexOfBytea(row.secret_hash),
+        request_secrets: latin1OfBytea(row.request_secrets),
+        request_secrets_hash: hexOfBytea(
+            row.request_secrets_hash,
+        ),
         response: latin1OfBytea(row.response),
         response_salt: hexOfBytea(row.response_salt),
         response_hash: hexOfBytea(row.response_hash),
+        response_secrets: latin1OfBytea(row.response_secrets),
+        response_secrets_hash: hexOfBytea(
+            row.response_secrets_hash,
+        ),
         pair_hash: hexOfBytea(row.pair_hash),
     } as unknown as T;
 }
@@ -421,8 +427,9 @@ async function selectPairById(
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         FROM fa_message_pairs
         WHERE id = ${uuidTextOfIdentifier(id)}
@@ -439,8 +446,9 @@ async function selectAll(
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         FROM fa_message_pairs
         ORDER BY fa_message_pairs.response_at, fa_message_pairs.id
@@ -458,8 +466,9 @@ async function selectCollectionPairs(
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         FROM fa_message_pairs
         WHERE path = ${path}
@@ -479,8 +488,9 @@ async function selectDocumentHistory(
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         FROM fa_message_pairs
         WHERE path = ${path}
@@ -518,8 +528,9 @@ async function selectHeadPair(
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         FROM fa_message_pairs
         WHERE path = ${path}
@@ -546,8 +557,9 @@ async function selectCollectionHeadPairs(
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                 AS response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         FROM (
             SELECT DISTINCT ON (name) *
@@ -584,9 +596,9 @@ async function insertPair(
     const requestHash = byteaOfHex(
         textField(row, 'request_hash'),
     );
-    const secret = byteaOfWire(row.secret);
-    const secretHash = byteaOfHex(
-        textField(row, 'secret_hash'),
+    const requestSecrets = byteaOfWire(row.request_secrets);
+    const requestSecretsHash = byteaOfHex(
+        textField(row, 'request_secrets_hash'),
     );
     const responseAt = textField(row, 'response_at');
     const response = byteaOfWire(row.response);
@@ -595,6 +607,10 @@ async function insertPair(
     );
     const responseHash = byteaOfHex(
         textField(row, 'response_hash'),
+    );
+    const responseSecrets = byteaOfWire(row.response_secrets);
+    const responseSecretsHash = byteaOfHex(
+        textField(row, 'response_secrets_hash'),
     );
     const pairHash = byteaOfHex(
         textField(row, 'pair_hash'),
@@ -615,8 +631,9 @@ async function insertPair(
             id, operation_id, path, name, supersedes,
             requester_identity_id, method, response_at,
             request, request_salt, request_hash,
-            secret, secret_hash,
+            request_secrets, request_secrets_hash,
             response, response_salt, response_hash,
+            response_secrets, response_secrets_hash,
             pair_hash
         ) VALUES (
             ${id}, ${operationId}, ${path}, ${name},
@@ -624,8 +641,9 @@ async function insertPair(
             ${requester}, ${method},
             ${responseAt}::text::timestamptz,
             ${request}, ${requestSalt}, ${requestHash},
-            ${secret}, ${secretHash},
+            ${requestSecrets}, ${requestSecretsHash},
             ${response}, ${responseSalt}, ${responseHash},
+            ${responseSecrets}, ${responseSecretsHash},
             ${pairHash}
         )
         ON CONFLICT (id) DO NOTHING
@@ -648,8 +666,9 @@ type StatementResult = {
     head_method: string | null,
     supersedes: string,
     request_hash: string,
-    secret_hash: string,
+    request_secrets_hash: string,
     response_hash: string,
+    response_secrets_hash: string,
     pair_hash: string,
 };
 
@@ -669,10 +688,11 @@ async function queryStatement(
             row.method,
             row.request,
             row.requestSalt,
-            row.secret,
+            row.requestSecrets,
             row.responsePrefix,
             row.responseSuffix,
             row.responseSalt,
+            row.responseSecrets,
             row.ifMatch === null
                 ? null
                 : uuidTextOfIdentifier(row.ifMatch),
@@ -747,8 +767,9 @@ async function queryStatement(
                 row.supersedes,
             ),
             requestHashHex: row.request_hash,
-            secretHashHex: row.secret_hash,
+            requestSecretsHashHex: row.request_secrets_hash,
             responseHashHex: row.response_hash,
+            responseSecretsHashHex: row.response_secrets_hash,
             pairHashHex: row.pair_hash,
         };
     });

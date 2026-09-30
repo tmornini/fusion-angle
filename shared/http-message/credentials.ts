@@ -1,12 +1,12 @@
 import { sortFields } from './canonical.ts';
-import { parseWire, serializeWire } from './wire-codec.ts';
 
 // Six names, and no name on both sides (RFC 9110 §11,
-// RFC 6265). The list does not grow with routes. One
-// secret is two blocks. Each line ends with CRLF, and
-// one extra CRLF between the blocks is the blank line.
-// Neither side is zero bytes, not that blank line.
-// merge inserts only this message's block.
+// RFC 6265). The list does not grow with routes. The
+// canonical order puts these lines after every other
+// field, so a message's hoisted lines are the tail of
+// its header block. Each message stores that tail
+// beside it, zero bytes when it carried none, and
+// putting it back is a splice before the blank line.
 export const REQUEST_CREDENTIAL_NAMES = [
     'authorization',
     'proxy-authorization',
@@ -56,6 +56,15 @@ export function splitCredentials(
     return { kept, hoisted };
 }
 
+// A stable partition of fields already in name order:
+// the credential lines keep their order at the end.
+export function credentialsLast(
+    fields: readonly FieldLine[],
+): FieldLine[] {
+    const split = splitCredentials(fields);
+    return [...split.kept, ...split.hoisted];
+}
+
 function latin1Bytes(text: string): Uint8Array {
     const bytes = new Uint8Array(text.length);
     for (let i = 0; i < text.length; i++) {
@@ -83,117 +92,46 @@ function blockText(fields: readonly FieldLine[]): string {
 export function secretBytes(
     hoisted: readonly FieldLine[],
 ): Uint8Array {
-    const request: FieldLine[] = [];
-    const response: FieldLine[] = [];
     for (const field of hoisted) {
-        if (includesName(
-            REQUEST_CREDENTIAL_NAMES,
-            field.name,
-        )) {
-            request.push(field);
-        } else if (includesName(
-            RESPONSE_CREDENTIAL_NAMES,
-            field.name,
-        )) {
-            response.push(field);
-        } else {
+        if (!credentialName(field.name)) {
             throw new Error(
                 'secret line is not a credential: '
                     + field.name,
             );
         }
     }
-    const requestBlock = blockText(request);
-    const responseBlock = blockText(response);
-    if (requestBlock === '' && responseBlock === '') {
-        return new Uint8Array(0);
-    }
-    return latin1Bytes(
-        requestBlock + CRLF + responseBlock,
-    );
+    return latin1Bytes(blockText(hoisted));
 }
 
-function fieldOf(line: string): FieldLine {
-    const colon = line.indexOf(':');
-    if (colon === -1) {
-        throw new Error('secret line has no colon');
-    }
-    return {
-        name: line.slice(0, colon).toLowerCase(),
-        value: line.slice(colon + 1).trim(),
-    };
-}
+const HEADER_END = CRLF + CRLF;
 
-function terminatedLines(text: string): string[] {
-    if (!text.endsWith(CRLF)) {
-        throw new Error('secret line is unterminated');
-    }
-    const lines: string[] = [];
-    let pos = 0;
-    while (pos < text.length) {
-        const eol = text.indexOf(CRLF, pos);
-        if (eol === -1) {
-            throw new Error('secret line is unterminated');
+// Zero or more lines, each `name: value` with one of
+// the six names and CRLF-terminated. Line order and
+// joining are not checked.
+export function isSecretsText(text: string): boolean {
+    if (text === '') return true;
+    if (!text.endsWith(CRLF)) return false;
+    for (const line of text.slice(0, -CRLF.length).split(CRLF)) {
+        if (line.includes('\r') || line.includes('\n')) {
+            return false;
         }
-        lines.push(text.slice(pos, eol));
-        pos = eol + CRLF.length;
+        const colon = line.indexOf(': ');
+        if (colon === -1) return false;
+        if (!credentialName(line.slice(0, colon))) return false;
     }
-    return lines;
-}
-
-function fieldsOf(
-    lines: readonly string[],
-    allowed: readonly string[],
-): FieldLine[] {
-    const fields: FieldLine[] = [];
-    for (const line of lines) {
-        const field = fieldOf(line);
-        if (!includesName(allowed, field.name)) {
-            throw new Error(
-                'secret line is not in this block: '
-                    + field.name,
-            );
-        }
-        fields.push(field);
-    }
-    return fields;
-}
-
-function blocksOf(secret: Uint8Array): {
-    request: FieldLine[];
-    response: FieldLine[];
-} {
-    if (secret.length === 0) {
-        return { request: [], response: [] };
-    }
-    const lines = terminatedLines(latin1Text(secret));
-    const blank = lines.indexOf('');
-    if (blank === -1) {
-        throw new Error('secret has no blank line');
-    }
-    return {
-        request: fieldsOf(
-            lines.slice(0, blank),
-            REQUEST_CREDENTIAL_NAMES,
-        ),
-        response: fieldsOf(
-            lines.slice(blank + 1),
-            RESPONSE_CREDENTIAL_NAMES,
-        ),
-    };
+    return true;
 }
 
 export function mergeSecret(
     message: string,
-    secret: Uint8Array,
+    secrets: Uint8Array,
 ): string {
-    const model = parseWire(message);
-    const blocks = blocksOf(secret);
-    const added = model.startLine.kind === 'request'
-        ? blocks.request
-        : blocks.response;
-    return serializeWire({
-        ...model,
-        fields: [...model.fields, ...added],
-    });
+    const end = message.indexOf(HEADER_END);
+    if (end === -1) {
+        throw new Error('message has no header block');
+    }
+    const at = end + CRLF.length;
+    return message.slice(0, at)
+        + latin1Text(secrets)
+        + message.slice(at);
 }

@@ -30,11 +30,12 @@ import {
 } from '../shared/identifier.ts';
 import type { StatementBind } from
     '../shared/ledger-statement.ts';
+import { sha256HexOfBytes } from '../shared/digest.ts';
 import {
     leafHashHex,
     microsOf,
     pairRootHex,
-    secretHashHex,
+    secretsHashHex,
     stampOfMicros,
 } from '../shared/pair-root.ts';
 
@@ -205,10 +206,11 @@ function bindOf(fields: {
         method: fields.method,
         request: new Uint8Array(0),
         requestSalt: salt,
-        secret: new Uint8Array(0),
+        requestSecrets: new Uint8Array(0),
         responsePrefix: split.prefix,
         responseSuffix: split.suffix,
         responseSalt: salt.slice(),
+        responseSecrets: new Uint8Array(0),
         ifMatch: null,
         notify: fields.notify,
     };
@@ -228,10 +230,11 @@ function parametersOf(
         row.method,
         row.request,
         row.requestSalt,
-        row.secret,
+        row.requestSecrets,
         row.responsePrefix,
         row.responseSuffix,
         row.responseSalt,
+        row.responseSecrets,
         row.ifMatch === null
             ? null
             : uuidTextOfIdentifier(row.ifMatch),
@@ -346,7 +349,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const landToken = schema + '-land';
     const matchToken = schema + '-match';
     let requestHash = '';
-    let secretHash = '';
+    let secretsHash = '';
     let responseHash = '';
     let pairHash = '';
     let requestSaltHex = '';
@@ -403,13 +406,13 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             .fill(0x11);
         const responseSalt = new Uint8Array(16)
             .fill(0x22);
-        const secret = new Uint8Array(0);
+        const secrets = new Uint8Array(0);
         requestSaltHex = hexOf(requestSalt);
         responseSaltHex = hexOf(responseSalt);
         requestHash = await leafHashHex(
             requestSalt, request,
         );
-        secretHash = await secretHashHex(secret);
+        secretsHash = await secretsHashHex(secrets);
         responseHash = await leafHashHex(
             responseSalt, response,
         );
@@ -423,8 +426,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             method: 'PUT',
             responseAt: RESPONSE_AT,
             requestHashHex: requestHash,
-            secretHashHex: secretHash,
+            requestSecretsHashHex: secretsHash,
             responseHashHex: responseHash,
+            responseSecretsHashHex: secretsHash,
         });
     });
 
@@ -478,7 +482,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         async () => {
             const row = only(await sql.query<{
                 request_hash: string;
-                secret_hash: string;
+                secrets_hash: string;
                 response_hash: string;
                 pair_hash: string;
             }>`
@@ -490,7 +494,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     ), 'hex') AS request_hash,
                     encode(sha256(
                         ''::bytea
-                    ), 'hex') AS secret_hash,
+                    ), 'hex') AS secrets_hash,
                     encode(sha256(
                         decode(
                             ${responseSaltHex}, 'hex'
@@ -509,16 +513,52 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         ${'PUT'},
                         ${RESPONSE_AT}::timestamptz,
                         decode(${requestHash}, 'hex'),
-                        decode(${secretHash}, 'hex'),
-                        decode(${responseHash}, 'hex')
+                        decode(${secretsHash}, 'hex'),
+                        decode(${responseHash}, 'hex'),
+                        decode(${secretsHash}, 'hex')
                     ), 'hex') AS pair_hash
             `);
             assertEquals(row.request_hash, requestHash);
-            assertEquals(row.secret_hash, secretHash);
+            assertEquals(row.secrets_hash, secretsHash);
             assertEquals(
                 row.response_hash, responseHash,
             );
             assertEquals(row.pair_hash, pairHash);
+        },
+    );
+
+    Deno.test(
+        'fa_pair_root takes the request secrets before the'
+            + ' response secrets',
+        async () => {
+            const row = only(await sql.query<{
+                pair_hash: string;
+            }>`
+                SELECT encode(fa_pair_root(
+                        ${PAIR_ID}::uuid,
+                        ${OPERATION_ID}::uuid,
+                        ${'/migrations/'},
+                        ${'0001-example'},
+                        ${NIL_UUID}::uuid,
+                        ${'fa_owner'},
+                        ${'PUT'},
+                        ${RESPONSE_AT}::timestamptz,
+                        decode(${requestHash}, 'hex'),
+                        sha256(convert_to(
+                            ${'authorization: Basic abc\r\n'},
+                            'UTF8'
+                        )),
+                        decode(${responseHash}, 'hex'),
+                        sha256(convert_to(
+                            ${'set-cookie: a=1\r\n'}, 'UTF8'
+                        ))
+                    ), 'hex') AS pair_hash
+            `);
+            assertEquals(
+                row.pair_hash,
+                '861114d59c2019cb8435ac96e5540f49'
+                    + '769563a92da2b53538afaafa49a38a9e',
+            );
         },
     );
 
@@ -611,9 +651,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         method: string,
         requestSalt: Uint8Array,
         requestHash: Uint8Array,
-        secretHash: Uint8Array,
+        requestSecretsHash: Uint8Array,
         responseSalt: Uint8Array,
         responseHash: Uint8Array,
+        responseSecretsHash: Uint8Array,
         pairHash: Uint8Array,
     };
 
@@ -626,9 +667,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             method: 'PUT',
             requestSalt: salt,
             requestHash: hash,
-            secretHash: hash.slice(),
+            requestSecretsHash: hash.slice(),
             responseSalt: salt.slice(),
             responseHash: hash.slice(),
+            responseSecretsHash: hash.slice(),
             pairHash: hash.slice(),
         };
     }
@@ -639,8 +681,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 id, operation_id, path, name, supersedes,
                 requester_identity_id, method, response_at,
                 request, request_salt, request_hash,
-                secret, secret_hash,
+                request_secrets, request_secrets_hash,
                 response, response_salt, response_hash,
+                response_secrets, response_secrets_hash,
                 pair_hash
             ) VALUES (
                 gen_random_uuid(),
@@ -655,10 +698,12 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 ${row.requestSalt},
                 ${row.requestHash},
                 ${new Uint8Array(0)},
-                ${row.secretHash},
+                ${row.requestSecretsHash},
                 ${new Uint8Array(0)},
                 ${row.responseSalt},
                 ${row.responseHash},
+                ${new Uint8Array(0)},
+                ${row.responseSecretsHash},
                 ${row.pairHash}
             )
         `;
@@ -694,12 +739,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 method: string;
                 stamp: string;
                 request_octets: number;
-                secret_octets: number;
+                request_secrets_octets: number;
+                response_secrets_octets: number;
                 request_salt: string;
                 response_salt: string;
                 request_hash: string;
-                secret_hash: string;
+                request_secrets_hash: string;
                 response_hash: string;
+                response_secrets_hash: string;
                 pair_hash: string;
                 response_hex: string;
                 request_id: string | null;
@@ -716,17 +763,22 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
                     ) AS stamp,
                     octet_length(request) AS request_octets,
-                    octet_length(secret) AS secret_octets,
+                    octet_length(request_secrets)
+                        AS request_secrets_octets,
+                    octet_length(response_secrets)
+                        AS response_secrets_octets,
                     encode(request_salt, 'hex')
                         AS request_salt,
                     encode(response_salt, 'hex')
                         AS response_salt,
                     encode(request_hash, 'hex')
                         AS request_hash,
-                    encode(secret_hash, 'hex')
-                        AS secret_hash,
+                    encode(request_secrets_hash, 'hex')
+                        AS request_secrets_hash,
                     encode(response_hash, 'hex')
                         AS response_hash,
+                    encode(response_secrets_hash, 'hex')
+                        AS response_secrets_hash,
                     encode(pair_hash, 'hex') AS pair_hash,
                     encode(response, 'hex') AS response_hex,
                     fa_request_id_of(response) AS request_id
@@ -738,7 +790,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             const requestDigest = await leafHashHex(
                 salt, empty,
             );
-            const secretDigest = await secretHashHex(
+            const secretsDigest = await secretsHashHex(
                 empty,
             );
             const responseDigest = await leafHashHex(
@@ -755,8 +807,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 method: row.method,
                 responseAt: row.stamp,
                 requestHashHex: requestDigest,
-                secretHashHex: secretDigest,
+                requestSecretsHashHex: secretsDigest,
                 responseHashHex: responseDigest,
+                responseSecretsHashHex: secretsDigest,
             });
             assertEquals(row.id, NIL_UUID);
             assertEquals(row.path, '/migrations/');
@@ -767,7 +820,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 row.requester_identity_id, 'fa_owner',
             );
             assertEquals(row.request_octets, 0);
-            assertEquals(row.secret_octets, 0);
+            assertEquals(row.request_secrets_octets, 0);
+            assertEquals(row.response_secrets_octets, 0);
             assertEquals(
                 row.request_salt, '00'.repeat(16),
             );
@@ -776,7 +830,12 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             );
             assertEquals(row.request_id, null);
             assertEquals(row.request_hash, requestDigest);
-            assertEquals(row.secret_hash, secretDigest);
+            assertEquals(
+                row.request_secrets_hash, secretsDigest,
+            );
+            assertEquals(
+                row.response_secrets_hash, secretsDigest,
+            );
             assertEquals(
                 row.response_hash, responseDigest,
             );
@@ -824,13 +883,26 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
 
     Deno.test(
-        'fa_message_pairs_secret_hash_chk rejects'
+        'fa_message_pairs_request_secrets_hash_chk rejects'
             + ' a short digest',
         async () => {
-            const row = validCheckRow('secret-hash');
-            row.secretHash = new Uint8Array(31);
+            const row = validCheckRow('request-secrets-hash');
+            row.requestSecretsHash = new Uint8Array(31);
             await assertCheck(
-                'fa_message_pairs_secret_hash_chk',
+                'fa_message_pairs_request_secrets_hash_chk',
+                row,
+            );
+        },
+    );
+
+    Deno.test(
+        'fa_message_pairs_response_secrets_hash_chk rejects'
+            + ' a short digest',
+        async () => {
+            const row = validCheckRow('response-secrets-hash');
+            row.responseSecretsHash = new Uint8Array(31);
+            await assertCheck(
+                'fa_message_pairs_response_secrets_hash_chk',
                 row,
             );
         },
@@ -1679,6 +1751,88 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
 
     Deno.test(
+        'each message stores its credential lines in'
+            + ' its own column',
+        async () => {
+            const id = generateIdentifier();
+            const requestLine =
+                'authorization: Bearer t0k3n\r\n';
+            const responseLine =
+                'set-cookie: refresh_token=r; HttpOnly\r\n';
+            const encoder = new TextEncoder();
+            const landed = only(await runLedgerStatement(
+                adapter, 'blind', [{
+                    ...bindOf({
+                        id,
+                        operationId: generateIdentifier(),
+                        path: '/secrets/',
+                        name: 'split-' + id,
+                        method: 'PUT',
+                        body: 'kept',
+                        notify: schema + '-secrets',
+                    }),
+                    requestSecrets: encoder.encode(
+                        requestLine,
+                    ),
+                    responseSecrets: encoder.encode(
+                        responseLine,
+                    ),
+                }],
+            ));
+            const row = only(await sql.query<{
+                request_secrets: string;
+                response_secrets: string;
+                request_secrets_hash: string;
+                response_secrets_hash: string;
+            }>`
+                SELECT convert_from(
+                        request_secrets, 'UTF8'
+                    ) AS request_secrets,
+                    convert_from(
+                        response_secrets, 'UTF8'
+                    ) AS response_secrets,
+                    encode(request_secrets_hash, 'hex')
+                        AS request_secrets_hash,
+                    encode(response_secrets_hash, 'hex')
+                        AS response_secrets_hash
+                FROM fa_message_pairs
+                WHERE id = ${uuidTextOfIdentifier(id)}::uuid
+            `);
+            assertEquals(row.request_secrets, requestLine);
+            assertEquals(row.response_secrets, responseLine);
+            assertEquals(
+                row.request_secrets.includes('set-cookie'),
+                false,
+            );
+            assertEquals(
+                row.response_secrets.includes(
+                    'authorization',
+                ),
+                false,
+            );
+            const requestDigest = await sha256HexOfBytes(
+                encoder.encode(requestLine),
+            );
+            const responseDigest = await sha256HexOfBytes(
+                encoder.encode(responseLine),
+            );
+            assertEquals(
+                row.request_secrets_hash, requestDigest,
+            );
+            assertEquals(
+                row.response_secrets_hash, responseDigest,
+            );
+            assertEquals(
+                landed.requestSecretsHashHex, requestDigest,
+            );
+            assertEquals(
+                landed.responseSecretsHashHex,
+                responseDigest,
+            );
+        },
+    );
+
+    Deno.test(
         'the head read is an index scan on'
             + ' fa_message_pairs_document',
         async () => {
@@ -1689,9 +1843,11 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     requester_identity_id, method,
                     response_at,
                     request, request_salt, request_hash,
-                    secret, secret_hash,
+                    request_secrets, request_secrets_hash,
                     response, response_salt,
-                    response_hash, pair_hash
+                    response_hash,
+                    response_secrets, response_secrets_hash,
+                    pair_hash
                 )
                 SELECT
                     gen_random_uuid(),
@@ -1709,6 +1865,8 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     decode(repeat('00', 32), 'hex'),
                     ''::bytea,
                     decode(repeat('00', 16), 'hex'),
+                    decode(repeat('00', 32), 'hex'),
+                    ''::bytea,
                     decode(repeat('00', 32), 'hex'),
                     decode(repeat('00', 32), 'hex')
                 FROM generate_series(1, 2000) AS gs

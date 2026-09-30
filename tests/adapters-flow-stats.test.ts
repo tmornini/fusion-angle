@@ -6,6 +6,8 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
+    ifMatchField,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -131,7 +133,7 @@ async function transitionWorkOrder(
         targetState,
         release: null,
         transitionAt: at,
-    }, [['If-Match', '"' + etag + '"']]);
+    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
 }
 
 // c→a→z graph: c isCreate, z isArchive, a regular

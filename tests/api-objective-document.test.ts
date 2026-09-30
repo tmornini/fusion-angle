@@ -248,8 +248,8 @@ async () => {
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
 // at the op level — see tests/api-record-attribute-document
-// .test.ts's own resend case: the fast path lives at the gate
-// (api.ts), agnostic to which op serves the route). ----------
+// .test.ts's own resend case: the statement matches the
+// resend against the head and stores nothing). ---------------
 
 Deno.test('a byte-identical PUT resend to'
     + ' organizations/:id/objectives/:id converges'

@@ -733,7 +733,7 @@ Deno.test('decline: missing declineAt is rejected (400)', async () => {
 
 // KEEP-ATOMIC (Author gate 6e): a removed member cannot
 // re-admit themselves by merely replaying their old acceptance.
-// currentInvitationState's 'accepted' branch short-circuits to
+// The accept path's 'accepted' branch short-circuits to
 // a no-op BEFORE the membership-existence check ever runs, so
 // the property holds today already — this pin proves it against
 // TODAY's code, before Phase 8 Task 6 adds the document-plane
@@ -743,7 +743,7 @@ Deno.test('a removed member who re-accepts gets a no-op — not a'
     // Distinct, strictly-increasing `at` stamps: grant/accept
     // share one invitation entity_id in the states log, so a tied
     // `at` would fall to the (at, id) reduction's id tie-break —
-    // the SAME reduction currentInvitationState reads — rather
+    // the SAME reduction the accept path reads — rather
     // than proving the property this test exists to pin.
     const db = await seed();
     const id = await grantSarahToWayne(db);

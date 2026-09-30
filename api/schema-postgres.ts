@@ -23,10 +23,10 @@ export const POSTGRES_MESSAGE_PAIRS_TABLE =
     request_hash bytea NOT NULL
         CONSTRAINT fa_message_pairs_request_hash_chk
         CHECK (octet_length(request_hash) = 32),
-    secret bytea NOT NULL,
-    secret_hash bytea NOT NULL
-        CONSTRAINT fa_message_pairs_secret_hash_chk
-        CHECK (octet_length(secret_hash) = 32),
+    request_secrets bytea NOT NULL,
+    request_secrets_hash bytea NOT NULL
+        CONSTRAINT fa_message_pairs_request_secrets_hash_chk
+        CHECK (octet_length(request_secrets_hash) = 32),
     response bytea NOT NULL,
     response_salt bytea NOT NULL
         CONSTRAINT fa_message_pairs_response_salt_chk
@@ -34,6 +34,10 @@ export const POSTGRES_MESSAGE_PAIRS_TABLE =
     response_hash bytea NOT NULL
         CONSTRAINT fa_message_pairs_response_hash_chk
         CHECK (octet_length(response_hash) = 32),
+    response_secrets bytea NOT NULL,
+    response_secrets_hash bytea NOT NULL
+        CONSTRAINT fa_message_pairs_response_secrets_hash_chk
+        CHECK (octet_length(response_secrets_hash) = 32),
     pair_hash bytea NOT NULL
         CONSTRAINT fa_message_pairs_pair_hash_chk
         CHECK (octet_length(pair_hash) = 32)
@@ -88,8 +92,9 @@ export const POSTGRES_FA_PAIR_ROOT_FUNCTION =
     method text,
     response_at timestamptz,
     request_hash bytea,
-    secret_hash bytea,
-    response_hash bytea
+    request_secrets_hash bytea,
+    response_hash bytea,
+    response_secrets_hash bytea
 )
 RETURNS bytea
 IMMUTABLE PARALLEL SAFE LANGUAGE sql
@@ -132,13 +137,17 @@ RETURN (
         ))::text
             || ':' || request_text || ','
         || octet_length(convert_to(
-            secret_text, 'UTF8'
+            request_secrets_text, 'UTF8'
         ))::text
-            || ':' || secret_text || ','
+            || ':' || request_secrets_text || ','
         || octet_length(convert_to(
             response_text, 'UTF8'
         ))::text
-            || ':' || response_text || ',',
+            || ':' || response_text || ','
+        || octet_length(convert_to(
+            response_secrets_text, 'UTF8'
+        ))::text
+            || ':' || response_secrets_text || ',',
         'UTF8'
     ))
     FROM (
@@ -155,9 +164,12 @@ RETURN (
                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
             ) AS stamp_text,
             encode(request_hash, 'hex') AS request_text,
-            encode(secret_hash, 'hex') AS secret_text,
+            encode(request_secrets_hash, 'hex')
+                AS request_secrets_text,
             encode(response_hash, 'hex')
-                AS response_text
+                AS response_text,
+            encode(response_secrets_hash, 'hex')
+                AS response_secrets_text
     ) AS texts
 );`;
 

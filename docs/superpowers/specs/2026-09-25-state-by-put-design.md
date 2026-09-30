@@ -93,7 +93,10 @@ statement judges a latch.
    own response says the whole state. Where it
    names a sub-resource or an operation, a
    synthesized sibling PUT of the parent lands in
-   the same statement. The seed spec's sixth
+   the same statement. "`id` first" describes the
+   object the family forms and the GET derive's
+   wire; the store sorts the stored bytes by key
+   (`sortJsonKeys`). The seed spec's sixth
    finding is this defect class and closes here
    (`docs/superpowers/specs/2026-09-23-ledger-seed-design.md:269-284`).
 
@@ -105,9 +108,11 @@ statement judges a latch.
    field the write specs gain, and never reads a
    head to decide a latch. The statement judges the
    value: a nil latch is stale when a live PUT head
-   exists and lands otherwise. The `genesis` attempt
-   class retires; the row's nil latch says it.
-   Fourteen parameters stay. §2.
+   exists and lands otherwise. Its sibling is the
+   never-written latch, stale over any head, live or
+   tombstone, which the instance create alone uses.
+   The `genesis` attempt class retires; the row's nil
+   latch says it. Fourteen parameters stay. §2.
 
 3. **A create declares itself.** The client
    declares a create by PUT or PATCH of an id it
@@ -561,9 +566,10 @@ names the document and the fact.
 **Tombstones.** A declared genesis over a DELETE
 head lands as 201, the RFC's "no current
 representation". Instances keep tombstone-wins:
-their create reads the head once and answers 409 on
-a tombstone, a family rule stated as one, not the
-ledger's.
+their create latches the never-written identifier
+and reads no head, so the statement refuses it over
+any head, and over a tombstone the answer is 410
+Gone (RFC 9110 §15.5.11): the name is retired.
 
 ## 3. The former
 
@@ -620,15 +626,22 @@ row and every sibling, composed. The received row
 carries no latch of its own, generalizing the rule
 `ifMatchOf` keeps for a composed POST
 (`api/message-pair.ts:1081-1086`); its siblings
-judge. Sameness runs per row as today, so an
-unchanged parent reports matched and nothing lands.
+judge. Sameness runs per row, and §7's statement
+rule decides what lands: an unchanged parent with no
+document row landing beside it is a no-op, and
+nothing lands, the received pair included; an
+unchanged parent beside a landing sibling is skipped
+while the sibling and the received pair land.
 
 **The answer.** Land: the received pair's completed
 response. Matched: the head's stored response
 through `responseFromHead` (`:607-643`), projected
-for the requester, as 200 with the head's etag.
-Stale: 412. Refused: 412 or 409 by §2. The bells
-stay one per inserted row (`:964-971`).
+for the requester, as 200 with the head's etag. A
+skipped parent beside landed siblings answers the
+same way, and the received pair that lands names the
+head its handler read. Stale: 412. Refused: 412 or
+409 by §2. The bells stay one per inserted row
+(`:964-971`).
 
 ## 4. Whole state, by family
 
@@ -892,22 +905,37 @@ its own; the statement's matched answers in its
 place.
 
 **Composed writes and the pre-check's job.** The
-pre-check existed because one matched row
-suppresses a whole statement
-(`shared/ledger-statement.ts:243-256`), and a
-composed edit that changes one attribute of three
-must not be suppressed by the two it left alone.
-The former keeps that job on the statement's own
-terms: a handler that forms several siblings omits
-any whose state equals its head's stored body, byte
-for byte, the head it already read to merge. With
-none left it stores nothing and answers the
-parent's head, as a no-op does. A create resent
-whole still reports matched from the statement and
-stores nothing, receipt included, which is the
-store's rule (`docs/superpowers/specs/2026-09-23-ledger-store-design.md:341-423`)
-and the right one: a create with a different join
-is not a create.
+pre-check existed because one matched row suppressed
+a whole statement, and a composed edit that changes
+one attribute of three must not be suppressed by the
+two it left alone. The statement now judges each row
+and then the whole (`shared/ledger-statement.ts`
+`reportedOutcome`; `api/ledger-statement-sql.ts`
+`reported`):
+
+- A *document row* is a row that carries a latch
+  (`if_match` not null); the received pair never
+  does.
+- Only a PUT or DELETE row can match its head; a POST
+  or PATCH row never matches.
+- Any stale row makes the statement stale. Otherwise,
+  if a row matched and no document row landed, the
+  statement is matched: nothing is stored, the
+  received pair included. Otherwise it lands: each
+  row whose outcome is land is inserted, and each
+  matched row is skipped, with no bell.
+- A statement of blind rows only has no document row,
+  so it stays all-or-nothing.
+
+A handler that forms several siblings still omits a
+later one whose state equals its head's stored body,
+byte for byte (`sameAsHead`), the head it already read
+to merge. With none left it stores nothing and answers
+the parent's head, as a no-op does. A create resent
+whole lands nothing either: its declared genesis is
+stale over the live head its first send landed, so it
+answers 409 when the handler declared it and 412 when
+the client did.
 
 ## 8. Requests: received, or nothing
 
@@ -1038,15 +1066,18 @@ oracle: nothing here imports outside `client/` and
 ## 10. The no-op, and the 412
 
 **The no-op.** A write whose sibling's state equals
-the head's, byte for byte, stores nothing at all,
-receipt included, and answers 200 with the head's
-response, projected for the requester, carrying the
-head's etag. That is item 0's rule for a PUT,
-applied to every write through the former; the
+the head's, byte for byte, with no document row
+landing beside it, stores nothing at all, the
+received pair included, and answers 200 with the
+head's response, projected for the requester,
+carrying the head's etag. That is item 0's rule for
+a PUT, applied to every write through the former; the
 instance PATCH already does it
 (`tests/api-instances-create.test.ts:575-614`). A
-composed write's handler omits the unchanged
-siblings first, per §7.
+composed write's handler omits unchanged later
+siblings first, per §7; an unchanged parent beside a
+landing sibling is skipped by the statement, which
+lands the rest.
 
 **One judge of a latch.** For every route this spec
 converts, the statement alone judges a latch's
@@ -1085,7 +1116,8 @@ with no special case.
 | 428 | a required conditional absent, or a tag missing for a document the operation derives from; the body names the document (RFC 6585 §3) |
 | 400 | a malformed entity-tag (RFC 9110 §15.5.1); a body with `organization_id`; a PUT with no body |
 | 412 | a stale `If-Match`; a declared genesis on a live head; both headers sent; a tag naming no head the operation derives from (§13.1.1, §13.1.2, §13.2.2) |
-| 409 | a POST create's taken name; an instance name that is retired (§15.5.10) |
+| 409 | a POST create's taken name (§15.5.10) |
+| 410 | an instance name that is retired: a create over its tombstone, and its GET and PATCH (§15.5.11) |
 | 201 | a genesis, own pair and sibling alike; a POST create's 201 carries `Location` (§15.3.2, §9.3.4) |
 | 200 | a successor; a no-op |
 | 204 | a document DELETE, unchanged (§9.3.5) |
@@ -1153,7 +1185,7 @@ New pins:
   400, both 412, with the memory backend's execution
   counter showing one statement and no pre-read.
 - A declared genesis over a tombstone: 201
-  elsewhere, 409 for an instance.
+  elsewhere, 410 for an instance.
 - A succession refusal: 409 when the handler
   declared, 412 when the client did.
 - The former: zero request bytes on a sibling, the

@@ -89,6 +89,30 @@ export function filterByField<T, K extends keyof T>(
     return rows.filter(row => row[field] === value);
 }
 
+// A write latches the head its read returned. A read that
+// carried no tag leaves nothing to latch, so the write is
+// never sent blind.
+export function requiredEtag(
+    etag: string | undefined,
+    read: string,
+): string {
+    if (etag === undefined || etag === '') {
+        throw new Error(read + ' carried no ETag');
+    }
+    return etag;
+}
+
+// The If-Match field naming each head a write latches, in
+// the order its route judges them.
+export function ifMatchField(
+    ...etags: readonly [string, ...string[]]
+): readonly [string, string] {
+    return [
+        'If-Match',
+        etags.map((etag) => '"' + etag + '"').join(', '),
+    ];
+}
+
 export function organizationCollection(
     ctx: RequestContext,
     family: string,

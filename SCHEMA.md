@@ -8,10 +8,13 @@ alphabets live in code; this file does not restate them.
 
 ## The one table
 
-A pair is the request wire bytes plus the response wire
-bytes (`api/schema-postgres.ts`
-`POSTGRES_MESSAGE_PAIRS_TABLE`). A document is `path` plus
-`name`: `pathname = path + name`, the URL API's word. `path`
+A pair is the request as received, or nothing, plus the
+response wire bytes (`api/schema-postgres.ts`
+`POSTGRES_MESSAGE_PAIRS_TABLE`). A pair the server
+synthesizes — a sibling, a token event, a seeded row —
+was never received, so its request is empty. A
+document is `path` plus `name`: `pathname = path +
+name`, the URL API's word. `path`
 is the collection's path, always slash-bounded; `name` is
 the document's name within it — an identifier for most
 documents, a word (`pii`, `default-organization`, `binding`)
@@ -108,18 +111,29 @@ to local time for display only.
 
 ## Secrets
 
-`secret` is the plaintext credential lines, not a
-digest. Six names, and no name on both sides
-(`shared/http-message/credentials.ts`): a request
-carries `authorization`, `proxy-authorization`, and
-`cookie`; a response carries `set-cookie`,
-`authentication-info`, and
-`proxy-authentication-info`. Every line is
-CRLF-terminated, including the last. A non-empty
-secret is the request block, then one extra CRLF,
-then the response block. Both blocks empty is zero
-bytes. `secret_hash` is sha256 of those bytes, no
-salt. Credential bodies do not carry the eight
+`request_secrets` and `response_secrets` are the
+plaintext credential lines, not digests, each beside
+its own message. Six names are credential lines
+(`shared/http-message/credentials.ts`):
+`authorization`, `proxy-authorization`, `cookie`,
+`set-cookie`, `authentication-info`, and
+`proxy-authentication-info`. The canonical message
+(`serializeWire`) orders every other field by name,
+then these, by name among themselves, so a message's
+credential lines are the tail of its header block.
+Each column holds whatever credential lines its own
+message carried, exactly as that tail serializes:
+every line CRLF-terminated, including the last, zero
+bytes when there are none; `request` and `response`
+hold the message without them. Putting a message back
+together (`mergeSecret`) is a splice with no parse:
+the stored header block, then its own column, then the
+blank line and the body. `request_secrets_hash` and
+`response_secrets_hash` are sha256 of their column's
+bytes, no salt; `pair_hash` covers both, request
+first. The storage edge (`validateMessagePairEntity`)
+rejects a column that is not credential lines.
+Credential bodies do not carry the eight
 fields `username`, `password`, `code`,
 `code_verifier`, `subject_token`, `actor_token`,
 `client_assertion`, and `refresh_token`.

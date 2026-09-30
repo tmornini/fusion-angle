@@ -1,5 +1,6 @@
 import { Octets } from './octets.ts';
 import { sortFields, sortJsonKeys } from './canonical.ts';
+import { credentialsLast } from './credentials.ts';
 import {
     isRawJson,
     parsePreservingNumbers,
@@ -339,7 +340,7 @@ function fieldsForProjection(
 }
 
 function pairs(fields: readonly FieldLine[]): string[][] {
-    return sortFields(fields).map((field) => [
+    return credentialsLast(sortFields(fields)).map((field) => [
         field.name,
         field.value,
     ]);

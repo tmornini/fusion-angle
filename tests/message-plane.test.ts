@@ -13,6 +13,7 @@ import {
 } from '../api/request-context.ts';
 import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import {
+    isSecretsText,
     mergeSecret,
     REQUEST_CREDENTIAL_NAMES,
     RESPONSE_CREDENTIAL_NAMES,
@@ -27,6 +28,8 @@ import { defaultBodyRegistry } from
     '../shared/http-message/media-registry.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
+import { sortFields } from
+    '../shared/http-message/canonical.ts';
 import { parseWire, serializeWire } from
     '../shared/http-message/wire-codec.ts';
 import { HttpMessageError } from
@@ -36,6 +39,7 @@ import {
     documentHeadAt,
     formWriteMessagePair,
     IF_NONE_MATCH_HEADER,
+    responseFromLatin1,
     responseRecordOf,
     IF_MATCH_HEADER,
     runStateWrite,
@@ -304,9 +308,9 @@ Deno.test(
             wire,
             'HTTP/1.1 201 \r\n'
             + 'content-length: 5\r\n'
+            + 'x-trace: two, one\r\n'
             + 'set-cookie: a=1\r\n'
             + 'set-cookie: b=2\r\n'
-            + 'x-trace: two, one\r\n'
             + '\r\n'
             + 'hello',
         );
@@ -574,7 +578,8 @@ const FOUR_NAMES = [
 ];
 
 Deno.test(
-    'credential lines split into a secret and merge back',
+    'credential lines split into each message\'s secrets'
+        + ' and merge back',
     async () => {
         assertStrictEquals(
             REQUEST_CREDENTIAL_NAMES.join(','),
@@ -608,15 +613,36 @@ Deno.test(
             + 'Content-Type: text/plain\r\n'
             + 'Authorization: Basic abc\r\n'
             + 'Content-Length: 2\r\n'
+            + 'Cookie: theme=dark\r\n'
             + '\r\n'
             + 'hi';
         const responseWire = 'HTTP/1.0 200 OK\r\n'
             + 'Content-Type: text/plain\r\n'
             + 'Set-Cookie: refresh_token=r; HttpOnly\r\n'
             + 'Authentication-Info: code="c"\r\n'
+            + 'Set-Cookie: theme=dark\r\n'
             + '\r\n';
         const request = parseWire(requestWire);
         const response = parseWire(responseWire);
+        assertStrictEquals(
+            serializeWire(request),
+            'POST /token HTTP/1.1\r\n'
+                + 'content-length: 2\r\n'
+                + 'content-type: text/plain\r\n'
+                + 'authorization: Basic abc\r\n'
+                + 'cookie: refresh_token=r, theme=dark\r\n'
+                + '\r\n'
+                + 'hi',
+        );
+        assertStrictEquals(
+            serializeWire(response),
+            'HTTP/1.1 200 OK\r\n'
+                + 'content-type: text/plain\r\n'
+                + 'authentication-info: code="c"\r\n'
+                + 'set-cookie: refresh_token=r; HttpOnly\r\n'
+                + 'set-cookie: theme=dark\r\n'
+                + '\r\n',
+        );
         const requestSplit = splitCredentials(
             request.fields,
         );
@@ -641,38 +667,47 @@ Deno.test(
                 false,
             );
         }
-        const secret = secretBytes([
-            ...requestSplit.hoisted,
-            ...responseSplit.hoisted,
-        ]);
+        const requestSecrets = secretBytes(
+            requestSplit.hoisted,
+        );
+        const responseSecrets = secretBytes(
+            responseSplit.hoisted,
+        );
         assertStrictEquals(
-            new TextDecoder().decode(secret),
+            new TextDecoder().decode(requestSecrets),
             'authorization: Basic abc\r\n'
-                + 'cookie: refresh_token=r\r\n'
-                + '\r\n'
-                + 'authentication-info: code="c"\r\n'
-                + 'set-cookie: refresh_token=r; HttpOnly\r\n',
+                + 'cookie: refresh_token=r, theme=dark\r\n',
+        );
+        assertStrictEquals(
+            new TextDecoder().decode(responseSecrets),
+            'authentication-info: code="c"\r\n'
+                + 'set-cookie: refresh_token=r; HttpOnly\r\n'
+                + 'set-cookie: theme=dark\r\n',
         );
         assertStrictEquals(
             new TextDecoder().decode(secretBytes([{
                 name: 'authorization',
                 value: 'Basic abc',
             }])),
-            'authorization: Basic abc\r\n\r\n',
+            'authorization: Basic abc\r\n',
         );
         assertStrictEquals(
             new TextDecoder().decode(secretBytes([{
                 name: 'set-cookie',
                 value: 'a=1',
             }])),
-            '\r\nset-cookie: a=1\r\n',
+            'set-cookie: a=1\r\n',
         );
+        assertThrows(() => secretBytes([{
+            name: 'x-trace',
+            value: 'no',
+        }]));
         assertStrictEquals(
-            mergeSecret(keptRequest, secret),
+            mergeSecret(keptRequest, requestSecrets),
             serializeWire(request),
         );
         assertStrictEquals(
-            mergeSecret(keptResponse, secret),
+            mergeSecret(keptResponse, responseSecrets),
             serializeWire(response),
         );
 
@@ -689,53 +724,49 @@ Deno.test(
             await sha256HexOfBytes(empty),
             EMPTY_SHA256,
         );
+        assertStrictEquals(
+            mergeSecret(serializeWire(bare), empty),
+            serializeWire(bare),
+        );
 
-        assertStrictEquals(
-            mergeSecret(
-                keptRequest,
-                secretBytes([{
-                    name: 'set-cookie',
-                    value: 'refresh_token=r; HttpOnly',
-                }]),
-            ),
-            keptRequest,
+        const requestLines = '\r\n'
+            + new TextDecoder().decode(requestSecrets);
+        const responseLines = '\r\n'
+            + new TextDecoder().decode(responseSecrets);
+        for (const name of RESPONSE_CREDENTIAL_NAMES) {
+            assertStrictEquals(
+                requestLines.includes('\r\n' + name + ':'),
+                false,
+            );
+        }
+        for (const name of REQUEST_CREDENTIAL_NAMES) {
+            assertStrictEquals(
+                responseLines.includes('\r\n' + name + ':'),
+                false,
+            );
+        }
+        assertThrows(
+            () => mergeSecret('no blank line', empty),
+            Error,
+            'message has no header block',
         );
-        assertStrictEquals(
-            mergeSecret(
-                keptResponse,
-                secretBytes([{
-                    name: 'authorization',
-                    value: 'Basic abc',
-                }]),
-            ),
-            keptResponse,
-        );
-        const raw = (text: string): Uint8Array =>
-            new TextEncoder().encode(text);
-        assertThrows(() => mergeSecret(
-            keptRequest,
-            raw('authorization: Basic abc\r\n'),
-        ));
-        assertThrows(() => mergeSecret(
-            keptRequest,
-            raw('set-cookie: a=1'),
-        ));
-        assertThrows(() => mergeSecret(
-            keptRequest,
-            raw('\r\nauthorization: Basic abc\r\n'),
-        ));
-        assertThrows(() => mergeSecret(
-            keptRequest,
-            raw('set-cookie: a=1\r\n\r\n'),
-        ));
-        assertThrows(() => mergeSecret(
-            keptRequest,
-            raw('x-trace: no\r\n\r\n'),
-        ));
-        assertThrows(() => mergeSecret(
-            keptRequest,
-            raw('nocolon\r\n\r\n'),
-        ));
+        for (const text of [
+            '',
+            'authorization: Basic abc\r\n',
+            'set-cookie: a=1\r\nset-cookie: b=2\r\n',
+        ]) {
+            assertStrictEquals(isSecretsText(text), true);
+        }
+        for (const text of [
+            'authorization: Basic abc',
+            'set-cookie: a=1',
+            '\r\nauthorization: Basic abc\r\n',
+            'authorization: Basic abc\r\n\r\n',
+            'x-trace: no\r\n',
+            'nocolon\r\n',
+        ]) {
+            assertStrictEquals(isSecretsText(text), false);
+        }
     },
 );
 
@@ -1320,7 +1351,7 @@ function probeWrite(name: string) {
 
 Deno.test(
     'an authenticated PUT hoists the bearer'
-        + ' into secret',
+        + ' into request_secrets',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -1349,8 +1380,9 @@ Deno.test(
             throw new Error('document was not stored');
         }
         const bearer = 'authorization: Bearer '
-            + token + '\r\n\r\n';
-        assertStrictEquals(stored.secret, bearer);
+            + token + '\r\n';
+        assertStrictEquals(stored.request_secrets, bearer);
+        assertStrictEquals(stored.response_secrets, '');
         assertStrictEquals(
             stored.request.includes('authorization:'),
             false,
@@ -1360,16 +1392,16 @@ Deno.test(
             false,
         );
         assertStrictEquals(
-            stored.secret_hash,
+            stored.request_secrets_hash,
             await sha256HexOfBytes(
                 Octets.fromLatin1(bearer).asBytes(),
             ),
         );
-        const secret = Octets.fromLatin1(
-            stored.secret,
+        const requestSecrets = Octets.fromLatin1(
+            stored.request_secrets,
         ).asBytes();
         const merged = mergeSecret(
-            stored.request, secret,
+            stored.request, requestSecrets,
         );
         const model = parseWire(stored.request);
         assertStrictEquals(
@@ -1394,7 +1426,7 @@ Deno.test(
 
 Deno.test(
     'response credential lines hoist into'
-        + ' the secret block',
+        + ' response_secrets in canonical order',
     async () => {
         const info = 'code="c"';
         const cookie = 'refresh_token=r; HttpOnly';
@@ -1422,24 +1454,302 @@ Deno.test(
             pair.requestMessage.includes('set-cookie'),
             false,
         );
+        const tail = 'authentication-info: ' + info + '\r\n'
+            + 'set-cookie: ' + cookie + '\r\n';
         assertStrictEquals(
-            new TextDecoder().decode(pair.secret),
-            '\r\nauthentication-info: ' + info + '\r\n'
-                + 'set-cookie: ' + cookie + '\r\n',
+            new TextDecoder().decode(pair.responseSecrets),
+            tail,
+        );
+        const formed = parseWire(pair.responseMessage);
+        const whole = serializeWire({
+            ...formed,
+            fields: [
+                ...formed.fields,
+                { name: 'set-cookie', value: cookie },
+                { name: 'authentication-info', value: info },
+            ],
+        });
+        assertStrictEquals(
+            whole.includes(tail + '\r\n'),
+            true,
+        );
+        assertStrictEquals(
+            mergeSecret(
+                pair.responseMessage, pair.responseSecrets,
+            ),
+            whole,
+        );
+        assertStrictEquals(
+            pair.requestSecrets.byteLength, 0,
+        );
+    },
+);
+
+Deno.test(
+    'each message keeps its credential lines beside it',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        const bearer = 'Bearer t0k3n';
+        const cookie = 'refresh_token=r; HttpOnly';
+        const pair = await formWriteMessagePair({
+            ...probeWrite(generateIdentifier()),
+            headerFields: [
+                { name: 'authorization', value: bearer },
+            ],
+            responseFields: [
+                { name: 'set-cookie', value: cookie },
+            ],
+        });
+        const answer = await runWrite(
+            db, attemptFor([pair]), [pair],
+        );
+        await answer.response.text();
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.id === pair.id);
+        if (stored === undefined) {
+            throw new Error('pair was not stored');
+        }
+        const requestLine = 'authorization: '
+            + bearer + '\r\n';
+        const responseLine = 'set-cookie: '
+            + cookie + '\r\n';
+        assertStrictEquals(
+            stored.request_secrets, requestLine,
+        );
+        assertStrictEquals(
+            stored.response_secrets, responseLine,
+        );
+        assertStrictEquals(
+            stored.request_secrets.includes('set-cookie'),
+            false,
+        );
+        assertStrictEquals(
+            stored.response_secrets.includes(
+                'authorization',
+            ),
+            false,
+        );
+        assertStrictEquals(
+            stored.request.includes('authorization'),
+            false,
+        );
+        assertStrictEquals(
+            stored.response.includes('set-cookie'),
+            false,
+        );
+        assertStrictEquals(
+            stored.request_secrets_hash,
+            await sha256HexOfBytes(
+                Octets.fromLatin1(requestLine).asBytes(),
+            ),
+        );
+        assertStrictEquals(
+            stored.response_secrets_hash,
+            await sha256HexOfBytes(
+                Octets.fromLatin1(responseLine).asBytes(),
+            ),
+        );
+        const request = parseWire(stored.request);
+        assertStrictEquals(
+            mergeSecret(
+                stored.request,
+                Octets.fromLatin1(
+                    stored.request_secrets,
+                ).asBytes(),
+            ),
+            serializeWire({
+                ...request,
+                fields: [
+                    ...request.fields,
+                    { name: 'authorization', value: bearer },
+                ],
+            }),
+        );
+        const response = parseWire(stored.response);
+        assertStrictEquals(
+            mergeSecret(
+                stored.response,
+                Octets.fromLatin1(
+                    stored.response_secrets,
+                ).asBytes(),
+            ),
+            serializeWire({
+                ...response,
+                fields: [
+                    ...response.fields,
+                    { name: 'set-cookie', value: cookie },
+                ],
+            }),
+        );
+        assertStrictEquals(
+            answer.response.headers.get('set-cookie'),
+            cookie,
+        );
+        assertStrictEquals(
+            answer.response.headers.get('authorization'),
+            null,
+        );
+    },
+);
+
+Deno.test(
+    'a request\'s set-cookie stays in its own secrets'
+        + ' and is never echoed',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const raw = '{"title":"t","position":1,'
+            + '"problem_statement":"p",'
+            + '"target_users":"u",'
+            + '"proposed_solution":"s",'
+            + '"expected_outcome":"o",'
+            + '"success_metrics":"m",'
+            + '"state":"active"}';
+        const request = receivedRequest(
+            'PUT',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                + id,
+            token,
+            generateIdentifier(),
+            raw,
+        );
+        request.headers.set('set-cookie', 'planted=1');
+        const response = await handleRequest(db, request);
+        await response.text();
+        assertStrictEquals(response.status, 201);
+        assertStrictEquals(
+            response.headers.get('set-cookie'),
+            null,
+        );
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.name === id);
+        if (stored === undefined) {
+            throw new Error('document was not stored');
+        }
+        assertStrictEquals(
+            stored.request_secrets,
+            'authorization: Bearer ' + token + '\r\n'
+                + 'set-cookie: planted=1\r\n',
+        );
+        assertStrictEquals(stored.response_secrets, '');
+        assertStrictEquals(
+            stored.request.includes('planted'),
+            false,
+        );
+        assertStrictEquals(
+            stored.response.includes('planted'),
+            false,
+        );
+    },
+);
+
+async function servedText(response: Response): Promise<string> {
+    const controller = new AbortController();
+    const server = Deno.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        signal: controller.signal,
+        onListen: () => {},
+    }, () => response);
+    const conn = await Deno.connect({
+        hostname: '127.0.0.1',
+        port: (server.addr as Deno.NetAddr).port,
+    });
+    try {
+        await conn.write(new TextEncoder().encode(
+            'GET / HTTP/1.1\r\nhost: x\r\n'
+                + 'connection: close\r\n\r\n',
+        ));
+        const decoder = new TextDecoder();
+        const buffer = new Uint8Array(4096);
+        let text = '';
+        for (;;) {
+            const read = await conn.read(buffer);
+            if (read === null) break;
+            text += decoder.decode(buffer.subarray(0, read));
+        }
+        return text;
+    } finally {
+        conn.close();
+        controller.abort();
+        await server.finished;
+    }
+}
+
+// The stored order puts credential lines last; the wire
+// Deno.serve writes is in name order either way, so a
+// served answer's bytes do not depend on that order.
+Deno.test(
+    'a served answer is the same bytes whatever the'
+        + ' stored field order',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        const pair = await formWriteMessagePair({
+            ...probeWrite(generateIdentifier()),
+            responseFields: [
+                { name: 'set-cookie', value: 'a=1' },
+                {
+                    name: 'authentication-info',
+                    value: 'code="c"',
+                },
+            ],
+        });
+        const answer = await runWrite(
+            db, attemptFor([pair]), [pair],
+        );
+        await answer.response.text();
+        const stored = (await db.messagePairs.getAll())
+            .find((row) => row.id === pair.id);
+        if (stored === undefined) {
+            throw new Error('pair was not stored');
+        }
+        const spliced = mergeSecret(
+            stored.response,
+            Octets.fromLatin1(
+                stored.response_secrets,
+            ).asBytes(),
+        );
+        const model = parseWire(spliced);
+        let nameOrder = 'HTTP/1.1 201 \r\n';
+        for (const field of sortFields(model.fields)) {
+            nameOrder += field.name + ': '
+                + field.value + '\r\n';
+        }
+        nameOrder += '\r\n';
+        assertNotStrictEquals(spliced, nameOrder);
+        const served = await servedText(
+            responseFromLatin1(spliced),
+        );
+        assertStrictEquals(
+            served,
+            await servedText(responseFromLatin1(nameOrder)),
+        );
+        assert(
+            served.indexOf('authentication-info:')
+                < served.indexOf('etag:'),
         );
     },
 );
 
 Deno.test(
     'a pair with no credential line stores'
-        + ' an empty secret',
+        + ' empty secrets',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const pair = await formWriteMessagePair(
             probeWrite(generateIdentifier()),
         );
-        assertStrictEquals(pair.secret.byteLength, 0);
+        assertStrictEquals(
+            pair.requestSecrets.byteLength, 0,
+        );
+        assertStrictEquals(
+            pair.responseSecrets.byteLength, 0,
+        );
         await runWrite(
             db, attemptFor([pair]), [pair],
         );
@@ -1448,9 +1758,13 @@ Deno.test(
         if (stored === undefined) {
             throw new Error('pair was not stored');
         }
-        assertStrictEquals(stored.secret, '');
+        assertStrictEquals(stored.request_secrets, '');
+        assertStrictEquals(stored.response_secrets, '');
         assertStrictEquals(
-            stored.secret_hash, EMPTY_SHA256,
+            stored.request_secrets_hash, EMPTY_SHA256,
+        );
+        assertStrictEquals(
+            stored.response_secrets_hash, EMPTY_SHA256,
         );
     },
 );
@@ -1920,7 +2234,7 @@ Deno.test(
             false,
         );
         assertStrictEquals(
-            authorizeRow.secret.includes(
+            authorizeRow.response_secrets.includes(
                 'code="' + code + '"',
             ),
             true,
@@ -1982,11 +2296,11 @@ Deno.test(
             false,
         );
         assertStrictEquals(
-            tokenRow.secret.includes('set-cookie:'),
+            tokenRow.response_secrets.includes('set-cookie:'),
             true,
         );
         assertStrictEquals(
-            tokenRow.secret.includes(access),
+            tokenRow.response_secrets.includes(access),
             true,
         );
         const refreshValue = /refresh_token=([^;]+)/

@@ -34,6 +34,12 @@ import {
 import type { StatementBind } from
     '../shared/ledger-statement.ts';
 import { Octets } from '../shared/http-message/octets.ts';
+import { sortFields } from
+    '../shared/http-message/canonical.ts';
+import { splitCredentials } from
+    '../shared/http-message/credentials.ts';
+import { parseWire } from
+    '../shared/http-message/wire-codec.ts';
 import type { DbAdapter } from '../api/db.ts';
 import {
     attemptFor,
@@ -75,8 +81,8 @@ Deno.test(
     () => {
         assertStrictEquals(POSTGRES_BIND_LIMIT, 65535);
         assertStrictEquals(LEADING_PARAMETERS, 1);
-        assertStrictEquals(PARAMETERS_PER_ROW, 14);
-        assertStrictEquals(SEED_ROWS_PER_STATEMENT, 2340);
+        assertStrictEquals(PARAMETERS_PER_ROW, 15);
+        assertStrictEquals(SEED_ROWS_PER_STATEMENT, 2184);
         assertStrictEquals(
             LEADING_PARAMETERS
                 + SEED_ROWS_PER_STATEMENT * PARAMETERS_PER_ROW,
@@ -86,13 +92,13 @@ Deno.test(
 );
 
 Deno.test(
-    'the statement binds the attempt, then fourteen a row',
+    'the statement binds the attempt, then fifteen a row',
     () => {
         const text = statementText(2);
         assertStringIncludes(text, '$1::text');
         assertStringIncludes(text, '$2::uuid');
-        assertStringIncludes(text, '$29::text');
-        assertStrictEquals(text.includes('$30'), false);
+        assertStringIncludes(text, '$31::text');
+        assertStrictEquals(text.includes('$32'), false);
     },
 );
 
@@ -641,7 +647,8 @@ Deno.test(
                 row.response.includes('\r\nrequest-id: '),
                 false,
             );
-            assertStrictEquals(row.secret, '');
+            assertStrictEquals(row.request_secrets, '');
+            assertStrictEquals(row.response_secrets, '');
         }
     },
 );
@@ -843,6 +850,41 @@ Deno.test('bootstrap lands in one statement', async () => {
     );
 });
 
+// Credential lines serialize last, but a stored message
+// holds none, so its bytes (and every digest over them)
+// are the plain name order they were before that rule.
+Deno.test(
+    'a mock-data seed stores every message in name order',
+    async () => {
+        const rows = await (await sharedMockDb())
+            .messagePairs.getAll();
+        let checked = 0;
+        for (const row of rows) {
+            for (const message of [row.request, row.response]) {
+                if (message === '') continue;
+                const model = parseWire(message);
+                assertStrictEquals(
+                    splitCredentials(model.fields).hoisted.length,
+                    0,
+                );
+                const end = message.indexOf('\r\n\r\n');
+                let head = message.slice(
+                    0, message.indexOf('\r\n') + 2,
+                );
+                for (const field of sortFields(model.fields)) {
+                    head += field.name + ': ' + field.value
+                        + '\r\n';
+                }
+                assertStrictEquals(
+                    message.slice(0, end + 2), head,
+                );
+                checked += 1;
+            }
+        }
+        assert(checked > 0);
+    },
+);
+
 Deno.test(
     'a mock-data seed keeps no request-id and no secret',
     async () => {
@@ -863,7 +905,8 @@ Deno.test(
                 row.response.includes('\r\nrequest-id: '),
                 false,
             );
-            assertStrictEquals(row.secret, '');
+            assertStrictEquals(row.request_secrets, '');
+            assertStrictEquals(row.response_secrets, '');
         }
     },
 );

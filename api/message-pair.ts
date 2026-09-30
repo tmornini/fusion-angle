@@ -21,7 +21,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import {
     mergeSecret,
-    secretBytes as secretOfLines,
+    secretBytes,
     splitCredentials,
 } from '../shared/http-message/credentials.ts';
 import {
@@ -48,9 +48,6 @@ import type {
     Outcome,
     StatementAnswer,
     StatementBind,
-} from '../shared/ledger-statement.ts';
-import {
-    refusalOf,
 } from '../shared/ledger-statement.ts';
 import {
     SuccessionConflict,
@@ -89,10 +86,11 @@ export interface MessagePair {
     readonly requesterIdentityId: Id;
     readonly requestMessage: string;   // serializeWire
     readonly requestHash: string;
-    readonly secret: Uint8Array;
+    readonly requestSecrets: Uint8Array;
     readonly responseStatus: number;
     readonly responseMessage: string;
     readonly responseHash: string;
+    readonly responseSecrets: Uint8Array;
     readonly method: string;
     readonly operationId: string;
     readonly requestId: string;
@@ -292,7 +290,7 @@ function receivedRequestWire(
 
 // The response half of every formed pair: its status, the
 // four lines every pair carries, any extra lines, and the
-// body. Credential lines are hoisted for the secret.
+// body. Credential lines are hoisted for its secrets.
 function formedResponse(input: {
     readonly status: number,
     readonly etag: Id,
@@ -373,10 +371,6 @@ export async function formWriteMessagePair(
             : input.responseBody,
     });
     const responseMessage = response.message;
-    const secret = secretOfLines([
-        ...requestSplit.hoisted,
-        ...response.hoisted,
-    ]);
     return {
         id,
         requestAt: input.requestAt,
@@ -385,10 +379,11 @@ export async function formWriteMessagePair(
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
-        secret,
+        requestSecrets: secretBytes(requestSplit.hoisted),
         responseStatus: storedStatus,
         responseMessage,
         responseHash: await requestMessageHash(responseMessage),
+        responseSecrets: secretBytes(response.hoisted),
         method: input.method,
         operationId: input.operationId,
         requestId: input.requestId,
@@ -760,8 +755,8 @@ export function responseRecordOf(
 
 // One statement for the rows of one write. Salts and
 // the notify payload are minted here, outside the
-// statement. A blind refusal runs the statement again,
-// up to three times. Postgres ignores `now`.
+// statement. A blind statement runs at most three times
+// in all. Postgres ignores `now`.
 export type WriteRow = {
     readonly id: string,
     readonly operationId: string,
@@ -771,9 +766,10 @@ export type WriteRow = {
     readonly method: string,
     readonly request: Uint8Array,
     readonly requestSalt?: Uint8Array,
-    readonly secret: Uint8Array,
+    readonly requestSecrets: Uint8Array,
     readonly response: Uint8Array,
     readonly responseSalt?: Uint8Array,
+    readonly responseSecrets: Uint8Array,
     readonly ifMatch: string | null,
 };
 
@@ -862,9 +858,10 @@ export type StatementRun =
 
 // Runs past a refusal only to learn which row lost.
 const NON_BLIND_RUNS = 2;
+const BLIND_RUNS = 3;
 
-// A blind refusal runs the statement again, up to three
-// times. Any other refusal runs it once more with the same
+// A blind statement runs at most three times in all. Any
+// other refusal runs it once more with the same
 // binds: the re-run classifies against the row that won, so
 // the answer can name the row it refused.
 export async function runStatement(
@@ -885,10 +882,9 @@ export async function runStatement(
                 throw error;
             }
             conflicts += 1;
-            const again = attempt === 'blind'
-                ? refusalOf(attempt, conflicts, '', '')
-                    === 'retry'
-                : conflicts < NON_BLIND_RUNS;
+            const again = conflicts < (attempt === 'blind'
+                ? BLIND_RUNS
+                : NON_BLIND_RUNS);
             if (!again) {
                 return { kind: 'refused' };
             }
@@ -1122,7 +1118,7 @@ export async function formStateWrite(
     return formedOf(
         write,
         'composed',
-        [writeRowOf(received, null), ...pairs],
+        [writeRowOf(received), ...pairs],
         pairs[0]!.id,
     );
 }
@@ -1267,7 +1263,7 @@ async function siblingsAnswer(
     }
     const own = responseFromLatin1(mergeSecret(
         latin1(stated[0]!.response),
-        secretBytes(rows[0]!),
+        rows[0]!.responseSecrets,
     ));
     return {
         response: write.answer.kind === 'received'
@@ -1332,12 +1328,13 @@ async function formSiblingPair(
         requesterIdentityId: context.requesterIdentityId,
         requestMessage,
         requestHash: await requestMessageHash(requestMessage),
-        secret: secretOfLines(response.hoisted),
+        requestSecrets: secretBytes([]),
         responseStatus: status,
         responseMessage: response.message,
         responseHash: await requestMessageHash(
             response.message,
         ),
+        responseSecrets: secretBytes(response.hoisted),
         method: sibling.method,
         operationId: context.operationId,
         requestId: context.requestId,
@@ -1380,15 +1377,13 @@ async function completedPair(
         responseHash: await requestMessageHash(
             response.message,
         ),
+        responseSecrets: secretBytes(response.hoisted),
     };
 }
 
 // The received row judges nothing in a sibling write; its
 // siblings do (Interpretation U).
-function writeRowOf(
-    pair: MessagePair,
-    ifMatch: string | null,
-): WriteRow {
+function writeRowOf(pair: MessagePair): WriteRow {
     return {
         id: pair.id,
         operationId: pair.operationId,
@@ -1397,9 +1392,10 @@ function writeRowOf(
         requesterIdentityId: pair.requesterIdentityId,
         method: pair.method,
         request: requestBytes(pair),
-        secret: pair.secret,
+        requestSecrets: pair.requestSecrets,
         response: responseBytes(pair),
-        ifMatch,
+        responseSecrets: pair.responseSecrets,
+        ifMatch: null,
     };
 }
 
@@ -1448,7 +1444,7 @@ function wireForPair(
     if (row === undefined) return answer.response;
     const stored = latin1(row.response);
     return responseFromLatin1(
-        mergeSecret(stored, secretBytes(pair)),
+        mergeSecret(stored, pair.responseSecrets),
     );
 }
 
@@ -1471,7 +1467,6 @@ function bindOf(
     const request = requestBytes(row);
     const response = responseBytes(row);
     const split = splitDate(response);
-    const secret = secretBytes(row);
     return {
         id: row.id,
         operationId: row.operationId,
@@ -1481,10 +1476,11 @@ function bindOf(
         method: row.method,
         request,
         requestSalt: saltOf(requestSaltOf(row)),
-        secret,
+        requestSecrets: row.requestSecrets,
         responsePrefix: split.prefix,
         responseSuffix: split.suffix,
         responseSalt: saltOf(responseSaltOf(row)),
+        responseSecrets: row.responseSecrets,
         ifMatch: ifMatchOf(attempt, row),
         notify: notifyPayload(eventForMessagePair({
             path: row.path,
@@ -1552,7 +1548,7 @@ function answerOf(
     return {
         response: responseFromLatin1(mergeSecret(
             latin1(row.response),
-            secretBytes(rows[index]!),
+            rows[index]!.responseSecrets,
         )),
         outcome,
         answeredId: row.id,
@@ -1610,18 +1606,6 @@ function responseBytes(
     return Octets.fromLatin1(
         (row as MessagePair).responseMessage,
     ).asBytes();
-}
-
-function secretBytes(
-    row: WriteRow | MessagePair,
-): Uint8Array {
-    if (
-        'secret' in row
-        && row.secret instanceof Uint8Array
-    ) {
-        return row.secret;
-    }
-    return new Uint8Array(0);
 }
 
 function requestSaltOf(
@@ -1809,12 +1793,12 @@ export function createdEntityName(
         ? value : undefined;
 }
 
-// The coverage gate: pairs, wire headers, and the idempotency
-// fast-path fire ONLY for wired route patterns. Seeded with the
-// ideas patterns in Task 1; every Task 2/3 family commit
-// extends it; the Task 6 exit test asserts it covers every
-// write route — so no intermediate commit ever advertises an
-// ETag it did not store.
+// The coverage gate: pairs and wire headers form ONLY for
+// wired route patterns. Seeded with the ideas patterns in
+// Task 1; every Task 2/3 family commit extends it; the Task 6
+// exit test asserts it covers every write route — so no
+// intermediate commit ever advertises an ETag it did not
+// store.
 export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'organizations/:id/ideas/:id',
     'organizations/:id/ideas/:id/conversion',

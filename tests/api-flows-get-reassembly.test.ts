@@ -4,6 +4,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    ifMatchField,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -298,9 +300,9 @@ Deno.test(
                 eventId: generateIdentifier(),
                 at: nowUtc(),
             },
-            undoHead.etag === undefined
-                ? []
-                : [['if-match', '"' + undoHead.etag + '"']],
+            [ifMatchField(
+                requiredEtag(undoHead.etag, 'the flow GET'),
+            )],
         );
 
         // Step 5: GET must return the target (undone) graph.

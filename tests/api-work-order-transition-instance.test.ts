@@ -672,6 +672,81 @@ async () => {
     );
 });
 
+// The instance head returns to 'Hello' under a new tag, so a
+// revision to 'Hello' equals the head: the statement skips
+// it, but still judges the tag the client read.
+async function instanceReturnedToHello(
+    db: MemoryDbAdapter,
+    token: string,
+    etag: string,
+): Promise<string> {
+    const away = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, token,
+        { set: [{ attribute_id: ATTR_ID, value: 'Away' }] },
+        { [IF_MATCH_HEADER]: etag },
+    ));
+    assertStrictEquals(away.status, 200);
+    await away.body?.cancel();
+    const back = await handleRequest(db, req(
+        'PATCH', INSTANCE_DETAIL, token,
+        { set: [{ attribute_id: ATTR_ID, value: 'Hello' }] },
+        { [IF_MATCH_HEADER]: away.headers.get('ETag')! },
+    ));
+    assertStrictEquals(back.status, 200);
+    await back.body?.cancel();
+    return back.headers.get('ETag')!;
+}
+
+Deno.test('an unchanged revision with a stale instance tag'
++ ' → 412; nothing stored', async () => {
+    const { db, adminToken, etag } = await seededBound();
+    await instanceReturnedToHello(db, adminToken, etag);
+    const workOrderBefore = await workOrderTag(db, adminToken);
+    const before = await requestCount(db);
+    const res = await handleRequest(db, req(
+        'POST', TRANSITION, adminToken,
+        valueBody({
+            eventId: 'te-same-stale',
+            set: [{ attribute_id: ATTR_ID, value: 'Hello' }],
+        }),
+        await latched(db, adminToken, etag),
+    ));
+    assertStrictEquals(res.status, 412);
+    assertEquals(await res.json(), {
+        error:
+            'If-Match does not match the current '
+            + 'document at ' + INSTANCE_DETAIL,
+    });
+    assertStrictEquals(await requestCount(db), before);
+    assertStrictEquals(
+        await workOrderTag(db, adminToken), workOrderBefore,
+    );
+});
+
+Deno.test('an unchanged revision with the current instance'
++ ' tag lands; no instance version', async () => {
+    const { db, adminToken, etag } = await seededBound();
+    const current = await instanceReturnedToHello(
+        db, adminToken, etag,
+    );
+    const workOrderBefore = await workOrderTag(db, adminToken);
+    const before = await instancePairCount(db);
+    const res = await handleRequest(db, req(
+        'POST', TRANSITION, adminToken,
+        valueBody({
+            eventId: 'te-same-current',
+            set: [{ attribute_id: ATTR_ID, value: 'Hello' }],
+        }),
+        await latched(db, adminToken, current),
+    ));
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
+    assertStrictEquals(await instancePairCount(db), before);
+    assertNotStrictEquals(
+        await workOrderTag(db, adminToken), workOrderBefore,
+    );
+});
+
 Deno.test('pure move with the instance If-Match → 412',
 async () => {
     const { db, adminToken, etag } = await seededBound();

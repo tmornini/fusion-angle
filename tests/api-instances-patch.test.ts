@@ -495,20 +495,23 @@ async () => {
     }
 });
 
-Deno.test('PATCH absent with If-Match → 400 (validation first)',
+Deno.test('PATCH absent with If-Match → 412; nothing stored',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
         { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
     ));
-    assertStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 412);
     assertEquals(await res.json(), {
-        error: 'unknown attribute_id "' + ATTR_ID + '"',
+        error: 'If-Match does not match the current document at '
+            + INSTANCE_DETAIL,
     });
+    assertStrictEquals(await countInstanceMessagePairs(db), 0);
 });
 
 Deno.test('an update of a retired instance is 410; never revives',
@@ -550,13 +553,17 @@ async () => {
     assertStrictEquals(head, undefined);
 });
 
-Deno.test('PATCH foreign instance id with If-Match → 400',
-async () => {
+// The tenancy fence: an id live in another organization
+// answers exactly as an absent one, and nothing lands on
+// either side.
+Deno.test('PATCH foreign instance id with If-Match → 412, as'
++ ' absent', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
-    await appendInstanceMessagePair(
+    const foreign = await appendInstanceMessagePair(
         db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_ID,
         'PUT', {
             set: [
@@ -576,10 +583,17 @@ async () => {
                 '"' + WELL_FORMED_TAG + '"',
         },
     ));
-    assertStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 412);
     assertEquals(await res.json(), {
-        error: 'unknown attribute_id "' + ATTR_ID + '"',
+        error: 'If-Match does not match the current document at '
+            + INSTANCE_DETAIL,
     });
+    assertStrictEquals(await countInstanceMessagePairs(db), 0);
+    const foreignHead = await db.messagePairs.getHeadPair(
+        instancesUriPrefix(ORGANIZATION_B, FOREIGN_TYPE_ID),
+        INSTANCE_ID,
+    );
+    assertStrictEquals(foreignHead?.id, foreign);
 });
 
 Deno.test('PATCH set∩clear overlap → 400',

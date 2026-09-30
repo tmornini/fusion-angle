@@ -1,8 +1,11 @@
 
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
-import type { RequestContext } from
-    '../client/request-context.ts';
+import {
+    ifMatchField,
+    requiredEtag,
+    type RequestContext,
+} from '../client/request-context.ts';
 import {
     getDashboardStats,
     getDashboardGauges,
@@ -108,7 +111,7 @@ async function seedProject(
     await putProject(ctx, id, {
         ...entity,
         state,
-    });
+    }, undefined);
 }
 
 // Seeds a flow through the SAME document PUT the live route
@@ -162,9 +165,7 @@ async function tombstoneFlow(
             },
             revivals: [],
         },
-        etag === undefined
-            ? undefined
-            : [['if-match', '"' + etag + '"']],
+        [ifMatchField(requiredEtag(etag, 'the flow GET'))],
     );
 }
 

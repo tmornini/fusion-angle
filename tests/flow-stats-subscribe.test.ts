@@ -122,7 +122,11 @@ Deno.test(
             const { inPageContext } = await import(
                 './in-page-facade.ts'
             );
-            const { organizationItem } = await import(
+            const {
+                ifMatchField,
+                organizationItem,
+                requiredEtag,
+            } = await import(
                 '../client/request-context.ts'
             );
             const { postFlowCreation } = await import(
@@ -179,7 +183,9 @@ Deno.test(
                     },
                     revivals: [],
                 },
-                [['if-match', '"' + etag + '"']],
+                [ifMatchField(
+                    requiredEtag(etag, 'the flow GET'),
+                )],
             );
             for (let i = 0; i < 25; i++) {
                 await new Promise(

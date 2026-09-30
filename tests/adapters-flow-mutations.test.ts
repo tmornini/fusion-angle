@@ -9,6 +9,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    ifMatchField,
+    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -60,20 +62,6 @@ const EMPTY_GRAPH_DELTA = {
     memberEvents: [],
     attributeEvents: [],
 };
-
-// organizations/:id/flows/:id takes a conditional PUT: a raw
-// ctx.PUT that hand-crafts its wire body (rather than riding putFlow's own C6
-// retry loop) must echo the current head itself, or a
-// non-genesis save 428s. Read once via GETWithEtag and
-// thread the echo through PUT's headerFields.
-function ifMatchHeaders(
-    etag: string | undefined,
-): readonly (readonly [string, string])[] {
-    if (etag === undefined) {
-        throw new Error('the flow GET carried no ETag');
-    }
-    return [['if-match', '"' + etag + '"']];
-}
 
 function buildNode(
     id: string,
@@ -417,7 +405,7 @@ Deno.test(
         const operationId = generateIdentifier();
         const headers: readonly (readonly [string, string])[] = [
             [OPERATION_ID_HEADER, operationId],
-            ...ifMatchHeaders(etag),
+            ifMatchField(requiredEtag(etag, 'the flow GET')),
         ];
         const path = 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw';
@@ -428,7 +416,7 @@ Deno.test(
             await ctx.GETWithEtag<FlowWithGraph>(path);
         await ctx.PUT(path, body, [
             [OPERATION_ID_HEADER, operationId],
-            ...ifMatchHeaders(fresh),
+            ifMatchField(requiredEtag(fresh, 'the flow GET')),
         ]);
         const events = await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -474,9 +462,9 @@ Deno.test(
                 eventId: generateIdentifier(),
                 at: '2099-01-02T00:00:00.000000Z',
             },
-            undoHead.etag === undefined
-                ? []
-                : [['if-match', '"' + undoHead.etag + '"']],
+            [ifMatchField(
+                requiredEtag(undoHead.etag, 'the flow GET'),
+            )],
         );
         const events = await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -523,7 +511,7 @@ Deno.test(
                 graphDelta: EMPTY_GRAPH_DELTA,
                 revivals: [],
             },
-            ifMatchHeaders(etag),
+            [ifMatchField(requiredEtag(etag, 'the flow GET'))],
         );
         const events = await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

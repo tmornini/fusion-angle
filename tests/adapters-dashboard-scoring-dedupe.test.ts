@@ -132,7 +132,7 @@ Deno.test(
                 actual_cost: 0,
                 position: 0,
                 state: 'approved',
-            });
+            }, undefined);
             await seedCtx.PUT(
                 'organizations/'
                     + ORGANIZATION_ID

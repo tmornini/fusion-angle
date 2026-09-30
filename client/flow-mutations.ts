@@ -37,9 +37,11 @@ import type {
     RequestContext,
 } from './request-context.ts';
 import {
+    ifMatchField,
     jitteredBackoff,
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 
 const flowChanges =
@@ -571,15 +573,12 @@ export async function putFlow(
                 ctx, id, save, revivalTarget,
             );
         try {
-            // A blind PUT answers 428; name the missing tag here
-            // rather than send one.
-            if (etag === undefined) {
-                throw new Error('the flow GET carried no ETag');
-            }
             await ctx.PUT(
                 organizationItem(ctx, 'flows', id),
                 body,
-                [['if-match', '"' + etag + '"']],
+                [ifMatchField(
+                    requiredEtag(etag, 'the flow GET'),
+                )],
             );
             flowChanges.notify();
             return;

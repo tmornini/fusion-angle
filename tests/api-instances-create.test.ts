@@ -217,16 +217,28 @@ Deno.test('PATCH create with clear is 400', async () => {
     assertStrictEquals(res.status, 400);
 });
 
-Deno.test('PATCH create with If-Match is 400', async () => {
+// If-Match names a head; a never-written instance has none,
+// so the PATCH is no create: it refuses and stores nothing.
+Deno.test('PATCH of a never-written instance with If-Match is'
++ ' 412', async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
+    await seedWritableTextAttr(db, adminToken);
+    const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
-        { set: [] },
+        setBody([{ attribute_id: ATTR_ID, value: 'Hello' }]),
         { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
     ));
-    assertStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 412);
+    assertEquals(await res.json(), {
+        error: 'If-Match does not match the current document at '
+            + INSTANCE_DETAIL,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 Deno.test('PATCH {set:[…]} member, type exists → 201 + ETag; '

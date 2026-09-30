@@ -684,7 +684,12 @@ function headersFor(
     if (conditional === 'required') {
         headers.push('If-Match or If-None-Match: *');
     }
-    if (conditional === 'optional') {
+    // If-None-Match: * never lands a DELETE: a name never
+    // written is 404, a gone one 204 with nothing stored,
+    // and a live head refuses it with 412.
+    if (conditional === 'optional' && lower === 'delete') {
+        headers.push('If-Match (optional)');
+    } else if (conditional === 'optional') {
         headers.push('If-Match or If-None-Match: * (optional)');
     }
     return headers;

@@ -1,5 +1,6 @@
 import { Octets } from './octets.ts';
 import { sortFields } from './canonical.ts';
+import { credentialsLast } from './credentials.ts';
 import {
     CONTENT_LENGTH,
     TRANSFER_ENCODING,
@@ -253,7 +254,7 @@ function serializeHead(
     fields: readonly FieldLine[],
 ): string {
     let out = serializeStartLine(startLine) + CRLF;
-    for (const field of sortFields(fields)) {
+    for (const field of credentialsLast(sortFields(fields))) {
         out += field.name + ': ' + field.value + CRLF;
     }
     return out + CRLF;
@@ -269,7 +270,7 @@ function serializeChunked(
         out += body.toLatin1() + CRLF;
     }
     out += '0' + CRLF;
-    for (const field of sortFields([...trailer])) {
+    for (const field of credentialsLast(sortFields(trailer))) {
         out += field.name + ': ' + field.value + CRLF;
     }
     return out + CRLF;

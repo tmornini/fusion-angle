@@ -7,6 +7,8 @@ import {
 } from '../shared/identifier.ts';
 import {
     activeOrganization,
+    ifMatchField,
+    requiredEtag,
     type RequestContext,
 } from './request-context.ts';
 import {
@@ -121,15 +123,8 @@ export async function getInvitationWithEtag(
     );
     return {
         invitation: inviteeViewOf(read.body),
-        etag: requiredEtag(read.etag),
+        etag: requiredEtag(read.etag, 'the invitation GET'),
     };
-}
-
-function requiredEtag(etag: string | undefined): string {
-    if (etag === undefined) {
-        throw new Error('the invitation GET carried no ETag');
-    }
-    return etag;
 }
 
 // The active org's outstanding invitations, for an admin — the
@@ -232,7 +227,7 @@ export async function postInvitationAcceptance(
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
-        [['If-Match', '"' + etag + '"']],
+        [ifMatchField(etag)],
     );
     try {
         await remintSessionClaims(ctx, organizationId);
@@ -337,7 +332,7 @@ export async function postInvitationDecline(
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
-        [['If-Match', '"' + etag + '"']],
+        [ifMatchField(etag)],
     );
     invitationChanges.notify();
 }
@@ -361,7 +356,9 @@ export async function postInvitationRevocation(
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
-        [['If-Match', '"' + requiredEtag(read.etag) + '"']],
+        [ifMatchField(
+            requiredEtag(read.etag, 'the invitation GET'),
+        )],
     );
     invitationChanges.notify();
 }

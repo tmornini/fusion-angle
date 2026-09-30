@@ -13,8 +13,10 @@ import {
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import {
+    ifMatchField,
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 import {
     getCurrentHumanMember,
@@ -222,8 +224,9 @@ export async function putIdea(
 // folds into the SAME PUT ideas/:id that putIdea already
 // drives for edits and transitions. The id and state are
 // minted ONCE here, before the single ctx.PUT hop (via
-// putIdea) — a retry resends the identical bytes, hitting the
-// op's idempotency fold. Use only at the create call site;
+// putIdea) — a retry resends the identical bytes, which the
+// statement matches against the head and stores nothing.
+// Use only at the create call site;
 // transitions of an existing idea go through
 // postIdeaStateChange; putIdea remains for entity edits
 // (title, position) that do not change state.
@@ -355,9 +358,7 @@ export async function postIdeaConversion(
             organizationItem(ctx, 'ideas', ideaId),
         ),
     ]);
-    if (idea.etag === undefined) {
-        throw new Error('the idea GET carried no ETag');
-    }
+    const ideaEtag = requiredEtag(idea.etag, 'the idea GET');
     await ctx.POSTWithHeaders(
         organizationItem(ctx, 'ideas', ideaId)
             + '/conversion',
@@ -381,7 +382,7 @@ export async function postIdeaConversion(
                 at: ideaStateAt,
             },
         })),
-    }, [['If-Match', '"' + idea.etag + '"']]);
+    }, [ifMatchField(ideaEtag)]);
     notifyProjectChange();
     notifyProjectScoreChange();
     ideaChanges.notify();

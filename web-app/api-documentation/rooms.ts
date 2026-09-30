@@ -24,7 +24,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -43,7 +43,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -62,7 +62,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -82,7 +82,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -102,7 +102,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -143,7 +143,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -167,7 +167,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -191,7 +191,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [
@@ -215,7 +215,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on writes',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match (optional)',
         ],
         statuses:
         [

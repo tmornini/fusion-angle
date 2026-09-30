@@ -9,8 +9,10 @@ import {
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import {
+    ifMatchField,
     organizationCollection,
     organizationItem,
+    requiredEtag,
 } from './request-context.ts';
 import {
     createSubscriptionChannel,
@@ -96,15 +98,13 @@ export async function putProject(
     ctx: RequestContext,
     id: string,
     document: ProjectDocumentFields,
-    etag?: string,
+    etag: string | undefined,
 ): Promise<void> {
     const { state, ...entity } = document;
     await ctx.PUT(
         organizationItem(ctx, 'projects', id),
         { ...entity, state },
-        etag === undefined
-            ? undefined
-            : [['if-match', '"' + etag + '"']],
+        etag === undefined ? undefined : [ifMatchField(etag)],
     );
     projectChanges.notify();
 }
@@ -131,16 +131,17 @@ async function projectRowFields(
     const read = await ctx.GETWithEtag<ProjectEntity>(
         organizationItem(ctx, 'projects', id),
     );
-    if (read.etag === undefined) {
-        throw new Error('the project GET carried no ETag');
-    }
     const {
         id: _id,
         organization_id: _org,
         state,
         ...fields
     } = read.body;
-    return { fields, state, etag: read.etag };
+    return {
+        fields,
+        state,
+        etag: requiredEtag(read.etag, 'the project GET'),
+    };
 }
 
 // The camelCase patch for a project's editable fields.
@@ -208,5 +209,5 @@ export async function postProjectStateChange(
     await putProject(ctx, id, {
         ...fields,
         state,
-    });
+    }, undefined);
 }

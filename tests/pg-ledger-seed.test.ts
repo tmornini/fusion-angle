@@ -30,7 +30,7 @@ import {
 import {
     leafHashHex,
     pairRootHex,
-    secretHashHex,
+    secretsHashHex,
 } from '../shared/pair-root.ts';
 import { testHashPassword } from './mock-seed.ts';
 
@@ -311,12 +311,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 stamp: string;
                 request: Uint8Array;
                 request_salt: Uint8Array;
-                secret: Uint8Array;
+                request_secrets: Uint8Array;
                 response: Uint8Array;
                 response_salt: Uint8Array;
+                response_secrets: Uint8Array;
                 request_hash: string;
-                secret_hash: string;
+                request_secrets_hash: string;
                 response_hash: string;
+                response_secrets_hash: string;
                 pair_hash: string;
                 request_id: string | null;
             }>`
@@ -329,14 +331,16 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                         response_at AT TIME ZONE 'UTC',
                         'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
                     ) AS stamp,
-                    request, request_salt, secret,
-                    response, response_salt,
+                    request, request_salt, request_secrets,
+                    response, response_salt, response_secrets,
                     encode(request_hash, 'hex')
                         AS request_hash,
-                    encode(secret_hash, 'hex')
-                        AS secret_hash,
+                    encode(request_secrets_hash, 'hex')
+                        AS request_secrets_hash,
                     encode(response_hash, 'hex')
                         AS response_hash,
+                    encode(response_secrets_hash, 'hex')
+                        AS response_secrets_hash,
                     encode(pair_hash, 'hex') AS pair_hash,
                     fa_request_id_of(response) AS request_id
                 FROM fa_message_pairs
@@ -348,18 +352,30 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             const requestDigest = await leafHashHex(
                 row.request_salt, row.request,
             );
-            const secretDigest = await secretHashHex(
-                row.secret,
+            const requestSecretsDigest = await secretsHashHex(
+                row.request_secrets,
             );
             const responseDigest = await leafHashHex(
                 row.response_salt, row.response,
             );
+            const responseSecretsDigest = await secretsHashHex(
+                row.response_secrets,
+            );
             assertStrictEquals(row.request_id, null);
-            assertStrictEquals(row.secret.byteLength, 0);
+            assertStrictEquals(row.request_secrets.byteLength, 0);
+            assertStrictEquals(
+                row.response_secrets.byteLength, 0,
+            );
             assertStrictEquals(row.request_hash, requestDigest);
-            assertStrictEquals(row.secret_hash, secretDigest);
+            assertStrictEquals(
+                row.request_secrets_hash, requestSecretsDigest,
+            );
             assertStrictEquals(
                 row.response_hash, responseDigest,
+            );
+            assertStrictEquals(
+                row.response_secrets_hash,
+                responseSecretsDigest,
             );
             assertStrictEquals(
                 row.pair_hash,
@@ -374,8 +390,11 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     method: row.method,
                     responseAt: row.stamp,
                     requestHashHex: requestDigest,
-                    secretHashHex: secretDigest,
+                    requestSecretsHashHex:
+                        requestSecretsDigest,
                     responseHashHex: responseDigest,
+                    responseSecretsHashHex:
+                        responseSecretsDigest,
                 }),
             );
         },

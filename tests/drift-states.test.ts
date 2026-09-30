@@ -1177,8 +1177,8 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 
     // The revoked leg: the ONE terminal invitation state that
     // had NO old-plane parity evidence anywhere before this task
-    // (currentInvitationState's Phase 14 Task 2 flip reads
-    // exactly this history for its own 'revoked' branch).
+    // (invitationLifecycleStatesFor reads exactly this
+    // history for its 'revoked' rows).
     await person(
         db, 'drift-states-invitee-revoke', 'Revoke Invitee',
         'drift-states-invitee-revoke@x.com',

@@ -219,12 +219,11 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
     assertEquals(await res.json(), domainRow);
 });
 
-// ── identity-tokens/:jti/rotation — REPLAY-EXEMPT operation
-// document: the gate NEVER serves a stored response for a
-// byte-identical resend of this route (message-pair.ts
-// REPLAY_EXEMPT_ROUTE_PATTERNS), so a resent reuse attempt
-// re-enters rotateRefreshJti's own 409 guard for real instead
-// of silently replaying the first success.
+// ── identity-tokens/:jti/rotation — an operation document:
+// the gate serves no stored response for a resend, so a
+// resent reuse attempt re-enters rotateRefreshJti's own 409
+// guard for real instead of silently replaying the first
+// success.
 
 Deno.test('a rotation appends its pair at an operation path:'
 + ' name stays empty, and the wire, the successor\'s state,'
@@ -457,9 +456,8 @@ function postToken(
 }
 
 // The ONE identity-token event a bare issuance grant forms has
-// its own event pair at its own document — a genesis pair
-// (identity-tokens/:id carries no DOCUMENT_CLASS entry, so no
-// head-read ever chains it), whose stored response deep-equals
+// its own event pair at its own document — a handler genesis,
+// the jti's first version — whose stored response deep-equals
 // the derived event itself.
 async function assertRootEventMessagePair(
     db: MemoryDbAdapter,
@@ -477,10 +475,9 @@ async function assertRootEventMessagePair(
     );
     assert(eventRequest, 'no event pair for the issued root');
     // requesterIdentityId is the event's OWN identity_id (the
-    // affected identity) — the NAMED convention
-    // formTokenEventMessagePair implements, since no
-    // authenticated actor is in view at this depth
-    // (message-pair.ts).
+    // affected identity) — the convention the token write
+    // keeps, since no authenticated actor is in view at this
+    // depth (api/authentication.ts).
     assertStrictEquals(
         eventRequest!.requester_identity_id, root.identity_id,
     );

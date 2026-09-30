@@ -128,9 +128,8 @@ async function resolveInvitationOwner(
 }
 
 // flow_nodes/flow_edges carry NO document of their own
-// (message-pair.ts: absent from both
-// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS and
-// DOCUMENT_CLASS_ROUTE_PATTERNS) — they ride folded inside the
+// (message-pair.ts: absent from
+// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS) — they ride folded inside the
 // flow's own document body, as graphDelta.nodes/.edges upserts
 // (api/routes.ts's writeFlowGraphDelta). A node/edge that is later
 // removed from the client's CURRENT graph snapshot still keeps its

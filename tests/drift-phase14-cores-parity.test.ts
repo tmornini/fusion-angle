@@ -39,9 +39,8 @@ const WORKORDERID_EV3 = generateIdentifier();
 // The Author gate 1 rule (e) pre-tx-vs-in-tx PARITY pins for the
 // three Phase 14 Task 1 cores (deriveInvitation,
 // invitationLifecycleStatesFor, workOrderLifecycleStatesFor) —
-// the membershipExistsFor / deriveIdentityTokenEventsForJti
-// precedent (tests/drift-memberships-identity.test.ts leg 5,
-// tests/drift-identity-tokens.test.ts legs 3/5): each core is
+// the membershipExistsFor precedent
+// (tests/drift-memberships-identity.test.ts leg 5): each core is
 // called BOTH pre-tx (the plain adapter) and in-tx (an open
 // read-transaction view) and proven byte-identical. The
 // invitation transitions and postWorkOrderClaimOp read heads
@@ -222,8 +221,8 @@ function workOrderFlowGraph(
 const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 
 Deno.test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
-+ ' plain adapter) vs in-tx (an open db.transaction view sharing'
-+ ' postWorkOrderClaimOp\'s own table list)', async () => {
++ ' plain adapter) vs in-tx (an open read-transaction view)',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = generateIdentifier();

@@ -47,8 +47,9 @@ type PairRootTexts = {
     method: string,
     responseAt: string,
     requestHashHex: string,
-    secretHashHex: string,
+    requestSecretsHashHex: string,
     responseHashHex: string,
+    responseSecretsHashHex: string,
 };
 
 function readStamp(stamp: string): Stamp {
@@ -153,10 +154,10 @@ export async function leafHashHex(
     return sha256HexOfBytes(joined);
 }
 
-export async function secretHashHex(
-    secret: Uint8Array,
+export async function secretsHashHex(
+    secrets: Uint8Array,
 ): Promise<string> {
-    return sha256HexOfBytes(secret);
+    return sha256HexOfBytes(secrets);
 }
 
 function netstring(text: string): string {
@@ -177,8 +178,9 @@ export async function pairRootHex(
         texts.method,
         texts.responseAt,
         texts.requestHashHex,
-        texts.secretHashHex,
+        texts.requestSecretsHashHex,
         texts.responseHashHex,
+        texts.responseSecretsHashHex,
     ];
     let joined = '';
     for (const text of parts) {
