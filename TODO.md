@@ -46,19 +46,28 @@ skew tests, which went with item 8's trio.
    and serializes exactly this form, request and response
    alike, and keeps every received line: `content-length`
    is checked against the body at the gate, never stripped
-   and recomputed. `request` holds the entire request as
-   received — start line, every header, and the body bytes
-   exactly as received, never re-serialized — less its
-   credential lines, hoisted as below. A pair for which
+   and recomputed. `request` holds the entire request —
+   its start line and header lines in the canonical form,
+   its body bytes exactly as received, never re-serialized
+   — less its credential lines, hoisted as below; the
+   client sends `user-agent: fusion-angle/<sha>` on every
+   API request
+   — the SHA `FA_GIT_SHA` supplies, its bullet in
+   `## Later work` — so the ledger names the build that
+   made each
+   request, and a browser that keeps its own token
+   instead (Layer 2 measures which) leaves that token
+   stored as received. A pair for which
    nothing was received (item 1's sibling PUTs) stores
    zero request bytes. `response` holds the entire
    response as sent, less its credential lines: the status
    actually sent — 201 for every PUT that lands, a
    genesis, a successor, or a PUT after a DELETE alike,
    as today (`api/message-pair.ts:649-651`), a sibling
-   PUT's line included; 200 for a blind PUT that lands
-   nothing
-   because its state is already the head, a replay,
+   PUT's line included; 200 for a PUT that lands nothing
+   because its state is already the head — blind, or
+   in-order with a latch that held (RFC 9110 §13.1.1) —
+   a replay,
    answered with the head's unit; and 204 on DELETE —
    and `date`, `etag`, `operation-id`, and `request-id` as
    the wire carries them; item 1 says how a read serves
@@ -67,20 +76,45 @@ skew tests, which went with item 8's trio.
    to it — same lines, same values, same body bytes — and
    the runtime must keep a `date` it is given
    (`Deno.serve` does: measured, 2.9.6), so the stamp
-   Postgres mints is the `date` the wire carries. A
+   Postgres mints is the `date` the wire carries — an
+   IMF-fixdate (RFC 9110 §5.6.7), the stamp at second
+   resolution, so the microsecond order lives in
+   `response_at` alone. A
    sibling PUT (item 1) sends nothing; its `response` is
-   the message a read of it serves. Secrets
-   move to credential lines: the password rides
-   `Authorization: Basic`, no longer the authorize body,
+   the message a read of it serves before the read's
+   three substitutions. Secrets
+   move to credential lines: every secret a request
+   presents rides `Authorization` — `Basic` where an
+   identifier and its proof travel together: the
+   password, no longer the authorize body, and the token
+   request's `code` with its `code_verifier`; `Bearer`
+   where the credential is a token: the exchange's
+   `subject_token` and `actor_token`, and the
+   `client_credentials` grant's `client_assertion`
+   (`api/authentication.ts:1066-1067`) — so no stored
+   request body holds a secret and `secret` is the one
+   column of secrets, the message plane naming each
+   grant's line;
    and the authorize `code` and the token grant's
-   `access_token` leave the response body for a response
-   header; the refresh token's `Set-Cookie` is the
+   `access_token` leave the response body for
+   `Authentication-Info` (RFC 9110 §11.6.3), the field
+   HTTP defines for what a server says once credentials
+   are accepted, as `#auth-param`: authorize answers
+   `code="…"`, the grant `access_token="…"`, and a
+   field that is no secret stays in the body; the
+   refresh token's `Set-Cookie` is the
    precedent, and the departure from RFC 6749 §5.1 is
    accepted: both clients are ours. Credential lines are
    hoisted whole — name and value — out of `request` and
-   `response` into a fenced column: `authorization` and
-   `cookie` from a request, `set-cookie` and the new
-   header from a response — HTTP's own credential fields,
+   `response` into one fenced column, `secret`, named
+   for its leaf and salt, which holds them in canonical
+   order joined by CRLF with none trailing, zero bytes
+   when there are none: `authorization`,
+   `proxy-authorization`, and `cookie` from a request,
+   `set-cookie`, `authentication-info`, and
+   `proxy-authentication-info` from a response — every
+   credential-carrying field HTTP defines (RFC 9110 §11,
+   RFC 6265),
    not a list that grows with our routes. No name sits on
    both sides of the fence, so sorting by name merges the
    hoisted lines back and rebuilds each message exactly:
@@ -117,14 +151,22 @@ skew tests, which went with item 8's trio.
    `message_pairs_replay`
    (`api/schema-postgres.ts:53-54`), whose two readers
    (`api/message-pair.ts:456`, `:723`) leave with the
-   dedupe below.
+   dedupe below, and with them the eleven callers of the
+   first: the replay (`api/api.ts:968`) and four
+   invitation replays (`api/invitations-domain.ts:473`,
+   `:665`, `:770`, `:852`), dedupes all, and six
+   post-dispatch readbacks (`api/api.ts:1450`, `:1639`,
+   `:1725`, `:1792`, `:1972`, `api/message-pair.ts:688`),
+   which the INSERT's `RETURNING` replaces.
    Idempotency is the
    verb's (RFC 9110 §9.2.2): a PUT or DELETE that would
    leave the head's state unchanged lands nothing, and a
    repeated POST or PATCH is a new request that runs again
-   — its only write is its sibling PUT (item 1). Nothing
-   dedupes requests. Every write is ONE statement, guarded
-   by a constraint, never by a transaction or a lock: the
+   — its own pair and a sibling PUT, or nothing when the
+   head already holds its state (item 1). Nothing
+   dedupes requests. Every write the api makes is ONE
+   statement, guarded by a constraint, never by a
+   transaction or a lock: the
    INSERT mints `response_at` from `clock_timestamp()`,
    splices it in as `date`, and computes every hash with
    Postgres's `sha256` over the bytes it stores — the
@@ -161,7 +203,13 @@ skew tests, which went with item 8's trio.
    minimal rows, 0 of 200,000 rows carrying 300 bytes and
    two uuids — and a predecessor landing in the same
    statement is not visible to it, so a seed's chains
-   take their order from more than the clock. Item 3's
+   take their order from more than the clock: the seed
+   lands by depth — every genesis, then every second
+   version, then every third, each statement seeing the
+   last one's rows inside the one transaction — with the
+   one INSERT text the api and `migrate` use, so the
+   index and the head selection guard the seed as they
+   guard the api. Item 3's
    full check walks every succession and names a pair
    stamped before its predecessor. The hashes form a
    tree. Each leaf —
@@ -173,15 +221,44 @@ skew tests, which went with item 8's trio.
    undercut it. `pair_hash` is `sha256` over the envelope
    columns and the three leaves, so every reader verifies
    the root from what it may see, and a reader who sees a
-   leaf's bytes and salt verifies that leaf too. Row
+   leaf's bytes and salt verifies that leaf too. The
+   root's input is fixed by the design, never by a
+   session's `DateStyle`, `TimeZone`, or `bytea_output`:
+   each envelope column — `id`, `operation_id`, `path`,
+   `name`, `supersedes`, `requester_identity_id`,
+   `method`, `response_at` — then each leaf, in DDL
+   order, as a netstring (`length:bytes,`) of its
+   canonical text — a uuid as Postgres prints it, the
+   stamp RFC 3339 zulu with six sub-second digits, a
+   digest hex — all concatenated and hashed as UTF-8,
+   the same string built in TypeScript for the memory
+   backend. The
+   three salts, `request_salt`, `secret_salt`, and
+   `response_salt`, are 16 random bytes each, minted by
+   the handler (`crypto.getRandomValues`) — one minting
+   site for both backends — held in a `bytea` column
+   beside the leaf's bytes under
+   `CHECK (octet_length(x) = 16)`, and handed to the
+   INSERT as parameters, like the bytes themselves. All
+   four digests are `bytea` under
+   `CHECK (octet_length(x) = 32)` — what `sha256()`
+   returns, stored as is; hex appears only where a
+   message body carries a digest (item 3). Today's
+   `request_hash` is hex `text` under a `{64}` check
+   (`api/schema-postgres.ts:17-19`). Row
    hashes stay independent — no chain: the root covers the
    `supersedes` id, never a predecessor's hash — so
    erasure stays possible. Every PUT and DELETE names the
    pair it supersedes; a genesis supersedes the ROOT, one
    row seeded with the schema under the nil UUID, so the
    column is NOT NULL and no sentinel exists. A received
-   POST or PATCH supersedes nothing — its sibling PUT
-   supersedes the head. `supersedes` is not an enforced
+   POST or PATCH names the head its `If-Match` named —
+   the state it acted on — and a creating POST the root,
+   as its sibling genesis does, so the column means one
+   thing on every pair; the sibling PUT supersedes that
+   head, and the index, over PUT and DELETE alone, sees
+   the sibling and never the pair beside it.
+   `supersedes` is not an enforced
    reference: the physical eraser in `## Later work` must
    be able to remove a superseded pair, and nothing may
    rewrite its successor, whose root covers `supersedes`;
@@ -192,6 +269,21 @@ skew tests, which went with item 8's trio.
    pairs: one successor per predecessor within a
    document, so the root, named by every genesis, has one
    successor per document and no document two geneses.
+   `supersedes` is a column of the pair, never a join
+   table: this index needs `path`, `name`, and the
+   predecessor in one relation, and a join table could
+   hold them only by copying the two names in.
+   The root is a real pair, `/migrations/0000-root` —
+   item 3's collection, the owner's alone — a PUT that
+   names itself: `request` zero bytes, `response` a 201
+   whose body is the digest of zero bytes, `fa_owner`
+   its requester, the seed's `operation-id` its
+   operation; it passes every CHECK as any pair does,
+   its own index entry,
+   `('/migrations/', '0000-root', nil)`, is the slot a
+   successor would need, so the index refuses one
+   forever, and boot counts it as the zeroth name of
+   the set it compares (item 3).
    The index cannot tell a predecessor from an invented
    id or another document's pair, so the INSERT selects
    its predecessor as this document's head — the newest
@@ -209,16 +301,21 @@ skew tests, which went with item 8's trio.
    writes are one
    multi-row INSERT; the bell rings from the same
    statement (`RETURNING` into `pg_notify`). `transaction`
-   and `writeLocks` leave `DbAdapter`; item 13's "advisory
-   locks already cluster-wide" loses its referent. A seed
-   is one of the two transactions left — item 3's release
-   is the other, on the same owner-side writer — and it
-   needs no adapter
+   and `writeLocks` leave `DbAdapter`. A seed is one of
+   the two transactions left — item 3's `migrate` is the
+   other, on the same owner-side writer — and it needs no
+   adapter
    primitive: it opens on the client beneath the adapter
    and holds the DDL, the root row, and every pair, in
-   multi-row INSERTs batched far below the 65,535
-   parameters Postgres allows a statement, because the
-   seed will grow. A failed seed leaves nothing, not even
+   multi-row INSERTs batched at half the 65,535
+   parameters Postgres allows a statement — rows per
+   statement `floor(65535 / 2 / n)`, `n` the INSERT's
+   own parameters per row, both named, no number picked
+   by hand — because the
+   seed will grow; the driver's multi-row helper serves
+   under item 2's `fetch_types: false` (measured: 5,000
+   pairs in ten statements, and a failed batch left no
+   table). A failed seed leaves nothing, not even
    a table — DDL, role switches, and batches roll back
    together (measured, 18.6) — and every pair is formed
    and every credential hashed before it opens. Today a
@@ -227,38 +324,7 @@ skew tests, which went with item 8's trio.
    (`api/backend-postgres.ts:86`), the dataset
    (`api/mock-data.ts:358`), the credentials
    (`api/mock-data.ts:285`), the marker
-   (`api/backend-postgres.ts:107-113`). The
-   brainstorm settles: the response credential header's
-   name; the root's values (it must satisfy every CHECK);
-   whether `supersedes` is a column or a succession join
-   table (a data-modifying CTE keeps one statement either
-   way) and how a pair that supersedes nothing is written
-   — either way the eraser stays unblocked and the root
-   covers the succession; one fenced column or one per
-   message, since a reader must tell which message a
-   hoisted line left; the salts — how many, where each is
-   stored, and what mints them (core Postgres has
-   `gen_random_uuid()`; `gen_random_bytes` is an
-   extension); the byte encoding of the envelope under
-   `pair_hash`; the hash columns' type — `sha256()`
-   yields `bytea`, today's are hex `text` under a `{64}`
-   check (`api/schema-postgres.ts:17-19`); whether the
-   envelope gains the
-   server-minted `request_id`, the per-request key
-   `operation_id` stops being; whether an in-order PUT
-   whose state is already the head answers 2xx, as
-   RFC 9110 §13.1.1 permits, or 412; which secrets
-   still ride a body (the token request's `code` and
-   `code_verifier`, the token exchange's `subject_token`
-   and `actor_token`, any password a body still carries)
-   and whether each moves to a credential line; and the
-   seed's batch size, a named constant measured against
-   the statement cap — the driver's multi-row helper
-   already serves under item 2's `fetch_types: false`
-   (measured: 5,000 pairs in ten statements, and a failed
-   batch left no table); and how a seed keeps a chain's
-   order — members in successive batches, or a rank on
-   the one clock. The DDL is
+   (`api/backend-postgres.ts:107-113`). The DDL is
    final when this item ships, but for `schema_marker`,
    which item 3 retires. Today falls short on every count:
    `request` keeps six header names
@@ -299,9 +365,22 @@ skew tests, which went with item 8's trio.
    PBKDF2 and names a column that is not there (owner
    call); and the two ids, each with one source.
    `request-id` names one wire request: the server mints
-   it, always, returns it in every response, and accepts
-   none — a `request-id` a client sends is one more stored
-   header line, read by nothing. Today the server takes
+   it, always, returns it in every response, and refuses
+   one: a request that carries `request-id` answers 400
+   and lands nothing, on every route, so no client's id
+   is ever answered with another in silence — the gate
+   refuses what it will not honor, as it requires the
+   `operation-id` only the client mints. The store ships
+   `fa_request_id_of(response)`, an `IMMUTABLE` extractor
+   of the `request-id` line — a function of the bytes,
+   as `message_body` is today
+   (`api/schema-postgres.ts:31-46`) — and an index over
+   it, `fa_message_pairs_request_id`, so a pair is found
+   by `request-id` through the index with the id in one
+   place, under the root through its leaf, and no
+   column repeats it; nothing reads it yet, and item 6's
+   log join is its first reader. Today the
+   server takes
    the client's when it is valid and mints one otherwise
    (`incomingContext`, `api/request-context.ts:66-71`),
    answers 400 to a malformed one on an authenticated
@@ -367,7 +446,9 @@ skew tests, which went with item 8's trio.
    from a head is in-order: a PATCH or a state-changing
    POST carries `If-Match` naming the head it read, its
    sibling names that head, a missing latch answers 428
-   at the gate (RFC 6585 §3), and a refused sibling — the
+   at the gate (RFC 6585 §3), a field its writer may not
+   change (`api/attribute-acl.ts:43`) answers 403 at the
+   gate and lands nothing, and a refused sibling — the
    index's, when two derive from one head — refuses the
    whole statement and answers 412, after which the
    client resends from a fresh read, as the retries
@@ -381,24 +462,37 @@ skew tests, which went with item 8's trio.
    holds the latch. A PATCH or POST that would leave
    the head's state unchanged stores nothing at all, as
    item 0's PUT does: neither its own pair nor a sibling
-   lands. Today a no-op claim still stores its pair
+   lands, and it answers 200 with the head's unit, as that
+   PUT does. Today a no-op claim still stores its pair
    (`api/routes.ts:1919-1923`) and a no-op PATCH appends a
    version and answers 201
    (`tests/api-instances-create.test.ts:578-614`).
    Sameness is judged on responses — the candidate
-   response body against the head's response body — never
+   response body against the head's response body, whole
+   against whole, never a projection — never
    on the stored request bodies the check reads today
    (`api/api.ts:1341`). A sibling PUT is synthesized —
    nothing was received for it and nothing sent — so its
    `request` is zero bytes and its `response` is the
-   message a read of it will serve, formed by the handler
+   message a read of it will serve, formed whole by the
+   handler
    in the same statement: its own status line, `date`
    spliced from its own stamp as every pair's is, `etag`
-   naming itself, the two ids, and the state as body —
-   for a PATCH usually the wire's own bytes, for
-   authorize's code document (item 0) and the token
-   grant's `tokens/:jti` a message the wire never
-   carried; and the handler mints both ids, so nothing
+   naming itself, its `request-id` and `operation-id`,
+   `content-type` and
+   `content-length`, and the WHOLE state as body — every
+   field, whatever its writer may read, as the
+   document's validator orders it with `id` last, so a
+   read adds nothing — for a PATCH usually the wire's
+   own bytes, for authorize's code document (item 0)
+   and the token grant's `tokens/:jti` a message the
+   wire never carried, the token document's issued,
+   rotated, and revoked events each landing the whole
+   state so the fold that resolves them
+   (`api/derive-identity-tokens.ts:14-26`) retires; the
+   requester's own response is that message projected
+   (below); and the handler mints both pairs' ids, so
+   nothing
    looks
    the sibling up afterward (item 0 retires
    `revisionMessagePairIdForPatch`). The PATCH revision
@@ -423,18 +517,38 @@ skew tests, which went with item 8's trio.
    `operation_id` both carry
    (`api/derive-flows.ts:257-263`, `:289-302`). A read
    hands out the stored
-   response whole: a document GET is the stored bytes with
+   response whole, and a DELETE head answers a document
+   GET 404 and yields no part, as today's
+   `WHERE method = 'PUT'` already does
+   (`api/backend-postgres.ts:544`): a document GET is the
+   stored bytes with
    three substitutions — the status line (201 → 200),
    `date`, and `request-id`, the lines that describe this
    transmission; `etag`, `content-type`, the body, and the
    `operation-id` of the write that made the state stay —
    made by ONE function on the head, the body
-   bytes untouched; a collection GET is `multipart/mixed`,
+   bytes untouched but for one projection: a document
+   whose fields carry read roles
+   (`api/attribute-acl.ts:33`) is served with the fields
+   this reader may read, by that same function, the
+   only place a body is ever transformed, and every
+   projection of one head carries the head's `etag`,
+   which names the state the client acted on — what
+   `If-Match` needs — and is safe under `no-store`;
+   a collection GET is `multipart/mixed`,
    each part an `application/http; msgtype=response` unit
-   with the same three substitutions, so one head is one
+   with the same three substitutions and the same
+   projection, so one head is one
    unit from either source. The boundary is a fresh
-   identifier per response, so no part can contain it, and
-   the client's rebuild owns the splitter. Measured on the
+   UUID minted per response — 36 characters of
+   RFC 2046 §5.1.1's alphabet, under its 70 — so a part
+   holds it only by chance, one in 2^122 at a position,
+   which no joiner scans for, and the joiner and the
+   splitter live
+   in `shared/http-message`, beside the parser every
+   part goes through: one library for both sides, and
+   the client's only dependency outside its own
+   directory. Measured on the
    mock data against today's arrays of bare bodies, a part
    costs 293 bytes, 215 of them the stored response's own
    lines: lists grow 33% in all — a tenth for large
@@ -450,13 +564,17 @@ skew tests, which went with item 8's trio.
    history, gating nothing. Derivation is head selection;
    whatever still needs a body reads it in place from the
    unit, never from `request`. A collection's heads come
-   from a skip walk of `message_pairs_document` — a
+   from a skip walk of `fa_message_pairs_document` — a
    recursive query that asks the index for the next name
    after the last, then one head read per name — one
    probe per document, where today's `DISTINCT ON`
    (`api/backend-postgres.ts:523-547`) reads every entry
    at the path, so its cost is every version of every
-   document there. Measured on 18.6, owner on the bare
+   document there. The walked heads are then sorted by
+   `response_at, id`, the order today's read serves
+   (`api/backend-postgres.ts:545`) — a small set — so the
+   contract and the memory backend stay as they are.
+   Measured on 18.6, owner on the bare
    table, 300-byte responses, medians of seven: 200
    documents at 10 / 250 / 2,500 versions read 0.51 /
    30.63 / 130.71 ms today and 1.11 / 1.43 / 1.93 ms by
@@ -469,9 +587,40 @@ skew tests, which went with item 8's trio.
    the memory backend is untouched. The API client keeps
    each
    response whole, and pages and presenters read from the
-   unit they were given; the packageable-client bullet on
-   the critical functionality path draws its boundary in
-   this rebuild. ARCHITECTURE.md gains a NAMED COVENANT,
+   unit they were given; the packageable client closes
+   in this rebuild, since the rebuild touches every file
+   its three couplings name: `web-app/app/adapters/` is
+   the client in all but boundary — one transport facade
+   (`http-facade.ts`), a `RequestContext` passed first
+   (`shared.ts`), per-noun adapters named by HTTP verb,
+   57 files and about 10,000 lines — and it imports the
+   server (37 files reach into `api/` for types, errors,
+   and header names — `OPERATION_ID_HEADER` from
+   `api/message-pair.ts`, `REQUEST_ID_HEADER` from
+   `api/request-context.ts`, `MissingTableError` from
+   `api/db.ts` — so the wire contract moves to
+   `shared/`, which never imports `api/`), imports the
+   app (24 files reach into `web-app/app/` — the facade
+   navigates to the login page on a failed refresh
+   (`web-app/app/adapters/http-facade.ts:286-292`), and
+   `shared.ts` redirects, logs, and records page request
+   profiles — so navigation, logging, and profiling are
+   handed in at construction), and holds a singleton
+   (`facade-holder.ts` keeps one module-level facade, so
+   two origins or two sessions cannot coexist; the
+   facade becomes an instance its caller owns); the
+   barrel (`web-app/app/adapters/index.ts`) re-exports
+   API nouns beside clipboard, viewport, location, and
+   resize-observer adapters, and the client's barrel
+   exports the client alone; three raw fetches bypass
+   the facade (item 0's rides-along names them), and
+   auth recovery lives at two layers (the retries
+   bullet on the critical functionality path); the
+   rebuilt client imports nothing from `api/` or the
+   app, and its oracle is a test that walks the client
+   entry point's import graph and finds no module
+   outside the client's directory and `shared/`.
+   ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
    and today the facade's `GETWithEtag` and `PUTWithEtag`
@@ -483,13 +632,18 @@ skew tests, which went with item 8's trio.
    response message: for a received request, the message
    handed to the wire; for a sibling PUT, which received
    nothing and sent nothing, the message a read of it
-   serves. A read serves those stored
+   serves before the substitutions below. A read serves
+   those stored
    bytes with exactly three substitutions — the status
    line, `date`, and `request-id`, the lines that describe
    this transmission — made by ONE function on the head;
    `etag` and `operation-id` stay, naming the state and
    the write that made it; the body
-   bytes are never touched. A list is whole responses:
+   bytes are never touched, except that a document
+   whose fields carry read roles is projected to the
+   fields the reader may see, by that same function,
+   the only place a body is ever transformed. A list is
+   whole responses:
    `multipart/mixed` of
    `application/http; msgtype=response` parts, each the
    unit a document GET serves. Nothing parts a response
@@ -522,20 +676,14 @@ skew tests, which went with item 8's trio.
    `api/message-pair.ts:606-636`); a collection GET
    dismantles every head into an array of bodies
    (`entitiesOf`, `api/message-store.ts:59-68`); and the
-   client receives bare JSON. The brainstorm settles:
-   whether the packageable client ships inside this item
-   or as its bullet after, since this item rebuilds the
-   facade either way; the per-route audit — which POSTs
-   change state and gain `If-Match`, which are read-only
-   conveniences, and what each PUT response must say for
-   its readers; the sibling messages the wire never
-   carried, the token grant's `tokens/:jti` and
-   authorize's code document; the multipart boundary's
-   form and the client splitter's home; and the
-   collection read's order — the skip walk yields names
-   in name order, today's read orders heads by stamp
-   (`api/backend-postgres.ts:545`), and pages may lean on
-   either. Follows item 0.
+   client receives bare JSON. The per-route audit —
+   which POSTs change state and gain `If-Match`, which
+   are read-only conveniences, and what each PUT
+   response must say for its readers — is the spec's
+   first section, written from the code as item 0
+   leaves it. Merged: the API client, packageable (the
+   critical functionality path), which keeps its
+   oracle. Follows item 0.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
@@ -615,7 +763,8 @@ skew tests, which went with item 8's trio.
    SQL (measured). The mock data cannot judge this: 577 of
    its 578 documents have one version. `EXPLAIN` and
    `./bin/measure` prove the head read stays on
-   `message_pairs_document`. The memory backend hides the
+   `fa_message_pairs_document`. The memory backend hides
+   the
    same pairs in TypeScript. Item 7's profile can be
    removed on its own only as its own document: keys on
    the seat body would hide the seat's whole history. The
@@ -640,7 +789,7 @@ skew tests, which went with item 8's trio.
    (measured, postgres.js 3.4.9), so
    `api/postgres-client.ts` sets it; product SQL passes no
    arrays today. After the reduction a member of `fa_api`
-   connects, uses the schema, inserts through its view,
+   connects, uses the schema, inserts into the table,
    reads its unfenced columns, and may LISTEN and NOTIFY,
    which are commands and not grants — nothing else. One
    owner verb, `migrate`, makes a cluster and its database
@@ -655,8 +804,11 @@ skew tests, which went with item 8's trio.
    owner transaction of its change, item 3's full check,
    and its document's genesis — and lands nothing where
    the two sets already match; where it does not,
-   it says seed is next; and it says which steps it lacked
-   the power for. The schema's objects die with the
+   it says seed is next; and, as `check` does, it
+   verifies the four superuser revokes below and names
+   which PUBLIC still holds — information, never drift,
+   since the owner cannot make them. The schema's
+   objects die with the
    schema, so seed builds the fence inside its one
    transaction — one fence function, two callers — and
    wipe drops it and leaves the roles. Two steps stay with
@@ -666,7 +818,10 @@ skew tests, which went with item 8's trio.
    image's `POSTGRES_USER` is always a superuser
    (measured), so compose has such a login, `fa_root`,
    and `fa_api`
-   must never be it. Each verb reads `FA_POSTGRES_URL`
+   must never be it; a host that offers no superuser
+   keeps the four as its recorded seam, since none of
+   them touches what the fence guarantees, and serves.
+   Each verb reads `FA_POSTGRES_URL`
    from its own environment and only the value differs:
    `serve` gets a member of `fa_api`; `seed`, `wipe`,
    `migrate`, and `check` get a member of `fa_owner`. The
@@ -697,10 +852,7 @@ skew tests, which went with item 8's trio.
    verbatim auth messages" and "Erased PII persists as
    superseded pairs" are reworded, not closed: the bytes
    persist in the owner-only ledger, and `fa_api` reads
-   none of them. The brainstorm settles:
-   whether the four superuser revokes are the verb's or
-   the deployment's; and what boot does on a host that
-   offered no superuser for them. Today: one role,
+   none of them. Today: one role,
    `fusion`, owns and reads everything, and compose,
    `./deploy --local`, `bin/test-postgres`, and the tests
    all assume that one login (`compose.yaml:2,8`,
@@ -718,14 +870,27 @@ skew tests, which went with item 8's trio.
    canonical form, hash tree, succession index, and head
    read (item 0) — in the collection `/migrations/`, named
    for what it does behind a four-digit order,
-   `0001-bootstrap` first, that the owner writes and no
+   `0000-root` (item 0's root) then `0001-bootstrap`,
+   that the owner writes and no
    route serves; one document with successors would hold
    the same history under a name that hides it. A
    migration's `request` is the SQL that ran —
    the whole definition for `0001-bootstrap`, the drops
-   and the new fence for a later one — and its `response`
+   and the new fence for a later one — as the body of a
+   PUT `fa_owner` writes, its requester as the root's,
+   whose `user-agent` line names the build that ran
+   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
+   `FA_GIT_SHA` supplies, its bullet in `## Later work`),
+   provenance the owner's `check` can report and
+   never the key; and its `response`
    is the digest of its fixed SQL, DDL and DML
-   alike: the root row's insert and the grants count, and
+   alike — `sha256` over the request body alone, the SQL
+   exactly as the binary holds it, UTF-8, statements in
+   run order joined as the module joins them, no
+   normalization, hex in the response body, so boot
+   digests its own strings the same way and the root's
+   is the digest of zero bytes —
+   the root row's insert and the grants count, and
    a seed's data pairs, which are parameters and vary by
    mode, do not. Item 2's fence does the rest: `fa_api`
    reads the digest and is refused the SQL, as it is every
@@ -737,7 +902,7 @@ skew tests, which went with item 8's trio.
    No route ever executes a body's SQL: that would put the
    owner's credential in the serving process and turn
    every authorization mistake into the owner's SQL. Seed
-   lands `0001-bootstrap`, a genesis, in its
+   lands the root and `0001-bootstrap`, a genesis, in its
    one transaction (item 0). A later migration is one
    owner transaction — the change, the full check, and
    the genesis of its own document, in item 0's
@@ -780,7 +945,9 @@ skew tests, which went with item 8's trio.
    catalog reads revoked (measured), and refuses to serve
    if it can read `request` or the credential column,
    update, delete, or
-   make temporary objects. And it reads the
+   make temporary objects — the rights the owner
+   controls; the four superuser revokes it never
+   checks. And it reads the
    `/migrations/` heads — a collection read (item 1) — and
    compares their names and digests with the migrations
    its binary carries, refusing to serve on any
@@ -798,8 +965,14 @@ skew tests, which went with item 8's trio.
    policies, and what PUBLIC holds —
    compares it to what the binary's migrations, applied
    in name order, declare, and
-   names the drift, and walks every succession to name a
-   pair stamped before its predecessor (item 0). The
+   names the drift; walks every succession to name a
+   pair stamped before its predecessor (item 0) and a
+   `supersedes` that names no row — none until the
+   eraser ships, and each one an erasure pair must name
+   after; and recomputes every root and every leaf the
+   owner can see, to name a pair whose digests no longer
+   match — a digest no reader recomputes is the dropped
+   `version` column again (the signed-ledger bullet). The
    expected list lives beside the
    DDL, and a digest lands only after the check passes, in
    the same transaction, so every seed proves the list
@@ -829,8 +1002,7 @@ skew tests, which went with item 8's trio.
    document has succession like any other, so a rollback
    can land as its DELETE head and a later system can
    annotate it without rewriting it — that bullet's to
-   settle. The brainstorm settles: the digest's exact
-   input; and what item 2 left open.
+   settle.
    Today: boot gates on
    the marker row (`assertSchemaMarker`,
    `server/postgres-gate.ts:67`, called at
@@ -912,7 +1084,9 @@ skew tests, which went with item 8's trio.
    object, and an
    error as three values (the Office of Structured
    Observability wants one document with level, message,
-   and request identity). One request clock, read once
+   and request identity, and never a credential line:
+   item 0's hoist is the store's rule, and the log is a
+   second writer). One request clock, read once
    at arrival and carried in the context: the request
    log stamps `Date.now()` at accept
    (`server/http-server.ts`) while `request_at` is
@@ -931,7 +1105,10 @@ skew tests, which went with item 8's trio.
    contractor seat elsewhere appears there as
    "contractor": the document shape (keys on the seat
    body, or a nested facet under the seat mirroring
-   `identities/:id/pii` — the brainstorm decides), its
+   `identities/:id/pii` — the brainstorm decides, under
+   item 2's rule that a profile removable on its own is
+   its own document, since keys on the seat body would
+   hide the seat's whole history), its
    validator, derive, seed, the roster and detail reads,
    and the Members page's edit. Replaces the
    one-profile-per-identity covenant at
@@ -1051,7 +1228,7 @@ skew tests, which went with item 8's trio.
     loop guard and a spend ceiling for a cycle whose
     every node is an AI seat; record content treated as
     data, never as instruction. Consumes items 9, 10, and
-    10. Merged: roster seat naming an AI agent
+    11. Merged: roster seat naming an AI agent
     (`tests/family-registry.test.ts:111-119`);
     FLOW-CANVAS.md's display-only AI checkboxes
     (`## Members and attributes`).
@@ -1064,10 +1241,10 @@ skew tests, which went with item 8's trio.
     the comment there when done). Then two replicas
     behind Render's balancer, each answering item 4's
     probe; LISTEN in each (item 9 is per process by
-    construction); advisory locks already cluster-wide;
-    the throttle's per-process counters named as a known
-    cost or moved to the store; a Postgres plan with a
-    standby and a rehearsed failover. Closes KNOWN seam
+    construction); the throttle's per-process counters
+    named as a known cost or moved to the store; a
+    Postgres plan with a standby and a rehearsed
+    failover. Closes KNOWN seam
     "Single mint process" and retires ARCHITECTURE.md's
     "do not run two replicas". Consumes items 4, 6, 9,
     and the examination report's lock and growth findings
@@ -1144,39 +1321,6 @@ Off the critical path; each with its oracle.
   panel under Auto Fit and switch it back off; zoom
   in once and click empty canvas — each red today,
   green once its door resets the save
-- The API client, packageable — `web-app/app/adapters/` is
-  the client in all but boundary: one transport facade
-  (`http-facade.ts`), a `RequestContext` passed first
-  (`shared.ts`), and per-noun adapters named by HTTP verb,
-  57 files and about 10,000 lines. Three couplings keep it
-  inside the app. It imports the server: 37 of the 57
-  files reach into `api/` for types, errors, and header
-  names — `OPERATION_ID_HEADER` from
-  `api/message-pair.ts`, `REQUEST_ID_HEADER` from
-  `api/request-context.ts`, `MissingTableError` from
-  `api/db.ts` — so the wire contract moves to `shared/`,
-  which never imports `api/`. It imports the app: 24 files
-  reach into `web-app/app/` — the facade navigates to the
-  login page on a failed refresh
-  (`web-app/app/adapters/http-facade.ts:286-292`), and
-  `shared.ts` redirects, logs, and records page request
-  profiles — so navigation, logging, and profiling are
-  handed in at construction. It holds a singleton:
-  `facade-holder.ts` keeps one module-level facade, so two
-  origins or two sessions cannot coexist; the facade
-  becomes an instance its caller owns. The barrel
-  (`web-app/app/adapters/index.ts`) re-exports API nouns
-  beside clipboard, viewport, location, and
-  resize-observer adapters; the client's barrel exports
-  the client alone. Three raw fetches bypass the facade
-  (item 0's rides-along names them), and auth recovery
-  lives at two layers (the retries bullet below). Item 1
-  rebuilds the facade to keep each response whole, which
-  is the moment to draw the boundary: the rebuilt client
-  imports nothing from `api/` or the app. Oracle: a test
-  that walks the client entry point's import graph and
-  finds no module outside the client's directory and
-  `shared/`
 - API retries, unified — the client resends by two
   unrelated mechanisms spread across its files, and leaves
   the commonest failures unhandled. Contention: flow PUT
@@ -1232,7 +1376,7 @@ Off the critical path; each with its oracle.
   and view `fa_*` (item 0 renames the table and its
   indexes; item 2 creates its roles and views under the
   prefix). Product code reads
-  six names, and every reader is ours — `POSTGRES_URL`,
+  six names of its own — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
   (`server/boot.ts:59-72`; the URL again at
   `server/postgres-seed.ts:68` and
@@ -1250,6 +1394,13 @@ Off the critical path; each with its oracle.
   Render CLI's `RENDER_API_KEY`, which `deploy:191` and
   `bin/postgres-seed:154` fill from their own argument; a
   dependency that ever dictates a name gets its adapter.
+  One dictates today: postgres.js reads sixteen `PG*`
+  names as option defaults — `PGPORT`, `PGSSL`,
+  `PGIDLE_TIMEOUT`, and their kin — and `bin/build:100-104`
+  grants the binary exactly those, so not every reader is
+  ours until `api/postgres-client.ts` passes every option
+  and the grants go, or `PG*` is named a third edge — the
+  brainstorm settles which.
   Today's role and database are both `fusion`
   (`compose.yaml:2,8-9`, `deploy:171`,
   `bin/test-postgres:22`). Ships no later than the deploy
@@ -1257,8 +1408,13 @@ Off the critical path; each with its oracle.
   configure, so they rename once. The brainstorm settles
   how far "infrastructure" reaches: the database name,
   compose's service and container names, the hosted
-  service names, and the test-only `CHROME` and
-  `CHROME_DEBUG_URL`. Oracle: `env | grep FA_` lists
+  service names, the test-only `CHROME` and
+  `CHROME_DEBUG_URL`, and the scripts' and tests'
+  `FUSION_ANGLE_STATIC_ROOT` (`bin/test-browser:38`,
+  `tests/browser/fixtures.ts:58`),
+  `MOST_RECENTLY_VALIDATED_SHA_PATH`, and
+  `WORKING_TREE_PORCELAIN` (`test:239`, `:243`), which
+  the oracle reaches. Oracle: `env | grep FA_` lists
   everything the system needs, and a test finds every
   environment read in product code and scripts and fails
   on a name without the prefix outside the two edges
@@ -1305,16 +1461,6 @@ Off the critical path; each with its oracle.
   insert-threshold behavior on the insert-only table. Oracle:
   numbers in the sweep's JSON and a backup-size line item 6
   can plan against.
-- Schema evolution. `CREATE … IF NOT EXISTS` plus a boolean
-  `schema_marker` is the whole migration story: a DDL change
-  reaches a database only by wipe and reseed, which the
-  `timestamptz` stamps needed and production's mock data
-  allowed. Name how a column change reaches a tenant database
-  that cannot be wiped — a versioned marker and forward-only
-  steps, or a rebuild through the seam's `append` — before the
-  first tenant holds real data. Oracle: a Layer-2 case that
-  boots the executable against a schema one step behind and
-  reads and writes a pair.
 - Stamp parameters stay text until Postgres parses
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
@@ -1333,18 +1479,6 @@ Off the critical path; each with its oracle.
   37-38`; examination report). Oracle: the sort
   helper takes the same string the keyed path does;
   a missing stamp throws
-- Gate Operation-ID non-reuse. The client mints one
-  Operation-ID per write (`writeHeaders` in
-  `web-app/app/adapters/shared.ts`); API.md item 3
-  says an Operation-ID names one write and is never
-  reused except a byte-identical retry. The server
-  does not enforce it: `operation_id uuid NOT NULL`
-  has no uniqueness (`api/schema-postgres.ts:23`),
-  and a read by operation id is neither a collection
-  nor a document read. Oracle: a second, different
-  request with a spent Operation-ID is 400; a
-  byte-identical retry still 200s; a PATCH and its
-  revision pair still share one id
 - Wipe and reseed live databases onto the exact-read
   shapes. Spec Decision 8: invitation `state` on the
   head, PII at `('/identities/<id>/', 'pii')`, token
@@ -1503,7 +1637,7 @@ Off the critical path; each with its oracle.
   messages where they are stored and verifies them;
   signing is what remains. The dropped `version` column
   hashed on write and was never checked on read —
-  `SCHEMA.md` item 4
+  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`
 - ACL-editing UI for record attributes (`read_roles` /
   `write_roles`) — R21's restricted branches are
   seed-produced today; setting an ACL is
@@ -1568,7 +1702,11 @@ Off the critical path; each with its oracle.
   but this branch saw `tests/ideas-empty-subscribe.test.ts`
   fail three times under `--parallel` (the file itself
   untouched; `BroadcastChannel` is process-global) and
-  `tests/adapters-flow-stats.test.ts` fail once, so the
+  `tests/adapters-flow-stats.test.ts` fail once, and
+  `ledger-decisions` saw the ideas file fail a fourth
+  and a fifth time, TODO.md its only change and a
+  second gate
+  running beside it, so the
   fixed count still proves less than it reads as proving;
   the ideas comment still says its drain matches the
   post-bell assert, which 90f5c722 turned into a deadline
@@ -2493,17 +2631,17 @@ Off the critical path; each with its oracle.
   above the budgets' noise — the item activates on that
   number, not before.
 - Simulated latency by environment — when
-  `FUSION_ANGLE_ENVIRONMENT` is exactly `local` and
-  `FUSION_ANGLE_LATENCY` is a millisecond count,
+  `FA_ENVIRONMENT` is exactly `local` and
+  `FA_LATENCY` is a millisecond count,
   both present and non-empty, every API request
   takes the existing log-normal sampler
   (`api/latency.ts:18-40`) with
-  `mu = ln(FUSION_ANGLE_LATENCY)`; otherwise the
+  `mu = ln(FA_LATENCY)`; otherwise the
   no-op. Merged: the shim's "both presets pass a
   no-op today" (`api/latency.ts:1-5`,
   `api/db-backed.ts:31-32` — revise both comments when
   done). Oracle:
-  `FUSION_ANGLE_LATENCY=200` under `local` lifts every
+  `FA_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
 - GPU flag in the Layer 2 launcher — `launchChrome`
@@ -2601,7 +2739,7 @@ Off the critical path; each with its oracle.
   and a wipe is no longer possible. The pieces already
   stand (item 3, measured): a migration is the genesis of
   its own document in `/migrations/`, named for what it
-  does behind a four-digit order, `0001-bootstrap` first,
+  does behind a four-digit order after item 0's root,
   landed by `migrate` with its SQL the `request` and
   its digest the `response`; names order migrations and
   item 0's index refuses a second runner, with no lock
@@ -2623,6 +2761,21 @@ Off the critical path; each with its oracle.
   and the loser's DDL gone; a second applies a table step
   to a database seeded from an older binary, and the new
   binary boots.
+- `FA_GIT_SHA` — the commit that built the running
+  binary, supplied by the environment as every `FA_`
+  value is and never defaulted, read once at boot and
+  carried in the context so every log line names the
+  build (the Office of Structured Observability), and
+  the one source of the `<sha>` in the `user-agent`
+  token items 0 and 3 send. `./deploy` fills it from
+  `git rev-parse HEAD`, exact because the build refuses
+  a dirty tree; on Render from the host's commit
+  variable (`RENDER_GIT_COMMIT`), a name that stays at
+  the edge (the naming bullet). How the page bundle
+  learns it — embedded at build, or served — is this
+  bullet's to settle. Oracle: a boot without it refuses,
+  as a boot without `FA_POSTGRES_URL` does, and a
+  request log line carries it
 
 ## Sequencing
 
