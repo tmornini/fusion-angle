@@ -1,10 +1,12 @@
 import { assertStrictEquals } from '@std/assert';
 import {
-    stays, useBrowser, withAdminPage, type Page,
+    stays, useBrowser, withAdminPage,
+    type Page, type Point,
 } from './fixtures.ts';
 import {
-    CANVAS, ONBOARDING, WRAP, openFlow,
-    doubleClick, nodeIdNamed, nodeSelector,
+    CANVAS, EDGE, LAYOUT_TEST, ONBOARDING, WRAP,
+    openFlow, doubleClick, edgeCount, edgeLabelSelector,
+    nodeIdNamed, nodeSelector,
 } from './canvas.ts';
 
 const browser = useBrowser();
@@ -17,6 +19,72 @@ const STAY_MS = 600;
 const PANEL_ABSENT =
     `document.querySelector('.flow-props-panel')`
     + ` === null`;
+const VIEWBOX_OF =
+    `document.querySelector('${CANVAS}')`
+    + `.getAttribute('viewBox')`;
+const ZOOM_IN = '[data-action="zoom-in"]';
+const DELETE_SELECTED = '[data-action="delete-selected"]';
+const EMPTY_INSET_PX = 20;
+
+// A canvas point with nothing under it: the four inset
+// corners, first empty one wins. A node or edge under
+// the point would make the click a selection, not the
+// empty-canvas case.
+async function emptyCanvasPoint(
+    page: Page,
+): Promise<Point> {
+    const svg = await page.rect(CANVAS);
+    const left = svg.x + EMPTY_INSET_PX;
+    const right = svg.x + svg.width - EMPTY_INSET_PX;
+    const top = svg.y + EMPTY_INSET_PX;
+    const bottom = svg.y + svg.height - EMPTY_INSET_PX;
+    const corners: Point[] = [
+        { x: right, y: top },
+        { x: left, y: top },
+        { x: right, y: bottom },
+        { x: left, y: bottom },
+    ];
+    for (const pt of corners) {
+        const isEmpty = await page.evaluate<boolean>(
+            `(() => {
+                const el = document.elementFromPoint(
+                    ${pt.x}, ${pt.y});
+                return el !== null
+                    && el.closest('${CANVAS}') !== null
+                    && el.closest(
+                        '[data-node-id], [data-edge-id]',
+                    ) === null;
+            })()`,
+        );
+        if (isEmpty) return pt;
+    }
+    throw new Error('no empty canvas corner');
+}
+
+// Zoom in once, then click empty canvas: the click
+// must leave the zoomed camera exactly where it was.
+async function assertEmptyClickKeepsZoom(
+    page: Page,
+): Promise<void> {
+    const before = await page.evaluate<string | null>(
+        VIEWBOX_OF,
+    );
+    await page.click(ZOOM_IN);
+    await page.until(
+        `${VIEWBOX_OF} !== ${JSON.stringify(before)}`,
+        'viewBox zoomed',
+    );
+    const zoomed = await page.evaluate<string | null>(
+        VIEWBOX_OF,
+    );
+    const pt = await emptyCanvasPoint(page);
+    await page.press(pt);
+    await page.release(pt);
+    assertStrictEquals(
+        await page.evaluate<string | null>(VIEWBOX_OF),
+        zoomed,
+    );
+}
 
 async function focusCanvas(page: Page): Promise<void> {
     await page.evaluate(
@@ -152,6 +220,37 @@ Deno.test(
                     ),
                     zoomed,
                 );
+            },
+        );
+    },
+);
+
+Deno.test(
+    'An empty-canvas click after deleting the open'
+    + ' edge keeps the zoomed viewBox (F29)',
+    async () => {
+        await withAdminPage(
+            browser.get(),
+            async (page, origin) => {
+                await openFlow(
+                    page, origin, LAYOUT_TEST,
+                );
+                await page.click(AUTO_FIT);
+                const label = edgeLabelSelector();
+                await page.waitFor(label);
+                const edges = await edgeCount(page);
+                await doubleClick(page, label);
+                await page.waitFor('.flow-props-panel');
+                await page.click(DELETE_SELECTED);
+                await page.until(
+                    `document.querySelectorAll('${EDGE}')`
+                    + `.length === ${edges - 1}`,
+                    'one fewer edge',
+                );
+                await page.until(
+                    PANEL_ABSENT, 'panel gone',
+                );
+                await assertEmptyClickKeepsZoom(page);
             },
         );
     },

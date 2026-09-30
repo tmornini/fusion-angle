@@ -410,6 +410,7 @@ async function handleDeleteSelectedEdge(
     commit(next, {
         advanceHistory: op.advanceHistory,
     });
+    closePanel();
     commitAndFit(
         pageState.presenter().withLayoutReconciled(),
     );
@@ -763,6 +764,17 @@ function commitAndFit(
 ): void {
     commit(next, opts);
     reconcileFitFromDom();
+}
+
+// A deleted selection leaves the panel nothing to show.
+// Close it through its transition, so the viewBox it
+// saved on open is restored and cleared here rather
+// than handed to the next empty-canvas click (F29).
+function closePanel(): void {
+    pageState.panelStateRef().open = false;
+    commit(
+        pageState.presenter().withPanelOpen(false),
+    );
 }
 
 function bindFlowNameEdit(
