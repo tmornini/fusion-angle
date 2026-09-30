@@ -3089,7 +3089,13 @@ opens and renders.)
        wheel path carries a test); tests/flow-fsm-reduce.test.ts
        'empty canvas click keeps a zoomed viewBox'
        (decides pointer-down + pointer-up on empty
-       canvas leaves viewBox and zoom untouched)
+       canvas leaves viewBox and zoom untouched);
+       tests/browser/canvas-pan.test.ts 'An empty-canvas
+       click after deleting the open edge keeps the
+       zoomed viewBox (F29)' and its node twin (decide
+       that deleting the open panel's selection closes
+       the panel, so the click restores no viewBox the
+       panel saved on open)
 - [ ] **F30** Edit a node name via the properties
   panel, wait 1 second for auto-save. Navigate
   away and return to the designer. PASS: all
