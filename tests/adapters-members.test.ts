@@ -10,7 +10,7 @@ import { deriveIdentityPii } from
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import {
-    HTTP_NOT_FOUND,
+    HTTP_GONE,
     RequestError,
 } from '../shared/http-errors.ts';
 import {
@@ -160,7 +160,7 @@ Deno.test('deleteHumanMemberSeat removes the seat', async () => {
         ),
     ) as Error;
     assert(err instanceof RequestError);
-    assertStrictEquals(err.status, HTTP_NOT_FOUND);
+    assertStrictEquals(err.status, HTTP_GONE);
     assertEquals(await deriveMembershipsForIdentity(db, id), []);
 });
 

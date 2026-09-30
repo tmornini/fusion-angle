@@ -207,7 +207,7 @@ async () => {
     assertStrictEquals(secondBody.at, second.at);
 });
 
-Deno.test('a seat DELETE-head is absent', async () => {
+Deno.test('a seat DELETE-head is Gone', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await handleRequest(
@@ -233,7 +233,7 @@ Deno.test('a seat DELETE-head is absent', async () => {
         }),
     );
     assertStrictEquals(del.status, 204);
-    const missing = await handleRequest(
+    const gone = await handleRequest(
         db,
         apiRequest({
             method: 'GET',
@@ -242,7 +242,7 @@ Deno.test('a seat DELETE-head is absent', async () => {
             token: DEV_TOKEN,
         }),
     );
-    assertStrictEquals(missing.status, 404);
+    assertStrictEquals(gone.status, 410);
 });
 
 Deno.test('stored PUT body equals the seat wire entity',

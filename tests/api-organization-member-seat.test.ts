@@ -348,7 +348,7 @@ async () => {
     const gone = await handleRequest(db, req(
         'GET', own, admin,
     ));
-    assertStrictEquals(gone.status, 404);
+    assertStrictEquals(gone.status, 410);
     // The seat that remains is now the last admin.
     const last = await handleRequest(db, req(
         'DELETE',

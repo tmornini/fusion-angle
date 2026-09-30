@@ -254,7 +254,7 @@ export function defineStoreAcceptance(
                 token,
             ),
         );
-        assertStrictEquals(got.status, 404);
+        assertStrictEquals(got.status, 410);
     });
 
     Deno.test(name + ': same-body PUT is 200', async () => {

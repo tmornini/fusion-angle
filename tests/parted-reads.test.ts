@@ -22,7 +22,6 @@ const PARTED = [
     'identities/:id/tokens/',
     'identities/:id/versions/',
     'identities/:id/versions/:etag',
-    'organizations/:id',
     'organizations/:id/flows/',
     'organizations/:id/flows/:id/records/',
     'organizations/:id/flows/:id/versions/',
@@ -54,7 +53,6 @@ const PARTED = [
     'organizations/:id/work-orders/:id/history',
     'organizations/:organization-id/former-members/',
     'organizations/:organization-id/members/',
-    'organizations/:organization-id/members/:identity-id',
     'organizations/:organization-id/members/:identity-id'
         + '/versions/',
     'organizations/:organization-id/members/:identity-id'

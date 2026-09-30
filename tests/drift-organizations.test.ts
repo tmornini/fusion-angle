@@ -172,10 +172,11 @@ async () => {
     // Phase Final Stage B: organizations table retired.
 });
 
-// ---- leg 2: :id wire equals derive for each seeded org -------
+// ---- leg 2: :id wire is the stored head for each seeded org --
 
-Deno.test('leg 2: the unfiltered collection + :id wire equals'
-+ ' derive for BOTH seeded organizations', async () => {
+Deno.test('leg 2: the unfiltered collection equals derive; :id'
++ ' wire is the stored head and equals derive by value, for'
++ ' BOTH seeded organizations', async () => {
     const db = await seededDb();
     const derivedAll = sortById(await deriveOrganizations(db));
     assertStrictEquals(derivedAll.length, 2);
@@ -195,10 +196,16 @@ Deno.test('leg 2: the unfiltered collection + :id wire equals'
         ));
         assertStrictEquals(res.status, 200);
         const wireText = await res.text();
-        const derived = await deriveOrganization(
-            db, organizationId,
+        assertStrictEquals(
+            wireText,
+            await storedPutBodyText(
+                db, '/organizations/', organizationId,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            JSON.parse(wireText),
+            await deriveOrganization(db, organizationId),
+        );
     }
     // Phase Final Stage B: organizations table retired.
 });

@@ -198,7 +198,8 @@ async () => {
 // -- 2. per-membership GET wire equals derive; DELETE tombstone
 
 Deno.test('per-seat GET wire equals derive (all 12); missing-'
-+ 'id 404; a DELETE-then-derive tombstone', async () => {
++ 'id 404; a DELETE-then-derive tombstone; a removed seat is'
++ ' Gone', async () => {
     const db = await seededDb();
     const allMemberships = sortById([
         ...await derivedMemberships(db, STARK_ORGANIZATION),
@@ -283,11 +284,10 @@ Deno.test('per-seat GET wire equals derive (all 12); missing-'
             'XXZruirZyAOoRpNxaDnpSA', target.organization_id,
         ),
     ));
-    assertStrictEquals(tombstoneRes.status, 404);
-    assertStrictEquals(
-        (await tombstoneRes.json() as { error: string }).error,
-        expectedTargetMessage,
-    );
+    assertStrictEquals(tombstoneRes.status, 410);
+    assertEquals(await tombstoneRes.json(), {
+        error: 'Gone: organization_members/' + target.id,
+    });
 });
 
 // -- 3. ai-members + human-members wire equals derive ----------

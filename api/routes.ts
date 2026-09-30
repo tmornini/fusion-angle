@@ -245,7 +245,6 @@ import {
 } from './derive-project-scores.ts';
 import {
     deriveOrganizationMemberSeats,
-    deriveOrganizationMemberSeat,
     deriveOrganizationFormerSeats,
     seatsPrefixFor,
     seatEntityOf,
@@ -279,7 +278,6 @@ import {
     type WorkOrderVersion,
 } from './work-order-version.ts';
 import {
-    deriveOrganization,
     deriveOrganizations,
     organizationEntityOf,
 } from './derive-organizations.ts';
@@ -5328,20 +5326,38 @@ export const routes: Route[] = [
     // Hand-written in place of makeIdRoute<OrganizationEntity>
     // so PUT can append its message pair — the factory's fixed
     // closures have no per-family pair selector (see
-    // message-pair.ts). GET reproduces the factory closure
-    // byte-equivalently; verbs stay {get, put}. organizations
+    // message-pair.ts). Verbs stay {get, put}. organizations
     // is DOCUMENT-class: a repeat PUT records Supersedes.
     // GLOBAL plane — no organization_id stamp (this table IS
-    // the tenant root). GET dispatches to deriveOrganization
-    // (api/derive-organizations.ts). A bespoke call, not the
-    // generic documentGetHandler(wiring): that machinery
-    // requires a wiring row's documentOp, and organizations has
-    // none. Phase Final Task 2: the organizations ROW half is
-    // stripped — pure message-plane write (postFlowTagDocumentOp
-    // shape). WRITE_RESPONSE_SPECS successBody forms the wire
-    // bytes via organizationEntityOf (id-first; GET wins).
+    // the tenant root). A bespoke selector, not the generic
+    // documentSelect(wiring): that machinery requires a wiring
+    // row's documentOp, and organizations has none. The gate's
+    // membership fence answers a foreign organization 403
+    // before this selector runs, so a miss here is genuine
+    // absence. Phase Final Task 2: the organizations ROW half
+    // is stripped — pure message-plane write
+    // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
+    // successBody forms the stored bytes via
+    // organizationEntityOf; GET serves them as stored.
     route('organizations/:id', {
-        get: (db, p) => deriveOrganization(db, param(p, 0)),
+        select: async (db, p) => {
+            const organizationId = param(p, 0);
+            const head = await db.messagePairs.getHeadPair(
+                canonicalPath(undefined, '/organizations/'),
+                organizationId,
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'organizations', organizationId,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'organizations', id: organizationId,
+                reader: { sees: 'whole' },
+            };
+        },
         put: postOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
@@ -5428,11 +5444,26 @@ export const routes: Route[] = [
             ),
     }),
     route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-        get: (db, p, _actor, organization) =>
-            deriveOrganizationMemberSeat(
-                db, requireOrganization(organization),
-                param(p, 1),
-            ),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const identityId = param(p, 1);
+            const head = await db.messagePairs.getHeadPair(
+                seatsPrefixFor(organizationId), identityId,
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'organization_members', identityId,
+                );
+            }
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'organization_members', id: identityId,
+                reader: { sees: 'whole' },
+            };
+        },
         put: (db, p, body, actor, messagePair) =>
             postMembershipDocumentOp(
                 db, param(p, 1), body, actor, messagePair,
