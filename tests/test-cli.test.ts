@@ -121,17 +121,18 @@ Deno.test(
     );
 });
 
-Deno.test('test-postgres mints PORT for compose parse',
+// compose-lib's mint and teardown are exercised through
+// bin/measure in tests/measure-wrapper.test.ts.
+Deno.test('test-postgres mints its stack through compose-lib',
 () => {
     const src = Deno.readTextFileSync('bin/test-postgres');
-    assertMatch(src, /export JWT_HMAC_SIGNING_KEY/);
-    assertMatch(src, /export POSTGRES_PASSWORD/);
-    assertNotMatch(src, /\$\{PORT:-/);
-    const inline = /export PORT=/.test(src);
-    const assign = /PORT=/.test(src)
-        && /export PORT\b/.test(src);
-    assert(
-        inline || assign,
-        'bin/test-postgres must export PORT',
+    assertMatch(src, /\. "\$BIN\/compose-lib"/);
+    assertMatch(src, /mint_compose_env 8080/);
+    assertMatch(
+        src,
+        /COMPOSE_PROJECT_NAME="fusion-test-postgres-\$\$"/,
     );
+    assertMatch(src, /trap compose_down_once EXIT INT TERM/);
+    assertNotMatch(src, /openssl rand/);
+    assertNotMatch(src, /docker compose -p/);
 });

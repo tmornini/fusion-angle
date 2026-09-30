@@ -10,32 +10,14 @@ if ! command -v docker >/dev/null; then
     exit 1
 fi
 
-POSTGRES_PASSWORD="$(openssl rand -hex 16)"
-JWT_HMAC_SIGNING_KEY="$(openssl rand -hex 32)"
-export POSTGRES_PASSWORD
-export JWT_HMAC_SIGNING_KEY
-# Compose parses the whole file, including server PORT.
+# shellcheck disable=SC1091
+. "$BIN/compose-lib"
 # This process never starts server; 8080 unblocks parse.
-export PORT=8080
-# Do not read an ambient POSTGRES_URL. Assign after
-# mint. Compose interpolates JWT at parse time.
-POSTGRES_URL="postgres://fusion:${POSTGRES_PASSWORD}"
-POSTGRES_URL="${POSTGRES_URL}@127.0.0.1:5432/fusion"
-export POSTGRES_URL
+mint_compose_env 8080
+export COMPOSE_PROJECT_NAME="fusion-test-postgres-$$"
+trap compose_down_once EXIT INT TERM
 
-PROJECT="fusion-test-postgres-$$"
-CLEANED=""
-cleanup() {
-    if [ -n "${CLEANED:-}" ]; then
-        return
-    fi
-    CLEANED=1
-    docker compose -p "$PROJECT" \
-        down --remove-orphans || true
-}
-trap cleanup EXIT INT TERM
-
-docker compose -p "$PROJECT" up -d --wait postgres
+docker compose up -d --wait postgres
 
 export SCHEMA_NAME="fusion_test_$(date +%s)_$$"
 DENO_PG_TEST=(
