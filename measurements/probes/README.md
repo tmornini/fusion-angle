@@ -77,6 +77,10 @@ Run from the repository root under the memory backend.
   `{}` as their response body.
 - `versions.ts` — item 2: the mock ledger's version depth
   per document.
+- `head-etag.ts` (2026-09-30) — item 1: whether every PUT
+  head's stored `etag` line names its own pair and carries
+  a body and a `content-type`, which a head read serves
+  as stored.
 
 ## store/ (2026-09-23)
 
