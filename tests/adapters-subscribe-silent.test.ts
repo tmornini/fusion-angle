@@ -32,10 +32,10 @@ Deno.test(
         g['document'] = { addEventListener: () => {} };
         try {
             const adapters = await import(
-                '../web-app/app/adapters/index.ts'
+                '../client/index.ts'
             ) as Record<string, unknown>;
             const { subscribeOnce } = await import(
-                '../web-app/app/channels.ts'
+                '../client/channels.ts'
             );
             const names = Object.keys(adapters)
                 .filter(name => /^subscribe\w+Changes$/.test(name))
@@ -59,7 +59,7 @@ Deno.test(
             }
         } finally {
             const { deleteNotificationChannel } = await import(
-                '../web-app/app/adapters/broadcast-channel.ts'
+                '../client/broadcast-channel.ts'
             );
             deleteNotificationChannel();
             delete g['window'];

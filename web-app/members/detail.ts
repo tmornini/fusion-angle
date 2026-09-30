@@ -35,9 +35,8 @@ import {
 import {
     RequestError,
     HTTP_NOT_FOUND,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import {
-    sessionContext,
     getHumanMember,
     getHumanMemberProfile,
     putHumanMember,
@@ -48,11 +47,14 @@ import {
     subscribeAIMemberChanges,
     getAdminSeatIds,
     deleteHumanMemberSeat,
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import {
     HumanMember,
     AIMember,
     type MemberPii,
     type IdentityPiiEntity,
-} from '../app/adapters/index.ts';
+} from '../../shared/types.ts';
 
 const { signal } = createPageAbort();
 

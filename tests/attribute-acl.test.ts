@@ -5,13 +5,13 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     ApiError,
     HTTP_FORBIDDEN,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import type { AttributeSchemaRow } from
-    '../api/record-constraints.ts';
+    '../shared/record-constraints.ts';
 import {
     assertWritableAttributeIds,
     projectReadableValues,

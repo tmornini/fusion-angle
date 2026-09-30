@@ -9,7 +9,7 @@ globalThis.document = {
 
 import { assertMatch } from '@std/assert';
 import { UnauthorizedError } from
-    '../api/http-errors.ts';
+    '../shared/http-errors.ts';
 import { handlePageLoadError } from
     '../web-app/app/page-loader.ts';
 

@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     buildSaveEvents,
     buildRevivals,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     buildFlowGraphDelta,
     buildFlowGraphRevivals,
@@ -11,7 +11,7 @@ import type {
     StoredGraph,
     GraphNode,
     GraphEdge,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 // Cross-consistency pin: api/flow-graph-diff.ts is the
 // sanctioned server twin of buildSaveEvents/buildRevivals

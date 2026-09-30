@@ -11,10 +11,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     organizationItem,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getObjectives,
@@ -28,7 +28,7 @@ import {
     postObjectiveArchival,
     postObjectiveReactivation,
     putObjectivePosition,
-} from '../web-app/app/adapters/objectives.ts';
+} from '../client/objectives.ts';
 import {
     computeNewPosition,
 } from '../web-app/app/drag-reorder-positions.ts';
@@ -40,7 +40,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 function ctxFor(db: MemoryDbAdapter) {
-    return createRequestContext(db, DEV_TOKEN);
+    return inPageContext(db, DEV_TOKEN);
 }
 
 // Seed an objective document: raw PUT

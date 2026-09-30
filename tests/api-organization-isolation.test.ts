@@ -16,7 +16,7 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import { SYSTEM_MEMBER_ID } from
-    '../api/types.ts';
+    '../shared/types.ts';
 import {
     seedIdentityCredential,
     seedPersonIdentity,

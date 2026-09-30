@@ -4,9 +4,9 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -17,15 +17,15 @@ import {
     postIdeaCreation,
     postIdeaStateChange,
     postIdeaConversion,
-} from '../web-app/app/adapters/ideas.ts';
+} from '../client/ideas.ts';
 import { getProjectEntity } from
-    '../web-app/app/adapters/projects.ts';
+    '../client/projects.ts';
 import {
     type IdeaEntity,
     type IdeaState,
     type ProjectEntity,
     type ProjectObjectiveBaselineScoreEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -33,8 +33,8 @@ import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
-import { FORMER_MEMBER_NAME } from '../api/types.ts';
+    '../client/members.ts';
+import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 
@@ -109,7 +109,7 @@ async () => {
         ctx, generateIdentifier(), ideaId, aliceId,
         '2026-04-01T00:00:00.000000Z',
     );
-    const memberCtx = createRequestContext(
+    const memberCtx = inPageContext(
         db, await organizationToken(aliceId),
     );
     const result = await getIdeas(memberCtx);
@@ -438,7 +438,7 @@ Deno.test('getIdeas resolves every seeded submitter in'
     const db = await seededMockDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken('XXZruirZyAOoRpNxaDnpSA'
                 , organization));
         const ideas = await getIdeas(ctx);
@@ -477,7 +477,7 @@ Deno.test(
     'getIdeas survives B28 removing a seeded submitter (D1)',
     async () => {
         const db = await seededMockDb();
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db,
             await organizationToken(
                 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,

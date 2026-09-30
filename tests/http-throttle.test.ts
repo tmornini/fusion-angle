@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { HTTP_TOO_MANY_REQUESTS } from
-    '../api/http-errors.ts';
+    '../shared/http-errors.ts';
 import {
     listenHttp,
     type HttpListener,

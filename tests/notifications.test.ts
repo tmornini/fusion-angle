@@ -3,7 +3,7 @@ import {
     identityTargetsFor,
     notificationEventFromWire,
     type NotificationEvent,
-} from '../api/notifications.ts';
+} from '../shared/notifications.ts';
 
 Deno.test('an identities route targets the path identity', () => {
     assertEquals(

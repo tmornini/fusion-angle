@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type {
     Id, IdentityDefaultOrganizationEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import { pickString } from './validators.ts';
 import {
     deriveDocumentsAt,

@@ -15,8 +15,8 @@ import {
     organizationToken,
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { ValidationError } from '../api/types.ts';
-import type { ObjectiveEntity } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
+import type { ObjectiveEntity } from '../shared/types.ts';
 import {
     EntityNotFoundError,
 } from '../api/db.ts';

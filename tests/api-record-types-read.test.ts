@@ -10,7 +10,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from
-    '../api/types.ts';
+    '../shared/types.ts';
 import {
     postRecordDocumentOp,
 } from '../api/routes.ts';

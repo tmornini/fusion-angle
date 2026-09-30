@@ -6,22 +6,24 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { subscribeOnce } from '../app/channels.ts';
+import { subscribeOnce } from '../../client/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
-    createRequestContext,
-    sessionContext,
     getProjects,
-    getProjectsScoreColumn,
     putProjectPosition,
-    isProjectState,
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
     subscribeObjectiveChanges,
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import type { RequestContext } from '../../client/request-context.ts';
+import {
+    isProjectState,
     type Project,
-} from '../app/adapters/index.ts';
+} from '../../shared/types.ts';
+import { getProjectsScoreColumn } from '../app/scoring-aggregate.ts';
 import {
     ProjectListPresenter,
     buildInitialProjectListState,
@@ -47,7 +49,7 @@ let projectBadgesEl: HTMLElement | null = null;
 let projectSortControlsEl: HTMLElement | null = null;
 
 async function loadScoreMap(
-    ctx: ReturnType<typeof createRequestContext>,
+    ctx: RequestContext,
 ): Promise<Map<string, ScoreRow>> {
     const scoreColumn =
         await getProjectsScoreColumn(ctx);
@@ -105,7 +107,7 @@ export async function init(): Promise<void> {
 async function onProjectsLoaded(
     projects: Project[],
     listEl: HTMLElement,
-    ctx: ReturnType<typeof createRequestContext>,
+    ctx: RequestContext,
 ): Promise<void> {
     // scoreMap already filled by the boot fetch wave.
     // ctx is retained for the drag-reorder / subscriber

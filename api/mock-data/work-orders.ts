@@ -2,10 +2,10 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import { daysFromNow } from './seed-kit.ts';
 import { buildFlows } from './flows.ts';
 

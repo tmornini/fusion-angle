@@ -7,18 +7,22 @@ import {
     type WorkOrder,
     type TransitionEvent,
     type StateFieldValue,
-    type WorkOrderFlowGraph,
-    type GraphNode,
-    type GraphEdge,
-    type NodeAttribute,
     type RecordAttribute,
     type HistoryEntry,
     type HistoryFieldValue,
     type ClaimStatus,
+} from '../../../client/index.ts';
+import {
     type ConstraintViolation,
-} from '../adapters/index.ts';
-import type { Member } from '../adapters/index.ts';
-import type { Id } from '../../../api/types.ts';
+} from '../../../shared/record-constraints.ts';
+import {
+    type WorkOrderFlowGraph,
+    type GraphNode,
+    type GraphEdge,
+    type NodeAttribute,
+} from '../../../shared/types.ts';
+import type { Member } from '../../../shared/types.ts';
+import type { Id } from '../../../shared/types.ts';
 import {
     ICON_SIZE,
     iconArrowLeft,
@@ -26,7 +30,7 @@ import {
 } from '../icons.ts';
 import {
     formatViolation,
-} from '../../../api/record-constraints.ts';
+} from '../../../shared/record-constraints.ts';
 
 const ATTRIBUTE_HTML_TYPE: Record<
     string,

@@ -4,11 +4,11 @@ import {
     storedGraph,
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     asStoredGraph,
     asWorkOrderFlowGraph,
-} from '../api/validators.ts';
+} from '../shared/flow-graph-body.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 

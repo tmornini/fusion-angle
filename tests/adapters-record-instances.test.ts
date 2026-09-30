@@ -7,9 +7,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedCurrentMember,
@@ -19,7 +17,7 @@ import {
 } from './test-fixtures.ts';
 import {
     postRecordChange,
-} from '../web-app/app/adapters/records.ts';
+} from '../client/records.ts';
 import {
     getRecordInstances,
     getRecordInstance,
@@ -27,11 +25,11 @@ import {
     patchRecordInstance,
     deleteRecordInstance,
     getRecordInstanceHistory,
-} from '../web-app/app/adapters/record-instances.ts';
+} from '../client/record-instances.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -51,7 +49,7 @@ async function seededCtx() {
     // One context is one operation. The instance
     // revision join still keys a write's sibling by
     // operation-id, so each call mints its own.
-    const ctx = () => createRequestContext(db, token);
+    const ctx = () => inPageContext(db, token);
     await postRecordChange(ctx(), TYPE_ID, {
         kind: 'create',
         record: {
@@ -200,7 +198,7 @@ Deno.test(
     + ' not 64-hex',
     () => {
         const src = Deno.readTextFileSync(
-            'web-app/app/adapters/record-instances.ts',
+            'client/record-instances.ts',
         );
         const start = src.indexOf(
             'interface InstanceHistoryWire',

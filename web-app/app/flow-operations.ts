@@ -1,36 +1,36 @@
 import type { FlowSnapshot } from
     './presenters/flow-designer.ts';
 import type { RequestContext } from
-    './adapters/shared.ts';
+    '../../client/request-context.ts';
 import type {
     GraphEdge,
     GraphNode,
     NodeAttribute,
     RecordAttributeId,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import {
     putFlow,
     enqueueFlowSave,
     notifyFlowChange,
-    getFlowGraph,
-    generateIdentifier,
-    nowUtc,
-} from './adapters/index.ts';
+} from '../../client/index.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { nowUtc } from '../../shared/types.ts';
+import { getRenderableFlowGraph } from './flow-graph-layout.ts';
 import type {
     FlowSaveShape,
-} from './adapters/flow-mutations.ts';
+} from '../../client/flow-mutations.ts';
 import {
     jitteredBackoff,
     organizationItem,
-} from './adapters/shared.ts';
+} from '../../client/request-context.ts';
 import {
     NODE_WIDTH,
     NODE_HEIGHT,
@@ -820,7 +820,7 @@ export async function performUndo(
         return failOp('Undo failed', 'error');
     }
     notifyFlowChange();
-    const graph = await getFlowGraph(
+    const graph = await getRenderableFlowGraph(
         ctx, snap.flowId,
     );
     const newHistory = recordUndoHistoryMark(
@@ -893,7 +893,7 @@ export async function performRedo(
         return failOp('Redo failed', 'error');
     }
     notifyFlowChange();
-    const graph = await getFlowGraph(
+    const graph = await getRenderableFlowGraph(
         ctx, snap.flowId,
     );
     const newHistory = recordUndoHistoryMark(

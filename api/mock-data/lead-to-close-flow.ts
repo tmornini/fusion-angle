@@ -2,7 +2,7 @@ import type {
     GraphNode,
     GraphEdge,
     Id,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import type {
     PathProfile,
     SojournProfile,

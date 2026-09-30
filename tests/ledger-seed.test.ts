@@ -66,7 +66,7 @@ import { buildUnaffiliatedIdentity } from
     '../api/mock-data/members.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-import type { MessagePairEntity } from '../api/types.ts';
+import type { MessagePairEntity } from '../shared/types.ts';
 
 Deno.test(
     'a seed batch is half the binds the attempt leaves',

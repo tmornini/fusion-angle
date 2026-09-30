@@ -5,9 +5,9 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -18,16 +18,16 @@ import {
     putProject,
     putProjectFields,
     putProjectPosition,
-    ProjectView,
-} from '../web-app/app/adapters/projects.ts';
+} from '../client/projects.ts';
+import { ProjectView } from '../web-app/app/project-view.ts';
 import {
     Project,
     COST_DIVISOR,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     ProjectEntity,
     ProjectState,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedCurrentMember,
 } from './member-fixtures.ts';
@@ -250,7 +250,7 @@ Deno.test(
             ...entity,
             state: STATE,
         });
-        const fresh = createRequestContext(db, await organizationToken());
+        const fresh = inPageContext(db, await organizationToken());
         const row = await getProjectEntity(fresh, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(row.title, 'Persisted');
     },

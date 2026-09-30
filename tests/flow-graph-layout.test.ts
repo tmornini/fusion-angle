@@ -5,10 +5,10 @@ import {
     areNodePositionsDegenerate,
     withRenderableLayout,
 } from '../web-app/app/flow-graph-layout.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
-import type { GraphNode, GraphEdge } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
+import type { GraphNode, GraphEdge } from '../shared/types.ts';
 import type { FlowGraph } from
-    '../web-app/app/adapters/flow-queries.ts';
+    '../client/flow-queries.ts';
 
 // --- builders ------------------------------------------------
 

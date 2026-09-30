@@ -34,7 +34,7 @@ import {
 import {
     ApiError,
     HTTP_PRECONDITION_FAILED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     INSTANCE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
@@ -46,7 +46,7 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     apiRequest,
     pairIdOf,

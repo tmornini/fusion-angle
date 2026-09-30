@@ -4,9 +4,7 @@ import {
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import {
-    asWorkOrderFlowGraph,
-} from '../api/validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -28,7 +26,7 @@ import { deriveFlows } from '../api/derive-flows.ts';
 import type {
     RecordEntity,
     RecordAttributeEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,

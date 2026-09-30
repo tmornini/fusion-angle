@@ -1,7 +1,7 @@
 import type {
     ModelId,
     ProviderModel,
-} from './types.ts';
+} from '../shared/types.ts';
 
 // Code-resident, not a DB table: the single source
 // of truth the AI-member validation gate checks

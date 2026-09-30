@@ -5,7 +5,7 @@ import {
     SYSTEM_MEMBER_ID,
     nowUtc,
     type Id,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     getModelsByProvider,
 } from '../api/provider-models.ts';

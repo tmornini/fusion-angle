@@ -23,9 +23,8 @@ Deno.test(
         createFakeStorage(), async () => {
         installGlobals();
         try {
-            await import('./in-page-facade.ts');
             const { initAdapter } = await import(
-                '../web-app/app/adapters/init.ts'
+                './client-init.ts'
             );
             const { initCommandPalette } =
                 await import(

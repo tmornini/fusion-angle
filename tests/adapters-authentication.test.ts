@@ -11,13 +11,16 @@ import { GET } from '../api/api.ts';
 import { testHashPassword } from './mock-seed.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import {
+    inPageClient,
+    inPageContext,
+} from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
-} from '../web-app/app/adapters/authentication.ts';
+} from '../client/authentication.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     seedIdentityCredential,
@@ -83,7 +86,7 @@ async function passwordUserCtx() {
         secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
     });
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await devToken('anonymous'));
     return { db, ctx };
 }
@@ -133,6 +136,7 @@ async () => {
     // An upstream 500 / network fault is a BUG, not a wrong
     // password — it must surface, not collapse to null.
     const ctx = {
+        session: inPageClient(memoryDbAdapter()),
         postForHeaders: async () => {
             throw new Error('upstream 500');
         },
@@ -151,6 +155,7 @@ async () => {
         headers?: readonly (readonly [string, string])[];
     }[] = [];
     const ctx = {
+        session: inPageClient(memoryDbAdapter()),
         postForHeaders: async (
             _path: string,
             body: Record<string, unknown>,

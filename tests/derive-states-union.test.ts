@@ -12,7 +12,7 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT, nowUtc, SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     deriveInvitationStates,
     workOrderLifecycleStatesFor,

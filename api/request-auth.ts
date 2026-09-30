@@ -1,7 +1,7 @@
 import {
     nowEpochSeconds,
     type Id,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     verifyAccessToken,
     principalFromClaims,
@@ -16,7 +16,7 @@ import type {
 import {
     HTTP_FORBIDDEN,
     HTTP_UNAUTHORIZED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     projectClaimRolesForOrganization,
     isPermitted,

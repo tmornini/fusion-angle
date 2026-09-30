@@ -12,7 +12,7 @@ import type {
     IdentityTokenRevocationEntity,
     ClientRegistrationEntity,
     IdentityKind,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     pickString,
     validateIdentityPiiEntity,

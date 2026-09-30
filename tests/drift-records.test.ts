@@ -16,7 +16,7 @@ import type {
     Id,
     RecordEntity,
     RecordAttributeEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {

@@ -59,7 +59,7 @@ run_memory() {
 
 run_check() {
     deno --version
-    deno check --frozen api shared server tests web-app
+    deno check --frozen api client shared server tests web-app
 }
 
 run_lint() {
@@ -67,7 +67,7 @@ run_lint() {
         printf "%s:%d: %d chars\n", FILENAME, FNR, length
     }'
     LONG_LINES=$( {
-        find api web-app tests shared server -type f \
+        find api client web-app tests shared server -type f \
             \( -name '*.ts' -o -name '*.html' \
                -o -name '*.css' \) \
             ! -path 'web-app/app/compose.ts' \
@@ -93,7 +93,7 @@ run_lint() {
     # use `organization`. Prose, URLs (w3.org), and
     # CSS class names may keep the short form.
     ORG_ABBREV=$(
-        find api web-app tests shared server -type f \
+        find api client web-app tests shared server -type f \
             \( -name '*.ts' -o -name '*.html' \
                -o -name '*.css' \) \
             ! -path 'web-app/app/compose.ts' -print0 \
@@ -124,7 +124,7 @@ run_lint() {
     PATTERN="$PATTERN|in-browser data|browser[ -]ZIP"
     RETIRED_VOCAB=$(
         {
-            find api shared server tests web-app/app \
+            find api client shared server tests web-app/app \
                 -type f \
                 \( -name '*.ts' -o -name '*.html' \
                    -o -name '*.css' \) -print0 \

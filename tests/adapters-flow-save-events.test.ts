@@ -1,12 +1,12 @@
 import { assertStrictEquals } from '@std/assert';
 import {
     buildSaveEvents,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import type {
     StoredGraph,
     GraphNode,
     NodeAttribute,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const FLOW_ID = 'aEsGMmBEFaVdWihhHXwCbw';

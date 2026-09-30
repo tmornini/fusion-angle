@@ -19,7 +19,7 @@ import {
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import { workOrderHistoryFor } from

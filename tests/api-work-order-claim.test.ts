@@ -18,7 +18,7 @@ import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
-import { nowUtc, type StateEntity } from '../api/types.ts';
+import { nowUtc, type StateEntity } from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';

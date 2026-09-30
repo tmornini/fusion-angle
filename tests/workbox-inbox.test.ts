@@ -9,20 +9,20 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     organizationItem,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    postWorkOrderCreation,
+    createWorkOrderFromFlow,
 } from
-'../web-app/app/adapters/work-orders-mutations.ts';
+'../web-app/app/work-order-creation.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     getMemberMap,
     getTransitionEventsByWorkOrder,
@@ -32,7 +32,7 @@ import {
     putWorkOrder,
     type WorkOrder,
     type TransitionEvent,
-} from '../web-app/app/adapters/index.ts';
+} from '../client/index.ts';
 import {
     buildInboxItems,
     type ActiveClaim,
@@ -42,7 +42,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     FORMER_MEMBER_NAME,
     nowUtc,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode,
     GraphEdge,
@@ -50,7 +50,7 @@ import type {
     Member,
     MemberId,
     Id,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -60,7 +60,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
+    '../client/members.ts';
 
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();
@@ -137,7 +137,7 @@ async function seedFlow(
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
         linkId: generateIdentifier(),
@@ -166,7 +166,7 @@ interface WoTables {
 async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const workOrders = await getWorkOrders(ctx);
     const transitionsByWo =
         await getTransitionEventsByWorkOrder(ctx);
@@ -197,10 +197,10 @@ async function setupOneWorkOrder(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
     const woId = generateIdentifier();
-    await postWorkOrderCreation(ctx, {
+    await createWorkOrderFromFlow(ctx, {
         workOrderId: woId,
         flowLinkId: generateIdentifier(),
         flowId: 'ZOousbbnzpqlxJExVAruYQ',
@@ -358,10 +358,10 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
         for (let i = 0; i < 3; i++) {
-            await postWorkOrderCreation(ctx, {
+            await createWorkOrderFromFlow(ctx, {
                 workOrderId:
                     generateIdentifier(),
                 flowLinkId:
@@ -431,7 +431,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', {
             nodes: [
                 buildNode(N_START, 'Start', {
@@ -457,7 +457,7 @@ Deno.test(
                 ),
             ],
         });
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId:
                 generateIdentifier(),
             flowLinkId:
@@ -546,7 +546,7 @@ Deno.test(
         );
         // A work order born AFTER the restore —
         // WB5a's most damning witness.
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId: generateIdentifier(),
             flowLinkId: generateIdentifier(),
             flowId: 'ZOousbbnzpqlxJExVAruYQ',
@@ -600,15 +600,15 @@ Deno.test(
                 buildEdge(E2, N_MIDDLE, N_FINISH),
             ],
         });
-        const leaverCtx = createRequestContext(
+        const leaverCtx = inPageContext(
             db, await organizationToken(leaverId),
         );
-        await postWorkOrderCreation(leaverCtx, {
+        await createWorkOrderFromFlow(leaverCtx, {
             workOrderId: generateIdentifier(),
             flowLinkId: generateIdentifier(),
             flowId,
         });
-        const admin = createRequestContext(
+        const admin = inPageContext(
             db, await organizationToken(),
         );
         await deleteHumanMemberSeat(admin, leaverId);

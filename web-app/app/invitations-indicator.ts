@@ -24,7 +24,7 @@ export async function mutateInvitationsBell(
         bell.addEventListener(
             'click', () => navigateTo('invitations'));
         const { subscribeInvitationChanges } =
-            await import('./adapters/index.ts');
+            await import('../../client/index.ts');
         subscribeInvitationChanges(
             () => void renderBell(bell, badge));
     }
@@ -35,8 +35,9 @@ async function renderBell(
     bell: HTMLElement,
     badge: HTMLElement | null,
 ): Promise<void> {
-    const { sessionContext, getInvitations } =
-        await import('./adapters/index.ts');
+    const { sessionContext } = await import('./client.ts');
+    const { getInvitations } =
+        await import('../../client/index.ts');
     const pending = (await getInvitations(sessionContext()))
         .filter(inv => inv.state === 'pending');
     if (pending.length === 0) {

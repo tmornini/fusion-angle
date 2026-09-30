@@ -6,7 +6,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { subscribeOnce } from '../app/channels.ts';
+import { subscribeOnce } from '../../client/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import {
     ICON_SIZE,
@@ -15,14 +15,14 @@ import {
 import { navigateTo } from '../app/navigation.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
-    sessionContext,
     getRecords,
     getRecord,
     putRecord,
     subscribeRecordChanges,
-    isRecordState,
     type RecordWithCounts,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { isRecordState } from '../../shared/types.ts';
 import {
     RecordListPresenter,
     buildInitialRecordListState,

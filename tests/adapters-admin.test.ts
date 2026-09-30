@@ -4,22 +4,22 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
-    getOrganization,
     getOrganizationStats,
-} from '../web-app/app/adapters/admin.ts';
-import { putIdea } from '../web-app/app/adapters/ideas.ts';
-import { putProject } from '../web-app/app/adapters/projects.ts';
+} from '../client/admin.ts';
+import { getOrganization } from '../web-app/app/organization-view.ts';
+import { putIdea } from '../client/ideas.ts';
+import { putProject } from '../client/projects.ts';
 import {
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
     type ProjectState,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
     seedAdminSchema,
@@ -28,7 +28,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
-    '../web-app/app/adapters/members.ts';
+    '../client/members.ts';
 
 function buildProject(
     id: string,
@@ -227,7 +227,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, await organizationToken(),
         );
         // The flipped GET organizations/:id (Phase 12 Task 5)

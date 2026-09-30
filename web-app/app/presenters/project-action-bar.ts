@@ -1,13 +1,13 @@
 import { html, type SafeHtml } from '../safe-html.ts';
 import type {
     Id, ObjectiveId, ProjectState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type {
     ProjectProblem,
-} from '../adapters/project-publish.ts';
+} from '../../../client/project-publish.ts';
 import type {
     ValidationResult,
-} from '../adapters/validation.ts';
+} from '../../../client/validation.ts';
 
 type Check = ValidationResult<ProjectProblem>;
 type ObjectiveNames = ReadonlyMap<

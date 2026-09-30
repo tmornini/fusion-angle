@@ -4,7 +4,7 @@ import {
 } from '../api/authorization.ts';
 import type {
     IdentityDefaultOrganizationEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const AT1 = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-02-01T00:00:00.000000Z';

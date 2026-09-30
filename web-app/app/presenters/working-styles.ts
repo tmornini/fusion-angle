@@ -10,7 +10,7 @@ import {
 import {
     isDimensionKey,
     type DimensionKey,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import { mutedEmptyNote } from './empty-note.ts';
 
 const LABELS: Record<DimensionKey, string> = {

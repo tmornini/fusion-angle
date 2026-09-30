@@ -27,18 +27,18 @@ import {
     handleDialogClick, closeDialog,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getMembers,
     fillHumanMemberProfile,
     postHumanMemberCreation,
     postAIMemberCreation,
     postInvitationGrant,
     type InvitationGrantOutcome,
-    generateIdentifier,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
     HumanMemberPiiIntakeFailedError,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     ManagedMembersPresenter,
     buildInitialManagedMembersState,

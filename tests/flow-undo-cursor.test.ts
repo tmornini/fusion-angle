@@ -13,7 +13,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     ApiError, HTTP_PRECONDITION_FAILED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import { handleRequest, RequestError } from '../api/api.ts';
 import { postFlowUndoOp } from '../api/routes.ts';
 import {
@@ -29,19 +29,19 @@ import {
     organizationToken, DEV_TOKEN,
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
-    createRequestContext,
-    sessionContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
+import { sessionContext } from '../web-app/app/client.ts';
 import {
     postFlowCreation,
     putFlow,
     enqueueFlowSave,
-} from '../web-app/app/adapters/flow-mutations.ts';
-import { getFlowGraph } from
-    '../web-app/app/adapters/flow-queries.ts';
+} from '../client/flow-mutations.ts';
+import { getRenderableFlowGraph } from
+    '../web-app/app/flow-graph-layout.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -51,13 +51,13 @@ import {
     type FlowSnapshot,
 } from '../web-app/app/presenters/flow-designer.ts';
 import { performUndo } from '../web-app/app/flow-operations.ts';
-import { wrapInPageAdapter } from
+import { inPageClient } from
     './in-page-facade.ts';
-import { putClientFacade } from
-    '../web-app/app/adapters/facade-holder.ts';
-import { putSessionToken } from
-    '../web-app/app/adapters/session-token.ts';
-import type { GraphNode } from '../api/types.ts';
+import {
+    getClient,
+    putClient,
+} from '../web-app/app/client.ts';
+import type { GraphNode } from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -433,7 +433,7 @@ Deno.test(
         await seedAdminSchema(db);
         const flowId = generateIdentifier();
         const nodeId = generateIdentifier();
-        const ctx = createRequestContext(db, DEV_TOKEN);
+        const ctx = inPageContext(db, DEV_TOKEN);
         await postFlowCreation(ctx, {
             flowId,
             linkId: FLOWID_LINK,
@@ -752,8 +752,8 @@ Deno.test(
 // flags is carried, not restored, not counted. The earlier
 // "content-invisible save consumes a step" covenant was
 // the old cursor rule; this is the retarget, not a weaken.
-// putClientFacade(wrapInPageAdapter(db)) plus
-// putSessionToken(DEV_TOKEN) makes sessionContext() live
+// putClient(inPageClient(db)) plus
+// getClient().putSessionToken(DEV_TOKEN) makes sessionContext() live
 // under Deno.test — the seam earlier comments called
 // unreachable.
 Deno.test(
@@ -840,13 +840,13 @@ Deno.test(
         const token = await organizationToken();
         const flowId = generateIdentifier();
         await createFlow(db, token, flowId);
-        putClientFacade(wrapInPageAdapter(db));
-        putSessionToken(DEV_TOKEN);
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
 
         const livePresenter = async (
             migrateToCenter = false,
         ): Promise<FlowDesignerPresenter> => {
-            const graph = await getFlowGraph(
+            const graph = await getRenderableFlowGraph(
                 sessionContext(), flowId,
             );
             const snap = buildInitialFlowSnapshot(
@@ -881,7 +881,7 @@ Deno.test(
             flowId, async () => undefined,
         );
 
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             sessionContext(), flowId,
         );
         const op = await performUndo(

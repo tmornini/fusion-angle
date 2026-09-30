@@ -13,7 +13,7 @@ import {
 import { iconShield, ICON_SIZE } from '../app/icons.ts';
 import {
     RequestError, HTTP_FORBIDDEN,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
@@ -23,12 +23,9 @@ import {
     handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    getOrganization,
     getOrganizationSeats,
     getOrganizationStats,
     putOrganizationGeneralInfo,
-    sessionContext,
-    Organization,
     type OrganizationStats,
     type GeneralInfoDraft,
     getObjectives,
@@ -45,8 +42,13 @@ import {
     getSentInvitations,
     postInvitationRevocation,
     subscribeInvitationChanges,
-    generateIdentifier,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import {
+    getOrganization,
+    Organization,
+} from '../app/organization-view.ts';
 import {
     fetchMeasureName,
     markEnd,

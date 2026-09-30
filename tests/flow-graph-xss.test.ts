@@ -5,7 +5,7 @@ import {
 import type {
     GraphEdge,
     GraphNode,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const HOSTILE_ID =
     'x"><script>alert(1)</script>';

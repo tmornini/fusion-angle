@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type { Id, IdentityTokenEntity } from './types.ts';
+import type { Id, IdentityTokenEntity } from '../shared/types.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';

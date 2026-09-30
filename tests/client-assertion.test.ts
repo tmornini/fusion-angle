@@ -4,7 +4,7 @@ import {
 } from '../api/client-assertion.ts';
 import type {
     ClientRegistrationEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';

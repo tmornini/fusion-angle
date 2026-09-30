@@ -16,7 +16,7 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     apiRequest,
     pairIdOf,

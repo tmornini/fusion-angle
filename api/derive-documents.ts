@@ -2,7 +2,7 @@ import type {
     Id,
     MessagePairEntity,
     StateEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import { pickString } from './validators.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import { compareIdentifiers } from

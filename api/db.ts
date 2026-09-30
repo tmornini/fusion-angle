@@ -1,10 +1,10 @@
 import type {
     MessagePairEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import type {
     NotificationEvent,
     NotificationPost,
-} from './notifications.ts';
+} from '../shared/notifications.ts';
 import type {
     Attempt,
     StatementAnswer,

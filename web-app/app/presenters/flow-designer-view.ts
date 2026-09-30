@@ -15,21 +15,21 @@ import {
     iconCopy,
     iconDownload,
 } from '../icons.ts';
+import type { RecordAttribute } from '../../../client/index.ts';
 import type {
     GraphNode,
     GraphEdge,
     NodeAttribute,
-    RecordAttribute,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
+import { MEMBER_WITHOUT_PII_NAME } from '../../../client/index.ts';
 import {
     HumanMember,
     AIMember,
-    MEMBER_WITHOUT_PII_NAME,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import type {
     RecordEntity,
     RecordId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 
 export function buildAttributeRefRow(
     ref: NodeAttribute,

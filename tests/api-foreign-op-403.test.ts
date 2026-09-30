@@ -9,7 +9,7 @@ import {
     seedAdminSchema,
     seedOrganizationDocument,
 } from './test-fixtures.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';

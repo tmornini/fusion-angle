@@ -28,17 +28,13 @@ import {
     handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    Project,
     getProjectEntity,
     projectStateOf,
-    ProjectView,
     putProjectFields,
     postProjectStateChange,
     getFlowsByProject,
     postFlowCreation,
     subscribeProjectChanges,
-    generateIdentifier,
-    sessionContext,
     type RequestContext,
     getProjectScoring,
     postProjectBaselineScoring,
@@ -54,16 +50,20 @@ import {
     postProjectArchival,
     validateProjectForApproval,
     validateProjectForArchival,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { Project } from '../../shared/types.ts';
+import { ProjectView } from '../app/project-view.ts';
+import type { FlowListItem } from '../../client/index.ts';
 import type {
-    FlowListItem,
     ProjectEntity,
     ProjectState,
-} from '../app/adapters/index.ts';
+} from '../../shared/types.ts';
 import {
     getMemberMap,
     memberName,
-} from '../app/adapters/members-union.ts';
+} from '../../client/members-union.ts';
 import { latestPerPair } from '../app/scoring-format.ts';
 import {
     ProjectDetailPresenter,

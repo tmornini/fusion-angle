@@ -3,12 +3,11 @@ import {
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
-import { Project } from '../api/types.ts';
+import { Project } from '../shared/types.ts';
 import type {
     ObjectiveEntity,
-} from '../api/types.ts';
-import { ProjectView } from
-    '../web-app/app/adapters/projects.ts';
+} from '../shared/types.ts';
+import { ProjectView } from '../web-app/app/project-view.ts';
 import {
     ProjectDetailPresenter,
 } from '../web-app/app/presenters/project-detail.ts';

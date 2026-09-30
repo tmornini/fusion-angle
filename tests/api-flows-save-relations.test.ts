@@ -4,28 +4,26 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import type {
     FlowWithGraph,
     GraphNode,
     GraphEdge,
     StateEntity,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
-import {
-    asStoredGraph,
-} from '../api/validators.ts';
+} from '../shared/types.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -37,7 +35,7 @@ import {
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { OPERATION_ID_HEADER } from '../api/message-pair.ts';
+import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 
 const NODE_A = generateIdentifier();
 const NODE_B = generateIdentifier();
@@ -62,7 +60,7 @@ async function setupMemDb(): Promise<{
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
     await seedHumanMember(db, MEMBER_TWO, 'Member Two');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return { db, ctx };
 }
 

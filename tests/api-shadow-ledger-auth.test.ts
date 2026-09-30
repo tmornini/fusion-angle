@@ -29,7 +29,7 @@ import { bytesToBase64Url } from '../shared/base64url.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
-import type { NotificationEvent } from '../api/notifications.ts';
+import type { NotificationEvent } from '../shared/notifications.ts';
 import {
     seedClientRegistration,
     seedIdentityCredential,

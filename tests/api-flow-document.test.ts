@@ -32,7 +32,7 @@ import {
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {

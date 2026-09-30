@@ -16,20 +16,18 @@ import {
     DEV_TOKEN,
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     putFlow,
     enqueueFlowSave,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
-    getFlowGraph,
-} from '../web-app/app/adapters/flow-queries.ts';
+    getRenderableFlowGraph,
+} from '../web-app/app/flow-graph-layout.ts';
 import {
     buildStartAndCompleteNodes,
-} from '../web-app/app/adapters/flow-defaults.ts';
+} from '../client/flow-defaults.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -41,12 +39,12 @@ import {
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { wrapInPageAdapter } from
+import { inPageClient } from
     './in-page-facade.ts';
-import { putClientFacade } from
-    '../web-app/app/adapters/facade-holder.ts';
-import { putSessionToken } from
-    '../web-app/app/adapters/session-token.ts';
+import {
+    getClient,
+    putClient,
+} from '../web-app/app/client.ts';
 import { performUndo } from
     '../web-app/app/flow-operations.ts';
 import { withLocalStorageAsync } from
@@ -160,11 +158,11 @@ Deno.test(
     'opening a flow does not append pairs',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
-        putClientFacade(wrapInPageAdapter(db));
-        putSessionToken(DEV_TOKEN);
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
-        const ctx = createRequestContext(
+        const ctx = inPageContext(
             db, DEV_TOKEN,
         );
         const { start, complete } =
@@ -181,7 +179,7 @@ Deno.test(
         const n = await flowDocumentPairCount(
             db, flowId,
         );
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             ctx, flowId,
         );
         const snap = buildInitialFlowSnapshot(
@@ -227,12 +225,12 @@ Deno.test(
     'a rename with no target appends no pair',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = await freshDb();
-        putClientFacade(wrapInPageAdapter(db));
-        putSessionToken(DEV_TOKEN);
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
         const flowId = generateIdentifier();
         await createFlow(db, DEV_TOKEN, flowId);
-        const ctx = createRequestContext(db, DEV_TOKEN);
-        const graph = await getFlowGraph(ctx, flowId);
+        const ctx = inPageContext(db, DEV_TOKEN);
+        const graph = await getRenderableFlowGraph(ctx, flowId);
         const snap = buildInitialFlowSnapshot(
             graph, CANVAS_W, CANVAS_H, [], [], [],
         );

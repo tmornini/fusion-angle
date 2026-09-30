@@ -14,8 +14,8 @@ import {
     ValidationError,
     msSinceUtc,
     nowUtc,
-} from './types.ts';
-import type { Id } from './types.ts';
+} from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import { pathAndNameOf } from './path-and-name.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
@@ -35,10 +35,10 @@ import {
     streamGetFromStored,
     parseIfMatch,
     LATCHED_OPERATION_ROUTE_PATTERNS,
-    OPERATION_ID_HEADER,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
+import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import type { ReceivedRequest } from './message-pair.ts';
 import {
     bodyOctetsOf,
@@ -75,7 +75,7 @@ import {
 } from './access-token.ts';
 import {
     identityTargetsFor,
-} from './notifications.ts';
+} from '../shared/notifications.ts';
 import {
     resolveGlobalOwner,
     missedReadError,
@@ -106,7 +106,7 @@ import {
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
     errorJson,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
     authenticateRequest,
@@ -130,10 +130,10 @@ import {
 import {
     framingRefusal,
     incomingContext,
-    REQUEST_ID_HEADER,
     type FramedContext,
     type IncomingContext,
 } from './request-context.ts';
+import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import {
     isIdentifier,
 } from '../shared/identifier.ts';
@@ -155,7 +155,7 @@ export {
     HTTP_UNPROCESSABLE_ENTITY,
     HTTP_INTERNAL_ERROR,
     HTTP_NOT_IMPLEMENTED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 const routeTable: readonly Route[] = routes;
 

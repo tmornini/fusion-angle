@@ -4,7 +4,7 @@
 
 import { sha256Hex } from '../shared/digest.ts';
 import type { NotificationEvent } from
-    './notifications.ts';
+    '../shared/notifications.ts';
 
 export const ADVISORY_KEY_HEX_DIGITS = 13;
 

@@ -13,12 +13,12 @@ import type {
     StoredGraph,
     MemberId,
     NodeAttribute,
-} from './types.ts';
-import { storedGraph } from './types.ts';
+} from '../shared/types.ts';
+import { storedGraph } from '../shared/types.ts';
 import {
     type FlowGraphDelta,
     asStoredGraph,
-} from './validators.ts';
+} from '../shared/flow-graph-body.ts';
 import { byIdAscending } from './derive-documents.ts';
 
 // On an equal-`at` tie a 'removed' outranks an 'added'

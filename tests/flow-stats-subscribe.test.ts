@@ -12,7 +12,7 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
     type FlowWithGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 const CHANNEL_NAME = 'fusion-angle:data';
 const BELL_DEADLINE_MS = 5000;
@@ -100,11 +100,13 @@ Deno.test(
                 sel === '#flow-stats' ? host : null,
         };
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
-                    '../web-app/app/adapters/init.ts'
+                    './client-init.ts'
                 );
+            const { getClient } = await import(
+                '../web-app/app/client.ts'
+            );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
             await seedHumanMember(
@@ -114,19 +116,19 @@ Deno.test(
                 () => db,
             );
             assertStrictEquals(hasSchema, true);
-            putSessionToken(
+            getClient().putSessionToken(
                 await organizationToken(),
             );
-            const {
-                createRequestContext,
-                organizationItem,
-            } = await import(
-                '../web-app/app/adapters/shared.ts'
+            const { inPageContext } = await import(
+                './in-page-facade.ts'
+            );
+            const { organizationItem } = await import(
+                '../client/request-context.ts'
             );
             const { postFlowCreation } = await import(
-                '../web-app/app/adapters/flow-mutations.ts'
+                '../client/flow-mutations.ts'
             );
-            const ctx = createRequestContext(
+            const ctx = inPageContext(
                 db, await organizationToken(),
             );
             const flowId = generateIdentifier();
@@ -224,7 +226,7 @@ Deno.test(
             // here — after the assertion above.
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

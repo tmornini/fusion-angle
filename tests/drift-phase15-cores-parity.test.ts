@@ -10,7 +10,7 @@ import {
     EntityNotFoundError,
     TABLE_NAMES,
 } from '../api/db.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     workOrderDocumentHeadFor,
     workOrderClaimHistoryFor,
@@ -31,7 +31,7 @@ import { latestByKey } from
     '../shared/ledger-reduction.ts';
 import type {
     GraphEdge, WorkOrderEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     collectAttributeReferrers,
     type AttributeReferrers,
@@ -41,13 +41,11 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
-import {
-    asWorkOrderFlowGraph,
-} from '../api/validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     latestClaimEvent,
     isClaimEventExpired,
-} from '../api/work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';

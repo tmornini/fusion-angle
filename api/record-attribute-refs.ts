@@ -1,11 +1,9 @@
 import type { DbAdapter } from './db.ts';
-import {
-    asWorkOrderFlowGraph,
-} from './validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     ApiError,
     HTTP_CONFLICT,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     relationFailClosed,

@@ -3,7 +3,7 @@ import { missedReadError } from './derive-states.ts';
 import type {
     Id, FlowWithGraph, StateEntity,
     FlowNodeAttributeEntity, FlowNodeMemberEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     pickString, pickNumber, pickBoolean,
     validateFlowNodeAttributeEntity,

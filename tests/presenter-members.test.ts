@@ -3,7 +3,7 @@ import {
     HumanMember,
     AIMember,
     type Member,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     makeHumanMember,
     makeAIMember,

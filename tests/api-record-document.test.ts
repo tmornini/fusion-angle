@@ -11,7 +11,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { postRecordDocumentOp } from '../api/routes.ts';
 import { validateRecordDocumentBody } from '../api/validators.ts';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     RECORD_TYPE_DETAIL_PATTERN,

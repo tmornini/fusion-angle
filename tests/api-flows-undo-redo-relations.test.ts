@@ -6,15 +6,15 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     buildInitialFlowSnapshot,
     type FlowSnapshot,
@@ -32,13 +32,11 @@ import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
-import {
-    asStoredGraph,
-} from '../api/validators.ts';
+} from '../shared/types.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
@@ -77,7 +75,7 @@ async function setupMemDb(): Promise<{
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
         linkId: generateIdentifier(),

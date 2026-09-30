@@ -4,7 +4,7 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     HTTP_NOT_FOUND,
     HTTP_UNAUTHORIZED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     listenHttp,
     type HttpListener,

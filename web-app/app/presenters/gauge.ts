@@ -15,7 +15,7 @@ import type {
     GaugeIcon,
     GaugeTheme,
     RatioGauge,
-} from '../adapters/dashboard.ts';
+} from '../dashboard.ts';
 
 type GaugeTone =
     'primary' | 'success' | 'warning';

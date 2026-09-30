@@ -10,7 +10,7 @@ import {
 } from './test-fixtures.ts';
 import {
     type ProjectObjectiveBaselineScoreEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { generateIdentifier } from

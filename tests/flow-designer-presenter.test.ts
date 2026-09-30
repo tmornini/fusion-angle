@@ -349,8 +349,8 @@ Deno.test(
 // direct applyUpdateNode test. Presenter wrapping
 // that queues a save is pinned in
 // tests/flow-designer-open.test.ts:
-// putClientFacade(wrapInPageAdapter(db)) plus
-// putSessionToken(DEV_TOKEN) makes
+// putClient(inPageClient(db)) plus
+// getClient().putSessionToken(DEV_TOKEN) makes
 // sessionContext() live under Deno.test. Same
 // reason no other withNode* mutation test exists
 // in this file.
@@ -447,8 +447,8 @@ Deno.test(
 // and silently queued a save whenever the snapshot's node
 // centroid drifted off origin — corrupting undo-as-replay's
 // document-pair history on every such render, not just page
-// load. putClientFacade(wrapInPageAdapter(db)) plus
-// putSessionToken(DEV_TOKEN) makes sessionContext()
+// load. putClient(inPageClient(db)) plus
+// getClient().putSessionToken(DEV_TOKEN) makes sessionContext()
 // live; tests/flow-designer-open.test.ts is the seam
 // that reaches #queueSave. This file still asserts
 // the STRUCTURAL guarantee that

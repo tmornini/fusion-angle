@@ -6,7 +6,7 @@ import type {
     GraphEdge,
     GraphNode,
     MemberId,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 
 function buildNode(
     id: string,

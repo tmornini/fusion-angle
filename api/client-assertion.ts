@@ -13,7 +13,7 @@ import {
 } from '../shared/base64url.ts';
 import type {
     ClientRegistrationEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 
 export type ClientAssertionResult =
     | { valid: true; jti: string; exp: number }

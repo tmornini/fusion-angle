@@ -1,5 +1,5 @@
 import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
-import type { IdentityEntityFields } from '../api/types.ts';
+import type { IdentityEntityFields } from '../shared/types.ts';
 import {
     validateIdentityEntity,
     validateIdentityPiiEntity,
@@ -9,7 +9,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { PUT, GET, DELETE, handleRequest } from '../api/api.ts';
-import { SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import {
     generateIdentifier, NIL_IDENTIFIER,
 } from '../shared/identifier.ts';

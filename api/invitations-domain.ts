@@ -4,7 +4,7 @@ import {
     assertInvitationState,
     type Id,
     type InvitationState,
-} from './types.ts';
+} from '../shared/types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     ApiError,
@@ -12,7 +12,7 @@ import {
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
     HTTP_CONFLICT,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     pickString,
     validateTimestampField,

@@ -6,26 +6,26 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getFlowStats,
-} from '../web-app/app/adapters/flow-stats.ts';
+} from '../web-app/app/flow-stats.ts';
 import {
     postFlowCreation,
     putFlow,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -257,7 +257,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
 
         // Flow ZOousbbnzpqlxJExVAruYQ with an Onboarding graph, seeded
         // through the
@@ -389,7 +389,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         // seedFlow saves is_auto_layout true; buildTestGraph
         // seeds c→a→z all at (0,0).
         const autoGraph = buildTestGraph();

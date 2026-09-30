@@ -15,11 +15,11 @@ import {
     iconClock,
 } from '../icons.ts';
 import { buildPageUrl } from '../navigation.ts';
+import type { RecordWithCounts } from '../../../client/index.ts';
 import type {
     RecordModel,
     RecordState,
-    RecordWithCounts,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import {
     RECORD_STATE_CONFIG,
 } from './state-display.ts';

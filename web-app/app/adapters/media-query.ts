@@ -1,6 +1,6 @@
 import {
     subscribeEventListener,
-} from './event-listener.ts';
+} from '../../../client/event-listener.ts';
 
 let interned:
     ((query: string) => MediaQueryList) | null = null;

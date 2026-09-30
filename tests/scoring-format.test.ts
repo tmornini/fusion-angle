@@ -5,7 +5,7 @@ import {
     formatSigned,
     toneForScore,
 } from '../web-app/app/scoring-format.ts';
-import type { ObjectiveId } from '../api/types.ts';
+import type { ObjectiveId } from '../shared/types.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 
 Deno.test('latestPerPair keeps the latest by at',

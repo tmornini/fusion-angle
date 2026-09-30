@@ -17,25 +17,24 @@ import {
     iconX,
 } from './icons.ts';
 import {
+    putLocation,
+} from './adapters/index.ts';
+import {
     getIdeas,
     getProjects,
     getHumanMembers,
     featuredHumanMembers,
-    sessionContext,
-    putLocation,
     subscribeIdeaChanges,
     subscribeProjectChanges,
     subscribeHumanMemberChanges,
     type IdeaWithSubmitter,
+    MEMBER_WITHOUT_PII_NAME,
+} from '../../client/index.ts';
+import { getClient, sessionContext } from './client.ts';
+import {
     Project,
     HumanMember,
-    MEMBER_WITHOUT_PII_NAME,
-} from './adapters/index.ts';
-// init.ts is the composition root —
-// intentionally outside the adapter barrel.
-import {
-    sessionIsOrganizationScoped,
-} from './adapters/session-token.ts';
+} from '../../shared/types.ts';
 import {
     PAGE_REGISTRY,
 } from './page-registry.ts';
@@ -309,7 +308,7 @@ export function initCommandPalette(
         // On an unscoped session (the anonymous seed on an auth-exempt
         // sidebar page) skip the build rather than 401; a later scoped
         // load reseeds it.
-        if (!sessionIsOrganizationScoped()) return;
+        if (!getClient().sessionIsOrganizationScoped()) return;
 
         const ctx = sessionContext();
         const [ideas, projects, humans] =

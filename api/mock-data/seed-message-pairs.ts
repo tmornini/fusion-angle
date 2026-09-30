@@ -131,18 +131,18 @@ import type {
     FlowRecordEntity,
     IdentityCredentialKind,
     OrganizationEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     SYSTEM_MEMBER_ID,
     storedGraph,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     formWriteMessagePair,
     IF_MATCH_HEADER,
-    OPERATION_ID_HEADER,
     strongEtagOf,
 } from '../message-pair.ts';
+import { OPERATION_ID_HEADER } from '../../shared/message-id-fields.ts';
 import type {
     MessagePair,
     ReceivedRequest,
@@ -153,7 +153,7 @@ import {
 } from '../../shared/identifier.ts';
 import {
     HTTP_NO_CONTENT,
-} from '../http-errors.ts';
+} from '../../shared/http-errors.ts';
 import {
     WRITE_RESPONSE_SPECS,
     flowCreateDocumentBody,
@@ -164,11 +164,11 @@ import {
     identityDocumentBodyOf,
 } from '../routes.ts';
 import {
-    asStoredGraph,
     validateFlowCreateBody,
     validateRecordWriteBody,
     validateObjectiveCreateBody,
 } from '../validators.ts';
+import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,

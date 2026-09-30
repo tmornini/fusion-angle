@@ -42,7 +42,7 @@ import {
     ORGANIZATION_TWO,
     MOCK_SEED_TIMESTAMP,
 } from '../api/mock-data/seed-constants.ts';
-import { SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import { deriveOrganization } from
     '../api/derive-organizations.ts';
 import { HttpMessage } from

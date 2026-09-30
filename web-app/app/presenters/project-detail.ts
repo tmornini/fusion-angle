@@ -21,21 +21,19 @@ import {
     toDateInputValue,
     DISPLAY_ABSENT,
 } from '../format.ts';
-import type {
-    ProjectView,
-    ProjectFieldsPatch,
-    ProjectState,
-} from '../adapters/index.ts';
+import type { ProjectFieldsPatch } from '../../../client/index.ts';
+import type { ProjectState } from '../../../shared/types.ts';
+import type { ProjectView } from '../project-view.ts';
 import {
     PROJECT_STATE_CONFIG,
 } from './state-display.ts';
 import {
     COST_DIVISOR,
     isProjectState,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import type {
     FlowListItem,
-} from '../adapters/flows.ts';
+} from '../../../client/flows.ts';
 
 export interface ProjectDraftFields {
     title: string;

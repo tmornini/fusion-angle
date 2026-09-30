@@ -6,15 +6,13 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
 import {
     postIdentityCreation,
-} from '../web-app/app/adapters/identities.ts';
+} from '../client/identities.ts';
 import {
     deriveIdentityPii,
     deriveCredentialsFor,
@@ -27,7 +25,7 @@ async function setup() {
     await seedAdminSchema(db);
     return {
         db,
-        ctx: createRequestContext(db, await devToken()),
+        ctx: inPageContext(db, await devToken()),
     };
 }
 

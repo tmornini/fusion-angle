@@ -18,11 +18,11 @@ import type {
     WorkOrderEntity,
     MessagePairEntity,
     StateEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
 import {
     documentMessagePairsAt,
@@ -36,12 +36,12 @@ import {
 import {
     pickString,
     validateWorkOrderDocumentBody,
-    asWorkOrderFlowGraph,
 } from '../api/validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
 import {
     latestClaimEvent,
-} from '../api/work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import {
     appendLegacyTransition,
 } from './legacy-transition-fixture.ts';

@@ -11,9 +11,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -28,14 +28,14 @@ import {
     getBackupFromZip,
     getFlowZip,
     type Backup,
-} from '../web-app/app/adapters/flow-export.ts';
+} from '../web-app/app/flow-export.ts';
 import {
     postFlowCreation,
     putFlow,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
-    getFlowGraph,
-} from '../web-app/app/adapters/flow-queries.ts';
+    getRenderableFlowGraph,
+} from '../web-app/app/flow-graph-layout.ts';
 import {
     generateMermaid,
     mermaidIdOf,
@@ -50,14 +50,12 @@ import {
 } from '../shared/identifier.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     FlowWithGraph,
     StoredGraph,
-} from '../api/types.ts';
-import {
-    asStoredGraph,
-} from '../api/validators.ts';
+} from '../shared/types.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,
@@ -74,7 +72,7 @@ async function setup(): Promise<{
         db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User',
     );
     await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     return { db, ctx };
@@ -531,7 +529,7 @@ Deno.test(
             ctx, importedId, backup,
             generateIdentifier(),
         );
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             ctx, importedId,
         );
         assertStrictEquals(graph.isAutoLayout, false);
@@ -635,7 +633,7 @@ Deno.test(
             ctx, importedId, zip.data,
             generateIdentifier(),
         );
-        const graph = await getFlowGraph(
+        const graph = await getRenderableFlowGraph(
             ctx, importedId,
         );
         assertStrictEquals(graph.isAutoLayout, false);

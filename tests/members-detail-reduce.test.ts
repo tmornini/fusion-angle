@@ -10,7 +10,7 @@ import {
 import {
     reduceRefresh, reduceSave, humanMemberPiiPatchIfDirty,
 } from '../web-app/members/detail.ts';
-import { HumanMember } from '../api/types.ts';
+import { HumanMember } from '../shared/types.ts';
 import {
     HumanMemberDetailPresenter,
     type SeatRemoval,

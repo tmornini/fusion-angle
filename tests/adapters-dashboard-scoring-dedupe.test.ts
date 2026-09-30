@@ -98,10 +98,9 @@ Deno.test(
             },
         };
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
-                    '../web-app/app/adapters/init.ts'
+                    './client-init.ts'
                 );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
@@ -113,15 +112,14 @@ Deno.test(
             );
             assertStrictEquals(hasSchema, true);
             const token = await organizationToken();
-            putSessionToken(token);
-            const { createRequestContext } =
+            const { inPageContext, wrapInPageAdapter } =
                 await import(
-                    '../web-app/app/adapters/shared.ts'
+                    './in-page-facade.ts'
                 );
             const { putProject } = await import(
-                '../web-app/app/adapters/projects.ts'
+                '../client/projects.ts'
             );
-            const seedCtx = createRequestContext(
+            const seedCtx = inPageContext(
                 db, token,
             );
             await putProject(seedCtx, PROJECT_ID, {
@@ -161,12 +159,16 @@ Deno.test(
                 },
             );
             const {
-                getClientFacade,
-                putClientFacade,
+                createAppClient,
+                getClient,
+                putClient,
             } = await import(
-                '../web-app/app/adapters/facade-holder.ts'
+                '../web-app/app/client.ts'
             );
-            const inner = getClientFacade();
+            const inner = wrapInPageAdapter(db)({
+                ...getClient(),
+                navigateToAuth: () => {},
+            });
             const paths: string[] = [];
             const holdObjectives =
                 Promise.withResolvers<void>();
@@ -176,7 +178,7 @@ Deno.test(
             let pendingScores = 0;
             let scoresDuringObjectives = false;
             let revisionsDuringScores = false;
-            putClientFacade({
+            const client = createAppClient(() => ({
                 ...inner,
                 GET: async (
                     resource,
@@ -230,7 +232,9 @@ Deno.test(
                         resource, token, requestId,
                     );
                 },
-            });
+            }));
+            client.putSessionToken(token);
+            putClient(client);
             const { init } = await import(
                 '../web-app/dashboard/index.ts'
             );
@@ -260,7 +264,7 @@ Deno.test(
         } finally {
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

@@ -1,7 +1,7 @@
 // Hand-built rows. Digests come from the pair-root
 // twin so a fixture cannot store a decorative hash.
 
-import type { MessagePairEntity } from '../api/types.ts';
+import type { MessagePairEntity } from '../shared/types.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
 import {

@@ -10,14 +10,12 @@ import {
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getProvidersFor,
-} from '../web-app/app/adapters/identity-providers.ts';
+} from '../client/identity-providers.ts';
 import { seedIdentityProvider } from './identity-fixtures.ts';
 import {
     deriveIdentityProvider,
@@ -29,7 +27,7 @@ import {
     attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import {
     apiRequest, storedPutBodyText,
 } from './http-fixtures.ts';
@@ -40,7 +38,7 @@ async function adminCtx() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return {
-        db, ctx: createRequestContext(db, await devToken()),
+        db, ctx: inPageContext(db, await devToken()),
     };
 }
 
@@ -78,7 +76,7 @@ Deno.test('an anonymous principal cannot read providers',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const anon = createRequestContext(
+    const anon = inPageContext(
         db, await devToken('anonymous'));
     await assertRejects(() => getProvidersFor(anon
         , 'prBESZPjJDiuXCeZLmbiVw'));

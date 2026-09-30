@@ -72,7 +72,7 @@ Deno.test('a flow write with an AI agent id in memberIds'
         agentFields('Bot'), token,
         operationIdHeader());
     const { DEFAULT_LOCK_TIMEOUT } = await import(
-        '../api/types.ts'
+        '../shared/types.ts'
     );
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

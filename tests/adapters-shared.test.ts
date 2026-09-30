@@ -5,21 +5,19 @@ import {
     assertThrows,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getHumanMemberMap,
     getCurrentHumanMember,
-} from '../web-app/app/adapters/members.ts';
+} from '../client/members.ts';
 import {
     memberName,
-} from '../web-app/app/adapters/members-union.ts';
+} from '../client/members-union.ts';
 import {
     type Member,
     type MemberId,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     makeHumanMember,
     seedHumanMember,
@@ -65,7 +63,7 @@ Deno.test(
         await seedAdminSchema(db);
         const u1 = generateIdentifier();
         await seedHumanMember(db, u1, 'Alice Adams');
-        const ctx = createRequestContext(db, DEV_TOKEN);
+        const ctx = inPageContext(db, DEV_TOKEN);
         const map = await getHumanMemberMap(ctx);
         assert(map.has(u1));
         const pii = map.get(u1)?.pii();
@@ -87,11 +85,11 @@ Deno.test('Fresh ctx re-fetches each call', async () => {
     const u2 = generateIdentifier();
     await seedHumanMember(db, u1, 'Alice Adams');
     const mFNSxZqywTSMXhgUTdTqtA = await getHumanMemberMap(
-        createRequestContext(db, DEV_TOKEN),
+        inPageContext(db, DEV_TOKEN),
     );
     await seedHumanMember(db, u2, 'Bob Brown');
     const m2 = await getHumanMemberMap(
-        createRequestContext(db, DEV_TOKEN),
+        inPageContext(db, DEV_TOKEN),
     );
     assertNotStrictEquals(mFNSxZqywTSMXhgUTdTqtA, m2);
     assert(mFNSxZqywTSMXhgUTdTqtA.has(u1));
@@ -109,7 +107,7 @@ Deno.test(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Alice Adams',
         );
         const row = await getCurrentHumanMember(
-            createRequestContext(db, DEV_TOKEN),
+            inPageContext(db, DEV_TOKEN),
         );
         assertStrictEquals(row.id, 'XXZruirZyAOoRpNxaDnpSA');
     },
@@ -120,8 +118,8 @@ Deno.test(
     + ' and unique',
     () => {
         const db = memoryDbAdapter();
-        const a = createRequestContext(db, DEV_TOKEN);
-        const b = createRequestContext(db, DEV_TOKEN);
+        const a = inPageContext(db, DEV_TOKEN);
+        const b = inPageContext(db, DEV_TOKEN);
         assertStrictEquals(
             a.operationId, a.operationId,
         );
@@ -145,7 +143,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, DEV_TOKEN);
+        const ctx = inPageContext(db, DEV_TOKEN);
         const pii = 'identities/'
             + 'XXZruirZyAOoRpNxaDnpSA/pii';
         await ctx.PUT(pii, {

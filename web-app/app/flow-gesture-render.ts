@@ -16,8 +16,9 @@
 // frame can never drift from its rebuilt form.
 
 import type {
-    GraphNode, GraphEdge,
-} from './adapters/flows.ts';
+    GraphNode,
+    GraphEdge,
+} from '../../shared/types.ts';
 import type {
     InteractionState,
     ViewBox,

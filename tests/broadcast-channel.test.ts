@@ -2,7 +2,7 @@ import { assertStrictEquals } from '@std/assert';
 import {
     postNotificationEvent,
     subscribeNotificationEvents,
-} from '../web-app/app/adapters/broadcast-channel.ts';
+} from '../client/broadcast-channel.ts';
 
 // The divorce point is inert without a browser: no channel
 // is created in Node, so the test runner never hangs on an

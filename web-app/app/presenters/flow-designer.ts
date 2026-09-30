@@ -5,28 +5,30 @@ import type { SafeHtml } from '../safe-html.ts';
 import { $required } from '../dom.ts';
 import { showToast } from '../toast.ts';
 import {
-    sessionContext,
     putFlow,
     enqueueFlowSave,
+} from '../../../client/index.ts';
+import { sessionContext } from '../client.ts';
+import {
     HumanMember,
     AIMember,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
 import type {
     RequestContext,
-} from '../adapters/shared.ts';
+} from '../../../client/request-context.ts';
 import { reportFault } from '../error-helpers.ts';
+import type {
+    FlowGraph,
+    FlowSaveShape,
+} from '../../../client/flows.ts';
 import type {
     GraphNode,
     GraphEdge,
-    FlowGraph,
-    FlowSaveShape,
-} from '../adapters/flows.ts';
+} from '../../../shared/types.ts';
 import type {
     MemberId,
-} from '../../../api/types.ts';
-import {
-    type RecordAttribute,
-} from '../adapters/index.ts';
+} from '../../../shared/types.ts';
+import { type RecordAttribute } from '../../../client/index.ts';
 import {
     buildGraphSvg,
     buildConnectPreview,

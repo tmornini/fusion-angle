@@ -1,7 +1,7 @@
 import {
     SECONDS_PER_HOUR,
     SECONDS_PER_DAY,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_WEEK   = 604800;

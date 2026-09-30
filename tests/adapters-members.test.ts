@@ -12,16 +12,16 @@ import { deriveMembershipsForIdentity } from
 import {
     HTTP_NOT_FOUND,
     RequestError,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     deleteHumanMemberSeat,
     featuredHumanMembers,
     getAdminSeatIds,
     getHumanMemberProfile,
     postHumanMemberCreation,
-    type HumanMember,
     type HumanMemberDraft,
-} from '../web-app/app/adapters/members.ts';
+} from '../client/members.ts';
+import { type HumanMember } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -83,7 +83,7 @@ Deno.test(
         await seedCurrentMember(db);
         await seedHumanMember(db, 'xdaJyuuPyHfffCGLhqDrOQ', 'Original Name');
         const { putHumanMember } = await import(
-            '../web-app/app/adapters/members.ts'
+            '../client/members.ts'
         );
         await putHumanMember(
             ctx, 'xdaJyuuPyHfffCGLhqDrOQ', {

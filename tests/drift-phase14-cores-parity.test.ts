@@ -1,7 +1,7 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { deriveInvitation } from '../api/derive-invitations.ts';
 import {
     invitationLifecycleStatesFor,

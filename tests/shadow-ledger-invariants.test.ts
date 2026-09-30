@@ -14,7 +14,7 @@ import {
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
     type Id,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,

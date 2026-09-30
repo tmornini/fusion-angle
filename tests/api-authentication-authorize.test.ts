@@ -24,7 +24,7 @@ import {
 } from './identity-fixtures.ts';
 import {
     MS_PER_SECOND, setClockForTest, resetClock,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import { deriveCredentialsFor } from

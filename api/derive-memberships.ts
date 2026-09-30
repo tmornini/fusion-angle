@@ -5,7 +5,7 @@ import type {
     MembershipEntity,
     FormerSeatEntity,
     OrganizationEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     validateSeatDocumentBody,
 } from './validators.ts';

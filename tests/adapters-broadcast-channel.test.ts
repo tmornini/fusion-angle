@@ -2,7 +2,7 @@ import { assertEquals, assertThrows } from '@std/assert';
 import {
     notificationEventFromWire,
     type NotificationEvent,
-} from '../api/notifications.ts';
+} from '../shared/notifications.ts';
 
 // The cross-tab wire shape is validated at the adapter —
 // a malformed message throws instead of handing subscribers

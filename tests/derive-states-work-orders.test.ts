@@ -9,7 +9,7 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';

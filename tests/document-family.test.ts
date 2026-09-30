@@ -18,7 +18,7 @@ import type {
     StorageBackend,
     Tx,
 } from '../api/db.ts';
-import type { Id } from '../api/types.ts';
+import type { Id } from '../shared/types.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     runWrite,
@@ -56,7 +56,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
-    '../api/http-errors.ts';
+    '../shared/http-errors.ts';
 import {
     apiRequest,
     pairIdOf,

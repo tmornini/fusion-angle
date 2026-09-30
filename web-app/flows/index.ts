@@ -10,7 +10,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { subscribeOnce } from '../app/channels.ts';
+import { subscribeOnce } from '../../client/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
@@ -24,22 +24,24 @@ import {
     handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
-    getProjects,
-    getFlowsWithProjectNames,
-    putFlow,
     postFlowFromMermaid,
     postFlowFromZip,
     getBackupFromZip,
     computeFlowBackupResolution,
     postFlowFromBackup,
-    generateIdentifier,
+} from '../app/flow-export.ts';
+import {
+    getProjects,
+    putFlow,
     subscribeFlowChanges,
-} from '../app/adapters/index.ts';
+    getFlowsWithProjectNames,
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import type {
     Backup,
     ImportResolution,
-} from '../app/adapters/index.ts';
+} from '../app/flow-export.ts';
 import {
     FlowPresenter,
 } from '../app/presenters/index.ts';

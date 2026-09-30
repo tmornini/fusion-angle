@@ -1,6 +1,6 @@
 import { assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../../api/api.ts';
-import { nowUtc } from '../../api/types.ts';
+import { nowUtc } from '../../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../../api/mock-data/seed-constants.ts';
 import { generateIdentifier } from

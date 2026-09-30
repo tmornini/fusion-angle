@@ -13,7 +13,6 @@ import {
     closeDialog,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getRecord,
     getRecordModel,
     getRecordAttributesByRecord,
@@ -22,15 +21,16 @@ import {
     postRecordChange,
     postRecordStateChange,
     subscribeRecordChanges,
-    generateIdentifier,
     getRecordInstances,
     getRecordInstance,
     putRecordInstance,
     patchRecordInstance,
     deleteRecordInstance,
     activeOrganization,
-} from '../app/adapters/index.ts';
-import { getFlowEntities } from '../app/adapters/flows.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { getFlowEntities } from '../../client/flows.ts';
 import {
     RecordDetailPresenter,
     RecordDetailEditPresenter,
@@ -49,15 +49,15 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     Constraint,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import type {
     RecordAttribute,
     RecordInstance,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import {
     projectClaimRolesForOrganization,
 } from '../../api/authorization.ts';

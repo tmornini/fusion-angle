@@ -13,7 +13,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
-import type { OrganizationEntity } from '../api/types.ts';
+import type { OrganizationEntity } from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { framedRequest } from './http-fixtures.ts';
 

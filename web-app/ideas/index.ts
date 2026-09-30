@@ -11,7 +11,7 @@ import {
 import {
     bindCrossTab,
     subscribeOnce,
-} from '../app/channels.ts';
+} from '../../client/channels.ts';
 import { handlePageLoadError } from '../app/page-loader.ts';
 import {
     ICON_SIZE,
@@ -22,10 +22,10 @@ import {
     getIdeas,
     putIdea,
     subscribeIdeaChanges,
-    isIdeaState,
-    sessionContext,
     type IdeaWithSubmitter,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { isIdeaState } from '../../shared/types.ts';
 import {
     IdeaListPresenter,
     buildInitialIdeaListState,

@@ -5,23 +5,23 @@ import {
 } from './fixtures/local-storage.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     validateFlowForCreation,
     getFlowsForCreation,
-} from '../web-app/app/adapters/flow-publish.ts';
+} from '../web-app/app/flow-publish.ts';
 import {
     postFlowCreation,
     putFlow,
-} from '../web-app/app/adapters/flow-mutations.ts';
+} from '../client/flow-mutations.ts';
 import {
     storedGraph,
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
-import { asStoredGraph } from '../api/validators.ts';
+} from '../shared/types.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -30,7 +30,7 @@ import type {
     GraphEdge,
     GraphNode,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -295,7 +295,7 @@ Deno.test(
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const goodId = generateIdentifier();
         const badId = generateIdentifier();
         const goodGraph = readyGraph(
@@ -352,7 +352,7 @@ Deno.test(
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const lockedId = generateIdentifier();
         const openId = generateIdentifier();
         const memberId = generateIdentifier();

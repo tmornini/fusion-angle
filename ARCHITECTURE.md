@@ -81,24 +81,34 @@ the build-time `POSTGRES_URL`.
 
 ## Layers
 
-Four directories. `api/` is the server REST and schema
+Five directories. `api/` is the server REST and schema
 handlers (Deno over Postgres on the product path; memory
-in `./test`). `shared/` is the one-way chasm: the HTTP
-wire schema (`http-message/`, with its own `types.ts`)
-plus pure utilities (`base64url.ts`, `identifier.ts`,
-`secret.ts`, `digest.ts`, `password-hash.ts`,
-`ledger-reduction.ts`, `error-helpers.ts`). Both `api/`
-and `web-app/` import `shared/`; `shared/` never imports
-`api/`. `web-app/` is the pages, adapters, presenters, and
-CSS. `server/` is boot, HTTP, seed, wipe, and throttle.
+in `./test`). `shared/` is the one-way chasm: the wire
+contract — domain types, status codes and error classes,
+the bell's wire, claim and token-chain derivation,
+record constraints, JSON assertions, graph bodies, and
+the two id header names — plus the HTTP message schema
+(`http-message/`, with its own `types.ts`) and pure
+utilities. `client/` is the API client: the transport,
+the request context, the session, the bell, and the
+per-noun verbs; it imports only itself and `shared/`,
+and `tests/client-import-graph.test.ts` walks
+`client/index.ts` to prove it. `api/`, `client/`, and
+`web-app/` import `shared/`; `shared/` never imports
+`api/`. `web-app/` is the pages, presenters, browser
+adapters, app logic, and CSS. `server/` is boot, HTTP,
+seed, wipe, and throttle.
 
 `web-app/app/server-core.ts` is the product composition
-root: it installs the fetch facade and calls `bootApp()`.
-`web-app/app/adapters/init.ts` is the test composition
-root (`initAdapter()` / `getDbAdapter()` over memory).
-`routes[]` (`api/routes.ts`) is the HTTP surface; if a URI
-is not on the table, it does not exist. Browse it at
-`/api-documentation/`.
+root: it builds the app's one client over the fetch
+transport (`createAppClient`, `web-app/app/client.ts`),
+puts it, and calls `bootApp()`. `web-app/app/root-redirect.ts`
+builds one for the apex probe. `tests/client-init.ts` is
+the test composition root (`initAdapter()` /
+`getDbAdapter()` over memory, behind
+`tests/in-page-facade.ts`). `routes[]` (`api/routes.ts`)
+is the HTTP surface; if a URI is not on the table, it
+does not exist. Browse it at `/api-documentation/`.
 
 ## The request vessel
 
@@ -266,7 +276,7 @@ page owns a `PageState` discriminated union
 constructs the appropriate one per render.
 
 Page modules never call transport verbs from `api/api.ts`
-— data access goes through `adapters/`. Pages may import
+— data access goes through `client/`. Pages may import
 error and status symbols.
 
 Naming: `mutate*` updates existing DOM; `toneFor*` /
@@ -275,7 +285,7 @@ Naming: `mutate*` updates existing DOM; `toneFor*` /
 throw; raw stored-shape reads carry the Entity suffix
 (`getProjectEntity`).
 
-Adapters take `ctx: RequestContext` first. Mutations
+Client verbs take `ctx: RequestContext` first. Mutations
 return `Promise<void>` by default; change-awareness flows
 through notification channels. Named non-void exceptions:
 `putRecordInstance` / `patchRecordInstance` → `{ etag }`;

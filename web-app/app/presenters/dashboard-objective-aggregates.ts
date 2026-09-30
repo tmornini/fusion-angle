@@ -2,11 +2,10 @@ import { html, type SafeHtml } from '../safe-html.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import { ICON_SIZE, iconTrendingUp } from '../icons.ts';
 import { buildBipolarGaugeSvg } from './gauge.ts';
-import type { TrendPoint } from
-    '../adapters/project-scoring.ts';
+import type { TrendPoint } from '../scoring-aggregate.ts';
 import { formatDate } from '../format.ts';
 import {
     formatSigned,

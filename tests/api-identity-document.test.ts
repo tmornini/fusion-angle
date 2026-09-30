@@ -12,7 +12,7 @@ import {
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     EntityNotFoundError,
 } from '../api/db.ts';

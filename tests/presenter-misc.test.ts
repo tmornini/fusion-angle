@@ -12,11 +12,11 @@ import type {
     GaugeData,
     RatioGauge,
     BipolarGauge,
-} from '../web-app/app/adapters/dashboard.ts';
+} from '../web-app/app/dashboard.ts';
 import { FlowPresenter } from
     '../web-app/app/presenters/flow.ts';
 import type { FlowSummary } from
-    '../web-app/app/adapters/flows.ts';
+    '../client/flows.ts';
 import { WorkingStylesPresenter } from
     '../web-app/app/presenters/working-styles.ts';
 import {
@@ -34,13 +34,12 @@ import { orderedKeys } from
     '../web-app/app/presenters/ordered-keys.ts';
 import {
     HumanMember, AIMember,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode, GraphEdge, RecordEntity,
     NodeAttribute,
-} from '../api/types.ts';
-import type { RecordAttribute } from
-    '../web-app/app/adapters/index.ts';
+} from '../shared/types.ts';
+import type { RecordAttribute } from '../client/index.ts';
 import {
     makeHumanMember as buildHumanMember,
     makeAIMember as buildAIMember,

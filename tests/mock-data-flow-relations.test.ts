@@ -1,8 +1,8 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { deriveFlow } from '../api/derive-flows.ts';
-import { asStoredGraph } from '../api/validators.ts';
-import type { StoredGraph } from '../api/types.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
+import type { StoredGraph } from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
 
 // buildFlows() seeds land on Stark (flowSeedBody stamps

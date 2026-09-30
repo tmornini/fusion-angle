@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, FlowRecordEntity } from './types.ts';
+import type { Id, FlowRecordEntity } from '../shared/types.ts';
 import { validateFlowRecordEntity } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';

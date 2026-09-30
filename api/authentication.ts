@@ -33,7 +33,7 @@ import {
     type ClientRegistrationEntity,
     type IdentityCredentialEntity,
     type IdentityPiiEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     pickString,
     validateIdentityCredentialEntity,
@@ -47,8 +47,8 @@ import {
     latestActionForJti,
     revocationAppends,
     jtiSetsEqual,
-} from './identity-tokens.ts';
-import type { RotationPlan } from './identity-tokens.ts';
+} from '../shared/identity-tokens.ts';
+import type { RotationPlan } from '../shared/identity-tokens.ts';
 import {
     hashPassword,
     verifyPassword,
@@ -97,7 +97,7 @@ import {
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
     HTTP_NOT_IMPLEMENTED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an

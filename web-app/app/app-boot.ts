@@ -13,64 +13,47 @@ import {
     handlePageLoadError,
 } from './page-loader.ts';
 import { log } from './logger.ts';
-import {
-    UnauthorizedError,
-} from './adapters/index.ts';
+import { UnauthorizedError } from '../../shared/http-errors.ts';
 import {
     RequestError,
     HTTP_FORBIDDEN,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import { principalFromToken } from
     '../../shared/access-token-decode.ts';
-import {
-    getSessionToken,
-    putSessionToken,
-    sessionTokenIsSeeded,
-} from './adapters/session-token.ts';
-import { getClientFacade } from './adapters/facade-holder.ts';
-import {
-    sessionContext,
-    createRequestContext,
-} from './adapters/shared.ts';
+import { getClient, sessionContext } from './client.ts';
 import {
     getOrganizations,
-} from './adapters/organizations.ts';
+} from '../../client/organizations.ts';
 import type {
     OrganizationEntity,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
     ACTIVE_ORGANIZATION_ID,
-} from './adapters/organization-session.ts';
+} from '../../client/organization-session.ts';
 import {
     getIdentityDefaultOrganization,
-} from './adapters/identity-default-organization.ts';
+} from '../../client/identity-default-organization.ts';
 import {
     nowEpochSeconds,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     getPreference,
     putPreference,
     deletePreference,
 } from './adapters/preferences.ts';
-import {
-    type SessionCredentials,
-    getSessionCredentials,
-    putSessionCredentials,
-    deleteSessionCredentials,
-    isCookieSession,
-} from './adapters/session-credentials.ts';
-import { runSingleFlightRefresh } from
-    './adapters/session-refresh-mutex.ts';
+import type {
+    SessionCredentials,
+} from '../../client/session-credentials.ts';
 import {
     resolveCredentialDecision,
     resolveOrganizationGate,
     resolveBootOrganizationBranch,
-} from './credential-resolution.ts';
+} from '../../client/credential-resolution.ts';
 import {
     postSessionRefresh,
-} from './adapters/session-refresh.ts';
+} from '../../client/session-refresh.ts';
 import { initErrorSurfacing } from './error-helpers.ts';
 import { replayPendingToast } from './toast.ts';
 import { redirectToLogin } from './auth-redirect.ts';
@@ -120,7 +103,7 @@ function bounceTo(
 async function scopeBootToActiveOrganization(
 ): Promise<readonly OrganizationEntity[] | null> {
     const principal = principalFromToken(
-        getSessionToken(),
+        getClient().getSessionToken(),
     );
     const branch = resolveBootOrganizationBranch(
         principal.organization,
@@ -135,9 +118,9 @@ async function scopeBootToActiveOrganization(
     }
     if (branch.kind === 'exchange') {
         const ctx = sessionContext();
-        putSessionToken(
+        getClient().putSessionToken(
             await postOrganizationSessionExchange(
-                ctx, getSessionToken(), branch.id,
+                ctx, getClient().getSessionToken(), branch.id,
             ),
         );
         putPreference(
@@ -163,9 +146,9 @@ async function scopeBootToActiveOrganization(
         getPreference(ACTIVE_ORGANIZATION_ID),
         defaultOrganization,
     );
-    putSessionToken(
+    getClient().putSessionToken(
         await postOrganizationSessionExchange(
-            ctx, getSessionToken(), active));
+            ctx, getClient().getSessionToken(), active));
     putPreference(ACTIVE_ORGANIZATION_ID, active);
     // Pre/post-exchange rows equal: getOrganizations is
     // identity-scoped (membership filter), not
@@ -190,13 +173,13 @@ async function scopeBootIfCredentialed(
 ): Promise<readonly OrganizationEntity[] | null> {
     let creds: SessionCredentials | null;
     try {
-        creds = getSessionCredentials();
+        creds = getClient().getSessionCredentials();
     } catch (err) {
         // a corrupt blob here just stays anonymous
         log.warn('corrupt session credential', 'core', err);
         return [];
     }
-    if (isCookieSession()) {
+    if (getClient().isCookieSession()) {
         if (!(await cookieRefreshAndInstall())) {
             return [];
         }
@@ -218,7 +201,7 @@ async function scopeBootIfCredentialed(
     }
     try {
         if (decision.kind === 'install') {
-            putSessionToken(decision.accessToken);
+            getClient().putSessionToken(decision.accessToken);
         } else if (
             !(await refreshAndInstall(decision.refreshToken))
         ) {
@@ -238,22 +221,21 @@ async function scopeBootIfCredentialed(
 // booting.
 async function cookieRefreshAndInstall(
 ): Promise<boolean> {
-    const token = sessionTokenIsSeeded()
-        ? getSessionToken()
+    const token = getClient().sessionTokenIsSeeded()
+        ? getClient().getSessionToken()
         : '';
-    const ctx = createRequestContext(
-        getClientFacade(), token);
+    const ctx = getClient().requestContext(token);
     const persisted = getPreference(
         ACTIVE_ORGANIZATION_ID,
     );
     try {
-        const access = await runSingleFlightRefresh(
+        const access = await getClient().runSingleFlightRefresh(
             async () => {
                 try {
                     const creds = await postSessionRefresh(
                         ctx, '', persisted ?? undefined,
                     );
-                    putSessionToken(creds.accessToken);
+                    getClient().putSessionToken(creds.accessToken);
                     return creds.accessToken;
                 } catch (err) {
                     if (err instanceof RequestError
@@ -266,7 +248,7 @@ async function cookieRefreshAndInstall(
                             await postSessionRefresh(
                                 ctx, '',
                             );
-                        putSessionToken(creds.accessToken);
+                        getClient().putSessionToken(creds.accessToken);
                         return creds.accessToken;
                     }
                     if (err instanceof UnauthorizedError) {
@@ -279,7 +261,7 @@ async function cookieRefreshAndInstall(
         if (access === null) {
             return false;
         }
-        putSessionToken(access);
+        getClient().putSessionToken(access);
         return true;
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -290,7 +272,7 @@ async function cookieRefreshAndInstall(
 }
 
 async function bootAuthGate(): Promise<boolean> {
-    if (isCookieSession()) {
+    if (getClient().isCookieSession()) {
         if (await cookieRefreshAndInstall()) {
             return true;
         }
@@ -299,18 +281,18 @@ async function bootAuthGate(): Promise<boolean> {
     }
     let creds: SessionCredentials | null;
     try {
-        creds = getSessionCredentials();
+        creds = getClient().getSessionCredentials();
     } catch (err) {
         // a corrupt blob is unrecoverable — scrub and bounce
         log.warn('corrupt session credential', 'core', err);
-        deleteSessionCredentials();
+        getClient().deleteSessionCredentials();
         redirectToLogin();
         return false;
     }
     const now = nowEpochSeconds();
     const decision = resolveCredentialDecision(creds, now);
     if (decision.kind === 'install') {
-        putSessionToken(decision.accessToken);
+        getClient().putSessionToken(decision.accessToken);
         return true;
     }
     if (decision.kind === 'refresh') {
@@ -335,7 +317,7 @@ async function bootOrganizationGate(
     const organizations =
         await scopeBootToActiveOrganization();
     const principal = principalFromToken(
-        getSessionToken(),
+        getClient().getSessionToken(),
     );
     const reachable = organizations === null
         ? (principal.organizations ?? [])
@@ -360,16 +342,16 @@ async function bootOrganizationGate(
 async function refreshAndInstall(
     refreshToken: string,
 ): Promise<boolean> {
-    const ctx = createRequestContext(
-        getClientFacade(), getSessionToken());
+    const ctx = getClient().requestContext(
+        getClient().getSessionToken());
     try {
-        const access = await runSingleFlightRefresh(
+        const access = await getClient().runSingleFlightRefresh(
             async () => {
                 try {
                     const creds = await postSessionRefresh(
                         ctx, refreshToken);
-                    putSessionCredentials(creds);
-                    putSessionToken(creds.accessToken);
+                    getClient().putSessionCredentials(creds);
+                    getClient().putSessionToken(creds.accessToken);
                     return creds.accessToken;
                 } catch (err) {
                     if (err instanceof UnauthorizedError) {
@@ -382,7 +364,7 @@ async function refreshAndInstall(
         if (access === null) {
             return false;
         }
-        putSessionToken(access);
+        getClient().putSessionToken(access);
         return true;
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -403,7 +385,7 @@ async function installRefreshedSession(
     if (await refreshAndInstall(refreshToken)) {
         return true;
     }
-    deleteSessionCredentials();
+    getClient().deleteSessionCredentials();
     redirectToLogin();
     return false;
 }

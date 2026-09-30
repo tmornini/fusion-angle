@@ -3,7 +3,7 @@ import type {
     Id,
     IdeaEntity,
     IdeaSubmissionEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     pickString, pickNumber,
     validateIdeaSubmissionEntity,

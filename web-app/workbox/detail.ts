@@ -35,25 +35,25 @@ import {
     putWorkOrderBinding,
     deleteWorkOrderClaim,
     getCurrentHumanMember,
-    sessionContext,
     getRecordForWorkOrder,
     getRecordAttributesByRecord,
     getRecordInstance,
     getRecordInstances,
     subscribeWorkOrderChanges,
     RecordTransitionViolations,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
 import type {
     NodeAttribute,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import type {
     RecordAttribute,
     RequestContext,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 
 /* ── Module state ────────── */
 

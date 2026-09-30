@@ -6,13 +6,13 @@ import {
 } from './organization-switcher.ts';
 import {
     shouldShowOrganizationSwitcher,
-} from './adapters/organization-session.ts';
+} from '../../client/organization-session.ts';
 import {
     RequestError, HTTP_FORBIDDEN,
-} from '../../api/http-errors.ts';
+} from '../../shared/http-errors.ts';
 import type {
     OrganizationEntity,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 
 const SIDEBAR_MEMBER_NAME_IDS = [
     'sidebar-member-name',
@@ -41,7 +41,7 @@ async function getSidebarMember(
     bootOrganizations:
         readonly OrganizationEntity[] | null = null,
 ): Promise<SidebarMember> {
-    const { sessionContext } = await import('./adapters/index.ts');
+    const { sessionContext } = await import('./client.ts');
     const ctx = sessionContext();
     // The chip is the caller's own row, drawn from role-independent
     // sources: id + display name from the verified token
@@ -61,7 +61,7 @@ async function getSidebarMember(
         try {
             const { getOrganizations } =
                 await import(
-                    './adapters/organizations.ts'
+                    '../../client/organizations.ts'
                 );
             organizations = await getOrganizations(ctx);
         } catch (err) {

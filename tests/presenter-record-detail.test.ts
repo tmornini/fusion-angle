@@ -9,8 +9,8 @@ import {
     allowedConstraintKinds,
     type AttributeDraft,
 } from '../web-app/app/presenters/record-detail.ts';
-import { RecordModel } from '../api/types.ts';
-import type { RecordState } from '../api/types.ts';
+import { RecordModel } from '../shared/types.ts';
+import type { RecordState } from '../shared/types.ts';
 
 function pageFor(
     state: RecordState,

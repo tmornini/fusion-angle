@@ -15,11 +15,11 @@ import {
     iconCheckCircle2,
     iconTrendingUp,
 } from '../icons.ts';
-import { type Idea } from '../adapters/index.ts';
+import { type Idea } from '../../../shared/types.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import {
     formatSigned,
 } from '../scoring-format.ts';

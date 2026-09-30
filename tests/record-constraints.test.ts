@@ -2,12 +2,12 @@ import { assertEquals, assertMatch, assertStrictEquals } from '@std/assert';
 import type {
     AttributeType,
     Constraint,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     type AttributeSchemaRow,
     validateAttributeValue,
     formatViolation,
-} from '../api/record-constraints.ts';
+} from '../shared/record-constraints.ts';
 
 function makeAttribute(
     attributeType: AttributeType,

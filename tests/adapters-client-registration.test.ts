@@ -5,14 +5,12 @@ import { devToken } from './token-fixtures.ts';
 import {
     seedServiceIdentity,
 } from './identity-fixtures.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     getClientRegistration,
     putClientRegistration,
     deleteClientRegistration,
-} from '../web-app/app/adapters/identities.ts';
+} from '../client/identities.ts';
 
 const FIELDS = {
     grantTypes: 'client_credentials',
@@ -26,7 +24,7 @@ async function setup() {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    return createRequestContext(db, await devToken());
+    return inPageContext(db, await devToken());
 }
 
 Deno.test('an unregistered service reads as registered: false',

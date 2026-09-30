@@ -10,10 +10,11 @@ import {
     postForHeaders as httpPostForHeaders,
     type ClientFacadeAdapter,
 } from '../api/api.ts';
-import type { HttpFacade } from
-    '../web-app/app/adapters/http-facade.ts';
-import { registerInPageWrap } from
-    '../web-app/app/adapters/facade-holder.ts';
+import type { HttpTransport } from
+    '../client/http-facade.ts';
+import type { Client } from '../client/create-client.ts';
+import type { RequestContext } from '../client/request-context.ts';
+import { createAppClient } from '../web-app/app/client.ts';
 
 // Test wrap: in-process handleRequest verbs as HttpFacade.
 // Product boot uses the fetch facade; this stays off the
@@ -21,8 +22,8 @@ import { registerInPageWrap } from
 
 export function wrapInPageAdapter(
     adapter: ClientFacadeAdapter,
-): HttpFacade {
-    return {
+): HttpTransport {
+    return () => ({
         GET: (resource, token, headerFields) =>
             httpGet(
                 adapter, resource, token, headerFields,
@@ -71,9 +72,22 @@ export function wrapInPageAdapter(
             adapter, resource, payload, token,
             headerFields,
         ),
-    };
+    });
 }
 
-registerInPageWrap(adapter => wrapInPageAdapter(
-    adapter as ClientFacadeAdapter,
-));
+// A client over the in-process handler, with the app's
+// hands.
+export function inPageClient(
+    adapter: ClientFacadeAdapter,
+): Client {
+    return createAppClient(wrapInPageAdapter(adapter));
+}
+
+// A context over the in-process handler, for a test that
+// holds a memory adapter and a token.
+export function inPageContext(
+    adapter: ClientFacadeAdapter,
+    token: string,
+): RequestContext {
+    return inPageClient(adapter).requestContext(token);
+}

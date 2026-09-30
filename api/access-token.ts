@@ -3,7 +3,7 @@ import {
     bytesToBase64Url,
     base64UrlToBytes,
 } from '../shared/base64url.ts';
-import type { Id } from './types.ts';
+import type { Id } from '../shared/types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     decodeAccessToken,

@@ -8,11 +8,11 @@ import {
     type FlowPath,
 } from '../web-app/app/flow-stats-aggregate.ts';
 import type {
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     TransitionEvent,
     StepTransition,
-} from '../web-app/app/adapters/work-orders-queries.ts';
+} from '../client/work-orders-queries.ts';
 
 export function makeFixture(): FlowStatsInput {
     return {

@@ -9,7 +9,7 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';

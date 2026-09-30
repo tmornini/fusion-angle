@@ -13,9 +13,9 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -26,21 +26,25 @@ import {
     putWorkOrderClaim,
     putWorkOrder,
 } from
-'../web-app/app/adapters/work-orders-mutations.ts';
+'../client/work-orders-mutations.ts';
+import {
+    createWorkOrderFromFlow,
+} from
+'../web-app/app/work-order-creation.ts';
 import {
     putRecordInstance,
     getRecordInstance,
     patchRecordInstance,
 } from
-'../web-app/app/adapters/record-instances.ts';
+'../client/record-instances.ts';
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../api/http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     postRecordChange,
 } from
-'../web-app/app/adapters/records.ts';
+'../client/records.ts';
 import {
     getWorkOrder,
     getWorkOrderActiveClaim,
@@ -48,12 +52,16 @@ import {
     getWorkOrderTransitionEvents,
     getActiveClaimsByWorkOrder,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
+import {
+    getFlowWithGraph,
+} from
+'../client/flow-queries.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
     generateIdentifier,
 } from
@@ -61,17 +69,17 @@ import {
 import {
     deleteWorkOrderClaim,
 } from
-'../web-app/app/adapters/work-orders-deletions.ts';
+'../client/work-orders-deletions.ts';
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
     StateEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -101,7 +109,7 @@ async function createWorkOrder(
     flowId: string,
 ): Promise<string> {
     const ids = mintCreateIds();
-    await postWorkOrderCreation(ctx, {
+    await createWorkOrderFromFlow(ctx, {
         ...ids, flowId,
     });
     return ids.workOrderId;
@@ -192,7 +200,7 @@ async function seedFlow(
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     const save = {
         name: 'Test flow',
         isLocked: false,
@@ -227,7 +235,7 @@ async function setupDb(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -463,6 +471,30 @@ Deno.test(
 );
 
 Deno.test(
+    'postWorkOrderCreation posts the position it'
+    + ' is handed',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+        );
+        const ids = mintCreateIds();
+        await postWorkOrderCreation(ctx, {
+            ...ids,
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+            flow: await getFlowWithGraph(
+                ctx, 'ZOousbbnzpqlxJExVAruYQ',
+            ),
+            position: 42,
+        });
+        assertStrictEquals(
+            (await getWorkOrder(ctx, ids.workOrderId)).position,
+            42,
+        );
+    },
+);
+
+Deno.test(
     'postWorkOrderCreation freezes '
     + 'flow_graph against subsequent '
     + 'flow edits',
@@ -611,7 +643,7 @@ async function setupScopedDb(): Promise<{
     await seedHumanMember(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
     );
-    const ctx = createRequestContext(
+    const ctx = inPageContext(
         db, await organizationToken(),
     );
     return { db, ctx };
@@ -899,7 +931,7 @@ Deno.test(
 import {
     getFlowWorkOrderEntities,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 
 Deno.test(
     'getFlowWorkOrderEntities returns the seeded '
@@ -907,7 +939,7 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         // NAMED re-pin (Task 7, the organizations/:id/projects/:id/flows
         // precedent in tests/adapters-flow-queries.test.ts): the
         // flipped GET organizations/:id/flows/:id/work-orders derives from
@@ -964,7 +996,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const woId = generateIdentifier();
         await seedBareWorkOrder(ctx, woId);
         // Backdate ten seconds; lockTimeout=1s
@@ -990,7 +1022,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const woId = generateIdentifier();
         await seedBareWorkOrder(ctx, woId);
         await seedClaim(ctx, woId, nowUtc());
@@ -1014,7 +1046,7 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await organizationToken());
+        const ctx = inPageContext(db, await organizationToken());
         const fresh1 = generateIdentifier();
         const fresh2 = generateIdentifier();
         const stale = generateIdentifier();

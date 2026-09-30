@@ -1,8 +1,8 @@
 import { assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import type { Id } from '../api/types.ts';
-import { assertInvitationState } from '../api/types.ts';
+import type { Id } from '../shared/types.ts';
+import { assertInvitationState } from '../shared/types.ts';
 import { deriveInvitation } from '../api/derive-invitations.ts';
 import {
     ORGANIZATION_TWO,

@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type {
     Id, MessagePairEntity, StateEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalPath } from './message-pair.ts';
 import { familyRegistration } from './family-registry.ts';
@@ -22,7 +22,7 @@ import type {
     PutHandler,
     WriteResponseSpec,
 } from './routes.ts';
-import { HTTP_OK } from './http-errors.ts';
+import { HTTP_OK } from '../shared/http-errors.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';

@@ -30,8 +30,8 @@
 // imports nothing from seed-message-pairs.ts in return — a
 // one-way dependency, no cycle.
 
-import type { Id, ObjectiveId } from '../types.ts';
-import { MS_PER_DAY } from '../types.ts';
+import type { Id, ObjectiveId } from '../../shared/types.ts';
+import { MS_PER_DAY } from '../../shared/types.ts';
 import {
     isoFromMs,
     deterministicScore,

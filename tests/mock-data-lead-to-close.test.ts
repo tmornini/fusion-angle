@@ -1,14 +1,12 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getFlowStats,
-} from '../web-app/app/adapters/flow-stats.ts';
+} from '../web-app/app/flow-stats.ts';
 import { now } from '../api/mock-data/seed-kit.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
-import { asStoredGraph } from '../api/validators.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import {
@@ -41,7 +39,7 @@ async function seededLeadToClose() {
         flow,
         `flow "${FLOW_NAME}" not seeded`,
     );
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return await getFlowStats(ctx, flow!.id, now.getTime());
 }
 

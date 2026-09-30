@@ -1,7 +1,7 @@
 import { assert } from '@std/assert';
 import { OrganizationObjectivesPresenter } from
     '../web-app/app/presenters/organization-objectives.ts';
-import type { ObjectiveEntity } from '../api/types.ts';
+import type { ObjectiveEntity } from '../shared/types.ts';
 
 const ORGANIZATION_ID = 'AjdvjuECVZEgZoFajaIEkg';
 

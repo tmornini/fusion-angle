@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type {
     Id, IdentityTokenEntity, MessagePairEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     generateIdentifier,
     isIdentifier,
@@ -34,9 +34,11 @@ import {
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
     errorJson,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
+import { OPERATION_ID_HEADER } from
+    '../shared/message-id-fields.ts';
 import type { NotificationEvent } from
-    './notifications.ts';
+    '../shared/notifications.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
 import type {
@@ -201,8 +203,6 @@ export function canonicalPath(
     }
     return flatPrefix;
 }
-
-export const OPERATION_ID_HEADER = 'operation-id';
 
 function headerFieldsWithOperationId(
     fields: readonly FieldLine[],

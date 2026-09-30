@@ -4,36 +4,34 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    createRequestContext,
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
 } from
-'../web-app/app/adapters/flow-mutations.ts';
+'../client/flow-mutations.ts';
 import {
-    postWorkOrderCreation,
+    createWorkOrderFromFlow,
 } from
-'../web-app/app/adapters/work-orders-mutations.ts';
+'../web-app/app/work-order-creation.ts';
 import {
     getWorkOrder,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 import type {
     FlowWithGraph,
     GraphNode,
     GraphEdge,
     StoredGraph,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
-} from '../api/types.ts';
-import {
-    asStoredGraph,
-} from '../api/validators.ts';
+} from '../shared/types.ts';
+import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -60,7 +58,7 @@ async function setupMemDb(): Promise<{
     await seedAdminSchema(db);
     await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
     await seedHumanMember(db, 'mFNSxZqywTSMXhgUTdTqtA', 'Member One');
-    const ctx = createRequestContext(db, await organizationToken());
+    const ctx = inPageContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -208,7 +206,7 @@ Deno.test(
         // Work-order creation reads the message-plane graph
         // via GET /organizations/:id/flows/:id.
         const woId = generateIdentifier();
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId: woId,
             flowLinkId: generateIdentifier(),
             flowId,

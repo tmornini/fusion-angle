@@ -3,7 +3,7 @@ import {
     assertInvitationState,
     type Id,
     type InvitationState,
-} from './types.ts';
+} from '../shared/types.ts';
 import { pickString } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import {

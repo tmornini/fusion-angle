@@ -4,13 +4,11 @@ import type {
     FlowEdgeEntity,
     FlowNodeMemberEntity,
     FlowNodeAttributeEntity,
-} from '../types.ts';
+} from '../../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-} from '../types.ts';
-import {
-    asStoredGraph,
-} from '../validators.ts';
+} from '../../shared/types.ts';
+import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import {
     l2cFlowId,
     buildLeadToCloseNodes,

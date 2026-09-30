@@ -7,19 +7,21 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { getDashboardGauges } from '../app/dashboard.ts';
 import {
-    sessionContext,
-    getDashboardGauges,
     startDashboardScoringReads,
     getObjectiveScoringInputs,
-    buildObjectiveAggregates,
-    buildObjectiveTrendlines,
     subscribeProjectScoreChanges,
     getCurrentObjectiveDefinitions,
     subscribeObjectiveChanges,
     subscribeProjectChanges,
     type DashboardScoringBundle,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import {
+    buildObjectiveAggregates,
+    buildObjectiveTrendlines,
+} from '../app/scoring-aggregate.ts';
 import {
     GaugePresenter,
     DashboardObjectiveAggregatesPresenter,

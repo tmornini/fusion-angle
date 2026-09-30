@@ -1,5 +1,5 @@
 import type { DbAdapter } from '../api/db.ts';
-import { nowUtc, SYSTEM_MEMBER_ID, type Id } from '../api/types.ts';
+import { nowUtc, SYSTEM_MEMBER_ID, type Id } from '../shared/types.ts';
 import {
     postIdentityDocumentOp,
     postIdentityPiiDocumentOp,

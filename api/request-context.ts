@@ -1,5 +1,5 @@
 import type { GuardedDbAdapter } from './db.ts';
-import { nowUtc, type Id } from './types.ts';
+import { nowUtc, type Id } from '../shared/types.ts';
 import type { Principal } from './access-token.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -7,7 +7,7 @@ import {
     errorJson,
     HTTP_BAD_REQUEST,
     HTTP_LENGTH_REQUIRED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 // The server half of the request vessel (Office of the
 // Context): one context enters at the gate and rides the
@@ -23,7 +23,6 @@ import {
 
 // The server mints request-id. A carried header is refused
 // at the gate; this step does not read one.
-export const REQUEST_ID_HEADER = 'request-id';
 
 const BODY_NEEDS_LENGTH =
     'A request body requires Content-Length';

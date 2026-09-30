@@ -96,10 +96,11 @@ Deno.test(
             },
         };
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { wrapInPageAdapter } =
+                await import('./in-page-facade.ts');
+            const { initAdapter } =
                 await import(
-                    '../web-app/app/adapters/init.ts'
+                    './client-init.ts'
                 );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
@@ -110,16 +111,19 @@ Deno.test(
                 () => db,
             );
             assertStrictEquals(hasSchema, true);
-            putSessionToken(await organizationToken());
             const {
-                getClientFacade,
-                putClientFacade,
+                createAppClient,
+                getClient,
+                putClient,
             } = await import(
-                '../web-app/app/adapters/facade-holder.ts'
+                '../web-app/app/client.ts'
             );
-            const inner = getClientFacade();
+            const inner = wrapInPageAdapter(db)({
+                ...getClient(),
+                navigateToAuth: () => {},
+            });
             const paths: string[] = [];
-            putClientFacade({
+            const client = createAppClient(() => ({
                 ...inner,
                 GET: async (
                     resource,
@@ -131,7 +135,9 @@ Deno.test(
                         resource, token, requestId,
                     );
                 },
-            });
+            }));
+            client.putSessionToken(await organizationToken());
+            putClient(client);
             const { init } = await import(
                 '../web-app/organization/index.ts'
             );
@@ -147,7 +153,7 @@ Deno.test(
         } finally {
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

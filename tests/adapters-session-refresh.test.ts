@@ -6,12 +6,10 @@ import {
 import {
     GET, handleRequest, UnauthorizedError,
 } from '../api/api.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import {
     postSessionRefresh,
-} from '../web-app/app/adapters/session-refresh.ts';
+} from '../client/session-refresh.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -21,7 +19,7 @@ import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { sha256Hex } from '../shared/digest.ts';
@@ -152,7 +150,7 @@ Deno.test('a live refresh token rotates to a usable pair',
 async () => {
     const db = await freshDb();
     const pair = await issuePair(db);
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = inPageContext(db, await devToken());
     const creds =
         await postSessionRefresh(ctx, pair.refresh_token);
     assertNotStrictEquals(creds.refreshToken, pair.refresh_token);
@@ -164,7 +162,7 @@ async () => {
 Deno.test('a garbage refresh token throws UnauthorizedError',
 async () => {
     const db = await freshDb();
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = inPageContext(db, await devToken());
     await assertRejects(
         () => postSessionRefresh(ctx, 'not.a.jwt'),
         UnauthorizedError);
@@ -174,7 +172,7 @@ Deno.test('a reused refresh token throws UnauthorizedError',
 async () => {
     const db = await freshDb();
     const pair = await issuePair(db);
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = inPageContext(db, await devToken());
     await postSessionRefresh(ctx, pair.refresh_token);
     // the rotated-away token is now poison — reuse → 401
     await assertRejects(

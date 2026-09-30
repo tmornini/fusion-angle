@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, FlowWorkOrderEntity } from './types.ts';
+import type { Id, FlowWorkOrderEntity } from '../shared/types.ts';
 import { validateFlowWorkOrderEntity } from './validators.ts';
 import { canonicalPath } from './message-pair.ts';
 import { withoutId } from './document-family.ts';

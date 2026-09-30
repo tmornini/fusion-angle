@@ -8,12 +8,13 @@ import type {
     TransitionFieldValueEntity,
     WorkOrderEntity,
     WorkOrderHistoryEventEntity,
-} from './types.ts';
-import { MS_PER_SECOND } from './types.ts';
+} from '../shared/types.ts';
+import { MS_PER_SECOND } from '../shared/types.ts';
 import {
-    pickString, pickNumber, asObject,
-    asWorkOrderFlowGraph,
+    pickString, pickNumber,
 } from './validators.ts';
+import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
+import { asObject } from '../shared/json-assert.ts';
 import { canonicalPath } from './message-pair.ts';
 import {
     documentMessagePairsAt,
@@ -28,7 +29,7 @@ import { deriveOrganizations } from './derive-organizations.ts';
 import {
     latestClaimEvent,
     addUtcSeconds,
-} from './work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 

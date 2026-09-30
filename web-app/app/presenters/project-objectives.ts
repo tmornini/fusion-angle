@@ -3,10 +3,10 @@ import type {
     ObjectiveEntity,
     ObjectiveId,
     ProjectState,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type {
     ObjectiveScore,
-} from '../adapters/project-scoring.ts';
+} from '../../../client/project-scoring.ts';
 import {
     latestPerPair,
     formatSigned,

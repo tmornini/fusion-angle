@@ -14,7 +14,7 @@ import {
     type AttributeType,
     type Id,
     type Member,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import type {
     CreationTransition,
     StepTransition,
@@ -22,13 +22,13 @@ import type {
     StateFieldValue,
     WorkOrder,
 } from
-'../web-app/app/adapters/work-orders-queries.ts';
+'../client/work-orders-queries.ts';
 import type {
     RecordAttribute,
-} from '../web-app/app/adapters/record-attributes.ts';
+} from '../client/record-attributes.ts';
 import type {
     ConstraintViolation,
-} from '../api/record-constraints.ts';
+} from '../shared/record-constraints.ts';
 import {
     WorkboxDetailPresenter,
     buildAttributeInputHtml,

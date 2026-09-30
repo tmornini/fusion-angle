@@ -1,5 +1,5 @@
 import { assert, assertMatch } from '@std/assert';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 
 // The Office of Time: persist RFC-3339 zulu at the fullest
 // resolution the environment provides. SCHEMA.md documents the

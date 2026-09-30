@@ -1,10 +1,10 @@
 import type { AttributeSchemaRow } from
-    './record-constraints.ts';
-import { ValidationError } from './types.ts';
+    '../shared/record-constraints.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     ApiError,
     HTTP_FORBIDDEN,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 
 // Field-level × role-aware ACL evaluation and read
 // projection. Admin bypass is FENCED-org roles only

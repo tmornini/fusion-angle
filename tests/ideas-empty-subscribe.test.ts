@@ -116,15 +116,14 @@ Deno.test(
         };
         g['document'] = doc;
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
+            const { initAdapter } =
                 await import(
-                    '../web-app/app/adapters/init.ts'
+                    './client-init.ts'
                 );
             const {
-                getClientFacade, putClientFacade,
+                getClient, putClient,
             } = await import(
-                '../web-app/app/adapters/facade-holder.ts'
+                '../web-app/app/client.ts'
             );
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
@@ -136,13 +135,13 @@ Deno.test(
             );
             assertStrictEquals(hasSchema, true);
             const token = await organizationToken();
-            putSessionToken(token);
-            const facade = getClientFacade();
+            const client = getClient();
+            client.putSessionToken(token);
             const reclaim = (): void => {
                 g['window'] = win;
                 g['document'] = doc;
-                putClientFacade(facade);
-                putSessionToken(token);
+                putClient(client);
+                client.putSessionToken(token);
             };
             const { init } = await import(
                 '../web-app/ideas/index.ts'
@@ -171,13 +170,13 @@ Deno.test(
             // same-tab notify, so only the
             // BroadcastChannel below can wake this
             // page.
-            const {
-                createRequestContext,
-                organizationItem,
-            } = await import(
-                '../web-app/app/adapters/shared.ts'
+            const { inPageContext } = await import(
+                './in-page-facade.ts'
             );
-            const ctx = createRequestContext(
+            const { organizationItem } = await import(
+                '../client/request-context.ts'
+            );
+            const ctx = inPageContext(
                 db, await organizationToken(),
             );
             const ideaId = generateIdentifier();
@@ -266,7 +265,7 @@ Deno.test(
                 deleteNamedNotificationChannel,
                 deleteNotificationChannel,
             } = await import(
-                '../web-app/app/adapters/broadcast-channel.ts'
+                '../client/broadcast-channel.ts'
             );
             deleteNamedNotificationChannel(CHANNEL_NAME);
             deleteNotificationChannel();

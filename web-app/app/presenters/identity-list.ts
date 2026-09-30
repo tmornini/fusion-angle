@@ -10,7 +10,7 @@ import {
     IDENTITY_WITHOUT_PII_NAME,
     UNNAMED_SERVICE_NAME,
     type IdentityRosterRow,
-} from '../adapters/index.ts';
+} from '../../../client/index.ts';
 
 const KIND_LABEL: Readonly<
     Record<IdentityRosterRow['kind'], string>

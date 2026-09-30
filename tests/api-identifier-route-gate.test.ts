@@ -19,11 +19,11 @@ import {
 } from '../shared/identifier.ts';
 import {
     incomingContext,
-    REQUEST_ID_HEADER,
 } from '../api/request-context.ts';
+import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import { validateWorkOrderTransitionBody } from
     '../api/validators.ts';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError } from '../shared/types.ts';
 
 const SKIP_PARAMS = new Set(['name']);
 

@@ -6,7 +6,7 @@ import {
 import { postBootstrap } from '../api/mock-data.ts';
 import {
     SYSTEM_MEMBER_ID,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import { deriveOrganization } from
     '../api/derive-organizations.ts';
 

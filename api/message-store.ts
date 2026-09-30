@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { MessagePairEntity } from './types.ts';
+import type { MessagePairEntity } from '../shared/types.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { parseWire } from

@@ -2,14 +2,14 @@ import { html, type SafeHtml } from '../safe-html.ts';
 import type {
     Id,
     ObjectiveId,
-} from '../../../api/types.ts';
+} from '../../../shared/types.ts';
 import type {
     ObjectiveLifecycleEvent,
     ObjectiveRevision,
-} from '../adapters/objectives.ts';
+} from '../../../client/objectives.ts';
 import type {
     ObjectiveScore,
-} from '../adapters/project-scoring.ts';
+} from '../../../client/project-scoring.ts';
 import {
     formatSigned,
     toneForScore,

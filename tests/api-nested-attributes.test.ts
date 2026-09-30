@@ -15,7 +15,7 @@ import {
 } from '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';

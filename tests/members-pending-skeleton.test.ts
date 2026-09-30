@@ -90,11 +90,8 @@ Deno.test(
         const gate = { held: Promise.resolve() };
         let release = (): void => {};
         try {
-            await import('./in-page-facade.ts');
-            const { initAdapter, putSessionToken } =
-                await import(
-                    '../web-app/app/adapters/init.ts'
-                );
+            const { initAdapter } =
+                await import('./client-init.ts');
             const db = new BackedDbAdapter(
                 new MemoryStorageBackend(),
                 () => gate.held,
@@ -106,7 +103,12 @@ Deno.test(
             assertStrictEquals(
                 await initAdapter(() => db), true,
             );
-            putSessionToken(await organizationToken());
+            const { getClient } = await import(
+                '../web-app/app/client.ts'
+            );
+            getClient().putSessionToken(
+                await organizationToken(),
+            );
             const { init } = await import(
                 '../web-app/members/index.ts'
             );
@@ -135,7 +137,7 @@ Deno.test(
             release();
             const { deleteNotificationChannel } =
                 await import(
-                    '../web-app/app/adapters/broadcast-channel.ts'
+                    '../client/broadcast-channel.ts'
                 );
             deleteNotificationChannel();
             delete g['window'];

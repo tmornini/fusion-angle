@@ -1,10 +1,8 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
-import { Project } from '../api/types.ts';
+import { Project } from '../shared/types.ts';
 import { DISPLAY_ABSENT } from '../web-app/app/format.ts';
-import { ProjectView } from
-    '../web-app/app/adapters/projects.ts';
-import { Organization } from
-    '../web-app/app/adapters/admin.ts';
+import { ProjectView } from '../web-app/app/project-view.ts';
+import { Organization } from '../web-app/app/organization-view.ts';
 import { ProjectPresenter } from
     '../web-app/app/presenters/project.ts';
 import {

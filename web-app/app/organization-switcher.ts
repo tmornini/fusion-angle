@@ -3,7 +3,7 @@ import { $, $$, $select } from './dom.ts';
 import {
     shouldShowOrganizationSwitcher,
     ACTIVE_ORGANIZATION_ID,
-} from './adapters/organization-session.ts';
+} from '../../client/organization-session.ts';
 import { putPreference } from './adapters/preferences.ts';
 import { showToast } from './toast.ts';
 
@@ -73,10 +73,9 @@ export function wireOrganizationSwitcher(activeOrganizationId: string): void {
 async function setActiveOrganizationAsDefault(
     organization: string,
 ): Promise<void> {
-    const { sessionContext } =
-        await import('./adapters/shared.ts');
+    const { sessionContext } = await import('./client.ts');
     const { putIdentityDefaultOrganization } =
-        await import('./adapters/identity-default-organization.ts');
+        await import('../../client/identity-default-organization.ts');
     await putIdentityDefaultOrganization(sessionContext(), organization);
     showToast(
         'Set as your default organization.', 'success');

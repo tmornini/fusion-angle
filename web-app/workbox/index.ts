@@ -21,24 +21,28 @@ import { navigateTo } from '../app/navigation.ts';
 import { initTabs } from '../app/dialog.ts';
 import { initDropdown } from '../app/theme-toggle.ts';
 import {
+    getFlowsForCreation,
+    type NotReadyFlowEntry,
+} from '../app/flow-publish.ts';
+import {
     getWorkOrders,
     getWorkOrderHistories,
     projectTransitions,
     activeClaimFromHistory,
     getMemberMap,
-    getFlowsForCreation,
-    postWorkOrderCreation,
     putWorkOrder,
-    sessionContext,
-    generateIdentifier,
     subscribeWorkOrderChanges,
-    type NotReadyFlowEntry,
     type RequestContext,
     type WorkOrder,
     type TransitionEvent,
-    type Member,
-} from '../app/adapters/index.ts';
-import type { Id } from '../../api/types.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { type Member } from '../../shared/types.ts';
+import {
+    createWorkOrderFromFlow,
+} from '../app/work-order-creation.ts';
+import type { Id } from '../../shared/types.ts';
 import {
     WorkboxInboxPresenter,
     buildInboxItems,
@@ -387,7 +391,7 @@ async function createWorkOrderForFlow(
     const flowLinkId =
         generateIdentifier();
     try {
-        await postWorkOrderCreation(ctx, {
+        await createWorkOrderFromFlow(ctx, {
             workOrderId,
             flowLinkId,
             flowId,

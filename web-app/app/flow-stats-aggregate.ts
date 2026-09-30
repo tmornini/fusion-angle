@@ -2,13 +2,13 @@ import type {
     GraphEdge,
     GraphNode,
     Id,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     MS_PER_DAY,
     MS_PER_SECOND,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import type { TransitionEvent }
-    from './adapters/work-orders-queries.ts';
+    from '../../client/work-orders-queries.ts';
 import { shouldShowMemberHazard } from './flow-graph.ts';
 import type { MemberHazardLevel } from './flow-graph.ts';
 

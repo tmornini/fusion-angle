@@ -16,27 +16,13 @@ import {
 import { navigateTo } from '../app/navigation.ts';
 import { log } from '../app/logger.ts';
 import { getViewportWidth } from '../app/adapters/index.ts';
-import {
-    getClientFacade,
-} from '../app/adapters/facade-holder.ts';
-import {
-    getSessionToken,
-    putSessionToken,
-    sessionHasReachableOrganization,
-    sessionTokenIsSeeded,
-} from '../app/adapters/session-token.ts';
-import {
-    createRequestContext,
-} from '../app/adapters/shared.ts';
+import { getClient } from '../app/client.ts';
 import {
     postPasswordLogin,
-} from '../app/adapters/authentication.ts';
-import {
-    putSessionCredentials,
-} from '../app/adapters/session-credentials.ts';
+} from '../../client/authentication.ts';
 import type {
     SessionCredentials,
-} from '../app/adapters/session-credentials.ts';
+} from '../../client/session-credentials.ts';
 import { decodeReturnTarget } from '../app/auth-redirect.ts';
 import { getUrlParam } from '../app/adapters/url-params.ts';
 
@@ -595,10 +581,9 @@ export async function init(): Promise<void> {
             let creds: SessionCredentials | null;
             try {
                 creds = await postPasswordLogin(
-                    createRequestContext(
-                        getClientFacade(),
-                        sessionTokenIsSeeded()
-                            ? getSessionToken()
+                    getClient().requestContext(
+                        getClient().sessionTokenIsSeeded()
+                            ? getClient().getSessionToken()
                             : '',
                     ),
                     email, password,
@@ -638,13 +623,13 @@ export async function init(): Promise<void> {
             // reloads, wiping the in-memory token holder —
             // only the persisted blob survives to re-
             // establish the session at boot.
-            putSessionCredentials(creds);
-            putSessionToken(creds.accessToken);
+            getClient().putSessionCredentials(creds);
+            getClient().putSessionToken(creds.accessToken);
             // A zero-membership identity reaches no org and
             // would 403 every org-scoped route; land it on
             // its pending invitations instead of the return
             // target's dead end.
-            if (!sessionHasReachableOrganization()) {
+            if (!getClient().sessionHasReachableOrganization()) {
                 navigateTo('invitations');
                 return;
             }

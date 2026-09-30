@@ -9,13 +9,11 @@ import {
     type IdeaEntity,
     type IdeaState,
     type ObjectiveEntity,
-} from '../api/types.ts';
+} from '../shared/types.ts';
 import {
     DISPLAY_ABSENT,
 } from '../web-app/app/format.ts';
-import type {
-    IdeaWithSubmitter,
-} from '../web-app/app/adapters/index.ts';
+import type { IdeaWithSubmitter } from '../client/index.ts';
 import {
     IdeaPresenter,
     IdeaEditPresenter,

@@ -33,6 +33,7 @@ const ROOT_FILES = [
 
 const TREES = [
     'api',
+    'client',
     'web-app',
     'tests',
     'shared',

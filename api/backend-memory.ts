@@ -9,7 +9,7 @@ import { createSerializer } from './store-serializer.ts';
 import { mintRootBind } from './ledger-root.ts';
 import { SuccessionConflict }
     from './ledger-statement.ts';
-import { nowUtc } from './types.ts';
+import { nowUtc } from '../shared/types.ts';
 import {
     classifyStatement,
 } from '../shared/ledger-statement.ts';

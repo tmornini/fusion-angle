@@ -4,12 +4,12 @@ import {
 import type {
     AttributeType,
     Constraint,
-} from '../api/types.ts';
-import { ValidationError } from '../api/types.ts';
+} from '../shared/types.ts';
+import { ValidationError } from '../shared/types.ts';
 import {
     type AttributeSchemaRow,
     validateInstanceValues,
-} from '../api/record-constraints.ts';
+} from '../shared/record-constraints.ts';
 
 // Server gate for instance set[] values: type conformance
 // (reconciliation 9 / G9) then the constraint engine.

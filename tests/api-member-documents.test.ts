@@ -14,7 +14,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
-import { ValidationError, nowUtc } from '../api/types.ts';
+import { ValidationError, nowUtc } from '../shared/types.ts';
 import {
     validateAiMemberDocumentBody,
     validateAIMemberEntity,

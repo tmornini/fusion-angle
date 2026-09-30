@@ -16,7 +16,7 @@ import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import { parseIfMatch } from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {

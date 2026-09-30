@@ -3,7 +3,7 @@ import {
     validateTimestampField,
     validateEnumField,
 } from '../api/validators.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 
 const STAMP = '2026-01-01T00:00:00.000000Z';
 

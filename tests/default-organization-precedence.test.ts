@@ -9,7 +9,7 @@ import {
     attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import { SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from

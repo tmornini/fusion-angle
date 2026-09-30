@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
-import type { Id } from './types.ts';
+import type { Id } from '../shared/types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import {
     headDocumentOf,

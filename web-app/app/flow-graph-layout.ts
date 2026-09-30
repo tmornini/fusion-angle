@@ -1,10 +1,14 @@
-import type { GraphNode, GraphEdge } from '../../api/types.ts';
+import type { GraphNode, GraphEdge } from '../../shared/types.ts';
 import {
     computeLayout, NODE_WIDTH, NODE_HEIGHT,
 } from './flow-layout.ts';
 import type { LayoutInput, LayoutResult } from './flow-layout.ts';
 import { computeEdgeLabelWidth } from './flow-graph.ts';
-import type { FlowGraph } from './adapters/flow-queries.ts';
+import {
+    getFlowGraph,
+    type FlowGraph,
+} from '../../client/flow-queries.ts';
+import type { RequestContext } from '../../client/request-context.ts';
 
 // The minimal edge shape a layout needs: who connects to whom,
 // and the label whose width reserves horizontal room.
@@ -116,4 +120,16 @@ export function withRenderableLayout(
                 : n;
         }),
     };
+}
+
+// The flow as the canvas draws it: the client's parsed
+// graph, laid out when the flow asks for auto-layout or its
+// stored positions are degenerate.
+export async function getRenderableFlowGraph(
+    ctx: RequestContext,
+    flowId: string,
+): Promise<FlowGraph> {
+    return withRenderableLayout(
+        await getFlowGraph(ctx, flowId),
+    );
 }

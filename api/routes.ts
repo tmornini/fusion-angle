@@ -44,11 +44,11 @@ import type {
     MemberEntity,
     AttributeType,
     Constraint,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
-} from './types.ts';
+} from '../shared/types.ts';
 import { hashPassword } from
     '../shared/password-hash.ts';
 import {
@@ -83,14 +83,16 @@ import {
     validateWorkOrderCreateBody,
     validateWorkOrderDocumentBody,
     validateWorkOrderTransitionBody,
-    asWorkOrderFlowGraph,
     pickString,
     pickStringArray,
     pickBoolean,
     pickNumber,
-    asStoredGraph,
-    asObject,
 } from './validators.ts';
+import {
+    asWorkOrderFlowGraph,
+    asStoredGraph,
+} from '../shared/flow-graph-body.ts';
+import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
     runWrite,
@@ -118,7 +120,7 @@ import {
     isClaimState,
     isExpiresAtPassed,
     addUtcSeconds,
-} from './work-order-claims.ts';
+} from '../shared/work-order-claims.ts';
 import {
     collectAttributeReferrers,
     hasReferrers,
@@ -142,13 +144,13 @@ import {
     HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import {
     reduceCreateGraphDelta,
 } from './flow-graph-relations.ts';
 import {
     storedGraph,
-} from './types.ts';
+} from '../shared/types.ts';
 import {
     deriveIdeaSubmissions,
     ideaEntityOf,
@@ -201,7 +203,7 @@ import {
 import {
     validateInstanceValues,
     type AttributeSchemaRow,
-} from './record-constraints.ts';
+} from '../shared/record-constraints.ts';
 import {
     flowEntityOf,
     deriveFlow,

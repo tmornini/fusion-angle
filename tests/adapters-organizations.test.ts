@@ -6,7 +6,7 @@ import {
     getOrganization,
     getOrganizations,
     putOrganization,
-} from '../web-app/app/adapters/organizations.ts';
+} from '../client/organizations.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';

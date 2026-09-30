@@ -5,7 +5,7 @@ import {
     enqueueFlowSave,
     awaitFlowSave,
 } from
-    '../web-app/app/adapters/flow-mutations.ts';
+    '../client/flow-mutations.ts';
 
 Deno.test(
     'awaitFlowSave waits for queued work',

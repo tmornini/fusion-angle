@@ -1,14 +1,12 @@
 import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    createRequestContext,
-} from '../web-app/app/adapters/shared.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postAIMemberCreation,
     putAIMember,
     getAIMemberEntity,
-} from '../web-app/app/adapters/ai-members.ts';
+} from '../client/ai-members.ts';
 import {
     seedHumanMember,
     seedAIMember,
@@ -35,7 +33,7 @@ Deno.test(
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = inPageContext(db, await devToken());
         const agentId = generateIdentifier();
 
         await postAIMemberCreation(
@@ -59,7 +57,7 @@ Deno.test(
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
         const agentId = generateIdentifier();
         await seedAIMember(db, agentId, 'Claude');
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = inPageContext(db, await devToken());
 
         await putAIMember(
             ctx, agentId,

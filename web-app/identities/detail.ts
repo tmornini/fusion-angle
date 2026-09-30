@@ -10,7 +10,6 @@ import {
     openDialog, closeDialog, handleDialogClick,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getIdentity,
     getMemberPii,
     getServiceFacet,
@@ -20,12 +19,15 @@ import {
     putClientRegistration,
     deleteClientRegistration,
     subscribeIdentityChanges,
+    type ServiceFacet,
+    type ClientRegistration,
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import {
     Identity,
     type MemberPii,
-    type ServiceFacet,
     type IdentityCredentialKind,
-    type ClientRegistration,
-} from '../app/adapters/index.ts';
+} from '../../shared/types.ts';
 import {
     IdentityDetailPresenter,
     type IdentityDetailView,

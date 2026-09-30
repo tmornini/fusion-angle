@@ -18,15 +18,15 @@ import {
     handleDialogClick, closeDialog,
 } from '../app/dialog.ts';
 import {
-    sessionContext,
     getIdentityRoster,
     postIdentityCreation,
     subscribeIdentityChanges,
-    generateIdentifier,
     IdentityPiiIntakeFailedError,
     type IdentityRosterRow,
     type RequestContext,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
 import {
     IdentityRosterPresenter,
 } from '../app/presenters/index.ts';

@@ -1,17 +1,19 @@
-import { assertRejects, assertStrictEquals } from '@std/assert';
+import {
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
 import {
     type RequestContext,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
 import {
     postSessionLogout,
-} from '../web-app/app/adapters/session-logout.ts';
-import {
-    getSessionCredentials,
-    putSessionCredentials,
-} from '../web-app/app/adapters/session-credentials.ts';
+} from '../client/session-logout.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
+import { inPageClient } from './in-page-facade.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import { deriveTokenRevocationsFor } from
@@ -43,7 +45,7 @@ function freshStorage(): Partial<Storage> {
 Deno.test('logout revokes this identity and clears credentials',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const { db, ctx } = await adminContext();
-    putSessionCredentials({
+    ctx.session.putSessionCredentials({
         accessToken: await devToken(),
         refreshToken: await organizationToken(),
     });
@@ -56,18 +58,20 @@ Deno.test('logout revokes this identity and clears credentials',
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
     // Phase Final Stage B: identity spine tables retired.
-    assertStrictEquals(getSessionCredentials(), null);
+    assertStrictEquals(ctx.session.getSessionCredentials(), null);
 }));
 
 Deno.test('logout scrubs locally even when the revoke fails',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    putSessionCredentials({
+    const client = inPageClient(memoryDbAdapter());
+    client.putSessionCredentials({
         accessToken: await devToken(),
         refreshToken: await organizationToken(),
     });
     // identity is read from the vessel; the server PUT throws.
     const ctx = {
         identity: { id: 'XXZruirZyAOoRpNxaDnpSA' },
+        session: client,
         PUT: async () => {
             throw new Error('revoke endpoint down');
         },
@@ -78,5 +82,24 @@ Deno.test('logout scrubs locally even when the revoke fails',
         'revoke endpoint down',
     );
     // teardown ran in finally despite the server fault
-    assertStrictEquals(getSessionCredentials(), null);
+    assertStrictEquals(client.getSessionCredentials(), null);
 }));
+
+Deno.test('logout scrubs the session its context carries',
+async () => {
+    const scrubbed: string[] = [];
+    const { ctx } = await adminContext();
+    await postSessionLogout({
+        ...ctx,
+        session: {
+            ...ctx.session,
+            deleteSessionCredentials: () => {
+                scrubbed.push('credentials');
+            },
+            deleteSessionToken: () => {
+                scrubbed.push('token');
+            },
+        },
+    });
+    assertEquals(scrubbed, ['credentials', 'token']);
+});

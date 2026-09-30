@@ -19,20 +19,20 @@ import {
     getIdea,
     getProjectEntities,
     postIdeaConversion,
-    createRequestContext,
-    sessionContext,
-    generateIdentifier,
-    type IdeaEntity,
-} from '../app/adapters/index.ts';
+} from '../../client/index.ts';
+import { sessionContext } from '../app/client.ts';
+import type { RequestContext } from '../../client/request-context.ts';
+import { generateIdentifier } from '../../shared/identifier.ts';
+import { type IdeaEntity } from '../../shared/types.ts';
 import {
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
-} from '../app/adapters/objectives.ts';
-import { MS_PER_DAY } from '../../api/types.ts';
+} from '../../client/objectives.ts';
+import { MS_PER_DAY } from '../../shared/types.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
-} from '../../api/types.ts';
+} from '../../shared/types.ts';
 import {
     nextPosition,
 } from '../app/drag-reorder-positions.ts';
@@ -573,7 +573,7 @@ function isoDateOnly(ms: number): string {
 }
 
 async function performConversion(
-    ctx: ReturnType<typeof createRequestContext>,
+    ctx: RequestContext,
     ideaId: string,
     projectId: string,
     draft: ConversionDraft,

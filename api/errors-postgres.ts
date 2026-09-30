@@ -8,7 +8,7 @@ import {
     ApiError,
     HTTP_GATEWAY_TIMEOUT,
     HTTP_INTERNAL_ERROR,
-} from './http-errors.ts';
+} from '../shared/http-errors.ts';
 import { SuccessionConflict }
     from './ledger-statement.ts';
 

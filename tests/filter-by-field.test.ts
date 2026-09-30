@@ -1,7 +1,7 @@
 import { assertEquals } from '@std/assert';
 import {
     filterByField,
-} from '../web-app/app/adapters/shared.ts';
+} from '../client/request-context.ts';
 
 Deno.test('filterByField keeps rows whose field equals value', () => {
     const rows = [

@@ -11,7 +11,7 @@ import type {
 } from './db.ts';
 import type {
     MessagePairEntity,
-} from './types.ts';
+} from '../shared/types.ts';
 import type {
     Attempt,
     StatementAnswer,
@@ -21,7 +21,7 @@ import type { LatencySimulation } from './latency.ts';
 import type {
     NotificationEvent,
     NotificationPost,
-} from './notifications.ts';
+} from '../shared/notifications.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
 import { SuccessionConflict } from

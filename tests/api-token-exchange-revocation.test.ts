@@ -14,7 +14,7 @@ import {
     mintAccessToken,
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
-import { nowUtc } from '../api/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { seedSeat } from './root-admin-fixture.ts';
