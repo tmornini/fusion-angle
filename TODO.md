@@ -18,12 +18,12 @@ skew tests, which went with item 8's trio.
 
 0. The table, right — what a pair stores and what the
    store guarantees, before anything reads it differently.
-   The store is brainstormed:
-   `docs/superpowers/specs/2026-09-23-ledger-store-design.md`.
-   The message plane and the seed are not yet.
-   It ships as three specs in order, each its own
-   worktree, master green at Layer 1 between them and
-   deployed with items 1–3: the store — the final DDL,
+   The store, the message plane, and the seed are implemented:
+   `docs/superpowers/specs/2026-09-23-ledger-store-design.md`,
+   `docs/superpowers/specs/2026-09-23-message-plane-design.md`,
+   `docs/superpowers/specs/2026-09-23-ledger-seed-design.md`.
+   Its three specs, executed in order, deploy with
+   items 1–3: the store — the final DDL,
    its table `fa_message_pairs` and its indexes named
    after it under the naming bullet's prefix,
    the root, succession, the hash tree, one statement per
@@ -1027,7 +1027,7 @@ skew tests, which went with item 8's trio.
    `server/postgres-gate.ts:67`, called at
    `server/boot.ts:106`), and the seed's one transaction
    writes `schema_marker` last
-   (`api/backend-postgres.ts:97-100`); the seed refuses
+   (`api/backend-postgres.ts:100-102`); the seed refuses
    on `fa_message_pairs`' presence, not the marker
    (`server/seed.ts:104-128`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
@@ -2831,10 +2831,16 @@ Off the critical path; each with its oracle.
   AI-member gate checks `model` against it, but it is not
   yet the only list: the seeded roster
   (`api/mock-data/ai-members.ts`) spells four of its names
-  again as agent names, and TEST-PLAN AA7a enumerates
-  them. Make the catalog the one list first: the roster
-  takes each agent's name from its `model` id, and AA7a
-  names the catalog rather than copying it. Then JEV
+  again as agent names, and TEST-PLAN.md spells catalog
+  names in prose: AA7a lists the four and picks "Claude
+  Haiku 4.5" (`:605-609`), AA8a's example names "Claude
+  Sonnet 4.6" (`:639`), and two pin notes quote a
+  fixture's 'Claude Opus 4.8' (`:650`, `:5361`). Make the
+  catalog the one list first: the roster takes each
+  agent's name from its `model` id, and TEST-PLAN.md
+  names models by their place in the catalog (the
+  seeded AIs, an Anthropic model not seeded), never by
+  spelling. Then JEV
   lands as one entry there: `provider` `TypeSafe AI`,
   `name` `JEV` (no catalog name carries its provider;
   "Claude", "GPT", and "Grok" are families, and the
@@ -2844,7 +2850,75 @@ Off the critical path; each with its oracle.
   Oracle: JEV appears in `PROVIDER_MODELS` under
   `TypeSafe AI` and in the AI form's Model picker, and
   no model name is spelled outside
-  `api/provider-models.ts` but in test fixtures
+  `api/provider-models.ts` but in test fixtures;
+  TEST-PLAN.md prose counts as a spelling
+- The seed's rehearsal runs its statements one at a
+  time. It opens no transaction (the ledger seed plan's
+  Interpretation (C): the instance PATCH create opens its
+  own), so each of its 1,416 statements queues through
+  `MemoryStorageBackend`'s serializer, and their async
+  digest work never overlaps. Measured on the ledger seed
+  branch (medians): replaying the rehearsal's own
+  statements takes 1,072 ms serialized against 146 ms run
+  concurrently inside one transaction, the base's pass-2
+  shape. A memory seed went from 692 ms to 1,398 ms, and
+  `./test` from 36.57 s to 62.51 s. On local Postgres the
+  seed is already faster than the base, because its
+  1,418 round trips became three statements (test hasher
+  2.44–2.55 s to 1.44–1.47 s; the verb with serial scrypt
+  4.97 s to 3.97–4.02 s); the rehearsal is 1.25 s of the
+  1.45 s. The scratch backend has one writer, the seed,
+  so its serializer guards nothing there: let the
+  rehearsal's statements overlap as a transaction's do,
+  keeping the verdict (every row lands, or the seed
+  fails) and the instance create's own transaction.
+  Oracle: the rehearsal's replay measures near the
+  concurrent 146 ms, a memory seed is back at or under
+  the base's 692 ms, and `./test` and the Postgres seed
+  are re-measured
+- No error-message allowlist. `safeErrorMessage`
+  (`server/postgres-gate.ts:101-121`) prints a message
+  only if a set names it, else `seed failed` (seed,
+  `server/seed.ts:41`), or boot's and wipe's fallback
+  (`postgres-gate.ts:126`, `server/postgres-wipe.ts:37`),
+  so a fault the seed's own code raises — a rehearsed row
+  that does not land, a row on another predecessor —
+  reaches the operator as `seed failed` and a code, the
+  evidence destroyed. Two classes replace it. A
+  precondition refusal names itself: the database is
+  not empty, a required env is missing, Postgres is
+  unreachable, a concurrent seed won, the flags are
+  wrong. Everything else is a bug and crashes with its
+  message and stack. The allowlist kept secrets off
+  stderr; that duty moves to the gate: no secret enters
+  an error message, and the Postgres adapter enriches a
+  driver fault without the URL or password. First check
+  what the driver's own messages carry (connection,
+  authentication, and constraint errors); a secret found
+  there is fixed at the adapter, not filtered at print.
+  Oracle: the allowlist and its fallback are gone; each
+  named refusal prints its own message; a forced
+  rehearsal fault prints its message; and a pin feeds
+  the adapter each driver fault class with a known
+  password in the URL and finds the password in no
+  message
+- One rehearsal per test process, if measurement earns
+  it. `tests/` calls `seededMockDb()` at 59 sites, and
+  `sharedMockDb()` seeds once per worker that uses it;
+  each builds the identical dataset from nothing: hash,
+  form, rehearse, land. A landing onto an absent table
+  is a pure function of the rehearsal, and fresh memory
+  backends share nothing, so the harness could rehearse
+  once per process and land that one rehearsal into each
+  new backend (a memory landing measured 130 ms). This is
+  a test-only cache, and the product seed never keeps
+  its rehearsal. It waits on the rehearsal-serialization
+  bullet above, which shrinks what it could save: land
+  that, re-measure `./test`, and build this only if the
+  per-seed rehearsal is still a cost worth a cache.
+  Oracle: `./test` measured before and after this change
+  alone, three runs each, and every test that mutates
+  its seeded database still gets its own backend
 
 ## Sequencing
 

@@ -3,6 +3,8 @@ import { STARK_ORGANIZATION } from
     '../../api/mock-data/seed-constants.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
+import { operationIdHeader } from
+    '../operation-id-header.ts';
 import {
     adminToken, type Origin, type Page, type Point,
 } from './fixtures.ts';
@@ -33,6 +35,7 @@ export async function flowIdNamed(
 ): Promise<string> {
     const rows = await GET<FlowRow[]>(
         origin.db, flowsPath(), await adminToken(),
+        operationIdHeader(),
     );
     const row = rows.find((r) => r.name === name);
     if (row === undefined) {
@@ -46,6 +49,7 @@ export async function flowGraph(
 ): Promise<FlowGraph> {
     return GET<FlowGraph>(
         origin.db, flowsPath() + flowId, await adminToken(),
+        operationIdHeader(),
     );
 }
 
