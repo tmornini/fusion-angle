@@ -20,6 +20,7 @@ import type {
     Route,
     GetHandler,
     PutHandler,
+    SelectHandler,
     WriteResponseSpec,
 } from './routes.ts';
 import { liveHeadId, messageStore } from
@@ -280,6 +281,40 @@ export function documentGetHandler(
         );
 }
 
+// A family's document head (spec §5, rungs 1–2): the
+// gate's fence has run; no head is this family's miss,
+// 403 for a foreign id and 404 otherwise. Whether the
+// head is deleted is the gate's to judge.
+export function documentSelect(
+    wiring: DocumentFamilyWiring,
+): SelectHandler {
+    return async (db, params, _actor, organization) => {
+        const organizationId = requireOrganization(
+            organization,
+        );
+        const id = entityIdParam(wiring, params);
+        const head = await db.messagePairs.getHeadPair(
+            canonicalPath(
+                organizationId, '/' + wiring.family + '/',
+            ),
+            id,
+        );
+        if (head === null) {
+            throw await throwDocumentMiss(
+                wiring, db, organizationId, id,
+            );
+        }
+        return {
+            kind: 'document',
+            head,
+            lifecycle: wiring.lifecycle,
+            table: wiring.notFoundTable,
+            id,
+            reader: { sees: 'whole' },
+        };
+    };
+}
+
 // Live PUT pair id at this document — the store's document
 // head read (`messageStore(db).getDocumentHead`). A DELETE head or
 // virgin document is undefined.
@@ -314,7 +349,7 @@ export function documentEntityRoute(
 ): Route {
     return {
         segments: entitySegments(wiring),
-        get: documentGetHandler(wiring),
+        select: documentSelect(wiring),
         put: documentPutHandler(wiring),
     };
 }
@@ -604,30 +639,6 @@ const STREAM_FAMILIES: ReadonlySet<string> = new Set([
     'identities',
     'ai-agents',
 ]);
-
-const ID_PATTERN_SUFFIX = '/:id';
-
-const ORGANIZATION_NEST_PREFIX = 'organizations/:id/';
-
-export function idFamilyOf(
-    pattern: string,
-): string | undefined {
-    if (!pattern.endsWith(ID_PATTERN_SUFFIX)) {
-        return undefined;
-    }
-    const rest = pattern.slice(
-        0, -ID_PATTERN_SUFFIX.length,
-    );
-    if (rest.startsWith(ORGANIZATION_NEST_PREFIX)) {
-        const family = rest.slice(
-            ORGANIZATION_NEST_PREFIX.length,
-        );
-        if (family.includes('/')) return undefined;
-        return family;
-    }
-    if (rest.includes('/')) return undefined;
-    return rest;
-}
 
 function documentFromBody(
     id: Id,

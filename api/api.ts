@@ -29,7 +29,7 @@ import {
     ownWireOf,
     attachEtag,
     attachDate,
-    streamGetFromStored,
+    httpDateOf,
     parseEntityTags,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
@@ -48,10 +48,9 @@ import {
     documentFamilyWiring,
     documentHeadMessagePairId,
     entityIdParam,
-    idFamilyOf,
-    throwDocumentMiss,
     requireOrganization,
 } from './document-family.ts';
+import { servedSelection } from './head-reads.ts';
 import {
     messageStore,
 } from './message-store.ts';
@@ -959,6 +958,18 @@ async function dispatched(
         };
         switch (method) {
             case 'GET': {
+                if (matched.select !== undefined) {
+                    return servedSelection(
+                        await matched.select(
+                            effective, params, actor,
+                            organization, roles,
+                        ),
+                        {
+                            date: httpDateOf(nowUtc()),
+                            requestId: ctx.requestId,
+                        },
+                    );
+                }
                 if (!matched.get) {
                     return Response.json(
                         {
@@ -969,16 +980,6 @@ async function dispatched(
                         },
                         { status: HTTP_METHOD_NOT_ALLOWED },
                     );
-                }
-                const streamedDocument =
-                    await streamStoredDocumentGet(
-                        effective,
-                        routePattern,
-                        params,
-                        organization,
-                    );
-                if (streamedDocument !== undefined) {
-                    return streamedDocument;
                 }
                 const streamedCollection =
                     await streamStoredCollectionGet(
@@ -1681,22 +1682,6 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-// Stream families read the stored head: a work order's is
-// its whole state. Flows stay on derive for
-// hasUndoHistory.
-function streamFamilyWiring(
-    routePattern: string,
-): ReturnType<typeof documentFamilyWiring> {
-    const family = idFamilyOf(routePattern);
-    if (
-        family === undefined
-        || family === 'flows'
-    ) {
-        return undefined;
-    }
-    return documentFamilyWiring(family);
-}
-
 function collectionFamilyOf(
     routePattern: string,
 ): string | undefined {
@@ -1725,28 +1710,6 @@ function streamCollectionWiring(
         return undefined;
     }
     return documentFamilyWiring(family);
-}
-
-async function streamStoredDocumentGet(
-    db: DbAdapter,
-    routePattern: string,
-    params: string[],
-    organization: Id | undefined,
-): Promise<Response | undefined> {
-    const wiring = streamFamilyWiring(routePattern);
-    if (wiring === undefined) return undefined;
-    const organizationId = requireOrganization(organization);
-    const id = entityIdParam(wiring, params);
-    const prefix = canonicalPath(
-        organizationId, '/' + wiring.family + '/',
-    );
-    const stored = await messageStore(db).getDocumentHead(prefix, id);
-    if (stored === null) {
-        throw await throwDocumentMiss(
-            wiring, db, organizationId, id,
-        );
-    }
-    return streamGetFromStored(stored, nowUtc());
 }
 
 async function streamStoredCollectionGet(

@@ -6,12 +6,17 @@ export const HTTP_VERBS = [
 
 export type HttpVerb = (typeof HTTP_VERBS)[number];
 
+// A `select` serves GET (spec §2), so a conversion changes
+// no offered verb.
+const GET_SERVERS = ['get', 'select'] as const;
+
 export function offeredVerbs(
     row: Route,
 ): readonly HttpVerb[] {
     const extra = Object.keys(row).filter(
         (key) =>
             key !== 'segments'
+            && key !== 'select'
             && !(HTTP_VERBS as readonly string[])
                 .includes(key)
             && typeof (row as unknown as
@@ -24,9 +29,10 @@ export function offeredVerbs(
             + extra.join(','),
         );
     }
-    return HTTP_VERBS.filter(
-        (verb) => row[verb] !== undefined,
-    );
+    return HTTP_VERBS.filter((verb) =>
+        verb === 'get'
+            ? GET_SERVERS.some((slot) => row[slot] !== undefined)
+            : row[verb] !== undefined);
 }
 
 export function routePatternOf(row: Route): string {

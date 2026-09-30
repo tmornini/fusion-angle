@@ -115,6 +115,7 @@ import type {
     StateSibling,
 } from './message-pair.ts';
 import type { Reader } from './served-response.ts';
+import type { HeadSelection } from './head-reads.ts';
 import { messageStore } from './message-store.ts';
 import {
     generateIdentifier,
@@ -293,8 +294,8 @@ import {
     documentCollectionGetHandler,
     documentCollectionRoute,
     documentEntityRoute,
-    documentGetHandler,
     documentPutHandler,
+    documentSelect,
     documentVersionListRoute,
     documentVersionRoute,
     storedRevisionDocument,
@@ -573,6 +574,16 @@ export type GetHandler = (
     roles: readonly string[],
 ) => Promise<unknown>;
 
+// A GET that serves stored responses (spec §2): the handler
+// fences and selects; the gate serves what it selected.
+export type SelectHandler = (
+    adapter: DbAdapter,
+    params: string[],
+    actor: Id,
+    organization: Id | undefined,
+    roles: readonly string[],
+) => Promise<HeadSelection>;
+
 // PutHandler, PatchHandler, PostHandler, and DeleteHandler
 // carry a trailing pair: it is undefined for bearer-exempt and
 // not-yet-wired writes (TypeScript cannot prove bearerExempt
@@ -646,6 +657,7 @@ type PostHandler = (
 export interface Route {
     segments: string[];
     get?: GetHandler;
+    select?: SelectHandler;
     put?: PutHandler;
     patch?: PatchHandler;
     delete?: DeleteHandler;
@@ -656,6 +668,7 @@ export function route(
     pattern: string,
     handlers: {
         get?: GetHandler;
+        select?: SelectHandler;
         put?: PutHandler;
         patch?: PatchHandler;
         delete?: DeleteHandler;
@@ -3719,14 +3732,14 @@ export const routes: Route[] = [
         },
     }),
     // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
-    // documentGetHandler(IDENTITIES_WIRING) — the SAME wiring row
+    // documentSelect(IDENTITIES_WIRING) — the SAME wiring row
     // PUT already rides — wire-identical to the hand-written
     // db.identities.getById dispatch it replaces. PUT rides the
     // generic documentPutHandler(IDENTITIES_WIRING) — wire-
     // identical to postIdentityDocumentOp's own direct dispatch
     // it replaces. Verbs stay {get, put}.
     route('identities/:id', {
-        get: documentGetHandler(IDENTITIES_WIRING),
+        select: documentSelect(IDENTITIES_WIRING),
         put: documentPutHandler(IDENTITIES_WIRING),
     }),
     // Singleton SET document. Self-only in the handler
@@ -3761,7 +3774,7 @@ export const routes: Route[] = [
     ),
     documentCollectionRoute(AI_AGENTS_WIRING),
     route('ai-agents/:id', {
-        get: documentGetHandler(AI_AGENTS_WIRING),
+        select: documentSelect(AI_AGENTS_WIRING),
         put: documentPutHandler(AI_AGENTS_WIRING),
     }),
     documentVersionListRoute(IDENTITIES_WIRING),
@@ -4518,7 +4531,7 @@ export const routes: Route[] = [
     // via MEMBER_VERBS['/work-orders']. Verbs stay
     // {get, put} — no DELETE.
     route('organizations/:id/work-orders/:id', {
-        get: documentGetHandler(WORK_ORDERS_WIRING),
+        select: documentSelect(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
     // PUT claims and DELETE releases: operations on the work
@@ -5484,7 +5497,7 @@ export const routes: Route[] = [
     }),
     // objectives/:id is the seventh family. GET is FLIPPED
     // (Task 7): absorbed into the generic documentEntityRoute —
-    // GET dispatches to documentGetHandler(OBJECTIVES_WIRING);
+    // GET dispatches to documentSelect(OBJECTIVES_WIRING);
     // objectiveDocumentEntityOf reads entity fields and `state`
     // alike from the head body. PUT stays
     // documentPutHandler(OBJECTIVES_WIRING), unchanged from

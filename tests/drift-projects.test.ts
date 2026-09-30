@@ -398,17 +398,13 @@ async () => {
         },
     ));
 
+    // A state-deleted head is Gone (spec §5).
     const deleted = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId, token),
     );
-    assertStrictEquals(deleted.status, 200);
-    assertStrictEquals(
-        await deleted.text(),
-        await storedPutBodyText(
-            db, '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/', projectId,
-        ),
-    );
+    assertStrictEquals(deleted.status, 410);
+    await deleted.body?.cancel();
     await assertRejects(
         () => getDocument(
             db, 'projects', 'AjdvjuECVZEgZoFajaIEkg', projectId,

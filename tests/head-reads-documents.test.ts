@@ -1,0 +1,229 @@
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
+import { handleRequest } from '../api/api.ts';
+import { seededMockDb } from './mock-seed.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { apiRequest, storedPutBodyText } from
+    './http-fixtures.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
+import { nowUtc } from '../shared/types.ts';
+import { ORGANIZATION_TWO } from
+    '../api/mock-data/seed-constants.ts';
+import { messageStore } from '../api/message-store.ts';
+import {
+    attemptFor,
+    formWriteMessagePair,
+    runWrite,
+} from '../api/message-pair.ts';
+import { withoutId } from '../api/document-family.ts';
+import { parseWire } from
+    '../shared/http-message/wire-codec.ts';
+
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const ME = 'XXZruirZyAOoRpNxaDnpSA';
+const IDEAS = '/organizations/' + STARK + '/ideas/';
+
+function idea(state: string) {
+    return {
+        title: 'Served', position: 1,
+        problem_statement: 'p', target_users: 't',
+        proposed_solution: 's', expected_outcome: 'o',
+        success_metrics: 'm', state,
+    };
+}
+
+async function put(
+    db: Awaited<ReturnType<typeof seededMockDb>>,
+    path: string,
+    body: unknown,
+    token: string,
+    operationId?: string,
+) {
+    const response = await handleRequest(db, apiRequest({
+        method: 'PUT', path, token, body,
+        ...(operationId === undefined ? {} : { operationId }),
+    }));
+    await response.body?.cancel();
+    return response;
+}
+
+// The seed's first document of a family and its stored body.
+async function seededDocument(
+    db: Awaited<ReturnType<typeof seededMockDb>>,
+    path: string,
+    family: string,
+): Promise<{ id: string, body: Record<string, unknown> }> {
+    const [first] = await messageStore(db).getCollection(
+        path,
+    ) as { id: string }[];
+    assert(first, 'the seed holds a ' + family + ' document');
+    const body = JSON.parse(
+        await storedPutBodyText(db, path, first.id),
+    ) as Record<string, unknown>;
+    return { id: first.id, body };
+}
+
+Deno.test('a document GET serves the stored lines and'
+    + ' octets', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const operationId = generateIdentifier();
+    await put(db, IDEAS + id, idea('active'), token, operationId);
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS + id, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    const head = await messageStore(db).getDocumentHead(
+        IDEAS, id,
+    );
+    const stored = new Map(parseWire(head!.response).fields
+        .map((field) => [field.name, field.value]));
+    assertStrictEquals(got.headers.get('etag'), stored.get('etag'));
+    assertStrictEquals(
+        got.headers.get('operation-id'), operationId,
+    );
+    assertStrictEquals(
+        got.headers.get('content-type'),
+        stored.get('content-type'),
+    );
+    assertNotStrictEquals(
+        got.headers.get('request-id'),
+        stored.get('request-id'),
+    );
+    assertMatch(got.headers.get('date')!, /GMT$/);
+    assertStrictEquals(
+        await got.text(),
+        await storedPutBodyText(db, IDEAS, id),
+    );
+});
+
+Deno.test('a state-deleted idea answers 410 after the fence',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    await put(db, IDEAS + id, idea('active'), token);
+    await put(db, IDEAS + id, idea('deleted'), token);
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS + id, token,
+    }));
+    assertStrictEquals(got.status, 410);
+    assertEquals(await got.json(), {
+        error: 'Gone: ideas/' + id,
+    });
+});
+
+Deno.test('a name never written answers 404', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS + generateIdentifier(),
+        token,
+    }));
+    assertStrictEquals(got.status, 404);
+    await got.body?.cancel();
+});
+
+Deno.test('a foreign deleted idea answers what its live one'
+    + ' does', async () => {
+    const db = await seededMockDb();
+    const mine = await organizationToken();
+    const theirs = await organizationToken(ME, ORGANIZATION_TWO);
+    const theirIdeas = '/organizations/' + ORGANIZATION_TWO
+        + '/ideas/';
+    const live = generateIdentifier();
+    const gone = generateIdentifier();
+    assertStrictEquals(
+        (await put(db, theirIdeas + live, idea('active'),
+            theirs)).status,
+        201,
+    );
+    await put(db, theirIdeas + gone, idea('active'), theirs);
+    await put(db, theirIdeas + gone, idea('deleted'), theirs);
+    const readLive = await handleRequest(db, apiRequest({
+        method: 'GET', path: theirIdeas + live, token: mine,
+    }));
+    const readGone = await handleRequest(db, apiRequest({
+        method: 'GET', path: theirIdeas + gone, token: mine,
+    }));
+    assertStrictEquals(readLive.status, 403);
+    assertStrictEquals(readGone.status, 403);
+    await readLive.body?.cancel();
+    await readGone.body?.cancel();
+});
+
+Deno.test('a state-deleted project and objective answer 410',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+
+    // A project admits `deleted` through the facade.
+    const projects = '/organizations/' + STARK + '/projects/';
+    const project = await seededDocument(db, projects, 'projects');
+    const projectHead = await messageStore(db).getDocumentHead(
+        projects, project.id,
+    );
+    const deletedProject = await handleRequest(db, apiRequest({
+        method: 'PUT', path: projects + project.id, token,
+        body: { ...withoutId(project.body), state: 'deleted' },
+        headers: { 'If-Match': '"' + projectHead!.id + '"' },
+    }));
+    assertStrictEquals(deletedProject.status, 200, 'projects');
+    await deletedProject.body?.cancel();
+    const gotProject = await handleRequest(db, apiRequest({
+        method: 'GET', path: projects + project.id, token,
+    }));
+    assertStrictEquals(gotProject.status, 410, 'projects');
+    await gotProject.body?.cancel();
+
+    // An objective's validator admits no `deleted`, so its
+    // state-deleted head is formed below the facade.
+    const objectives = '/organizations/' + STARK
+        + '/objectives/';
+    const objective = await seededDocument(
+        db, objectives, 'objectives',
+    );
+    const deletedBody = {
+        ...withoutId(objective.body), state: 'deleted',
+    };
+    const messagePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: objectives + objective.id,
+        routePattern: 'organizations/:id/objectives/:id',
+        routeSegments: [
+            'organizations', ':id', 'objectives', ':id',
+        ],
+        pathSegments: [
+            'organizations', STARK, 'objectives', objective.id,
+        ],
+        headerFields: [],
+        body: deletedBody,
+        requesterIdentityId: ME,
+        requestAt: nowUtc(),
+        organization: STARK,
+        responseBody: { id: objective.id, ...deletedBody },
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
+    );
+    const objectiveHead = await db.messagePairs.getHeadPair(
+        objectives, objective.id,
+    );
+    assertStrictEquals(
+        objectiveHead?.id, messagePair.id, 'objectives',
+    );
+    const gotObjective = await handleRequest(db, apiRequest({
+        method: 'GET', path: objectives + objective.id, token,
+    }));
+    assertStrictEquals(gotObjective.status, 410, 'objectives');
+    await gotObjective.body?.cancel();
+});

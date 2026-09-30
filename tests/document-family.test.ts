@@ -5,13 +5,14 @@ import {
     assertNotStrictEquals,
     assertRejects,
     assertStrictEquals,
+    assertThrows,
 } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    EntityNotFoundError,
+    RetiredEntityError,
 } from '../api/db.ts';
 import type {
     DbAdapter,
@@ -48,11 +49,13 @@ import {
     documentFamilyWiring,
     documentEntityRoute,
     documentGetHandler,
+    documentSelect,
     documentCollectionGetHandler,
     documentWriteResponseSpec,
     DOCUMENT_FAMILY_WIRINGS,
     type DocumentFamilyWiring,
 } from '../api/document-family.ts';
+import { servedSelection } from '../api/head-reads.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ApiError, HTTP_PRECONDITION_FAILED } from
@@ -238,17 +241,24 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
     assertStrictEquals(
         (written as { title: string }).title, 'Generic',
     );
-    const got = await route.get!(
+    const selection = await route.select!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg']
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         [],
     );
-    assertEquals(
-        got,
-        JSON.parse(await storedPutBodyText(
+    const served = servedSelection(selection, {
+        date: 'Wed, 30 Sep 2026 12:00:00 GMT',
+        requestId: 'ReqReqReqReqReqReqReqQ',
+    });
+    assertStrictEquals(
+        served.headers.get('etag'), strongEtagOf(messagePair.id),
+    );
+    assertStrictEquals(
+        await served.text(),
+        await storedPutBodyText(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
             'gZsGVjTnvrgHQLzbKnQckg',
-        )),
+        ),
     );
 });
 
@@ -361,12 +371,11 @@ async function withSyntheticLockedFamily<T>(
     const wiring: DocumentFamilyWiring = {
         family: TEST_FAMILY,
         httpNest: 'global',
-        // Inert for these PUT-dispatch tests (the required
-        // arm never exercises GET), but REQUIRED fields on the
-        // interface — this is the fourth DocumentFamilyWiring
-        // construction site (the other three are
-        // routes.ts's ideas/projects/flows rows).
-        lifecycle: 'state',
+        // The documents this family stores carry entity
+        // fields only, no `state`: the gate judges a 'state'
+        // head's body, so the declaration must be true to
+        // what the required arm's GET reads.
+        lifecycle: 'stateless',
         notFoundTable: TEST_FAMILY,
         validateDocument: (body) => ({
             entity: body,
@@ -948,19 +957,24 @@ Deno.test('stateless lifecycle: documentCollectionGetHandler'
     ]);
 });
 
-Deno.test('stateless lifecycle: a DELETE head 404s carrying'
+Deno.test('stateless lifecycle: a DELETE head is Gone carrying'
 + ' notFoundTable, never the family', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentMessagePair(db, SL_3, { v: 'first' });
     await deleteStatelessDocumentMessagePair(db, SL_3);
-    const error = await assertRejects(
-        () => documentGetHandler(statelessWiring)(
-            db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
-                , 'AjdvjuECVZEgZoFajaIEkg', [],
-        ),
-    ) as EntityNotFoundError;
-    assertInstanceOf(error, EntityNotFoundError);
+    const selection = await documentSelect(statelessWiring)(
+        db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
+            , 'AjdvjuECVZEgZoFajaIEkg', [],
+    );
+    assertStrictEquals(selection.head.method, 'DELETE');
+    const error = assertThrows(
+        () => servedSelection(selection, {
+            date: 'Wed, 30 Sep 2026 12:00:00 GMT',
+            requestId: 'ReqReqReqReqReqReqReqQ',
+        }),
+        RetiredEntityError,
+    );
     assertStrictEquals(error.table, STATELESS_TABLE);
 });
 

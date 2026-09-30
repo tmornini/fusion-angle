@@ -676,38 +676,6 @@ export function responseFromLatin1(
     });
 }
 
-// Stream a stored PUT as this caller's GET: same body
-// octets, Date replaced with now, no Operation-ID.
-// ETag names the stored pair.
-export function streamGetFromStored(
-    stored: MessagePairEntity,
-    at: string,
-): Response {
-    const model = parseWire(stored.response);
-    if (model.startLine.kind !== 'response') {
-        throw new Error(
-            'stored response message has no status line: '
-            + stored.id,
-        );
-    }
-    const headers = new Headers();
-    headers.set('Date', httpDateOf(at));
-    const storedBody = HttpMessage.fromModel(model).body();
-    if (storedBody.exists()) {
-        headers.set('Content-Type', 'application/json');
-    }
-    const response = storedBody.exists()
-        ? new Response(storedBody.toText(), {
-            status: HTTP_OK,
-            headers,
-        })
-        : new Response(null, {
-            status: HTTP_OK,
-            headers,
-        });
-    return attachEtag(response, stored.id);
-}
-
 export function responseBodyText(
     message: string,
 ): string {

@@ -29,7 +29,9 @@ const SKIP_PARAMS = new Set(['name']);
 
 function verbsOn(route: Route): string[] {
     const verbs: string[] = [];
-    if (route.get !== undefined) verbs.push('GET');
+    if (route.get !== undefined || route.select !== undefined) {
+        verbs.push('GET');
+    }
     if (route.put !== undefined) verbs.push('PUT');
     if (route.patch !== undefined) verbs.push('PATCH');
     if (route.delete !== undefined) verbs.push('DELETE');

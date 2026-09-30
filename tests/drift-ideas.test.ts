@@ -402,17 +402,13 @@ Deno.test('live-write lifecycle: create + edit + transition +'
         ideaDocument('Lifecycle Idea Edited', 'deleted', 2),
     ));
 
-    // Trio-deleted is still a live PUT head. GET streams it.
-    // Derive still 404s the deleted state.
+    // A state-deleted head is Gone (spec §5).
     const afterDelete = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token),
     );
-    assertStrictEquals(afterDelete.status, 200);
-    assertStrictEquals(
-        await afterDelete.text(),
-        await storedPutBodyText(db, prefix, ideaId),
-    );
+    assertStrictEquals(afterDelete.status, 410);
+    await afterDelete.body?.cancel();
     await assertRejects(
         () => getDocument(
             db, 'ideas', 'AjdvjuECVZEgZoFajaIEkg', ideaId,
