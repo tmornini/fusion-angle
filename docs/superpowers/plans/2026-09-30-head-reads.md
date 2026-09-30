@@ -808,17 +808,21 @@ operator to run, from `.worktrees/head-reads`, with
 set:
 
 ```bash
+cd .worktrees/head-reads
 ./bin/measure --record --visualize --runs 25 \
-    --pages dashboard,ideas,projects,records,flows,workbox,members,identities,organization \
     2>&1 | tee .superpowers/measure-base.txt
 ```
 
-These are the list-heavy pages (`web-app/app/page-
-registry.ts`: every page whose load reads one or more
-collections). No `--write-budgets`, no `--check`: the
-measure gates nothing. Read
+`--record` refuses `--pages` (a partial record is
+illegal, `web-app/app/measure-cli.ts:142-148`), so the
+sweep covers the whole registry. No `--write-budgets`,
+no `--check`: the measure gates nothing. Read
 `.superpowers/measure-base.txt` when the operator says
-it is done, and record each page's median `readyMs`.
+it is done, and record the median `readyMs` of the
+list-heavy pages — dashboard, ideas, projects, records,
+flows, workbox, members, identities, organization
+(`web-app/app/page-registry.ts`: every page whose load
+reads one or more collections).
 
 - [ ] **Step 3: Commit the record**
 
