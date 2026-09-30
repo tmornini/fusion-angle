@@ -307,6 +307,19 @@ Off the critical path; each with its oracle.
   or rule the pre-import blank container a product gap.
   Oracle: TEST-PLAN I21's probe step and its
   `### Driving notes` twin
+- A panel closed outside `withPanelOpen` keeps the
+  viewBox it saved on open, so the next empty-canvas
+  click or delete restores a stale camera — F29's
+  defect through two more doors in
+  `web-app/flows/detail.ts`: `handleAddNodeAtPosition`
+  writes `isPanelOpen: false` by hand, and
+  `refreshFlowFromServer` drops the panel when a
+  cross-tab edit removes its selection. Oracle: a
+  Layer 2 test in `tests/browser/canvas-pan.test.ts`
+  that opens a node's panel with Auto Fit off,
+  port-drags a new node, zooms in once, and clicks
+  empty canvas — red today, green once both doors
+  call `closePanel()`
 
 ## Later work
 
