@@ -132,18 +132,17 @@ function messagePairJsonOf(message: string): {
 // document message pairs (Phase 10 Task 6: 12 human password
 // credentials + the system client-secret credential, one
 // identities/:id/credentials/:cid pair per row — formed by
-// seedHumanCredentials' OWN local pass-1/pass-2 split,
-// api/mock-data.ts, since a credential's hashed secret is
-// unknown until PBKDF2 resolves and so can never join this
-// file's shared pre-tx pass) + 0 role-grant document message
+// formSeedCredentialMessagePairs from the hashes
+// hashSeedCredentials (api/mock-data.ts) computes first,
+// before pass 1) + 0 role-grant document message
 // pairs (retired: membership type carries privilege; mint
 // bakes claims) + 859 legacy work-order historical-trace
 // transition operation message pairs (states-document
 // retirement Task 12: 861 traces minus WO01's two
 // value-bearing events, which migrate to the
-// instance chain) + 6 WO-instance SoT chain pairs (Task 6:
-// instance genesis + binding + Review/Complete new-shape ops
-// each with a revision — net +4 vs 1494) + 11 identity-default-
+// instance chain) + 7 WO-instance chain pairs (the PATCH
+// create's PATCH and PUT, the binding, and Review and
+// Complete, each a POST with its revision) + 11 identity-default-
 // organization pairs (Phase 11 Task 8: one event-append pair
 // per seeded human member at its identity-keyed
 // /identities/:id/default-organization/ document; Phase Final
@@ -156,10 +155,10 @@ function messagePairJsonOf(message: string): {
 // identities/:id/pii for the zero-membership identity —
 // no membership, no default-organization pair) + 2
 // invitation pairs (the seeded pending Stark
-// invitation's operation + document,
-// formInvitationSeedMessagePairs). Measure after
+// invitation's operation + document, granted by
+// postOrganizationInvitationGrant). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1454;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1455;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {

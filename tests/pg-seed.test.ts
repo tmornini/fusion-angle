@@ -30,6 +30,8 @@ import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
 import { testHashPassword } from './mock-seed.ts';
 
 function fakeClient(
@@ -152,26 +154,20 @@ Deno.test('seedErrorMessage never echoes a URL', () => {
     );
 });
 
-Deno.test('isDatabaseEmpty is true when no rows exist',
+Deno.test('isDatabaseEmpty is true when the table is absent',
 async () => {
-    const empty = fakeClient([{
-        message_pairs: false,
-        marker: false,
-    }]);
+    const empty = fakeClient([{ message_pairs: false }]);
     assertStrictEquals(await isDatabaseEmpty(empty.sql), true);
     assertMatch(
-        empty.texts[0] ?? '', /FROM fa_message_pairs/,
+        empty.texts[0] ?? '',
+        /to_regclass\('fa_message_pairs'\)/,
     );
-    assertMatch(empty.texts[0] ?? '', /0000-root/);
-    assertMatch(empty.texts[0] ?? '', /schema_marker/);
+    assertNotMatch(empty.texts[0] ?? '', /0000-root/);
 });
 
-Deno.test('assertEmptyDatabase refuses any message row',
+Deno.test('assertEmptyDatabase refuses an existing table',
 async () => {
-    const nonempty = fakeClient([{
-        message_pairs: true,
-        marker: false,
-    }]);
+    const nonempty = fakeClient([{ message_pairs: true }]);
     const error = await assertRejects(
         () => assertEmptyDatabase(nonempty.sql),
     ) as Error;
@@ -179,20 +175,7 @@ async () => {
     assertStrictEquals(error.message, SEED_NONEMPTY);
 });
 
-Deno.test('assertEmptyDatabase refuses a marker row',
-async () => {
-    const marked = fakeClient([{
-        message_pairs: false,
-        marker: true,
-    }]);
-    const error = await assertRejects(
-        () => assertEmptyDatabase(marked.sql),
-    ) as Error;
-    assertInstanceOf(error, Error);
-    assertStrictEquals(error.message, SEED_NONEMPTY);
-});
-
-Deno.test('postgres-seed refuses leftover pairs before DDL',
+Deno.test('postgres-seed refuses leftover pairs before seeding',
 () => {
     const src = Deno.readTextFileSync(
         'server/postgres-seed.ts',
@@ -200,10 +183,11 @@ Deno.test('postgres-seed refuses leftover pairs before DDL',
     const legacy = src.indexOf(
         'assertNoLegacyMessageTables',
     );
-    const ensure = src.indexOf('ensureTable');
+    const seed = src.indexOf('seedPostgres(');
     assert(legacy >= 0);
-    assert(ensure >= 0);
-    assert(legacy < ensure);
+    assert(seed >= 0);
+    assert(legacy < seed);
+    assertStrictEquals(src.indexOf('ensureTable'), -1);
 });
 
 Deno.test('serial hasher never overlaps', async () => {
@@ -242,7 +226,6 @@ async () => {
     const db = memoryDbAdapter();
     const nonempty = fakeClient([{
         message_pairs: true,
-        marker: false,
     }]);
     let wrote = false;
     const error = await assertRejects(
@@ -261,12 +244,32 @@ async () => {
     assertStrictEquals(await db.hasSchema(), false);
 });
 
+Deno.test('a failed landing prints no credential',
+async () => {
+    const backend = new MemoryStorageBackend();
+    const db = new BackedDbAdapter(
+        backend, async () => {}, async () => {}, () => {},
+    );
+    const empty = fakeClient([{ message_pairs: false }]);
+    backend.refuseNextSuccessions(1);
+    let wrote = false;
+    await assertRejects(
+        () => seedPostgres(empty.sql, db, 'bootstrap', {
+            hashPassword: testHashPassword,
+            write: () => {
+                wrote = true;
+            },
+        }),
+    );
+    assertStrictEquals(wrote, false);
+    assertStrictEquals(await db.hasSchema(), false);
+});
+
 Deno.test('seedPostgres seeds when mode is required',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
         message_pairs: false,
-        marker: false,
     }]);
     const chunks: string[] = [];
     await seedPostgres(
@@ -289,7 +292,6 @@ async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
         message_pairs: false,
-        marker: false,
     }]);
     const chunks: string[] = [];
     await seedPostgres(
@@ -312,7 +314,6 @@ async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
         message_pairs: false,
-        marker: false,
     }]);
     const chunks: string[] = [];
     await seedPostgres(
@@ -357,7 +358,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
-        await adapter.ensureTable();
     });
 
     Deno.test.afterAll(async () => {
@@ -417,8 +417,7 @@ Deno.test({
             const db = memoryDbAdapter();
             const empty = fakeClient([{
                 message_pairs: false,
-                marker: false,
-            }]);
+                    }]);
             await seedPostgres(
                 empty.sql, db, mode, {
                     hashPassword: testHashPassword,

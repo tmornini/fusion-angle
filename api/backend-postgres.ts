@@ -87,6 +87,26 @@ export class PostgresBackend implements StorageBackend {
         }
     }
 
+    async seedTransaction<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R> {
+        try {
+            return await this.#sql.begin(async (sql) => {
+                await sql.unsafe(POSTGRES_SCHEMA);
+                const result = await fn(
+                    postgresTx(sql, 'readwrite', true),
+                );
+                await sql.query`
+                    INSERT INTO schema_marker ("only")
+                    VALUES (true)
+                `;
+                return result;
+            });
+        } catch (error) {
+            throw mapPostgresError(error);
+        }
+    }
+
     async ensureTable(): Promise<void> {
         try {
             await this.#sql.unsafe(POSTGRES_SCHEMA);

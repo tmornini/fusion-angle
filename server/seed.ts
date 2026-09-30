@@ -1,6 +1,7 @@
 // Operator seed below HTTP. Flags seed an empty
 // database and print credentials once. Non-empty
-// refuses. formSeedMessagePair already mints operation_id.
+// refuses. Pass 1 mints one operation id per simulated
+// operation.
 
 import type { BackedDbAdapter } from
     '../api/db-backed.ts';
@@ -97,29 +98,25 @@ export function parseSeedArgv(
     return { kind: 'ok', mode };
 }
 
+// The seed creates the table in its own transaction, so
+// a database is empty exactly when fa_message_pairs does
+// not exist.
 export async function isDatabaseEmpty(
     sql: SqlClient,
 ): Promise<boolean> {
-    // The nil root is schema genesis, not seeded data.
     const rows = await sql.query<{
         message_pairs: boolean;
-        marker: boolean;
     }>`
-        SELECT
-            EXISTS (
-                SELECT 1 FROM fa_message_pairs
-                WHERE NOT (
-                    path = '/migrations/'
-                    AND name = '0000-root'
-                )
-            ) AS message_pairs,
-            EXISTS (
-                SELECT 1 FROM schema_marker
-            ) AS marker
+        SELECT to_regclass('fa_message_pairs') IS NOT NULL
+            AS message_pairs
     `;
     const row = rows[0];
-    if (row === undefined) return true;
-    return !row.message_pairs && !row.marker;
+    if (row === undefined) {
+        throw new Error(
+            'the emptiness check returned no row',
+        );
+    }
+    return !row.message_pairs;
 }
 
 export async function assertEmptyDatabase(

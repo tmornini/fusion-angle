@@ -32,7 +32,6 @@ async function adminCredential(db: MemoryDbAdapter) {
 Deno.test('bootstrap surfaces an admin password that verifies',
 async () => {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     const reveal = currentReveal(
         await postBootstrap(db));
     assert(reveal, 'current credential surfaced');
@@ -53,7 +52,6 @@ async () => {
 Deno.test('mock data surfaces a verifying admin password',
 async () => {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     const reveal = currentReveal(
         await postMockDataLoad(db));
     assert(reveal, 'current credential surfaced');
@@ -72,7 +70,6 @@ async () => {
 Deno.test('mock-data surfaces exactly twelve human credentials',
 async () => {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     const creds = await postMockDataLoad(db);
     assertStrictEquals(creds.identities.length, 12);
     assert(
@@ -83,7 +80,6 @@ async () => {
 Deno.test('bootstrap surfaces exactly one human credential',
 async () => {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     const creds = await postBootstrap(db);
     assertStrictEquals(creds.identities.length, 1);
     assertStrictEquals(
@@ -95,9 +91,7 @@ async () => {
 Deno.test('each seed run yields a distinct admin password',
 async () => {
     const db1 = memoryDbAdapter();
-    await db1.postSchemaCreation();
     const db2 = memoryDbAdapter();
-    await db2.postSchemaCreation();
     const a = currentReveal(
         await postBootstrap(db1));
     const b = currentReveal(

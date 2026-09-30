@@ -53,7 +53,6 @@ Deno.test("bootstrap seeds 'XXZruirZyAOoRpNxaDnpSA' a default-organization"
 + ' document for organization 1',
 async () => {
     const db = memoryDbAdapter();
-    await db.postSchemaCreation();
     await postBootstrap(db);
     const defaults = await deriveDefaultOrganization(
         db, 'XXZruirZyAOoRpNxaDnpSA',

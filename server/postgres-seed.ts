@@ -84,7 +84,6 @@ export async function seedMain(
                 async () => {},
                 () => {},
             );
-            await adapter.ensureTable();
             await seedPostgres(
                 sql, adapter, parsed.mode, {
                     hashPassword: serialPasswordHasher(),

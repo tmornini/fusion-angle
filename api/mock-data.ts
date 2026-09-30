@@ -1,5 +1,14 @@
 import type { DbAdapter } from './db.ts';
 import type { BackedDbAdapter } from './db-backed.ts';
+import { MemoryStorageBackend } from
+    './backend-memory.ts';
+import {
+    postSeedLanding,
+    rehearse,
+    type SeedRehearsal,
+} from './ledger-seed.ts';
+import { generateIdentifier } from
+    '../shared/identifier.ts';
 
 import {
     postIdeaDocumentOp,
@@ -9,6 +18,8 @@ import {
     postFlowDocumentOp,
     postWorkOrderDocumentOp,
     postWorkOrderTransitionOp,
+    postWorkOrderBindingOp,
+    postInstancePatchOp,
     postFlowWorkOrderDocumentOp,
     postFlowRecordDocumentOp,
     postRecordWriteOp,
@@ -20,13 +31,19 @@ import {
     postIdentityDocumentOp,
     postIdentityCredentialDocumentOp,
     postAiAgentDocumentOp,
+    postOrganizationDocumentOp,
     identityDocumentBodyOf,
 } from './routes.ts';
+import { putIdentityDefaultOrganization } from
+    './organization-requests.ts';
+import { postOrganizationInvitationGrant } from
+    './invitations-domain.ts';
 import type {
     FlowCreationMessagePairs,
     RecordWriteMessagePairs,
     ObjectiveCreationMessagePairs,
 } from './routes.ts';
+import type { Id } from './types.ts';
 import {
     SYSTEM_MEMBER_ID,
     nowUtc,
@@ -35,10 +52,6 @@ import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
-import {
-    attemptFor,
-    runWrite,
-} from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
     pickHumanMember,
@@ -115,16 +128,25 @@ import {
     identityCredentialSeedBody,
     VALUE_BEARING_TRANSITION_EVENT_IDS,
     SEED_INSTANCE_ID,
-    UNAFFILIATED_INVITATION_ID,
+    SEED_RECORD_TYPE_ID,
     WO01_ID,
-    WO01_REVIEW_EVENT_ID,
-    WO01_COMPLETE_EVENT_ID,
+    formInstanceChainSeedInput,
+    formInstanceTransitionSeedPair,
     flowRecordOrganizationFor,
+    defaultOrganizationSeedBody,
+    memberPrimaryOrganization,
+    seededOrganizationBody,
+    formInvitationGrantSeedInput,
 } from './mock-data/seed-message-pairs.ts';
+import type {
+    InstanceChainSeedInput,
+    InvitationGrantSeedInput,
+} from './mock-data/seed-message-pairs.ts';
+import { deriveInstanceHead } from
+    './derive-record-instances.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
-    INSTANCE_DETAIL_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
@@ -133,21 +155,6 @@ import {
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
 // loud rather than silently write the row with no pair.
-export async function writeSeedPair(
-    adapter: DbAdapter,
-    pair: MessagePair,
-    now?: string,
-): Promise<void> {
-    const answer = await runWrite(
-        adapter, attemptFor([pair]), [pair], now,
-    );
-    if (answer.outcome !== 'land') {
-        throw new Error(
-            'seed statement returned ' + answer.outcome,
-        );
-    }
-}
-
 function requireMessagePair(
     messagePairs: ReadonlyMap<string, MessagePair>, key: string,
 ): MessagePair {
@@ -160,51 +167,34 @@ function requireMessagePair(
     return messagePair;
 }
 
-// The seeded admin credential set, returned to the caller so a
-// one-time reveal can surface the plaintext password. The
-// plaintext is never stored — only its PBKDF2 hash lands in the
-// identity_credentials.secret column.
+// The seeded sign-ins, returned so the operator
+// sees each password once. The seed never stores a
+// plaintext: each password's hash lands in its
+// identities/:id/credentials/:cid document, and the
+// plaintexts live only in this return value.
 export interface SeededIdentityCredential {
     readonly identityId: string;
     readonly username: string;
     readonly password: string;
 }
 
-// The freshly-seeded human sign-ins, surfaced in-band exactly
-// once. Only PBKDF2 hashes land in identity_credentials.secret;
-// these plaintexts live only in this return value. DEMO-ONLY:
-// the in-band plaintext return is deleted at the server tier.
+// The seeded sign-ins, returned so the operator
+// sees each password once. The seed never stores a
+// plaintext: each password's hash lands in its
+// identities/:id/credentials/:cid document, and the
+// plaintexts live only in this return value.
 export interface SeededCredentials {
     readonly identities:
         readonly SeededIdentityCredential[];
 }
 
-// Mint a fresh crypto-grade password for EVERY login-capable
-// person identity (one with a PII email), hash it into the
-// credential ledger, and return the plaintexts in-band for a
-// one-time reveal. A placeholder string would not verify
-// through the real /authentication/authorize loop. The system
-// identity signs with a client_secret — generated, hashed, and
-// discarded, never revealed. Both seed paths call this AFTER
-// the entity seed commits, NEVER inside it: PBKDF2 hashing is
-// async crypto. Formed pre-tx — crypto, hashing, and timers
-// never run inside an open transaction (AGENTS.md §
-// Transaction bodies await only row ops). So every hash is
-// computed up front, then the credential rows land together in
-// one transaction of pure row ops. Phase 10 Task 6: each
-// credential row ALSO forms its OWN message pair, re-pointed
-// onto postIdentityCredentialDocumentOp — its OWN local pass-1/
-// pass-2 split (formSeedCredentialMessagePairs, seed-message-pairs.ts),
-// since a credential's body embeds the post-hash secret computed
-// HERE, after formMockDataMessagePairs / formBootstrapMessagePair
-// already ran. The write transaction is one table; a nested
-// view.transaction re-enters the same tx.
-//
-// Phase Final Task 1(d): recipients are the in-memory
-// person/PII list (buildMembers / bootstrap PII body) — never
-// a post-tx identityPii/identities row scan. Stripping the
-// identity-spine row halves must not drop 1514→1503 /
-// 14→13 or empty SeededCredentials on the wire.
+// Mint a password for every login-capable person
+// identity and a client secret for the system identity,
+// and hash them all first: the credential documents
+// embed the hashes (Sequence, step 1). A placeholder
+// would not verify through /authentication/authorize.
+// Recipients are the in-memory person list, never a
+// row scan.
 
 const SEED_PASSWORD_CREDENTIAL_BY_IDENTITY:
     Readonly<Record<string, string>> = {
@@ -263,13 +253,26 @@ type PasswordHasher = (
     plaintext: string,
 ) => Promise<string>;
 
-export async function seedHumanCredentials(
-    adapter: BackedDbAdapter,
+interface SeedCredentialPlan {
+    readonly humans: readonly {
+        readonly id: string;
+        readonly identityId: string;
+        readonly username: string;
+        readonly password: string;
+        readonly secret: string;
+    }[];
+    readonly system: {
+        readonly id: string;
+        readonly secret: string;
+    };
+}
+
+async function hashSeedCredentials(
     recipients: readonly CredentialRecipient[],
-    hashPasswordFn: PasswordHasher = hashPassword,
-): Promise<SeededCredentials> {
-    const planned = await Promise.all(
-        recipients.map(async recipient => {
+    hash: PasswordHasher,
+): Promise<SeedCredentialPlan> {
+    const humans = await Promise.all(
+        recipients.map(async (recipient) => {
             const password = generateSecret();
             return {
                 id: seedPasswordCredentialId(
@@ -277,73 +280,69 @@ export async function seedHumanCredentials(
                 identityId: recipient.identityId,
                 username: recipient.email,
                 password,
-                secret: await hashPasswordFn(password),
+                secret: await hash(password),
             };
         }));
-    const systemCredentialId =
-        'cFiyyRHxbIEVqeVFNPmDnw';
-    const systemSecret = await hashPasswordFn(
-        generateSecret());
-    // Pass 1 (no tx): each credential's message pair, formed from
-    // the SAME post-hash secret pass 2 below writes — the row
-    // content is unknown until PBKDF2 resolves above, so this
-    // batch cannot join either seed path's own pre-tx pass (both
-    // already ran before this function was even called).
-    // requestAt is minted once, this credential batch's own
-    // arrival moment.
-    const requestAt = nowUtc();
-    const credentialMessagePairs = await formSeedCredentialMessagePairs(
-        planned,
-        { id: systemCredentialId, secret: systemSecret },
-        requestAt,
-    );
-    // Pass 2: message-plane only (Phase Final Task 2 stripped
-    // the identity_credentials ROW half).
-    // postIdentityCredential DocumentOp is the SAME op
-    // every live PUT identities/:id/credentials/:cid rides.
-    await adapter.backend.transaction(
-        'readwrite',
-        async (tx) => {
-            const view = adapter.openClient(tx);
-            await Promise.all([
-                ...planned.map(cred =>
-                    postIdentityCredentialDocumentOp(
-                        view,
+    const systemCredentialId = 'cFiyyRHxbIEVqeVFNPmDnw';
+    return {
+        humans,
+        system: {
+            id: systemCredentialId,
+            secret: await hash(generateSecret()),
+        },
+    };
+}
+
+// Pass 2's last wave: the credential documents, through
+// the op every live PUT identities/:id/credentials/:cid
+// rides.
+async function postSeedCredentialsIn(
+    adapter: DbAdapter,
+    plan: SeedCredentialPlan,
+    credentialPairs: ReadonlyMap<string, MessagePair>,
+): Promise<void> {
+    await Promise.all([
+        ...plan.humans.map((cred) =>
+            postIdentityCredentialDocumentOp(
+                adapter,
+                cred.id,
+                identityCredentialSeedBody(
+                    cred.identityId, 'password',
+                    cred.secret,
+                ),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    credentialPairs,
+                    seedMessagePairKey(
+                        'identities/:id/credentials/:cid',
                         cred.id,
-                        identityCredentialSeedBody(
-                            cred.identityId, 'password',
-                            cred.secret,
-                        ),
-                        SYSTEM_MEMBER_ID,
-                        requireMessagePair(
-                            credentialMessagePairs,
-                            seedMessagePairKey(
-                                'identities/:id/credentials/:cid',
-                                cred.id,
-                            ),
-                        ),
-                    )),
-                postIdentityCredentialDocumentOp(
-                    view,
-                    systemCredentialId,
-                    identityCredentialSeedBody(
-                        SYSTEM_MEMBER_ID, 'client_secret',
-                        systemSecret,
-                    ),
-                    SYSTEM_MEMBER_ID,
-                    requireMessagePair(
-                        credentialMessagePairs,
-                        seedMessagePairKey(
-                            'identities/:id/credentials/:cid',
-                            systemCredentialId,
-                        ),
                     ),
                 ),
-            ]);
-        },
-    );
+            )),
+        postIdentityCredentialDocumentOp(
+            adapter,
+            plan.system.id,
+            identityCredentialSeedBody(
+                SYSTEM_MEMBER_ID, 'client_secret',
+                plan.system.secret,
+            ),
+            SYSTEM_MEMBER_ID,
+            requireMessagePair(
+                credentialPairs,
+                seedMessagePairKey(
+                    'identities/:id/credentials/:cid',
+                    plan.system.id,
+                ),
+            ),
+        ),
+    ]);
+}
+
+function revealedCredentials(
+    plan: SeedCredentialPlan,
+): SeededCredentials {
     return {
-        identities: planned.map(cred => ({
+        identities: plan.humans.map((cred) => ({
             identityId: cred.identityId,
             username: cred.username,
             password: cred.password,
@@ -357,37 +356,31 @@ export type PostMockDataLoadOptions = {
     readonly hashPassword?: PasswordHasher;
 };
 
-export async function postMockDataLoad(
-    adapter: BackedDbAdapter,
+// A rehearsed seed and the sign-ins it minted. The
+// plaintexts leave only after the landing commits.
+export interface RehearsedSeed {
+    readonly rehearsal: SeedRehearsal;
+    readonly credentials: SeededCredentials;
+}
+
+// Pass 2's input for the mock-data seed: the pass-1 message
+// pairs, keyed as requireMessagePair reads them, the
+// invitation grant's and the instance chain's own live-op
+// inputs (Decision 8), and the seed's shared requestAt.
+export interface MockDataSeedInput {
+    readonly messagePairs: ReadonlyMap<string, MessagePair>;
+    readonly invitation: InvitationGrantSeedInput;
+    readonly instanceChain: InstanceChainSeedInput;
+    readonly requestAt: string;
+}
+
+// Hash, form, and rehearse (Sequence, steps 1 to 3). The
+// live ops run on scratch memory; nothing touches the
+// target.
+export async function rehearseMockData(
     options?: PostMockDataLoadOptions,
-): Promise<SeededCredentials> {
-    // Pass 1 (no tx): every pair-wired op-invocation's message
-    // pair, formed up front — formWriteMessagePair's hashing is async
-    // crypto. Formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (AGENTS.md §
-    // Transaction bodies await only row ops). requestAt is
-    // minted once, the seed's own arrival moment, and shared
-    // by every pair.
-    const messagePairs = await formMockDataMessagePairs(nowUtc());
-    // Pass 2: seed the whole demo dataset in one transaction —
-    // row ops only — so a mid-seed failure leaves no
-    // half-populated schema. The credentials seed runs after it
-    // commits — its PBKDF2 hashing is ALSO async crypto and
-    // cannot run inside the tx. The schema marker stamps LAST,
-    // so a failed seed leaves hasSchema() false: the datastore
-    // reads as empty and the seed can be retried cleanly.
-    await adapter.ensureTable();
-    await adapter.backend.transaction(
-        'readwrite',
-        (tx) => postMockDataLoadIn(
-            adapter.openClient(tx), messagePairs,
-        ),
-    );
-    // Task 1(d): same buildMembers (+ the unaffiliated
-    // identity) enumeration that pass 2 used for PII — no
-    // row read after strip.
-    const creds = await seedHumanCredentials(
-        adapter,
+): Promise<RehearsedSeed> {
+    const credentials = await hashSeedCredentials(
         [
             ...buildMembers(),
             buildUnaffiliatedIdentity(),
@@ -395,16 +388,116 @@ export async function postMockDataLoad(
             identityId: member.id,
             email: member.email,
         })),
-        options?.hashPassword,
+        options?.hashPassword ?? hashPassword,
     );
-    await adapter.postSchemaCreation();
-    return creds;
+    const seedRunId = generateIdentifier();
+    const requestAt = nowUtc();
+    const messagePairs =
+        await formMockDataMessagePairs(requestAt);
+    const credentialPairs =
+        await formSeedCredentialMessagePairs(
+            credentials.humans, credentials.system,
+            requestAt,
+        );
+    const input: MockDataSeedInput = {
+        messagePairs,
+        invitation: formInvitationGrantSeedInput(requestAt),
+        instanceChain:
+            await formInstanceChainSeedInput(requestAt),
+        requestAt,
+    };
+    const statements = await rehearse(
+        new MemoryStorageBackend(),
+        async (db) => {
+            await postMockDataLoadIn(db, input);
+            await postSeedCredentialsIn(
+                db, credentials, credentialPairs,
+            );
+        },
+    );
+    return {
+        rehearsal: { seedRunId, statements },
+        credentials: revealedCredentials(credentials),
+    };
+}
+
+// Plan and land (steps 4 and 5) in one transaction
+// beneath the adapter. The caller reveals the sign-ins
+// after this resolves.
+export async function postMockDataLoad(
+    adapter: BackedDbAdapter,
+    options?: PostMockDataLoadOptions,
+): Promise<SeededCredentials> {
+    const seed = await rehearseMockData(options);
+    await postSeedLanding(adapter.backend, seed.rehearsal);
+    return seed.credentials;
+}
+
+// Seat types in Stark, as the fence hands a handler its
+// roles (api/api.ts).
+function starkRolesOf(identityId: Id): readonly string[] {
+    return identityId === 'XXZruirZyAOoRpNxaDnpSA'
+        ? ['admin']
+        : ['member'];
+}
+
+// The WO01 chain through the live ops, after the flow
+// records land: the binding op reads the flow's record
+// joins. Each transition's POST latches the head the
+// previous op wrote.
+async function postInstanceChainIn(
+    adapter: DbAdapter,
+    chain: InstanceChainSeedInput,
+    requestAt: string,
+): Promise<void> {
+    await postInstancePatchOp(
+        adapter,
+        [STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
+            SEED_INSTANCE_ID],
+        { set: [] },
+        SYSTEM_MEMBER_ID,
+        chain.create,
+        STARK_ORGANIZATION,
+        [],
+    );
+    await postWorkOrderBindingOp(
+        adapter,
+        WO01_ID,
+        {
+            instance_id: SEED_INSTANCE_ID,
+            record_type_id: SEED_RECORD_TYPE_ID,
+        },
+        SYSTEM_MEMBER_ID,
+        STARK_ORGANIZATION,
+        chain.binding,
+    );
+    for (const transition of [chain.review, chain.complete]) {
+        const head = await deriveInstanceHead(
+            adapter, STARK_ORGANIZATION,
+            SEED_RECORD_TYPE_ID, SEED_INSTANCE_ID,
+        );
+        if (head === undefined) {
+            throw new Error('the seed instance has no head');
+        }
+        await postWorkOrderTransitionOp(
+            adapter,
+            WO01_ID,
+            transitionSeedBody(transition.event),
+            transition.event.member_id,
+            STARK_ORGANIZATION,
+            starkRolesOf(transition.event.member_id),
+            await formInstanceTransitionSeedPair(
+                transition, head.messagePairId, requestAt,
+            ),
+        );
+    }
 }
 
 async function postMockDataLoadIn(
     adapter: DbAdapter,
-    messagePairs: ReadonlyMap<string, MessagePair>,
+    input: MockDataSeedInput,
 ): Promise<void> {
+    const messagePairs = input.messagePairs;
     const members = buildMembers();
     const unaffiliated = buildUnaffiliatedIdentity();
 
@@ -434,16 +527,6 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                writeSeedPair(
-                    adapter,
-                    requireMessagePair(
-                        messagePairs,
-                        seedMessagePairKey(
-                            'identities/:id/default-organization',
-                            member.id,
-                        ),
-                    ),
-                ),
                 postIdentityDocumentOp(
                     adapter,
                     member.id,
@@ -504,39 +587,46 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        (async () => {
-            // Live grant order: operation, then document
-            // (grantInvitation, invitations-domain.ts).
-            const pairs = [
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'invitations',
-                        UNAFFILIATED_INVITATION_ID,
-                    ),
-                ),
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'invitations/:id',
-                        UNAFFILIATED_INVITATION_ID,
-                    ),
-                ),
-            ];
-            const answer = await runWrite(
-                adapter, attemptFor(pairs), pairs,
-            );
-            if (answer.outcome !== 'land') {
-                throw new Error(
-                    'seed statement returned '
-                        + answer.outcome,
-                );
-            }
-        })(),
-        // Role grants retired: membership `type` (admin for
-        // current, member otherwise) seeds privilege; mint
-        // bakes claim roles from those memberships.
     ]);
+
+    // The default-organization and invitation handlers
+    // read the seats and PII wave 1 lands (Decision 8).
+    await Promise.all([
+        ...members.map((member, index) =>
+            putIdentityDefaultOrganization(
+                adapter,
+                [member.id],
+                defaultOrganizationSeedBody(
+                    memberPrimaryOrganization(
+                        member.id, index,
+                    ),
+                ),
+                member.id,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'identities/:id/default-organization',
+                        member.id,
+                    ),
+                ),
+            )),
+        postOrganizationInvitationGrant(
+            adapter,
+            [input.invitation.organization],
+            input.invitation.body,
+            input.invitation.granterId,
+            undefined,
+            input.invitation.organization,
+            ['admin'],
+            input.invitation.requestAt,
+            input.invitation.operationId,
+            input.invitation.received,
+        ),
+    ]);
+
+    // Role grants retired: membership `type` (admin for
+    // current, member otherwise) seeds privilege; mint
+    // bakes claim roles from those memberships.
 
     const ideas = buildIdeas();
 
@@ -548,8 +638,8 @@ async function postMockDataLoadIn(
     // nothing, so organization_id rides in the seed body
     // instead of the (route-only) omission. ideaGenesis is
     // imported from seed-message-pairs.ts — pass 1 there needs
-    // the SAME array to form each idea's pair before this
-    // transaction opens.
+    // the SAME array to form each idea's pair before the
+    // rehearsal's writes.
     const ideaGenesisById = new Map(
         ideaGenesis.map(g => [g.entityId, g]),
     );
@@ -568,26 +658,21 @@ async function postMockDataLoadIn(
             );
         }),
         // Phase Final Task 2: organizations ROW half stripped —
-        // message-plane only (organizationSeedBody still
+        // message-plane only (seededOrganizationBody still
         // shapes the pair body in seed-message-pairs.ts).
-        writeSeedPair(
-            adapter,
-            requireMessagePair(
-                messagePairs,
-                seedMessagePairKey(
-                    'organizations/:id', STARK_ORGANIZATION,
+        ...[STARK_ORGANIZATION, ORGANIZATION_TWO].map(
+            (organization) => postOrganizationDocumentOp(
+                adapter,
+                [organization],
+                seededOrganizationBody(organization),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'organizations/:id', organization,
+                    ),
                 ),
-            ),
-        ),
-        writeSeedPair(
-            adapter,
-            requireMessagePair(
-                messagePairs,
-                seedMessagePairKey(
-                    'organizations/:id', ORGANIZATION_TWO,
-                ),
-            ),
-        ),
+            )),
     ]);
 
     const projects = buildProjects();
@@ -600,8 +685,8 @@ async function postMockDataLoadIn(
     // (route-only) omission. projectGenesis (including the
     // org-2 override's own row) is imported from
     // seed-message-pairs.ts — pass 1 there needs the SAME array
-    // to form each project's pair before this transaction opens.
-    // projectOrg2 extends projects[0] under organization
+    // to form each project's pair before the rehearsal's
+    // writes. projectOrg2 extends projects[0] under organization
     // 'BBjWJsjYIDkTRKIIPrzWRw' —
     // the SAME construction pass 1 uses, so a seeded pair can
     // never drift from what this write actually stores.
@@ -648,7 +733,7 @@ async function postMockDataLoadIn(
     // flow's row and graph delta. flowStateEvents is
     // imported from seed-message-pairs.ts — pass 1
     // there needs the SAME array to form each flow's
-    // pair before this transaction opens.
+    // pair before the rehearsal's writes.
     const flowStateEventByFlowId = new Map(
         flowStateEvents.map(e => [e.entity_id, e]),
     );
@@ -667,8 +752,8 @@ async function postMockDataLoadIn(
 
     // mockFlowRecords (the flow-record join rows) is imported
     // from seed-message-pairs.ts — pass 1 there needs the SAME
-    // array to form each join's pair before this transaction
-    // opens.
+    // array to form each join's pair before the rehearsal's
+    // writes.
 
     // One genesis row per seeded Record: its initial
     // state and the member credited with creating it.
@@ -678,7 +763,7 @@ async function postMockDataLoadIn(
     // (pairs + states.postEvent only). recordGenesis
     // is imported from seed-message-pairs.ts — pass 1
     // there needs the SAME array to form each record's
-    // pair before this transaction opens.
+    // pair before the rehearsal's writes.
     const recordGenesisById = new Map(
         recordGenesis.map(g => [g.entityId, g]),
     );
@@ -691,8 +776,8 @@ async function postMockDataLoadIn(
 
     // mockProjectFlows is imported from
     // seed-message-pairs.ts — pass 1 there needs the SAME
-    // array to form each flow's pair before this transaction
-    // opens.
+    // array to form each flow's pair before the rehearsal's
+    // writes.
 
     const leadToCloseData = buildLeadToCloseWorkload();
 
@@ -812,7 +897,7 @@ async function postMockDataLoadIn(
         // trace drives through the live transition op — body
         // validates via validateWorkOrderTransitionBody. WO-
         // instance SoT Task 6: value-bearing WO01 events leave
-        // this loop (appended with the instance chain below).
+        // this loop (they drive the instance chain below).
         ...mockStateEvents
             .filter((r) =>
                 !VALUE_BEARING_TRANSITION_EVENT_IDS.has(
@@ -897,11 +982,6 @@ async function postMockDataLoadIn(
                     ),
                 ),
             ),
-        // WO-instance SoT Task 6: instance genesis + binding +
-        // Review/Complete new-shape ops and revision pairs.
-        // Append-only (below-facade) — same as every other
-        // seed pair write; chain formed pre-tx.
-
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -948,38 +1028,6 @@ async function postMockDataLoadIn(
         }),
     ]);
 
-    // The instance chain shares one document. Write it in
-    // authored order and stamp each pair at its requestAt,
-    // so a later sibling cannot become the head.
-    const instanceChainKeys = [
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
-        ),
-        seedMessagePairKey(
-            'work-orders/:id/binding', WO01_ID,
-        ),
-        seedMessagePairKey(
-            'work-orders/:id/transition',
-            WO01_REVIEW_EVENT_ID,
-        ),
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN,
-            SEED_INSTANCE_ID + '-review',
-        ),
-        seedMessagePairKey(
-            'work-orders/:id/transition',
-            WO01_COMPLETE_EVENT_ID,
-        ),
-        seedMessagePairKey(
-            INSTANCE_DETAIL_PATTERN,
-            SEED_INSTANCE_ID + '-complete',
-        ),
-    ];
-    for (const key of instanceChainKeys) {
-        const pair = requireMessagePair(messagePairs, key);
-        await writeSeedPair(adapter, pair, pair.requestAt);
-    }
-
     // Bindings probe their record inside the write gate
     // (postFlowRecordDocumentOp), so the records above must
     // have landed first — a second wave, not a spread into
@@ -1001,6 +1049,9 @@ async function postMockDataLoadIn(
             ),
         ),
     );
+    await postInstanceChainIn(
+        adapter, input.instanceChain, input.requestAt,
+    );
 
     // A score or revision author is always a member of the
     // scored entity's org. Seed authors from that org ONLY:
@@ -1009,14 +1060,16 @@ async function postMockDataLoadIn(
     // then threw when the project-history modal resolved them.
     //
     // The STARK-org objective revisions' author cannot read
-    // memberships back in-tx: its pair was already formed pre-tx
-    // (pass 1, before any membership row existed to read back),
-    // so pass 2 must pick from the SAME pure pool pass 1 used —
-    // see humanMemberPoolsByOrganization's doc comment for why
-    // the two are proven to agree. The baseline/actual-score
+    // memberships back in the rehearsal: its pair was already
+    // formed before the rehearsal's writes (pass 1, before any
+    // membership row existed to read back), so pass 2 must pick
+    // from the SAME pure pool pass 1 used — see
+    // humanMemberPoolsByOrganization's doc comment for why the
+    // two are proven to agree. The baseline/actual-score
     // deferral below (buildSeedScoreRows) draws from this SAME
-    // pool now too — the former in-tx memberFor DB-read retired
-    // once its pick moved onto pickHumanMember (Phase 7 Task 5).
+    // pool now too — the former memberFor DB-read done in the
+    // rehearsal retired once its pick moved onto
+    // pickHumanMember (Phase 7 Task 5).
     // Phase Final Task 2: objectives + objective_revisions
     // ROW halves stripped — seed drives through
     // postObjectiveCreationOp (pairs only).
@@ -1097,8 +1150,8 @@ async function postMockDataLoadIn(
 
     // The baseline/actual-score rows — hoisted VERBATIM into a
     // pure builder (Phase 7 Task 5) so pass 1 (seed-message-
-    // pairs.ts) forms each row's message pair before this
-    // transaction opens, the SAME split every other seeded
+    // pairs.ts) forms each row's message pair before the
+    // rehearsal's writes, the SAME split every other seeded
     // family already uses. buildScoreSeedProjects resolves each
     // project's organization_id/state PURELY (never a DB read
     // back). This closes the scores half of the Phase 0 seed
@@ -1136,78 +1189,60 @@ async function postMockDataLoadIn(
     ]);
 }
 
-export async function postBootstrap(
-    adapter: BackedDbAdapter,
+export async function rehearseBootstrap(
     options?: PostMockDataLoadOptions,
-): Promise<SeededCredentials> {
-    // Pass 1 (no tx): the lone 'XXZruirZyAOoRpNxaDnpSA' human-member create's
-    // bundle, formed up front — see postMockDataLoad's pass 1
-    // for why. Formed pre-tx — crypto, hashing, and timers
-    // never run inside an open transaction (AGENTS.md §
-    // Transaction bodies await only row ops). Bootstrap's
-    // body embeds nowUtc() (there is
-    // no fixed seed timestamp here), so it is minted ONCE inside
-    // formBootstrapMessagePair and reused verbatim by pass 2
-    // below — never a second, independently timestamped body.
-    // Task 5: ALSO forms
-    // bootstrap's own membership pair — closed the SAME way
-    // postMockDataLoad's own membership sites are. Phase 10
-    // Task 2: ALSO forms the current member's PII document
-    // message pair, closing the intake decomposition's
-    // bootstrap side. Task 6: ALSO forms the system
-    // member's own identities/:id document message pair —
-    // closed the SAME way postMockDataLoad's own
-    // system-identity site is. The credential pairs are
-    // NOT here — seedHumanCredentials forms those itself,
-    // below, since their content is unknown until PBKDF2
-    // resolves. Phase 11 Task 8: ALSO forms bootstrap's
-    // own default-organization document message pair —
-    // the mock-data seed's own per-member
-    // precedent, mirrored here for bootstrap's lone identity.
-    const {
-        identityMessagePair,
-        seatMessagePair,
-        piiMessagePair,
-        systemIdentityMessagePair,
-        defaultOrganizationMessagePair,
-        organizationMessagePair,
-    } = await formBootstrapMessagePair(nowUtc());
-    // Pass 2: seed the pristine bootstrap data in one
-    // transaction. Credentials seed after it commits — PBKDF2
-    // hashing is ALSO async crypto and cannot run inside the tx.
-    // The schema marker stamps LAST so a failed bootstrap leaves
-    // the anonymous plane open for retry.
-    await adapter.ensureTable();
-    await adapter.backend.transaction(
-        'readwrite',
-        (tx) => postBootstrapIn(
-            adapter.openClient(tx),
-            identityMessagePair, seatMessagePair,
-            piiMessagePair,
-            systemIdentityMessagePair,
-            defaultOrganizationMessagePair,
-            organizationMessagePair,
-        ),
-    );
-    // Task 1(d): bootstrap's lone human is 'XXZruirZyAOoRpNxaDnpSA' with
-    // the same PII body pass 2 wrote — no row read.
-    const bootstrapPii = bootstrapCurrentMemberPiiBody();
-    const bootstrapEmail = bootstrapPii['email'];
+): Promise<RehearsedSeed> {
+    const bootstrapEmail =
+        bootstrapCurrentMemberPiiBody()['email'];
     if (typeof bootstrapEmail !== 'string') {
-        throw new Error(
-            'bootstrap PII body lacks email',
-        );
+        throw new Error('bootstrap PII body lacks email');
     }
-    const creds = await seedHumanCredentials(
-        adapter,
+    const credentials = await hashSeedCredentials(
         [{
             identityId: 'XXZruirZyAOoRpNxaDnpSA',
             email: bootstrapEmail,
         }],
-        options?.hashPassword,
+        options?.hashPassword ?? hashPassword,
     );
-    await adapter.postSchemaCreation();
-    return creds;
+    const seedRunId = generateIdentifier();
+    const requestAt = nowUtc();
+    const bootstrap =
+        await formBootstrapMessagePair(requestAt);
+    const credentialPairs =
+        await formSeedCredentialMessagePairs(
+            credentials.humans, credentials.system,
+            requestAt,
+        );
+    const statements = await rehearse(
+        new MemoryStorageBackend(),
+        async (db) => {
+            await postBootstrapIn(
+                db,
+                bootstrap.identityMessagePair,
+                bootstrap.seatMessagePair,
+                bootstrap.piiMessagePair,
+                bootstrap.systemIdentityMessagePair,
+                bootstrap.defaultOrganizationMessagePair,
+                bootstrap.organizationMessagePair,
+            );
+            await postSeedCredentialsIn(
+                db, credentials, credentialPairs,
+            );
+        },
+    );
+    return {
+        rehearsal: { seedRunId, statements },
+        credentials: revealedCredentials(credentials),
+    };
+}
+
+export async function postBootstrap(
+    adapter: BackedDbAdapter,
+    options?: PostMockDataLoadOptions,
+): Promise<SeededCredentials> {
+    const seed = await rehearseBootstrap(options);
+    await postSeedLanding(adapter.backend, seed.rehearsal);
+    return seed.credentials;
 }
 
 export async function postBootstrapIn(
@@ -1241,12 +1276,26 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             seatMessagePair,
         ),
-        writeSeedPair(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        writeSeedPair(adapter, organizationMessagePair),
+    ]);
+    await Promise.all([
+        putIdentityDefaultOrganization(
+            adapter,
+            ['XXZruirZyAOoRpNxaDnpSA'],
+            defaultOrganizationSeedBody(STARK_ORGANIZATION),
+            'XXZruirZyAOoRpNxaDnpSA',
+            defaultOrganizationMessagePair,
+        ),
+        postOrganizationDocumentOp(
+            adapter,
+            [STARK_ORGANIZATION],
+            seededOrganizationBody(STARK_ORGANIZATION),
+            SYSTEM_MEMBER_ID,
+            organizationMessagePair,
+        ),
     ]);
 }

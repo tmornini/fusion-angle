@@ -4030,6 +4030,35 @@ async function authGrantOffered(): Promise<never> {
     );
 }
 
+// PUT /organizations/:id — the tenant root's document,
+// a pure message-plane write. The response is the entity
+// organizationEntityOf forms.
+export async function postOrganizationDocumentOp(
+    db: DbAdapter,
+    p: string[],
+    body: Record<string, unknown>,
+    _actor: Id,
+    messagePair: MessagePair | undefined,
+) {
+    const id = param(p, 0);
+    const entity = organizationEntityOf({
+        name: id,
+        messagePairId: id,
+        method: 'PUT',
+        body: withoutId(body),
+    });
+    // Phase Final Task 2: organizations ROW half
+    // stripped.
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
+}
+
 export const routes: Route[] = [
     route('identities/', {
         // GET is FLIPPED (Phase 10 Task 8): derived via
@@ -5745,25 +5774,7 @@ export const routes: Route[] = [
     // bytes via organizationEntityOf (id-last; GET wins).
     route('organizations/:id', {
         get: (db, p) => deriveOrganization(db, param(p, 0)),
-        put: async (db, p, body, _actor, messagePair) => {
-            const id = param(p, 0);
-            const entity = organizationEntityOf({
-                name: id,
-                messagePairId: id,
-                method: 'PUT',
-                body: withoutId(body),
-            });
-            // Phase Final Task 2: organizations ROW half
-            // stripped.
-            if (messagePair !== undefined) {
-                await runWrite(
-                    db,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-            return entity;
-        },
+        put: postOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
         get: async (db, p) => {

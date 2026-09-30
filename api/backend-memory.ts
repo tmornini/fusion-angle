@@ -94,6 +94,26 @@ export class MemoryStorageBackend
         });
     }
 
+    // The schema step is a buffer: empty when the table is
+    // absent, its rows when it exists (IF NOT EXISTS).
+    // Memory has no marker; the table is the schema. A
+    // throw adopts nothing, so an absent table stays
+    // absent.
+    async seedTransaction<R>(
+        fn: (tx: Tx) => Promise<R>,
+    ): Promise<R> {
+        return this.#serialize(async () => {
+            const buffer = this.#rows === undefined
+                ? []
+                : [...this.#rows];
+            const result = await fn(
+                bufferTx(buffer, 'readwrite'),
+            );
+            this.#rows = buffer;
+            return result;
+        });
+    }
+
     async ensureTable(): Promise<void> {
         if (this.#rows === undefined) {
             this.#rows = [];

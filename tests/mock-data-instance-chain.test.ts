@@ -221,12 +221,14 @@ async () => {
     ]);
     const byId = new Map(
         responses
-            .filter((r) => r.name === SEED_INSTANCE_ID)
+            .filter((r) => r.name === SEED_INSTANCE_ID
+                && r.method === 'PUT')
             .map((r) => [r.id, r]),
     );
     const requestById = new Map(
         requests
-            .filter((r) => r.name === SEED_INSTANCE_ID)
+            .filter((r) => r.name === SEED_INSTANCE_ID
+                && r.method === 'PUT')
             .map((r) => [r.id, r]),
     );
     assertStrictEquals(byId.size, 3);
