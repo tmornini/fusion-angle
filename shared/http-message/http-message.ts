@@ -30,7 +30,7 @@ import type { MessageModel } from './types.ts';
 // registry is injected (Dependency Inversion) and carried across
 // modifications; it defaults to JSON-only so the first use needs
 // no configuration.
-export class HttpMessage {
+export class HttpMessage<T = unknown> {
     readonly #model: MessageModel;
     readonly #bodyRegistry: BodyRegistry;
     readonly #codingRegistry: ContentCodingRegistry;
@@ -47,35 +47,35 @@ export class HttpMessage {
         this.#codingRegistry = codingRegistry;
     }
 
-    static fromModel(
+    static fromModel<T = unknown>(
         model: MessageModel,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
         codingRegistry: ContentCodingRegistry =
             defaultContentCodingRegistry(),
-    ): HttpMessage {
-        return new HttpMessage(
+    ): HttpMessage<T> {
+        return new HttpMessage<T>(
             model, bodyRegistry, codingRegistry,
         );
     }
 
-    static fromWire(
+    static fromWire<T = unknown>(
         wire: string,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
         codingRegistry: ContentCodingRegistry =
             defaultContentCodingRegistry(),
-    ): HttpMessage {
-        return new HttpMessage(
+    ): HttpMessage<T> {
+        return new HttpMessage<T>(
             parseWire(wire), bodyRegistry, codingRegistry,
         );
     }
 
-    static fromJson(
+    static fromJson<T = unknown>(
         json: string,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
         codingRegistry: ContentCodingRegistry =
             defaultContentCodingRegistry(),
-    ): HttpMessage {
-        return new HttpMessage(
+    ): HttpMessage<T> {
+        return new HttpMessage<T>(
             parseJson(json, bodyRegistry),
             bodyRegistry,
             codingRegistry,
@@ -102,8 +102,8 @@ export class HttpMessage {
         return queryModel(this.#model, this.#bodyRegistry, dottedKey);
     }
 
-    body(): Body {
-        return Body.fromModel(
+    body(): Body<T> {
+        return Body.fromModel<T>(
             this.#model, this.#bodyRegistry, this.#codingRegistry,
         );
     }
@@ -112,29 +112,29 @@ export class HttpMessage {
     // withFieldPut overwrites (idempotent — PUT semantics);
     // withFieldAppended is the one ordered, non-idempotent
     // affordance, named loudly.
-    withFieldPut(name: string, value: string): HttpMessage {
+    withFieldPut(name: string, value: string): HttpMessage<T> {
         return this.#derive(putField(this.#model, name, value));
     }
 
-    withFieldAppended(name: string, value: string): HttpMessage {
+    withFieldAppended(name: string, value: string): HttpMessage<T> {
         return this.#derive(
             appendField(this.#model, name, value),
         );
     }
 
-    withFieldDeleted(name: string): HttpMessage {
+    withFieldDeleted(name: string): HttpMessage<T> {
         return this.#derive(deleteField(this.#model, name));
     }
 
-    withMethod(method: string): HttpMessage {
+    withMethod(method: string): HttpMessage<T> {
         return this.#derive(putMethod(this.#model, method));
     }
 
-    withTarget(target: string): HttpMessage {
+    withTarget(target: string): HttpMessage<T> {
         return this.#derive(putTarget(this.#model, target));
     }
 
-    withStatus(status: number, reason: string): HttpMessage {
+    withStatus(status: number, reason: string): HttpMessage<T> {
         return this.#derive(
             putStatus(this.#model, status, reason),
         );
@@ -147,13 +147,15 @@ export class HttpMessage {
                 'no body codec for media type: ' + mediaType,
             );
         }
-        return this.#derive(
+        return new HttpMessage(
             putBody(this.#model, mediaType, codec.encode(value)),
+            this.#bodyRegistry,
+            this.#codingRegistry,
         );
     }
 
-    #derive(model: MessageModel): HttpMessage {
-        return new HttpMessage(
+    #derive(model: MessageModel): HttpMessage<T> {
+        return new HttpMessage<T>(
             model, this.#bodyRegistry, this.#codingRegistry,
         );
     }

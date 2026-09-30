@@ -17,8 +17,9 @@ const IDENTITY = 'identity';
 // every accessor on an absent body throws (Design by Contract),
 // and decoded() throws on a missing/unknown codec or a malformed
 // body — a TELL, where message.query('body.x') stays a lenient
-// ASK that returns absent.
-export class Body {
+// ASK that returns absent. toValue() beside exists() is the
+// value read: the whole decoded body, typed by the caller.
+export class Body<T = unknown> {
     readonly #octets: Octets | undefined;
     readonly #fields: readonly FieldLine[];
     readonly #registry: BodyRegistry;
@@ -36,12 +37,12 @@ export class Body {
         this.#codingRegistry = codingRegistry;
     }
 
-    static fromModel(
+    static fromModel<T = unknown>(
         model: MessageModel,
         registry: BodyRegistry,
         codingRegistry: ContentCodingRegistry,
-    ): Body {
-        return new Body(
+    ): Body<T> {
+        return new Body<T>(
             model.body, model.fields, registry, codingRegistry,
         );
     }
@@ -77,7 +78,7 @@ export class Body {
     // only `identity`); every real coding (gzip, br, …) is a
     // deferred pluggable seam that throws loudly rather than
     // silently passing the still-encoded bytes through.
-    contentDecoded(): Body {
+    contentDecoded(): Body<T> {
         this.#require();
         const codings = this.#contentEncodings();
         if (codings.every((coding) => coding === IDENTITY)) {
@@ -88,14 +89,22 @@ export class Body {
         );
     }
 
+    // The body decoded by its content-type: the whole value
+    // where toNumber(), toBoolean(), and toDate() return a
+    // leaf. The client asserts T at the wire and trusts it
+    // after (spec §7).
+    toValue(): T {
+        return this.contentDecoded().#valueByType() as T;
+    }
+
     // Decode per Content-Type, after stripping any Content-
     // Encoding — so a still-encoded (gzip, …) body fails loudly
     // rather than feeding compressed octets to the codec.
     decoded(): Decoded {
-        return this.contentDecoded().#decodeByType();
+        return Decoded.of(this.contentDecoded().#valueByType());
     }
 
-    #decodeByType(): Decoded {
+    #valueByType(): unknown {
         const octets = this.#require();
         const type = this.#fields.find(
             (field) => field.name === CONTENT_TYPE,
@@ -111,7 +120,7 @@ export class Body {
                 'no body codec for ' + type.value,
             );
         }
-        return Decoded.of(codec.decode(octets));
+        return codec.decode(octets);
     }
 
     // Async sibling of contentDecoded: strip gzip/deflate via the
@@ -119,7 +128,7 @@ export class Body {
     // field removed (it is identity-coded now). An unknown coding
     // throws — the seam refuses to pass still-encoded octets on,
     // exactly as the sync path does.
-    async contentDecodedAsync(): Promise<Body> {
+    async contentDecodedAsync(): Promise<Body<T>> {
         this.#require();
         const codings = this.#contentEncodings();
         if (codings.every((coding) => coding === IDENTITY)) {
@@ -139,14 +148,14 @@ export class Body {
         const fields = this.#fields.filter(
             (line) => line.name !== CONTENT_ENCODING,
         );
-        return new Body(
+        return new Body<T>(
             octets, fields, this.#registry, this.#codingRegistry,
         );
     }
 
     async decodedAsync(): Promise<Decoded> {
         const source = await this.contentDecodedAsync();
-        return source.#decodeByType();
+        return Decoded.of(source.#valueByType());
     }
 
     toNumber(): number {
