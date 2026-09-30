@@ -137,54 +137,89 @@ export function withoutRequestIdLine(
     };
 }
 
-// Records what the seed's live ops write. It keeps
-// openClient's verdict beneath the adapter: a matched,
-// stale, or refused row fails the seed. A conflict must
-// not reach runWrite, which would retry and answer
-// refused.
+// Records what the seed's live ops write. The run holds
+// one transaction open on the scratch, which nothing else
+// uses: the ops' own transactions and reads re-enter it,
+// and a bare statement applies on it, so the statements
+// overlap as a transaction's do. It keeps openClient's
+// verdict beneath the adapter: a matched, stale, or
+// refused row fails the seed. A conflict must not reach
+// runWrite, which would retry and answer refused. A wave's
+// statements finish in any order, so each takes its place
+// when called, and they are returned in call order.
 export class RehearsalBackend implements StorageBackend {
     readonly #scratch: StorageBackend;
-    readonly #statements: RehearsedStatement[] = [];
+    readonly #recorded = new Map<number, RehearsedStatement>();
+    #calls = 0;
+    #open: Tx | undefined;
 
     constructor(scratch: StorageBackend) {
         this.#scratch = scratch;
+        this.#open = undefined;
     }
 
     statements(): readonly RehearsedStatement[] {
-        return this.#statements;
+        return [...this.#recorded]
+            .sort(([a], [b]) => a - b)
+            .map(([, statement]) => statement);
     }
 
-    read<R>(fn: (tx: Tx) => Promise<R>): Promise<R> {
-        return this.#scratch.read(fn);
+    // Hold `tx`, the scratch's one open transaction, for
+    // `run`. Cleared in finally, so no handle outlives it.
+    async runOn(
+        tx: Tx,
+        run: () => Promise<void>,
+    ): Promise<void> {
+        this.#open = tx;
+        try {
+            await run();
+        } finally {
+            this.#open = undefined;
+        }
     }
 
-    transaction<R>(
-        mode: TxMode,
+    // The ops' reads and transactions re-enter the open
+    // handle, as a nested readTransaction re-enters the
+    // open client. A readonly request joins the readwrite
+    // handle: the live path enforces the mode, and the
+    // rehearsal does not.
+    async read<R>(fn: (tx: Tx) => Promise<R>): Promise<R> {
+        return fn(this.#handle());
+    }
+
+    async transaction<R>(
+        _mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
-        return this.#scratch.transaction(mode, fn);
+        return fn(this.#handle());
     }
 
-    seedTransaction<R>(
+    async seedTransaction<R>(
         fn: (tx: Tx) => Promise<R>,
     ): Promise<R> {
+        this.#refuseWhileOpen('seedTransaction');
         return this.#scratch.seedTransaction(fn);
     }
 
-    ensureTable(): Promise<void> {
+    async ensureTable(): Promise<void> {
+        this.#refuseWhileOpen('ensureTable');
         return this.#scratch.ensureTable();
     }
 
+    // An op inside its own transaction passes the handle
+    // it re-entered; a bare statement takes the open one.
     async executeLedger(
         attempt: Attempt,
         rows: readonly StatementBind[],
         now: string | undefined,
         tx: Tx | undefined,
     ): Promise<StatementAnswer[]> {
+        const position = this.#calls++;
+        const handle = tx === undefined ? this.#handle() : tx;
         let answers: StatementAnswer[];
         try {
             answers = await this.#scratch.executeLedger(
-                attempt, rows, now, tx,
+                attempt, rows, now, handle,
             );
         } catch (error) {
             if (error instanceof SuccessionConflict) {
@@ -202,7 +237,7 @@ export class RehearsalBackend implements StorageBackend {
                 );
             }
         }
-        this.#statements.push({
+        this.#recorded.set(position, {
             rows: [...rows],
             supersedes: answers.map(
                 (answer) => answer.supersedes,
@@ -215,18 +250,41 @@ export class RehearsalBackend implements StorageBackend {
         return this.#scratch.hasSchema();
     }
 
-    postSchemaCreation(): Promise<void> {
+    async postSchemaCreation(): Promise<void> {
+        this.#refuseWhileOpen('postSchemaCreation');
         return this.#scratch.postSchemaCreation();
     }
 
     deleteSchema(): Promise<void> {
         return this.#scratch.deleteSchema();
     }
+
+    // Each of the three takes the scratch's serializer,
+    // which the open run holds until it ends: a crash in
+    // place of a hang.
+    #refuseWhileOpen(method: string): void {
+        if (this.#open !== undefined) {
+            throw new Error(
+                method + ' called during the open seed'
+                    + ' rehearsal',
+            );
+        }
+    }
+
+    // Nothing reaches the scratch's rows outside a run.
+    #handle(): Tx {
+        if (this.#open === undefined) {
+            throw new Error('seed rehearsal is not open');
+        }
+        return this.#open;
+    }
 }
 
-// Run the seed's live ops on a scratch backend and return
-// every statement they executed, in order. The scratch
-// root is the scratch's own statement, not the seed's.
+// Run the seed's live ops in one transaction on a scratch
+// backend and return every statement they executed, in
+// the order they were called. The scratch root is the
+// scratch's own statement, not the seed's, and lands
+// before the transaction copies the table.
 export async function rehearse(
     scratch: StorageBackend,
     run: (db: BackedDbAdapter) => Promise<void>,
@@ -239,7 +297,10 @@ export async function rehearse(
         () => {},
     );
     await db.ensureTable();
-    await run(db);
+    await scratch.transaction(
+        'readwrite',
+        (tx) => backend.runOn(tx, () => run(db)),
+    );
     return backend.statements();
 }
 

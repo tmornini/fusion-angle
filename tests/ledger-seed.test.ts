@@ -278,18 +278,27 @@ function ideaPair(
     title: string,
     genesis: boolean,
 ): Promise<MessagePair> {
+    return ideaPairAt(IDEA, method, title, genesis);
+}
+
+function ideaPairAt(
+    idea: string,
+    method: 'PUT' | 'DELETE',
+    title: string,
+    genesis: boolean,
+): Promise<MessagePair> {
     const operationId = generateIdentifier();
     const body = method === 'DELETE' ? undefined : { title };
     return formWriteMessagePair({
         method,
         pathname: '/organizations/' + ORGANIZATION
-            + '/ideas/' + IDEA,
+            + '/ideas/' + idea,
         routePattern: 'organizations/:id/ideas/:id',
         routeSegments: [
             'organizations', ':id', 'ideas', ':id',
         ],
         pathSegments: [
-            'organizations', ORGANIZATION, 'ideas', IDEA,
+            'organizations', ORGANIZATION, 'ideas', idea,
         ],
         headerFields: [],
         body,
@@ -361,6 +370,194 @@ Deno.test('a refused row fails the rehearsal', async () => {
         'seed statement returned refused',
     );
 });
+
+Deno.test(
+    'a wave of concurrent writes records each predecessor',
+    async () => {
+        const ideas = [fresh(), fresh(), fresh()];
+        const geneses = await Promise.all(ideas.map(
+            (idea) => ideaPairAt(idea, 'PUT', 'Fresh', true),
+        ));
+        const successors = await Promise.all(ideas.map(
+            (idea) => ideaPairAt(idea, 'PUT', 'Again', false),
+        ));
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await Promise.all(
+                    geneses.map((pair) => write(db, pair)),
+                );
+                await Promise.all(
+                    successors.map((pair) => write(db, pair)),
+                );
+            },
+        );
+        const depths = depthsOf(statements);
+        const recorded = new Map(statements.map(
+            (statement, index) => [
+                statement.rows[0]!.id,
+                {
+                    supersedes: statement.supersedes[0],
+                    depth: depths[index],
+                },
+            ],
+        ));
+        assertStrictEquals(statements.length, 6);
+        assertStrictEquals(recorded.size, 6);
+        geneses.forEach((genesis, index) => {
+            assertEquals(
+                recorded.get(genesis.id),
+                { supersedes: NIL, depth: 1 },
+            );
+            assertEquals(
+                recorded.get(successors[index]!.id),
+                { supersedes: genesis.id, depth: 2 },
+            );
+        });
+        const backend = new MemoryStorageBackend();
+        await postSeedLanding(
+            backend, { seedRunId: fresh(), statements },
+        );
+        assertStrictEquals(backend.statementExecutions(), 2);
+    },
+);
+
+Deno.test(
+    'a write inside an op\'s own transaction is recorded',
+    async () => {
+        const pair = await ideaPair('PUT', 'Fresh', true);
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            (db) => db.backend.transaction(
+                'readwrite',
+                (tx) => write(db.clientOn(tx), pair),
+            ),
+        );
+        assertEquals(
+            statements.map((s) => s.rows.map((r) => r.id)),
+            [[pair.id]],
+        );
+    },
+);
+
+Deno.test(
+    'a read inside the rehearsal sees the run\'s writes',
+    async () => {
+        const pair = await ideaPair('PUT', 'Fresh', true);
+        await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await write(db, pair);
+                const head = await db.messagePairs.getHeadPair(
+                    '/organizations/' + ORGANIZATION
+                        + '/ideas/',
+                    IDEA,
+                );
+                assertStrictEquals(head?.id, pair.id);
+            },
+        );
+    },
+);
+
+Deno.test(
+    'two writers of one document in a wave fail the seed',
+    async () => {
+        const first = await ideaPair('PUT', 'Fresh', true);
+        const second = await ideaPair('PUT', 'Again', false);
+        await assertRejects(
+            () => rehearse(
+                new MemoryStorageBackend(),
+                async (db) => {
+                    await Promise.all([
+                        write(db, first),
+                        write(db, second),
+                    ]);
+                },
+            ),
+            Error,
+            'seed statement returned refused',
+        );
+    },
+);
+
+Deno.test(
+    'a failed rehearsal adopts nothing on its scratch',
+    async () => {
+        const scratch = new MemoryStorageBackend();
+        const pair = await ideaPair('PUT', 'Fresh', true);
+        await assertRejects(
+            () => rehearse(scratch, async (db) => {
+                await write(db, pair);
+                throw new Error('stop the rehearsal');
+            }),
+            Error,
+            'stop the rehearsal',
+        );
+        assertStrictEquals(
+            (await scratch.read((tx) => tx.getAll())).length,
+            1,
+        );
+    },
+);
+
+Deno.test(
+    'the scratch\'s schema calls are refused mid-rehearsal',
+    async () => {
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await assertRejects(
+                    () => db.backend.ensureTable(),
+                    Error,
+                    'ensureTable called during the open seed'
+                        + ' rehearsal',
+                );
+                await assertRejects(
+                    () => db.backend.seedTransaction(
+                        async () => {},
+                    ),
+                    Error,
+                    'seedTransaction called during the open'
+                        + ' seed rehearsal',
+                );
+                await assertRejects(
+                    () => db.backend.postSchemaCreation(),
+                    Error,
+                    'postSchemaCreation called during the open'
+                        + ' seed rehearsal',
+                );
+            },
+        );
+        assertStrictEquals(statements.length, 0);
+    },
+);
+
+Deno.test(
+    'a wave\'s statements are recorded in call order',
+    async () => {
+        const slow = await Promise.all(
+            [fresh(), fresh(), fresh(), fresh()].map(
+                (idea) => ideaPairAt(idea, 'PUT', 'Fresh', true),
+            ),
+        );
+        const quick = await ideaPairAt(
+            fresh(), 'PUT', 'Fresh', true,
+        );
+        const statements = await rehearse(
+            new MemoryStorageBackend(),
+            async (db) => {
+                await Promise.all([
+                    runWrite(db, attemptFor(slow), slow),
+                    write(db, quick),
+                ]);
+            },
+        );
+        assertEquals(
+            statements.map((s) => s.rows.map((r) => r.id)),
+            [slow.map((pair) => pair.id), [quick.id]],
+        );
+    },
+);
 
 function adapterOver(
     backend: MemoryStorageBackend,
