@@ -178,6 +178,8 @@ import {
     ORGANIZATION_MEMBERS_COLLECTION_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN,
+    CREDENTIALS_COLLECTION_PATTERN,
+    CREDENTIAL_DETAIL_PATTERN,
     CREDENTIAL_KEY_READ_ROLES,
 } from './family-registry.ts';
 import {
@@ -251,7 +253,7 @@ import {
 } from './derive-memberships.ts';
 import {
     deriveCredentialsFor,
-    deriveCredential,
+    credentialsPrefixFor,
     deriveIdentityKind,
     deriveIdentityProvidersFor,
     deriveIdentityProvider,
@@ -3129,7 +3131,7 @@ export const WRITE_RESPONSE_SPECS:
     },
     // The stored state keeps secret; the answer is projected
     // (credentialReader).
-    'identities/:id/credentials/:cid': {
+    [CREDENTIAL_DETAIL_PATTERN]: {
         conditional: 'optional',
         successBody: (params, body) => ({
             id: param(params, 1),
@@ -3851,9 +3853,10 @@ export const routes: Route[] = [
     // id is param 0, so the SERVER filters the collection to that
     // identity by its identity_id FK (the org fence still rides
     // the facade re-entry — viaMembership derives visibility from
-    // the co-membership ledger). Both the collection and the leaf
-    // GET project the opaque `secret` out (withoutSecret) so the
-    // hash never crosses the boundary. The leaf id is param 1; GET
+    // the co-membership ledger). The collection projects the
+    // opaque `secret` out (withoutSecret) and the leaf's reader
+    // drops it, so the hash never crosses the boundary. The
+    // leaf id is param 1; GET
     // and PUT are exposed exactly as the flat makeIdRoute carried
     // them. ADMIN-ONLY: /identities is not member-tier, so these
     // fall to the root admin entries — NO MEMBER_VERBS entry.
@@ -3881,7 +3884,7 @@ export const routes: Route[] = [
     // derived rows to identity_id === the path id FIRST — exactly
     // the OLD plane's WHERE — so a mismatched row never survives
     // to the fence step, on either plane.
-    route('identities/:id/credentials/', {
+    route(CREDENTIALS_COLLECTION_PATTERN, {
         get: async (db, p, actor, organization) => {
             const organizationId = requireOrganization(
                 organization,
@@ -3908,45 +3911,49 @@ export const routes: Route[] = [
             return rows.map(withoutSecret);
         },
     }),
-    // GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveCredential, fenced the SAME way (gate 15) — a
-    // foreign identity's credential 403s; a genuinely absent
-    // one still 404s via EntityNotFoundError. FENCE-INPUT FIX
-    // (post-session review): the path :id only keys the
-    // scan (deriveCredential reads the row at
-    // /identities/{path id}/credentials/{cid} — that is where
-    // the pair lives); the pre-flip fence read the ROW's OWN
-    // identity_id field — the hand-written route this flip
-    // replaced ignored the path entirely, fetching by cid
-    // alone via parentScope.getById, which then fenced via
-    // viaMembership on the ROW's stored identity_id. So the
-    // fence input below is `credential.identity_id`, never the
-    // path — a below-facade write whose body.identity_id
-    // disagrees with its own document now fences EXACTLY as the
-    // row plane did.
-    route('identities/:id/credentials/:cid', {
-        get: async (db, p, actor, organization) => {
+    // The fence input is the head's own identity_id, never
+    // the path: the path :id only keys the prefix the pair
+    // lives at, and no validator ties body.identity_id to
+    // it, so a hand-crafted admin PUT can store a credential
+    // whose identity disagrees with its path. The row plane
+    // this replaced fenced on the stored field; so does this.
+    // A foreign identity's credential 403s; an absent one
+    // 404s. The secret reaches no reader (credentialReader).
+    route(CREDENTIAL_DETAIL_PATTERN, {
+        select: async (db, p, actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
             const cid = param(p, 1);
-            const credential = await deriveCredential(
-                db, identityId, cid,
+            const head = await db.messagePairs.getHeadPair(
+                credentialsPrefixFor(identityId), cid,
             );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'identity_credentials', cid,
+                );
+            }
             const memberships =
                 await membershipsAcrossAllOrganizations(
                     db, actor,
                 );
             const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships, credential.identity_id, organizationId,
+                memberships,
+                pickString(bodyOf(head.response), 'identity_id'),
+                organizationId,
             );
             if (owner !== null && owner !== organizationId) {
                 throw new ForeignOrganizationError(
                     'identity_credentials', cid,
                 );
             }
-            return withoutSecret(credential);
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'identity_credentials', id: cid,
+                reader: credentialReader(roles),
+            };
         },
         put: (db, p, body, actor, messagePair, _organization, roles) =>
             postIdentityCredentialDocumentOp(

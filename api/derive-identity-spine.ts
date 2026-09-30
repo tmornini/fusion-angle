@@ -158,7 +158,7 @@ export async function deriveIdentityPii(
 // ---- the deriveBaselineScores/deriveActualScores precedent -----
 // ---- (api/derive-project-scores.ts) ------------------------------
 
-function credentialsPrefixFor(identityId: Id): string {
+export function credentialsPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined,
         '/identities/' + identityId + '/credentials/',

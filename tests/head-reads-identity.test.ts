@@ -3,6 +3,7 @@ import { handleRequest } from '../api/api.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { apiRequest } from './http-fixtures.ts';
+import { deriveCredentialsFor } from '../api/derive-identity-spine.ts';
 
 const ME = 'XXZruirZyAOoRpNxaDnpSA';
 
@@ -26,4 +27,24 @@ Deno.test('an erased PII answers 410', async () => {
     assertEquals(await after.json(), {
         error: 'Gone: identity_pii/' + ME,
     });
+});
+
+Deno.test('a credential GET serves no secret to an admin',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const [credential] = (await deriveCredentialsFor(db, ME));
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/' + ME + '/credentials/'
+            + credential!.id,
+        token,
+    }));
+    assertStrictEquals(got.status, 200);
+    const text = await got.text();
+    assertStrictEquals(text.includes('"secret"'), false);
+    assertStrictEquals(
+        got.headers.get('content-length'),
+        String(new TextEncoder().encode(text).byteLength),
+    );
 });

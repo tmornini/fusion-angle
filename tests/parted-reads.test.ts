@@ -13,7 +13,6 @@ const PARTED = [
     'ai-agents/:id/versions/:etag',
     'identities/',
     'identities/:id/credentials/',
-    'identities/:id/credentials/:cid',
     'identities/:id/default-organization',
     'identities/:id/invitations/',
     'identities/:id/invitations/:id',
