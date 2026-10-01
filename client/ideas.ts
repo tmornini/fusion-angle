@@ -212,7 +212,7 @@ export async function putIdea(
 ): Promise<HttpMessage<IdeaEntity>> {
     const saved = await ctx.PUT<IdeaEntity>(
         organizationItem(ctx, 'ideas', held.body().toValue().id),
-        { ...document },
+        document,
         [held],
     );
     ideaChanges.notify();

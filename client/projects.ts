@@ -94,7 +94,7 @@ export async function putProject(
 ): Promise<HttpMessage<ProjectEntity>> {
     const saved = await ctx.PUT<ProjectEntity>(
         organizationItem(ctx, 'projects', held.body().toValue().id),
-        { ...document },
+        document,
         [held],
     );
     projectChanges.notify();

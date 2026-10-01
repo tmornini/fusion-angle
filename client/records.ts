@@ -192,7 +192,7 @@ export async function putRecord(
 ): Promise<HttpMessage<RecordEntity>> {
     const saved = await ctx.PUT<RecordEntity>(
         recordTypePath(ctx, held.body().toValue().id),
-        { ...document },
+        document,
         [held],
     );
     recordChanges.notify();
