@@ -1328,8 +1328,18 @@ Off the critical path; each with its oracle.
   drag reorders surface nothing on a refusal (ideas,
   projects, records, organization — workbox toasts); the
   flow save's per-attempt read and `postFlowUndo`'s
-  read-on-412 are the model; and a held-item miss on a
-  drop also says nothing
+  read-on-412 are the model; and a held-item miss also
+  says nothing: a drop's handler returns when the item
+  it held is gone (`web-app/ideas/index.ts:149`,
+  `web-app/records/index.ts:140`,
+  `web-app/projects/index.ts:189`,
+  `web-app/organization/index.ts:230`,
+  `web-app/workbox/index.ts:294`), as do the objective
+  reactivate and archive clicks
+  (`web-app/organization/index.ts:300`, `:467`) — no
+  error, since a bell repaint landing mid-gesture has
+  already resolved the list and a drop reverts visually,
+  but nothing tells the person the gesture did nothing
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
@@ -1449,7 +1459,17 @@ Off the critical path; each with its oracle.
   410 on GET after the fence and is no part of a
   collection. The write half stays open: every other
   family re-creates over its tombstone (the nil latch
-  lands over a DELETE head). An id is
+  lands over a DELETE head), and a singleton's first
+  write sends no declaration: `putClientRegistration`
+  and `deleteClientRegistration`
+  (`client/identities.ts:252`, `:265`) and the PII hop
+  of `putHumanMember` (`client/members.ts`) send no
+  conditional when the page read absence, though the
+  transport has `'creates'` (`If-None-Match: *`,
+  `client/request-context.ts:106`), used only by the
+  instance create (`client/record-instances.ts:129`), so
+  two tabs registering the same client at once overwrite
+  each other silently. An id is
   an identity: reusing one lets a stale reference — a
   binding, an export, an audit line, a client's cache —
   name a different document, as two customers sharing an
@@ -3004,7 +3024,12 @@ Off the critical path; each with its oracle.
   `FlowSummary`, `FlowListItem`, `BoundFlowSummary`,
   and the transition and claim projections — keep
   their shapes and drop the responses they were built
-  from. Oracle: every client read verb returns a
+  from. `putHumanMember` (`client/members.ts`) answers
+  void: its two heads, the identity's and the PII's,
+  have no holder — the members page re-reads after a
+  save (`web-app/members/detail.ts:561`) — and the one
+  head a write verb owes is a composite shape for this
+  bullet to name. Oracle: every client read verb returns a
   message, an array of messages, or a value whose
   `message` members name every response it was built
   from
