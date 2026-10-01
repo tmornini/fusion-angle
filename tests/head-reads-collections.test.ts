@@ -28,6 +28,13 @@ import { generateIdentifier } from '../shared/identifier.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
+import { nowUtc } from '../shared/types.ts';
+import {
+    attemptFor,
+    formWriteMessagePair,
+    runWrite,
+} from '../api/message-pair.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 
@@ -729,4 +736,83 @@ async () => {
     }));
     assertStrictEquals(removed.status, 204);
     assertEquals(await seatedOf(), []);
+});
+
+// A 'state' family's PUT validator makes a stored head with
+// no `state` impossible, and the credential PUT's one with no
+// `identity_id`; a head formed below the facade is a bug the
+// collection's request crashes on, never the reader's fault.
+Deno.test('a collection holding a corrupt head answers 500',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const ideas = '/organizations/' + STARK + '/ideas/';
+    const ideaId = generateIdentifier();
+    const stateless = {
+        title: 'Served', position: 1,
+        problem_statement: 'p', target_users: 't',
+        proposed_solution: 's', expected_outcome: 'o',
+        success_metrics: 'm',
+    };
+    const messagePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: ideas + ideaId,
+        routePattern: 'organizations/:id/ideas/:id',
+        routeSegments: ['organizations', ':id', 'ideas', ':id'],
+        pathSegments: ['organizations', STARK, 'ideas', ideaId],
+        headerFields: [],
+        body: stateless,
+        requesterIdentityId: ME,
+        requestAt: nowUtc(),
+        organization: STARK,
+        responseBody: { id: ideaId, ...stateless },
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(db, attemptFor([messagePair]), [messagePair]);
+    const cid = generateIdentifier();
+    const orphan = {
+        kind: 'password', status: 'set', secret: 'x', at: nowUtc(),
+    };
+    const credentialPair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/identities/' + ME + '/credentials/' + cid,
+        routePattern: 'identities/:id/credentials/:cid',
+        routeSegments: ['identities', ':id', 'credentials', ':cid'],
+        pathSegments: ['identities', ME, 'credentials', cid],
+        headerFields: [],
+        body: orphan,
+        requesterIdentityId: ME,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseBody: { id: cid, ...orphan },
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(
+        db, attemptFor([credentialPair]), [credentialPair],
+    );
+    const legs: readonly [string, string][] = [
+        [ideas, 'stored head has no state: '],
+        [
+            '/identities/' + ME + '/credentials/',
+            'stored credential has no identity_id: ',
+        ],
+    ];
+    for (const [path, offence] of legs) {
+        const { result: got, calls } = await captureConsole(
+            'error',
+            () => handleRequest(db, apiRequest({
+                method: 'GET', path, token,
+            })),
+        );
+        assertStrictEquals(got.status, 500, path);
+        assertEquals(await got.json(), { error: 'internal error' });
+        assertStrictEquals(calls.length, 1, path);
+        const [event, , error] = calls[0]!;
+        assertStrictEquals(event, 'request failed');
+        assertMatch(
+            (error as Error).message, new RegExp('^' + offence),
+        );
+    }
 });
