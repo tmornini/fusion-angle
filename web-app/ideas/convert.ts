@@ -24,6 +24,8 @@ import { sessionContext } from '../app/client.ts';
 import type { RequestContext } from '../../client/request-context.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
 import { type IdeaEntity } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
@@ -479,10 +481,9 @@ export async function init(
                 try {
                     await performConversion(
                         ctx,
-                        ideaId,
+                        tuple.idea.message,
                         projectId,
                         submitted,
-                        tuple.entity,
                         activeObjectives,
                     );
                 } catch (err) {
@@ -574,10 +575,9 @@ function isoDateOnly(ms: number): string {
 
 async function performConversion(
     ctx: RequestContext,
-    ideaId: string,
+    held: HttpMessage<IdeaEntity>,
     projectId: string,
     draft: ConversionDraft,
-    ideaEntity: IdeaEntity,
     activeObjectives: readonly ObjectiveEntity[],
 ): Promise<void> {
     const fields = draft.fields;
@@ -606,13 +606,13 @@ async function performConversion(
         organization_id: _organizationId,
         state: _state,
         ...promotedIdea
-    } = ideaEntity;
+    } = held.body().toValue();
     void _id;
     void _organizationId;
     void _state;
     await postIdeaConversion(
         ctx,
-        ideaId,
+        held,
         projectId,
         {
             title:

@@ -12,12 +12,13 @@ import {
     Idea, Project, HumanMember,
     type IdeaState,
 } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 function buildIdea(
     id: string, title: string,
     state: IdeaState = 'active',
 ): Idea {
-    return new Idea({
+    return new Idea(responseMessage({
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title,
@@ -28,7 +29,7 @@ function buildIdea(
         expected_outcome: '',
         success_metrics: '',
         state,
-    }, state);
+    }), state);
 }
 
 function buildProject(
@@ -199,7 +200,6 @@ Deno.test(
     () => {
         const tuple = {
             idea: buildIdea('fndCYAsXazdzMUlEGMNIZw', 'My Idea'),
-            entity: undefined as unknown as never,
             submitterName: 'Alice',
             submittedAt: '2026-01-01',
         };
@@ -221,7 +221,6 @@ Deno.test(
                 'fxysGbBPBsnCwJNJsyZnkA', 'Other',
                 'approved',
             ),
-            entity: undefined as unknown as never,
             submitterName: 'Bob',
             submittedAt: '2026-01-01',
         };

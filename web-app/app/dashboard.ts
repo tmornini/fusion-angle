@@ -213,7 +213,7 @@ export async function getDashboardStats(
     return [
         {
             label: 'Ideas',
-            value: ideas.filter(row =>
+            value: ideas.map(m => m.body().toValue()).filter(row =>
                 ideaIsVisible(
                     assertIdeaState(
                         row.state,

@@ -136,7 +136,9 @@ export async function init():
                 const existing =
                     await getIdeaEntities(ctx);
                 const position = nextPosition(
-                    existing.map(r => r.position),
+                    existing.map(
+                        m => m.body().toValue().position,
+                    ),
                 );
                 await postIdeaCreation(
                     ctx,

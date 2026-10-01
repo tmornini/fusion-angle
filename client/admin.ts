@@ -61,7 +61,7 @@ export async function getOrganizationStats(
     ctx: RequestContext,
     seatsP?: Promise<readonly MembershipEntity[]>,
 ): Promise<OrganizationStats> {
-    const [projects, ideaRows, activePeopleCount] =
+    const [projects, ideaMessages, activePeopleCount] =
         await Promise.all([
             getProjects(ctx),
             getIdeaEntities(ctx),
@@ -76,6 +76,7 @@ export async function getOrganizationStats(
     const projectsCurrent = projects.filter(
         p => p.stateValue() !== 'declined',
     ).length;
+    const ideaRows = ideaMessages.map(m => m.body().toValue());
     const ideasCurrent = ideaRows.filter(row =>
         ideaIsVisible(
             assertIdeaState(

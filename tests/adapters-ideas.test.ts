@@ -1,12 +1,16 @@
 import {
     assert,
+    assertEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import {
     type RequestContext,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -37,6 +41,7 @@ import { deleteHumanMemberSeat } from
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import { RequestError } from '../shared/http-errors.ts';
 
 function buildIdea(
     _id: string, title: string,
@@ -196,14 +201,61 @@ Deno.test('putIdea persists changes', async () => {
         id: _id,
         organization_id: _organizationId,
         ...fields
-    } = before;
-    await putIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', {
+    } = before.body().toValue();
+    await putIdea(ctx, before, {
         ...fields,
         title: 'Updated',
         state: 'active',
     });
-    const stored = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
+    const stored = (await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw'))
+        .body().toValue();
     assertStrictEquals(stored.title, 'Updated');
+});
+
+const LATCHED = 'fndCYAsXazdzMUlEGMNIZw';
+
+Deno.test('a save latches the held idea and answers the'
+    + ' new head', async () => {
+    const { db } = await adminContext();
+    const { ctx, sent } = recordedContext(
+        db, await organizationToken(),
+    );
+    await seedIdea(ctx, LATCHED, 'Original', 'active');
+    const held = await getIdeaEntity(ctx, LATCHED);
+    const { id: _id, organization_id: _o, ...fields } =
+        held.body().toValue();
+    sent.length = 0;
+    const saved = await putIdea(
+        ctx, held, { ...fields, title: 'Once' },
+    );
+    assertEquals(
+        sent.map((r) => [r.method, r.ifMatch]),
+        [['PUT', held.query('header.etag').toText()]],
+    );
+    const again = await putIdea(
+        ctx, saved, { ...fields, title: 'Twice' },
+    );
+    assertStrictEquals(again.body().toValue().title, 'Twice');
+    await assertRejects(
+        () => putIdea(ctx, held, { ...fields, title: 'Stale' }),
+        RequestError,
+        'If-Match does not match',
+    );
+});
+
+Deno.test('a transition latches the held idea', async () => {
+    const { db } = await adminContext();
+    const { ctx, sent } = recordedContext(
+        db, await organizationToken(),
+    );
+    await seedIdea(ctx, LATCHED, 'Moving', 'active');
+    const held = await getIdeaEntity(ctx, LATCHED);
+    sent.length = 0;
+    await postIdeaStateChange(ctx, held, 'in_review');
+    assertEquals(
+        sent.map((r) => r.ifMatch),
+        [held.query('header.etag').toText()],
+    );
 });
 
 Deno.test('archived ideas are filtered from getIdeas', async () => {
@@ -245,7 +297,8 @@ Deno.test(
             'active',
         );
 
-        const row = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
+        const row = (await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw'))
+            .body().toValue();
         assertStrictEquals(row.title, 'Fresh');
         assertStrictEquals(row.state, 'active');
     },
@@ -261,13 +314,15 @@ Deno.test(
         );
         await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'Original'
             , 'in_review');
-        const before = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
+        const held = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
+        const before = held.body().toValue();
 
         await postIdeaStateChange(
-            ctx, before, 'approved',
+            ctx, held, 'approved',
         );
 
-        const after = await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw');
+        const after = (await getIdeaEntity(ctx, 'fndCYAsXazdzMUlEGMNIZw'))
+            .body().toValue();
         // Entity content fields unchanged; GET reflects the
         // transition.
         assertStrictEquals(after.title, before.title);
@@ -284,11 +339,17 @@ Deno.test(
     'postIdeaConversion commits project, idea,'
     + ' and N baseline rows in one atomic batch',
     async () => {
-        const { db, ctx } = await adminContext();
+        const { db } = await adminContext();
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User',
         );
-        await seedIdea(ctx, 'fndCYAsXazdzMUlEGMNIZw', 'First', 'approved');
+        const ideaId = 'fndCYAsXazdzMUlEGMNIZw';
+        await seedIdea(ctx, ideaId, 'First', 'approved');
+        const held = await getIdeaEntity(ctx, ideaId);
+        sent.length = 0;
         const obj1 = generateIdentifier();
         const obj2 = generateIdentifier();
 
@@ -310,7 +371,7 @@ Deno.test(
 
         await postIdeaConversion(
             ctx,
-            'fndCYAsXazdzMUlEGMNIZw',
+            held,
             'pnXmXrxOWayANgDLdCjuBw',
             projectEntity,
             'submitted',
@@ -321,6 +382,15 @@ Deno.test(
             ],
             [obj1, obj2],
         );
+        assertEquals(
+            sent.filter((r) => r.method === 'GET'
+                && r.path.endsWith('/ideas/' + ideaId)),
+            [],
+        );
+        assertStrictEquals(
+            sent.find((r) => r.method === 'POST')!.ifMatch,
+            held.query('header.etag').toText(),
+        );
 
         // Phase Final Task 2: projects row half stripped —
         // read via GET /organizations/:id/projects/:id.
@@ -330,9 +400,9 @@ Deno.test(
         )).body().toValue();
         assertStrictEquals(project.title, 'P1');
 
-        const idea = await getIdeaEntity(
+        const idea = (await getIdeaEntity(
             ctx, 'fndCYAsXazdzMUlEGMNIZw',
-        );
+        )).body().toValue();
         assertStrictEquals(idea.state, 'promoted');
 
         const promotedProject = await getProjectEntity(
@@ -382,10 +452,13 @@ Deno.test(
             buildIdea('fndCYAsXazdzMUlEGMNIZw', 'First');
         const obj1 = generateIdentifier();
         const obj2 = generateIdentifier();
+        const held = await getIdeaEntity(
+            ctx, 'fndCYAsXazdzMUlEGMNIZw',
+        );
         await assertRejects(
             () => postIdeaConversion(
                 ctx,
-                'fndCYAsXazdzMUlEGMNIZw',
+                held,
                 'pnXmXrxOWayANgDLdCjuBw',
                 projectEntity,
                 'submitted',
@@ -464,7 +537,7 @@ async () => {
     await deleteHumanMemberSeat(ctx, leaverId);
     const rows = await getIdeas(ctx);
     assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.entity.id, ideaId);
+    assertStrictEquals(rows[0]!.idea.idForLink(), ideaId);
     assertStrictEquals(
         rows[0]!.submitterName, FORMER_MEMBER_NAME,
     );

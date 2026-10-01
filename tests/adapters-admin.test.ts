@@ -14,7 +14,7 @@ import {
     getOrganizationStats,
 } from '../client/admin.ts';
 import { getOrganization } from '../web-app/app/organization-view.ts';
-import { putIdea } from '../client/ideas.ts';
+import { getIdeaEntity, putIdea } from '../client/ideas.ts';
 import { putProject } from '../client/projects.ts';
 import {
     type ProjectEntity, type IdeaEntity,
@@ -83,7 +83,8 @@ async function seedProject(
 }
 
 // Seeds an idea through the SAME document PUT the live route
-// uses (putIdea) and its submission through the live
+// uses (postIdeaCreation's unlatched PUT of a fresh id) and
+// its submission through the live
 // submissions PUT, so both message pairs exist — required for
 // the flipped GET ideas / GET organizations/:id/ideas/:id/submissions routes
 // (Phase 2 Task 5), which getIdeas (getOrganizationStats' idea
@@ -99,7 +100,7 @@ async function seedIdea(
 ): Promise<void> {
     const { organization_id: _organizationId, ...entity } =
         buildIdea(id);
-    await putIdea(ctx, id, {
+    await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, {
         ...entity,
         state,
     });
@@ -212,7 +213,7 @@ Deno.test(
         }, undefined);
         const { organization_id: _ideaOrganizationId, ...iFields } =
             buildIdea(ideaId);
-        await putIdea(ctx, ideaId, {
+        await putIdea(ctx, await getIdeaEntity(ctx, ideaId), {
             ...iFields,
             state: 'archived',
         });

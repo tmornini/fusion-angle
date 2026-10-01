@@ -20,6 +20,7 @@ import {
 import { navigateTo } from '../app/navigation.ts';
 import {
     getIdeas,
+    ideaOf,
     putIdea,
     subscribeIdeaChanges,
     type IdeaWithSubmitter,
@@ -144,15 +145,26 @@ function onIdeasLoaded(
         async (id, newPosition) => {
             if (!ideaState) return;
             const tuple = ideaState.ideas
-                .find(t => t.entity.id === id);
+                .find(t => t.idea.idForLink() === id);
             if (!tuple) return;
-            await putIdea(
-                sessionContext(), id,
-                {
-                    ...tuple.entity,
-                    position: newPosition,
-                    state: tuple.idea.stateValue(),
-                },
+            const {
+                id: _id,
+                organization_id: _organizationId,
+                ...fields
+            } = tuple.idea.message.body().toValue();
+            const saved = await putIdea(
+                sessionContext(), tuple.idea.message,
+                { ...fields, position: newPosition },
+            );
+            // The next drag of this card latches the head this
+            // save made, not the one it replaced.
+            if (!ideaState) return;
+            ideaState = applyIdeaListUpdate(
+                ideaState,
+                ideaState.ideas.map(t =>
+                    t.idea.idForLink() === id
+                        ? { ...t, idea: ideaOf(saved) }
+                        : t),
             );
         },
     );

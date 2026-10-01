@@ -14,6 +14,7 @@ import {
     DISPLAY_ABSENT,
 } from '../web-app/app/format.ts';
 import type { IdeaWithSubmitter } from '../client/index.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     IdeaPresenter,
     IdeaEditPresenter,
@@ -123,7 +124,7 @@ function makeIdea(
     state: IdeaState = 'active',
 ): Idea {
     return new Idea(
-        makeIdeaEntity(overrides), state,
+        responseMessage(makeIdeaEntity(overrides)), state,
     );
 }
 
@@ -135,8 +136,7 @@ function makeWithSubmitter(
 ): IdeaWithSubmitter {
     const entity = makeIdeaEntity(overrides);
     return {
-        idea: new Idea(entity, state),
-        entity,
+        idea: new Idea(responseMessage(entity), state),
         submitterName,
         submittedAt,
     };
@@ -235,7 +235,7 @@ Deno.test(
             FILLED_DRAFT,
         );
         const roundTripped = new Idea(
-            { ...base, ...patch },
+            responseMessage({ ...base, ...patch }),
             'active',
         );
         assertEquals(

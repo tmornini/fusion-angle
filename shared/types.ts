@@ -1,3 +1,5 @@
+import type { HttpMessage } from
+    './http-message/http-message.ts';
 import { NIL_IDENTIFIER } from
     './identifier.ts';
 
@@ -1433,6 +1435,7 @@ export interface ProjectFlowEntity {
 }
 
 export class Idea {
+    readonly message: HttpMessage<IdeaEntity>;
     readonly #id: string;
     readonly #title: string;
     readonly #position: number;
@@ -1444,9 +1447,11 @@ export class Idea {
     readonly #successMetrics: string;
 
     constructor(
-        entity: IdeaEntity,
+        message: HttpMessage<IdeaEntity>,
         state: IdeaState,
     ) {
+        this.message = message;
+        const entity = message.body().toValue();
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
