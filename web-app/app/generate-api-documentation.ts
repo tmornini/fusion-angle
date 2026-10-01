@@ -29,8 +29,6 @@ import { AUTHENTICATION_ROUTES } from
     '../../api/request-auth.ts';
 import { documentFamilyWiring } from
     '../../api/document-family.ts';
-import { RECORD_TYPE_DETAIL_PATTERN } from
-    '../../api/family-registry.ts';
 
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
@@ -629,9 +627,6 @@ function conditionalFor(
 // A family's document is the segment before its id.
 function isDeletableDocument(row: Route): boolean {
     if (offeredVerbs(row).includes('delete')) return true;
-    if (routePatternOf(row) === RECORD_TYPE_DETAIL_PATTERN) {
-        return true;
-    }
     const id = row.segments.at(-1);
     const family = row.segments.at(-2);
     return id !== undefined
