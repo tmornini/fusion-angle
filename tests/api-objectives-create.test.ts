@@ -1,7 +1,7 @@
 import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { GET, POST } from '../api/api.ts';
+import { GET, POST } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -51,13 +51,13 @@ Deno.test(
             operationIdHeader());
         // Phase Final Task 2: row halves stripped — GET is
         // pair-derived.
-        const objective = await GET<{
+        const objective = (await GET<{
             id: string;
             position: number;
             organization_id: string;
             state?: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            , DEV_TOKEN, operationIdHeader());
+            , DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(objective.position, 1);
         // The fence stamped the bound org — never the body.
         assertStrictEquals(
@@ -68,12 +68,13 @@ Deno.test(
         // The leaf revision route is PUT-only; read the nested
         // per-objective collection and find the revision the
         // create synthesized (the server filters to this id).
-        const revisions = await GET<Array<{
+        const revisions = (await GET<Array<{
             id: string;
             objective_id: string;
             name: string;
         }>>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-            + '/revisions/', DEV_TOKEN, operationIdHeader());
+            + '/revisions/', DEV_TOKEN, operationIdHeader()))
+                .body().toValue();
         const revision = revisions.find(
             r => r.id === 'sVWUntTCtQYFCpONjkzAKg');
         assert(revision);

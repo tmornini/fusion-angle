@@ -1,11 +1,11 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import { stub } from '@std/testing/mock';
 import { FakeTime } from '@std/testing/time';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET, GETWithEtag, PUT } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import { jitteredBackoff } from
     '../client/request-context.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -76,16 +76,16 @@ Deno.test('PUT with only operation-id still returns'
     const db = await freshDb();
     const token = await organizationToken();
     const ideaId = generateIdentifier();
-    const written = await PUT<{ id: string; title: string }>(
+    const written = (await PUT<{ id: string; title: string }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId,
         ideaPutBody(ideaId, 'No Headers'), token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(written.title, 'No Headers');
 });
 
-Deno.test('GETWithEtag returns the parsed body and the'
-+ ' head pair id as ETag (streamed organizations/:id/ideas/:id)',
+Deno.test('a read answers its head\'s etag: the parsed body and'
++ ' the head pair id (streamed organizations/:id/ideas/:id)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -95,36 +95,13 @@ async () => {
             + ideaId,
         ideaPutBody(ideaId, 'Plain'), token,
         operationIdHeader());
-    const { body, etag } =
-        await GETWithEtag<{
-            id: string; title: string;
-        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, token, operationIdHeader());
-    assertStrictEquals(body.title, 'Plain');
-    assert(etag !== undefined && isIdentifier(etag));
-});
-
-Deno.test('GETWithEtag and GET agree on the body for the'
-+ ' same resource (delegation, not a divergent read path)',
-async () => {
-    const db = await freshDb();
-    const token = await organizationToken();
-    const ideaId = generateIdentifier();
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId,
-        ideaPutBody(ideaId, 'Agree'), token,
-        operationIdHeader());
-    const viaGet = await GET<{ id: string; title: string }>(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, token,
-            operationIdHeader());
-    const { body: viaGetWithEtag } =
-        await GETWithEtag<{
-            id: string; title: string;
-        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + ideaId, token, operationIdHeader());
-    assertEquals(viaGetWithEtag, viaGet);
+    const read = await GET<{
+        id: string; title: string;
+    }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+        + ideaId, token, operationIdHeader());
+    assertStrictEquals(read.body().toValue().title, 'Plain');
+    const etag = read.query('header.etag').toText();
+    assert(isIdentifier(etag.slice(1, -1)));
 });
 
 Deno.test('jitteredBackoff waits base*2^(attempt-1) plus jitter'

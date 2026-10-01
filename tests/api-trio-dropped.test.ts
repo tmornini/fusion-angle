@@ -1,7 +1,7 @@
 import { operationIdHeader } from './operation-id-header.ts';
 import { assert, assertStrictEquals } from '@std/assert';
 import { seededMockDb } from './mock-seed.ts';
-import { GET } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { organizationToken } from
     './token-fixtures.ts';
 import { buildIdeas } from
@@ -29,11 +29,11 @@ Deno.test('idea JSON has no state_at or'
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
     const token = await organizationToken();
-    const row = await GET<Record<string, unknown>>(
+    const row = (await GET<Record<string, unknown>>(
         db,
         nest('ideas', idea.id),
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -44,13 +44,13 @@ Deno.test('GET idea versions/ is collection item'
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
     const token = await organizationToken();
-    const rows = await GET<
+    const rows = (await GET<
         Record<string, unknown>[]
     >(
         db,
         nest('ideas', idea.id) + '/versions/',
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);
@@ -63,11 +63,11 @@ Deno.test('project JSON has no state_at or'
     const db = await seededMockDb();
     const project = buildProjects()[0]!;
     const token = await organizationToken();
-    const row = await GET<Record<string, unknown>>(
+    const row = (await GET<Record<string, unknown>>(
         db,
         nest('projects', project.id),
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -78,14 +78,14 @@ Deno.test('GET project versions/ is collection item'
     const db = await seededMockDb();
     const project = buildProjects()[0]!;
     const token = await organizationToken();
-    const rows = await GET<
+    const rows = (await GET<
         Record<string, unknown>[]
     >(
         db,
         nest('projects', project.id)
             + '/versions/',
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);
@@ -98,11 +98,11 @@ Deno.test('objective JSON has no state_at or'
     const db = await seededMockDb();
     const objective = OBJECTIVE_SEEDS[0]!;
     const token = await organizationToken();
-    const row = await GET<Record<string, unknown>>(
+    const row = (await GET<Record<string, unknown>>(
         db,
         nest('objectives', objective.id),
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -113,14 +113,14 @@ Deno.test('GET objective versions/ is collection'
     const db = await seededMockDb();
     const objective = OBJECTIVE_SEEDS[0]!;
     const token = await organizationToken();
-    const rows = await GET<
+    const rows = (await GET<
         Record<string, unknown>[]
     >(
         db,
         nest('objectives', objective.id)
             + '/versions/',
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);
@@ -133,11 +133,11 @@ Deno.test('record-type JSON has no state_at or'
     const db = await seededMockDb();
     const record = buildRecords()[0]!;
     const token = await organizationToken();
-    const row = await GET<Record<string, unknown>>(
+    const row = (await GET<Record<string, unknown>>(
         db,
         nest('record-types', record.id),
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals('state_at' in row, false);
     assertStrictEquals('state_event_id' in row, false);
     assertStrictEquals(typeof row.state, 'string');
@@ -148,14 +148,14 @@ Deno.test('GET record-type versions/ is collection'
     const db = await seededMockDb();
     const record = buildRecords()[0]!;
     const token = await organizationToken();
-    const rows = await GET<
+    const rows = (await GET<
         Record<string, unknown>[]
     >(
         db,
         nest('record-types', record.id)
             + '/versions/',
         token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assert(rows.length >= 1);
     const first = rows[0]!;
     assertStrictEquals('state_at' in first, false);

@@ -1,5 +1,5 @@
 import { assert, assertStrictEquals } from '@std/assert';
-import { GET } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -59,8 +59,9 @@ for (const route of COLLECTION_ROUTES) {
             const db = memoryDbAdapter();
             await seedAdminSchema(db);
             const rows =
-                await GET<unknown[]>(
-                    db, route, await devToken(), operationIdHeader());
+                (await GET<unknown[]>(
+                    db, route, await devToken(), operationIdHeader()))
+                        .body().toValue();
             assert(
                 Array.isArray(rows),
                 route + ' should return an array',
@@ -77,11 +78,11 @@ Deno.test('GET /identities/:id/organizations/ self-fences'
 async () => {
     const db = await seededMockDb();
     const singleOrganizationIdentityId = buildMembers()[0]!.id;
-    const rows = await GET<OrganizationEntity[]>(
+    const rows = (await GET<OrganizationEntity[]>(
         db,
         'identities/' + singleOrganizationIdentityId
             + '/organizations/',
         await devToken(singleOrganizationIdentityId),
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(rows.length, 1);
 });

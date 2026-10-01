@@ -1,4 +1,4 @@
-import { GET } from '../../api/api.ts';
+import { GET } from '../in-page-facade.ts';
 import { STARK_ORGANIZATION } from
     '../../api/mock-data/seed-constants.ts';
 import { registryUrl } from
@@ -33,10 +33,10 @@ function flowsPath(): string {
 export async function flowIdNamed(
     origin: Origin, name: string,
 ): Promise<string> {
-    const rows = await GET<FlowRow[]>(
+    const rows = (await GET<FlowRow[]>(
         origin.db, flowsPath(), await adminToken(),
         operationIdHeader(),
-    );
+    )).body().toValue();
     const row = rows.find((r) => r.name === name);
     if (row === undefined) {
         throw new Error(`no seeded flow named ${name}`);
@@ -47,10 +47,10 @@ export async function flowIdNamed(
 export async function flowGraph(
     origin: Origin, flowId: string,
 ): Promise<FlowGraph> {
-    return GET<FlowGraph>(
+    return (await GET<FlowGraph>(
         origin.db, flowsPath() + flowId, await adminToken(),
         operationIdHeader(),
-    );
+    )).body().toValue();
 }
 
 export async function openFlow(

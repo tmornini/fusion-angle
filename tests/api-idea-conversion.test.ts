@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { GET, POST, PUT } from '../api/api.ts';
+import { GET, POST, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -167,12 +167,13 @@ Deno.test(
                 ['If-Match', '"' + ideaHead!.id + '"'],
             ]));
 
-        const project = await GET<{
+        const project = (await GET<{
             title: string;
             organization_id: string;
             state: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
-            + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN, operationIdHeader());
+            + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN, operationIdHeader()))
+                .body().toValue();
         assertStrictEquals(project.title, 'Promoted Project');
         // The fence stamped the bound org — never the body.
         assertStrictEquals(project.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
@@ -182,37 +183,37 @@ Deno.test(
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
-        const ideaHistory = await GET<{
+        const ideaHistory = (await GET<{
             id: string;
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         const ideaCurrent = ideaHistory[0]!;
         assertStrictEquals(ideaCurrent.id, 'gVvtDIaqhnkXZQcxZeSuiw');
         assertStrictEquals(ideaCurrent.state, 'promoted');
 
         // The new project entered at its initial state, also
         // authored by the actor.
-        const projectVersions = await GET<{
+        const projectVersions = (await GET<{
             state: string;
             member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(projectVersions.length, 1);
         assertStrictEquals(
             projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
-        const mine = await GET<
+        const mine = (await GET<
             ProjectObjectiveBaselineScoreEntity[]
         >(
             db,
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
             DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [b.objective_id, b.score]),
@@ -428,15 +429,15 @@ Deno.test(
                 ['If-Match', '"' + ideaHead!.id + '"'],
             ]));
 
-        const project = await GET<{ id: string }>(
+        const project = (await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(project.id, 'pnXmXrxOWayANgDLdCjuBw');
-        const ideaHistory = await GET<{ state: string }[]>(
+        const ideaHistory = (await GET<{ state: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         // Family history is DESC — index 0 is current.
         const ideaCurrent = ideaHistory[0]!;
         assertStrictEquals(ideaCurrent.state, 'promoted');
