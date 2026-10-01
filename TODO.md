@@ -414,14 +414,13 @@ skew tests, which went with item 8's trio.
    bearer-exempt routes included (`api/api.ts:403-417`),
    and two handler calls read it `?? ''`
    (`api/api.ts:975-977`, `:1265-1267`). It stops naming
-   one write,
-   and one reader depended on that: the join from a PATCH
-   pair to its revision (`revisionMessagePairIdForPatch`,
-   `api/api.ts:309-328`), there only to attach the
-   revision's ETag — its replay caller (`api/api.ts:981`)
-   leaves with the dedupe, and its other caller
-   (`api/api.ts:1746`) leaves when item 1 lands both pairs
-   in one statement, the handler having minted both ids.
+   one write, and no reader depends on that: an instance
+   PATCH lands its received pair and its revision in one
+   statement (`postInstancePatchOp`, `api/routes.ts:3521`,
+   through `runStateWrite`), and its answer's ETag names
+   the revision from that statement (`receivedEtag`,
+   `api/message-pair.ts:1063`), not from a join on
+   `operation-id`.
    It serves no idempotency: nothing looks a request up by
    it. Three client call sites send no id at all, each a
    raw `fetch` of `POST authentication/token` with
