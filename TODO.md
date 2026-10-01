@@ -3044,6 +3044,56 @@ Off the critical path; each with its oracle.
   message, an array of messages, or a value whose
   `message` members name every response it was built
   from
+- Fewer body decodes, after item 1's fifth spec. Head
+  reads slowed eight of the nine list pages' readyMs
+  (item 1's landed line, base → tip, medians of 25),
+  workbox 122.7 → 142.0 and flows 46.0 → 56.4 the
+  most. Three suspects, none measured: larger
+  multipart list payloads, each part a whole stored
+  response (about 300 header octets plus the full
+  document); each part's split and framing; and
+  repeated body decodes. `Body.toValue()` decodes
+  afresh on every call (`shared/http-message/body.ts:96`),
+  and `HttpMessage.body()` builds a new `Body` on every
+  call (`shared/http-message/http-message.ts:105-109`),
+  so a memo belongs on `HttpMessage` beside `#wire` and
+  `#json` (`:85-99`), not on `Body`. A message is
+  shared across holders — `flowSaves` sends one head to
+  every subscriber (`client/flow-mutations.ts:598`,
+  `:73`), a page holds messages in its state
+  (`web-app/organization/index.ts:171`), and values keep
+  theirs in `message` fields
+  (`client/flow-queries.ts:26`,
+  `client/work-orders-queries.ts:99`) — and no caller
+  mutates a decoded value today, so a memo hands every
+  holder one shared object: freeze it, or rule the memo
+  out. The quick reductions come first, before any
+  memo: decode once before sorting rather than inside
+  the comparator (`client/admin.ts:46`,
+  `client/members.ts:86-90`,
+  `client/organizations.ts:22`, and
+  `client/objectives.ts:52-55`, whose four callers are
+  `client/objectives.ts:249`,
+  `client/project-scoring.ts:206`,
+  `web-app/dashboard/index.ts:50`, and
+  `web-app/organization/index.ts:150`); `flowSaves`
+  subscribers each decode a whole flow to read its `id`
+  (`client/flow-mutations.ts:74`); the flows binding
+  render decodes each record twice
+  (`web-app/flows/detail.ts:1503`, after
+  `bindableRecords` at
+  `web-app/app/presenters/flow-designer-view.ts:457`);
+  presenters decode per render
+  (`web-app/app/presenters/organization-objectives.ts:108`,
+  `project-objectives.ts:102`,
+  `dashboard-objective-aggregates.ts:86`,
+  `idea-conversion.ts:105` and `:640`, and
+  `web-app/ideas/convert.ts:244`); and the organization
+  page decodes each objective again per pass
+  (`web-app/organization/index.ts:150-158`, `:178`,
+  `:187`). Oracle: a profile of workbox and flows names
+  the cost before any change, and each reduction lands
+  with its readyMs before and after
 - Comments name absent code. `appendMessagePairOnce`
   and `appendMessagePairAlways` left with the store's
   one statement, and the comments citing them stayed:
