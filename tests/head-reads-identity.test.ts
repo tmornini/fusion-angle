@@ -263,3 +263,29 @@ async () => {
         new RegExp(ME + '/credentials/' + cid + '.*' + messagePair.id),
     );
 });
+
+// The fence judges the stored identity_id, the row plane's
+// rule: a credential whose body names an identity seated
+// elsewhere is foreign to the path identity's organization,
+// whatever the path says.
+Deno.test('a credential naming an identity seated elsewhere'
+    + ' answers 403', async () => {
+    const db = await seededMockDb();
+    const elsewhere = await seedSeatedIdentity(db, ORGANIZATION_TWO);
+    const cid = generateIdentifier();
+    const path = '/identities/' + ME + '/credentials/' + cid;
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT', path, token: DEV_TOKEN,
+        body: {
+            identity_id: elsewhere, kind: 'password', status: 'set',
+            secret: '$scrypt$ln=17,r=8,p=1$c2FsdA$aGFzaA', at: AT,
+        },
+    }));
+    assertStrictEquals(put.status, 201);
+    await put.body?.cancel();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path, token: await organizationToken(),
+    }));
+    assertStrictEquals(got.status, 403);
+    await got.body?.cancel();
+});
