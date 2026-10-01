@@ -293,3 +293,20 @@ async () => {
     );
     assertEquals(await response.json(), { name: 'Zoë' });
 });
+
+// A read role naming a prototype property hides nothing:
+// only an own key of the stored body is a credential line,
+// and a body with nothing hidden is served as its octets.
+Deno.test('a keys reader hides own keys only', () => {
+    const body = '{"b":1,"a":2}';
+    assertStrictEquals(
+        projectedBody(body, {
+            sees: 'keys',
+            readRoles: new Map<string, readonly string[]>([
+                ['constructor', []],
+            ]),
+            roles: [],
+        }),
+        body,
+    );
+});

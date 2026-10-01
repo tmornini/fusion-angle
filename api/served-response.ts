@@ -142,7 +142,7 @@ function keptKeys(
     roles: readonly string[],
 ): Record<string, unknown> | undefined {
     const hidden = [...readRoles].filter(
-        ([key, admitted]) => key in record
+        ([key, admitted]) => Object.hasOwn(record, key)
             && !admitted.some((role) => roles.includes(role)),
     ).map(([key]) => key);
     if (hidden.length === 0) return undefined;
