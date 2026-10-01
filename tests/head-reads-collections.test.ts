@@ -252,6 +252,18 @@ Deno.test('a state-deleted flow is no part of its collection',
 async () => {
     const db = await seededMockDb();
     const token = await organizationToken();
+    const partsNamed = async (): Promise<string[]> => {
+        const parts = await partsOf<{ id: string }>(
+            await handleRequest(db, apiRequest({
+                method: 'GET', path: FLOWS, token,
+            })),
+        );
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        return parts
+            .map((part) => part.body().toValue().id)
+            .filter((id) => id === ONBOARDING);
+    };
+    assertEquals(await partsNamed(), [ONBOARDING]);
     const read = await handleRequest(db, apiRequest({
         method: 'GET', path: FLOWS + ONBOARDING, token,
     }));
@@ -274,17 +286,7 @@ async () => {
     }));
     assertStrictEquals(deleted.status, 200);
     await deleted.body?.cancel();
-    const parts = await partsOf<{ id: string }>(
-        await handleRequest(db, apiRequest({
-            method: 'GET', path: FLOWS, token,
-        })),
-    );
-    await assertPartsAreHeads(db, parts, { sees: 'whole' });
-    assertEquals(
-        parts.filter((part) =>
-            part.body().toValue().id === ONBOARDING),
-        [],
-    );
+    assertEquals(await partsNamed(), []);
 });
 
 for (const join of ['records', 'work-orders']) {
@@ -376,22 +378,25 @@ Deno.test('a state-deleted record type is no part of its'
     const db = await seededMockDb();
     const token = await organizationToken();
     const id = generateIdentifier();
+    const partsNamed = async (): Promise<string[]> => {
+        const parts = await partsOf<{ id: string }>(
+            await handleRequest(db, apiRequest({
+                method: 'GET', path: RECORD_TYPES, token,
+            })),
+        );
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        return parts
+            .map((part) => part.body().toValue().id)
+            .filter((named) => named === id);
+    };
     const created = await putRecordType(db, token, id, 'active');
     assertStrictEquals(created.status, 201);
+    assertEquals(await partsNamed(), [id]);
     const deleted = await putRecordType(
         db, token, id, 'deleted', created.headers.get('etag')!,
     );
     assertStrictEquals(deleted.status, 200);
-    const parts = await partsOf<{ id: string }>(
-        await handleRequest(db, apiRequest({
-            method: 'GET', path: RECORD_TYPES, token,
-        })),
-    );
-    await assertPartsAreHeads(db, parts, { sees: 'whole' });
-    assertEquals(
-        parts.filter((part) => part.body().toValue().id === id),
-        [],
-    );
+    assertEquals(await partsNamed(), []);
 });
 
 Deno.test(RECORD_TYPES + CUSTOMER_PROFILE + '/attributes/'
