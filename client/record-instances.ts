@@ -2,22 +2,16 @@ import type { RequestContext } from './request-context.ts';
 import { activeOrganization } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
+import { compareIdentifiers } from '../shared/identifier.ts';
 
 // Domain face of a record instance: values as a map keyed
-// by attribute id. etag is the unquoted pair id for
-// If-Match on PATCH.
+// by attribute id, and the head it was read from, which a
+// page holds across an edit and its write latches.
 export interface RecordInstance {
     readonly id: string;
     readonly recordTypeId: string;
     readonly values: ReadonlyMap<string, string>;
-    readonly etag: string;
-}
-
-// The instance and the head it was read from, which the
-// page holds across an edit and its PATCH latches.
-export interface RecordInstanceRead {
-    readonly instance: RecordInstance;
-    readonly read: HttpMessage<InstanceDetailWire>;
+    readonly message: HttpMessage<InstanceDetailWire>;
 }
 
 export interface RecordInstanceHistoryEntry {
@@ -41,7 +35,6 @@ interface InstanceDetailWire {
     readonly organization_id: string;
     readonly record_type_id: string;
     readonly values: readonly InstanceValueWire[];
-    readonly etag?: string;
 }
 
 interface InstanceHistoryWire {
@@ -78,14 +71,14 @@ function valuesMap(
 }
 
 function toRecordInstance(
-    row: InstanceDetailWire,
-    etag: string,
+    message: HttpMessage<InstanceDetailWire>,
 ): RecordInstance {
+    const row = message.body().toValue();
     return {
         id: row.id,
         recordTypeId: row.record_type_id,
         values: valuesMap(row.values),
-        etag,
+        message,
     };
 }
 
@@ -98,58 +91,43 @@ function setWire(
     }));
 }
 
+// By id: the collection orders by write, and a saved
+// instance must not move in the records list or the
+// workbox picker.
 export async function getRecordInstances(
     ctx: RequestContext,
     recordTypeId: string,
 ): Promise<RecordInstance[]> {
-    const rows = (await ctx.GET<InstanceDetailWire[]>(
+    return (await ctx.GETCollection<InstanceDetailWire>(
         instancesPath(ctx, recordTypeId),
-    )).body().toValue();
-    return rows.map(row => {
-        // A list row with no tag leaves nothing for a
-        // page to latch; this is a bug, not an absence.
-        if (row.etag === undefined || row.etag === '') {
-            throw new Error(
-                'the instance list row ' + row.id
-                    + ' carried no ETag',
-            );
-        }
-        return toRecordInstance(row, row.etag);
-    });
+    )).map(toRecordInstance)
+        .sort((a, b) => compareIdentifiers(a.id, b.id));
 }
 
-// Detail: the tag is header-authoritative (not
-// body-embedded); the message the page keeps carries it.
 export async function getRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
-): Promise<RecordInstanceRead> {
-    const read = await ctx.GET<InstanceDetailWire>(
+): Promise<RecordInstance> {
+    return toRecordInstance(await ctx.GET<InstanceDetailWire>(
         instancePath(ctx, recordTypeId, id),
-    );
-    return {
-        instance: toRecordInstance(
-            read.body().toValue(),
-            read.query('header.etag').toText().slice(1, -1),
-        ),
-        read,
-    };
+    ));
 }
 
-// PATCH create, declared as creating. Answers the create's
-// message so the caller can enter edit without a re-GET.
-export function putRecordInstance(
+// PATCH create, declared as creating. Answers the instance
+// the create wrote, its message the new head, so the caller
+// can enter edit without a re-GET.
+export async function putRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
     set: readonly InstanceValueSet[],
-): Promise<HttpMessage> {
-    return ctx.PATCH(
+): Promise<RecordInstance> {
+    return toRecordInstance(await ctx.PATCH<InstanceDetailWire>(
         instancePath(ctx, recordTypeId, id),
         { set: setWire(set) },
         'creates',
-    );
+    ));
 }
 
 // Latches the head the page holds and answers the new one.
@@ -179,13 +157,14 @@ export function patchRecordInstance(
     );
 }
 
+// Latches the head the page holds.
 export async function deleteRecordInstance(
     ctx: RequestContext,
-    recordTypeId: string,
-    id: string,
+    instance: RecordInstance,
 ): Promise<void> {
     await ctx.DELETE(
-        instancePath(ctx, recordTypeId, id),
+        instancePath(ctx, instance.recordTypeId, instance.id),
+        [instance.message],
     );
 }
 

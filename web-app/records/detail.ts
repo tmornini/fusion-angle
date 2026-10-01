@@ -58,8 +58,6 @@ import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
 } from '../../shared/http-errors.ts';
-import type { HttpMessage } from
-    '../../shared/http-message/http-message.ts';
 import {
     projectClaimRolesForOrganization,
 } from '../../api/authorization.ts';
@@ -77,9 +75,8 @@ type PageState =
     }
     | {
         kind: 'instances-editing';
-        instanceId: string;
+        instance: RecordInstance;
         draft: Record<string, string>;
-        held: HttpMessage;
         fields: readonly InstanceFieldView[];
         conflictNotice: string | null;
     };
@@ -131,7 +128,7 @@ function buildInstancesSection(
         return {
             instances: [],
             editing: {
-                instanceId: editing.instanceId,
+                instanceId: editing.instance.id,
                 fields: editing.fields.map(f => ({
                     ...f,
                     value: f.access === 'writable'
@@ -536,26 +533,16 @@ async function handleNewInstance(
         );
         const fields = fieldsFromAttributes(
             currentView.attributes,
-            new Map(),
+            created.values,
         );
         pageState = {
             kind: 'instances-editing',
-            instanceId,
+            instance: created,
             draft: draftFromFields(fields),
-            held: created,
             fields,
             conflictNotice: null,
         };
-        loadedInstances = [
-            ...loadedInstances,
-            {
-                id: instanceId,
-                recordTypeId: recordId,
-                values: new Map(),
-                etag: created.query('header.etag').toText()
-                    .slice(1, -1),
-            },
-        ];
+        loadedInstances = [...loadedInstances, created];
         render(root);
         bindActions(root);
     } catch (err) {
@@ -575,18 +562,17 @@ async function handleEditInstance(
     if (pageState.kind !== 'reading') return;
     const ctx = sessionContext();
     try {
-        const detail = await getRecordInstance(
+        const instance = await getRecordInstance(
             ctx, recordId, instanceId,
         );
         const fields = fieldsFromAttributes(
             currentView.attributes,
-            detail.instance.values,
+            instance.values,
         );
         pageState = {
             kind: 'instances-editing',
-            instanceId,
+            instance,
             draft: draftFromFields(fields),
-            held: detail.read,
             fields,
             conflictNotice: null,
         };
@@ -608,9 +594,7 @@ async function handleInstanceSave(
     if (!recordId) return;
     if (saveInProgress) return;
     const ctx = sessionContext();
-    const {
-        instanceId, draft, held, fields,
-    } = pageState;
+    const { instance, draft, fields } = pageState;
     // Empty string is rejected at the gate; only ship
     // non-empty writable values in this minimal UI
     // (no clear-on-blank path yet).
@@ -627,8 +611,8 @@ async function handleInstanceSave(
         await patchRecordInstance(
             ctx,
             recordId,
-            instanceId,
-            held,
+            instance.id,
+            instance.message,
             { set },
         );
         pageState = { kind: 'reading' };
@@ -645,21 +629,20 @@ async function handleInstanceSave(
                     await getRecordInstance(
                         ctx,
                         recordId,
-                        instanceId,
+                        instance.id,
                     );
                 if (!currentView) return;
                 const freshFields =
                     fieldsFromAttributes(
                         currentView.attributes,
-                        fresh.instance.values,
+                        fresh.values,
                     );
                 pageState = {
                     kind: 'instances-editing',
-                    instanceId,
+                    instance: fresh,
                     draft: draftFromFields(
                         freshFields,
                     ),
-                    held: fresh.read,
                     fields: freshFields,
                     conflictNotice:
                         INSTANCE_CONFLICT_NOTICE,
@@ -690,20 +673,23 @@ async function handleInstanceSave(
 async function handleDeleteInstance(
     root: HTMLElement,
 ): Promise<void> {
-    if (!recordId) return;
     const instanceId = pendingDeleteInstanceId;
     pendingDeleteInstanceId = null;
     if (!instanceId) return;
     if (saveInProgress) return;
+    // A reload since the dialog opened may have dropped the
+    // row: the instance is already gone from this list.
+    const instance = loadedInstances.find(
+        (row) => row.id === instanceId,
+    );
+    if (instance === undefined) return;
     const ctx = sessionContext();
     saveInProgress = true;
     try {
-        await deleteRecordInstance(
-            ctx, recordId, instanceId,
-        );
+        await deleteRecordInstance(ctx, instance);
         if (
             pageState.kind === 'instances-editing'
-            && pageState.instanceId === instanceId
+            && pageState.instance.id === instanceId
         ) {
             pageState = { kind: 'reading' };
         }

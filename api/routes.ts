@@ -196,7 +196,6 @@ import {
 import {
     instancesUriPrefix,
     deriveInstanceHead,
-    deriveInstanceCollection,
     deriveInstanceRevisions,
     mergeInstanceValues,
     revisionValuesOf,
@@ -4912,38 +4911,35 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Nested instances collection (Task 16): member GET
-    // under a live type. Parent probe first; heads via
-    // deriveInstanceCollection; each row projects values
-    // by attribute ACL and embeds etag (pair id, no quotes).
+    // Nested instances collection: member GET under a live
+    // type. Parent probe first, so a type never written
+    // answers 404; each live head is served as its document
+    // GET serves it, projected by the reader's attribute
+    // roles.
     route(INSTANCES_COLLECTION_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
-            const typeId = param(p, 1);
-            await requireRecordTypeExists(db, org, typeId);
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
-                );
-            const heads = await deriveInstanceCollection(
-                db, org, typeId,
+            const organizationId = requireOrganization(
+                organization,
             );
-            const rows = [];
-            for (const head of heads) {
-                const values = projectReadableValues(
-                    head.values, attributesById, roles,
-                );
-                rows.push({
-                    id: head.id,
-                    organization_id: org,
-                    record_type_id: typeId,
-                    values,
-                    etag: head.messagePairId,
-                });
-            }
-            return rows;
+            const typeId = param(p, 1);
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
+            );
+            return {
+                ...await selectHeadsAtPath(
+                    db,
+                    instancesUriPrefix(organizationId, typeId),
+                    'stateless',
+                ),
+                reader: instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
+                ),
+            };
         },
     }),
     // Nested instance value-revision versions (Task 19).

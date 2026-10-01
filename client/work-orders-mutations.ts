@@ -293,11 +293,11 @@ export async function postWorkOrderTransition(
         ]);
     const storedValues = bound === null
         ? null
-        : bound.instance.values;
+        : bound.values;
     const held = heldInstance
         ?? (bound === null
             ? undefined
-            : bound.read);
+            : bound.message);
 
     const pendingValues = new Map(
         Object.entries(values),

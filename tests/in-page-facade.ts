@@ -12,6 +12,10 @@ import {
 import type { Client } from '../client/create-client.ts';
 import type { RequestContext } from '../client/request-context.ts';
 import { createAppClient } from '../web-app/app/client.ts';
+import {
+    recordingFetch,
+    type SentRequest,
+} from './fixtures/recording-fetch.ts';
 
 // Test wrap: the real transport over a fetch that reaches
 // handleRequest in-process. Product boot uses the browser's
@@ -79,6 +83,26 @@ export function inPageContext(
     token: string,
 ): RequestContext {
     return inPageClient(adapter).requestContext(token);
+}
+
+// A context over the in-process fetch whose requests are
+// recorded, for a pin that counts them.
+export type RecordedContext = {
+    readonly ctx: RequestContext,
+    readonly sent: SentRequest[],
+};
+
+export function recordedContext(
+    adapter: ClientFacadeAdapter,
+    token: string,
+): RecordedContext {
+    const recorded = recordingFetch(inProcessFetch(adapter));
+    return {
+        ctx: createAppClient(createHttpFacade(
+            IN_PROCESS_ORIGIN, recorded.fetch,
+        )).requestContext(token),
+        sent: recorded.sent,
+    };
 }
 
 // A caller that holds no session: a 401 answers as it was

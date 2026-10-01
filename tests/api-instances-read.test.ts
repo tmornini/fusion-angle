@@ -30,7 +30,13 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partsOf,
 } from './http-fixtures.ts';
+import {
+    instanceReader,
+    loadAttributeSchemaById,
+} from '../api/routes.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
     compareIdentifiers,
@@ -40,8 +46,8 @@ import {
 
 // Instance GET detail + list: read projection by attribute
 // ACL; advertised ETag is the head pair id, shared by every
-// caller. List embeds etag sans quotes. Full-state head
-// only (R5 — no fold).
+// caller. Each list part carries its head's ETag line.
+// Full-state head only (R5 — no fold).
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const AT2 = '2026-01-02T00:00:00.000000Z';
@@ -235,7 +241,6 @@ interface InstanceDetailWire {
     organization_id: string;
     record_type_id: string;
     values: { attribute_id: string; value: string }[];
-    etag?: string;
 }
 
 Deno.test('GET detail member → 200; only read-permitted '
@@ -415,24 +420,20 @@ async () => {
     ));
     assertStrictEquals(listMember.status, 200);
     assertStrictEquals(listAdmin.status, 200);
-    const memberRows = await listMember.json() as {
-        id: string;
-        etag: string;
-    }[];
-    const adminRows = await listAdmin.json() as {
-        id: string;
-        etag: string;
-    }[];
-    const memberRow = memberRows.find(
-        (row) => row.id === INSTANCE_A,
-    );
-    const adminRow = adminRows.find(
-        (row) => row.id === INSTANCE_A,
-    );
+    const memberRow = (await partsOf<InstanceDetailWire>(
+        listMember,
+    )).find((part) => part.body().toValue().id === INSTANCE_A);
+    const adminRow = (await partsOf<InstanceDetailWire>(
+        listAdmin,
+    )).find((part) => part.body().toValue().id === INSTANCE_A);
     assert(memberRow !== undefined);
     assert(adminRow !== undefined);
-    assertStrictEquals(memberRow.etag, head.messagePairId);
-    assertStrictEquals(adminRow.etag, head.messagePairId);
+    assertStrictEquals(
+        memberRow.query('header.etag').toText(), expected,
+    );
+    assertStrictEquals(
+        adminRow.query('header.etag').toText(), expected,
+    );
 });
 
 Deno.test('GET detail absent → 404 record_instances '
@@ -548,8 +549,8 @@ async () => {
     assertStrictEquals(retired.status, 404);
 });
 
-Deno.test('GET list → 200 identifier order ASC; tombstones'
-+ ' omitted; row etag == detail ETag sans quotes',
+Deno.test('GET list → 200 in (response_at, id) order;'
++ ' tombstones omitted; part etag == detail ETag',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -602,15 +603,21 @@ async () => {
         'GET', INSTANCES, memberToken,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as InstanceDetailWire[];
-    assertStrictEquals(rows.length, 2);
-    const ordered = [INSTANCE_A, INSTANCE_B]
-        .slice()
-        .sort(compareIdentifiers);
-    assertStrictEquals(rows[0]!.id, ordered[0]);
-    assertStrictEquals(rows[1]!.id, ordered[1]);
-    assert(isIdentifier(rows[0]!.etag!));
-    assert(isIdentifier(rows[1]!.etag!));
+    const parts = await partsOf<InstanceDetailWire>(list);
+    await assertPartsAreHeads(db, parts, instanceReader(
+        await loadAttributeSchemaById(db, ORGANIZATION, TYPE_ID),
+        ['member'],
+    ));
+    const rows = parts.map((part) => part.body().toValue());
+    assertEquals(
+        rows.map((row) => row.id).sort(compareIdentifiers),
+        [INSTANCE_A, INSTANCE_B].sort(compareIdentifiers),
+    );
+    for (const part of parts) {
+        assert(isIdentifier(
+            part.query('header.etag').toText().slice(1, -1),
+        ));
+    }
     const firstId = rows[0]!.id;
     const detailFirst = await handleRequest(db, req(
         'GET', detailPath(firstId), memberToken,
@@ -619,8 +626,8 @@ async () => {
     const detailEtag = detailFirst.headers.get('ETag');
     assert(detailEtag !== null);
     assertStrictEquals(
-        rows[0]!.etag,
-        detailEtag.slice(1, -1),
+        parts[0]!.query('header.etag').toText(),
+        detailEtag,
     );
     assertEquals(rows[0]!.values, [
         {

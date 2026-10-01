@@ -421,8 +421,8 @@ async function loadPresenter(
                         bound.instanceId,
                     );
                 return {
-                    instanceValues: detail.instance.values,
-                    instance: detail.read,
+                    instanceValues: detail.values,
+                    instance: detail.message,
                     pickerItems: [],
                     heldTypeId: bound.recordTypeId,
                 };

@@ -794,7 +794,7 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            head.instance.values.get(ATTR_ID),
+            head.values.get(ATTR_ID),
             'xDyDkxEPwtcNmJVknUHDsg',
         );
         assertStrictEquals(
@@ -825,7 +825,7 @@ Deno.test(
                 ctx, woId,
             );
         await patchRecordInstance(
-            ctx, RT_ID, INST_ID, loaded.read, {
+            ctx, RT_ID, INST_ID, loaded.message, {
                 set: [{
                     attributeId: ATTR_ID,
                     value: 'vB',
@@ -837,7 +837,7 @@ Deno.test(
                 workOrderId: woId,
                 edgeId: EDGE_MIDDLE_FINISH,
                 values: { [ATTR_ID]: 'vStale' },
-                instance: loaded.read,
+                instance: loaded.message,
             }),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
@@ -846,7 +846,7 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            head.instance.values.get(ATTR_ID), 'vB',
+            head.values.get(ATTR_ID), 'vB',
         );
         assertStrictEquals(
             await getWorkOrderCurrentNodeId(
@@ -880,7 +880,7 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            head.instance.values.has(ATTR_ID), false,
+            head.values.has(ATTR_ID), false,
         );
     },
 );
@@ -913,10 +913,11 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            after.instance.etag, before.instance.etag,
+            after.message.query('header.etag').toText(),
+            before.message.query('header.etag').toText(),
         );
         assertStrictEquals(
-            after.instance.values.get(ATTR_ID), 'v0',
+            after.values.get(ATTR_ID), 'v0',
         );
         assertStrictEquals(
             await getWorkOrderCurrentNodeId(

@@ -18,7 +18,11 @@ import {
     assertPartsAreHeads,
     partsOf,
 } from './http-fixtures.ts';
-import { credentialReader } from '../api/routes.ts';
+import {
+    credentialReader,
+    instanceReader,
+    loadAttributeSchemaById,
+} from '../api/routes.ts';
 import type { Reader } from '../api/served-response.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
@@ -441,4 +445,147 @@ Deno.test('attributes under a record type never written'
     assertEquals(await got.json(), {
         error: 'Not found: record_types/' + id,
     });
+});
+
+// An instance list: each part is a live head, projected by
+// its reader's attribute roles as the document GET projects
+// it.
+const ADMIN_ONLY = generateIdentifier();
+const EVERYONE = generateIdentifier();
+
+type InstanceWire = {
+    id: string;
+    values: { attribute_id: string; value: string }[];
+};
+
+async function instancesDb() {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const typeId = generateIdentifier();
+    const created = await putRecordType(
+        db, token, typeId, 'active',
+    );
+    assertStrictEquals(created.status, 201);
+    const type = RECORD_TYPES + typeId;
+    for (const [id, readRoles] of [
+        [EVERYONE, ['member', 'admin']],
+        [ADMIN_ONLY, ['admin']],
+    ] as const) {
+        const put = await handleRequest(db, apiRequest({
+            method: 'PUT', path: type + '/attributes/' + id,
+            token,
+            body: {
+                name: 'Field ' + id, attribute_type: 'text',
+                sort_order: 0, options: [], constraints: [],
+                read_roles: [...readRoles],
+                write_roles: ['admin'],
+            },
+        }));
+        assertStrictEquals(put.status, 201);
+        await put.body?.cancel();
+    }
+    const instances = type + '/instances/';
+    const ids = [generateIdentifier(), generateIdentifier()];
+    for (const id of ids) {
+        const put = await handleRequest(db, apiRequest({
+            method: 'PATCH', path: instances + id, token,
+            headers: { 'if-none-match': '*' },
+            body: {
+                set: [
+                    { attribute_id: EVERYONE, value: 'open' },
+                    { attribute_id: ADMIN_ONLY, value: 'held' },
+                ],
+            },
+        }));
+        assertStrictEquals(put.status, 201);
+        await put.body?.cancel();
+    }
+    const member = generateIdentifier();
+    await seedSeat(db, STARK, member, 'member');
+    return {
+        db, token, typeId, instances, ids,
+        memberToken: await organizationToken(member),
+    };
+}
+
+Deno.test('an instance list serves its heads as parts, each'
+    + ' projected for its reader as its document GET',
+async () => {
+    const { db, token, typeId, instances, ids, memberToken } =
+        await instancesDb();
+    const schema = await loadAttributeSchemaById(
+        db, STARK, typeId,
+    );
+    for (const [reader, roles, sees] of [
+        [token, ['admin'], [EVERYONE, ADMIN_ONLY]],
+        [memberToken, ['member'], [EVERYONE]],
+    ] as const) {
+        const got = await handleRequest(db, apiRequest({
+            method: 'GET', path: instances, token: reader,
+        }));
+        assertStrictEquals(got.status, 200);
+        assertMatch(
+            got.headers.get('content-type')!,
+            /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+        );
+        assertStrictEquals(got.headers.get('etag'), null);
+        const parts = await partsOf<InstanceWire>(got);
+        await assertPartsAreHeads(
+            db, parts, instanceReader(schema, roles),
+        );
+        assertEquals(
+            parts.map((part) => part.body().toValue().id).sort(),
+            [...ids].sort(),
+        );
+        for (const part of parts) {
+            const instance = part.body().toValue();
+            assertEquals(
+                instance.values.map((v) => v.attribute_id).sort(),
+                [...sees].sort(),
+            );
+            await assertPartIsDocumentGet(
+                db, reader, part, instances + instance.id,
+            );
+        }
+    }
+});
+
+Deno.test('a retired instance is no part of its list',
+async () => {
+    const { db, token, typeId, instances, ids } =
+        await instancesDb();
+    const retired = ids[0]!;
+    const deleted = await handleRequest(db, apiRequest({
+        method: 'DELETE', path: instances + retired, token,
+    }));
+    assertStrictEquals(deleted.status, 204);
+    const parts = await partsOf<InstanceWire>(
+        await handleRequest(db, apiRequest({
+            method: 'GET', path: instances, token,
+        })),
+    );
+    await assertPartsAreHeads(db, parts, instanceReader(
+        await loadAttributeSchemaById(db, STARK, typeId),
+        ['admin'],
+    ));
+    assertEquals(
+        parts.map((part) => part.body().toValue().id),
+        [ids[1]!],
+    );
+});
+
+Deno.test('a record type with no instances answers 204',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const created = await putRecordType(db, token, id, 'active');
+    assertStrictEquals(created.status, 201);
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: RECORD_TYPES + id + '/instances/',
+        token,
+    }));
+    assertStrictEquals(got.status, 204);
+    assertStrictEquals(await got.text(), '');
+    assertMatch(got.headers.get('date')!, /GMT$/);
 });
