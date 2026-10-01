@@ -466,13 +466,24 @@ skew tests, which went with item 8's trio.
    Head reads landed
    (`docs/superpowers/specs/2026-09-30-head-reads-design.md`):
    43 GET routes serve stored responses; thirty stay
-   parted under `tests/parted-reads.test.ts`. Two specs
+   parted under `tests/parted-reads.test.ts`. `./test`
+   76.0 s → 104.1 s (medians; the base one parallel
+   invocation, the tip three: parallel pass, serial
+   lane, and tz); readyMs per list page, base → tip
+   (medians of 25, `measurements/history.jsonl`, `4a540f3`
+   → `9a8396a`): dashboard 65.7 → 61.5, ideas 53.8 →
+   58.4, projects 57.5 → 62.3, records 50.6 → 54.9,
+   flows 46.0 → 56.4, workbox 122.7 → 142.0, members
+   53.8 → 54.1, identities 55.0 → 56.4, organization
+   51.2 → 54.1. Two specs
    follow: version and history reads, the four
-   invitation reads, and `former-members/` (the fourth);
-   work-order events (the fifth). The covenant lands
-   with the spec that empties the census — the fourth,
-   or the fifth if `…/work-orders/:id/history` waits for
-   it (spec §1 D, `## For the next brainstorms`).
+   invitation reads, and `former-members/` (the fourth,
+   which leaves `…/work-orders/:id/history` in the
+   census); work-order events (the fifth, which builds
+   that read once, as a heads read of the work order's
+   event documents). The covenant lands with the fifth,
+   in the commit that empties the census (spec §12,
+   `## For the next brainstorms`).
    ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
@@ -1328,8 +1339,18 @@ Off the critical path; each with its oracle.
   drag reorders surface nothing on a refusal (ideas,
   projects, records, organization — workbox toasts); the
   flow save's per-attempt read and `postFlowUndo`'s
-  read-on-412 are the model; and a held-item miss on a
-  drop also says nothing
+  read-on-412 are the model; and a held-item miss also
+  says nothing: a drop's handler returns when the item
+  it held is gone (`web-app/ideas/index.ts:149`,
+  `web-app/records/index.ts:140`,
+  `web-app/projects/index.ts:189`,
+  `web-app/organization/index.ts:230`,
+  `web-app/workbox/index.ts:294`), as do the objective
+  reactivate and archive clicks
+  (`web-app/organization/index.ts:300`, `:467`) — no
+  error, since a bell repaint landing mid-gesture has
+  already resolved the list and a drop reverts visually,
+  but nothing tells the person the gesture did nothing
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
@@ -1449,7 +1470,17 @@ Off the critical path; each with its oracle.
   410 on GET after the fence and is no part of a
   collection. The write half stays open: every other
   family re-creates over its tombstone (the nil latch
-  lands over a DELETE head). An id is
+  lands over a DELETE head), and a singleton's first
+  write sends no declaration: `putClientRegistration`
+  and `deleteClientRegistration`
+  (`client/identities.ts:252`, `:265`) and the PII hop
+  of `putHumanMember` (`client/members.ts`) send no
+  conditional when the page read absence, though the
+  transport has `'creates'` (`If-None-Match: *`,
+  `client/request-context.ts:106`), used only by the
+  instance create (`client/record-instances.ts:129`), so
+  two tabs registering the same client at once overwrite
+  each other silently. An id is
   an identity: reusing one lets a stale reference — a
   binding, an export, an audit line, a client's cache —
   name a different document, as two customers sharing an
@@ -3004,10 +3035,65 @@ Off the critical path; each with its oracle.
   `FlowSummary`, `FlowListItem`, `BoundFlowSummary`,
   and the transition and claim projections — keep
   their shapes and drop the responses they were built
-  from. Oracle: every client read verb returns a
+  from. `putHumanMember` (`client/members.ts`) answers
+  void: its two heads, the identity's and the PII's,
+  have no holder — the members page re-reads after a
+  save (`web-app/members/detail.ts:561`) — and the one
+  head a write verb owes is a composite shape for this
+  bullet to name. Oracle: every client read verb returns a
   message, an array of messages, or a value whose
   `message` members name every response it was built
   from
+- Fewer body decodes, after item 1's fifth spec. Head
+  reads slowed eight of the nine list pages' readyMs
+  (item 1's landed line, base → tip, medians of 25),
+  workbox 122.7 → 142.0 and flows 46.0 → 56.4 the
+  most. Three suspects, none measured: larger
+  multipart list payloads, each part a whole stored
+  response (about 300 header octets plus the full
+  document); each part's split and framing; and
+  repeated body decodes. `Body.toValue()` decodes
+  afresh on every call (`shared/http-message/body.ts:96`),
+  and `HttpMessage.body()` builds a new `Body` on every
+  call (`shared/http-message/http-message.ts:105-109`),
+  so a memo belongs on `HttpMessage` beside `#wire` and
+  `#json` (`:85-99`), not on `Body`. A message is
+  shared across holders — `flowSaves` sends one head to
+  every subscriber (`client/flow-mutations.ts:598`,
+  `:73`), a page holds messages in its state
+  (`web-app/organization/index.ts:171`), and values keep
+  theirs in `message` fields
+  (`client/flow-queries.ts:26`,
+  `client/work-orders-queries.ts:99`) — and no caller
+  mutates a decoded value today, so a memo hands every
+  holder one shared object: freeze it, or rule the memo
+  out. The quick reductions come first, before any
+  memo: decode once before sorting rather than inside
+  the comparator (`client/admin.ts:46`,
+  `client/members.ts:86-90`,
+  `client/organizations.ts:22`, and
+  `client/objectives.ts:52-55`, whose four callers are
+  `client/objectives.ts:249`,
+  `client/project-scoring.ts:206`,
+  `web-app/dashboard/index.ts:50`, and
+  `web-app/organization/index.ts:150`); `flowSaves`
+  subscribers each decode a whole flow to read its `id`
+  (`client/flow-mutations.ts:74`); the flows binding
+  render decodes each record twice
+  (`web-app/flows/detail.ts:1503`, after
+  `bindableRecords` at
+  `web-app/app/presenters/flow-designer-view.ts:457`);
+  presenters decode per render
+  (`web-app/app/presenters/organization-objectives.ts:108`,
+  `project-objectives.ts:102`,
+  `dashboard-objective-aggregates.ts:86`,
+  `idea-conversion.ts:105` and `:640`, and
+  `web-app/ideas/convert.ts:244`); and the organization
+  page decodes each objective again per pass
+  (`web-app/organization/index.ts:150-158`, `:178`,
+  `:187`). Oracle: a profile of workbox and flows names
+  the cost before any change, and each reduction lands
+  with its readyMs before and after
 - Comments name absent code. `appendMessagePairOnce`
   and `appendMessagePairAlways` left with the store's
   one statement, and the comments citing them stayed:
