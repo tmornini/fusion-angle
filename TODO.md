@@ -466,7 +466,16 @@ skew tests, which went with item 8's trio.
    Head reads landed
    (`docs/superpowers/specs/2026-09-30-head-reads-design.md`):
    43 GET routes serve stored responses; thirty stay
-   parted under `tests/parted-reads.test.ts`. Two specs
+   parted under `tests/parted-reads.test.ts`. `./test`
+   76.0 s → 173.1 s (medians; the base one parallel
+   invocation, the tip three: parallel pass, serial
+   lane, and tz); readyMs per list page, base → tip
+   (medians of 25, `measurements/history.jsonl`, `4a540f3`
+   → `9a8396a`): dashboard 65.7 → 61.5, ideas 53.8 →
+   58.4, projects 57.5 → 62.3, records 50.6 → 54.9,
+   flows 46.0 → 56.4, workbox 122.7 → 142.0, members
+   53.8 → 54.1, identities 55.0 → 56.4, organization
+   51.2 → 54.1. Two specs
    follow: version and history reads, the four
    invitation reads, and `former-members/` (the fourth);
    work-order events (the fifth). The covenant lands
