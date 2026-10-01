@@ -1,4 +1,3 @@
-// tests/http-multipart.test.ts
 import {
     assertEquals,
     assertStrictEquals,
@@ -150,6 +149,18 @@ Deno.test('the splitter refuses every malformed shape',
             good,
             'more than one boundary',
         ],
+        ['multipart/mixed; boundary=has space', good,
+            'invalid multipart boundary'],
+        [
+            'multipart/mixed; boundary=b0',
+            joinParts(['HTTP/1.1 204 \r\netag: "a"'], 'b0'),
+            'no header section end',
+        ],
+        [TYPE, good.replace('content-length: 2\r\n',
+            'content-length: 2\r\ncontent-length: 2\r\n'),
+            'invalid content-length'],
+        [TYPE, good.replace('content-length: 2',
+            'content-length: two'), 'invalid content-length'],
     ];
     for (const [type, body, message] of refusals) {
         assertThrows(
