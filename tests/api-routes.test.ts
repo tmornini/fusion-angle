@@ -28,6 +28,7 @@ const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 // The collections that serve their heads as parts.
 const SERVED_COLLECTIONS: readonly string[] = [
     'ai-agents/',
+    'identities/' + ANY_ID + '/organizations/',
     'organizations/' + STARK + '/ideas/',
     'organizations/' + STARK + '/projects/',
     'organizations/' + STARK + '/work-orders/',
@@ -35,7 +36,6 @@ const SERVED_COLLECTIONS: readonly string[] = [
 ];
 // The collections still answering handler JSON.
 const PARTED_COLLECTIONS: readonly string[] = [
-    'identities/' + ANY_ID + '/organizations/',
     'organizations/' + STARK + '/members/',
     'organizations/' + STARK + '/flows/',
     'organizations/' + STARK + '/projects/'
@@ -100,11 +100,11 @@ Deno.test('GET /identities/:id/organizations/ self-fences'
 async () => {
     const db = await seededMockDb();
     const singleOrganizationIdentityId = buildMembers()[0]!.id;
-    const rows = (await GET<OrganizationEntity[]>(
+    const parts = await GETCollection<OrganizationEntity>(
         db,
         'identities/' + singleOrganizationIdentityId
             + '/organizations/',
         await devToken(singleOrganizationIdentityId),
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(rows.length, 1);
+        operationIdHeader());
+    assertStrictEquals(parts.length, 1);
 });

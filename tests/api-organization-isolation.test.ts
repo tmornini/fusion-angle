@@ -182,7 +182,7 @@ async () => {
         'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         token));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     // 'XXZruirZyAOoRpNxaDnpSA' is ALSO a member of seedRootAdmin's own org
     // 'AjdvjuECVZEgZoFajaIEkg'
     // (Phase 13 Task 3's fixture prerequisite gave it a real,
@@ -244,7 +244,7 @@ async () => {
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/organizations/',
         await organizationToken('toccYYkLEABmlbpHJalgtQ', organizationA)));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     assertEquals(rows.map(r => r.id), [organizationA]);
 });
 
@@ -1206,11 +1206,11 @@ async () => {
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as Array<{
+    const rows = await partBodiesOf<{
         id: string;
         identity_id: string;
         secret?: string;
-    }>;
+    }>(res);
     assertEquals(rows.map(r => r.id), [fx.paCred]);
     for (const r of rows) {
         assertStrictEquals(r.secret, undefined);
@@ -1387,9 +1387,9 @@ async () => {
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
     assertStrictEquals(res.status, 200);
-    const ids = (await res.json() as Array<{
+    const ids = (await partBodiesOf<{
         identity_id: string;
-    }>).map(r => r.identity_id);
+    }>(res)).map(r => r.identity_id);
     assertEquals(ids, [orphan]);
 });
 

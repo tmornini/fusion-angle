@@ -199,8 +199,9 @@ async () => {
         tokens + a.jti + '/rotation', {},
     )).body().toValue();
     await ctx.POST(tokens + b.jti + '/revocation', {});
-    const heads = (await ctx.GET<IdentityTokenEntity[]>(tokens))
-        .body().toValue();
+    const heads = (await ctx.GETCollection<IdentityTokenEntity>(
+        tokens,
+    )).map((part) => part.body().toValue());
     const headA = heads.find((head) => head.jti === a.jti);
     const headB = heads.find((head) => head.jti === b.jti);
     assert(headA && headB, 'both successors listed');

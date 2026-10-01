@@ -7,7 +7,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
-import { apiRequest } from './http-fixtures.ts';
+import { apiRequest, partsOf } from './http-fixtures.ts';
 import { deriveCredentialsFor } from '../api/derive-identity-spine.ts';
 import { bodyOf } from '../api/derive-documents.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
@@ -177,10 +177,10 @@ Deno.test('every written token, revocation, and provider head'
     );
 });
 
-// The nested read reaches no flat prefix: a provider pair at
+// The nested reads reach no flat prefix: a provider pair at
 // the retired /identity-providers/ path is invisible to
-// identities/:id/providers/:eid, so a fallback that returned
-// would serve it.
+// identities/:id/providers/:eid and to its collection, so a
+// fallback that returned would serve it.
 Deno.test('a provider at the retired flat prefix is not served'
     + ' nested', async () => {
     const db = await seededMockDb();
@@ -217,6 +217,17 @@ Deno.test('a provider at the retired flat prefix is not served'
     }));
     assertStrictEquals(got.status, 404);
     await got.body?.cancel();
+    const collection = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/' + ME + '/providers/',
+        token: DEV_TOKEN,
+    }));
+    assertEquals(
+        (await partsOf<{ id: string }>(collection))
+            .map((part) => part.body().toValue().id)
+            .filter((id) => id === eid),
+        [],
+    );
 });
 
 // The credential PUT validator admits no body without its

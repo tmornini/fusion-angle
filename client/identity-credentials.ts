@@ -60,10 +60,10 @@ export async function getIdentityCredentialState(
     // The server filters the nested collection to the parent
     // identity by its identity_id FK, so no client filter is
     // needed.
-    const forIdentity = (await ctx.GET<
-        IdentityCredentialEntity[]
+    const forIdentity = (await ctx.GETCollection<
+        IdentityCredentialEntity
     >('identities/' + identityId + '/credentials/'))
-        .body().toValue();
+        .map((m) => m.body().toValue());
     // Latest by `at`, not array order — a snapshot reimport
     // or concurrent write can reorder rows. latestByKey's
     // default >= tiebreak is the secure direction.

@@ -1377,8 +1377,8 @@ async () => {
             },
         },
     ));
-    assertStrictEquals(seats.status, 200);
-    assertEquals(await seats.json(), []);
+    assertStrictEquals(seats.status, 204);
+    assertStrictEquals(await seats.text(), '');
     const refreshToken =
         refreshTokenFromSetCookie(exchanged);
     const refreshed = await handleRequest(

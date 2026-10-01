@@ -1,7 +1,7 @@
 import { operationIdHeader } from './operation-id-header.ts';
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import { assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET } from './in-page-facade.ts';
+import { GETCollection } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { routes, matchRoute } from
     '../api/routes.ts';
@@ -36,12 +36,12 @@ Deno.test('GET /identities/:id/organizations/ lists'
     + ' authorized organizations', async () => {
     const db = await seededMockDb();
     const identityId = buildMembers()[0]!.id;
-    const rows = (await GET<OrganizationEntity[]>(
+    const parts = await GETCollection<OrganizationEntity>(
         db,
         'identities/' + identityId + '/organizations/',
         await devToken(identityId),
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(rows.length, 1);
+        operationIdHeader());
+    assertStrictEquals(parts.length, 1);
 });
 
 Deno.test('GET /organizations 404s when authenticated',
@@ -91,7 +91,7 @@ async () => {
     // Admin claims name both seeded orgs; the path
     // identity holds one live seat. Claims of the
     // caller must not shape this list.
-    const rows = (await GET<OrganizationEntity[]>(
+    const parts = await GETCollection<OrganizationEntity>(
         db,
         'identities/' + identityId + '/organizations/',
         await claimToken({
@@ -102,18 +102,25 @@ async () => {
                 'admin:BBjWJsjYIDkTRKIIPrzWRw',
             ],
         }),
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(rows.length, 1);
+        operationIdHeader());
+    assertStrictEquals(parts.length, 1);
 });
 
 Deno.test('org-less GET identities/:id/organizations/'
-    + ' returns an empty list', async () => {
+    + ' answers 204', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const rows = (await GET<OrganizationEntity[]>(
+    const res = await handleRequest(
         db,
-        'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
-        await devToken(),
-        operationIdHeader())).body().toValue();
-    assertEquals(rows, []);
+        framedRequest(
+            BASE + '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
+            {
+                headers: {
+                    Authorization: 'Bearer ' + await devToken(),
+                },
+            },
+        ),
+    );
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
 });

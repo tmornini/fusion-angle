@@ -116,6 +116,8 @@ import type {
 import type { Reader } from './served-response.ts';
 import {
     selectHeadAtPath,
+    selectHeadsAtPath,
+    wholeCollectionSelection,
     wholeHeadSelection,
     type HeadSelection,
 } from './head-reads.ts';
@@ -254,10 +256,8 @@ import {
     seatEntityOf,
 } from './derive-memberships.ts';
 import {
-    deriveCredentialsFor,
     credentialsPrefixFor,
     deriveIdentityKind,
-    deriveIdentityProvidersFor,
     providersPrefixFor,
     tokenRevocationsPrefixFor,
     piiEntityOf,
@@ -285,7 +285,6 @@ import {
     organizationEntityOf,
 } from './derive-organizations.ts';
 import {
-    deriveIdentityTokensFor,
     identityTokenEntityOf,
     IDENTITY_TOKENS_TABLE,
     tokensPrefixFor,
@@ -310,7 +309,7 @@ import {
     type DocumentFamilyWiring,
 } from './document-family.ts';
 import {
-    getIdentityOrganizations,
+    selectIdentityOrganizations,
     putIdentityDefaultOrganization,
     selectIdentityDefaultOrganization,
 } from './organization-requests.ts';
@@ -676,17 +675,6 @@ export function route(
         segments: pattern.split('/'),
         ...handlers,
     };
-}
-
-// Project the opaque `secret` out of a credential before it
-// crosses the API boundary — reads expose existence and
-// lifecycle, never the hash. Makes true the non-leakage
-// covenant in types.ts and SCHEMA.md § Secrets.
-function withoutSecret(
-    cred: IdentityCredentialEntity,
-): Omit<IdentityCredentialEntity, 'secret'> {
-    const { secret: _secret, ...rest } = cred;
-    return rest;
 }
 
 // GATE 15 — THE PRODUCTION MEMBERSHIP PAIR PLANE (Phase 10 Task
@@ -3453,6 +3441,23 @@ export function instanceReader(
     return { sees: 'values', attributesById, roles };
 }
 
+// The PUT validator admits no credential without its
+// identity, so a stored head lacking it is the store's
+// fault, never the reader's: it fails the request, as a
+// state head with no state does.
+function storedCredentialIdentityOf(
+    head: MessagePairEntity,
+): Id {
+    const identity = bodyOf(head.response)['identity_id'];
+    if (typeof identity !== 'string') {
+        throw new Error(
+            'stored credential has no identity_id: '
+                + head.path + head.name + ' (' + head.id + ')',
+        );
+    }
+    return identity;
+}
+
 // A credential's secret reaches no reader (§3).
 export function credentialReader(
     roles: readonly string[],
@@ -3744,7 +3749,7 @@ export const routes: Route[] = [
         put: putIdentityDefaultOrganization,
     }),
     route('identities/:id/organizations/', {
-        get: getIdentityOrganizations,
+        select: selectIdentityOrganizations,
     }),
     // Invitation receive nest. Storage prefix stays
     // /invitations/. Two HTTP nests are filters and
@@ -3838,65 +3843,50 @@ export const routes: Route[] = [
             }
         },
     }),
-    // Credentials nest under their parent identity: the identity
-    // id is param 0, so the SERVER filters the collection to that
-    // identity by its identity_id FK (the org fence still rides
-    // the facade re-entry — viaMembership derives visibility from
-    // the co-membership ledger). The collection projects the
-    // opaque `secret` out (withoutSecret) and the leaf's reader
-    // drops it, so the hash never crosses the boundary. The
-    // leaf id is param 1; GET and PUT are exposed exactly as
-    // the flat makeIdRoute carried them. ADMIN-ONLY:
-    // /identities is not member-tier, so these fall to the root
-    // admin entries — NO MEMBER_VERBS entry. GET is FLIPPED
-    // (Phase 10 Task 8): derived via deriveCredentialsFor,
-    // fenced via gate 15 (keyed on the PARENT identity id
-    // rather than each row's own id) — a hidden identity's
-    // credentials read as an EMPTY array, byte-identical to
-    // parentScope.getAllWhere silently dropping every
-    // matched-but-invisible row (never a 404 — getAllWhere
-    // never throws).
-    // FENCE-INPUT FIX (post-session review): the path :id only
-    // keys the ledger scan (deriveCredentialsFor reads the
-    // /identities/{path id}/credentials/ prefix — that is where
-    // the pairs live); the pre-flip fence read each ROW's OWN
-    // identity_id field (parentScope's getAllWhere on identity_id,
-    // path id) filters the OLD-plane store by that field BEFORE
-    // fencing, then viaMembership fences on that SAME field). A
-    // below-facade write whose body.identity_id disagrees with
-    // its own document (producible below-facade, or via a hand-
-    // crafted admin PUT — no validator ties body.identity_id to
-    // the path :id, so an admin-crafted request CAN produce it;
-    // only a web-app-generated request cannot) would otherwise
-    // fence on the wrong identity. Reproduced here by filtering the
-    // derived rows to identity_id === the path id FIRST — exactly
-    // the OLD plane's WHERE — so a mismatched row never survives
-    // to the fence step, on either plane.
+    // Credentials nest under their parent identity: the
+    // identity id is param 0, and the path :id only keys the
+    // prefix the heads live at. No validator ties a stored
+    // body's identity_id to that path, so a hand-crafted admin
+    // PUT can store a credential whose identity disagrees with
+    // it: the collection keeps the heads whose stored
+    // identity_id is the path identity, then fences on that
+    // identity (gate 15's co-membership ledger), as the row
+    // plane's WHERE did before it fenced. A collection none of
+    // whose heads survive is empty, never a 403. ADMIN-ONLY:
+    // /identities is not member-tier, so these fall to the
+    // root admin entries — NO MEMBER_VERBS entry. The secret
+    // reaches no reader (credentialReader).
     route(CREDENTIALS_COLLECTION_PATTERN, {
-        get: async (db, p, actor, organization) => {
+        select: async (db, p, actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
-            const rows = (
-                await deriveCredentialsFor(db, identityId)
-            ).filter(
-                (credential) => credential.identity_id === identityId,
-            );
-            if (rows.length === 0) return [];
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
-            const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships, identityId, organizationId,
-            );
-            if (owner !== null && owner !== organizationId) {
-                throw new ForeignOrganizationError(
-                    'identity_credentials', identityId,
-                );
+            const heads = (
+                await db.messagePairs.getCollectionHeadPairs(
+                    credentialsPrefixFor(identityId),
+                )
+            ).filter((head) =>
+                storedCredentialIdentityOf(head) === identityId);
+            if (heads.length > 0) {
+                const memberships =
+                    await membershipsAcrossAllOrganizations(
+                        db, actor,
+                    );
+                const owner =
+                    ownerOrganizationViaMembershipPairPlane(
+                        memberships, identityId, organizationId,
+                    );
+                if (owner !== null && owner !== organizationId) {
+                    throw new ForeignOrganizationError(
+                        'identity_credentials', identityId,
+                    );
+                }
             }
-            return rows.map(withoutSecret);
+            return {
+                ...wholeCollectionSelection(heads, 'stateless'),
+                reader: credentialReader(roles),
+            };
         },
     }),
     // The fence input is the head's own identity_id, never
@@ -3922,19 +3912,8 @@ export const routes: Route[] = [
                     'identity_credentials', cid,
                 );
             }
-            // The PUT validator admits no credential without
-            // its identity, so a stored head lacking it is the
-            // store's fault, never the reader's: it fails the
-            // request, as a state head with no state does.
             const identityOfHead =
-                bodyOf(head.response)['identity_id'];
-            if (typeof identityOfHead !== 'string') {
-                throw new Error(
-                    'stored credential has no identity_id: '
-                        + head.path + head.name
-                        + ' (' + head.id + ')',
-                );
-            }
+                storedCredentialIdentityOf(head);
             const memberships =
                 await membershipsAcrossAllOrganizations(
                     db, actor,
@@ -4058,8 +4037,9 @@ export const routes: Route[] = [
     // '/identities/:id/tokens' POST. Flat /identity-tokens
     // is retired (router 404).
     route('identities/:id/tokens/', {
-        get: (db, p) =>
-            deriveIdentityTokensFor(db, param(p, 0)),
+        select: (db, p) => selectHeadsAtPath(
+            db, tokensPrefixFor(param(p, 0)), 'stateless',
+        ),
     }),
     // Hand-written so PUT can stamp identity_id from the
     // path (the Task 3 hole: omit-PUT must not poison GET)
@@ -4164,16 +4144,15 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Nested provider events (credentials shape). The
-    // collection's dual-read still sees leftover
-    // /identity-providers/ pairs; the document reads the
-    // nested prefix alone. No fence:
+    // Nested provider events (credentials shape). Both reads
+    // see the nested prefix alone. No fence:
     // GLOBAL-plane (no organization_id). ADMIN-ONLY — not in
     // MEMBER_VERBS. Flat /identity-providers is retired
     // (router 404).
     route('identities/:id/providers/', {
-        get: (db, p) =>
-            deriveIdentityProvidersFor(db, param(p, 0)),
+        select: (db, p) => selectHeadsAtPath(
+            db, providersPrefixFor(param(p, 0)), 'stateless',
+        ),
     }),
     route('identities/:id/providers/:eid', {
         select: (db, p) => selectHeadAtPath(

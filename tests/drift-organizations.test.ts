@@ -34,6 +34,8 @@ import { mintAccessToken, TOKEN_AUDIENCE } from
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
@@ -88,7 +90,7 @@ const MULTI_ORGANIZATION_IDENTITY_ID: Id = 'XXZruirZyAOoRpNxaDnpSA';
 const SINGLE_ORGANIZATION_IDENTITY_ID: Id =
     buildMembers()[0]!.id;
 
-// The derived-source twin of getIdentityOrganizations:
+// The derived-source twin of selectIdentityOrganizations:
 // live seats of the path identity, then
 // deriveOrganizations filtered to those ids.
 // Token for drift: claim organizations/roles match live
@@ -139,7 +141,9 @@ async function wireReachableOrganizations(
         await membershipClaimToken(db, identityId),
     ));
     assertStrictEquals(res.status, 200);
-    return (await res.json()) as OrganizationEntity[];
+    const parts = await partsOf<OrganizationEntity>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    return parts.map((part) => part.body().toValue());
 }
 
 // ---- leg 1: collection wire equals derive PER CALLER ---------

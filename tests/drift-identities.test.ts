@@ -58,8 +58,12 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
+    messageOfResponse,
     partsOf,
 } from './http-fixtures.ts';
+import { bodyOf } from '../api/derive-documents.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 
 const INV_A = generateIdentifier();
 
@@ -143,15 +147,23 @@ function humanCreateBody(id: string): Record<string, unknown> {
     };
 }
 
-// The route's own private projection (api/routes.ts's
-// withoutSecret) re-derived here — the SAME pattern
-// liveClosureRoster (tests/drift-roster.test.ts) uses for a
-// module-private closure this file must independently reproduce.
-function withoutSecret<T extends { secret: string }>(
-    cred: T,
-): Omit<T, 'secret'> {
-    const { secret: _secret, ...rest } = cred;
-    return rest;
+// A served credential is its stored body less its secret
+// (credentialReader): every other stored key, by value. The
+// stored body holds a secret, so the projection is not vacuous.
+async function assertServedWithoutSecret(
+    db: DbAdapter,
+    message: HttpMessage,
+): Promise<void> {
+    const head = await db.messagePairs.getById(
+        message.query('header.etag').toText().slice(1, -1),
+    );
+    const stored = bodyOf(head.response);
+    assert('secret' in stored, 'the stored body holds a secret');
+    assertEquals(
+        message.body().toValue(),
+        Object.fromEntries(Object.entries(stored)
+            .filter(([key]) => key !== 'secret')),
+    );
 }
 
 // -- test-side wiring mirrors (routes.ts's private rows, by ----
@@ -489,10 +501,11 @@ async () => {
 });
 
 // -- 3. credentials parity per identity + per cid + the ---------
-// -- withoutSecret projection pin + 404 bytes --------------------
+// -- served collection lacks only the secret + 404 bytes ---------
 
 Deno.test('credentials per identity + per cid (13 seeded) + the'
-+ ' withoutSecret projection pin + 404 bytes', async () => {
++ ' served collection lacks only the secret + 404 bytes',
+async () => {
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
 
@@ -501,6 +514,8 @@ Deno.test('credentials per identity + per cid (13 seeded) + the'
     const parents = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,
     );
+    const memberships =
+        await pairPlaneMembershipsAcrossKnownOrganizations(db);
     const allDerived: IdentityCredentialEntity[] = [];
     for (const identity of parents) {
         const derived = sortById(
@@ -512,9 +527,25 @@ Deno.test('credentials per identity + per cid (13 seeded) + the'
                 db, identity.id, row.id,
             );
             assertEquals(one, row);
-            assertStrictEquals(
-                'secret' in withoutSecret(one), false,
-            );
+        }
+        // Read from an organization the identity's fence admits.
+        const organization = pairPlaneOwnerOrganization(
+            memberships, identity.id, STARK_ORGANIZATION,
+        ) ?? STARK_ORGANIZATION;
+        const parts = await partsOf<Record<string, unknown>>(
+            await handleRequest(db, req(
+                'GET', '/identities/' + identity.id + '/credentials/',
+                await organizationToken(
+                    'XXZruirZyAOoRpNxaDnpSA', organization,
+                ),
+            )),
+        );
+        assertEquals(
+            parts.map((part) => part.body().toValue()['id']).sort(),
+            derived.map((row) => row.id).sort(),
+        );
+        for (const part of parts) {
+            await assertServedWithoutSecret(db, part);
         }
     }
     assertStrictEquals(allDerived.length, 13);
@@ -605,9 +636,19 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
             organization === ORGANIZATION_TWO,
             'leaf visibility for ' + organization,
         );
-        assertStrictEquals(
-            'secret' in withoutSecret(credential), false,
-        );
+        if (derivedVisible) {
+            const leaf = await handleRequest(db, req(
+                'GET',
+                '/identities/' + identityA + '/credentials/' + cid,
+                await organizationToken(
+                    'XXZruirZyAOoRpNxaDnpSA', organization,
+                ),
+            ));
+            assertStrictEquals(leaf.status, 200);
+            await assertServedWithoutSecret(
+                db, await messageOfResponse(leaf),
+            );
+        }
 
         // -- collection, path A: mismatched identity_id (B)
         // never equals path (A) — empty regardless of org.

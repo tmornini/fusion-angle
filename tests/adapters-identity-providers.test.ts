@@ -30,17 +30,10 @@ import {
 import { seedIdentityProvider } from './identity-fixtures.ts';
 import {
     deriveIdentityProvider,
-    deriveIdentityProvidersFor,
     identityProviderEntityOf,
 } from '../api/derive-identity-spine.ts';
 import {
-    runWrite,
-    attemptFor,
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../shared/types.ts';
-import {
-    apiRequest, storedPutBodyText,
+    apiRequest, partBodiesOf, storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -177,10 +170,10 @@ async () => {
         token: DEV_TOKEN,
     }));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as readonly {
+    const rows = await partBodiesOf<{
         readonly id: string;
         readonly identity_id: string;
-    }[];
+    }>(list);
     const row = rows.find(r => r.id === id);
     assert(row, 'omitted-id event is in the collection');
     assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');
@@ -213,83 +206,3 @@ async () => {
     assertStrictEquals(res.status, 400);
 });
 
-Deno.test('derive dual-reads leftover flat provider pairs',
-async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    const id = generateIdentifier();
-    const body = { ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw' };
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/identity-providers/' + id,
-        routePattern: 'identity-providers/:id',
-        routeSegments: ['identity-providers', ':id'],
-        pathSegments: ['identity-providers', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: undefined,
-        responseBody: identityProviderEntityOf({
-            name: id,
-            messagePairId: id,
-            method: 'PUT',
-            body,
-        }),
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await runWrite(
-        db,
-        attemptFor([messagePair]),
-        [messagePair],
-    );
-    const rows = await deriveIdentityProvidersFor(db
-        , 'prBESZPjJDiuXCeZLmbiVw');
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.id, id);
-});
-
-Deno.test('same event id on both planes — nested wins',
-async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    const id = generateIdentifier();
-    const flatBody = {
-        ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',
-        provider: 'flat-google',
-    };
-    const flatPair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/identity-providers/' + id,
-        routePattern: 'identity-providers/:id',
-        routeSegments: ['identity-providers', ':id'],
-        pathSegments: ['identity-providers', id],
-        headerFields: [],
-        body: flatBody,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: undefined,
-        responseBody: identityProviderEntityOf({
-            name: id,
-            messagePairId: id,
-            method: 'PUT',
-            body: flatBody,
-        }),
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await runWrite(
-        db,
-        attemptFor([flatPair]),
-        [flatPair],
-    );
-    await seedIdentityProvider(db, 'prBESZPjJDiuXCeZLmbiVw', id, {
-        ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',
-        provider: 'nested-github',
-    });
-    const rows = await deriveIdentityProvidersFor(db
-        , 'prBESZPjJDiuXCeZLmbiVw');
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.provider, 'nested-github');
-});

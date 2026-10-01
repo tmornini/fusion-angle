@@ -164,7 +164,7 @@ export function credentialsPrefixFor(identityId: Id): string {
 
 // FULL rows from the stored response (the wire) — the secret
 // rides the wire, unlike role-grants (gate 16 above); the route
-// projects withoutSecret at read time, not here.
+// serves it through credentialReader, which drops it.
 function credentialEntityOf(
     document: DerivedDocument,
 ): IdentityCredentialEntity {
@@ -222,12 +222,7 @@ export async function deriveCredential(
     return credentialEntityOf(document);
 }
 
-// ---- identity_providers — nested under the identity; the
-// ---- collection dual-reads the old flat prefix so leftover
-// ---- seed pairs still derive.
-
-const IDENTITY_PROVIDERS_PREFIX =
-    canonicalPath(undefined, '/identity-providers/');
+// ---- identity_providers — nested under the identity.
 
 export function providersPrefixFor(identityId: Id): string {
     return canonicalPath(
@@ -269,34 +264,6 @@ async function fetchProviderDocumentsAt(
     const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     return deriveDocumentsAt(messagePairs, prefix);
-}
-
-// Nested docs plus old-flat docs whose identity_id matches.
-// Nested wins on the same event id.
-export async function deriveIdentityProvidersFor(
-    db: DbAdapter,
-    identityId: Id,
-): Promise<IdentityProviderEntity[]> {
-    const nested = await fetchProviderDocumentsAt(
-        db, providersPrefixFor(identityId),
-    );
-    const flat = await fetchProviderDocumentsAt(
-        db, IDENTITY_PROVIDERS_PREFIX,
-    );
-    const byId = new Map<string, IdentityProviderEntity>();
-    for (const document of flat.values()) {
-        const entity = identityProviderEntityOf(document);
-        if (entity.identity_id === identityId) {
-            byId.set(entity.id, entity);
-        }
-    }
-    for (const document of nested.values()) {
-        const entity = nestedProviderEntityOf(
-            identityId, document,
-        );
-        byId.set(entity.id, entity);
-    }
-    return [...byId.values()].sort(byIdAscending);
 }
 
 export async function deriveIdentityProvider(

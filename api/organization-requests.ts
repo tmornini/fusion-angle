@@ -1,11 +1,13 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, OrganizationEntity } from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import {
+    wholeCollectionSelection,
     wholeHeadSelection,
     type HeadSelection,
 } from './head-reads.ts';
 import {
     attemptFor,
+    canonicalPath,
     runWrite,
     type MessagePair,
 } from './message-pair.ts';
@@ -16,7 +18,6 @@ import {
     HTTP_NOT_FOUND,
 } from '../shared/http-errors.ts';
 import { param } from './document-family.ts';
-import { deriveOrganizations } from './derive-organizations.ts';
 import {
     defaultOrganizationPrefix,
 } from './derive-default-organization.ts';
@@ -28,16 +29,17 @@ import {
     validateDefaultOrganizationBody,
 } from './validators.ts';
 
-// GET /identities/:id/organizations/ — the path
-// identity's live seats. Self or admin. Caller
-// claims must not shape another identity's list.
-export async function getIdentityOrganizations(
+// GET /identities/:id/organizations/ — the organization
+// heads the path identity holds a live seat in. Self or
+// admin. Caller claims must not shape another identity's
+// list.
+export async function selectIdentityOrganizations(
     db: DbAdapter,
     params: string[],
     actor: Id,
     _organization: Id | undefined,
     roles: readonly string[],
-): Promise<OrganizationEntity[]> {
+): Promise<HeadSelection> {
     const identityId = param(params, 0);
     if (
         actor !== identityId
@@ -50,17 +52,18 @@ export async function getIdentityOrganizations(
         );
     }
     return db.readTransaction(async (view) => {
-        const organizations =
-            await deriveOrganizations(view);
-        const memberships =
-            await deriveMembershipsForIdentity(
-                view, identityId, organizations,
+        const heads =
+            await view.messagePairs.getCollectionHeadPairs(
+                canonicalPath(undefined, '/organizations/'),
             );
-        const mine = new Set(
-            memberships.map(m => m.organization_id),
+        const seats = new Set(
+            (await deriveMembershipsForIdentity(
+                view, identityId,
+            )).map((membership) => membership.organization_id),
         );
-        return organizations.filter(
-            o => mine.has(o.id),
+        return wholeCollectionSelection(
+            heads.filter((head) => seats.has(head.name)),
+            'stateless',
         );
     });
 }

@@ -19,12 +19,12 @@ import {
     seedIdentityCredential,
 } from './identity-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
-import {
-    compareIdentifiers,
-    generateIdentifier,
-} from '../shared/identifier.ts';
+import { generateIdentifier } from '../shared/identifier.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partBodiesOf,
+    partsOf,
     storedMessageBodyText,
     storedPutBodyText,
     refreshTokenFromSetCookie,
@@ -275,21 +275,20 @@ Deno.test('identities/:id/tokens/:jti successBody is id-first',
     assertStrictEquals(body.id, JTI_G4);
 });
 
-// -- 2: GET wire byte-parity — the ACTUAL flipped route against --
-// -- a LITERAL id-FIRST reconstruction of what was PUT: ----------
-// -- byIdAscending collection order, and the 404 body -------------
+// -- 2: GET serves the stored heads — each document its own, --
+// -- the collection its parts in (response_at, id) order, -------
+// -- each equal to a LITERAL reconstruction of what was PUT; -----
+// -- and the 404 body ---------------------------------------------
 
 Deno.test('GET /identities/:id/tokens/:jti serves each jti\'s'
-+ ' stored head; byIdAscending collection order and the'
-+ ' 404 body',
++ ' stored head; the collection serves them in write order;'
++ ' and the 404 body',
 async () => {
     const db = await freshDb();
-    // THREE distinct jti documents, so byIdAscending genuinely
-    // ORDERS the collection: with two names, insertion order is
-    // already the sorted order half the time, and the test would
-    // pass by coin flip rather than by the property it claims to
-    // prove. The last PUT revisits the w1 jti's OWN document, so
-    // the collection returns its 'rotated' HEAD.
+    // THREE distinct jti documents. The last PUT revisits the w1
+    // jti's OWN document, so its 'rotated' HEAD moves after w2:
+    // the collection's order is neither the first PUTs' order
+    // nor the identifier order, only the heads' write order.
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_W3, {
         jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -315,15 +314,14 @@ async () => {
     }, DEV_TOKEN,
         operationIdHeader());
 
-    // The literal id-FIRST reconstruction of each document's
-    // HEAD body, identifier order (byIdAscending — the
-    // derivation's own order, never the backend's) — the
-    // expected wire text, independent of any stored row.
+    // The literal reconstruction of each document's HEAD body,
+    // in its head's write order — the expected values,
+    // independent of any stored row.
     const expected = [
         {
-            id: JTI_W1,
-            jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-            action: 'rotated', chain_id: CHAIN_W, at: AT2,
+            id: JTI_W3,
+            jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+            action: 'issued', chain_id: CHAIN_W3, at: AT,
         },
         {
             id: JTI_W2,
@@ -331,11 +329,11 @@ async () => {
             action: 'issued', chain_id: CHAIN_W2, at: AT,
         },
         {
-            id: JTI_W3,
-            jti: JTI_W3, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-            action: 'issued', chain_id: CHAIN_W3, at: AT,
+            id: JTI_W1,
+            jti: JTI_W1, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
+            action: 'rotated', chain_id: CHAIN_W, at: AT2,
         },
-    ].sort((a, b) => compareIdentifiers(a.id, b.id));
+    ];
 
     const collectionRes = await handleRequest(
         db, req(
@@ -343,8 +341,10 @@ async () => {
         ),
     );
     assertStrictEquals(collectionRes.status, 200);
-    assertStrictEquals(
-        await collectionRes.text(), JSON.stringify(expected),
+    const parts = await partsOf(collectionRes);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(
+        parts.map((part) => part.body().toValue()), expected,
     );
 
     for (const row of expected) {
@@ -510,16 +510,16 @@ Deno.test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
 // -- 6: NESTED WIRE — collection under the identity; flat
 // -- prefix RETIRED; omit-PUT stamps identity_id from path ----
 
-Deno.test('GET /identities/XXZruirZyAOoRpNxaDnpSA/tokens is a 200 array',
+Deno.test('GET /identities/XXZruirZyAOoRpNxaDnpSA/tokens is a 204'
++ ' when it holds none',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
             , DEV_TOKEN),
     );
-    assertStrictEquals(res.status, 200);
-    const rows = await res.json() as unknown;
-    assert(Array.isArray(rows));
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
 });
 
 Deno.test('GET /identity-tokens is retired (router 404)',
@@ -548,10 +548,10 @@ async () => {
             , DEV_TOKEN),
     );
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as readonly {
+    const rows = await partBodiesOf<{
         readonly id: string;
         readonly identity_id: string;
-    }[];
+    }>(list);
     const row = rows.find(r => r.id === JTI_OMIT);
     assert(row, 'omitted-id event is in the collection');
     assertStrictEquals(row.identity_id, 'XXZruirZyAOoRpNxaDnpSA');

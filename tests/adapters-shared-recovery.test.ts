@@ -354,8 +354,9 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     const [members, organizations] = await Promise.all([
         ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
             .then(read => read.body().toValue()),
-        ctx.GET('identities/XXZruirZyAOoRpNxaDnpSA/organizations/')
-            .then(read => read.body().toValue()),
+        ctx.GETCollection(
+            'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
+        ).then(parts => parts.map(part => part.body().toValue())),
     ]);
     assert(Array.isArray(members));
     assert(Array.isArray(organizations));
@@ -677,14 +678,6 @@ Deno.test(
                     fields?: HeaderFields,
                 ): Promise<HttpMessage<T>> => {
                     if (resource.endsWith(
-                        '/organizations/',
-                    )) {
-                        record('re-scope', fields);
-                        return Promise.resolve(responseMessage([{
-                            id: organization,
-                        }] as T));
-                    }
-                    if (resource.endsWith(
                         '/default-organization',
                     )) {
                         record('re-scope', fields);
@@ -695,10 +688,18 @@ Deno.test(
                     throw new Error('unexpected GET ' + resource);
                 },
                 GETCollection: <T>(
-                    _resource: string,
+                    resource: string,
                     _token: string,
                     fields?: HeaderFields,
                 ): Promise<HttpMessage<T>[]> => {
+                    if (resource.endsWith(
+                        '/organizations/',
+                    )) {
+                        record('re-scope', fields);
+                        return Promise.resolve([responseMessage({
+                            id: organization,
+                        } as T)]);
+                    }
                     record('read', fields);
                     reads += 1;
                     if (reads === 1) {
