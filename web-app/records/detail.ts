@@ -675,6 +675,25 @@ async function handleInstanceSave(
     }
 }
 
+type InstanceToDelete =
+    | {
+        readonly kind: 'present';
+        readonly instance: RecordInstance;
+    }
+    | { readonly kind: 'gone' };
+
+// A reload since the dialog opened may have dropped the
+// row: the instance is already gone from this list.
+export function instanceToDelete(
+    loaded: readonly RecordInstance[],
+    id: string,
+): InstanceToDelete {
+    const instance = loaded.find((row) => row.id === id);
+    return instance === undefined
+        ? { kind: 'gone' }
+        : { kind: 'present', instance };
+}
+
 async function handleDeleteInstance(
     root: HTMLElement,
 ): Promise<void> {
@@ -682,12 +701,17 @@ async function handleDeleteInstance(
     pendingDeleteInstanceId = null;
     if (!instanceId) return;
     if (saveInProgress) return;
-    // A reload since the dialog opened may have dropped the
-    // row: the instance is already gone from this list.
-    const instance = loadedInstances.find(
-        (row) => row.id === instanceId,
+    const target = instanceToDelete(
+        loadedInstances, instanceId,
     );
-    if (instance === undefined) return;
+    if (target.kind === 'gone') {
+        // Say so and show the list as it stands, rather than
+        // let a confirmed delete do nothing.
+        showToast('Instance already deleted', 'info');
+        await load(root);
+        return;
+    }
+    const instance = target.instance;
     const ctx = sessionContext();
     saveInProgress = true;
     try {
