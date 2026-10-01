@@ -152,14 +152,3 @@ export function DELETE(
         resource, token, headerFields,
     );
 }
-
-export function POSTUnauthenticated<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    headerFields?: HeaderFields,
-) {
-    return facadeOver(adapter).POSTUnauthenticated<T>(
-        resource, payload, headerFields,
-    );
-}
