@@ -289,3 +289,18 @@ Deno.test('a credential naming an identity seated elsewhere'
     assertStrictEquals(got.status, 403);
     await got.body?.cancel();
 });
+
+// The fence precedes the head read: an absent foreign PII is
+// 403, never the 404 that would say the identity has none.
+Deno.test('a foreign identity\'s absent PII answers 403, never'
+    + ' 404', async () => {
+    const db = await seededMockDb();
+    const seated = generateIdentifier();
+    await seedSeat(db, ORGANIZATION_TWO, seated, 'member');
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: '/identities/' + seated + '/pii',
+        token: await organizationToken(),
+    }));
+    assertStrictEquals(got.status, 403);
+    await got.body?.cancel();
+});
