@@ -11,7 +11,10 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { Octets } from '../shared/http-message/octets.ts';
 import { splitParts } from '../shared/http-message/multipart.ts';
-import type { FieldLine } from '../shared/http-message/types.ts';
+import {
+    HttpMessageError,
+    type FieldLine,
+} from '../shared/http-message/types.ts';
 import { handleRequest } from '../api/api.ts';
 import { messageStore } from '../api/message-store.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -289,8 +292,13 @@ export async function partsOf<T>(
         await response.body?.cancel();
         return [];
     }
-    const type = response.headers.get('content-type') ?? '';
+    const type = response.headers.get('content-type');
     const message = await messageOfResponse(response);
+    if (type === null) {
+        throw new HttpMessageError(
+            'a collection answer has no content-type',
+        );
+    }
     return splitParts(
         type, Octets.fromBytes(message.body().toBytes())
             .toLatin1(),

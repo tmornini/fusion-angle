@@ -6,6 +6,7 @@ import {
 import { createHttpFacade } from '../client/http-facade.ts';
 import { RequestError } from '../shared/http-errors.ts';
 import { joinParts } from '../shared/http-message/multipart.ts';
+import { HttpMessageError } from '../shared/http-message/types.ts';
 
 const NO_SESSION = {
     runSingleFlightRefresh: () => Promise.resolve(null),
@@ -183,5 +184,18 @@ async () => {
     );
     assertStrictEquals(
         error.response.query('status').toNumber(), 412,
+    );
+});
+
+Deno.test('a collection answer without a content-type is refused',
+async () => {
+    const facade = createHttpFacade('http://x', scripted(() =>
+        new Response(new TextEncoder().encode('{}'), {
+            status: 200,
+        })))(NO_SESSION);
+    await assertRejects(
+        () => facade.GETCollection('ideas/', 't'),
+        HttpMessageError,
+        'no content-type',
     );
 });

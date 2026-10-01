@@ -11,7 +11,10 @@ import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { Octets } from '../shared/http-message/octets.ts';
 import { splitParts } from '../shared/http-message/multipart.ts';
-import type { FieldLine } from '../shared/http-message/types.ts';
+import {
+    HttpMessageError,
+    type FieldLine,
+} from '../shared/http-message/types.ts';
 import { authParam } from './authentication.ts';
 
 // Fetch transport for the server ZIP. Same RequestContext
@@ -339,8 +342,13 @@ export function createHttpFacade(
                 if (response.status === HTTP_NO_CONTENT) {
                     return [];
                 }
+                if (type === null) {
+                    throw new HttpMessageError(
+                        'a collection answer has no content-type',
+                    );
+                }
                 return splitParts(
-                    type ?? '',
+                    type,
                     Octets.fromBytes(message.body().toBytes())
                         .toLatin1(),
                 ).map((part) => HttpMessage.fromWire<T>(part));
