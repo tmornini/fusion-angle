@@ -1045,13 +1045,16 @@ skew tests, which went with item 8's trio.
     `viewBox` mutation at four method sites
     (`web-app/app/presenters/flow-designer.ts:537-538,
     556-559, 1036-1039, 1066-1067`); `hasUndoHistory` as
-    `pairs > 1`
-    (`api/derive-flows.ts:108` — the client's
-    approximation, read by no route; the undo route
-    walks the stack itself and its bottom-of-stack 201
-    is the documented no-op, `api/types.ts:1082-1090`,
-    which TEST-PLAN F36/F45 call PASS — the brainstorm
-    decides whether that stays); rotation only on the
+    the designer's own `versions.length > 1`
+    (`web-app/app/flow-operations.ts:841`, over the
+    `…/flows/:id/versions/` read, `client/flow-queries.ts:
+    238` — the server no longer computes it; the undo
+    route resolves its target itself
+    (`resolveFlowUndoTarget`, `api/derive-flows.ts:291`)
+    and with no target writes the current body unchanged
+    (`api/routes.ts:1433-1435`), which TEST-PLAN F36/F45
+    call PASS — the brainstorm decides whether that
+    stays); rotation only on the
     toggle path (`web-app/app/flow-layout.ts:1032-1037`);
     the mirror trigger; and the canvas entries of the
     genericity bullet in `## Later work` (two zoom
@@ -2670,10 +2673,12 @@ Off the critical path; each with its oracle.
   a 405 — while the gate requires `operation-id` on
   every request, a method never served included
   (`api/api.ts:403-417`). Add
-  `HEAD` to the API: once item 1 makes a document GET the
-  stored bytes with three substitutions, `HEAD` is that
-  function without the body. Conditional requests
-  (`If-None-Match` / `304`) stay open. Start:
+  `HEAD` to the API: now that a document GET serves the
+  stored response with three substitutions
+  (`servedResponse`, `api/served-response.ts:62`; thirty
+  routes stay parted, `tests/parted-reads.test.ts`),
+  `HEAD` is that function without the body. Conditional
+  requests (`If-None-Match` / `304`) stay open. Start:
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
