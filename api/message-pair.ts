@@ -246,7 +246,7 @@ function headerFieldsWithOperationId(
 // rule — widening it would rename every operation
 // (transition, rotation, acceptance).
 const PII_ROUTE_PATTERN = 'identities/:id/pii';
-const PII_DOCUMENT_NAME = 'pii';
+export const PII_DOCUMENT_NAME = 'pii';
 
 export function storedPathAndNameOf(input: {
     readonly routePattern: string;

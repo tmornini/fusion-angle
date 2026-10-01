@@ -105,6 +105,7 @@ import {
     documentHeadAt,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
+    PII_DOCUMENT_NAME,
 } from './message-pair.ts';
 import type {
     MessagePair,
@@ -2656,7 +2657,7 @@ export async function postIdentityPiiDocumentOp(
     messagePair?: MessagePair,
 ): Promise<IdentityPiiEntity> {
     const entity = piiEntityOf(id, {
-        name: 'pii',
+        name: PII_DOCUMENT_NAME,
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -3116,7 +3117,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
-                name: 'pii',
+                name: PII_DOCUMENT_NAME,
                 messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
@@ -3815,7 +3816,7 @@ export const routes: Route[] = [
                 );
             }
             const head = await db.messagePairs.getHeadPair(
-                identityPrefixFor(identityId), 'pii',
+                identityPrefixFor(identityId), PII_DOCUMENT_NAME,
             );
             if (head === null) {
                 throw new EntityNotFoundError(

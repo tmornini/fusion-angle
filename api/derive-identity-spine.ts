@@ -20,7 +20,10 @@ import {
     validateIdentityProviderEntity,
     validateIdentityTokenRevocationEntity,
 } from './validators.ts';
-import { canonicalPath } from './message-pair.ts';
+import {
+    canonicalPath,
+    PII_DOCUMENT_NAME,
+} from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -62,12 +65,6 @@ import {
 // ---- plural/bare-singular naming rule is -----------------------
 // ---- deriveIdentityPiiRows/deriveIdentityPii, never ------------
 // ---- deriveIdentityPiis/deriveIdentityPiiRow ---------------------
-
-// The PII slot is the identity's own singleton: `path =
-// /identities/<id>/`, `name = pii` — the same pathname as
-// PUT identities/:id/pii (message-pair.ts
-// storedPathAndNameOf). One document read serves it.
-const PII_DOCUMENT_NAME = 'pii';
 
 const IDENTITIES_PREFIX = canonicalPath(
     undefined, '/identities/',
