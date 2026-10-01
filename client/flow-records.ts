@@ -6,6 +6,8 @@ import type {
     RecordId,
     FlowWorkOrderEntity,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     filterByField,
     organizationItem,
@@ -29,11 +31,11 @@ import { nowUtc } from '../shared/types.ts';
 async function getFlowRecordsForFlow(
     ctx: RequestContext,
     flowId: Id,
-): Promise<FlowRecordEntity[]> {
-    return (await ctx.GETCollection<FlowRecordEntity>(
+): Promise<HttpMessage<FlowRecordEntity>[]> {
+    return await ctx.GETCollection<FlowRecordEntity>(
         organizationItem(ctx, 'flows', flowId)
             + '/records/',
-    )).map((m) => m.body().toValue());
+    );
 }
 
 // The bindings across EVERY flow the caller's org can see —
@@ -43,27 +45,27 @@ async function getFlowRecordsForFlow(
 // parallel and concatenated.
 async function getAllFlowRecordEntities(
     ctx: RequestContext,
-    flows?: readonly { readonly id: Id }[],
+    flows?: readonly HttpMessage<FlowEntity>[],
 ): Promise<FlowRecordEntity[]> {
     const list = flows ?? await getFlowEntities(ctx);
     const perFlow = await Promise.all(
         list.map(f => getFlowRecordsForFlow(
-            ctx, f.id,
+            ctx, f.body().toValue().id,
         )),
     );
-    return perFlow.flat();
+    return perFlow.flat().map((m) => m.body().toValue());
 }
 
 // The flow↔work-order joins across EVERY flow the caller's org
 // can see — same per-flow reassembly as the bindings above.
 async function getAllFlowWorkOrderEntities(
     ctx: RequestContext,
-    flows?: readonly { readonly id: Id }[],
+    flows?: readonly HttpMessage<FlowEntity>[],
 ): Promise<FlowWorkOrderEntity[]> {
     const list = flows ?? await getFlowEntities(ctx);
     const perFlow = await Promise.all(
         list.map(f => ctx.GETCollection<FlowWorkOrderEntity>(
-            organizationItem(ctx, 'flows', f.id)
+            organizationItem(ctx, 'flows', f.body().toValue().id)
                 + '/work-orders/',
         ).then(parts => parts.map((m) => m.body().toValue()))),
     );
@@ -82,14 +84,17 @@ export async function putFlowRecord(
     notifyRecordChange();
 }
 
+// Removes a binding the caller read, latching that part's
+// head so a binding rewritten since the read refuses.
 export async function deleteFlowRecord(
     ctx: RequestContext,
     flowId: Id,
-    id: FlowRecordId,
+    held: HttpMessage<FlowRecordEntity>,
 ): Promise<void> {
     await ctx.DELETE(
         organizationItem(ctx, 'flows', flowId)
-            + '/records/' + id,
+            + '/records/' + held.body().toValue().id,
+        [held],
     );
     notifyRecordChange();
 }
@@ -113,8 +118,9 @@ export async function postFlowRecordBinding(
     );
 }
 
-// Unbind a flow from its record. No-op when the flow
-// has no binding — the absence IS the unbound state.
+// Unbind a flow from its record, latching the binding part
+// it reads. No-op when the flow has no binding — the
+// absence IS the unbound state.
 export async function deleteFlowRecordForFlow(
     ctx: RequestContext,
     flowId: Id,
@@ -122,7 +128,7 @@ export async function deleteFlowRecordForFlow(
     const rows = await getFlowRecordsForFlow(ctx, flowId);
     const existing = rows[0];
     if (!existing) return;
-    await deleteFlowRecord(ctx, flowId, existing.id);
+    await deleteFlowRecord(ctx, flowId, existing);
 }
 
 export async function getRecordForFlow(
@@ -131,7 +137,7 @@ export async function getRecordForFlow(
 ): Promise<RecordId | null> {
     const rows = await getFlowRecordsForFlow(ctx, flowId);
     const found = rows[0];
-    return found ? found.record_id : null;
+    return found ? found.body().toValue().record_id : null;
 }
 
 export async function getRecordForWorkOrder(
@@ -149,7 +155,7 @@ export async function getRecordForWorkOrder(
         ctx, link.flow_id,
     );
     const found = bindings[0];
-    return found ? found.record_id : null;
+    return found ? found.body().toValue().record_id : null;
 }
 
 // The flows bound to a record, shaped for display:
@@ -164,7 +170,7 @@ export interface BoundFlowSummary {
 export async function getFlowSummariesForRecord(
     ctx: RequestContext,
     recordId: RecordId,
-    flows?: readonly FlowEntity[],
+    flows?: readonly HttpMessage<FlowEntity>[],
     flowRecords?: readonly FlowRecordEntity[],
 ): Promise<BoundFlowSummary[]> {
     const list = flows ?? await getFlowEntities(ctx);
@@ -175,6 +181,7 @@ export async function getFlowSummariesForRecord(
             .map(r => r.flow_id),
     );
     return list
+        .map(f => f.body().toValue())
         .filter(f => wanted.has(f.id))
         .map(f => ({ id: f.id, name: f.name }));
 }
@@ -182,7 +189,7 @@ export async function getFlowSummariesForRecord(
 export async function getWorkOrdersForRecord(
     ctx: RequestContext,
     recordId: RecordId,
-    flows?: readonly { readonly id: Id }[],
+    flows?: readonly HttpMessage<FlowEntity>[],
     flowRecords?:
         | readonly FlowRecordEntity[]
         | Promise<readonly FlowRecordEntity[]>,
@@ -218,7 +225,7 @@ export async function getWorkOrdersForRecord(
 export async function loadRecordFlowJoins(
     ctx: RequestContext,
     recordId: RecordId,
-    flows: readonly FlowEntity[],
+    flows: readonly HttpMessage<FlowEntity>[],
 ): Promise<{
     readonly summaries: BoundFlowSummary[];
     readonly workOrders: WorkOrder[];

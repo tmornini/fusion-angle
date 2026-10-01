@@ -35,8 +35,11 @@ import type {
 } from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    storedGraph,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
+import { getFlowGraph } from '../client/flow-queries.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
@@ -147,6 +150,16 @@ function snapOf(
 ): FlowSnapshot {
     return buildInitialFlowSnapshot(
         {
+            message: responseMessage<FlowWithGraph>({
+                id: FLOW_ID,
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                name: 'Undo/Redo Flow',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                graph: storedGraph({ nodes, edges }),
+            }),
             id: FLOW_ID,
             name: 'Undo/Redo Flow',
             isLocked: false,
@@ -303,6 +316,7 @@ Deno.test(
         // version that still had X.
         const undo = await performUndo(
             ctx, snapOf([a], []), HAS_UNDO_HISTORY,
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
@@ -351,6 +365,7 @@ Deno.test(
         // is deleted by the undo delta.
         const undo = await performUndo(
             ctx, snapOf([a, x], []), HAS_UNDO_HISTORY,
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
@@ -390,6 +405,7 @@ Deno.test(
         // Undo -> revert to the no-member version.
         const undo = await performUndo(
             ctx, snapOf([aWithMember], []), HAS_UNDO_HISTORY,
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
@@ -420,6 +436,7 @@ Deno.test(
         // Undo -> X revived.
         const undo = await performUndo(
             ctx, snapOf([a], []), HAS_UNDO_HISTORY,
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;

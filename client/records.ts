@@ -32,7 +32,7 @@ async function getAllFlowRecords(
     const flows = await getFlowEntities(ctx);
     const perFlow = await Promise.all(
         flows.map(f => ctx.GETCollection<FlowRecordEntity>(
-            organizationItem(ctx, 'flows', f.id)
+            organizationItem(ctx, 'flows', f.body().toValue().id)
                 + '/records/',
         ).then(parts => parts.map((m) => m.body().toValue()))),
     );

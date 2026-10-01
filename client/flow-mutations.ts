@@ -27,6 +27,7 @@ import {
     generateIdentifier,
 } from '../shared/identifier.ts';
 import {
+    createChannel,
     createSubscriptionChannel,
 } from './channels.ts';
 import {
@@ -55,6 +56,18 @@ export function subscribeFlowChanges(
 
 export function notifyFlowChange(): void {
     flowChanges.notify();
+}
+
+// Each save's answer is the flow's new head. The page that
+// holds the flow hears it here and latches its next write
+// on it; the change bell above carries no message, and a
+// head cannot cross tabs, so this channel is this tab's.
+const flowSaves = createChannel<HttpMessage<FlowWithGraph>>();
+
+export function subscribeFlowSaves(
+    fn: (head: HttpMessage<FlowWithGraph>) => void,
+): () => void {
+    return flowSaves.subscribe(fn);
 }
 
 export interface FlowCreationInput {
@@ -542,10 +555,11 @@ export function awaitFlowSave(
 // path. Any other error, or the third 412, propagates — the
 // caller (the designer's #persistFlow, routed through
 // reportFault, or performRedo's own catch) is the only place a
-// save failure surfaces. The flow-change notification fires
-// EXACTLY ONCE, on this loop's OWN success return — never per
-// attempt, never in a finally — so a mid-retry 412 never
-// triggers a wasted cross-tab re-render.
+// save failure surfaces. The saved head goes out on the saves
+// channel, the flow-change notification fires, and the head
+// is answered — each EXACTLY ONCE, on this loop's OWN success
+// return — never per attempt, never in a finally — so a
+// mid-retry 412 never triggers a wasted cross-tab re-render.
 // `revivalTarget` names the CALLER's intent — the graph a
 // revival-bearing op (redo; undo's own retry, a later task)
 // wants restored — never a precomputed revivals list: a
@@ -562,24 +576,23 @@ export async function putFlow(
     id: string,
     save: FlowSaveShape,
     revivalTarget?: StoredGraph,
-): Promise<void> {
-    for (
-        let attempt = 1;
-        attempt <= MAX_PUT_ATTEMPTS;
-        attempt++
-    ) {
+): Promise<HttpMessage<FlowWithGraph>> {
+    // No loop condition: the catch caps the attempts, so
+    // every exit either answers the saved head or throws.
+    for (let attempt = 1; ; attempt++) {
         const { body, read } =
             await buildFlowPutBody(
                 ctx, id, save, revivalTarget,
             );
         try {
-            await ctx.PUT(
+            const saved = await ctx.PUT<FlowWithGraph>(
                 organizationItem(ctx, 'flows', id),
                 body,
                 [read],
             );
+            flowSaves.send(saved);
             flowChanges.notify();
-            return;
+            return saved;
         } catch (err) {
             if (
                 err instanceof RequestError

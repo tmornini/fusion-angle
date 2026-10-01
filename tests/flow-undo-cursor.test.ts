@@ -31,7 +31,10 @@ import {
     organizationToken, DEV_TOKEN,
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
+import {
+    DEFAULT_LOCK_TIMEOUT,
+    storedGraph,
+} from '../shared/types.ts';
 import {
     type Latch,
     type RequestContext,
@@ -48,7 +51,10 @@ import {
 } from '../client/flow-mutations.ts';
 import { getRenderableFlowGraph } from
     '../web-app/app/flow-graph-layout.ts';
-import { getFlowVersions } from '../client/flow-queries.ts';
+import {
+    getFlowGraph,
+    getFlowVersions,
+} from '../client/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -64,7 +70,10 @@ import {
     getClient,
     putClient,
 } from '../web-app/app/client.ts';
-import type { GraphNode } from '../shared/types.ts';
+import type {
+    FlowWithGraph,
+    GraphNode,
+} from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -458,9 +467,21 @@ Deno.test(
             edges: [],
         });
 
+        const flowPath =
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId;
         let posts = 0;
+        // The loop's own reads of the flow, each stamped with
+        // the POSTs sent so far: none before the first attempt,
+        // which latches the held flow, and one after the 412.
+        const readsBeforeRetry: number[] = [];
         const flaky: RequestContext = {
             ...ctx,
+            GET: <T>(path: string): Promise<HttpMessage<T>> => {
+                if (path === flowPath && posts < 2) {
+                    readsBeforeRetry.push(posts);
+                }
+                return ctx.GET<T>(path);
+            },
             POST: <T>(
                 resource: string,
                 body: Record<string, unknown>,
@@ -490,11 +511,17 @@ Deno.test(
         const snap = snapOf(flowId, [
             buildNode(nodeId),
         ]);
+        const held = (await getFlowGraph(ctx, flowId)).message;
         const op = await performUndo(
-            flaky, snap, buildFlowHistorySnapshot(true),
+            flaky, snap, buildFlowHistorySnapshot(true), held,
         );
         assertStrictEquals(op.kind, 'ok');
         assertStrictEquals(posts, 2, 'the retry re-posts once');
+        assertEquals(
+            readsBeforeRetry, [1],
+            'the first attempt latches the held flow;'
+                + ' the retry alone reads the head',
+        );
     }),
 );
 
@@ -513,6 +540,16 @@ function snapOf(
 ): FlowSnapshot {
     return buildInitialFlowSnapshot(
         {
+            message: responseMessage<FlowWithGraph>({
+                id: flowId,
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                name: 'Retry Flow',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                graph: storedGraph({ nodes, edges: [] }),
+            }),
             id: flowId,
             name: 'Retry Flow',
             isLocked: false,
@@ -895,6 +932,7 @@ Deno.test(
                 graph, 800, 600, [], [], [],
             ),
             buildFlowHistorySnapshot(true),
+            graph.message,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;

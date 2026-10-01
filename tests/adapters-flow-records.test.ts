@@ -1,11 +1,15 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
     deleteFlowRecord,
+    deleteFlowRecordForFlow,
     getRecordForFlow,
     getRecordForWorkOrder,
     getFlowSummariesForRecord,
@@ -17,6 +21,7 @@ import {
 import {
     DEFAULT_LOCK_TIMEOUT,
     storedWorkOrderFlowGraph,
+    type FlowRecordEntity,
     type WorkOrderFlowGraph,
 } from '../shared/types.ts';
 import { generateIdentifier } from
@@ -335,8 +340,47 @@ Deno.test(
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        await deleteFlowRecord(ctx, 'aEsGMmBEFaVdWihhHXwCbw'
-            , 'dCnpryxCNwuTnCrBBDIMOw');
+        const [held] = await ctx.GETCollection<FlowRecordEntity>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/records/',
+        );
+        await deleteFlowRecord(
+            ctx, 'aEsGMmBEFaVdWihhHXwCbw', held!,
+        );
+        assertStrictEquals(
+            await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
+            null,
+        );
+    },
+);
+
+// Unbinding reads the flow's binding part and latches it
+// (spec §9): the DELETE's If-Match names that part's head.
+Deno.test(
+    'deleteFlowRecordForFlow latches the binding it reads',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
+            at: AT,
+        });
+        const [held] = await ctx.GETCollection<FlowRecordEntity>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/records/',
+        );
+        const { ctx: recorded, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        await deleteFlowRecordForFlow(
+            recorded, 'aEsGMmBEFaVdWihhHXwCbw',
+        );
+        assertEquals(
+            sent.filter((r) => r.method === 'DELETE')
+                .map((r) => r.ifMatch),
+            [held!.query('header.etag').toText()],
+        );
         assertStrictEquals(
             await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
             null,

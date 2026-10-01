@@ -10,6 +10,8 @@ import type {
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import { asBoolean } from '../shared/json-assert.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import type { RequestContext } from './request-context.ts';
 import {
     organizationCollection,
@@ -17,7 +19,11 @@ import {
 } from './request-context.ts';
 import { getProjectEntities } from './projects.ts';
 
+// The flow as the canvas reads it, in camelCase, with its
+// graph parsed. The message is the head it was read from,
+// which the designer's undo latches.
 export interface FlowGraph {
+    readonly message: HttpMessage<FlowWithGraph>;
     id: string;
     name: string;
     isLocked: boolean;
@@ -54,11 +60,11 @@ export interface FlowListItem {
 async function getProjectFlowsForProject(
     ctx: RequestContext,
     projectId: string,
-): Promise<ProjectFlowEntity[]> {
-    return (await ctx.GETCollection<ProjectFlowEntity>(
+): Promise<HttpMessage<ProjectFlowEntity>[]> {
+    return await ctx.GETCollection<ProjectFlowEntity>(
         organizationItem(ctx, 'projects', projectId)
             + '/flows/',
-    )).map((m) => m.body().toValue());
+    );
 }
 
 // The project↔flow joins across EVERY project the caller's org
@@ -68,7 +74,7 @@ async function getProjectFlowsForProject(
 // fetched in parallel and concatenated.
 export async function getProjectFlowEntities(
     ctx: RequestContext,
-): Promise<ProjectFlowEntity[]> {
+): Promise<HttpMessage<ProjectFlowEntity>[]> {
     const projects = await getProjectEntities(ctx);
     const perProject = await Promise.all(
         projects.map(p => getProjectFlowsForProject(
@@ -107,12 +113,13 @@ getFlowsWithProjectNames(
         string, string
     >();
     for (const pf of projectFlows) {
+        const link = pf.body().toValue();
         const name = projectNameById.get(
-            pf.project_id,
+            link.project_id,
         );
         if (name !== undefined) {
             projectNameByFlow.set(
-                pf.flow_id, name,
+                link.flow_id, name,
             );
         }
     }
@@ -144,7 +151,7 @@ export async function getFlowsByProject(
         ]);
 
     const flowIds = new Set(
-        projectFlows.map(pw => pw.flow_id),
+        projectFlows.map(pw => pw.body().toValue().flow_id),
     );
 
     const flowMap = new Map(
@@ -171,29 +178,31 @@ export async function getFlowsByProject(
 export async function getFlowWithGraph(
     ctx: RequestContext,
     flowId: string,
-): Promise<FlowWithGraph> {
-    return (await ctx.GET<FlowWithGraph>(
+): Promise<HttpMessage<FlowWithGraph>> {
+    return await ctx.GET<FlowWithGraph>(
         organizationItem(ctx, 'flows', flowId),
-    )).body().toValue();
+    );
 }
 
 // Every flow the organization holds, each with its graph —
 // the rows the work-order picker judges readiness from.
 export async function getFlowsWithGraphs(
     ctx: RequestContext,
-): Promise<FlowWithGraph[]> {
-    return (await ctx.GETCollection<FlowWithGraph>(
+): Promise<HttpMessage<FlowWithGraph>[]> {
+    return await ctx.GETCollection<FlowWithGraph>(
         organizationCollection(ctx, 'flows'),
-    )).map((m) => m.body().toValue());
+    );
 }
 
 export async function getFlowGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowGraph> {
-    const flow = await getFlowWithGraph(ctx, flowId);
+    const message = await getFlowWithGraph(ctx, flowId);
+    const flow = message.body().toValue();
     const g = parseGraph(flow.graph);
     return {
+        message,
         id: flow.id,
         name: flow.name,
         isLocked: asBoolean(

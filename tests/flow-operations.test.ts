@@ -19,7 +19,10 @@ import {
 } from '../client/request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
@@ -53,6 +56,7 @@ import {
     performRedo,
 } from '../web-app/app/flow-operations.ts';
 import type {
+    FlowWithGraph,
     GraphNode,
     GraphEdge,
     NodeAttribute,
@@ -60,10 +64,13 @@ import type {
 } from '../shared/types.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    storedGraph,
 } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
+    getFlowGraph,
     getFlowVersions,
     type FlowGraph,
 } from '../client/flow-queries.ts';
@@ -144,6 +151,16 @@ function buildGraph(
     edges: GraphEdge[] = [],
 ): FlowGraph {
     return {
+        message: responseMessage<FlowWithGraph>({
+            id: FLOW_ID,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            name: 'Test Flow',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: storedGraph({ nodes, edges }),
+        }),
         id: FLOW_ID,
         name: 'Test Flow',
         isLocked: false,
@@ -1212,13 +1229,14 @@ Deno.test(
     'performUndo: with no history is a no-op'
     + ' that returns the same snapshot',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
-        const { db } = await setupFlow();
+        const { db, ctx } = await setupFlow();
         const snap = snapFrom(buildGraph([
             buildNode(NODE_A), buildNode(NODE_B),
         ]));
         const op = await performUndo(
             inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(false),
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1232,13 +1250,14 @@ Deno.test(
 Deno.test(
     'performUndo: locked flow fails',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
-        const { db } = await setupFlow();
+        const { db, ctx } = await setupFlow();
         const snap = locked(snapFrom(buildGraph([
             buildNode(NODE_A),
         ])));
         const op = await performUndo(
             inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(true),
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(op.kind, 'fail');
     }),
@@ -1273,6 +1292,7 @@ Deno.test(
         const op = await performUndo(
             inPageContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(true),
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1302,6 +1322,47 @@ Deno.test(
         );
         const g = await persistedGraph(db);
         assertStrictEquals(g.nodes.length, 2);
+    }),
+);
+
+// The designer holds the flow's latest message and undo
+// latches it (spec §9): the undo POST is the first request
+// the loop sends, and its If-Match names the held head.
+Deno.test(
+    'performUndo: latches the held flow, and the undo'
+    + ' POST is its first request',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await setupFlow();
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+        ]);
+        const currentNodes = [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+            buildNode(NODE_C),
+        ];
+        await seedCurrentGraph(ctx, currentNodes);
+        const snap = snapFrom(buildGraph(currentNodes));
+        const { ctx: recorded, sent } = recordedContext(
+            db, DEV_TOKEN,
+        );
+        const held = await getFlowGraph(recorded, FLOW_ID);
+        sent.length = 0;
+        const op = await performUndo(
+            recorded, snap, buildFlowHistorySnapshot(true),
+            held.message,
+        );
+        assertStrictEquals(op.kind, 'ok');
+        assertEquals(
+            sent.filter((r) => r.method === 'POST')
+                .map((r) => r.ifMatch),
+            [held.message.query('header.etag').toText()],
+        );
+        assertEquals(
+            sent.findIndex((r) => r.method === 'POST'),
+            0,
+        );
     }),
 );
 
@@ -1342,6 +1403,7 @@ Deno.test(
             ),
             snap,
             buildFlowHistorySnapshot(true),
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1397,6 +1459,7 @@ Deno.test(
             ),
             snap,
             buildFlowHistorySnapshot(true),
+            (await getFlowGraph(ctx, FLOW_ID)).message,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1647,11 +1710,12 @@ Deno.test(
             ctx, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
                 + '/undo',
         );
+        const held = (await getFlowGraph(ctx, FLOW_ID)).message;
         const { result: op } = await captureConsole(
             'error',
             () => performUndo(
                 faulting.ctx, snap,
-                buildFlowHistorySnapshot(true),
+                buildFlowHistorySnapshot(true), held,
             ),
         );
         assertStrictEquals(op.kind, 'fail');

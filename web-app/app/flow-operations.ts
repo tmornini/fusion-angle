@@ -3,11 +3,14 @@ import type { FlowSnapshot } from
 import type { RequestContext } from
     '../../client/request-context.ts';
 import type {
+    FlowWithGraph,
     GraphEdge,
     GraphNode,
     NodeAttribute,
     RecordAttributeId,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
@@ -104,11 +107,13 @@ async function commitFlowMutation(
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): Promise<void> {
-    await enqueueFlowSave(snap.flowId, () => putFlow(
-        ctx,
-        snap.flowId,
-        snapToSave(snap, nodes, edges),
-    ));
+    await enqueueFlowSave(snap.flowId, async () => {
+        await putFlow(
+            ctx,
+            snap.flowId,
+            snapToSave(snap, nodes, edges),
+        );
+    });
 }
 
 export type ToastVariant =
@@ -707,40 +712,36 @@ function applyServerGraph(
 // bound putFlow's own PUT retry uses (adapters/flow-mutations.ts).
 const MAX_UNDO_ATTEMPTS = 3;
 
-// Drive POST /flows/:id/undo with its own jittered 412-absorb:
-// the undo lands in-order on the tag this attempt read, so a
-// save racing this undo for the SAME head makes the statement
-// answer 412 and store nothing.
-// Undo-as-replay (Phase 14 Task 8)
-// resolves the restore target SERVER-SIDE from the message plane
-// (api/derive-flows.ts's resolveFlowUndoTarget), so this loop
-// carries no baseline of its own — a 412 just means the head
-// moved; the server re-resolves fresh against the NEW head on
-// the very next attempt, landing correctly on "one step back
-// from whatever raced this undo in" with nothing for the client
-// to recompute or refetch. Each attempt mints a FRESH
-// eventId/at (the E6 split putFlow's own retry uses): they
-// stamp the restored version, so each attempt is its own
-// event (FlowUndoBody's doc comment, api/validators.ts).
+// Drive POST /flows/:id/undo from the flow the designer
+// holds, with its own jittered 412-absorb: the first attempt
+// latches the held head with no read, so a save that landed
+// since the designer last held the flow makes the statement
+// answer 412 and store nothing. Undo-as-replay (Phase 14
+// Task 8) resolves the restore target SERVER-SIDE from the
+// message plane (api/derive-flows.ts's resolveFlowUndoTarget),
+// so this loop carries no baseline of its own — a 412 just
+// means the head moved; the loop reads the NEW head and the
+// next attempt latches it, and the server re-resolves fresh
+// against that head, landing correctly on "one step back from
+// whatever raced this undo in" with nothing for the client to
+// recompute. Each attempt mints a FRESH eventId/at (the E6
+// split putFlow's own retry uses): they stamp the restored
+// version, so each attempt is its own event (FlowUndoBody's
+// doc comment, api/validators.ts).
 // Not exported: performUndo is the only caller.
 async function postFlowUndo(
     ctx: RequestContext,
-    flowId: string,
+    held: HttpMessage<FlowWithGraph>,
 ): Promise<void> {
+    const resource = organizationItem(
+        ctx, 'flows', held.body().toValue().id,
+    );
+    let latch = held;
     for (
         let attempt = 1;
         attempt <= MAX_UNDO_ATTEMPTS;
         attempt++
     ) {
-        // The echo is the precondition, so it is re-read
-        // EVERY attempt: retrying against the stale one
-        // would 412 forever. A head that moved under us is
-        // exactly what the backoff is for — the next
-        // attempt pins the NEW head and the server
-        // re-resolves one step back from it.
-        const resource =
-            organizationItem(ctx, 'flows', flowId);
-        const read = await ctx.GET<unknown>(resource);
         try {
             await ctx.POST(
                 resource + '/undo',
@@ -748,7 +749,7 @@ async function postFlowUndo(
                     eventId: generateIdentifier(),
                     at: nowUtc(),
                 },
-                [read],
+                [latch],
             );
             return;
         } catch (err) {
@@ -758,6 +759,7 @@ async function postFlowUndo(
                 && attempt < MAX_UNDO_ATTEMPTS
             ) {
                 await jitteredBackoff(attempt);
+                latch = await ctx.GET<FlowWithGraph>(resource);
                 continue;
             }
             throw err;
@@ -765,10 +767,14 @@ async function postFlowUndo(
     }
 }
 
+// `held` is the flow's latest message as the designer holds
+// it (its load, its bell refresh, each save's answer); the
+// undo latches it.
 export async function performUndo(
     ctx: RequestContext,
     snap: FlowSnapshot,
     history: FlowHistorySnapshot,
+    held: HttpMessage<FlowWithGraph>,
 ): Promise<OpResult<HistoryOpOk>> {
     const locked = requireFlowNotLocked(snap);
     if (locked) return locked;
@@ -808,7 +814,7 @@ export async function performUndo(
     // The 3-attempt jittered 412-absorb lives in postFlowUndo,
     // above.
     try {
-        await postFlowUndo(ctx, snap.flowId);
+        await postFlowUndo(ctx, held);
     } catch (err) {
         log.error(
             'performUndo failed',

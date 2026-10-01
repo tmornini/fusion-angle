@@ -50,12 +50,14 @@ import {
 } from '../shared/identifier.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    storedGraph,
 } from '../shared/types.ts';
 import type {
     FlowWithGraph,
     StoredGraph,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,
@@ -269,62 +271,74 @@ Deno.test(
         const startId = generateIdentifier();
         const midId = generateIdentifier();
         const endId = generateIdentifier();
+        const nodes = [
+            {
+                id: startId,
+                name: 'Create',
+                positionX: -190,
+                positionY: 30,
+                isCreate: true,
+                isArchive: false,
+                memberIds: [],
+                attributes: [],
+                taskInstructions: '',
+            },
+            {
+                id: midId,
+                name: 'Capture',
+                positionX: 0,
+                positionY: 30,
+                isCreate: false,
+                isArchive: false,
+                memberIds: [],
+                attributes: [],
+                taskInstructions: '',
+            },
+            {
+                id: endId,
+                name: 'Archive',
+                positionX: 190,
+                positionY: 30,
+                isCreate: false,
+                isArchive: true,
+                memberIds: [],
+                attributes: [],
+                taskInstructions: '',
+            },
+        ];
+        const edges = [
+            {
+                id: generateIdentifier(),
+                name: 'begin',
+                fromNodeId: startId,
+                toNodeId: midId,
+            },
+            {
+                id: generateIdentifier(),
+                name: 'submit',
+                fromNodeId: midId,
+                toNodeId: endId,
+            },
+        ];
         const mmd = generateMermaid({
+            message: responseMessage<FlowWithGraph>({
+                id: flowId,
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                name: 'Lead',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                graph: storedGraph({ nodes, edges }),
+            }),
             id: flowId,
             name: 'Lead',
             isLocked: false,
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            nodes: [
-                {
-                    id: startId,
-                    name: 'Create',
-                    positionX: -190,
-                    positionY: 30,
-                    isCreate: true,
-                    isArchive: false,
-                    memberIds: [],
-                    attributes: [],
-                    taskInstructions: '',
-                },
-                {
-                    id: midId,
-                    name: 'Capture',
-                    positionX: 0,
-                    positionY: 30,
-                    isCreate: false,
-                    isArchive: false,
-                    memberIds: [],
-                    attributes: [],
-                    taskInstructions: '',
-                },
-                {
-                    id: endId,
-                    name: 'Archive',
-                    positionX: 190,
-                    positionY: 30,
-                    isCreate: false,
-                    isArchive: true,
-                    memberIds: [],
-                    attributes: [],
-                    taskInstructions: '',
-                },
-            ],
-            edges: [
-                {
-                    id: generateIdentifier(),
-                    name: 'begin',
-                    fromNodeId: startId,
-                    toNodeId: midId,
-                },
-                {
-                    id: generateIdentifier(),
-                    name: 'submit',
-                    fromNodeId: midId,
-                    toNodeId: endId,
-                },
-            ],
+            nodes,
+            edges,
         });
         await postFlowFromMermaid(
             ctx, flowId, mmd, generateIdentifier(),

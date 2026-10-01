@@ -33,6 +33,8 @@ import {
     getProjectFlowEntities,
 } from '../../client/flow-queries.ts';
 import type { FlowGraph } from '../../client/flow-queries.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import type { RequestContext } from '../../client/request-context.ts';
 import { getFlowEntities } from '../../client/flows.ts';
 import { getProjectEntities } from '../../client/projects.ts';
@@ -233,7 +235,7 @@ async function getFlowBackupData(
     ctx: RequestContext,
     flowId: string,
 ): Promise<{
-    flow: FlowWithGraph;
+    flow: HttpMessage<FlowWithGraph>;
     projectId: string | undefined;
 }> {
     const [flow, projectFlows] =
@@ -241,9 +243,9 @@ async function getFlowBackupData(
             getFlowWithGraph(ctx, flowId),
             getProjectFlowEntities(ctx),
         ]);
-    const pf = projectFlows.find(
-        r => r.flow_id === flowId,
-    );
+    const pf = projectFlows
+        .map(m => m.body().toValue())
+        .find(r => r.flow_id === flowId);
     return {
         flow,
         projectId: pf?.project_id,
@@ -300,14 +302,16 @@ export async function getFlowZip(
     data: Uint8Array;
     name: string;
 }> {
-    const { flow, projectId } =
+    const { flow: read, projectId } =
         await getFlowBackupData(ctx, flowId);
+    const flow = read.body().toValue();
 
     const graph = asStoredGraph(
         flow.graph, 'flow.graph',
     );
 
     const mermaidGraph: FlowGraph = {
+        message: read,
         id: flow.id,
         name: flow.name,
         isLocked: asBoolean(
@@ -457,7 +461,7 @@ export async function computeFlowBackupResolution(
             getProjectEntities(ctx),
         ]);
     const flowExists = flows.some(
-        f => f.id === backup.flow.id,
+        f => f.body().toValue().id === backup.flow.id,
     );
     const project = backup.projectId
         ? projects.map(m => m.body().toValue()).find(p =>

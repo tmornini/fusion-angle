@@ -5,10 +5,18 @@ import {
     areNodePositionsDegenerate,
     withRenderableLayout,
 } from '../web-app/app/flow-graph-layout.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
-import type { GraphNode, GraphEdge } from '../shared/types.ts';
+import {
+    DEFAULT_LOCK_TIMEOUT,
+    storedGraph,
+} from '../shared/types.ts';
+import type {
+    FlowWithGraph,
+    GraphNode,
+    GraphEdge,
+} from '../shared/types.ts';
 import type { FlowGraph } from
     '../client/flow-queries.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // --- builders ------------------------------------------------
 
@@ -50,11 +58,24 @@ function flowGraph(o: {
     nodes: GraphNode[];
     edges: GraphEdge[];
 }): FlowGraph {
+    const isAutoLayout = o.isAutoLayout ?? false;
     return {
+        message: responseMessage<FlowWithGraph>({
+            id: 'ZOousbbnzpqlxJExVAruYQ',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            name: 'F1',
+            is_locked: false,
+            is_auto_layout: isAutoLayout,
+            is_auto_fit: true,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: storedGraph({
+                nodes: o.nodes, edges: o.edges,
+            }),
+        }),
         id: 'ZOousbbnzpqlxJExVAruYQ',
         name: 'F1',
         isLocked: false,
-        isAutoLayout: o.isAutoLayout ?? false,
+        isAutoLayout,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: o.nodes,

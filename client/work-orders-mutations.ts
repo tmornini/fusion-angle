@@ -88,7 +88,7 @@ export interface WorkOrderCreationInput {
 // chose: the flow as read is frozen into the work order.
 export interface WorkOrderCreation
     extends WorkOrderCreationInput {
-    readonly flow: FlowWithGraph;
+    readonly flow: HttpMessage<FlowWithGraph>;
     readonly position: number;
 }
 
@@ -99,9 +99,10 @@ export async function postWorkOrderCreation(
     const displayId = await generateDisplayId(
         creation.workOrderId,
     );
+    const flow = creation.flow.body().toValue();
     const graph: StoredGraph =
         asStoredGraph(
-            creation.flow.graph, 'flow.graph',
+            flow.graph, 'flow.graph',
         );
 
     const startNode = graph.nodes.find(
@@ -134,8 +135,8 @@ export async function postWorkOrderCreation(
 
     const flowGraph: WorkOrderFlowGraph =
         {
-            name: creation.flow.name,
-            lockTimeout: creation.flow.lock_timeout,
+            name: flow.name,
+            lockTimeout: flow.lock_timeout,
             nodes: graph.nodes,
             edges: graph.edges,
         };

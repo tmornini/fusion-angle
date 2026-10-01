@@ -213,6 +213,7 @@ Deno.test(
         const op = await performUndo(
             ctx, opened,
             buildFlowHistorySnapshot(true),
+            graph.message,
         );
         assertStrictEquals(op.kind, 'ok');
         if (op.kind !== 'ok') return;

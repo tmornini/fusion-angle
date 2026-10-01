@@ -431,10 +431,11 @@ Deno.test(
             , 'aEsGMmBEFaVdWihhHXwCbw', 'pnXmXrxOWayANgDLdCjuBw');
         await createBaseFlow(WeXjAaAxGSpLpamfEuvcww, flow2
             , 'prBESZPjJDiuXCeZLmbiVw');
-        const rows: ProjectFlowEntity[] =
+        const rows: ProjectFlowEntity[] = (
             await getProjectFlowEntities(
                 inPageContext(db, await organizationToken()),
-            );
+            )
+        ).map((m) => m.body().toValue());
         assertStrictEquals(rows.length, 2);
         const link1 = rows.find(
             r => r.flow_id === 'aEsGMmBEFaVdWihhHXwCbw',

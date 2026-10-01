@@ -9,6 +9,7 @@ import {
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     validateFlowForCreation,
     getFlowsForCreation,
@@ -156,7 +157,7 @@ Deno.test(
             generateIdentifier(),
             readyGraph(generateIdentifier()),
         );
-        const r = validateFlowForCreation(flow);
+        const r = validateFlowForCreation(responseMessage(flow));
         assertStrictEquals(r.ready, true);
         assertStrictEquals(r.problems.length, 0);
     }),
@@ -191,7 +192,7 @@ Deno.test(
         const flow = buildFlowEntity(
             generateIdentifier(), graph,
         );
-        const r = validateFlowForCreation(flow);
+        const r = validateFlowForCreation(responseMessage(flow));
         assertStrictEquals(r.ready, false);
         assertStrictEquals(r.problems.length, 1);
         assertStrictEquals(
@@ -240,7 +241,7 @@ Deno.test(
         const flow = buildFlowEntity(
             generateIdentifier(), graph,
         );
-        const r = validateFlowForCreation(flow);
+        const r = validateFlowForCreation(responseMessage(flow));
         assertStrictEquals(r.ready, false);
         const problem = r.problems.find(
             p => p.nodeId === orphan,
@@ -283,7 +284,7 @@ Deno.test(
         const flow = buildFlowEntity(
             generateIdentifier(), graph,
         );
-        const r = validateFlowForCreation(flow);
+        const r = validateFlowForCreation(responseMessage(flow));
         assertStrictEquals(r.ready, true);
     }),
 );
