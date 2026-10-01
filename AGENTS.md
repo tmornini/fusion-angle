@@ -214,7 +214,11 @@ cannot know:
 - **Commandments touched by the task.** Name them.
 - **Abominations the task specifically risks.** Name them.
 - **Existing codebase patterns to match.** RequestContext
-  as the first argument to client verbs, SafeHtml from
+  as the first argument to client verbs, a client verb
+  returns an `HttpMessage`, an array of them, or a value
+  that keeps one (the aggregates TODO.md's three-shapes
+  bullet names excepted), a write from a held message
+  takes the message it latches, SafeHtml from
   presenters, snake_case storage / camelCase domain,
   HTTP-verb adapter naming (`getNoun`/`putNoun`/`deleteNoun`/
   `postNounOperation`), validators at the gate not
@@ -286,8 +290,11 @@ Where an RFC speaks, the product follows it, RFC 9110
 first. A conditional that fails answers what the RFC says
 even when another status reads friendlier: an `If-Match`
 that names no current representation answers 412, even
-for an id never written (RFC 9110 §13.1.1), and a retired
-instance answers 410 Gone (§15.5.11).
+for an id never written (RFC 9110 §13.1.1), and a deleted
+document — a DELETE head, or a state-`deleted` head in a
+lifecycle family — answers 410 Gone (§15.5.11) on a read,
+after the fence; a retired instance also refuses its
+writes with 410.
 
 ### node:crypto scrypt
 
