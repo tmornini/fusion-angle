@@ -2,19 +2,20 @@ import { assert } from '@std/assert';
 import { OrganizationObjectivesPresenter } from
     '../web-app/app/presenters/organization-objectives.ts';
 import type { ObjectiveEntity } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 const ORGANIZATION_ID = 'AjdvjuECVZEgZoFajaIEkg';
 
-const activeObjs: ObjectiveEntity[] = [
+const activeObjs = [
     { id: 'ohqxgUBEaFQwYbXsonRPmg', organization_id: ORGANIZATION_ID,
       position: 0, state: 'active' },
     { id: 'o2', organization_id: ORGANIZATION_ID,
       position: 1, state: 'active' },
-];
-const archivedObjs: ObjectiveEntity[] = [
+].map((o) => responseMessage<ObjectiveEntity>(o));
+const archivedObjs = [
     { id: 'o3', organization_id: ORGANIZATION_ID,
       position: 99, state: 'archived' },
-];
+].map((o) => responseMessage<ObjectiveEntity>(o));
 const defs = new Map([
     ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Increase incomes'
         , description: 'd1' }],

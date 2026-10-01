@@ -54,8 +54,12 @@ export function getPortfolioImpactSummary(
     projectCount: number;
     actualCount: number;
 } {
-    const objectives = bundle.objectives;
-    const projectRows = bundle.projects;
+    const objectives = bundle.objectives.map(
+        (m) => m.body().toValue(),
+    );
+    const projectRows = bundle.projects.map(
+        (m) => m.body().toValue(),
+    );
     const allBaseline = bundle.baselineScores;
     const allActual = bundle.actualScores;
     const approved = projectRows.filter(p =>
@@ -146,7 +150,8 @@ export function buildObjectiveAggregates(
     );
 
     const result = [];
-    for (const obj of inputs.activeObjectives) {
+    for (const message of inputs.activeObjectives) {
+        const obj = message.body().toValue();
         const baselineScores =
             filterByField(latestB, 'objectiveId', obj.id)
                 .map(r => r.score);
@@ -191,7 +196,8 @@ export function buildObjectiveTrendlines(
 
     const result = new Map<ObjectiveId, TrendPoint[]>();
 
-    for (const obj of inputs.activeObjectives) {
+    for (const message of inputs.activeObjectives) {
+        const obj = message.body().toValue();
         const baselineRows = filterByField(
             latestBaselineForApproved, 'objectiveId', obj.id,
         );
@@ -252,13 +258,16 @@ export async function getProjectsScoreColumn(
 }>> {
     const [
         activeObjs,
-        objectives,
+        objectiveMessages,
         projectMessages,
     ] = await Promise.all([
         getActiveObjectives(ctx),
         getObjectives(ctx),
         getProjectEntities(ctx),
     ]);
+    const objectives = objectiveMessages.map(
+        (m) => m.body().toValue(),
+    );
     const projectRows = projectMessages.map(
         (m) => m.body().toValue(),
     );

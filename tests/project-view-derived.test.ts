@@ -23,15 +23,15 @@ function makeProject(): Project {
 const T1 = '2026-05-14T00:00:00.000000Z';
 const T2 = '2026-05-15T00:00:00.000000Z';
 
-const oneObjective: ObjectiveEntity[] = [
+const oneObjective = [
     {
         id: 'ohqxgUBEaFQwYbXsonRPmg',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         position: 0,
         state: 'active',
     },
-];
-const twoObjectives: ObjectiveEntity[] = [
+].map((o) => responseMessage<ObjectiveEntity>(o));
+const twoObjectives = [
     {
         id: 'ohqxgUBEaFQwYbXsonRPmg',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -44,7 +44,7 @@ const twoObjectives: ObjectiveEntity[] = [
         position: 1,
         state: 'active',
     },
-];
+].map((o) => responseMessage<ObjectiveEntity>(o));
 
 Deno.test(
     'impactBaselineMean returns null with no scores',

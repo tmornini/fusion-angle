@@ -1,4 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
+import type { HttpMessage } from
+    '../../../shared/http-message/http-message.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
@@ -41,13 +43,13 @@ function directionForDelta(delta: number): Direction {
 }
 
 export class DashboardObjectiveAggregatesPresenter {
-    readonly #activeObjectives: ObjectiveEntity[];
+    readonly #activeObjectives: HttpMessage<ObjectiveEntity>[];
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #aggregates: Aggregate[];
     readonly #trendlines: Map<ObjectiveId, TrendPoint[]>;
 
     constructor(
-        activeObjectives: ObjectiveEntity[],
+        activeObjectives: HttpMessage<ObjectiveEntity>[],
         defs: Map<ObjectiveId, Definition>,
         aggregates: Aggregate[],
         trendlines: Map<ObjectiveId, TrendPoint[]>,
@@ -80,8 +82,9 @@ export class DashboardObjectiveAggregatesPresenter {
                     }">Objectives</h3>
                 </div>
                 <ul class="objective-aggregates-rows">
-                    ${this.#activeObjectives.map(o =>
-                        this.#row(o, aggMap.get(o.id)))
+                    ${this.#activeObjectives
+                        .map(m => m.body().toValue())
+                        .map(o => this.#row(o, aggMap.get(o.id)))
                     }
                 </ul>
             </div>

@@ -25,6 +25,7 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // organization_id EXCLUDED — the client never supplies it (the
 // org fence stamps it downstream); see ProjectDocumentFields.
@@ -41,18 +42,18 @@ Deno.test('validator: not ready when objectives unscored',
     () => {
         const r = validateProjectForApproval(
             [
-                {
+                responseMessage({
                     id: 'ohqxgUBEaFQwYbXsonRPmg',
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     position: 0,
                     state: 'active',
-                },
-                {
+                }),
+                responseMessage({
                     id: generateIdentifier(),
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     position: 1,
                     state: 'active',
-                },
+                }),
             ],
             [],
         );
@@ -62,12 +63,12 @@ Deno.test('validator: not ready when objectives unscored',
 
 Deno.test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
-        [{
+        [responseMessage({
             id: 'ohqxgUBEaFQwYbXsonRPmg',
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             position: 0,
             state: 'active',
-        }],
+        })],
         [{ id: generateIdentifier(),
            projectId: 'pnXmXrxOWayANgDLdCjuBw',
            objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50,

@@ -1,4 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
+import type { HttpMessage } from
+    '../../../shared/http-message/http-message.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
@@ -47,14 +49,14 @@ function actualVisible(state: ProjectState): boolean {
 }
 
 export class ProjectObjectivesPresenter {
-    readonly #activeObjectives: ObjectiveEntity[];
+    readonly #activeObjectives: HttpMessage<ObjectiveEntity>[];
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #latestBaselines: ObjectiveScore[];
     readonly #latestActuals: ObjectiveScore[];
     readonly #state: ProjectState;
 
     constructor(
-        activeObjectives: ObjectiveEntity[],
+        activeObjectives: HttpMessage<ObjectiveEntity>[],
         defs: Map<ObjectiveId, Definition>,
         latestBaselines: ObjectiveScore[],
         latestActuals: ObjectiveScore[],
@@ -96,8 +98,9 @@ export class ProjectObjectivesPresenter {
                     }">Objectives</h3>
                 </div>
                 <ul class="project-objectives-rows">
-                    ${this.#activeObjectives.map(o =>
-                        this.#row(
+                    ${this.#activeObjectives
+                        .map(m => m.body().toValue())
+                        .map(o => this.#row(
                             o,
                             baseMap.get(o.id),
                             actualMap.get(o.id),

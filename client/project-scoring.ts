@@ -11,11 +11,14 @@ import {
     projectStateIsApproved,
     assertProjectState,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     organizationItem,
     type RequestContext,
 } from './request-context.ts';
 import {
+    activeObjectivesOf,
     getObjectives,
 } from './objectives.ts';
 import {
@@ -129,8 +132,8 @@ export async function getAllActualScores(
 }
 
 export interface DashboardScoringBundle {
-    readonly projects: ProjectEntity[];
-    readonly objectives: ObjectiveEntity[];
+    readonly projects: HttpMessage<ProjectEntity>[];
+    readonly objectives: HttpMessage<ObjectiveEntity>[];
     readonly baselineScores: ObjectiveScore[];
     readonly actualScores: ObjectiveScore[];
 }
@@ -139,21 +142,22 @@ export function startDashboardScoringReads(
     ctx: RequestContext,
 ): {
     readonly bundleP: Promise<DashboardScoringBundle>;
-    readonly objectivesP: Promise<ObjectiveEntity[]>;
+    readonly objectivesP: Promise<HttpMessage<ObjectiveEntity>[]>;
 } {
-    const projectsP = getProjectEntities(ctx).then(
-        (messages) => messages.map((m) => m.body().toValue()),
-    );
+    const projectsP = getProjectEntities(ctx);
     const objectivesP = getObjectives(ctx);
     const bundleP = (async () => {
         const projects = await projectsP;
+        const projectBodies = projects.map(
+            (m) => m.body().toValue(),
+        );
         const [
             baselineScores,
             actualScores,
             objectives,
         ] = await Promise.all([
-            getAllBaselineScores(ctx, projects),
-            getAllActualScores(ctx, projects),
+            getAllBaselineScores(ctx, projectBodies),
+            getAllActualScores(ctx, projectBodies),
             objectivesP,
         ]);
         return {
@@ -190,7 +194,7 @@ export async function getProjectScoring(
 // the same five logical reads, so fetching per-builder
 // repeated every read and its auth/ledger derivation.
 export interface ObjectiveScoringInputs {
-    activeObjectives: ObjectiveEntity[];
+    activeObjectives: HttpMessage<ObjectiveEntity>[];
     approvedProjectIds: Set<Id>;
     baselineScores: ObjectiveScore[];
     actualScores: ObjectiveScore[];
@@ -199,11 +203,10 @@ export interface ObjectiveScoringInputs {
 export function getObjectiveScoringInputs(
     bundle: DashboardScoringBundle,
 ): ObjectiveScoringInputs {
-    const activeObjectives = bundle.objectives
-        .filter(o => o.state === 'active')
-        .sort((a, b) => a.position - b.position);
+    const activeObjectives = activeObjectivesOf(bundle.objectives);
     const approvedProjectIds = new Set(
         bundle.projects
+            .map(m => m.body().toValue())
             .filter(p =>
                 projectStateIsApproved(
                     assertProjectState(

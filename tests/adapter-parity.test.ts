@@ -23,12 +23,18 @@ Deno.test('K5 reactivation on the memory adapter',
         await postObjectiveCreation(
             ctx, 'ohqxgUBEaFQwYbXsonRPmg', 'Rev', 'd', 0,
         );
-        await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
-        await postObjectiveReactivation(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
+        const held = (await getActiveObjectives(ctx)).find(
+            (m) => m.body().toValue().id === 'ohqxgUBEaFQwYbXsonRPmg',
+        )!;
+        await postObjectiveReactivation(
+            ctx, await postObjectiveArchival(ctx, held),
+        );
         const active = await getActiveObjectives(ctx);
         const archivedIds =
             await getArchivedObjectiveIds(ctx);
-        assert(active.some(o => o.id === 'ohqxgUBEaFQwYbXsonRPmg'),
+        assert(active.some(
+            (m) => m.body().toValue().id === 'ohqxgUBEaFQwYbXsonRPmg',
+        ),
             'ohqxgUBEaFQwYbXsonRPmg returns to active list');
         assertStrictEquals(archivedIds.size, 0,
             'active event supersedes archived');

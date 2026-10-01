@@ -37,30 +37,22 @@ export function notifyObjectiveChange(): void {
     objectiveChanges.notify();
 }
 
-export async function getObjectives(
+export function getObjectives(
     ctx: RequestContext,
-): Promise<ObjectiveEntity[]> {
-    return (await ctx.GETCollection<ObjectiveEntity>(
+): Promise<HttpMessage<ObjectiveEntity>[]> {
+    return ctx.GETCollection<ObjectiveEntity>(
         organizationCollection(ctx, 'objectives'),
-    )).map((m) => m.body().toValue());
-}
-
-// The objective's head as read, which a merge latches.
-function getObjectiveWithEtag(
-    ctx: RequestContext,
-    id: ObjectiveId,
-): Promise<HttpMessage<ObjectiveEntity>> {
-    return ctx.GET<ObjectiveEntity>(
-        organizationItem(ctx, 'objectives', id),
     );
 }
 
 export function activeObjectivesOf(
-    rows: readonly ObjectiveEntity[],
-): ObjectiveEntity[] {
-    return rows
-        .filter(o => o.state === 'active')
-        .sort((a, b) => a.position - b.position);
+    messages: readonly HttpMessage<ObjectiveEntity>[],
+): HttpMessage<ObjectiveEntity>[] {
+    return messages
+        .filter(m => m.body().toValue().state === 'active')
+        .sort((a, b) =>
+            a.body().toValue().position
+            - b.body().toValue().position);
 }
 
 // Archived set from the GET-stamped state on each objective
@@ -68,7 +60,8 @@ export function activeObjectivesOf(
 export async function getArchivedObjectiveIds(
     ctx: RequestContext,
 ): Promise<Set<ObjectiveId>> {
-    const objectives = await getObjectives(ctx);
+    const objectives = (await getObjectives(ctx))
+        .map(m => m.body().toValue());
     return new Set(
         objectives
             .filter(o => o.state === 'archived')
@@ -252,7 +245,7 @@ export async function getCurrentObjectiveDefinitions(
 
 export async function getActiveObjectives(
     ctx: RequestContext,
-): Promise<ObjectiveEntity[]> {
+): Promise<HttpMessage<ObjectiveEntity>[]> {
     return activeObjectivesOf(await getObjectives(ctx));
 }
 
@@ -328,63 +321,63 @@ export async function postObjectiveRevision(
     notifyObjectiveChange();
 }
 
-// Read-then-put: only position is echoed from the current
-// head (the GET-stamped state is never re-sent); the
-// transition sends the new state fresh. The PUT latches the
-// head it read, so a drag-reorder landing in between refuses
-// this one with a 412 rather than being overwritten.
+// A transition from the held objective: only its position is
+// echoed (the GET-stamped state is never re-sent); the new
+// state is sent fresh. The PUT latches the held head, so a
+// drag-reorder landing since the page read it refuses this one
+// with a 412 rather than being overwritten.
 export async function postObjectiveArchival(
     ctx: RequestContext,
-    id: ObjectiveId,
-): Promise<void> {
-    const read = await getObjectiveWithEtag(ctx, id);
-    const objective = read.body().toValue();
-    await ctx.PUT(
-        organizationItem(ctx, 'objectives', id),
+    held: HttpMessage<ObjectiveEntity>,
+): Promise<HttpMessage<ObjectiveEntity>> {
+    const objective = held.body().toValue();
+    const saved = await ctx.PUT<ObjectiveEntity>(
+        organizationItem(ctx, 'objectives', objective.id),
         {
             position: objective.position,
             state: 'archived',
         },
-        [read],
+        [held],
     );
     notifyObjectiveChange();
+    return saved;
 }
 
 export async function postObjectiveReactivation(
     ctx: RequestContext,
-    id: ObjectiveId,
-): Promise<void> {
-    const read = await getObjectiveWithEtag(ctx, id);
-    const objective = read.body().toValue();
-    await ctx.PUT(
-        organizationItem(ctx, 'objectives', id),
+    held: HttpMessage<ObjectiveEntity>,
+): Promise<HttpMessage<ObjectiveEntity>> {
+    const objective = held.body().toValue();
+    const saved = await ctx.PUT<ObjectiveEntity>(
+        organizationItem(ctx, 'objectives', objective.id),
         {
             position: objective.position,
             state: 'active',
         },
-        [read],
+        [held],
     );
     notifyObjectiveChange();
+    return saved;
 }
 
-// A reorder carries only the position: the state comes from
-// the head this call read, so an archive or reactivation
-// written since the caller's page load is kept, and the PUT
-// latches that head.
+// A reorder carries only the position: the state is the held
+// objective's, so the PUT latches the head that state came
+// from, and an archive or reactivation written since the page
+// read it refuses this one with a 412.
 export async function putObjectivePosition(
     ctx: RequestContext,
-    id: ObjectiveId,
+    held: HttpMessage<ObjectiveEntity>,
     position: number,
-): Promise<void> {
-    const read = await getObjectiveWithEtag(ctx, id);
-    const objective = read.body().toValue();
-    await ctx.PUT(
-        organizationItem(ctx, 'objectives', id),
+): Promise<HttpMessage<ObjectiveEntity>> {
+    const objective = held.body().toValue();
+    const saved = await ctx.PUT<ObjectiveEntity>(
+        organizationItem(ctx, 'objectives', objective.id),
         {
             position,
             state: objective.state,
         },
-        [read],
+        [held],
     );
     notifyObjectiveChange();
+    return saved;
 }

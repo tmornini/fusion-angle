@@ -15,6 +15,8 @@ import {
 } from './scoring-format.ts';
 import type { ObjectiveScore } from
     '../../client/project-scoring.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 
 export class ProjectView {
     readonly #project: Project;
@@ -23,16 +25,17 @@ export class ProjectView {
 
     constructor(
         project: Project,
-        objectives: readonly ObjectiveEntity[],
+        objectives: readonly HttpMessage<ObjectiveEntity>[],
         baselineScores: readonly ObjectiveScore[],
         actualScores: readonly ObjectiveScore[],
     ) {
         this.#project = project;
         const posByObj =
             new Map<ObjectiveId, number>(
-                objectives.map(
-                    o => [o.id, o.position],
-                ),
+                objectives.map(m => {
+                    const o = m.body().toValue();
+                    return [o.id, o.position];
+                }),
             );
         const latestB = latestPerPair(baselineScores);
         this.#impactBaselineMean =

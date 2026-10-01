@@ -39,12 +39,13 @@ function latestPerObjective(
 }
 
 export function validateProjectForApproval(
-    activeObjectives: ObjectiveEntity[],
+    activeObjectives: HttpMessage<ObjectiveEntity>[],
     baselineScores: ObjectiveScore[],
 ): ValidationResult<ProjectProblem> {
     const scored = latestPerObjective(baselineScores);
     const problems: ProjectProblem[] = [];
-    for (const obj of activeObjectives) {
+    for (const message of activeObjectives) {
+        const obj = message.body().toValue();
         if (!scored.has(obj.id)) {
             problems.push({
                 kind: 'baseline_unscored',

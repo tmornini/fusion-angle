@@ -84,12 +84,12 @@ function makeProject() {
     }), 'approved');
 }
 
-const objectives: ObjectiveEntity[] = [
+const objectives = [
     { id: 'ohqxgUBEaFQwYbXsonRPmg', organization_id: 'org-1',
       position: 0, state: 'active' },
     { id: 'o2', organization_id: 'org-1',
       position: 1, state: 'active' },
-];
+].map((o) => responseMessage<ObjectiveEntity>(o));
 
 const baselineFull = [
     { id: 'b1', projectId: 'pr-1',

@@ -77,7 +77,7 @@ export async function init(
         ReturnType<typeof getIdea>
     >;
     type ObjectivesBundle = {
-        active: readonly ObjectiveEntity[];
+        active: readonly HttpMessage<ObjectiveEntity>[];
         defs: ReadonlyMap<
             ObjectiveId, ObjectiveDefinition
         >;
@@ -91,7 +91,7 @@ export async function init(
                 const defs =
                     await getCurrentObjectiveDefinitions(
                         ctx,
-                        active.map(o => o.id),
+                        active.map(m => m.body().toValue().id),
                     );
                 return { active, defs };
             })(),
@@ -240,7 +240,8 @@ export async function init(
                 );
             }
         }
-        for (const obj of activeObjectives) {
+        for (const message of activeObjectives) {
+            const obj = message.body().toValue();
             const chk = $(
                 `#check-baseline-${obj.id}`,
                 document,
@@ -578,7 +579,7 @@ async function performConversion(
     held: HttpMessage<IdeaEntity>,
     projectId: string,
     draft: ConversionDraft,
-    activeObjectives: readonly ObjectiveEntity[],
+    activeObjectives: readonly HttpMessage<ObjectiveEntity>[],
 ): Promise<void> {
     const fields = draft.fields;
     const projects = await getProjectEntities(ctx);
@@ -632,6 +633,6 @@ async function performConversion(
         'submitted',
         promotedIdea,
         baselines,
-        activeObjectives.map(o => o.id),
+        activeObjectives.map(m => m.body().toValue().id),
     );
 }

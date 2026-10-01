@@ -771,7 +771,7 @@ async function paintActionBarAndObjectives(
     const { active, scoring, view } = data;
     const defs =
         await getCurrentObjectiveDefinitions(
-            ctx, active.map(o => o.id),
+            ctx, active.map(m => m.body().toValue().id),
         );
     const latestBaselines = latestPerPair(
         scoring.baseline,
