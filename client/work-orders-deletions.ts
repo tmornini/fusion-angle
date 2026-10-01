@@ -1,6 +1,4 @@
 import type { WorkOrderEntity } from '../shared/types.ts';
-import type { HttpMessage } from
-    '../shared/http-message/http-message.ts';
 import type { RequestContext } from './request-context.ts';
 import { organizationItem } from './request-context.ts';
 import { notifyWorkOrderChanges } from './work-orders-mutations.ts';
@@ -17,15 +15,13 @@ export async function deleteWorkOrderClaim(
     ctx: RequestContext,
     held: WorkOrder,
 ): Promise<WorkOrder> {
-    const released = await ctx.DELETE(
+    // The release is an operation on the work order, and
+    // its route answers the work order's new head.
+    const released = await ctx.DELETE<WorkOrderEntity>(
         organizationItem(ctx, 'work-orders', held.id)
             + '/claim',
         [held.message],
     );
     notifyWorkOrderChanges();
-    // The release is an operation on the work order, and
-    // its route answers the work order's new head.
-    return toWorkOrder(
-        released as HttpMessage<WorkOrderEntity>,
-    );
+    return toWorkOrder(released);
 }
