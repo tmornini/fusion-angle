@@ -8,6 +8,7 @@ import type {
 import {
     RecordModel,
     assertRecordState,
+    documentFieldsOf,
 } from '../shared/types.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -285,10 +286,7 @@ export async function postRecordStateChange(
     held: HttpMessage<RecordEntity>,
     state: RecordState,
 ): Promise<HttpMessage<RecordEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...fields
-    } = held.body().toValue();
-    return await putRecord(ctx, held, { ...fields, state });
+    return await putRecord(ctx, held, {
+        ...documentFieldsOf(held), state,
+    });
 }

@@ -26,7 +26,7 @@ import {
     type IdeaWithSubmitter,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
-import { isIdeaState } from '../../shared/types.ts';
+import { isIdeaState, documentFieldsOf } from '../../shared/types.ts';
 import {
     IdeaListPresenter,
     buildInitialIdeaListState,
@@ -147,14 +147,12 @@ function onIdeasLoaded(
             const tuple = ideaState.ideas
                 .find(t => t.idea.idForLink() === id);
             if (!tuple) return;
-            const {
-                id: _id,
-                organization_id: _organizationId,
-                ...fields
-            } = tuple.idea.message.body().toValue();
             const saved = await putIdea(
                 sessionContext(), tuple.idea.message,
-                { ...fields, position: newPosition },
+                {
+                    ...documentFieldsOf(tuple.idea.message),
+                    position: newPosition,
+                },
             );
             // The next drag of this card latches the head this
             // save made, not the one it replaced.

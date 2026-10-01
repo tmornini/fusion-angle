@@ -5,6 +5,7 @@ import type {
 import {
     Project,
     assertProjectState,
+    documentFieldsOf,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import {
@@ -119,13 +120,8 @@ export async function putProjectFields(
     held: HttpMessage<ProjectEntity>,
     patch: ProjectFieldsPatch,
 ): Promise<HttpMessage<ProjectEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...fields
-    } = held.body().toValue();
     return await putProject(ctx, held, {
-        ...fields,
+        ...documentFieldsOf(held),
         title: patch.title,
         description: patch.description,
         start_date: patch.startDate,
@@ -139,12 +135,9 @@ export async function putProjectPosition(
     held: HttpMessage<ProjectEntity>,
     position: number,
 ): Promise<HttpMessage<ProjectEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...fields
-    } = held.body().toValue();
-    return await putProject(ctx, held, { ...fields, position });
+    return await putProject(ctx, held, {
+        ...documentFieldsOf(held), position,
+    });
 }
 
 // State transition for an existing project: ONE document PUT
@@ -158,10 +151,7 @@ export async function postProjectStateChange(
     held: HttpMessage<ProjectEntity>,
     state: ProjectState,
 ): Promise<HttpMessage<ProjectEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...fields
-    } = held.body().toValue();
-    return await putProject(ctx, held, { ...fields, state });
+    return await putProject(ctx, held, {
+        ...documentFieldsOf(held), state,
+    });
 }

@@ -10,6 +10,7 @@ import {
     Idea, nowUtc,
     ideaIsVisible,
     assertIdeaState,
+    documentFieldsOf,
 } from '../shared/types.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -261,12 +262,7 @@ export function postIdeaStateChange(
     held: HttpMessage<IdeaEntity>,
     state: IdeaState,
 ): Promise<HttpMessage<IdeaEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...entity
-    } = held.body().toValue();
-    return putIdea(ctx, held, { ...entity, state });
+    return putIdea(ctx, held, { ...documentFieldsOf(held), state });
 }
 
 export async function putIdeaSubmission(

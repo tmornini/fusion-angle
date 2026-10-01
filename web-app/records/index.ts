@@ -22,7 +22,7 @@ import {
     type RecordWithCounts,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
-import { isRecordState } from '../../shared/types.ts';
+import { isRecordState, documentFieldsOf } from '../../shared/types.ts';
 import {
     RecordListPresenter,
     buildInitialRecordListState,
@@ -139,14 +139,9 @@ function onRecordsLoaded(
                 );
             if (!found) return;
             const held = found.record.message;
-            const {
-                id: _id,
-                organization_id: _organizationId,
-                ...fields
-            } = held.body().toValue();
             const saved = await putRecord(
                 sessionContext(), held,
-                { ...fields, position: newPosition },
+                { ...documentFieldsOf(held), position: newPosition },
             );
             // The next drag of this card latches the head this
             // save made, not the one it replaced.

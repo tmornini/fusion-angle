@@ -30,7 +30,7 @@ import {
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
 } from '../../client/objectives.ts';
-import { MS_PER_DAY } from '../../shared/types.ts';
+import { MS_PER_DAY, documentFieldsOf } from '../../shared/types.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
@@ -597,19 +597,12 @@ async function performConversion(
             objectiveId, score,
         }),
     );
-    // Strip server-stamped keys: postIdeaConversion's
-    // promotedIdea is entity fields only (no id, org, or GET
-    // state). Passing the full entity through a variable
-    // bypasses excess-property checks and 400s at the
-    // validator.
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        state: _state,
-        ...promotedIdea
-    } = held.body().toValue();
-    void _id;
-    void _organizationId;
+    // The GET state goes with the server-stamped identity:
+    // postIdeaConversion's promotedIdea is entity fields only.
+    // Passing the full entity through a variable bypasses
+    // excess-property checks and 400s at the validator.
+    const { state: _state, ...promotedIdea } =
+        documentFieldsOf(held);
     void _state;
     await postIdeaConversion(
         ctx,
