@@ -41,12 +41,7 @@ export async function postOrganizationSessionExchange(
     );
     const refused = refusedDoor(answered);
     if (refused !== null) throw refused;
-    const accessToken = authParam(
-        answered.query('header.authentication-info').exists()
-            ? answered.query('header.authentication-info').toText()
-            : null,
-        'access_token',
-    );
+    const accessToken = authParam(answered, 'access_token');
     if (accessToken === null) {
         throw new Error(
             'authentication-info lacks access_token',

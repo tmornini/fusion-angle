@@ -11,7 +11,7 @@ import { generateSecret } from
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from
     '../shared/base64url.ts';
-import type { HttpMessage } from
+import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 
 export function basicAuthorization(
@@ -31,19 +31,28 @@ export function basicAuthorization(
     return 'Basic ' + btoa(binary);
 }
 
+// The named parameter of an authentication-info line, or
+// null when the parameter is absent. The recovery layer
+// hands the raw line it read from a response; a verb hands
+// the message it was answered, whose absent line answers
+// null the same way.
 export function authParam(
-    header: string | null,
+    source: HttpMessage | string | null,
     name: string,
 ): string | null {
-    if (header === null) return null;
+    if (source instanceof HttpMessage) {
+        const line = source.query('header.authentication-info');
+        return authParam(line.exists() ? line.toText() : null, name);
+    }
+    if (source === null) return null;
     const prefix = name + '="';
-    const at = header.indexOf(prefix);
+    const at = source.indexOf(prefix);
     if (at < 0) return null;
-    const end = header.indexOf(
+    const end = source.indexOf(
         '"', at + prefix.length,
     );
     if (end < 0) return null;
-    return header.slice(at + prefix.length, end);
+    return source.slice(at + prefix.length, end);
 }
 
 // The refresh cookie the door set, from the answer's
@@ -125,13 +134,7 @@ export async function postPasswordLogin(
         return null;
     }
     if (authorizeRefusal !== null) throw authorizeRefusal;
-    const code = authParam(
-        authorized.query('header.authentication-info').exists()
-            ? authorized.query('header.authentication-info')
-                .toText()
-            : null,
-        'code',
-    );
+    const code = authParam(authorized, 'code');
     if (code === null) {
         throw new Error(
             'authentication-info lacks code',
@@ -152,12 +155,7 @@ export async function postPasswordLogin(
         return null;
     }
     if (grantRefusal !== null) throw grantRefusal;
-    const accessToken = authParam(
-        granted.query('header.authentication-info').exists()
-            ? granted.query('header.authentication-info').toText()
-            : null,
-        'access_token',
-    );
+    const accessToken = authParam(granted, 'access_token');
     if (accessToken === null) {
         throw new Error(
             'authentication-info lacks access_token',

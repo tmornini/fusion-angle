@@ -36,14 +36,7 @@ export async function probeRefreshSession(
             if (answered.query('status').toNumber() !== 200) {
                 return null;
             }
-            return authParam(
-                answered.query('header.authentication-info')
-                    .exists()
-                    ? answered.query('header.authentication-info')
-                        .toText()
-                    : null,
-                'access_token',
-            );
+            return authParam(answered, 'access_token');
         },
     );
     return access !== null;
