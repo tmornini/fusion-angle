@@ -1,5 +1,5 @@
 import { assert, assertStrictEquals } from '@std/assert';
-import { GET, PUT } from './in-page-facade.ts';
+import { GETCollection, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -48,9 +48,9 @@ Deno.test(
         assertStrictEquals(
             principalFromToken(token).id, 'alice',
         );
-        const seats = (await GET<{ id: string }[]>(
+        const seats = (await GETCollection<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-            operationIdHeader())).body().toValue();
+            operationIdHeader())).map((part) => part.body().toValue());
         assert(seats.some(s => s.id === 'alice'));
     },
 );

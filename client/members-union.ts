@@ -45,10 +45,10 @@ export async function getMembers(
     const [seats, agents] = await Promise.all([
         organization === undefined
             ? Promise.resolve([] as MembershipEntity[])
-            : ctx.GET<MembershipEntity[]>(
+            : ctx.GETCollection<MembershipEntity>(
                 'organizations/' + organization
                     + '/members/',
-            ).then(read => read.body().toValue()),
+            ).then(parts => parts.map((m) => m.body().toValue())),
         ctx.GETCollection<AIAgentEntity>('ai-agents/')
             .then(parts => parts.map((m) => m.body().toValue())),
     ]);

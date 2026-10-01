@@ -330,8 +330,9 @@ Deno.test('a recover context silently refreshes a dead access token',
     const ctx = client.recoveringRequestContext(
         deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
-    const members = (await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
-        + 'members/')).body().toValue();
+    const members = (await ctx.GETCollection(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+    )).map(part => part.body().toValue());
     assert(Array.isArray(members));
 }));
 
@@ -352,8 +353,8 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     // both reads 401 in parallel; a second refresh would be
     // branded reuse and revoke the fresh chain
     const [members, organizations] = await Promise.all([
-        ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
-            .then(read => read.body().toValue()),
+        ctx.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
+            .then(parts => parts.map(part => part.body().toValue())),
         ctx.GETCollection(
             'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         ).then(parts => parts.map(part => part.body().toValue())),
@@ -389,8 +390,9 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
     const ctx = client.recoveringRequestContext(
         seed);
     // recovery re-installs the live token, re-scopes, and retries
-    const members = (await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
-        + 'members/')).body().toValue();
+    const members = (await ctx.GETCollection(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+    )).map(part => part.body().toValue());
     assert(Array.isArray(members));
     // the live session is preserved (not scrubbed) and now scoped
     assertNotStrictEquals(client.getSessionCredentials(), null);
@@ -614,8 +616,9 @@ Deno.test('a concurrent facade refresh and remint present'
         ),
     );
     const [members] = await Promise.all([
-        reader.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/').then(read => read.body().toValue()),
+        reader.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/'
+            + 'members/').then(parts =>
+            parts.map(part => part.body().toValue())),
         postInvitationAcceptance(
             acceptor, invitationId, ORGANIZATION_B,
         ),

@@ -32,7 +32,6 @@ const PARTED = [
     'organizations/:id/versions/:etag',
     'organizations/:id/work-orders/:id/history',
     'organizations/:organization-id/former-members/',
-    'organizations/:organization-id/members/',
     'organizations/:organization-id/members/:identity-id'
         + '/versions/',
     'organizations/:organization-id/members/:identity-id'

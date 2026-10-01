@@ -94,9 +94,10 @@ async () => {
     const creds = await postPasswordLogin(
         ctx, 'demo@example.com', 's3cret');
     assert(creds);
-    assert(Array.isArray(
-        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken, operationIdHeader())).body().toValue()));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        creds.accessToken, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('postPasswordLogin issues a 30-day refresh token',

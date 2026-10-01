@@ -680,3 +680,53 @@ async () => {
     assertStrictEquals(await got.text(), '');
     assertMatch(got.headers.get('date')!, /GMT$/);
 });
+
+const MEMBERS = ORGANIZATION + '/members/';
+
+Deno.test(MEMBERS + ' serves its seat heads as parts, each'
+    + ' its document GET', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: MEMBERS, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    assertMatch(
+        got.headers.get('content-type')!,
+        /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+    );
+    assertStrictEquals(got.headers.get('etag'), null);
+    const parts = await partsOf<{ identity_id: string }>(got);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    for (const part of parts) {
+        await assertPartIsDocumentGet(
+            db, token, part,
+            MEMBERS + part.body().toValue().identity_id,
+        );
+    }
+});
+
+Deno.test('a removed seat is no part of its roster',
+async () => {
+    const db = await seededMockDb();
+    const id = generateIdentifier();
+    await seedSeat(db, STARK, id, 'member');
+    const token = await organizationToken();
+    const seatedOf = async (): Promise<string[]> => {
+        const parts = await partsOf<{ identity_id: string }>(
+            await handleRequest(db, apiRequest({
+                method: 'GET', path: MEMBERS, token,
+            })),
+        );
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        return parts
+            .map((part) => part.body().toValue().identity_id)
+            .filter((seated) => seated === id);
+    };
+    assertEquals(await seatedOf(), [id]);
+    const removed = await handleRequest(db, apiRequest({
+        method: 'DELETE', path: MEMBERS + id, token,
+    }));
+    assertStrictEquals(removed.status, 204);
+    assertEquals(await seatedOf(), []);
+});

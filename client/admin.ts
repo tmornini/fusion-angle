@@ -4,6 +4,7 @@ import {
     type OrganizationEntity,
     type MembershipEntity,
 } from '../shared/types.ts';
+import { compareIdentifiers } from '../shared/identifier.ts';
 import {
     getOrganization as fetchOrganization,
     putOrganization,
@@ -33,10 +34,15 @@ export async function getOrganizationSeats(
     if (organization === undefined) {
         return [];
     }
-    return (await ctx.GET<MembershipEntity[]>(
+    // The roster serves in write order; its readers take the
+    // seats in grant order.
+    return (await ctx.GETCollection<MembershipEntity>(
         'organizations/' + organization
             + '/members/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue())
+        .sort((a, b) => a.at < b.at ? -1
+            : a.at > b.at ? 1
+                : compareIdentifiers(a.id, b.id));
 }
 
 export interface OrganizationStats {

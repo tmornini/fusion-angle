@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, PUT } from './in-page-facade.ts';
+import { GET, GETCollection, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -70,9 +70,9 @@ Deno.test(
             operationIdHeader())).body().toValue();
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');
-        const seats = (await GET<{ id: string }[]>(
+        const seats = (await GETCollection<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-            operationIdHeader())).body().toValue();
+            operationIdHeader())).map((part) => part.body().toValue());
         assert(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
     },
 );

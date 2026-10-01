@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
-    inPageContext, GET, GETCollection,
+    inPageContext, GETCollection,
 } from './in-page-facade.ts';
 import {
     getOrganizations,
@@ -56,13 +56,13 @@ async () => {
         , 'BBjWJsjYIDkTRKIIPrzWRw');
 
     const membersA = idsOf(
-        (await GET<{ id: string }[]>(
+        (await GETCollection<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tokA,
-                operationIdHeader())).body().toValue());
+                operationIdHeader())).map((m) => m.body().toValue()));
     const membersB = idsOf(
-        (await GET<{ id: string }[]>(
+        (await GETCollection<{ id: string }>(
             db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw/members/', tokB,
-                operationIdHeader())).body().toValue());
+                operationIdHeader())).map((m) => m.body().toValue()));
     const ideasA = idsOf(
         (await GETCollection<{ id: string }>(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA,

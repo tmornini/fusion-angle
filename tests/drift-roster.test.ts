@@ -30,8 +30,10 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
     partBodiesOf,
+    partsOf,
     invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -160,8 +162,10 @@ async () => {
     const stark = await deriveOrganizationMemberSeats(
         db, STARK_ORGANIZATION,
     );
+    const starkParts = await partsOf<MembershipEntity>(resStark);
+    await assertPartsAreHeads(db, starkParts, { sees: 'whole' });
     assertEquals(
-        sortById(await resStark.json() as MembershipEntity[]),
+        sortById(starkParts.map((part) => part.body().toValue())),
         sortById(stark),
     );
     assertStrictEquals(stark.length, 6);
@@ -181,8 +185,10 @@ async () => {
     const org2 = await deriveOrganizationMemberSeats(
         db, ORGANIZATION_TWO,
     );
+    const twoParts = await partsOf<MembershipEntity>(resTwo);
+    await assertPartsAreHeads(db, twoParts, { sees: 'whole' });
     assertEquals(
-        sortById(await resTwo.json() as MembershipEntity[]),
+        sortById(twoParts.map((part) => part.body().toValue())),
         sortById(org2),
     );
     assertStrictEquals(org2.length, 6);
@@ -396,8 +402,10 @@ Deno.test('seat collection counts per org; current identity;'
         ),
     );
     assertStrictEquals(resStark.status, 200);
+    const rosterParts = await partsOf<MembershipEntity>(resStark);
+    await assertPartsAreHeads(db, rosterParts, { sees: 'whole' });
     assertEquals(
-        sortById(await resStark.json() as MembershipEntity[]),
+        sortById(rosterParts.map((part) => part.body().toValue())),
         sortById(starkRoster),
     );
 

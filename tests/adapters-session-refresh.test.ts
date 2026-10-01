@@ -1,4 +1,8 @@
-import { assert, assertNotStrictEquals, assertRejects } from '@std/assert';
+import {
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -152,9 +156,10 @@ async () => {
     const creds =
         await postSessionRefresh(ctx, pair.refresh_token);
     assertNotStrictEquals(creds.refreshToken, pair.refresh_token);
-    assert(Array.isArray(
-        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken, operationIdHeader())).body().toValue()));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        creds.accessToken, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('a garbage refresh token throws UnauthorizedError',

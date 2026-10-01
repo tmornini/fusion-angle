@@ -127,10 +127,10 @@ Deno.test(
         const humanId = generateIdentifier();
         await seedHumanMember(db, humanId, 'Sarah Chen');
         const members =
-            (await GET<{ id: string }[]>(
+            (await GETCollection<{ id: string }>(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
                 await organizationToken(), operationIdHeader()))
-                    .body().toValue();
+                    .map((part) => part.body().toValue());
         assert(
             members.some(row => row.id === humanId),
         );

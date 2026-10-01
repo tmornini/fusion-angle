@@ -443,10 +443,10 @@ async () => {
         undefined,
     );
     // the minted access token passes the SP-3 gate
-    const rows = (await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', body.access_token, operationIdHeader())).body().toValue();
-    assert(Array.isArray(rows));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        body.access_token, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('replaying a consumed code is a 401 no-op', async () => {
@@ -651,11 +651,10 @@ async () => {
     assert(typeof body['access_token'] === 'string');
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
-    assert(Array.isArray(
-        (await GET(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
-            body['access_token'] as string,
-            operationIdHeader())).body().toValue()));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        body['access_token'] as string, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test(
@@ -714,9 +713,10 @@ Deno.test('refresh rotates to a new pair', async () => {
     };
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
-    assert(Array.isArray(
-        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , pair2.access_token, operationIdHeader())).body().toValue()));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        pair2.access_token, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('replaying a rotated refresh token revokes the chain',
@@ -851,9 +851,10 @@ async () => {
     assertStrictEquals(claims.sub, 'XXZruirZyAOoRpNxaDnpSA');
     assertStrictEquals(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
     // the delegated token passes the gate (current = admin)
-    assert(Array.isArray(
-        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token, operationIdHeader())).body().toValue()));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        body.access_token, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('token-exchange 201 has no refresh Set-Cookie',
@@ -1040,9 +1041,10 @@ Deno.test('client_credentials issues a gate-valid token', async () => {
     }));
     assertStrictEquals(res.status, 200);
     const body = await presentedFields(res) as { access_token: string };
-    assert(Array.isArray(
-        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token, operationIdHeader())).body().toValue()));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        body.access_token, operationIdHeader(),
+    )).query('status').toNumber(), 200);
     assertNotStrictEquals(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );

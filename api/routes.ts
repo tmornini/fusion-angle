@@ -5316,11 +5316,13 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
             ),
     }),
+    // The roster serves in write order; a reader that wants
+    // grant order sorts the seat bodies by `at`.
     route(ORGANIZATION_MEMBERS_COLLECTION_PATTERN, {
-        get: (db, _p, _actor, organization) =>
-            deriveOrganizationMemberSeats(
-                db, requireOrganization(organization),
-            ),
+        select: (db, _p, _actor, organization) => selectHeadsAtPath(
+            db, seatsPrefixFor(requireOrganization(organization)),
+            'stateless',
+        ),
     }),
     route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
         select: (db, p, _actor, organization) => selectHeadAtPath(

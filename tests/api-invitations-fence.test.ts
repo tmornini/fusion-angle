@@ -22,6 +22,7 @@ import {
 import {
     apiRequest,
     invitationLatched,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -303,7 +304,7 @@ async function rosterIds(
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw')));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     return new Set(rows.map(r => r.id));
 }
 

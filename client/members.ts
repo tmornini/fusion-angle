@@ -12,6 +12,7 @@ import {
     nowUtc,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
+import { compareIdentifiers } from '../shared/identifier.ts';
 import { getMemberPii } from './identities.ts';
 import {
     createSubscriptionChannel,
@@ -73,11 +74,16 @@ function seatedHumanParent(
     return { id, type: 'human' };
 }
 
+// The roster serves in write order; the members page and
+// the palette's featured six read the seats in grant order.
 export function buildHumanMemberMap(
     seats: readonly MembershipEntity[],
 ): Map<MemberId, HumanMember> {
     const map = new Map<MemberId, HumanMember>();
-    for (const seat of seats) {
+    const granted = seats.toSorted((a, b) => a.at < b.at ? -1
+        : a.at > b.at ? 1
+            : compareIdentifiers(a.id, b.id));
+    for (const seat of granted) {
         map.set(
             seat.identity_id,
             new HumanMember(
@@ -93,9 +99,9 @@ export function buildHumanMemberMap(
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const seats = (await ctx.GET<MembershipEntity[]>(
+    const seats = (await ctx.GETCollection<MembershipEntity>(
         seatsCollection(ctx),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     const map = buildHumanMemberMap(seats);
     const filled = await Promise.all(
         [...map.entries()].map(async ([id]) => {
@@ -242,9 +248,9 @@ export async function deleteHumanMemberSeat(
 export async function getAdminSeatIds(
     ctx: RequestContext,
 ): Promise<MemberId[]> {
-    const seats = (await ctx.GET<MembershipEntity[]>(
+    const seats = (await ctx.GETCollection<MembershipEntity>(
         seatsCollection(ctx),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     return seats
         .filter(seat => seat.type === 'admin')
         .map(seat => seat.identity_id);

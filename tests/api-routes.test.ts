@@ -1,9 +1,5 @@
-import {
-    assert,
-    assertEquals,
-    assertStrictEquals,
-} from '@std/assert';
-import { GET, GETCollection } from './in-page-facade.ts';
+import { assertEquals, assertStrictEquals } from '@std/assert';
+import { GETCollection } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -50,14 +46,6 @@ const SERVED_COLLECTIONS: readonly string[] = [
     'organizations/' + STARK + '/projects/'
         + ANY_ID + '/objective-actual-scores/',
 ];
-// The collections still answering handler JSON.
-const PARTED_COLLECTIONS: readonly string[] = [
-    'organizations/' + STARK + '/members/',
-    // GET states/:id/field-values RETIRED (C4); field values
-    // fold on work-orders/:id/history.
-    // Bulk lifecycle collection RETIRED (states-URI
-    // elimination C3).
-];
 
 for (const route of SERVED_COLLECTIONS) {
     Deno.test(
@@ -73,24 +61,21 @@ for (const route of SERVED_COLLECTIONS) {
     );
 }
 
-for (const route of PARTED_COLLECTIONS) {
-    Deno.test(
-        `GET ${route} returns an array on an empty`
-        + ` db`,
-        async () => {
-            const db = memoryDbAdapter();
-            await seedAdminSchema(db);
-            const rows =
-                (await GET<unknown[]>(
-                    db, route, await devToken(), operationIdHeader()))
-                        .body().toValue();
-            assert(
-                Array.isArray(rows),
-                route + ' should return an array',
-            );
-        },
-    );
-}
+// The admin seat seedAdminSchema writes is the roster's one
+// part.
+Deno.test(
+    'GET organizations/' + STARK + '/members/ serves the'
+    + ' admin seat on an empty db',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const parts = await GETCollection(
+            db, 'organizations/' + STARK + '/members/',
+            await devToken(), operationIdHeader(),
+        );
+        assertStrictEquals(parts.length, 1);
+    },
+);
 
 // Enumeration lives on the identity nest. A
 // SINGLE-organization caller sees only their own
