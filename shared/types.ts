@@ -139,19 +139,15 @@ export const OBJECTIVE_STATES = [
 export type ObjectiveState =
     typeof OBJECTIVE_STATES[number];
 
-// The invitation lifecycle, derived from the invitation
-// document's own PUT history (never a states log —
-// deriveInvitationStates, derive-states.ts). Grant (admin)
-// PUTs 'pending'; the invitee PUTs 'accepted' (which writes
-// the membership) or 'declined'; the admin PUTs 'revoked' to
-// cancel a pending invite. Current status = the head's
-// state — derive, never mutate. No 'deleted': an invitation
-// persists as audit.
+// pending: an offer. accepted: holds a seat. declined: the
+// invitee said no. revoked: an offer withdrawn before
+// acceptance. removed: a seat taken away. None is deleted.
 export const INVITATION_STATES = [
     'pending',
     'accepted',
     'declined',
     'revoked',
+    'removed',
 ] as const;
 
 export type InvitationState =
