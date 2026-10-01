@@ -13,6 +13,7 @@ import {
     decodeIdentifier,
     isIdentifier,
     compareIdentifiers,
+    byAtThenIdAscending,
 } from '../shared/identifier.ts';
 
 const FINALS = new Set(['A', 'Q', 'g', 'w']);
@@ -150,4 +151,25 @@ Deno.test('6-bit symbols are uniform', () => {
             `Char "${ch}" appeared ${count}, expected ~`
             + expected.toFixed(0));
     }
+});
+
+Deno.test('byAtThenIdAscending orders by at, then by id', () => {
+    const low = NIL_IDENTIFIER;
+    const high = 'BAAAAAAAAAAAAAAAAAAAAA';
+    const earlier = '2026-01-01T00:00:00.000000Z';
+    const later = '2026-01-01T00:00:00.000001Z';
+    assertEquals(
+        [
+            { at: earlier, id: high },
+            { at: earlier, id: low },
+        ].sort(byAtThenIdAscending).map((row) => row.id),
+        [low, high],
+    );
+    assertEquals(
+        [
+            { at: later, id: low },
+            { at: earlier, id: high },
+        ].sort(byAtThenIdAscending).map((row) => row.at),
+        [earlier, later],
+    );
 });

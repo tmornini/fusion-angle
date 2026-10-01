@@ -101,3 +101,14 @@ export function compareIdentifiers(
     }
     return 0;
 }
+
+// Every stored `at` is zulu at one fixed width (the
+// validators admit no other), so string order is instant
+// order; a tie falls to the id, which makes the order total.
+export function byAtThenIdAscending<
+    T extends { at: string; id: string },
+>(a: T, b: T): number {
+    return a.at < b.at ? -1
+        : a.at > b.at ? 1
+            : compareIdentifiers(a.id, b.id);
+}
