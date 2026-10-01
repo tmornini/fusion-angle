@@ -1,5 +1,6 @@
 // Minimal DOM stubs so redirectToLogin (getPageName reads
-// data-page; navigateTo sets window.location.href) runs in Node.
+// data-page; navigateTo sets window.location.href) runs under
+// Deno.
 // @ts-expect-error — Node global stub
 globalThis.window = { location: { href: '', search: '' } };
 globalThis.document = {

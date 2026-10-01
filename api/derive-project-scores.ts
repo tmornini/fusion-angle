@@ -22,11 +22,12 @@ import {
 // /projects/{id}/objective-actual-scores/, written by a live
 // standalone PUT at either leaf AND by the idea-conversion
 // bundle's per-baseline synthesized pairs (routes.ts's
-// route('ideas/:id/conversion', ...)). The GENERIC entity/
-// collection handlers serve only a FAMILY-ROOTED prefix
-// (research finding 10), never a project-nested one, so both
-// leaves need this bespoke module, exactly as flow_records
-// needed its own.
+// route('ideas/:id/conversion', ...)). Both collection GETs
+// serve the stored heads at their prefix through
+// selectHeadsAtPath (api/head-reads.ts); the two derivations
+// stay for their test callers (Interpretation V), and
+// routes.ts still calls the prefix and entity-of helpers for
+// the writes.
 //
 // Neither leaf carries a lifecycle, a DELETE, or a by-id GET
 // route (only the bare collection GET is live at each document;
@@ -85,12 +86,12 @@ async function fetchScoreDocuments(
 }
 
 // id-lex ordered (byIdAscending — the derivation's own
-// order, never the backend's). GET projects/:id/objective-
-// baseline-scores/ serves the stored heads at this prefix
-// (spec §1 B): the SERVER already filters by the parent
-// project through this derivation's own nested prefix, so
-// the org fence and the parent scope are both closed by the
-// document alone.
+// order, never the backend's). The route no longer calls
+// this: GET projects/:id/objective-baseline-scores/ serves
+// the stored heads at this prefix through selectHeadsAtPath,
+// and this derivation stays for its test callers
+// (Interpretation V). The parent scope is still the prefix
+// alone.
 export async function deriveBaselineScores(
     db: DbAdapter,
     organization: Id,

@@ -16,17 +16,16 @@ import {
 // records.ts): one prefix scan per parent objective, at the
 // nested document a live genesis create (POST /objectives, the
 // synthesized revision pair) and a live PUT objectives/:id/
-// revisions/:rid (a fresh revision) both write. The GENERIC
-// entity/collection handlers (documentGetHandler/document
-// CollectionGetHandler, api/document-family.ts) serve only the
-// FAMILY-ROOTED objectives/ prefix — OBJECTIVES_WIRING IS that
-// derivation — so this nested sub-resource needs its own bespoke
-// module, exactly as flow_records did (research finding 10:
-// param() throws on '', and documentMessagePairsAt
-// matches path by EQUALITY, so a revision pair
-// at .../objectives/{id}/
-// revisions/ can never leak into the objectives-collection
-// derivation, or vice versa).
+// revisions/:rid (a fresh revision) both write. GET
+// objectives/:id/revisions/ serves the stored heads at this
+// prefix through selectHeadsAtPath (api/head-reads.ts); this
+// derivation stays for its test callers (Interpretation V),
+// and routes.ts still calls the prefix and entity-of helpers
+// for the writes (research finding 10: param() throws on '',
+// and documentMessagePairsAt matches path by EQUALITY, so a
+// revision pair at .../objectives/{id}/revisions/ can never
+// leak into the objectives-collection derivation, or vice
+// versa).
 //
 // Revisions carry NO lifecycle of their own — there is no
 // revision-level state, no DELETE at this document, and no by-id
@@ -71,14 +70,13 @@ export function objectiveRevisionEntityOf(
 }
 
 // id-lex ordered (byIdAscending — the derivation's own
-// order, never the backend's). GET objectives/:id/revisions/
-// serves the stored heads at this prefix (spec §1 B): the
-// SERVER already filters by the parent objective through this
-// derivation's own nested prefix, so the org fence and the
-// parent scope are both closed by the document alone — no
-// foreign-parent row can ever surface (a foreign organization or
-// a foreign objective id yields a distinct, empty prefix, never
-// a filtered-out row).
+// order, never the backend's). The route no longer calls
+// this: GET objectives/:id/revisions/ serves the stored heads
+// at this prefix through selectHeadsAtPath, and this
+// derivation stays for its test callers (Interpretation V).
+// The parent scope is still the prefix alone — a foreign
+// organization or a foreign objective id yields a distinct,
+// empty prefix, never a filtered-out row.
 export async function deriveObjectiveRevisions(
     db: DbAdapter,
     organization: Id,

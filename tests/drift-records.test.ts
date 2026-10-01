@@ -1103,8 +1103,8 @@ async () => {
 
 // -- 9. non-lex collection order (craftsmanship) -----------------
 
-Deno.test('GET /records collection is wire byte-identical to a'
-+ ' literal id-lex reconstruction after non-lex PUTs',
+Deno.test('GET /record-types/ serves non-lex PUTs in (at, id)'
++ ' order, each part its head, and equals the derive',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();

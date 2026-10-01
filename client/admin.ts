@@ -34,8 +34,10 @@ export async function getOrganizationSeats(
     if (organization === undefined) {
         return [];
     }
-    // The roster serves in write order; its readers take the
-    // seats in grant order.
+    // The roster serves in write order; the seats read in
+    // grant order, the one order a seat list has (see
+    // buildHumanMemberMap), though today's readers only
+    // count them.
     return (await ctx.GETCollection<MembershipEntity>(
         'organizations/' + organization
             + '/members/',
