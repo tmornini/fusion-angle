@@ -1,4 +1,4 @@
-import { assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -10,6 +10,7 @@ import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
+    getOrganizationSeats,
     getOrganizationStats,
 } from '../client/admin.ts';
 import { getOrganization } from '../web-app/app/organization-view.ts';
@@ -29,6 +30,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { deleteHumanMemberSeat } from
     '../client/members.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 function buildProject(
     id: string,
@@ -265,3 +267,24 @@ Deno.test(
         assertStrictEquals(stats.activePeopleCount, 1);
     },
 );
+
+Deno.test('getOrganizationSeats lists the seats in grant order',
+async () => {
+    const { db, ctx } = await adminContext();
+    const later = generateIdentifier();
+    const earlier = generateIdentifier();
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', later, 'member',
+        '2026-01-02T00:00:00.000000Z',
+    );
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', earlier, 'member',
+        '2026-01-01T00:00:00.000000Z',
+    );
+    assertEquals(
+        (await getOrganizationSeats(ctx))
+            .map((seat) => seat.identity_id)
+            .filter((id) => id === earlier || id === later),
+        [earlier, later],
+    );
+});

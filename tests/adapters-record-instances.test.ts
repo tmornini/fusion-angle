@@ -34,8 +34,10 @@ import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 // Adapter instances surface (Task 21): create → list →
 // patch(with etag) → 412-on-stale → re-read → retry →
@@ -265,3 +267,19 @@ Deno.test(
         assertNotMatch(src, /64-hex/);
     },
 );
+
+Deno.test('getRecordInstances lists instances by id, not by write',
+async () => {
+    const { ctx } = await seededCtx();
+    const [low, high] = [generateIdentifier(), generateIdentifier()]
+        .sort(compareIdentifiers) as [string, string];
+    for (const id of [high, low]) {
+        await putRecordInstance(ctx(), TYPE_ID, id, [
+            { attributeId: ATTR_ID, value: 'v-' + id },
+        ]);
+    }
+    assertEquals(
+        (await getRecordInstances(ctx(), TYPE_ID)).map((r) => r.id),
+        [low, high],
+    );
+});

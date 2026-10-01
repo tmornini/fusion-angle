@@ -8,8 +8,10 @@ import {
     putOrganization,
 } from '../client/organizations.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 Deno.test('putOrganization then getOrganization round-trips',
 async () => {
@@ -58,4 +60,24 @@ async () => {
     const organizations = await getOrganizations(ctx);
     assertEquals(organizations.map(o => o.id)
         , ['AjdvjuECVZEgZoFajaIEkg']);
+});
+
+Deno.test('getOrganizations lists the seats by id, not by write',
+async () => {
+    const { db, ctx } = await adminContext();
+    const [low, high] = [generateIdentifier(), generateIdentifier()]
+        .sort(compareIdentifiers) as [string, string];
+    for (const id of [high, low]) {
+        await putOrganization(ctx, id, organizationRow('O-' + id));
+        await seedMembershipPair(
+            db, generateIdentifier(), id, 'XXZruirZyAOoRpNxaDnpSA',
+            '2026-06-04T00:00:00.000000Z',
+        );
+    }
+    assertEquals(
+        (await getOrganizations(ctx))
+            .map(o => o.id)
+            .filter(id => id === low || id === high),
+        [low, high],
+    );
 });

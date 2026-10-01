@@ -14,6 +14,7 @@ import {
     RequestError,
 } from '../shared/http-errors.ts';
 import {
+    buildHumanMemberMap,
     deleteHumanMemberSeat,
     featuredHumanMembers,
     getAdminSeatIds,
@@ -21,7 +22,10 @@ import {
     postHumanMemberCreation,
     type HumanMemberDraft,
 } from '../client/members.ts';
-import { type HumanMember } from '../shared/types.ts';
+import {
+    type HumanMember,
+    type MembershipEntity,
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -173,4 +177,22 @@ async () => {
         await getAdminSeatIds(ctx),
         ['XXZruirZyAOoRpNxaDnpSA'],
     );
+});
+
+Deno.test('buildHumanMemberMap takes the seats in grant order',
+() => {
+    const later = generateIdentifier();
+    const earlier = generateIdentifier();
+    const seat = (
+        identity: string, at: string,
+    ): MembershipEntity => ({
+        id: generateIdentifier(),
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: identity, type: 'member', at,
+    });
+    const map = buildHumanMemberMap([
+        seat(later, '2026-01-02T00:00:00.000000Z'),
+        seat(earlier, '2026-01-01T00:00:00.000000Z'),
+    ]);
+    assertEquals([...map.keys()], [earlier, later]);
 });

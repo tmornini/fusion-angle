@@ -1,4 +1,9 @@
-import { assert, assertStrictEquals, fail } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+    fail,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
@@ -215,4 +220,25 @@ async () => {
     const eventB = chain.events.find((e) => e.jti === b.jti);
     assertStrictEquals(eventA?.parentJti, root);
     assertStrictEquals(eventB?.parentJti, a.jti);
+});
+
+Deno.test('getTokenChainsFor orders a chain\'s events by at',
+async () => {
+    const { ctx } = await setup();
+    const identity = generateIdentifier();
+    const chain = generateIdentifier();
+    const tokens = 'identities/' + identity + '/tokens/';
+    const later = generateIdentifier();
+    const earlier = generateIdentifier();
+    await ctx.PUT(tokens + later, {
+        jti: later, identity_id: identity, action: 'issued',
+        chain_id: chain, at: '2026-01-02T00:00:00.000000Z',
+    });
+    await ctx.PUT(tokens + earlier, {
+        jti: earlier, identity_id: identity, action: 'issued',
+        chain_id: chain, at: '2026-01-01T00:00:00.000000Z',
+    });
+    const [only] = await getTokenChainsFor(ctx, identity);
+    assert(only, 'the chain is listed');
+    assertEquals(only.events.map((e) => e.jti), [earlier, later]);
 });
