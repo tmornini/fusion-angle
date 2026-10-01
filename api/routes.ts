@@ -115,7 +115,7 @@ import type {
 } from './message-pair.ts';
 import type { Reader } from './served-response.ts';
 import {
-    selectGlobalHead,
+    selectHeadAtPath,
     wholeHeadSelection,
     type HeadSelection,
 } from './head-reads.ts';
@@ -4019,7 +4019,7 @@ export const routes: Route[] = [
     // identity is the document — stamped on write, so the
     // stored head carries it.
     route('identities/:id/token-revocations/:rid', {
-        select: (db, p) => selectGlobalHead(
+        select: (db, p) => selectHeadAtPath(
             db, tokenRevocationsPrefixFor(param(p, 0)),
             param(p, 1), 'identity_token_revocations',
         ),
@@ -4070,7 +4070,7 @@ export const routes: Route[] = [
     // GET serves the stored head — 404 body unchanged. PUT
     // is PAIR-ONLY.
     route('identities/:id/tokens/:jti', {
-        select: (db, p) => selectGlobalHead(
+        select: (db, p) => selectHeadAtPath(
             db, tokensPrefixFor(param(p, 0)), param(p, 1),
             IDENTITY_TOKENS_TABLE,
         ),
@@ -4179,7 +4179,7 @@ export const routes: Route[] = [
             deriveIdentityProvidersFor(db, param(p, 0)),
     }),
     route('identities/:id/providers/:eid', {
-        select: (db, p) => selectGlobalHead(
+        select: (db, p) => selectHeadAtPath(
             db, providersPrefixFor(param(p, 0)), param(p, 1),
             'identity_providers',
         ),
@@ -5276,7 +5276,7 @@ export const routes: Route[] = [
     // successBody forms the stored bytes via
     // organizationEntityOf; GET serves them as stored.
     route('organizations/:id', {
-        select: (db, p) => selectGlobalHead(
+        select: (db, p) => selectHeadAtPath(
             db, canonicalPath(undefined, '/organizations/'),
             param(p, 0), 'organizations',
         ),
@@ -5366,7 +5366,7 @@ export const routes: Route[] = [
             ),
     }),
     route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-        select: (db, p, _actor, organization) => selectGlobalHead(
+        select: (db, p, _actor, organization) => selectHeadAtPath(
             db, seatsPrefixFor(requireOrganization(organization)),
             param(p, 1), 'organization_members',
         ),

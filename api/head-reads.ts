@@ -43,7 +43,7 @@ export function wholeHeadSelection(
 
 // A stateless head at a prefix the gate has already fenced:
 // its miss is plain absence, with no owner to probe.
-export async function selectGlobalHead(
+export async function selectHeadAtPath(
     db: DbAdapter,
     prefix: string,
     name: string,
