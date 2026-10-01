@@ -409,18 +409,18 @@ skew tests, which went with item 8's trio.
    token pairs, or a 401 with its refresh, its exchange,
    and its resend, read as one operation in the ledger and
    in the logs, which carry both ids. The gate requires it
-   on every request but `/status` (item 4): today it skips
-   reads and the two bearer-exempt routes
-   (`requireOperationId`, `api/message-pair.ts:156-189`),
-   and a side channel reads it `?? ''`
-   (`api/api.ts:1634-1636`). It stops naming one write,
-   and one reader depended on that: the join from a PATCH
-   pair to its revision (`revisionMessagePairIdForPatch`,
-   `api/api.ts:309-328`), there only to attach the
-   revision's ETag — its replay caller (`api/api.ts:981`)
-   leaves with the dedupe, and its other caller
-   (`api/api.ts:1746`) leaves when item 1 lands both pairs
-   in one statement, the handler having minted both ids.
+   on every request but `/status` (item 4); today it
+   requires it on every request, reads and the two
+   bearer-exempt routes included (`api/api.ts:403-417`),
+   and two handler calls read it `?? ''`
+   (`api/api.ts:975-977`, `:1265-1267`). It stops naming
+   one write, and no reader depends on that: an instance
+   PATCH lands its received pair and its revision in one
+   statement (`postInstancePatchOp`, `api/routes.ts:3521`,
+   through `runStateWrite`), and its answer's ETag names
+   the revision from that statement (`receivedEtag`,
+   `api/message-pair.ts:1063`), not from a join on
+   `operation-id`.
    It serves no idempotency: nothing looks a request up by
    it. Three client call sites send no id at all, each a
    raw `fetch` of `POST authentication/token` with
@@ -462,119 +462,22 @@ skew tests, which went with item 8's trio.
    nothing re-fills `supersedes` around a stale body,
    which would drop the winner's change, and only the
    blind PUT retries on the server, since it derives
-   nothing. Every unit a client reads carries its `etag`,
-   so the client always holds the latch. Flows keep their
-   event walk until item 11. A read
-   hands out the stored
-   response whole, and a DELETE head answers a document
-   GET 404 and yields no part, as today's head read and
-   `WHERE method = 'PUT'` already do
-   (`api/backend-postgres.ts:493-517`, `:544`): a
-   document GET is the
-   stored bytes with
-   three substitutions — the status line (201 → 200),
-   `date`, and `request-id`, the lines that describe this
-   transmission; `etag`, `content-type`, the body, and the
-   `operation-id` of the write that made the state stay —
-   made by ONE function on the head, the body
-   bytes untouched but for one projection: a document
-   whose fields carry read roles
-   (`api/attribute-acl.ts:33`) is served with the fields
-   this reader may read, by that same function, the
-   only place a body is ever transformed, and every
-   projection of one head carries the head's `etag`,
-   which names the state the client acted on — what
-   `If-Match` needs — and is safe under `no-store`;
-   a collection GET is `multipart/mixed`,
-   each part an `application/http; msgtype=response` unit
-   with the same three substitutions and the same
-   projection, so one head is one
-   unit from either source. The boundary is a fresh
-   UUID minted per response — 36 characters of
-   RFC 2046 §5.1.1's alphabet, under its 70 — so a part
-   holds it only by chance, one in 2^122 at a position,
-   which no joiner scans for, and the joiner and the
-   splitter live
-   in `shared/http-message`, beside the parser every
-   part goes through: one library for both sides, and
-   the client's only dependency outside its own
-   directory. Measured on the
-   mock data against today's arrays of bare bodies, a part
-   costs 293 bytes, 215 of them the stored response's own
-   lines: lists grow 33% in all — a tenth for large
-   documents (flows, work orders), while most small ones
-   double or triple — and gzipped, which nothing at the
-   origin does today, they double, because each part's
-   three ids do not compress. A JSON array of the same
-   bytes as strings measured larger (38%), and a rebuilt
-   JSON form is a second representation, so multipart
-   stands. A before-and-after
-   `./bin/measure --record --visualize` run on the
-   list-heavy pages adds both sets of numbers to the
-   history, gating nothing. A collection's heads come
-   from a skip walk of `fa_message_pairs_document` — a
-   recursive query that asks the index for the next name
-   after the last, then one head read per name — one
-   probe per document, where today's `DISTINCT ON`
-   (`api/backend-postgres.ts:523-547`) reads every entry
-   at the path, so its cost is every version of every
-   document there. The walked heads are then sorted by
-   `response_at, id`, the order today's read serves
-   (`api/backend-postgres.ts:545`) — a small set — so the
-   contract and the memory backend stay as they are.
-   Measured on 18.6, owner on the bare
-   table, 300-byte responses, medians of seven: 200
-   documents at 10 / 250 / 2,500 versions read 0.51 /
-   30.63 / 130.71 ms today and 1.11 / 1.43 / 1.93 ms by
-   the walk, 2.15 ms through item 2's fence; the walk
-   loses where documents are many and shallow — 10,000
-   of one version, 4.54 ms today against 39.48 — and
-   breaks even near 15 to 20 versions a document, a
-   depth documents are expected to pass. Both reads use
-   the index item 0 freezes; `EXPLAIN` pins the plan and
-   the memory backend is untouched. The API client keeps
-   each
-   response whole, and pages and presenters read from the
-   unit they were given; the packageable client closes
-   in this rebuild, since the rebuild touches every file
-   its three couplings name: `web-app/app/adapters/` is
-   the client in all but boundary — one transport facade
-   (`http-facade.ts`), a `RequestContext` passed first
-   (`shared.ts`), per-noun adapters named by HTTP verb,
-   57 files and about 10,000 lines — and it imports the
-   server (37 files reach into `api/` for types, errors,
-   and header names — `OPERATION_ID_HEADER` from
-   `api/message-pair.ts`, `REQUEST_ID_HEADER` from
-   `api/request-context.ts`, `MissingTableError` from
-   `api/db.ts` — so the wire contract moves to
-   `shared/`, which never imports `api/`), imports the
-   app (25 files reach into `web-app/app/` — the facade
-   navigates to the login page on a failed refresh
-   (`web-app/app/adapters/http-facade.ts:286-292`), and
-   `shared.ts` redirects, logs, and records page request
-   profiles — so navigation, logging, and profiling are
-   handed in at construction), and holds a singleton
-   (`facade-holder.ts` keeps one module-level facade, so
-   two origins or two sessions cannot coexist; the
-   facade becomes an instance its caller owns); the
-   barrel (`web-app/app/adapters/index.ts`) re-exports
-   API nouns beside clipboard, viewport, location, and
-   resize-observer adapters, and the client's barrel
-   exports the client alone; three raw fetches bypass
-   the facade (item 0's rides-along names them), and
-   auth recovery lives at two layers (the retries
-   bullet on the critical functionality path); the
-   rebuilt client imports nothing from `api/` or the
-   app, and its oracle is a test that walks the client
-   entry point's import graph and finds no module
-   outside the client's directory and `shared/`.
+   nothing. Flows keep their event walk until item 11.
+   Head reads landed
+   (`docs/superpowers/specs/2026-09-30-head-reads-design.md`):
+   43 GET routes serve stored responses; thirty stay
+   parted under `tests/parted-reads.test.ts`. Two specs
+   follow: version and history reads, the four
+   invitation reads, and `former-members/` (the fourth);
+   work-order events (the fifth). The covenant lands
+   with the spec that empties the census — the fourth,
+   or the fifth if `…/work-orders/:id/history` waits for
+   it (spec §1 D, `## For the next brainstorms`).
    ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
-   and today the facade's `GETWithEtag`, `PUTWithEtag`,
-   and `PATCHWithEtag` and `unwrapResponse` part every
-   response
-   (`web-app/app/adapters/http-facade.ts:32,44,58,80`). Its
+   and today thirty GET routes still answer handler JSON
+   (`tests/parted-reads.test.ts`). Its
    approved wording: "The API, the client, and the
    application treat a response — status line, headers,
    and body — as one unit. A stored response is a
@@ -601,21 +504,7 @@ skew tests, which went with item 8's trio.
    unit they were given. The application derives from
    `response` only, never from `request`." The landing
    commit adds the file references: the one read function
-   and the client's splitter. API
-   tests pin the headers a read serves and the headers it
-   must not. Today: a work-order operation answers the
-   work order's version, which the head's response
-   stores whole (`api/work-order-version.ts`), and
-   derivation reads no request body; a document GET
-   parses the stored response, keeps the body, and
-   rebuilds three headers, dropping `Operation-ID` on
-   purpose (`streamGetFromStored`,
-   `api/message-pair.ts:710-737`); a collection GET
-   dismantles every head into an array of bodies
-   (`entitiesOf`, `api/message-store.ts:59-68`); and the
-   client receives bare JSON. Merged: the API client,
-   packageable (the critical functionality path), which
-   keeps its oracle. Follows item 0.
+   and the client's splitter. Follows item 0.
    Work-order events become a sub-collection of an
    immutable document type. State by PUT keeps each
    version's own lifecycle events inside the work-order
@@ -1156,13 +1045,16 @@ skew tests, which went with item 8's trio.
     `viewBox` mutation at four method sites
     (`web-app/app/presenters/flow-designer.ts:537-538,
     556-559, 1036-1039, 1066-1067`); `hasUndoHistory` as
-    `pairs > 1`
-    (`api/derive-flows.ts:108` — the client's
-    approximation, read by no route; the undo route
-    walks the stack itself and its bottom-of-stack 201
-    is the documented no-op, `api/types.ts:1082-1090`,
-    which TEST-PLAN F36/F45 call PASS — the brainstorm
-    decides whether that stays); rotation only on the
+    the designer's own `versions.length > 1`
+    (`web-app/app/flow-operations.ts:841`, over the
+    `…/flows/:id/versions/` read, `client/flow-queries.ts:
+    238` — the server no longer computes it; the undo
+    route resolves its target itself
+    (`resolveFlowUndoTarget`, `api/derive-flows.ts:291`)
+    and with no target writes the current body unchanged
+    (`api/routes.ts:1433-1435`), which TEST-PLAN F36/F45
+    call PASS — the brainstorm decides whether that
+    stays); rotation only on the
     toggle path (`web-app/app/flow-layout.ts:1032-1037`);
     the mirror trigger; and the canvas entries of the
     genericity bullet in `## Later work` (two zoom
@@ -1419,7 +1311,25 @@ Off the critical path; each with its oracle.
   transport — a rejection, a stall, a 429 with
   `Retry-After`, a 503, an HTML 502 — asserting the
   attempts, the delays, and that a POST with an unknown
-  outcome is never resent
+  outcome is never resent. Head reads hands this bullet
+  the 412 a latched save now answers and the errors that
+  carry their response (`RequestError.response`,
+  `shared/http-errors.ts`): a page that holds a message
+  and is refused keeps the stale head
+  (`web-app/ideas/detail.ts`, `web-app/ideas/index.ts`,
+  `web-app/projects/detail.ts`,
+  `web-app/projects/index.ts`,
+  `web-app/records/detail.ts`,
+  `web-app/records/index.ts`,
+  `web-app/organization/index.ts`,
+  `web-app/workbox/index.ts`, and the PII hop of
+  `putHumanMember` in `client/members.ts`), so every
+  retry refuses until a bell refetch or a reload; the
+  drag reorders surface nothing on a refusal (ideas,
+  projects, records, organization — workbox toasts); the
+  flow save's per-attempt read and `postFlowUndo`'s
+  read-on-412 are the model; and a held-item miss on a
+  drop also says nothing
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
@@ -1533,19 +1443,23 @@ Off the critical path; each with its oracle.
   record instance's id for good: the never-written latch
   makes tombstone-wins the statement's rule, and a
   retired instance's read, update, and re-create answer
-  410 Gone (RFC 9110 §15.5.11). Every other family
-  re-creates over its tombstone (the nil latch lands over
-  a DELETE head) and answers 404 after a delete. An id is
+  410 Gone (RFC 9110 §15.5.11). Reads are done: every
+  family's deleted document — a DELETE head, or a
+  state-`deleted` head in a lifecycle family — answers
+  410 on GET after the fence and is no part of a
+  collection. The write half stays open: every other
+  family re-creates over its tombstone (the nil latch
+  lands over a DELETE head). An id is
   an identity: reusing one lets a stale reference — a
   binding, an export, an audit line, a client's cache —
   name a different document, as two customers sharing an
   id would. Consider tombstone-wins, and so 410, for
-  every document. It costs re-creation by PUT for the
-  class A families and `If-None-Match: *` over a
+  every document's writes. It costs re-creation by PUT
+  for the class A families and `If-None-Match: *` over a
   tombstone for flows and work orders; the POST creates
   already mint fresh ids. Oracle: for each family,
-  create, DELETE, then GET answers 410 and a declared
-  create answers 410; a never-written id answers 404; a
+  create, DELETE, then a declared create answers 410, as
+  a GET already does; a never-written id answers 404; a
   foreign organization's retired document answers what
   its live one does; history and past versions still
   answer 200.
@@ -1723,16 +1637,6 @@ Off the critical path; each with its oracle.
   recovered vs `c50e849`) and is closed. Oracle: every
   live database has been wiped and reseeded after
   `66457197`
-- Drop leftover `/identity-providers/` dual-read.
-  Nested providers are the source of truth;
-  `deriveIdentityProvidersFor` still scans the retired
-  flat prefix so leftover seed pairs still join
-  (`api/derive-identity-spine.ts:228-301`). Exact-read
-  Decision 8 retired the invitation, PII, and token
-  dual-reads; this one remains. Cheap after the wipe
-  bullet. Oracle: that derive reads only
-  `/identities/<id>/providers/`, and a leftover flat
-  pair does not appear
 - XSS can use the refresh cookie from the page. The
   cookie is HttpOnly, SameSite=Strict, Path=
   `/api/authentication`, Secure
@@ -2766,12 +2670,15 @@ Off the critical path; each with its oracle.
   405 carries no `Allow` (`api/api.ts:2004-2013`) —
   RFC 9110 §9.1 requires GET and HEAD of a
   general-purpose server and §15.5.6 requires `Allow` on
-  a 405 — while `requireOperationId` already skips a
-  method never served (`api/message-pair.ts:163`). Add
-  `HEAD` to the API: once item 1 makes a document GET the
-  stored bytes with three substitutions, `HEAD` is that
-  function without the body. Conditional requests
-  (`If-None-Match` / `304`) stay open. Start:
+  a 405 — while the gate requires `operation-id` on
+  every request, a method never served included
+  (`api/api.ts:403-417`). Add
+  `HEAD` to the API: now that a document GET serves the
+  stored response with three substitutions
+  (`servedResponse`, `api/served-response.ts:62`; thirty
+  routes stay parted, `tests/parted-reads.test.ts`),
+  `HEAD` is that function without the body. Conditional
+  requests (`If-None-Match` / `304`) stay open. Start:
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
@@ -3080,6 +2987,27 @@ Off the critical path; each with its oracle.
   in `shared/`; the generator is a tool and may read
   the server. Oracle: an import-graph walk from every
   `PAGE_REGISTRY` entry finds no module under `api/`
+- The client hands the app three shapes. Head reads
+  made each raw row a message: a verb that read a wire
+  row answers `HttpMessage<Row>`, or an array of them
+  for a collection's parts. The five named values
+  (`Idea`, `Project`, `RecordModel`, `WorkOrder`,
+  `RecordInstance`) and the values a write latches
+  through (`HumanMember` by its `seat`, `MemberPii`
+  present, `ClientRegistration` registered, the app's
+  `Organization`, and `FlowGraph`) keep the message
+  they were built from. The aggregates and the
+  camelCase values nothing writes through — `AIMember`,
+  `Identity`, the roster, `RecordAttribute`,
+  `ObjectiveScore`, `ObjectiveRevision`,
+  `ProviderEvent`, `TokenChain`, the credential state,
+  `FlowSummary`, `FlowListItem`, `BoundFlowSummary`,
+  and the transition and claim projections — keep
+  their shapes and drop the responses they were built
+  from. Oracle: every client read verb returns a
+  message, an array of messages, or a value whose
+  `message` members name every response it was built
+  from
 - Comments name absent code. `appendMessagePairOnce`
   and `appendMessagePairAlways` left with the store's
   one statement, and the comments citing them stayed:

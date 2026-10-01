@@ -72,6 +72,7 @@ import { generateIdentifier } from
 import {
     getFlowGraph,
     getFlowVersions,
+    flowGraphOf,
     type FlowGraph,
 } from '../client/flow-queries.ts';
 import {
@@ -150,26 +151,16 @@ function buildGraph(
     nodes: GraphNode[],
     edges: GraphEdge[] = [],
 ): FlowGraph {
-    return {
-        message: responseMessage<FlowWithGraph>({
-            id: FLOW_ID,
-            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-            name: 'Test Flow',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: storedGraph({ nodes, edges }),
-        }),
+    return flowGraphOf(responseMessage<FlowWithGraph>({
         id: FLOW_ID,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         name: 'Test Flow',
-        isLocked: false,
-        isAutoLayout: true,
-        isAutoFit: true,
-        lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        nodes,
-        edges,
-    };
+        is_locked: false,
+        is_auto_layout: true,
+        is_auto_fit: true,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: storedGraph({ nodes, edges }),
+    }));
 }
 
 function buildFlowVersion(
@@ -1358,6 +1349,52 @@ Deno.test(
             sent.filter((r) => r.method === 'POST')
                 .map((r) => r.ifMatch),
             [held.message.query('header.etag').toText()],
+        );
+        assertEquals(
+            sent.findIndex((r) => r.method === 'POST'),
+            0,
+        );
+    }),
+);
+
+// A fast second undo latches the head the first one made,
+// without waiting for the bell's refetch (spec §9).
+Deno.test(
+    'a second undo latches the first\'s post-undo head',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await setupFlow();
+        await seedCurrentGraph(ctx, [buildNode(NODE_A)]);
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+        ]);
+        const currentNodes = [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+            buildNode(NODE_C),
+        ];
+        await seedCurrentGraph(ctx, currentNodes);
+        const snap = snapFrom(buildGraph(currentNodes));
+        const { ctx: recorded, sent } = recordedContext(
+            db, DEV_TOKEN,
+        );
+        const held = await getFlowGraph(recorded, FLOW_ID);
+        const first = await performUndo(
+            recorded, snap, buildFlowHistorySnapshot(true),
+            held.message,
+        );
+        assertStrictEquals(first.kind, 'ok');
+        if (first.kind !== 'ok') return;
+        sent.length = 0;
+        const second = await performUndo(
+            recorded, first.freshSnap, first.newHistory,
+            first.message,
+        );
+        assertStrictEquals(second.kind, 'ok');
+        assertEquals(
+            sent.filter((r) => r.method === 'POST')
+                .map((r) => r.ifMatch),
+            [first.message.query('header.etag').toText()],
         );
         assertEquals(
             sent.findIndex((r) => r.method === 'POST'),

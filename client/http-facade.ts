@@ -58,11 +58,11 @@ export interface HttpFacade {
         token: string,
         headerFields?: HeaderFields,
     ): Promise<HttpMessage<T>>;
-    DELETE(
+    DELETE<T = unknown>(
         resource: string,
         token: string,
         headerFields?: HeaderFields,
-    ): Promise<HttpMessage>;
+    ): Promise<HttpMessage<T>>;
     POSTUnauthenticated<T>(
         resource: string,
         payload: Record<string, unknown>,

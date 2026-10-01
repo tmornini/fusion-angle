@@ -58,6 +58,7 @@ import type {
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import { responseMessage } from './fixtures/response-message.ts';
+import { flowGraphOf } from '../client/flow-queries.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,
@@ -320,8 +321,8 @@ Deno.test(
                 toNodeId: endId,
             },
         ];
-        const mmd = generateMermaid({
-            message: responseMessage<FlowWithGraph>({
+        const mmd = generateMermaid(flowGraphOf(
+            responseMessage<FlowWithGraph>({
                 id: flowId,
                 organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 name: 'Lead',
@@ -331,15 +332,7 @@ Deno.test(
                 lock_timeout: DEFAULT_LOCK_TIMEOUT,
                 graph: storedGraph({ nodes, edges }),
             }),
-            id: flowId,
-            name: 'Lead',
-            isLocked: false,
-            isAutoLayout: false,
-            isAutoFit: false,
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            nodes,
-            edges,
-        });
+        ));
         await postFlowFromMermaid(
             ctx, flowId, mmd, generateIdentifier(),
         );

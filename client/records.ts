@@ -8,6 +8,7 @@ import type {
 import {
     RecordModel,
     assertRecordState,
+    documentFieldsOf,
 } from '../shared/types.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -191,7 +192,7 @@ export async function putRecord(
 ): Promise<HttpMessage<RecordEntity>> {
     const saved = await ctx.PUT<RecordEntity>(
         recordTypePath(ctx, held.body().toValue().id),
-        { ...document },
+        document,
         [held],
     );
     recordChanges.notify();
@@ -236,7 +237,7 @@ export async function postRecordChange(
     ctx: RequestContext,
     id: RecordId,
     change: RecordChange,
-): Promise<void> {
+): Promise<HttpMessage<RecordEntity>> {
     // The server stamps organization_id from the verified
     // token; this present-and-valid value only satisfies the
     // record-write body validator, which requires the column.
@@ -247,8 +248,9 @@ export async function postRecordChange(
     const attributes = change.attributes.map(a => ({
         ...a, organization_id: organization,
     }));
+    let saved: HttpMessage<RecordEntity>;
     if (change.kind === 'create') {
-        await ctx.POST(recordTypesPath(ctx), {
+        saved = await ctx.POST<RecordEntity>(recordTypesPath(ctx), {
             kind: 'create',
             id,
             record,
@@ -259,7 +261,7 @@ export async function postRecordChange(
         // The edit is an operation on the type: it names the
         // head the page holds, so a 412 surfaces as
         // RequestError.
-        await ctx.POST(recordTypesPath(ctx), {
+        saved = await ctx.POST<RecordEntity>(recordTypesPath(ctx), {
             kind: 'edit',
             id,
             record,
@@ -270,6 +272,7 @@ export async function postRecordChange(
         }, [change.held]);
     }
     recordChanges.notify();
+    return saved;
 }
 
 // A transition: composes the document PUT with a FRESH state
@@ -283,10 +286,7 @@ export async function postRecordStateChange(
     held: HttpMessage<RecordEntity>,
     state: RecordState,
 ): Promise<HttpMessage<RecordEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...fields
-    } = held.body().toValue();
-    return await putRecord(ctx, held, { ...fields, state });
+    return await putRecord(ctx, held, {
+        ...documentFieldsOf(held), state,
+    });
 }

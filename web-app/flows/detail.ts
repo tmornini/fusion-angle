@@ -352,6 +352,7 @@ async function handleUndo(): Promise<void> {
         return;
     }
     pageState.setHistory(op.newHistory);
+    pageState.setHeldFlow(op.message);
     commit(op.freshSnap);
     reconcileFitFromDom();
 }

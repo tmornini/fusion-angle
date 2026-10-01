@@ -161,7 +161,10 @@ export interface RequestContext {
         body: Record<string, unknown>,
         latch?: Latch,
     ): Promise<HttpMessage<T>>;
-    DELETE(resource: string, latch?: Latch): Promise<HttpMessage>;
+    DELETE<T = unknown>(
+        resource: string,
+        latch?: Latch,
+    ): Promise<HttpMessage<T>>;
     // Door POST. Token is always empty, so the session
     // bearer never rides the grant's authorization line.
     POSTUnauthenticated<T>(
@@ -300,11 +303,11 @@ function openRequestContext(
                     resource, body, tok, headers,
                 ));
         },
-        DELETE: (resource: string, latch?: Latch) => {
+        DELETE: <T = unknown>(resource: string, latch?: Latch) => {
             core.recordRequest('DELETE', resource);
             const headers = latchHeaders(latch);
-            return run<HttpMessage>(
-                tok => verbs.DELETE(
+            return run<HttpMessage<T>>(
+                tok => verbs.DELETE<T>(
                     resource, tok, headers,
                 ));
         },

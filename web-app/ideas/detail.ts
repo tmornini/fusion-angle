@@ -36,6 +36,7 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import type { IdeaEntity } from '../../shared/types.ts';
+import { documentFieldsOf } from '../../shared/types.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
 
@@ -355,16 +356,11 @@ async function handleSave(): Promise<void> {
         state.draft,
     );
     const held = state.view.idea.message;
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...fields
-    } = held.body().toValue();
     const ctx = sessionContext();
     let saved: HttpMessage<IdeaEntity>;
     try {
         saved = await putIdea(ctx, held, {
-            ...fields,
+            ...documentFieldsOf(held),
             ...trimStrings(patch),
         });
     } catch (err) {

@@ -1751,3 +1751,17 @@ export function projectStateIsApproved(
 ): boolean {
     return state === 'approved';
 }
+
+// A PUT body carries a document's fields alone: the path
+// names its id and the verified token its organization, so
+// neither rides along from the held body a write is built on.
+export function documentFieldsOf<
+    T extends { id: string; organization_id: string },
+>(held: HttpMessage<T>): Omit<T, 'id' | 'organization_id'> {
+    const {
+        id: _id,
+        organization_id: _organizationId,
+        ...fields
+    } = held.body().toValue();
+    return fields;
+}

@@ -10,6 +10,7 @@ import {
     Idea, nowUtc,
     ideaIsVisible,
     assertIdeaState,
+    documentFieldsOf,
 } from '../shared/types.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -182,20 +183,19 @@ export async function getIdea(
     };
 }
 
-// The wire document PUT /ideas/:id now takes today's entity
-// fields plus state, camelCase on this side of the adapter
-// seam. organization_id is EXCLUDED too — the client never
-// supplies it (the org fence stamps it downstream);
-// postIdeaCreation's fresh entity naturally lacks it, while an
-// edit/transition's entity (spread from an existing read,
-// below) may still carry it at runtime as a harmless extra the
-// validator tolerates but ignores. A state-UNCHANGED save
-// (title/position/etc. edited, state echoed back unchanged)
-// converges to a no-op event write at the op; a genuine
-// transition (postIdeaStateChange below) sends a new state.
-// Genesis (postIdeaCreation below) is just the head-absent
-// case of this SAME PUT — one shape serves create, edit, and
-// transition.
+// The wire document PUT /ideas/:id takes today's entity
+// fields plus state, snake_case as the wire carries them.
+// organization_id is EXCLUDED too — the client never
+// supplies it (the organization fence stamps it downstream):
+// postIdeaCreation's fresh entity lacks it by type, and an
+// edit/transition builds its body with documentFieldsOf,
+// which strips the held read's id and organization_id. A
+// state-UNCHANGED save (title/position/etc. edited, state
+// echoed back unchanged) converges to a no-op event write at
+// the op; a genuine transition (postIdeaStateChange below)
+// sends a new state. Genesis (postIdeaCreation below) is just
+// the head-absent case of this SAME PUT — one shape serves
+// create, edit, and transition.
 export type IdeaDocumentFields =
     Omit<
         IdeaEntity,
@@ -212,7 +212,7 @@ export async function putIdea(
 ): Promise<HttpMessage<IdeaEntity>> {
     const saved = await ctx.PUT<IdeaEntity>(
         organizationItem(ctx, 'ideas', held.body().toValue().id),
-        { ...document },
+        document,
         [held],
     );
     ideaChanges.notify();
@@ -261,12 +261,7 @@ export function postIdeaStateChange(
     held: HttpMessage<IdeaEntity>,
     state: IdeaState,
 ): Promise<HttpMessage<IdeaEntity>> {
-    const {
-        id: _id,
-        organization_id: _organizationId,
-        ...entity
-    } = held.body().toValue();
-    return putIdea(ctx, held, { ...entity, state });
+    return putIdea(ctx, held, { ...documentFieldsOf(held), state });
 }
 
 export async function putIdeaSubmission(

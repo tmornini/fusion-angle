@@ -54,6 +54,7 @@ import { getRenderableFlowGraph } from
 import {
     getFlowGraph,
     getFlowVersions,
+    flowGraphOf,
 } from '../client/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
@@ -539,26 +540,16 @@ function snapOf(
     flowId: string, nodes: GraphNode[],
 ): FlowSnapshot {
     return buildInitialFlowSnapshot(
-        {
-            message: responseMessage<FlowWithGraph>({
-                id: flowId,
-                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                name: 'Retry Flow',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: storedGraph({ nodes, edges: [] }),
-            }),
+        flowGraphOf(responseMessage<FlowWithGraph>({
             id: flowId,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             name: 'Retry Flow',
-            isLocked: false,
-            isAutoLayout: false,
-            isAutoFit: false,
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            nodes,
-            edges: [],
-        },
+            is_locked: false,
+            is_auto_layout: false,
+            is_auto_fit: false,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: storedGraph({ nodes, edges: [] }),
+        })),
         800, 600, [], [], [],
     );
 }
