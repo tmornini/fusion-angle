@@ -1615,16 +1615,6 @@ Off the critical path; each with its oracle.
   recovered vs `c50e849`) and is closed. Oracle: every
   live database has been wiped and reseeded after
   `66457197`
-- Drop leftover `/identity-providers/` dual-read.
-  Nested providers are the source of truth;
-  `deriveIdentityProvidersFor` still scans the retired
-  flat prefix so leftover seed pairs still join
-  (`api/derive-identity-spine.ts:228-301`). Exact-read
-  Decision 8 retired the invitation, PII, and token
-  dual-reads; this one remains. Cheap after the wipe
-  bullet. Oracle: that derive reads only
-  `/identities/<id>/providers/`, and a leftover flat
-  pair does not appear
 - XSS can use the refresh cookie from the page. The
   cookie is HttpOnly, SameSite=Strict, Path=
   `/api/authentication`, Secure
