@@ -43,6 +43,10 @@ export const STATUS_DOCUMENTS: readonly
         body: { error: 'conflict message' },
     },
     {
+        code: 410,
+        body: { error: 'Gone: table/id' },
+    },
+    {
         code: 412,
         body: { error: 'precondition failed' },
     },

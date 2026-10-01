@@ -2628,6 +2628,11 @@ export const API_DOC_STATUSES:
         body: '{\n  "error": "conflict message"\n}',
     },
     {
+        hash: 'statuses/410',
+        code: '410',
+        body: '{\n  "error": "Gone: table/id"\n}',
+    },
+    {
         hash: 'statuses/412',
         code: '412',
         body: '{\n  "error": "precondition failed"\n}',
