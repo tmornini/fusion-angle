@@ -477,11 +477,13 @@ skew tests, which went with item 8's trio.
    53.8 → 54.1, identities 55.0 → 56.4, organization
    51.2 → 54.1. Two specs
    follow: version and history reads, the four
-   invitation reads, and `former-members/` (the fourth);
-   work-order events (the fifth). The covenant lands
-   with the spec that empties the census — the fourth,
-   or the fifth if `…/work-orders/:id/history` waits for
-   it (spec §1 D, `## For the next brainstorms`).
+   invitation reads, and `former-members/` (the fourth,
+   which leaves `…/work-orders/:id/history` in the
+   census); work-order events (the fifth, which builds
+   that read once, as a heads read of the work order's
+   event documents). The covenant lands with the fifth,
+   in the commit that empties the census (spec §12,
+   `## For the next brainstorms`).
    ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,

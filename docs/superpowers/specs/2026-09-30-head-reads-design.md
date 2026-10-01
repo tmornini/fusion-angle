@@ -13,10 +13,12 @@
   and every write from a held message latched
 - Defers: version and history reads, the four
   invitation reads, and `former-members/` (item 1's
-  fourth spec, where the ARCHITECTURE covenant
-  lands); work-order events as a sub-collection
-  (its fifth); the retries bullet; writes to a
-  deleted name
+  fourth spec, which leaves
+  `…/work-orders/:id/history` in the census);
+  work-order events as a sub-collection (its fifth,
+  which builds that read once and where the
+  ARCHITECTURE covenant lands); the retries bullet;
+  writes to a deleted name
 - Witness: `measurements/probes/mock-data/head-etag.ts`;
   `./test` timed before and after; the operator's
   before-and-after `./bin/measure --record
@@ -321,12 +323,16 @@ response holds all of it.
 
 - Version and history reads, the four invitation
   reads, and `former-members/`: item 1's fourth
-  spec. They need the wire to say who wrote a pair,
+  spec, which leaves `…/work-orders/:id/history`
+  in the census for the fifth to build once, as a
+  heads read of the work order's event documents.
+  They need the wire to say who wrote a pair,
   when, and what it superseded, and three of the
   invitation fields are PII read across the
   membership fence, which item 2 owns.
 - The covenant `## A response is one unit`: it
-  lands with that spec.
+  lands with item 1's fifth spec, in the commit
+  that empties the census.
 - Work-order events as a sub-collection of an
   immutable document type: item 1's fifth spec.
   This spec treats `events` as a key of the
@@ -933,10 +939,13 @@ a parsed body reads the `set-cookie` line.
 and asserts that the GET routes not served by §2
 are exactly the thirty of §1 D, by pattern. A GET
 route added with a handler that answers JSON fails
-it. The fourth spec removes patterns until the
-list is empty, and the commit that empties it adds
-`## A response is one unit` to ARCHITECTURE.md
-with the file references item 1 names.
+it. The fourth spec removes every pattern but
+`…/work-orders/:id/history`. The fifth builds that
+read once, as a heads read of the work order's
+event documents, and its commit that empties the
+list adds `## A response is one unit` to
+ARCHITECTURE.md with the file references item 1
+names.
 
 ## Error and wire
 
@@ -1048,7 +1057,8 @@ truth or deleted with the behavior it named.
 The fourth spec, version and history reads,
 inherits:
 
-- The census, and the covenant it triggers.
+- The census, all but `…/work-orders/:id/history`,
+  which it leaves for the fifth.
 - The question three reads share: how the wire
   says who wrote a pair, when, and what it
   superseded. A version row's `at` and `member_id`,
@@ -1064,8 +1074,12 @@ inherits:
   `projectReadableValues`.
 
 The fifth spec, work-order events, inherits
-`…/work-orders/:id/history` as a collection to
-build once.
+`…/work-orders/:id/history` to build once, as a
+heads read of the work order's event documents,
+and with it the census's last pattern and the
+covenant it triggers: its commit that empties the
+census adds `## A response is one unit` to
+ARCHITECTURE.md.
 
 The retries bullet inherits the 412 a latched save
 now answers, and errors that carry their response.

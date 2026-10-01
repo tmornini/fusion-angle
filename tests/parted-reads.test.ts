@@ -4,11 +4,11 @@ import { routePatternOf } from '../api/route-surface.ts';
 
 // The GET routes that still answer handler JSON instead of
 // the stored response (spec §12). A conversion deletes its
-// patterns here in the commit that converts them; the spec
-// that empties the list — the fourth, or the fifth if
-// `…/work-orders/:id/history` waits for it (spec §1 D,
-// `## For the next brainstorms`) — adds `## A response is
-// one unit` to ARCHITECTURE.md in the commit that does.
+// patterns here in the commit that converts them. The fourth
+// spec leaves `…/work-orders/:id/history`; the fifth builds
+// it once, and its commit that empties the list adds
+// `## A response is one unit` to ARCHITECTURE.md (spec §12,
+// `## For the next brainstorms`).
 const PARTED = [
     'ai-agents/:id/versions/',
     'ai-agents/:id/versions/:etag',
