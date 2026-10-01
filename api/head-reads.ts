@@ -15,6 +15,8 @@ import {
 } from '../shared/http-message/multipart.ts';
 import { serializeWire } from '../shared/http-message/wire-codec.ts';
 import { Octets } from '../shared/http-message/octets.ts';
+import { contentLengthOfLatin1 } from
+    '../shared/http-message/framing.ts';
 import type { StatusLine } from '../shared/http-message/types.ts';
 import { HTTP_NO_CONTENT, HTTP_OK } from '../shared/http-errors.ts';
 
@@ -174,7 +176,7 @@ function servedCollection(
         startLine: statusLine(HTTP_OK),
         fields: [
             ...lines,
-            { name: 'content-length', value: String(body.length) },
+            contentLengthOfLatin1(body),
             {
                 name: 'content-type',
                 value: MULTIPART_MIXED + '; boundary=' + boundary,

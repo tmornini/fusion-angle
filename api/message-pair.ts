@@ -17,6 +17,8 @@ import {
     requestMessageHash,
 } from './message-form.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
+import { contentLengthOfLatin1 } from
+    '../shared/http-message/framing.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     parseWire,
@@ -1368,7 +1370,7 @@ function landedWire(stored: string, reader: Reader): string {
         ...model,
         fields: model.fields.map((field) =>
             field.name === 'content-length'
-                ? { name: field.name, value: String(body.length) }
+                ? contentLengthOfLatin1(body)
                 : field),
         body: Octets.fromLatin1(body),
     });

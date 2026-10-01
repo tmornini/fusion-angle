@@ -1,6 +1,13 @@
-import { assertStrictEquals, assertThrows } from '@std/assert';
+import {
+    assertEquals,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { HttpMessageError } from '../shared/http-message/types.ts';
+import { contentLengthOfLatin1 } from
+    '../shared/http-message/framing.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 
 Deno.test('withFieldPut overwrites an existing field', () => {
     const message = HttpMessage
@@ -166,4 +173,14 @@ Deno.test('a modified message re-serializes canonically', () => {
         message.toWire(),
         'GET / HTTP/1.1\r\naccept: text/html\r\nhost: a\r\n\r\n',
     );
+});
+
+Deno.test('contentLengthOfLatin1 counts octets, not characters',
+() => {
+    const body = Octets.fromBytes(
+        new TextEncoder().encode('{"name":"Zoë"}'),
+    ).toLatin1();
+    assertEquals(contentLengthOfLatin1(body), {
+        name: 'content-length', value: '15',
+    });
 });

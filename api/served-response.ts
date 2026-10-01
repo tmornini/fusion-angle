@@ -3,6 +3,8 @@ import type { AttributeSchemaRow } from
 import type { FieldLine } from
     '../shared/http-message/types.ts';
 import { Octets } from '../shared/http-message/octets.ts';
+import { contentLengthOfLatin1 } from
+    '../shared/http-message/framing.ts';
 import {
     parseWire,
     serializeWire,
@@ -79,10 +81,7 @@ export function servedResponse(
         { name: 'request-id', value: transmission.requestId },
         ...(body === undefined
             ? []
-            : [{
-                name: 'content-length',
-                value: String(body.length),
-            }]),
+            : [contentLengthOfLatin1(body)]),
     ];
     return serializeWire({
         startLine: {
