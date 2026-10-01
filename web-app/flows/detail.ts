@@ -1815,9 +1815,8 @@ function onFlowLoaded(
         void refreshFlowFromServer(flowId);
     });
     // Each save's answer is the flow's new head; the next
-    // undo latches it with no read. This page is the tab's
-    // only flow writer, so every save answers this flow.
-    subscribeFlowSaves((head) => {
+    // undo latches it with no read.
+    subscribeFlowSaves(flowId, (head) => {
         pageState.setHeldFlow(head);
     });
 }

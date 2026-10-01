@@ -58,16 +58,21 @@ export function notifyFlowChange(): void {
     flowChanges.notify();
 }
 
-// Each save's answer is the flow's new head. The page that
-// holds the flow hears it here and latches its next write
-// on it; the change bell above carries no message, and a
-// head cannot cross tabs, so this channel is this tab's.
+// Each save's answer is the flow's new head. A page that
+// holds a flow hears that flow's heads here, by id, and
+// latches its next write on the latest; another flow's save
+// in this tab is legitimate and simply not delivered. The
+// change bell above carries no message, and a head cannot
+// cross tabs, so this channel is this tab's.
 const flowSaves = createChannel<HttpMessage<FlowWithGraph>>();
 
 export function subscribeFlowSaves(
+    flowId: string,
     fn: (head: HttpMessage<FlowWithGraph>) => void,
 ): () => void {
-    return flowSaves.subscribe(fn);
+    return flowSaves.subscribe((head) => {
+        if (head.body().toValue().id === flowId) fn(head);
+    });
 }
 
 export interface FlowCreationInput {
