@@ -43,9 +43,6 @@ const PARTED = [
         + '/versions/',
     'organizations/:organization-id/members/:identity-id'
         + '/versions/:etag',
-    'organizations/:organization-id/record-types/',
-    'organizations/:organization-id/record-types/'
-        + ':record-type-id/attributes/',
     'organizations/:organization-id/record-types/'
         + ':record-type-id/instances/',
     'organizations/:organization-id/record-types/'

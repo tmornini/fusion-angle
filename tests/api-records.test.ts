@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects, assertStrictEquals } from '@std/assert';
+import { assertRejects, assertStrictEquals } from '@std/assert';
 import { DELETE, GET, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -27,14 +27,13 @@ const ATTR = ATTRS + 'UQBiHFcwJeCDSnmkPBoYRA';
 // record-types
 
 Deno.test(
-    'GET nested record-types returns an empty array'
-    + ' on an empty db',
+    'GET nested record-types answers 204 on an empty db',
     async () => {
         const db = await freshDb();
-        const out =
-            (await GET<unknown[]>(db, TYPES, DEV_TOKEN, operationIdHeader()))
-                .body().toValue();
-        assertEquals(out, []);
+        const read =
+            await GET(db, TYPES, DEV_TOKEN, operationIdHeader());
+        assertStrictEquals(read.query('status').toNumber(), 204);
+        assertStrictEquals(read.body().exists(), false);
     },
 );
 
@@ -90,7 +89,7 @@ Deno.test(
 // nested attributes
 
 Deno.test(
-    'GET nested attributes returns an empty array',
+    'GET nested attributes answers 204 when the type has none',
     async () => {
         const db = await freshDb();
         await PUT(db, TYPE, {
@@ -102,10 +101,10 @@ Deno.test(
             state: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const out = (await GET<unknown[]>(
-            db, ATTRS, DEV_TOKEN,
-            operationIdHeader())).body().toValue();
-        assertEquals(out, []);
+        const read = await GET(
+            db, ATTRS, DEV_TOKEN, operationIdHeader());
+        assertStrictEquals(read.query('status').toNumber(), 204);
+        assertStrictEquals(read.body().exists(), false);
     },
 );
 

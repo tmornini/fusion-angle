@@ -611,14 +611,6 @@ export function attachEtag(
     return response;
 }
 
-// Attach IMF-fixdate Date from an RFC-3339 zulu `at`.
-export function attachDate(
-    response: Response, at: string,
-): Response {
-    response.headers.set('Date', httpDateOf(at));
-    return response;
-}
-
 export function requestTarget(request: Request): string {
     const url = new URL(request.url);
     return url.pathname + url.search;

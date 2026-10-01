@@ -5,7 +5,10 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -307,4 +310,135 @@ Deno.test('a flow with no work orders answers 204', async () => {
     assertStrictEquals(got.status, 204);
     assertStrictEquals(await got.text(), '');
     assertMatch(got.headers.get('date')!, /GMT$/);
+});
+
+const RECORD_TYPES = '/organizations/' + STARK + '/record-types/';
+// Customer Profile carries seeded attributes.
+const CUSTOMER_PROFILE = 'sJxkGGTrPegHqFbQAkXnjw';
+
+async function putRecordType(
+    db: MemoryDbAdapter,
+    token: string,
+    id: string,
+    state: string,
+    ifMatch?: string,
+): Promise<Response> {
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT', path: RECORD_TYPES + id, token,
+        ...(ifMatch !== undefined
+            ? { headers: { 'if-match': ifMatch } } : {}),
+        body: {
+            name: 'Rental', description: 'Rental desc',
+            position: 3, state,
+        },
+    }));
+    await put.body?.cancel();
+    return put;
+}
+
+Deno.test(RECORD_TYPES + ' serves its heads as parts, each its'
+    + ' document GET', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: RECORD_TYPES, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    assertMatch(
+        got.headers.get('content-type')!,
+        /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+    );
+    assertStrictEquals(got.headers.get('etag'), null);
+    const parts = await partsOf<{ id: string }>(got);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    for (const part of parts) {
+        await assertPartIsDocumentGet(
+            db, token, part,
+            RECORD_TYPES + part.body().toValue().id,
+        );
+    }
+});
+
+Deno.test('a state-deleted record type is no part of its'
+    + ' collection', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const created = await putRecordType(db, token, id, 'active');
+    assertStrictEquals(created.status, 201);
+    const deleted = await putRecordType(
+        db, token, id, 'deleted', created.headers.get('etag')!,
+    );
+    assertStrictEquals(deleted.status, 200);
+    const parts = await partsOf<{ id: string }>(
+        await handleRequest(db, apiRequest({
+            method: 'GET', path: RECORD_TYPES, token,
+        })),
+    );
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(
+        parts.filter((part) => part.body().toValue().id === id),
+        [],
+    );
+});
+
+Deno.test(RECORD_TYPES + CUSTOMER_PROFILE + '/attributes/'
+    + ' serves its heads as parts, each its document GET',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const attributes = RECORD_TYPES + CUSTOMER_PROFILE
+        + '/attributes/';
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: attributes, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    assertMatch(
+        got.headers.get('content-type')!,
+        /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+    );
+    assertStrictEquals(got.headers.get('etag'), null);
+    const parts = await partsOf<{
+        id: string; record_type_id: string;
+    }>(got);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    for (const part of parts) {
+        const attribute = part.body().toValue();
+        assertStrictEquals(
+            attribute.record_type_id, CUSTOMER_PROFILE,
+        );
+        await assertPartIsDocumentGet(
+            db, token, part, attributes + attribute.id,
+        );
+    }
+});
+
+Deno.test('a record type with no attributes answers 204',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const created = await putRecordType(db, token, id, 'active');
+    assertStrictEquals(created.status, 201);
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: RECORD_TYPES + id + '/attributes/',
+        token,
+    }));
+    assertStrictEquals(got.status, 204);
+    assertStrictEquals(await got.text(), '');
+    assertMatch(got.headers.get('date')!, /GMT$/);
+});
+
+Deno.test('attributes under a record type never written'
+    + ' answer 404', async () => {
+    const db = await seededMockDb();
+    const id = generateIdentifier();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: RECORD_TYPES + id + '/attributes/',
+        token: await organizationToken(),
+    }));
+    assertStrictEquals(got.status, 404);
+    assertEquals(await got.json(), {
+        error: 'Not found: record_types/' + id,
+    });
 });

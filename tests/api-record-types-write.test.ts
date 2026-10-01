@@ -247,8 +247,8 @@ async () => {
     const collection = await handleRequest(db, req(
         'GET', COLLECTION, adminToken,
     ));
-    assertStrictEquals(collection.status, 200);
-    assertEquals(await collection.json(), []);
+    assertStrictEquals(collection.status, 204);
+    assertStrictEquals(await collection.text(), '');
 });
 
 Deno.test('DELETE .../record-types/:id member → 403',

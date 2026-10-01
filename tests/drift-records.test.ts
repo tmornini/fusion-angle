@@ -65,6 +65,7 @@ import {
     apiRequest,
     assertPartsAreHeads,
     pairIdOf,
+    partBodiesOf,
     partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
@@ -171,14 +172,14 @@ async function derivedRecordAttributes(
             token,
         ),
     );
-    if (typesRes.status !== 200) {
+    // A 204 is an empty collection: it contributes no row.
+    if (typesRes.status !== 200 && typesRes.status !== 204) {
         throw new Error(
             'derivedRecordAttributes: types GET '
             + typesRes.status,
         );
     }
-    const types =
-        await typesRes.json() as { id: string }[];
+    const types = await partBodiesOf<{ id: string }>(typesRes);
     const out: RecordAttributeEntity[] = [];
     for (const type of types) {
         const res = await handleRequest(
@@ -191,14 +192,14 @@ async function derivedRecordAttributes(
                 token,
             ),
         );
-        if (res.status !== 200) {
+        if (res.status !== 200 && res.status !== 204) {
             throw new Error(
                 'derivedRecordAttributes: GET '
                 + res.status,
             );
         }
         out.push(
-            ...await res.json() as RecordAttributeEntity[],
+            ...await partBodiesOf<RecordAttributeEntity>(res),
         );
     }
     return out;
@@ -391,9 +392,12 @@ Deno.test('seeded GET nested record-types wire equals derived'
             ),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
+        const parts = await partsOf(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await derivedRecords(db, organization);
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            parts.map((part) => part.body().toValue()), derived,
+        );
     }
     const org1 = await derivedRecords(db, STARK_ORGANIZATION);
     const org2 = await derivedRecords(db, ORGANIZATION_TWO);
@@ -1145,7 +1149,9 @@ async () => {
                 + '/record-types/', token),
     );
     assertStrictEquals(res.status, 200);
-    const list = await res.json() as { id: string }[];
+    const parts = await partsOf<{ id: string }>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    const list = parts.map((part) => part.body().toValue());
     const added = list.filter((row) =>
         [
             REC_DRIFT_Z, REC_DRIFT_A, REC_DRIFT_M,
@@ -1154,9 +1160,7 @@ async () => {
         added.map((r) => r.id), expectedIds,
     );
     const derived = await derivedRecords(db, STARK_ORGANIZATION);
-    assertStrictEquals(
-        JSON.stringify(list), JSON.stringify(derived),
-    );
+    assertEquals(list, derived);
 });
 
 // -- 10. delete-then-recreate ------------------------------------
@@ -1233,7 +1237,7 @@ async () => {
                 + '/record-types/', token),
     );
     assertStrictEquals(listRes.status, 200);
-    const list = await listRes.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(listRes);
     assertStrictEquals(
         list.some((r) => r.id === recordId), true,
     );

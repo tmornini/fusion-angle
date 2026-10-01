@@ -107,7 +107,7 @@ async function allAttributes(
             ),
         );
         assertStrictEquals(typesRes.status, 200);
-        const types = await typesRes.json() as { id: string }[];
+        const types = await partBodiesOf<{ id: string }>(typesRes);
         for (const type of types) {
             const res = await handleRequest(
                 db,
@@ -124,7 +124,7 @@ async function allAttributes(
             );
             assertStrictEquals(res.status, 200);
             out.push(
-                ...await res.json() as RecordAttributeEntity[],
+                ...await partBodiesOf<RecordAttributeEntity>(res),
             );
         }
     }

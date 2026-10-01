@@ -38,6 +38,7 @@ const SERVED_COLLECTIONS: readonly string[] = [
         + ANY_ID + '/work-orders/',
     'organizations/' + STARK + '/flows/'
         + ANY_ID + '/records/',
+    'organizations/' + STARK + '/record-types/',
 ];
 // The collections still answering handler JSON.
 const PARTED_COLLECTIONS: readonly string[] = [
@@ -46,7 +47,6 @@ const PARTED_COLLECTIONS: readonly string[] = [
         + ANY_ID + '/flows/',
     // GET states/:id/field-values RETIRED (C4); field values
     // fold on work-orders/:id/history.
-    'organizations/' + STARK + '/record-types/',
     'organizations/' + STARK + '/ideas/'
         + ANY_ID + '/submissions/',
     'organizations/' + STARK + '/objectives/'

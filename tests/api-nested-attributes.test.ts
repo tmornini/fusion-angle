@@ -19,6 +19,7 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -147,15 +148,15 @@ async function putLiveType(
     assertStrictEquals(put.status, 201);
 }
 
-Deno.test('GET .../attributes under live type → 200 []',
+Deno.test('GET .../attributes under live type → 204',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const res = await handleRequest(db, req(
         'GET', ATTRS, adminToken,
     ));
-    assertStrictEquals(res.status, 200);
-    assertEquals(await res.json(), []);
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
 });
 
 Deno.test('GET .../attributes under absent type → 404 '
@@ -271,7 +272,7 @@ async () => {
         'GET', ATTRS, memberToken,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as AttributeWireRow[];
+    const rows = await partBodiesOf<AttributeWireRow>(list);
     assertStrictEquals(rows.length, 1);
     assertEquals(
         rows[0]!.read_roles, ['member', 'auditor'],

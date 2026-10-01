@@ -619,9 +619,9 @@ async () => {
             + '/record-types/', recordToken),
     );
     assertStrictEquals(recordsRes.status, 200);
-    const recordsStark = await recordsRes.json() as {
+    const recordsStark = await partBodiesOf<{
         id: string;
-    }[];
+    }>(recordsRes);
     const flowsStark = await deriveFlows(
         db, STARK_ORGANIZATION,
     );

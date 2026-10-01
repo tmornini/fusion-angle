@@ -446,7 +446,10 @@ async () => {
         token,
     ));
     assertStrictEquals(list.status, 200);
-    assertEquals(await list.json(), [stored]);
+    const parts = await partsOf(list);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals objectiveRevisionEntityOf',

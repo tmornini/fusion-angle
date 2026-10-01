@@ -49,23 +49,6 @@ export function recordTypeEntityOf(
     };
 }
 
-export async function deriveRecordTypeCollection(
-    db: DbAdapter,
-    organization: Id,
-): Promise<RecordTypeWireRow[]> {
-    const prefix = recordTypesUriPrefix(organization);
-    const heads = await db.messagePairs.getCollectionHeadPairs(
-        prefix,
-    );
-    const rows: RecordTypeWireRow[] = [];
-    for (const head of heads) {
-        const document = headDocumentOf(head);
-        if (documentIsTombstone(document)) continue;
-        rows.push(recordTypeEntityOf(document, organization));
-    }
-    return rows;
-}
-
 // The live type's head: the composed edit latches on it and
 // a nested read or write requires it. No head, or a
 // tombstone, is a miss.

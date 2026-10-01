@@ -73,9 +73,9 @@ function recordTypePath(
 export async function getRecordEntities(
     ctx: RequestContext,
 ): Promise<RecordEntity[]> {
-    return (await ctx.GET<RecordEntity[]>(
+    return (await ctx.GETCollection<RecordEntity>(
         recordTypesPath(ctx),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 export async function getRecord(
@@ -121,12 +121,12 @@ export async function getRecords(
     // Per-type nested attributes collection — server-side
     // filter replaces the retired flat bulk + client filter.
     const attrLists = await Promise.all(
-        rows.map(row => ctx.GET<
-            RecordAttributeEntity[]
+        rows.map(row => ctx.GETCollection<
+            RecordAttributeEntity
         >(
             recordTypePath(ctx, row.id)
             + '/attributes/',
-        ).then(read => read.body().toValue())),
+        ).then(parts => parts.map((m) => m.body().toValue()))),
     );
     const attrCountByRecord = new Map<
         string, number

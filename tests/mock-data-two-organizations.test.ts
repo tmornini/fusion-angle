@@ -111,8 +111,7 @@ async function derivedRecordAttributes(
             + typesRes.status,
         );
     }
-    const types =
-        await typesRes.json() as { id: string }[];
+    const types = await partBodiesOf<{ id: string }>(typesRes);
     const out: RecordAttributeEntity[] = [];
     for (const type of types) {
         const res = await handleRequest(
@@ -135,7 +134,7 @@ async function derivedRecordAttributes(
             );
         }
         out.push(
-            ...await res.json() as RecordAttributeEntity[],
+            ...await partBodiesOf<RecordAttributeEntity>(res),
         );
     }
     return out;

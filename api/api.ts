@@ -27,7 +27,6 @@ import {
     writeAnswerOf,
     ownWireOf,
     attachEtag,
-    attachDate,
     httpDateOf,
     parseEntityTags,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
@@ -39,9 +38,6 @@ import type { ReceivedRequest } from './message-pair.ts';
 import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
-import {
-    RECORD_TYPES_COLLECTION_PATTERN,
-} from './family-registry.ts';
 import {
     documentFamilyWiring,
 } from './document-family.ts';
@@ -952,15 +948,6 @@ async function dispatched(
                         ),
                     );
                 }
-                // Stream collection GET: one Date: now. No
-                // collection ETag. No 304. Assemble surfaces
-                // (organizations, invitations, members join)
-                // stay Date-free.
-                if (isLiveHeadCollectionGet(routePattern)) {
-                    return attachDate(
-                        Response.json(result), nowUtc(),
-                    );
-                }
                 return Response.json(result);
             }
             case 'PUT': {
@@ -1417,12 +1404,4 @@ function documentEntityPattern(
     return wiring.httpNest === 'organization'
         ? 'organizations/:id/' + wiring.family + '/:id'
         : wiring.family + '/:id';
-}
-
-// The one live-head JSON list still dated here:
-// record-types, until it serves its stored heads.
-function isLiveHeadCollectionGet(
-    routePattern: string,
-): boolean {
-    return routePattern === RECORD_TYPES_COLLECTION_PATTERN;
 }

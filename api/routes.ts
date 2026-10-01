@@ -163,7 +163,6 @@ import {
     projectEntityOf,
 } from './derive-projects.ts';
 import {
-    deriveRecordTypeCollection,
     RECORD_TYPES_TABLE,
     recordTypeEntityOf,
     recordTypeHeadFor,
@@ -890,22 +889,9 @@ export async function loadAttributeSchemaById(
     return map;
 }
 
-// An attribute's stored response is its wire, which
-// repeats the path's keys; the path owns them.
-function attributeStateOf(
-    body: Record<string, unknown>,
-): Record<string, unknown> {
-    const {
-        id: _id,
-        organization_id: _organization,
-        record_type_id: _recordType,
-        ...state
-    } = body;
-    return state;
-}
-
-// G6: GET derive is the stored PUT. Document echoes plus
-// the stored nested document body (both ACL keys required).
+// G6: the stored PUT body, which a GET serves. Document
+// echoes plus the stored nested document body (both ACL
+// keys required).
 export function nestedAttributeWireOf(
     organization: Id,
     recordTypeId: Id,
@@ -4642,9 +4628,15 @@ export const routes: Route[] = [
     // the former, split by the body's kind.
     // DELETE is inline records/:id posture plus type RESTRICT.
     route(RECORD_TYPES_COLLECTION_PATTERN, {
-        get: (db, _p, _actor, organization) =>
-            deriveRecordTypeCollection(
-                db, requireOrganization(organization),
+        // The stored heads; the gate drops a state-'deleted'
+        // one.
+        select: (db, _p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                recordTypesUriPrefix(
+                    requireOrganization(organization),
+                ),
+                'state',
             ),
         // Admin-only composed create/edit (MEMBER_VERBS has
         // GET only). A create lands the type and each
@@ -4823,29 +4815,23 @@ export const routes: Route[] = [
     }),
     // Nested attributes collection (Task 7): member GET under
     // a live type. Parent probe first (record_types 404);
-    // heads at .../attributes/, id-lex. No POST (parity with
-    // the flat family — composed op + PUT are the creators).
+    // then the stored heads at .../attributes/. No POST
+    // (parity with the flat family — composed op + PUT are
+    // the creators).
     route(ATTRIBUTES_COLLECTION_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
-            await requireRecordTypeExists(db, org, typeId);
-            const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getCollectionPairs(
-                prefix,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            const documents = deriveDocumentsAt(
-                messagePairs, prefix,
+            return selectHeadsAtPath(
+                db,
+                attributesUriPrefix(organizationId, typeId),
+                'stateless',
             );
-            const rows: { id: string }[] = [];
-            for (const [id, document] of documents) {
-                const wire = nestedAttributeWireOf(
-                    org, typeId, id,
-                    attributeStateOf(document.body),
-                );
-                rows.push(wire as { id: string });
-            }
-            return rows.sort(byIdAscending);
         },
     }),
     // Nested attribute detail (Task 7): member GET, admin

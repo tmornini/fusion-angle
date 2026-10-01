@@ -3,7 +3,7 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { GET, POST } from './in-page-facade.ts';
+import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedCurrentMember,
@@ -74,10 +74,10 @@ Deno.test(
                 operationIdHeader())).body().toValue();
         assertStrictEquals(history.length, 1);
         assertStrictEquals(history[0]!.state, 'active');
-        const attrs = (await GET<unknown[]>(
+        const attrs = (await GETCollection<unknown>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader())).map((m) => m.body().toValue());
         assertStrictEquals(attrs.length, 1);
     },
 );
@@ -251,12 +251,12 @@ Deno.test(
             operationIdHeader([
                 ['If-Match', '"' + head!.id + '"'],
             ]));
-        const all = (await GET<{
+        const all = (await GETCollection<{
             id: string;
             name: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader())).map((m) => m.body().toValue());
         assertStrictEquals(all.length, 1);
         assertStrictEquals(all[0]!.id, newAttrId);
         assertStrictEquals(all[0]!.name, 'New');
