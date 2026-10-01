@@ -467,7 +467,7 @@ skew tests, which went with item 8's trio.
    (`docs/superpowers/specs/2026-09-30-head-reads-design.md`):
    43 GET routes serve stored responses; thirty stay
    parted under `tests/parted-reads.test.ts`. `./test`
-   76.0 s → 173.1 s (medians; the base one parallel
+   76.0 s → 104.1 s (medians; the base one parallel
    invocation, the tip three: parallel pass, serial
    lane, and tz); readyMs per list page, base → tip
    (medians of 25, `measurements/history.jsonl`, `4a540f3`
