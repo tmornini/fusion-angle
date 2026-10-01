@@ -32,12 +32,14 @@ import {
     postFlowRecordBinding,
     deleteFlowRecordForFlow,
     subscribeFlowChanges,
+    subscribeFlowSaves,
     awaitFlowSave,
     type RequestContext,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { getRenderableFlowGraph } from '../app/flow-graph-layout.ts';
 import type {
+    FlowWithGraph,
     GraphEdge,
     GraphNode,
     MemberId,
@@ -46,6 +48,8 @@ import type {
     RecordId,
     StateEntity,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     postBlobDownload,
 } from '../app/adapters/blob-download.ts';
@@ -228,6 +232,26 @@ class PageState {
     setHistory(h: FlowHistorySnapshot): void {
         this.#history = h;
     }
+
+    // The flow's latest message: its load, each bell
+    // refresh, and each save's answer. Undo latches it.
+    #heldFlow: HttpMessage<FlowWithGraph> | null = null;
+
+    heldFlow(): HttpMessage<FlowWithGraph> {
+        if (!this.#heldFlow) {
+            throw new Error(
+                'pageState.heldFlow() called'
+                + ' before setHeldFlow()',
+            );
+        }
+        return this.#heldFlow;
+    }
+
+    setHeldFlow(
+        message: HttpMessage<FlowWithGraph>,
+    ): void {
+        this.#heldFlow = message;
+    }
 }
 
 const pageState = new PageState();
@@ -288,6 +312,7 @@ async function reportOpFailure(
 ): Promise<void> {
     showToast(toast, toastVariant);
     const g = await getRenderableFlowGraph(ctx, flowId);
+    pageState.setHeldFlow(g.message);
     const current = pageState.presenter().snapshot();
     commit({
         ...current,
@@ -320,6 +345,7 @@ async function handleUndo(): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performUndo(
         sessionContext(), snap, pageState.history(),
+        pageState.heldFlow(),
     );
     if (op.kind === 'fail') {
         showToast(op.toast, op.toastVariant);
@@ -1464,7 +1490,7 @@ function bindPanelActions(
 
 function renderBindingSlot(
     container: HTMLElement,
-    records: readonly RecordEntity[],
+    records: readonly HttpMessage<RecordEntity>[],
     boundRecordId: RecordId | null,
 ): void {
     const slot = $(
@@ -1473,7 +1499,7 @@ function renderBindingSlot(
     if (!slot) return;
     const sorted = bindableRecords(
         records, boundRecordId,
-    ).toSorted(
+    ).map((message) => message.body().toValue()).toSorted(
         (a, b) => a.name.localeCompare(b.name),
     );
     setHtml(
@@ -1681,6 +1707,7 @@ function onFlowLoaded(
     flowId: string,
 ): void {
     pageState.setCanvasSize(FALLBACK_W, FALLBACK_H);
+    pageState.setHeldFlow(loaded.graph.message);
     pageState.setHistory(
         buildFlowHistorySnapshot(
             loaded.versions.length > 1,
@@ -1787,6 +1814,11 @@ function onFlowLoaded(
     subscribeFlowChanges(() => {
         void refreshFlowFromServer(flowId);
     });
+    // Each save's answer is the flow's new head; the next
+    // undo latches it with no read.
+    subscribeFlowSaves(flowId, (head) => {
+        pageState.setHeldFlow(head);
+    });
 }
 
 // True when the server graph + flags already match the
@@ -1882,6 +1914,7 @@ async function refreshFlowFromServer(
         );
         return;
     }
+    pageState.setHeldFlow(graph.message);
     // Await yielded — re-check live hazards.
     if (
         isGestureActive(

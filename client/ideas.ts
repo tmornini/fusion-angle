@@ -11,6 +11,8 @@ import {
     ideaIsVisible,
     assertIdeaState,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import type { RequestContext } from './request-context.ts';
 import {
     organizationCollection,
@@ -45,21 +47,21 @@ export function subscribeIdeaChanges(
     return ideaChanges.subscribe(fn);
 }
 
-export async function getIdeaEntities(
+export function getIdeaEntities(
     ctx: RequestContext,
-): Promise<IdeaEntity[]> {
-    return (await ctx.GETCollection<IdeaEntity>(
+): Promise<HttpMessage<IdeaEntity>[]> {
+    return ctx.GETCollection<IdeaEntity>(
         organizationCollection(ctx, 'ideas'),
-    )).map((m) => m.body().toValue());
+    );
 }
 
-export async function getIdeaEntity(
+export function getIdeaEntity(
     ctx: RequestContext,
     id: string,
-): Promise<IdeaEntity> {
-    return (await ctx.GET<IdeaEntity>(
+): Promise<HttpMessage<IdeaEntity>> {
+    return ctx.GET<IdeaEntity>(
         organizationItem(ctx, 'ideas', id),
-    )).body().toValue();
+    );
 }
 
 // The submissions for ONE idea — the server filters the nested
@@ -105,7 +107,6 @@ async function getIdeaSubmissionEntity(
 
 export interface IdeaWithSubmitter {
     readonly idea: Idea;
-    readonly entity: IdeaEntity;
     readonly submitterName: string;
     readonly submittedAt: string;
 }
@@ -116,40 +117,41 @@ function ideaStateOf(row: IdeaEntity): IdeaState {
     return assertIdeaState(row.state, 'idea ' + row.id);
 }
 
+export function ideaOf(message: HttpMessage<IdeaEntity>): Idea {
+    return new Idea(
+        message, ideaStateOf(message.body().toValue()),
+    );
+}
+
 export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
     // Wave 1: idea rows + member map (independent).
     // Wave 2: submissions need the idea ids.
-    const [rows, memberMap] = await Promise.all([
+    const [messages, memberMap] = await Promise.all([
         getIdeaEntities(ctx),
         getMemberMap(ctx),
     ]);
+    const ideas = messages.map(ideaOf);
     const submissions = await getIdeaSubmissionEntities(
-        ctx, rows.map(r => r.id),
+        ctx, ideas.map(idea => idea.idForLink()),
     );
     const submissionMap = new Map(
         submissions.map(s => [s.idea_id, s]),
     );
-    return rows
-        .filter(row => ideaIsVisible(
-            ideaStateOf(row),
-        ))
-        .map(row => {
+    return ideas
+        .filter(idea => ideaIsVisible(idea.stateValue()))
+        .map(idea => {
             const submission =
-                submissionMap.get(row.id);
+                submissionMap.get(idea.idForLink());
             if (!submission) {
                 throw new Error(
                     'Idea has no submission: '
-                    + row.id,
+                    + idea.idForLink(),
                 );
             }
             return {
-                idea: new Idea(
-                    row,
-                    ideaStateOf(row),
-                ),
-                entity: row,
+                idea,
                 submitterName: memberName(
                     memberMap,
                     submission.member_id,
@@ -165,17 +167,14 @@ export async function getIdea(
     ideaId: string,
 ): Promise<IdeaWithSubmitter> {
     const [
-        row, submission, memberMap,
+        message, submission, memberMap,
     ] = await Promise.all([
         getIdeaEntity(ctx, ideaId),
         getIdeaSubmissionEntity(ctx, ideaId),
         getMemberMap(ctx),
     ]);
     return {
-        idea: new Idea(
-            row, ideaStateOf(row),
-        ),
-        entity: row,
+        idea: ideaOf(message),
         submitterName: memberName(
             memberMap, submission.member_id,
         ),
@@ -204,25 +203,28 @@ export type IdeaDocumentFields =
         | 'organization_id'
     >;
 
+// A save from the held idea names the head it replaces, so
+// a write over a newer head is refused rather than lost.
 export async function putIdea(
     ctx: RequestContext,
-    id: string,
+    held: HttpMessage<IdeaEntity>,
     document: IdeaDocumentFields,
-): Promise<void> {
-    const { state, ...entity } = document;
-    await ctx.PUT(organizationItem(ctx, 'ideas', id), {
-        ...entity,
-        state,
-    });
+): Promise<HttpMessage<IdeaEntity>> {
+    const saved = await ctx.PUT<IdeaEntity>(
+        organizationItem(ctx, 'ideas', held.body().toValue().id),
+        { ...document },
+        [held],
+    );
     ideaChanges.notify();
+    return saved;
 }
 
 // Idea creation: genesis is head-presence-defined — the FIRST
 // document version at this document IS the birth, so create
-// folds into the SAME PUT ideas/:id that putIdea already
-// drives for edits and transitions. The id and state are
-// minted ONCE here, before the single ctx.PUT hop (via
-// putIdea) — a retry resends the identical bytes, which the
+// is the SAME PUT ideas/:id that putIdea drives for edits and
+// transitions, with no head to latch: the id is fresh. The id
+// and state are minted ONCE here, before the single ctx.PUT
+// hop — a retry resends the identical bytes, which the
 // statement matches against the head and stores nothing.
 // Use only at the create call site;
 // transitions of an existing idea go through
@@ -238,43 +240,42 @@ export async function postIdeaCreation(
         | 'state'
     >,
     initialState: IdeaState,
-): Promise<void> {
-    await putIdea(ctx, id, {
-        ...entity,
-        state: initialState,
-    });
+): Promise<HttpMessage<IdeaEntity>> {
+    const created = await ctx.PUT<IdeaEntity>(
+        organizationItem(ctx, 'ideas', id),
+        { ...entity, state: initialState },
+    );
+    ideaChanges.notify();
+    return created;
 }
 
 // A transition: composes the document PUT with a FRESH state
 // (mint-once-reuse — a retry of the SAME transition resends
 // this same pinned pair, converging at the op) over the
-// idea's CURRENT entity fields — hop count 1 → 1 (one
-// ctx.PUT, via putIdea). Strip the GET-stamped state so the
-// new state is the only lifecycle value in the PUT body.
-export async function postIdeaStateChange(
+// held idea's entity fields — hop count 1 → 1 (one ctx.PUT,
+// via putIdea, latched on the held idea). The new state
+// replaces the held one, so it is the only lifecycle value in
+// the PUT body.
+export function postIdeaStateChange(
     ctx: RequestContext,
-    idea: IdeaEntity,
+    held: HttpMessage<IdeaEntity>,
     state: IdeaState,
-): Promise<void> {
+): Promise<HttpMessage<IdeaEntity>> {
     const {
-        id,
-        state: _priorState,
+        id: _id,
+        organization_id: _organizationId,
         ...entity
-    } = idea;
-    void _priorState;
-    await putIdea(ctx, id, {
-        ...entity,
-        state,
-    });
+    } = held.body().toValue();
+    return putIdea(ctx, held, { ...entity, state });
 }
 
 export async function putIdeaSubmission(
     ctx: RequestContext,
     submissionId: string,
     ideaId: string,
-): Promise<void> {
+): Promise<HttpMessage<IdeaSubmissionEntity>> {
     const member = await getCurrentHumanMember(ctx);
-    await ctx.PUT(
+    return ctx.PUT<IdeaSubmissionEntity>(
         organizationItem(ctx, 'ideas', ideaId)
             + '/submissions/' + submissionId,
         {
@@ -317,7 +318,7 @@ function assertConversionFullyScored(
 // the org fence stamps it before the store re-validates.
 export async function postIdeaConversion(
     ctx: RequestContext,
-    ideaId: string,
+    held: HttpMessage<IdeaEntity>,
     projectId: string,
     project: Omit<
         ProjectEntity,
@@ -348,16 +349,12 @@ export async function postIdeaConversion(
     // The ledger's latest-wins total order requires distinct values.
     const ideaStateAt = nowUtc();
     const projectStateAt = nowUtc();
-    // The conversion is an operation on the idea: it names the
-    // head it was read from, so a 412 surfaces as RequestError.
-    const [member, idea] = await Promise.all([
-        getCurrentHumanMember(ctx),
-        ctx.GET<IdeaEntity>(
-            organizationItem(ctx, 'ideas', ideaId),
-        ),
-    ]);
+    const member = await getCurrentHumanMember(ctx);
+    // The conversion is an operation on the held idea: it
+    // names the head the page holds, so a 412 surfaces as
+    // RequestError.
     await ctx.POST(
-        organizationItem(ctx, 'ideas', ideaId)
+        organizationItem(ctx, 'ideas', held.body().toValue().id)
             + '/conversion',
         {
         projectId,
@@ -379,7 +376,7 @@ export async function postIdeaConversion(
                 at: ideaStateAt,
             },
         })),
-    }, [idea]);
+    }, [held]);
     notifyProjectChange();
     notifyProjectScoreChange();
     ideaChanges.notify();

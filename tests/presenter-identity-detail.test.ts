@@ -1,5 +1,10 @@
 import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
-import { Identity } from '../shared/types.ts';
+import {
+    Identity,
+    type ClientRegistrationEntity,
+    type IdentityPiiEntity,
+} from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     IDENTITY_WITHOUT_PII_NAME,
     UNNAMED_SERVICE_NAME,
@@ -77,6 +82,13 @@ function personPresenter() {
             email: 'ada@example.com',
             phone: '555-0100',
             bio: 'First programmer.',
+            message: responseMessage<IdentityPiiEntity>({
+                id: 'pnXmXrxOWayANgDLdCjuBw',
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                phone: '555-0100',
+                bio: 'First programmer.',
+            }),
         },
         service: { named: false },
         activeCredentialKinds: [],
@@ -231,6 +243,14 @@ Deno.test(
                 jwks: '{"keys":[]}',
                 aud: 'fusion-angle',
                 status: 'active',
+                message: responseMessage<ClientRegistrationEntity>({
+                    id: 'syWUUcdBSbBgMwBiCrgbDw',
+                    grant_types: 'client_credentials',
+                    redirect_uris: '',
+                    jwks: '{"keys":[]}',
+                    aud: 'fusion-angle',
+                    status: 'active',
+                }),
             },
         }).renderShell(container);
         assertMatch(allHtml(), /data-tone="success"/);

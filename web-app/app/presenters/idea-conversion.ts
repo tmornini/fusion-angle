@@ -23,6 +23,8 @@ import type {
 import {
     formatSigned,
 } from '../scoring-format.ts';
+import type { HttpMessage } from
+    '../../../shared/http-message/http-message.ts';
 
 export interface ObjectiveDefinition {
     name: string;
@@ -93,14 +95,14 @@ export function conversionCompletedCount(
 
 export function conversionIsReady(
     draft: ConversionDraft,
-    activeObjectives: readonly ObjectiveEntity[],
+    activeObjectives: readonly HttpMessage<ObjectiveEntity>[],
 ): boolean {
     const allFieldsFilled = REQUIRED_FIELDS.every(
         f => draft.fields[f] !== '',
     );
     if (!allFieldsFilled) return false;
     return activeObjectives.every(
-        o => draft.baselines.has(o.id),
+        m => draft.baselines.has(m.body().toValue().id),
     );
 }
 
@@ -120,7 +122,7 @@ export class IdeaConversionPresenter {
     readonly #successMetrics: string;
     readonly #draft: ConversionDraft;
     readonly #activeObjectives:
-        readonly ObjectiveEntity[];
+        readonly HttpMessage<ObjectiveEntity>[];
     readonly #defs: ReadonlyMap<
         ObjectiveId, ObjectiveDefinition
     >;
@@ -128,7 +130,7 @@ export class IdeaConversionPresenter {
     constructor(
         idea: Idea,
         draft: ConversionDraft,
-        activeObjectives: readonly ObjectiveEntity[],
+        activeObjectives: readonly HttpMessage<ObjectiveEntity>[],
         defs: ReadonlyMap<
             ObjectiveId, ObjectiveDefinition
         >,
@@ -635,7 +637,7 @@ export class IdeaConversionPresenter {
                     </span>
                 </div>
                 ${this.#activeObjectives.map(
-                    o => this.#baselineRow(o),
+                    m => this.#baselineRow(m.body().toValue()),
                 )}
             </div>`;
     }

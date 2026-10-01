@@ -549,7 +549,9 @@ async function rescopeToActiveOrganization(
         getOrganizations(ctx),
         getIdentityDefaultOrganization(ctx),
     ]);
-    const reachable = organizations.map(o => o.id);
+    const reachable = organizations.map(
+        o => o.body().toValue().id,
+    );
     if (reachable.length === 0) {
         return;
     }

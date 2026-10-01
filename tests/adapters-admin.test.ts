@@ -5,17 +5,26 @@ import {
 } from '../api/db-memory.ts';
 import {
     type RequestContext,
+    organizationItem,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
+    getOrganizationEntity,
     getOrganizationSeats,
     getOrganizationStats,
+    putOrganizationGeneralInfo,
 } from '../client/admin.ts';
 import { getOrganization } from '../web-app/app/organization-view.ts';
-import { putIdea } from '../client/ideas.ts';
-import { putProject } from '../client/projects.ts';
+import { getIdeaEntity, putIdea } from '../client/ideas.ts';
+import {
+    getProjectEntity,
+    putProject,
+} from '../client/projects.ts';
 import {
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
@@ -28,8 +37,10 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { deleteHumanMemberSeat } from
-    '../client/members.ts';
+import {
+    deleteHumanMemberSeat,
+    getHumanMember,
+} from '../client/members.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 function buildProject(
@@ -64,7 +75,8 @@ function buildIdea(
 }
 
 // Seeds a project through the SAME document PUT the live route
-// uses (putProject), so a message pair exists at this project's
+// uses (an unlatched PUT of a fresh id: putProject latches the
+// head it replaces), so a message pair exists at this project's
 // document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getProjects (getOrganizationStats'
 // project count) reads, to derive it. A fixed historical
@@ -76,14 +88,15 @@ async function seedProject(
 ): Promise<void> {
     const { organization_id: _organizationId, ...entity } =
         buildProject(id);
-    await putProject(ctx, id, {
+    await ctx.PUT(organizationItem(ctx, 'projects', id), {
         ...entity,
         state,
-    }, undefined);
+    });
 }
 
 // Seeds an idea through the SAME document PUT the live route
-// uses (putIdea) and its submission through the live
+// uses (postIdeaCreation's unlatched PUT of a fresh id) and
+// its submission through the live
 // submissions PUT, so both message pairs exist — required for
 // the flipped GET ideas / GET organizations/:id/ideas/:id/submissions routes
 // (Phase 2 Task 5), which getIdeas (getOrganizationStats' idea
@@ -99,7 +112,7 @@ async function seedIdea(
 ): Promise<void> {
     const { organization_id: _organizationId, ...entity } =
         buildIdea(id);
-    await putIdea(ctx, id, {
+    await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id, {
         ...entity,
         state,
     });
@@ -206,13 +219,13 @@ Deno.test(
 
         const { organization_id: _projectOrganizationId, ...pFields } =
             buildProject(projectId);
-        await putProject(ctx, projectId, {
+        await putProject(ctx, await getProjectEntity(ctx, projectId), {
             ...pFields,
             state: 'declined',
-        }, undefined);
+        });
         const { organization_id: _ideaOrganizationId, ...iFields } =
             buildIdea(ideaId);
-        await putIdea(ctx, ideaId, {
+        await putIdea(ctx, await getIdeaEntity(ctx, ideaId), {
             ...iFields,
             state: 'archived',
         });
@@ -249,6 +262,28 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'putOrganizationGeneralInfo latches the held organization',
+    async () => {
+        const { db } = await adminContext();
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        const held = await getOrganizationEntity(ctx);
+        sent.length = 0;
+        const saved = await putOrganizationGeneralInfo(
+            ctx, held, { name: 'Renamed', domain: 'renamed.test' },
+        );
+        await putOrganizationGeneralInfo(
+            ctx, saved, { name: 'Again', domain: 'renamed.test' },
+        );
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['PUT', held.query('header.etag').toText()],
+            ['PUT', saved.query('header.etag').toText()],
+        ]);
+    },
+);
+
 // G9: the organization page counts ideas through getIdeas,
 // so a submitter who left took the whole page down.
 Deno.test(
@@ -261,7 +296,9 @@ Deno.test(
         await seedIdea(
             ctx, generateIdentifier(), 'active', leaverId,
         );
-        await deleteHumanMemberSeat(ctx, leaverId);
+        await deleteHumanMemberSeat(
+            ctx, await getHumanMember(ctx, leaverId),
+        );
         const stats = await getOrganizationStats(ctx);
         assertStrictEquals(stats.ideasCurrent, 1);
         assertStrictEquals(stats.activePeopleCount, 1);
@@ -283,7 +320,7 @@ async () => {
     );
     assertEquals(
         (await getOrganizationSeats(ctx))
-            .map((seat) => seat.identity_id)
+            .map((seat) => seat.body().toValue().identity_id)
             .filter((id) => id === earlier || id === later),
         [earlier, later],
     );

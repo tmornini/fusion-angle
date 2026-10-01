@@ -6,9 +6,13 @@ import {
 } from '@std/assert';
 import {
     type RequestContext,
+    organizationItem,
 } from '../client/request-context.ts';
 import { RequestError } from '../shared/http-errors.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -34,6 +38,7 @@ import {
 } from './member-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 function buildProject(
     _id: string,
@@ -66,7 +71,8 @@ function buildProject(
 }
 
 // Seeds a project through the SAME document PUT the live route
-// uses (putProject), so a message pair exists at this project's
+// uses (an unlatched PUT of a fresh id: putProject latches the
+// head it replaces), so a message pair exists at this project's
 // document — required for the flipped GET projects / GET
 // organizations/:id/projects/:id routes (Phase 3 Task 6) to derive it. A
 // fixed
@@ -82,10 +88,10 @@ async function seedProject(
 ): Promise<void> {
     const { organization_id: _organizationId, ...entity } =
         buildProject(id, title, overrides);
-    await putProject(ctx, id, {
+    await ctx.PUT(organizationItem(ctx, 'projects', id), {
         ...entity,
         state,
-    }, undefined);
+    });
 }
 
 Deno.test(
@@ -98,7 +104,9 @@ Deno.test(
                 estimated_cost: 99000,
             },
         );
-        const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        const row = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(row.id, 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(row.title, 'Alpha');
         assertStrictEquals(row.description, 'desc for Alpha');
@@ -134,7 +142,7 @@ Deno.test(
         const rows = await getProjectEntities(ctx);
         assertStrictEquals(rows.length, 2);
         const titles = rows
-            .map(r => r.title)
+            .map(r => r.body().toValue().title)
             .sort();
         assertEquals(titles, ['Alpha', 'Beta']);
     },
@@ -194,11 +202,8 @@ Deno.test(
         await seedProject(ctx, goneId, 'Gone');
         // Tombstone lands as a state-'deleted' document PUT
         // (Phase Final Task 2: no projects row plane).
-        const {
-            id: _id, organization_id: _org, ...fields
-        } = await getProjectEntity(ctx, goneId);
         await postProjectStateChange(
-            ctx, goneId, fields, 'deleted',
+            ctx, await getProjectEntity(ctx, goneId), 'deleted',
         );
         const projects = await getProjects(ctx);
         assertStrictEquals(projects.length, 1);
@@ -218,12 +223,13 @@ Deno.test('putProject persists a new project', async () => {
     const { ctx } = await adminContext();
     const { organization_id: _o, ...entity } =
         buildProject('pnXmXrxOWayANgDLdCjuBw', 'Created');
-    await putProject(
-        ctx, 'pnXmXrxOWayANgDLdCjuBw',
+    await ctx.PUT(
+        organizationItem(ctx, 'projects', 'pnXmXrxOWayANgDLdCjuBw'),
         { ...entity, state: STATE },
-        undefined,
     );
-    const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    const stored = (await getProjectEntity(
+        ctx, 'pnXmXrxOWayANgDLdCjuBw',
+    )).body().toValue();
     assertStrictEquals(stored.title, 'Created');
 });
 
@@ -232,11 +238,13 @@ Deno.test('putProject updates an existing project', async () => {
     await seedProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Before');
     const { organization_id: _o, ...entity } =
         buildProject('pnXmXrxOWayANgDLdCjuBw', 'After', { progress: 100 });
-    await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
-        ...entity,
-        state: STATE,
-    }, undefined);
-    const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    await putProject(
+        ctx, await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+        { ...entity, state: STATE },
+    );
+    const stored = (await getProjectEntity(
+        ctx, 'pnXmXrxOWayANgDLdCjuBw',
+    )).body().toValue();
     assertStrictEquals(stored.title, 'After');
     assertStrictEquals(stored.progress, 100);
 });
@@ -247,12 +255,14 @@ Deno.test(
         const { db, ctx } = await adminContext();
         const { organization_id: _o, ...entity } =
             buildProject('pnXmXrxOWayANgDLdCjuBw', 'Persisted');
-        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
-            ...entity,
-            state: STATE,
-        }, undefined);
+        await ctx.PUT(
+            organizationItem(ctx, 'projects', 'pnXmXrxOWayANgDLdCjuBw'),
+            { ...entity, state: STATE },
+        );
         const fresh = inPageContext(db, await organizationToken());
-        const row = await getProjectEntity(fresh, 'pnXmXrxOWayANgDLdCjuBw');
+        const row = (await getProjectEntity(
+            fresh, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(row.title, 'Persisted');
     },
 );
@@ -268,14 +278,19 @@ Deno.test(
                 progress: 40,
             },
         );
-        await putProjectFields(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
-            title: 'After',
-            description: 'new desc',
-            startDate: '2026-02-01',
-            targetEndDate: '2026-11-30',
-            estimatedCost: 75000,
-        }, STATE);
-        const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        await putProjectFields(
+            ctx, await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+            {
+                title: 'After',
+                description: 'new desc',
+                startDate: '2026-02-01',
+                targetEndDate: '2026-11-30',
+                estimatedCost: 75000,
+            },
+        );
+        const stored = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(stored.title, 'After');
         assertStrictEquals(
             stored.description, 'new desc',
@@ -303,8 +318,13 @@ Deno.test(
                 position: 1,
             },
         );
-        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5);
-        const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        await putProjectPosition(
+            ctx, await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+            9.5,
+        );
+        const stored = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(stored.position, 9.5);
         assertStrictEquals(stored.title, 'Stay');
     },
@@ -317,8 +337,13 @@ Deno.test(
         await seedProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Stay', 'archived',
         );
-        await putProjectPosition(ctx, 'pnXmXrxOWayANgDLdCjuBw', 9.5);
-        const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        await putProjectPosition(
+            ctx, await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+            9.5,
+        );
+        const stored = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(stored.state, 'archived');
         assertStrictEquals(stored.position, 9.5);
     },
@@ -333,35 +358,60 @@ Deno.test(
                 position: 1,
             },
         );
-        // Another write moves the head after the merge's read
-        // and before its PUT.
-        const racing: RequestContext = {
-            ...ctx,
-            GET: async <T>(resource: string) => {
-                const read = await ctx.GET<T>(resource);
-                await seedProject(
-                    ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Moved',
-                );
-                return read;
-            },
-        };
+        const held = (await getProjects(ctx)).find(
+            (p) => p.idForLink() === 'pnXmXrxOWayANgDLdCjuBw',
+        )!.message;
+        // Another write moves the head after the list read
+        // and before the reorder.
+        await seedProject(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Moved',
+        );
         const error = await assertRejects(
-            () => putProjectPosition(
-                racing, 'pnXmXrxOWayANgDLdCjuBw', 9.5,
-            ),
+            () => putProjectPosition(ctx, held, 9.5),
             RequestError,
         );
         assertStrictEquals(error.status, 412);
-        const stored = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        const stored = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(stored.title, 'Moved');
         assertStrictEquals(stored.position, 1);
     },
 );
 
+Deno.test('a field save then a state change both land',
+async () => {
+    const { db } = await adminContext();
+    const { ctx, sent } = recordedContext(
+        db, await organizationToken(),
+    );
+    const id = generateIdentifier();
+    await seedProject(ctx, id, 'Latched', 'submitted');
+    const held = await getProjectEntity(ctx, id);
+    const body = held.body().toValue();
+    sent.length = 0;
+    const saved = await putProjectFields(ctx, held, {
+        title: 'Renamed',
+        description: body.description,
+        startDate: body.start_date,
+        targetEndDate: body.target_end_date,
+        estimatedCost: body.estimated_cost,
+    });
+    const moved = await postProjectStateChange(
+        ctx, saved, 'under_review',
+    );
+    assertEquals(sent.map((r) => r.method), ['PUT', 'PUT']);
+    assertEquals(sent.map((r) => r.ifMatch), [
+        held.query('header.etag').toText(),
+        saved.query('header.etag').toText(),
+    ]);
+    assertStrictEquals(moved.body().toValue().title, 'Renamed');
+});
+
 Deno.test(
     'ProjectView exposes project display fields',
     () => {
-        const project = new Project({
+        const project = new Project(responseMessage({
             ...buildProject('pnXmXrxOWayANgDLdCjuBw', 'Viewable', {
                 start_date: '2026-01-01',
                 target_end_date: '2026-12-31',
@@ -370,7 +420,7 @@ Deno.test(
             }),
             state: STATE,
             id: 'pnXmXrxOWayANgDLdCjuBw',
-        }, STATE);
+        }), STATE);
         const view = new ProjectView(project, [], [], []);
         assertStrictEquals(view.idForLink(), 'pnXmXrxOWayANgDLdCjuBw');
         assertStrictEquals(view.titleText(), 'Viewable');
@@ -401,20 +451,16 @@ Deno.test(
         await seedProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Original', 'approved',
         );
-        const before = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        const {
-            id: _id,
-            organization_id: _org,
-            state: _priorState,
-            ...fields
-        } = before;
-        void _priorState;
-
-        await postProjectStateChange(
-            ctx, 'pnXmXrxOWayANgDLdCjuBw', fields, 'archived',
+        const held = await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );
+        const before = held.body().toValue();
 
-        const after = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        await postProjectStateChange(ctx, held, 'archived');
+
+        const after = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         // Entity content fields unchanged; GET reflects the
         // transition.
         assertStrictEquals(after.title, before.title);
@@ -429,14 +475,14 @@ Deno.test(
 Deno.test(
     'ProjectView timeBaselineDays spans the dates',
     () => {
-        const project = new Project({
+        const project = new Project(responseMessage({
             ...buildProject('pnXmXrxOWayANgDLdCjuBw', 'Spanned', {
                 start_date: '2026-01-01',
                 target_end_date: '2026-01-11',
             }),
             state: STATE,
             id: 'pnXmXrxOWayANgDLdCjuBw',
-        }, STATE);
+        }), STATE);
         const view = new ProjectView(project, [], [], []);
         assertStrictEquals(view.timeBaselineDays(), 10);
     },

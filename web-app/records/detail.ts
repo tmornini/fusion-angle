@@ -13,7 +13,6 @@ import {
     closeDialog,
 } from '../app/dialog.ts';
 import {
-    getRecord,
     getRecordModel,
     getRecordAttributesByRecord,
     loadRecordFlowJoins,
@@ -676,6 +675,25 @@ async function handleInstanceSave(
     }
 }
 
+type InstanceToDelete =
+    | {
+        readonly kind: 'present';
+        readonly instance: RecordInstance;
+    }
+    | { readonly kind: 'gone' };
+
+// A reload since the dialog opened may have dropped the
+// row: the instance is already gone from this list.
+export function instanceToDelete(
+    loaded: readonly RecordInstance[],
+    id: string,
+): InstanceToDelete {
+    const instance = loaded.find((row) => row.id === id);
+    return instance === undefined
+        ? { kind: 'gone' }
+        : { kind: 'present', instance };
+}
+
 async function handleDeleteInstance(
     root: HTMLElement,
 ): Promise<void> {
@@ -683,12 +701,17 @@ async function handleDeleteInstance(
     pendingDeleteInstanceId = null;
     if (!instanceId) return;
     if (saveInProgress) return;
-    // A reload since the dialog opened may have dropped the
-    // row: the instance is already gone from this list.
-    const instance = loadedInstances.find(
-        (row) => row.id === instanceId,
+    const target = instanceToDelete(
+        loadedInstances, instanceId,
     );
-    if (instance === undefined) return;
+    if (target.kind === 'gone') {
+        // Say so and show the list as it stands, rather than
+        // let a confirmed delete do nothing.
+        showToast('Instance already deleted', 'info');
+        await load(root);
+        return;
+    }
+    const instance = target.instance;
     const ctx = sessionContext();
     saveInProgress = true;
     try {
@@ -712,12 +735,11 @@ async function handleDeleteInstance(
 
 async function handleArchive(): Promise<void> {
     if (pageState.kind !== 'reading') return;
-    if (!recordId) return;
+    if (!currentView) return;
     const ctx = sessionContext();
-    const entity = await getRecord(ctx, recordId);
     try {
         await postRecordStateChange(
-            ctx, entity, 'archived',
+            ctx, currentView.record.message, 'archived',
         );
     } catch (err) {
         reportFault(
@@ -1079,11 +1101,12 @@ async function handleSave(
                     attributes: draftEntities,
                     removedAttributeIds,
                     state: originalRecord.stateValue(),
+                    held: originalRecord.message,
                 },
             );
         } else {
             await putRecord(
-                ctx, recordId,
+                ctx, originalRecord.message,
                 {
                     ...recordFields,
                     state: originalRecord.stateValue(),

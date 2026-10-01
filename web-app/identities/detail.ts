@@ -221,10 +221,10 @@ async function onClick(e: MouseEvent): Promise<void> {
 }
 
 async function performErase(): Promise<void> {
-    if (!currentId || !pageContainer) return;
+    if (!currentId || !pageContainer || !lastLoaded) return;
     try {
         await deleteIdentityPii(
-            sessionContext(), currentId,
+            sessionContext(), currentId, lastLoaded.pii,
         );
     } catch (err) {
         log.error(
@@ -267,7 +267,7 @@ function prefillRegistrationDialog(): void {
 }
 
 async function saveRegistration(): Promise<void> {
-    if (!currentId) return;
+    if (!currentId || !lastLoaded) return;
     const grantTypes =
         registrationField('#reg-grant-types').value.trim();
     const aud = registrationField('#reg-aud').value.trim();
@@ -291,6 +291,7 @@ async function saveRegistration(): Promise<void> {
                 status: registrationField('#reg-status')
                     .value as 'active' | 'disabled',
             },
+            lastLoaded.registration,
         );
     } catch (err) {
         log.error(
@@ -306,10 +307,11 @@ async function saveRegistration(): Promise<void> {
 }
 
 async function deregisterClient(): Promise<void> {
-    if (!currentId) return;
+    if (!currentId || !lastLoaded) return;
     try {
         await deleteClientRegistration(
             sessionContext(), currentId,
+            lastLoaded.registration,
         );
     } catch (err) {
         log.error(

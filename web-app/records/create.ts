@@ -53,7 +53,7 @@ async function handleSubmit(): Promise<void> {
     const ctx = sessionContext();
     const existing = await getRecordEntities(ctx);
     const position = nextPosition(
-        existing.map(r => r.position),
+        existing.map(r => r.body().toValue().position),
     );
     const id = generateIdentifier();
     await postRecordChange(ctx, id, {

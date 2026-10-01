@@ -58,8 +58,10 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { deleteHumanMemberSeat } from
-    '../client/members.ts';
+import {
+    deleteHumanMemberSeat,
+    getHumanMember,
+} from '../client/members.ts';
 
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();
@@ -379,9 +381,8 @@ Deno.test(
         const created = await getWorkOrders(ctx);
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {
-            const id = created[i]!.id;
             await putWorkOrderPosition(
-                ctx, id, explicit[i]!,
+                ctx, created[i]!, explicit[i]!,
             );
         }
         const tables = await collectTables(db);
@@ -604,7 +605,9 @@ Deno.test(
         const admin = inPageContext(
             db, await organizationToken(),
         );
-        await deleteHumanMemberSeat(admin, leaverId);
+        await deleteHumanMemberSeat(
+            admin, await getHumanMember(admin, leaverId),
+        );
         const {
             workOrders, transitionsByWo,
             activeClaimsByWo, memberMap,

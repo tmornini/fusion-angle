@@ -93,8 +93,10 @@ export function validateWorkOrderFlowGraph(
 // adapter is the divorce point, so above the storage
 // seam the flow graph is a real WorkOrderFlowGraph,
 // never the raw body value the datastore persists,
-// and the fields speak camelCase.
+// and the fields speak camelCase. The message is the
+// head it was read from, which a write from it latches.
 export interface WorkOrder {
+    readonly message: HttpMessage<WorkOrderEntity>;
     id: Id;
     organizationId: Id;
     displayId: string;
@@ -105,10 +107,12 @@ export interface WorkOrder {
     recordTypeId?: Id;
 }
 
-function toWorkOrder(
-    entity: WorkOrderEntity,
+export function toWorkOrder(
+    message: HttpMessage<WorkOrderEntity>,
 ): WorkOrder {
+    const entity = message.body().toValue();
     const out: WorkOrder = {
+        message,
         id: entity.id,
         organizationId: entity.organization_id,
         displayId: entity.display_id,
@@ -376,53 +380,33 @@ export async function getWorkOrderTransitionEvents(
 
 export async function getWorkOrderEntities(
     ctx: RequestContext,
-): Promise<WorkOrderEntity[]> {
-    return (await ctx.GETCollection<WorkOrderEntity>(
+): Promise<HttpMessage<WorkOrderEntity>[]> {
+    return await ctx.GETCollection<WorkOrderEntity>(
         organizationCollection(ctx, 'work-orders'),
-    )).map((m) => m.body().toValue());
+    );
 }
 
 export async function getWorkOrders(
     ctx: RequestContext,
 ): Promise<WorkOrder[]> {
-    const rows = await getWorkOrderEntities(ctx);
-    return rows.map(toWorkOrder);
+    return (await getWorkOrderEntities(ctx)).map(toWorkOrder);
 }
 
 export async function getFlowWorkOrderEntities(
     ctx: RequestContext,
     flowId: string,
-): Promise<FlowWorkOrderEntity[]> {
-    return (await ctx.GETCollection<FlowWorkOrderEntity>(
+): Promise<HttpMessage<FlowWorkOrderEntity>[]> {
+    return await ctx.GETCollection<FlowWorkOrderEntity>(
         organizationItem(ctx, 'flows', flowId)
             + '/work-orders/',
-    )).map((m) => m.body().toValue());
+    );
 }
 
 export async function getWorkOrder(
     ctx: RequestContext,
     id: string,
 ): Promise<WorkOrder> {
-    const row = (await ctx.GET<WorkOrderEntity>(
+    return toWorkOrder(await ctx.GET<WorkOrderEntity>(
         organizationItem(ctx, 'work-orders', id),
-    )).body().toValue();
-    return toWorkOrder(row);
-}
-
-// The work order and the head it came from, which an
-// operation on it latches.
-export async function getWorkOrderWithEtag(
-    ctx: RequestContext,
-    id: string,
-): Promise<{
-    workOrder: WorkOrder;
-    read: HttpMessage<WorkOrderEntity>;
-}> {
-    const read = await ctx.GET<WorkOrderEntity>(
-        organizationItem(ctx, 'work-orders', id),
-    );
-    return {
-        workOrder: toWorkOrder(read.body().toValue()),
-        read,
-    };
+    ));
 }

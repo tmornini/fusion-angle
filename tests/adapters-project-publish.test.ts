@@ -1,10 +1,14 @@
 import {
+    assertEquals,
     assertMatch,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     validateProjectForApproval,
@@ -12,10 +16,7 @@ import {
     postProjectApproval,
     postProjectArchival,
 } from '../client/project-publish.ts';
-import {
-    getProjectEntity,
-    putProject,
-} from '../client/projects.ts';
+import { getProjectEntity } from '../client/projects.ts';
 import {
     seedCurrentMember,
 } from './member-fixtures.ts';
@@ -24,6 +25,7 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // organization_id EXCLUDED — the client never supplies it (the
 // org fence stamps it downstream); see ProjectDocumentFields.
@@ -40,18 +42,18 @@ Deno.test('validator: not ready when objectives unscored',
     () => {
         const r = validateProjectForApproval(
             [
-                {
+                responseMessage({
                     id: 'ohqxgUBEaFQwYbXsonRPmg',
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     position: 0,
                     state: 'active',
-                },
-                {
+                }),
+                responseMessage({
                     id: generateIdentifier(),
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                     position: 1,
                     state: 'active',
-                },
+                }),
             ],
             [],
         );
@@ -61,12 +63,12 @@ Deno.test('validator: not ready when objectives unscored',
 
 Deno.test('validator: ready when all scored', () => {
     const r = validateProjectForApproval(
-        [{
+        [responseMessage({
             id: 'ohqxgUBEaFQwYbXsonRPmg',
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             position: 0,
             state: 'active',
-        }],
+        })],
         [{ id: generateIdentifier(),
            projectId: 'pnXmXrxOWayANgDLdCjuBw',
            objectiveId: 'ohqxgUBEaFQwYbXsonRPmg', score: 50,
@@ -98,16 +100,19 @@ Deno.test('postProjectApproval moves state to approved',
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = inPageContext(db, await organizationToken());
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
         // Seeded through the live document PUT (not a raw
         // db.projects.put + db.states.postEvent) so pnXmXrxOWayANgDLdCjuBw's
-        // message pair exists — postProjectApproval /
-        // postProjectArchival gate on the flipped GET
-        // organizations/:id/projects/:id existence check (Phase 3 Task 6).
-        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
+        // message pair exists — the held project is read
+        // through the flipped GET
+        // organizations/:id/projects/:id (Phase 3 Task 6).
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',
-        }, undefined);
+        });
         // The objective and its baseline score are seeded the
         // SAME wire-reachable way (Phase 7 Task 7) — a raw
         // db.objectives.put/db.projectObjectiveBaselineScores.put
@@ -131,8 +136,26 @@ Deno.test('postProjectApproval moves state to approved',
               member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-05-14T00:00:00.000000Z' },
         );
-        await postProjectApproval(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        const held = await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        );
+        sent.length = 0;
+        await postProjectApproval(ctx, held);
+        const put = sent.findIndex((r) => r.method === 'PUT');
+        assertEquals(
+            sent.slice(0, put).filter((r) => r.method === 'GET'
+                && r.path.endsWith(
+                    '/projects/pnXmXrxOWayANgDLdCjuBw',
+                )),
+            [],
+        );
+        assertStrictEquals(
+            sent[put]!.ifMatch,
+            held.query('header.etag').toText(),
+        );
+        const row = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(row.state, 'approved');
     });
 
@@ -144,17 +167,21 @@ Deno.test('postProjectApproval throws when not ready',
         const ctx = inPageContext(db, await organizationToken());
         // A synthesized state (this fixture never carried
         // one) — the state itself is irrelevant to this test.
-        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'under_review',
-        }, undefined);
+        });
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
             state: 'active',
         });
+        const held = await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        );
         const err = await assertRejects(
-            () => postProjectApproval(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+            () => postProjectApproval(ctx, held),
         ) as Error;
         assertMatch(err.message, /not ready|unscored/i);
     });
@@ -165,10 +192,11 @@ Deno.test('postProjectArchival moves state to archived',
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = inPageContext(db, await organizationToken());
-        await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
+        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+            + 'pnXmXrxOWayANgDLdCjuBw', {
             ...SAMPLE_PROJECT_BODY,
             state: 'approved',
-        }, undefined);
+        });
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg', {
             position: 0,
@@ -194,7 +222,11 @@ Deno.test('postProjectArchival moves state to archived',
               member_id: 'xdaJyuuPyHfffCGLhqDrOQ',
               at: '2026-05-15T00:00:00.000000Z' },
         );
-        await postProjectArchival(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-        const row = await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+        await postProjectArchival(
+            ctx, await getProjectEntity(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+        );
+        const row = (await getProjectEntity(
+            ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        )).body().toValue();
         assertStrictEquals(row.state, 'archived');
     });

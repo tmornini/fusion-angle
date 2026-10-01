@@ -24,6 +24,7 @@ import {
     postFlowCreation,
     putFlow,
     buildFlowBody,
+    subscribeFlowSaves,
 } from
 '../client/flow-mutations.ts';
 import type {
@@ -662,5 +663,50 @@ Deno.test(
             'mid reappears once its restore rides the'
             + ' retry that actually lands',
         );
+    },
+);
+
+// The saves channel is addressed by flow id: a page holding
+// one flow hears that flow's heads and no other's, so a
+// second writer in the same tab can never hand it a foreign
+// head to latch.
+Deno.test(
+    "subscribeFlowSaves delivers only its flow's saves",
+    async () => {
+        const { ctx } = await setupMemDb();
+        const heldId = generateIdentifier();
+        const otherId = generateIdentifier();
+        await createBaseFlow(ctx, heldId);
+        await createBaseFlow(ctx, otherId);
+        const heard: string[] = [];
+        const unsubscribe = subscribeFlowSaves(
+            heldId,
+            (head) => {
+                heard.push(head.body().toValue().id);
+            },
+        );
+        try {
+            await putFlow(ctx, otherId, {
+                name: 'Other Flow',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [buildNode(generateIdentifier())],
+                edges: [],
+            });
+            await putFlow(ctx, heldId, {
+                name: 'Held Flow',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [buildNode(generateIdentifier())],
+                edges: [],
+            });
+        } finally {
+            unsubscribe();
+        }
+        assertEquals(heard, [heldId]);
     },
 );

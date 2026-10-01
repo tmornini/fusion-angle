@@ -3,15 +3,16 @@ import { DashboardObjectiveAggregatesPresenter } from
     '../web-app/app/presenters/dashboard-objective-aggregates.ts';
 import type { TrendPoint } from '../web-app/app/scoring-aggregate.ts';
 import type { ObjectiveEntity } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 const ORGANIZATION_ID = 'AjdvjuECVZEgZoFajaIEkg';
 
-const activeObjs: ObjectiveEntity[] = [
+const activeObjs = [
     { id: 'ohqxgUBEaFQwYbXsonRPmg', organization_id: ORGANIZATION_ID,
       position: 0, state: 'active' },
     { id: 'o2', organization_id: ORGANIZATION_ID,
       position: 1, state: 'active' },
-];
+].map((o) => responseMessage<ObjectiveEntity>(o));
 const defs = new Map([
     ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Increase incomes'
         , description: 'd1' }],

@@ -57,6 +57,10 @@ const { signal } = createPageAbort();
 
 let activePresenter:
     WorkboxInboxPresenter | null = null;
+// The rows the page last read, with each reorder's answer
+// in place of the work order it moved, so the next drag of
+// that card latches the head the last save made.
+let inboxRows: InboxRows | null = null;
 
 export async function init(
     _params?: Record<string, string>,
@@ -227,12 +231,13 @@ async function fetchInboxRows(
             activeClaimsByWo.set(woId, claim);
         }
     }
-    return {
+    inboxRows = {
         workOrders,
         transitionsByWo,
         activeClaimsByWo,
         memberMap,
     };
+    return inboxRows;
 }
 
 function buildItems(
@@ -245,15 +250,6 @@ function buildItems(
         rows.activeClaimsByWo,
         rows.memberMap,
         mode,
-    );
-}
-
-async function loadInboxItems(
-    mode: InboxMode,
-    ctx: RequestContext,
-): Promise<InboxItem[]> {
-    return buildItems(
-        await fetchInboxRows(ctx), mode,
     );
 }
 
@@ -292,9 +288,14 @@ function onActiveListLoaded(
         '[data-work-order-card]',
         'data-work-order-card',
         async (id, newPosition) => {
+            if (!inboxRows) return;
+            const held = inboxRows.workOrders
+                .find(wo => wo.id === id);
+            if (!held) return;
+            let moved: WorkOrder;
             try {
-                await putWorkOrderPosition(
-                    ctx, id, newPosition,
+                moved = await putWorkOrderPosition(
+                    ctx, held, newPosition,
                 );
             } catch (err) {
                 log.error(
@@ -307,11 +308,15 @@ function onActiveListLoaded(
                 );
                 return;
             }
-            const refreshed =
-                await loadInboxItems('active', ctx);
+            inboxRows = {
+                ...inboxRows,
+                workOrders: inboxRows.workOrders.map(
+                    wo => wo.id === id ? moved : wo,
+                ),
+            };
             activePresenter =
                 new WorkboxInboxPresenter(
-                    refreshed, true,
+                    buildItems(inboxRows, 'active'), true,
                 );
             activePresenter.renderList(
                 activeEl,

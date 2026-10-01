@@ -44,6 +44,12 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
+import type {
+    ObjectiveEntity,
+    OrganizationEntity,
+} from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     getOrganization,
     Organization,
@@ -143,19 +149,46 @@ async function fetchObjectivesData(
     const allObjs = await getObjectives(ctx);
     const active = activeObjectivesOf(allObjs);
     const archived = allObjs.filter(
-        o => o.state === 'archived',
+        m => m.body().toValue().state === 'archived',
     );
     const defs =
         await getCurrentObjectiveDefinitions(
             ctx,
             [...active, ...archived]
-                .map(o => o.id),
+                .map(m => m.body().toValue().id),
         );
     return {
         active,
         archived,
         defs,
         archivedAt: new Map<string, string>(),
+    };
+}
+
+// The objectives the page last painted. A write from one of
+// them latches its held head, and the head the write answers
+// replaces it, so the next write names the head this one made.
+let heldObjectives: ObjectivesData | null = null;
+
+function heldObjective(
+    id: string,
+): HttpMessage<ObjectiveEntity> | undefined {
+    if (!heldObjectives) return undefined;
+    return [...heldObjectives.active, ...heldObjectives.archived]
+        .find(m => m.body().toValue().id === id);
+}
+
+function holdObjective(
+    saved: HttpMessage<ObjectiveEntity>,
+): void {
+    if (!heldObjectives) return;
+    const id = saved.body().toValue().id;
+    const swap = (m: HttpMessage<ObjectiveEntity>) =>
+        m.body().toValue().id === id ? saved : m;
+    heldObjectives = {
+        ...heldObjectives,
+        active: heldObjectives.active.map(swap),
+        archived: heldObjectives.archived.map(swap),
     };
 }
 
@@ -172,6 +205,7 @@ function organizationAndStats(
 function paintObjectives(
     data: ObjectivesData,
 ): void {
+    heldObjectives = data;
     const presenter =
         new OrganizationObjectivesPresenter(
             data.active,
@@ -192,10 +226,11 @@ function paintObjectives(
         '[data-objective-id]',
         'data-objective-id',
         async (id, newPosition) => {
-            const dragCtx = sessionContext();
-            await putObjectivePosition(
-                dragCtx, id, newPosition,
-            );
+            const held = heldObjective(id);
+            if (!held) return;
+            holdObjective(await putObjectivePosition(
+                sessionContext(), held, newPosition,
+            ));
         },
     );
 }
@@ -261,9 +296,11 @@ async function onObjectiveAction(
         action === 'reactivate'
         && objectiveId
     ) {
-        await postObjectiveReactivation(
-            ctx, objectiveId,
-        );
+        const held = heldObjective(objectiveId);
+        if (!held) return;
+        holdObjective(await postObjectiveReactivation(
+            ctx, held,
+        ));
     }
 }
 
@@ -388,7 +425,7 @@ export async function init(): Promise<void> {
         const ctx = sessionContext();
         const objs = await getObjectives(ctx);
         const position = nextPosition(
-            objs.map(o => o.position),
+            objs.map(m => m.body().toValue().position),
         );
         const newId = generateIdentifier();
         await postObjectiveCreation(
@@ -426,8 +463,11 @@ export async function init(): Promise<void> {
         const id = ($(
             '#confirm-archive-id', document,
         ) as HTMLInputElement).value;
-        const ctx = sessionContext();
-        await postObjectiveArchival(ctx, id);
+        const held = heldObjective(id);
+        if (!held) return;
+        holdObjective(await postObjectiveArchival(
+            sessionContext(), held,
+        ));
         closeDialog('confirm-archive');
     }, { signal });
 }
@@ -611,10 +651,12 @@ async function handleSave(): Promise<void> {
         return;
     }
     const trimmed = trimStrings(state.draft);
+    const { organization: held, stats } = state;
     const ctx = sessionContext();
+    let saved: HttpMessage<OrganizationEntity>;
     try {
-        await putOrganizationGeneralInfo(
-            ctx, trimmed,
+        saved = await putOrganizationGeneralInfo(
+            ctx, held.message, trimmed,
         );
     } catch (err) {
         log.error(
@@ -629,12 +671,15 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Organization saved', 'success');
-    const [freshOrganization, freshStats] =
-        await organizationAndStats(ctx);
+    // The page goes on holding this organization, so its next
+    // save latches the head this one made. A name or domain
+    // moves no seat, so the derived usage carries over.
     state = {
         kind: 'reading',
-        organization: freshOrganization,
-        stats: freshStats,
+        organization: new Organization(saved, {
+            usedSeats: held.usedSeats(),
+        }),
+        stats,
     };
     await rerender();
 }

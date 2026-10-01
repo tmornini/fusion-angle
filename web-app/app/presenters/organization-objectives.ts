@@ -1,4 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
+import type { HttpMessage } from
+    '../../../shared/http-message/http-message.ts';
 import type {
     ObjectiveEntity,
     ObjectiveId,
@@ -15,14 +17,14 @@ interface Definition {
 }
 
 export class OrganizationObjectivesPresenter {
-    readonly #active: ObjectiveEntity[];
-    readonly #archived: ObjectiveEntity[];
+    readonly #active: HttpMessage<ObjectiveEntity>[];
+    readonly #archived: HttpMessage<ObjectiveEntity>[];
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #archivedAt: Map<ObjectiveId, string>;
 
     constructor(
-        active: ObjectiveEntity[],
-        archived: ObjectiveEntity[],
+        active: HttpMessage<ObjectiveEntity>[],
+        archived: HttpMessage<ObjectiveEntity>[],
         defs: Map<ObjectiveId, Definition>,
         archivedAt: Map<ObjectiveId, string>,
     ) {
@@ -100,9 +102,10 @@ export class OrganizationObjectivesPresenter {
     }
 
     #row(
-        o: ObjectiveEntity,
+        message: HttpMessage<ObjectiveEntity>,
         isArchived: boolean,
     ): SafeHtml {
+        const o = message.body().toValue();
         const def = this.#defs.get(o.id);
         if (!def) {
             throw new Error(

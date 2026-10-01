@@ -11,13 +11,16 @@ import type {
 import {
     Idea, Project, HumanMember,
     type IdeaState,
+    type IdentityPiiEntity,
+    type MembershipEntity,
 } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 function buildIdea(
     id: string, title: string,
     state: IdeaState = 'active',
 ): Idea {
-    return new Idea({
+    return new Idea(responseMessage({
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title,
@@ -28,13 +31,13 @@ function buildIdea(
         expected_outcome: '',
         success_metrics: '',
         state,
-    }, state);
+    }), state);
 }
 
 function buildProject(
     id: string, title: string,
 ): Project {
-    return new Project({
+    return new Project(responseMessage({
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title,
@@ -47,7 +50,7 @@ function buildProject(
         actual_cost: 0,
         position: 1,
         state: 'approved',
-    }, 'approved');
+    }), 'approved');
 }
 
 function buildHumanMember(
@@ -56,6 +59,13 @@ function buildHumanMember(
     title = 'engineer',
     department = 'Eng',
 ): HumanMember {
+    const pii = {
+        name: first + ' ' + last,
+        email: first.toLowerCase()
+            + '@example.com',
+        phone: '',
+        bio: '',
+    };
     return new HumanMember(
         {
             id,
@@ -70,12 +80,18 @@ function buildHumanMember(
         },
         {
             erased: false,
-            name: first + ' ' + last,
-            email: first.toLowerCase()
-                + '@example.com',
-            phone: '',
-            bio: '',
+            ...pii,
+            message: responseMessage<IdentityPiiEntity>({
+                id, ...pii,
+            }),
         },
+        responseMessage<MembershipEntity>({
+            id,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: id,
+            type: 'member',
+            at: '2026-01-01T00:00:00.000000Z',
+        }),
     );
 }
 
@@ -199,7 +215,6 @@ Deno.test(
     () => {
         const tuple = {
             idea: buildIdea('fndCYAsXazdzMUlEGMNIZw', 'My Idea'),
-            entity: undefined as unknown as never,
             submitterName: 'Alice',
             submittedAt: '2026-01-01',
         };
@@ -221,7 +236,6 @@ Deno.test(
                 'fxysGbBPBsnCwJNJsyZnkA', 'Other',
                 'approved',
             ),
-            entity: undefined as unknown as never,
             submitterName: 'Bob',
             submittedAt: '2026-01-01',
         };

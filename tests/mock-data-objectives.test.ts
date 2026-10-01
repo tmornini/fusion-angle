@@ -71,7 +71,8 @@ async function projectIdsByState(
     wanted: ProjectState,
 ): Promise<Id[]> {
     // Lifecycle state rides the project GET row.
-    const rows = await getProjectEntities(ctx);
+    const rows = (await getProjectEntities(ctx))
+        .map((m) => m.body().toValue());
     return rows
         .filter(p => p.state === wanted)
         .map(p => p.id);
@@ -81,7 +82,8 @@ Deno.test('seeds every objective seed plus the org-2 objective',
 async () => {
     const db = await sharedMockDb();
     const ctx = inPageContext(db, await organizationToken());
-    const rows = await getObjectives(ctx);
+    const rows = (await getObjectives(ctx))
+        .map((m) => m.body().toValue());
     // getObjectives is org-scoped to the token's org (Stark).
     assertStrictEquals(rows.length, OBJECTIVE_SEEDS.length);
     for (const r of rows) {

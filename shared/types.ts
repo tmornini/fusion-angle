@@ -1,3 +1,5 @@
+import type { HttpMessage } from
+    './http-message/http-message.ts';
 import { NIL_IDENTIFIER } from
     './identifier.ts';
 
@@ -639,7 +641,9 @@ export interface IdentityProviderEntity {
 // The person-PII display facet as a tagged union, so the
 // ABSENCE of the row (erased PII) is represented without
 // null and DECIDED AT THE CALL SITE. Presenters switch on
-// `erased` and supply their own fallback constant.
+// `erased` and supply their own fallback constant. Present
+// PII keeps the message it was read from, so a write over
+// it names the head it replaces.
 export type MemberPii =
     | {
         readonly erased: false;
@@ -647,6 +651,7 @@ export type MemberPii =
         readonly email: string;
         readonly phone: string;
         readonly bio: string;
+        readonly message: HttpMessage<IdentityPiiEntity>;
     }
     | { readonly erased: true };
 
@@ -715,6 +720,9 @@ export type HumanProfile =
 
 export class HumanMember {
     readonly kind = 'human' as const;
+    // The seat this member was read through: its removal
+    // names the head it replaces.
+    readonly seat: HttpMessage<MembershipEntity>;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
     readonly #profile: HumanProfile;
@@ -723,7 +731,9 @@ export class HumanMember {
         parent: MemberEntity,
         profile: HumanProfile,
         pii: MemberPii,
+        seat: HttpMessage<MembershipEntity>,
     ) {
+        this.seat = seat;
         this.#id = parent.id;
         this.#pii = pii;
         this.#profile = profile;
@@ -1433,6 +1443,7 @@ export interface ProjectFlowEntity {
 }
 
 export class Idea {
+    readonly message: HttpMessage<IdeaEntity>;
     readonly #id: string;
     readonly #title: string;
     readonly #position: number;
@@ -1444,9 +1455,11 @@ export class Idea {
     readonly #successMetrics: string;
 
     constructor(
-        entity: IdeaEntity,
+        message: HttpMessage<IdeaEntity>,
         state: IdeaState,
     ) {
+        this.message = message;
+        const entity = message.body().toValue();
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
@@ -1536,6 +1549,7 @@ export class Idea {
 }
 
 export class Project {
+    readonly message: HttpMessage<ProjectEntity>;
     readonly #id: string;
     readonly #title: string;
     readonly #description: string;
@@ -1548,9 +1562,11 @@ export class Project {
     readonly #position: number;
 
     constructor(
-        entity: ProjectEntity,
+        message: HttpMessage<ProjectEntity>,
         state: ProjectState,
     ) {
+        this.message = message;
+        const entity = message.body().toValue();
         this.#id = entity.id;
         this.#title = entity.title;
         this.#description =
@@ -1661,6 +1677,7 @@ export class Project {
 }
 
 export class RecordModel {
+    readonly message: HttpMessage<RecordEntity>;
     readonly #id: string;
     readonly #name: string;
     readonly #description: string;
@@ -1668,9 +1685,11 @@ export class RecordModel {
     readonly #state: RecordState;
 
     constructor(
-        entity: RecordEntity,
+        message: HttpMessage<RecordEntity>,
         state: RecordState,
     ) {
+        this.message = message;
+        const entity = message.body().toValue();
         this.#id = entity.id;
         this.#name = entity.name;
         this.#description = entity.description;

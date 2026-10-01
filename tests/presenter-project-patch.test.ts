@@ -5,6 +5,7 @@ import {
     projectDraftFromView,
     projectPatchFromDraft,
 } from '../web-app/app/presenters/project-detail.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // None of api/types.ts, adapters/projects.ts, or
 // presenters/project-detail.ts reads localStorage (checked
@@ -20,7 +21,7 @@ globalThis.window = {
 globalThis.document = { addEventListener: () => {} };
 
 function buildView() {
-    const project = new Project({
+    const project = new Project(responseMessage({
         id: 'pnXmXrxOWayANgDLdCjuBw',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 'Costly',
@@ -32,7 +33,7 @@ function buildView() {
         actual_cost: 12000,
         position: 1,
         state: 'approved',
-    }, 'approved');
+    }), 'approved');
     return new ProjectView(project, [], [], []);
 }
 

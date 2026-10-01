@@ -1,6 +1,8 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { ProjectObjectivesPresenter } from
     '../web-app/app/presenters/project-objectives.ts';
+import type { ObjectiveEntity } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 const activeObjs = [
     {
@@ -15,7 +17,7 @@ const activeObjs = [
         position: 1,
         state: 'active',
     },
-];
+].map((o) => responseMessage<ObjectiveEntity>(o));
 const defs = new Map([
     ['ohqxgUBEaFQwYbXsonRPmg', { name: 'Revenue', description: 'd1' }],
     ['o2', { name: 'Cost', description: 'd2' }],

@@ -71,7 +71,9 @@ export function getDashboardGauges(
     // Lifecycle state rides the project GET row
     // (Phase A stamp) — no second hop.
     const impact = getPortfolioImpactSummary(bundle);
-    const projects = bundle.projects.filter(p =>
+    const projects = bundle.projects.map(
+        m => m.body().toValue(),
+    ).filter(p =>
         projectStateIsApproved(
             assertProjectState(
                 p.state, 'project ' + p.id,
@@ -213,7 +215,7 @@ export async function getDashboardStats(
     return [
         {
             label: 'Ideas',
-            value: ideas.filter(row =>
+            value: ideas.map(m => m.body().toValue()).filter(row =>
                 ideaIsVisible(
                     assertIdeaState(
                         row.state,
@@ -224,7 +226,7 @@ export async function getDashboardStats(
         },
         {
             label: 'Projects',
-            value: projects.filter(p =>
+            value: projects.map(m => m.body().toValue()).filter(p =>
                 projectStateIsNotDeleted(
                     assertProjectState(
                         p.state,

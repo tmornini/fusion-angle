@@ -17,8 +17,12 @@ import {
 } from '../client/request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
+import type { ObjectiveEntity } from '../shared/types.ts';
 import { RequestError } from '../shared/http-errors.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -240,14 +244,17 @@ Deno.test(
             'ohqxgUBEaFQwYbXsonRPmg',
             'Rev', 'd', 0,
         );
-        await postObjectiveArchival(
-            ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg',
+        const held = (await getObjectives(ctx)).find(
+            (m) => m.body().toValue().id === 'ohqxgUBEaFQwYbXsonRPmg',
+        )!;
+        const archived = await postObjectiveArchival(
+            ctxFor(db), held,
         );
-        await postObjectiveReactivation(
-            ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg',
+        const reactivated = await postObjectiveReactivation(
+            ctxFor(db), archived,
         );
         await postObjectiveArchival(
-            ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg',
+            ctxFor(db), reactivated,
         );
         const events =
             await getObjectiveLifecycleEvents(ctx);
@@ -286,7 +293,11 @@ Deno.test(
             'Rev', 'd', 0,
         );
         await postObjectiveArchival(
-            ctxFor(db), 'ohqxgUBEaFQwYbXsonRPmg',
+            ctxFor(db),
+            (await getObjectives(ctx)).find(
+                (m) => m.body().toValue().id
+                    === 'ohqxgUBEaFQwYbXsonRPmg',
+            )!,
         );
         // The wire putObjectivePosition drives: a
         // position PUT re-sending the standing
@@ -323,7 +334,8 @@ Deno.test(
 
         // Phase Final Task 2: row halves stripped — assert via
         // adapter GETs (message plane).
-        const objectives = await getObjectives(ctx);
+        const objectives = (await getObjectives(ctx))
+            .map((m) => m.body().toValue());
         assertStrictEquals(objectives.length, 1);
         assertStrictEquals(objectives[0]!.id, 'ohqxgUBEaFQwYbXsonRPmg');
         assertStrictEquals(objectives[0]!.position, 1);
@@ -371,16 +383,21 @@ Deno.test(
 
         const active = await getActiveObjectives(ctx);
         const others = active.filter(
-            o => o.id !== o3,
+            m => m.body().toValue().id !== o3,
         );
         const newPos = computeNewPosition(
-            others.map(o => o.position),
+            others.map(m => m.body().toValue().position),
             1,
         );
-        await putObjectivePosition(ctx, o3, newPos);
+        await putObjectivePosition(
+            ctx,
+            active.find(m => m.body().toValue().id === o3)!,
+            newPos,
+        );
 
         // Phase Final Task 2: positions from GET (message plane).
-        const all = await getObjectives(ctx);
+        const all = (await getObjectives(ctx))
+            .map((m) => m.body().toValue());
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
@@ -411,11 +428,21 @@ Deno.test(
             ctx, o3, 'C', 'd', 3,
         );
 
-        await putObjectivePosition(ctx, o2, 1.5);
-        await putObjectivePosition(ctx, o3, 1.25);
+        const held = await getObjectives(ctx);
+        await putObjectivePosition(
+            ctx,
+            held.find(m => m.body().toValue().id === o2)!,
+            1.5,
+        );
+        await putObjectivePosition(
+            ctx,
+            held.find(m => m.body().toValue().id === o3)!,
+            1.25,
+        );
 
         // Phase Final Task 2: positions from GET (message plane).
-        const all = await getObjectives(ctx);
+        const all = (await getObjectives(ctx))
+            .map((m) => m.body().toValue());
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
@@ -436,21 +463,17 @@ Deno.test(
             organizationItem(ctx, 'objectives', id),
             objectiveDoc(1, 'active'),
         );
-        // Another write moves the head after the merge's read
-        // and before its PUT.
-        const racing: RequestContext = {
-            ...ctx,
-            GET: async <T>(resource: string) => {
-                const read = await ctx.GET<T>(resource);
-                await ctx.PUT(
-                    organizationItem(ctx, 'objectives', id),
-                    objectiveDoc(2, 'active'),
-                );
-                return read;
-            },
-        };
+        const held = (await getObjectives(ctx)).find(
+            (m) => m.body().toValue().id === id,
+        )!;
+        // Another write moves the head after the list read
+        // and before the archival.
+        await ctx.PUT(
+            organizationItem(ctx, 'objectives', id),
+            objectiveDoc(2, 'active'),
+        );
         const error = await assertRejects(
-            () => postObjectiveArchival(racing, id),
+            () => postObjectiveArchival(ctx, held),
             RequestError,
         );
         assertStrictEquals(error.status, 412);
@@ -468,19 +491,14 @@ type RecordedCall = {
     path: string;
     body?: Record<string, unknown>;
     latch?: Latch | undefined;
-    answer?: HttpMessage;
 };
 
-// Recording fake RequestContext — pins the hop shape of
-// get-then-put writers without spinning up a MemoryDb. A
-// GET answers the handler's row as a message carrying the
-// handler's tag on its etag line; a PUT records the latch
-// it was handed.
+// Recording fake RequestContext — pins the hop shape of the
+// held-objective writers without spinning up a MemoryDb. A
+// PUT records the latch it was handed; any read throws, since
+// the page already holds the objective.
 function recordingCtx(
     handlers: {
-        GET?: (
-            path: string,
-        ) => Promise<{ body: unknown; etag: string }>;
         PUT?: (
             path: string,
             body: Record<string, unknown>,
@@ -492,18 +510,8 @@ function recordingCtx(
         requestId: 'rOEPOcVMQdJiiiMuiiEhlg',
         identity: { id: 'XXZruirZyAOoRpNxaDnpSA'
             , organization: 'AjdvjuECVZEgZoFajaIEkg' },
-        GET: async <T>(
-            path: string,
-        ): Promise<HttpMessage<T>> => {
-            if (!handlers.GET) {
-                throw new Error('unexpected GET ' + path);
-            }
-            const { body, etag } = await handlers.GET(path);
-            const answer = responseMessage<T>(
-                body as T, { etag: '"' + etag + '"' },
-            );
-            calls.push({ method: 'GET', path, answer });
-            return answer;
+        GET: async (path: string) => {
+            throw new Error('unexpected GET ' + path);
         },
         PUT: async <T>(
             path: string,
@@ -534,37 +542,25 @@ Deno.test(
     'postObjectiveArchival PUTs the document with the'
     + ' archived state and the current position',
     async () => {
+        const held = responseMessage<ObjectiveEntity>({
+            id: 'ohqxgUBEaFQwYbXsonRPmg',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            position: 3,
+            state: 'active',
+        }, { etag: '"objectiveHeadEtagXXXXXX"' });
         const { ctx, calls } = recordingCtx({
-            GET: async (path) => {
-                assertStrictEquals(path
-                    , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-                    + 'ohqxgUBEaFQwYbXsonRPmg');
-                return {
-                    body: {
-                        id: 'ohqxgUBEaFQwYbXsonRPmg',
-                        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                        position: 3,
-                        state: 'active',
-                    },
-                    etag: 'objectiveHeadEtagXXXXXX',
-                };
-            },
             PUT: async () => ({}),
         });
-        await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
-        assertStrictEquals(calls.length, 2);
-        assertStrictEquals(calls[0]!.method, 'GET');
+        await postObjectiveArchival(ctx, held);
+        assertStrictEquals(calls.length, 1);
+        assertStrictEquals(calls[0]!.method, 'PUT');
+        const latch = calls[0]!.latch;
+        assert(latch !== undefined && latch !== 'creates');
+        assertStrictEquals(latch[0], held);
         assertStrictEquals(calls[0]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
-        assertStrictEquals(calls[1]!.method, 'PUT');
-        const latch = calls[1]!.latch;
-        assert(latch !== undefined && latch !== 'creates');
-        assertStrictEquals(latch[0], calls[0]!.answer);
-        assertStrictEquals(calls[1]!.path
-            , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
-            + 'ohqxgUBEaFQwYbXsonRPmg');
-        const body = calls[1]!.body!;
+        const body = calls[0]!.body!;
         assertStrictEquals(body['position'], 3);
         assertStrictEquals(body['state'], 'archived');
         assertStrictEquals('state_at' in body, false);
@@ -575,33 +571,50 @@ Deno.test(
     'putObjectivePosition keeps the head state, sending'
     + ' only the position from the caller',
     async () => {
+        const held = responseMessage<ObjectiveEntity>({
+            id: 'ohqxgUBEaFQwYbXsonRPmg',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            position: 9,
+            state: 'archived',
+        }, { etag: '"objectiveHeadEtagXXXXXX"' });
         const { ctx, calls } = recordingCtx({
-            GET: async () => ({
-                body: {
-                    id: 'ohqxgUBEaFQwYbXsonRPmg',
-                    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                    position: 9,
-                    state: 'archived',
-                },
-                etag: 'objectiveHeadEtagXXXXXX',
-            }),
             PUT: async () => ({}),
         });
-        await putObjectivePosition(
-            ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5,
-        );
-        assertStrictEquals(calls.length, 2);
-        assertStrictEquals(calls[0]!.method, 'GET');
-        assertStrictEquals(calls[1]!.method, 'PUT');
-        assertStrictEquals(calls[1]!.path
+        await putObjectivePosition(ctx, held, 1.5);
+        assertStrictEquals(calls.length, 1);
+        assertStrictEquals(calls[0]!.method, 'PUT');
+        assertStrictEquals(calls[0]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
-        const latch = calls[1]!.latch;
+        const latch = calls[0]!.latch;
         assert(latch !== undefined && latch !== 'creates');
-        assertStrictEquals(latch[0], calls[0]!.answer);
-        assertEquals(calls[1]!.body, {
+        assertStrictEquals(latch[0], held);
+        assertEquals(calls[0]!.body, {
             position: 1.5,
             state: 'archived',
         });
     },
 );
+
+Deno.test('a reactivation on the archival answer lands',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const { ctx, sent } = recordedContext(db, DEV_TOKEN);
+    const id = generateIdentifier();
+    await ctx.PUT(
+        organizationItem(ctx, 'objectives', id),
+        objectiveDoc(1, 'active'),
+    );
+    const held = (await getObjectives(ctx)).find(
+        (m) => m.body().toValue().id === id,
+    )!;
+    sent.length = 0;
+    const archived = await postObjectiveArchival(ctx, held);
+    await postObjectiveReactivation(ctx, archived);
+    assertEquals(sent.map((r) => r.method), ['PUT', 'PUT']);
+    assertEquals(sent.map((r) => r.ifMatch), [
+        held.query('header.etag').toText(),
+        archived.query('header.etag').toText(),
+    ]);
+});

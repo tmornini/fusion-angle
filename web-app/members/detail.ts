@@ -468,9 +468,8 @@ async function handleSave(): Promise<void> {
 async function performRemove(): Promise<void> {
     if (!state || state.variant !== 'human') return;
     const ctx = sessionContext();
-    const memberId = state.member.idForLink();
     try {
-        await deleteHumanMemberSeat(ctx, memberId);
+        await deleteHumanMemberSeat(ctx, state.member);
     } catch (err) {
         reportFault(ctx, 'Failed to remove member', err);
         return;
@@ -516,10 +515,11 @@ async function saveHumanMember(
     const memberId = s.member.idForLink();
     const ctx = sessionContext();
     let profile;
+    let read;
     try {
-        profile = await getHumanMemberProfile(
+        ({ profile, read } = await getHumanMemberProfile(
             ctx, memberId,
-        );
+        ));
     } catch (err) {
         reportFault(
             ctx, 'Failed to save member', err,
@@ -543,7 +543,11 @@ async function saveHumanMember(
     );
     try {
         await putHumanMember(
-            ctx, memberId, nextDetail, piiPatch,
+            ctx, memberId,
+            { held: read, body: nextDetail },
+            piiPatch === undefined
+                ? undefined
+                : { current: s.member.pii(), body: piiPatch },
         );
     } catch (err) {
         reportFault(
@@ -573,9 +577,9 @@ async function saveAIMember(
 ): Promise<void> {
     const memberId = s.member.idForLink();
     const ctx = sessionContext();
-    let row;
+    let held;
     try {
-        row = await getAIMemberEntity(
+        held = await getAIMemberEntity(
             ctx, memberId,
         );
     } catch (err) {
@@ -592,10 +596,10 @@ async function saveAIMember(
     const patch = trimStrings(
         aiMemberPatchFromDraft(s.draft),
     );
-    const { id: _id, ...rest } = row;
+    const { id: _id, ...rest } = held.body().toValue();
     try {
         await putAIMember(
-            ctx, memberId,
+            ctx, held,
             { ...rest, ...patch },
         );
     } catch (err) {

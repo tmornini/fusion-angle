@@ -4,6 +4,8 @@ import type {
 } from '../../shared/types.ts';
 import { formatCalendarDate } from './format.ts';
 import type { RequestContext } from '../../client/request-context.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     getOrganizationEntity,
     getOrganizationSeats,
@@ -18,14 +20,16 @@ export interface OrganizationDerived {
 }
 
 export class Organization {
+    readonly message: HttpMessage<OrganizationEntity>;
     readonly #entity: OrganizationEntity;
     readonly #derived: OrganizationDerived;
 
     constructor(
-        entity: OrganizationEntity,
+        message: HttpMessage<OrganizationEntity>,
         derived: OrganizationDerived,
     ) {
-        this.#entity = entity;
+        this.message = message;
+        this.#entity = message.body().toValue();
         this.#derived = derived;
     }
 
@@ -88,13 +92,13 @@ export class Organization {
 // so the count is the active org's slice.
 async function deriveOrganizationFacts(
     ctx: RequestContext,
-    seatsP?: Promise<readonly MembershipEntity[]>,
+    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<OrganizationDerived> {
     const seats = seatsP !== undefined
         ? await seatsP
         : await getOrganizationSeats(ctx);
     const identities = new Set(
-        seats.map(m => m.identity_id),
+        seats.map(m => m.body().toValue().identity_id),
     );
     return {
         usedSeats: identities.size,
@@ -103,11 +107,11 @@ async function deriveOrganizationFacts(
 
 export async function getOrganization(
     ctx: RequestContext,
-    seatsP?: Promise<readonly MembershipEntity[]>,
+    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<Organization> {
-    const [entity, derived] = await Promise.all([
+    const [message, derived] = await Promise.all([
         getOrganizationEntity(ctx),
         deriveOrganizationFacts(ctx, seatsP),
     ]);
-    return new Organization(entity, derived);
+    return new Organization(message, derived);
 }

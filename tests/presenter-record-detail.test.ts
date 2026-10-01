@@ -11,13 +11,14 @@ import {
 } from '../web-app/app/presenters/record-detail.ts';
 import { RecordModel } from '../shared/types.ts';
 import type { RecordState } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 function pageFor(
     state: RecordState,
     roles: readonly string[],
 ): string {
     const model = new RecordModel(
-        {
+        responseMessage({
             id: 'rbfHGatkwQzGZJVXKJEeyw',
             organization_id:
                 'AjdvjuECVZEgZoFajaIEkg',
@@ -25,7 +26,7 @@ function pageFor(
             description: 'Quarterly review subject',
             position: 1,
             state,
-        },
+        }),
         state,
     );
     return new RecordDetailPresenter({

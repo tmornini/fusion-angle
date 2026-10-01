@@ -249,6 +249,12 @@ export class WorkboxDetailPresenter {
             : { kind: 'unclaimed' };
     }
 
+    // The work order the page holds: each write from this
+    // screen latches its head.
+    workOrder(): WorkOrder {
+        return this.#workOrder;
+    }
+
     idValue(): string {
         return this.#workOrder.id;
     }

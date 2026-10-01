@@ -6,6 +6,7 @@ import {
 } from '@std/assert';
 import {
     nowUtc,
+    storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
     type GraphNode,
@@ -37,6 +38,7 @@ import {
 import {
     makeHumanMember,
 } from './member-fixtures.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // WorkboxDetailPresenter is pure: the constructor
 // takes the work order, transition events, per-event
@@ -136,6 +138,13 @@ function makeWorkOrder(
     overrides: Partial<WorkOrder> = {},
 ): WorkOrder {
     return {
+        message: responseMessage({
+            id: 'wo-1',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            display_id: 'WO-42',
+            flow_graph: storedWorkOrderFlowGraph(graph),
+            position: 0,
+        }),
         id: 'wo-1',
         organizationId: 'AjdvjuECVZEgZoFajaIEkg',
         displayId: 'WO-42',

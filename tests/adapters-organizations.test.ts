@@ -16,9 +16,13 @@ import {
 Deno.test('putOrganization then getOrganization round-trips',
 async () => {
     const { ctx } = await adminContext();
-    await putOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'
-        , organizationRow('Acme'));
-    const organization = await getOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg');
+    await putOrganization(
+        ctx, await getOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'),
+        organizationRow('Acme'),
+    );
+    const organization = (
+        await getOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg')
+    ).body().toValue();
     assertStrictEquals(organization.name, 'Acme');
     assertStrictEquals(organization.id, 'AjdvjuECVZEgZoFajaIEkg');
 });
@@ -47,10 +51,13 @@ async function seedMembershipPair(
 Deno.test('getOrganizations returns only the caller member orgs',
 async () => {
     const { db, ctx } = await adminContext();
-    await putOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'
-        , organizationRow('Acme'));
     await putOrganization(
-        ctx, generateIdentifier(), organizationRow('Beta'),
+        ctx, await getOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'),
+        organizationRow('Acme'),
+    );
+    await ctx.PUT(
+        'organizations/' + generateIdentifier(),
+        organizationRow('Beta'),
     );
     await seedMembershipPair(
         db, generateIdentifier(),
@@ -58,7 +65,7 @@ async () => {
         '2026-06-04T00:00:00.000000Z',
     );
     const organizations = await getOrganizations(ctx);
-    assertEquals(organizations.map(o => o.id)
+    assertEquals(organizations.map(o => o.body().toValue().id)
         , ['AjdvjuECVZEgZoFajaIEkg']);
 });
 
@@ -68,7 +75,9 @@ async () => {
     const [low, high] = [generateIdentifier(), generateIdentifier()]
         .sort(compareIdentifiers) as [string, string];
     for (const id of [high, low]) {
-        await putOrganization(ctx, id, organizationRow('O-' + id));
+        await ctx.PUT(
+            'organizations/' + id, organizationRow('O-' + id),
+        );
         await seedMembershipPair(
             db, generateIdentifier(), id, 'XXZruirZyAOoRpNxaDnpSA',
             '2026-06-04T00:00:00.000000Z',
@@ -76,7 +85,7 @@ async () => {
     }
     assertEquals(
         (await getOrganizations(ctx))
-            .map(o => o.id)
+            .map(o => o.body().toValue().id)
             .filter(id => id === low || id === high),
         [low, high],
     );

@@ -4,6 +4,8 @@ import type {
 } from '../../shared/types.ts';
 import { asStoredGraph } from '../../shared/flow-graph-body.ts';
 import { asBoolean } from '../../shared/json-assert.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import type { RequestContext } from '../../client/request-context.ts';
 import { getFlowsWithGraphs } from '../../client/flow-queries.ts';
 import { shouldShowMemberHazard } from './flow-graph.ts';
@@ -16,10 +18,10 @@ export type FlowProblem =
 export type FlowReadiness = ValidationResult<FlowProblem>;
 
 export function validateFlowForCreation(
-    flow: FlowWithGraph,
+    flow: HttpMessage<FlowWithGraph>,
 ): FlowReadiness {
     const graph = asStoredGraph(
-        flow.graph, 'flow.graph',
+        flow.body().toValue().graph, 'flow.graph',
     );
     const problems: FlowProblem[] = [];
     for (const node of graph.nodes) {
@@ -82,13 +84,14 @@ export async function getFlowsForCreation(
     const flows = await getFlowsWithGraphs(ctx);
     const ready: FlowPickerEntry[] = [];
     const notReady: NotReadyFlowEntry[] = [];
-    for (const flow of flows) {
+    for (const message of flows) {
+        const flow = message.body().toValue();
         const isLocked = asBoolean(
             flow.is_locked, 'is_locked',
         );
         if (isLocked) continue;
         const readiness =
-            validateFlowForCreation(flow);
+            validateFlowForCreation(message);
         if (readiness.ready) {
             ready.push({
                 id: flow.id,

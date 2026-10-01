@@ -50,6 +50,7 @@ import {
 import {
     DISPLAY_ABSENT,
 } from '../web-app/app/format.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // helpers
 
@@ -1144,14 +1145,17 @@ Deno.test(
         );
         assertEquals(
             bindableRecords(
-                [active, archived, boundArchived],
+                [active, archived, boundArchived]
+                    .map((r) => responseMessage(r)),
                 boundArchived.id,
-            ).map(r => r.id),
+            ).map(r => r.body().toValue().id),
             [active.id, boundArchived.id],
         );
         assertEquals(
-            bindableRecords([active, archived], null)
-                .map(r => r.id),
+            bindableRecords(
+                [active, archived].map((r) => responseMessage(r)),
+                null,
+            ).map(r => r.body().toValue().id),
             [active.id],
         );
     },

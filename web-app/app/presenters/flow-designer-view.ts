@@ -30,6 +30,8 @@ import type {
     RecordEntity,
     RecordId,
 } from '../../../shared/types.ts';
+import type { HttpMessage } from
+    '../../../shared/http-message/http-message.ts';
 
 export function buildAttributeRefRow(
     ref: NodeAttribute,
@@ -448,11 +450,12 @@ class="flow-toolbar">
 // state, so the control keeps showing the truth and a change
 // event cannot silently unbind an archived record.
 export function bindableRecords(
-    records: readonly RecordEntity[],
+    records: readonly HttpMessage<RecordEntity>[],
     boundRecordId: RecordId | null,
-): RecordEntity[] {
-    return records.filter(
-        r => r.state !== 'archived'
-            || r.id === boundRecordId,
-    );
+): HttpMessage<RecordEntity>[] {
+    return records.filter((message) => {
+        const record = message.body().toValue();
+        return record.state !== 'archived'
+            || record.id === boundRecordId;
+    });
 }

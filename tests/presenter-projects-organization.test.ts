@@ -14,6 +14,7 @@ import {
     OrganizationPresenter,
     OrganizationEditPresenter,
 } from '../web-app/app/presenters/organization.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // None of these seven modules reads localStorage (checked
 // against the full product tree); window/document are
@@ -87,7 +88,7 @@ function makeProject(overrides: {
     estimatedCost?: number;
     position?: number;
 }) {
-    return new Project({
+    return new Project(responseMessage({
         id: overrides.id ?? 'pr-1',
         organization_id: 'org-1',
         title: overrides.title ?? 'Apollo',
@@ -101,11 +102,11 @@ function makeProject(overrides: {
         actual_cost: 25000,
         position: overrides.position ?? 0,
         state: overrides.state ?? 'approved',
-    }, overrides.state ?? 'approved');
+    }), overrides.state ?? 'approved');
 }
 
 function makeOrganization() {
-    return new Organization({
+    return new Organization(responseMessage({
         id: 'org-1',
         name: 'Acme Innovations',
         domain: 'acme.example',
@@ -113,7 +114,7 @@ function makeOrganization() {
         seats: 50,
         projects_limit: 100,
         ideas_limit: 200,
-    }, {
+    }), {
         usedSeats: 12,
     });
 }

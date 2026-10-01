@@ -1,11 +1,15 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
     deleteFlowRecord,
+    deleteFlowRecordForFlow,
     getRecordForFlow,
     getRecordForWorkOrder,
     getFlowSummariesForRecord,
@@ -14,10 +18,10 @@ import {
 import {
     postFlowCreation,
 } from '../client/flow-mutations.ts';
-import { putRecord } from '../client/records.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     storedWorkOrderFlowGraph,
+    type FlowRecordEntity,
     type WorkOrderFlowGraph,
 } from '../shared/types.ts';
 import { generateIdentifier } from
@@ -95,17 +99,22 @@ async function seedWorkOrder(
 
 // The binding PUT probes the bound record's own existence,
 // so every record_id a test binds must be seeded first —
-// the SAME record-types PUT the live route serves, same
-// precedent as seedFlow/seedWorkOrder above.
+// the SAME record-types PUT the live route serves (an
+// unlatched PUT of a fresh id: putRecord latches the head
+// it replaces), same precedent as seedFlow/seedWorkOrder
+// above.
 async function seedRecord(
     db: MemoryDbAdapter,
     id: string,
 ): Promise<void> {
     const ctx = inPageContext(db, await organizationToken());
-    await putRecord(ctx, id, {
-        name: 'Record', description: '', position: 1,
-        state: 'active',
-    });
+    await ctx.PUT(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id,
+        {
+            name: 'Record', description: '', position: 1,
+            state: 'active',
+        },
+    );
 }
 
 Deno.test(
@@ -331,8 +340,47 @@ Deno.test(
             record_id: 'rbfHGatkwQzGZJVXKJEeyw',
             at: AT,
         });
-        await deleteFlowRecord(ctx, 'aEsGMmBEFaVdWihhHXwCbw'
-            , 'dCnpryxCNwuTnCrBBDIMOw');
+        const [held] = await ctx.GETCollection<FlowRecordEntity>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/records/',
+        );
+        await deleteFlowRecord(
+            ctx, 'aEsGMmBEFaVdWihhHXwCbw', held!,
+        );
+        assertStrictEquals(
+            await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
+            null,
+        );
+    },
+);
+
+// Unbinding reads the flow's binding part and latches it
+// (spec §9): the DELETE's If-Match names that part's head.
+Deno.test(
+    'deleteFlowRecordForFlow latches the binding it reads',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await seedRecord(db, 'rbfHGatkwQzGZJVXKJEeyw');
+        await putFlowRecord(ctx, 'dCnpryxCNwuTnCrBBDIMOw', {
+            flow_id: 'aEsGMmBEFaVdWihhHXwCbw',
+            record_id: 'rbfHGatkwQzGZJVXKJEeyw',
+            at: AT,
+        });
+        const [held] = await ctx.GETCollection<FlowRecordEntity>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/records/',
+        );
+        const { ctx: recorded, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        await deleteFlowRecordForFlow(
+            recorded, 'aEsGMmBEFaVdWihhHXwCbw',
+        );
+        assertEquals(
+            sent.filter((r) => r.method === 'DELETE')
+                .map((r) => r.ifMatch),
+            [held!.query('header.etag').toText()],
+        );
         assertStrictEquals(
             await getRecordForFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw'),
             null,

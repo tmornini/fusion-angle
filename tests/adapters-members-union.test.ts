@@ -47,8 +47,10 @@ import {
 } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { deleteHumanMemberSeat } from
-    '../client/members.ts';
+import {
+    deleteHumanMemberSeat,
+    getHumanMember,
+} from '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -421,7 +423,9 @@ Deno.test(
             memberName(await getMemberMap(ctx), leaverId),
             'Lisa Leaver',
         );
-        await deleteHumanMemberSeat(ctx, leaverId);
+        await deleteHumanMemberSeat(
+            ctx, await getHumanMember(ctx, leaverId),
+        );
         const map = await getMemberMap(ctx);
         const former = map.get(leaverId);
         assert(former !== undefined, 'former member mapped');

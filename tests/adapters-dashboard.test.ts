@@ -3,6 +3,7 @@ import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import {
     type RequestContext,
+    organizationItem,
 } from '../client/request-context.ts';
 import {
     getDashboardStats,
@@ -14,7 +15,6 @@ import {
 import { postIdeaCreation } from
     '../client/ideas.ts';
 import {
-    putProject,
     postProjectStateChange,
     getProjectEntity,
 } from '../client/projects.ts';
@@ -94,7 +94,8 @@ function buildProject(
 }
 
 // Seeds a project through the SAME document PUT the live route
-// uses (putProject), so a message pair exists at this project's
+// uses (an unlatched PUT of a fresh id: putProject latches the
+// head it replaces), so a message pair exists at this project's
 // document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getDashboardStats /
 // getDashboardGauges read, to derive it.
@@ -106,10 +107,10 @@ async function seedProject(
 ): Promise<void> {
     const { organization_id: _organizationId, ...entity } =
         buildProject(id, overrides);
-    await putProject(ctx, id, {
+    await ctx.PUT(organizationItem(ctx, 'projects', id), {
         ...entity,
         state,
-    }, undefined);
+    });
 }
 
 // Seeds a flow through the SAME document PUT the live route
@@ -250,11 +251,10 @@ Deno.test(
         // transition (mirrors drift-projects.test.ts's
         // lifecycle case).
         // Phase Final Task 2: projects row half stripped.
-        const {
-            id: _id, organization_id: _org, ...fields
-        } = await getProjectEntity(ctx, 'prBESZPjJDiuXCeZLmbiVw');
         await postProjectStateChange(
-            ctx, 'prBESZPjJDiuXCeZLmbiVw', fields, 'deleted',
+            ctx,
+            await getProjectEntity(ctx, 'prBESZPjJDiuXCeZLmbiVw'),
+            'deleted',
         );
         // NAMED re-pin (Phase 4 Task 8): the flows half now
         // flips too — see tombstoneFlow's own comment above.

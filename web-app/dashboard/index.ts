@@ -11,6 +11,7 @@ import { getDashboardGauges } from '../app/dashboard.ts';
 import {
     startDashboardScoringReads,
     getObjectiveScoringInputs,
+    activeObjectivesOf,
     subscribeProjectScoreChanges,
     getCurrentObjectiveDefinitions,
     subscribeObjectiveChanges,
@@ -46,12 +47,8 @@ function definitionsFrom(
     return objectivesP.then(objectives =>
         getCurrentObjectiveDefinitions(
             ctx,
-            objectives
-                .filter(o => o.state === 'active')
-                .sort(
-                    (a, b) => a.position - b.position,
-                )
-                .map(o => o.id),
+            activeObjectivesOf(objectives)
+                .map(m => m.body().toValue().id),
         ),
     );
 }

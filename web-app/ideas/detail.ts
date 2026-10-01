@@ -28,6 +28,7 @@ import {
 } from '../app/dialog.ts';
 import {
     getIdea,
+    ideaOf,
     postIdeaStateChange,
     putIdea,
     subscribeIdeaChanges,
@@ -35,6 +36,8 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import type { IdeaEntity } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 
 const { signal } = createPageAbort();
 
@@ -100,7 +103,7 @@ const TRANSITION_CONFIG:
 };
 
 async function transitionIdea(
-    entity: IdeaEntity,
+    held: HttpMessage<IdeaEntity>,
     toState: IdeaTransition,
 ): Promise<void> {
     if (!state) return;
@@ -108,7 +111,7 @@ async function transitionIdea(
     const cfg = TRANSITION_CONFIG[toState]!;
     try {
         await postIdeaStateChange(
-            ctx, entity, toState,
+            ctx, held, toState,
         );
     } catch (err) {
         reportFault(ctx, cfg.failureToast, err);
@@ -270,16 +273,18 @@ function handleIdeaActions(
             return true;
         case 'submit-review':
             void transitionIdea(
-                state.view.entity, 'in_review',
+                state.view.idea.message, 'in_review',
             );
             return true;
         case 'approve':
             void transitionIdea(
-                state.view.entity, 'approved',
+                state.view.idea.message, 'approved',
             );
             return true;
         case 'send-back-confirm':
-            void handleSendBackConfirm(state.view.entity);
+            void handleSendBackConfirm(
+                state.view.idea.message,
+            );
             return true;
         default:
             return false;
@@ -287,11 +292,11 @@ function handleIdeaActions(
 }
 
 async function handleSendBackConfirm(
-    entity: IdeaEntity,
+    held: HttpMessage<IdeaEntity>,
 ): Promise<void> {
     closeDialog('approval-send-back');
     await transitionIdea(
-        entity, 'sent_back',
+        held, 'sent_back',
     );
 }
 
@@ -349,15 +354,18 @@ async function handleSave(): Promise<void> {
     const patch = ideaPatchFromDraft(
         state.draft,
     );
-    const ideaId = state.view.idea.idForLink();
-    const entity = state.view.entity;
-    const idea = state.view.idea;
+    const held = state.view.idea.message;
+    const {
+        id: _id,
+        organization_id: _organizationId,
+        ...fields
+    } = held.body().toValue();
     const ctx = sessionContext();
+    let saved: HttpMessage<IdeaEntity>;
     try {
-        await putIdea(ctx, ideaId, {
-            ...entity,
+        saved = await putIdea(ctx, held, {
+            ...fields,
             ...trimStrings(patch),
-            state: idea.stateValue(),
         });
     } catch (err) {
         log.error(
@@ -367,6 +375,14 @@ async function handleSave(): Promise<void> {
             'Failed to save idea', 'error',
         );
         return;
+    }
+    // The page goes on holding this idea, so its next write
+    // latches the head this save made.
+    if (state) {
+        state = {
+            ...state,
+            view: { ...state.view, idea: ideaOf(saved) },
+        };
     }
     showToast('Idea saved', 'success');
 }

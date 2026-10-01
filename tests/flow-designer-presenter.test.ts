@@ -20,8 +20,24 @@ import {
 import type {
     InteractionState,
 } from '../web-app/app/flow-interactions.ts';
+import type { FlowWithGraph } from '../shared/types.ts';
+import { storedGraph } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
+// The message is the head a graph was read from. The
+// presenter never reads it, so the empty flow's stands in
+// for every graph spread from this one.
 const emptyGraph = {
+    message: responseMessage<FlowWithGraph>({
+        id: 'aEsGMmBEFaVdWihhHXwCbw',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        name: 'Test Flow',
+        is_locked: false,
+        is_auto_layout: false,
+        is_auto_fit: false,
+        lock_timeout: 0,
+        graph: storedGraph({ nodes: [], edges: [] }),
+    }),
     id: 'aEsGMmBEFaVdWihhHXwCbw',
     name: 'Test Flow',
     isLocked: false,

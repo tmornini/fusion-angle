@@ -1,6 +1,9 @@
-import { assertStrictEquals } from '@std/assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     getIdentity,
@@ -35,7 +38,7 @@ async () => {
     });
     const before = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assertStrictEquals(before.erased, false);
-    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw', before);
     const after = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
     assertStrictEquals(after.erased, true);
 });
@@ -46,11 +49,30 @@ async () => {
     await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
         name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
-    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    await deleteIdentityPii(
+        ctx, 'pnXmXrxOWayANgDLdCjuBw',
+        await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+    );
     assertStrictEquals(
         (await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw')).erased,
         true,
     );
     assertStrictEquals((await getIdentity(ctx
         , 'pnXmXrxOWayANgDLdCjuBw')).isPerson(), true);
+});
+
+Deno.test('a PII erase latches the held PII', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
+        name: 'P', email: 'p@x.io', phone: '', bio: 'b',
+    });
+    const { ctx, sent } = recordedContext(db, await devToken());
+    const pii = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
+    assert(!pii.erased);
+    sent.length = 0;
+    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw', pii);
+    assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+        ['DELETE', pii.message.query('header.etag').toText()],
+    ]);
 });

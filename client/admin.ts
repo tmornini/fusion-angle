@@ -5,6 +5,8 @@ import {
     type MembershipEntity,
 } from '../shared/types.ts';
 import { byAtThenIdAscending } from '../shared/identifier.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     getOrganization as fetchOrganization,
     putOrganization,
@@ -17,9 +19,9 @@ import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
 import { getHumanMembers } from './members.ts';
 
-export async function getOrganizationEntity(
+export function getOrganizationEntity(
     ctx: RequestContext,
-): Promise<OrganizationEntity> {
+): Promise<HttpMessage<OrganizationEntity>> {
     // The active org — the tenant the session is scoped to —
     // so the org page reflects an org switch. The session token
     // always carries it post-boot (activeOrganization crashes otherwise).
@@ -28,7 +30,7 @@ export async function getOrganizationEntity(
 
 export async function getOrganizationSeats(
     ctx: RequestContext,
-): Promise<MembershipEntity[]> {
+): Promise<HttpMessage<MembershipEntity>[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
     if (organization === undefined) {
@@ -41,8 +43,9 @@ export async function getOrganizationSeats(
     return (await ctx.GETCollection<MembershipEntity>(
         'organizations/' + organization
             + '/members/',
-    )).map((m) => m.body().toValue())
-        .toSorted(byAtThenIdAscending);
+    )).toSorted((a, b) => byAtThenIdAscending(
+        a.body().toValue(), b.body().toValue(),
+    ));
 }
 
 export interface OrganizationStats {
@@ -59,15 +62,15 @@ export interface OrganizationStats {
 // reader and the entities it counts.
 export async function getOrganizationStats(
     ctx: RequestContext,
-    seatsP?: Promise<readonly MembershipEntity[]>,
+    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<OrganizationStats> {
-    const [projects, ideaRows, activePeopleCount] =
+    const [projects, ideaMessages, activePeopleCount] =
         await Promise.all([
             getProjects(ctx),
             getIdeaEntities(ctx),
             seatsP !== undefined
                 ? seatsP.then(seats => new Set(
-                    seats.map(m => m.identity_id),
+                    seats.map(m => m.body().toValue().identity_id),
                 ).size)
                 : getHumanMembers(ctx).then(
                     humans => humans.length,
@@ -76,6 +79,7 @@ export async function getOrganizationStats(
     const projectsCurrent = projects.filter(
         p => p.stateValue() !== 'declined',
     ).length;
+    const ideaRows = ideaMessages.map(m => m.body().toValue());
     const ideasCurrent = ideaRows.filter(row =>
         ideaIsVisible(
             assertIdeaState(
@@ -95,17 +99,18 @@ export interface GeneralInfoDraft {
     domain: string;
 }
 
-export async function
-putOrganizationGeneralInfo(
+// Merges the draft onto the held organization's body, so the
+// save reads nothing first and latches the head the page
+// shows.
+export function putOrganizationGeneralInfo(
     ctx: RequestContext,
+    held: HttpMessage<OrganizationEntity>,
     draft: GeneralInfoDraft,
-): Promise<void> {
-    const current = await getOrganizationEntity(ctx);
-    const { id: _id, ...rest } = current;
-    await putOrganization(
-        ctx, activeOrganization(ctx), {
-            ...rest,
-            name: draft.name,
-            domain: draft.domain,
-        });
+): Promise<HttpMessage<OrganizationEntity>> {
+    const { id: _id, ...rest } = held.body().toValue();
+    return putOrganization(ctx, held, {
+        ...rest,
+        name: draft.name,
+        domain: draft.domain,
+    });
 }

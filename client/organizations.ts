@@ -1,6 +1,8 @@
 import type {
     OrganizationEntity,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import type { RequestContext } from './request-context.ts';
 import { compareIdentifiers } from '../shared/identifier.ts';
 
@@ -12,27 +14,33 @@ import { compareIdentifiers } from '../shared/identifier.ts';
 // organization nor the switcher's options.
 export async function getOrganizations(
     ctx: RequestContext,
-): Promise<OrganizationEntity[]> {
+): Promise<HttpMessage<OrganizationEntity>[]> {
     return (await ctx.GETCollection<OrganizationEntity>(
         'identities/' + ctx.identity.id
             + '/organizations/',
-    )).map((m) => m.body().toValue())
-        .sort((a, b) => compareIdentifiers(a.id, b.id));
+    )).sort((a, b) => compareIdentifiers(
+        a.body().toValue().id, b.body().toValue().id,
+    ));
 }
 
-export async function getOrganization(
+export function getOrganization(
     ctx: RequestContext,
     id: string,
-): Promise<OrganizationEntity> {
-    return (await ctx.GET<OrganizationEntity>(
-        'organizations/' + id,
-    )).body().toValue();
+): Promise<HttpMessage<OrganizationEntity>> {
+    return ctx.GET<OrganizationEntity>('organizations/' + id);
 }
 
-export async function putOrganization(
+// The PUT latches the held head, so an edit landing since the
+// page read it refuses this one with a 412 rather than being
+// overwritten.
+export function putOrganization(
     ctx: RequestContext,
-    id: string,
-    fields: Omit<OrganizationEntity, 'id'>,
-): Promise<void> {
-    await ctx.PUT('organizations/' + id, fields);
+    held: HttpMessage<OrganizationEntity>,
+    body: Omit<OrganizationEntity, 'id'>,
+): Promise<HttpMessage<OrganizationEntity>> {
+    return ctx.PUT<OrganizationEntity>(
+        'organizations/' + held.body().toValue().id,
+        body,
+        [held],
+    );
 }
