@@ -3215,9 +3215,10 @@ that the canvas re-renders after each step.)
   Re-open the flow — a fresh load stages no redo,
   and F32–F35 have filled the stack otherwise.
   PASS: the Redo button renders disabled. (Undo
-  may stay enabled at exhaustion —
-  `hasUndoHistory` is `pairs > 1`
-  (`api/derive-flows.ts`) — and the click is a
+  may stay enabled at exhaustion — the designer
+  marks undo history when `…/flows/:id/versions/`
+  answers more than one row
+  (`client/flow-queries.ts`) — and the click is a
   graceful server no-op.)
   Pin: tests/presenter-misc.test.ts 'buildToolbar disables
        undo, redo, and delete buttons when their actions
