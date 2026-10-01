@@ -28,9 +28,8 @@ import {
 // by-id read (deriveFlowRecord) alongside the collection read —
 // deriveFlow's own absent/DELETE-head -> Entity
 // NotFoundError shape, applied to a join rather than a document
-// family. LIVE: GET flows/:id/records is wired to
-// deriveFlowRecords below (Phase 6 Task 7); GET flows/:id/
-// records/:frid serves the join's stored head (spec §1 A).
+// family. GET flows/:id/records/ and GET flows/:id/records/
+// :frid serve the joins' stored heads (spec §1).
 
 const FLOW_RECORDS_TABLE = 'flow_records';
 
@@ -69,8 +68,7 @@ async function fetchFlowRecordDocuments(
 // id-lex ordered (byIdAscending — the derivation's own
 // order, never the backend's); a DELETE head
 // excludes the row exactly as the old plane's physical splice
-// does (parity, not a new mechanism). Serves the live GET
-// flows/:id/records route (Phase 6 Task 7).
+// does (parity, not a new mechanism).
 export async function deriveFlowRecords(
     db: DbAdapter,
     organization: Id,

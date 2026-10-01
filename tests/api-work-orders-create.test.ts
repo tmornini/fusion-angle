@@ -2,7 +2,7 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { handleRequest } from '../api/api.ts';
-import { GET, POST } from './in-page-facade.ts';
+import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { apiRequest, pairIdOf } from './http-fixtures.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -151,13 +151,13 @@ Deno.test(
         // Row plane empty; join lives on the message plane.
         // Phase Final Stage B: work_orders +
         // flow_work_orders tables retired.
-        const links = (await GET<{
+        const links = (await GETCollection<{
             id: string;
             flow_id: string;
             work_order_id: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader())).map((m) => m.body().toValue());
         assertStrictEquals(links.length, 1);
         assertStrictEquals(links[0]!.id, FWO_ID);
         assertStrictEquals(links[0]!.flow_id, 'ZOousbbnzpqlxJExVAruYQ');

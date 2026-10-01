@@ -41,7 +41,9 @@ import { deriveProjectFlows } from
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 
@@ -320,10 +322,14 @@ async function wireFlowText(
     return res.text();
 }
 
+type ServedFlowBody = { id: string } & Record<string, unknown>;
+
+// The list's part bodies, each part its head's stored
+// response served.
 async function wireFlowsText(
     db: MemoryDbAdapter,
     organization: string,
-): Promise<string> {
+): Promise<ServedFlowBody[]> {
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organization,
     );
@@ -335,7 +341,9 @@ async function wireFlowsText(
         ),
     );
     assertStrictEquals(res.status, 200);
-    return res.text();
+    const parts = await partsOf<ServedFlowBody>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    return parts.map((part) => part.body().toValue());
 }
 
 // The flow GET serves its head's stored body octets. That
@@ -422,11 +430,23 @@ async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const wireText = await wireFlowsText(
-            db, organization,
-        );
+        const bodies = await wireFlowsText(db, organization);
         const derived = await deriveFlows(db, organization);
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        // Each stored body, read as its document, derives to
+        // the derive's row (see assertWireEqualsDerived).
+        const prefix = canonicalPath(organization, '/flows/');
+        const served = [];
+        for (const body of bodies) {
+            const head = await db.messagePairs.getHeadPair(
+                prefix, body.id,
+            );
+            assert(head !== null);
+            served.push(flowEntityOf({
+                name: body.id, messagePairId: head.id,
+                method: 'PUT', body,
+            }, organization));
+        }
+        assertEquals(served, derived);
         assert(derived.length > 0);
     }
 });
@@ -743,11 +763,11 @@ Deno.test('live-write chain: create, save, node delete, undo, '
     assertStrictEquals(
         derivedList.some((f) => f.id === flowId), false,
     );
-    const listText = await wireFlowsText(
+    const listBodies = await wireFlowsText(
         db, STARK_ORGANIZATION,
     );
     assertStrictEquals(
-        listText.includes('"' + flowId + '"'), false,
+        listBodies.some((body) => body.id === flowId), false,
     );
 
     const derivedHistory = await deriveFlowStateHistory(

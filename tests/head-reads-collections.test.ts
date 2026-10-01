@@ -204,3 +204,107 @@ async () => {
     assertStrictEquals(got.status, 204);
     assertStrictEquals(await got.text(), '');
 });
+
+const FLOWS = '/organizations/' + STARK + '/flows/';
+// Customer Onboarding carries a record binding and 39 work
+// orders; Fusion Angle Flow carries no work order.
+const ONBOARDING = 'esKujtyQFYUJaVSXWwavzA';
+const UNWORKED = 'GgfDbXOJUvvaCekCTcvhuw';
+
+Deno.test(FLOWS + ' serves its heads as parts, each its'
+    + ' document GET', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: FLOWS, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    assertMatch(
+        got.headers.get('content-type')!,
+        /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+    );
+    assertStrictEquals(got.headers.get('etag'), null);
+    const parts = await partsOf<{ id: string }>(got);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    for (const part of parts) {
+        await assertPartIsDocumentGet(
+            db, token, part, FLOWS + part.body().toValue().id,
+        );
+    }
+});
+
+Deno.test('a state-deleted flow is no part of its collection',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const read = await handleRequest(db, apiRequest({
+        method: 'GET', path: FLOWS + ONBOARDING, token,
+    }));
+    assertStrictEquals(read.status, 200);
+    const stored = await read.json() as Record<string, unknown>;
+    const { id: _id, ...body } = stored;
+    const deleted = await handleRequest(db, apiRequest({
+        method: 'PUT', path: FLOWS + ONBOARDING, token,
+        headers: { 'if-match': read.headers.get('etag')! },
+        body: {
+            ...body,
+            state: 'deleted', state_at: AT,
+            state_event_id: generateIdentifier(),
+            graphDelta: {
+                nodes: [], edges: [], deletions: [],
+                memberEvents: [], attributeEvents: [],
+            },
+            revivals: [],
+        },
+    }));
+    assertStrictEquals(deleted.status, 200);
+    await deleted.body?.cancel();
+    const parts = await partsOf<{ id: string }>(
+        await handleRequest(db, apiRequest({
+            method: 'GET', path: FLOWS, token,
+        })),
+    );
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(
+        parts.filter((part) =>
+            part.body().toValue().id === ONBOARDING),
+        [],
+    );
+});
+
+for (const join of ['records', 'work-orders']) {
+    const collection = FLOWS + ONBOARDING + '/' + join + '/';
+    Deno.test(collection + ' serves its join heads as parts',
+    async () => {
+        const db = await seededMockDb();
+        const got = await handleRequest(db, apiRequest({
+            method: 'GET', path: collection,
+            token: await organizationToken(),
+        }));
+        assertStrictEquals(got.status, 200);
+        assertMatch(
+            got.headers.get('content-type')!,
+            /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+        );
+        assertStrictEquals(got.headers.get('etag'), null);
+        const parts = await partsOf<{ flow_id: string }>(got);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        for (const part of parts) {
+            assertStrictEquals(
+                part.body().toValue().flow_id, ONBOARDING,
+            );
+        }
+    });
+}
+
+Deno.test('a flow with no work orders answers 204', async () => {
+    const db = await seededMockDb();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: FLOWS + UNWORKED + '/work-orders/',
+        token: await organizationToken(),
+    }));
+    assertStrictEquals(got.status, 204);
+    assertStrictEquals(await got.text(), '');
+    assertMatch(got.headers.get('date')!, /GMT$/);
+});

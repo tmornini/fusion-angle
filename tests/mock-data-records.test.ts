@@ -36,7 +36,7 @@ import {
     projectBriefRecordId,
 } from '../api/mock-data/records.ts';
 import { seededMockDb } from './mock-seed.ts';
-import { framedRequest } from './http-fixtures.ts';
+import { framedRequest, partBodiesOf } from './http-fixtures.ts';
 
 // Phase Final Task 2: records(+attributes+flow_records) seed
 // row halves stripped — assertions ride the message plane.
@@ -351,8 +351,8 @@ Deno.test(
     + ' (no fields[]) via message-plane derive',
     async () => {
         const db = await seeded();
-        // Wire GET /flows carries graph as native nested
-        // JSON on each FlowWithGraph row (message-plane head).
+        // Each flow GET carries graph as native nested JSON
+        // (its stored head); GET /flows names the flows.
         async function assertGraphShape(
             token: string,
             organization: string,
@@ -370,9 +370,9 @@ Deno.test(
                 ),
             );
             assertStrictEquals(res.status, 200);
-            const flows = await res.json() as {
+            const flows = await partBodiesOf<{
                 id: string;
-            }[];
+            }>(res);
             for (const flow of flows) {
                 const detail = await handleRequest(
                     db,

@@ -29,10 +29,10 @@ async function getAllFlowRecords(
 ): Promise<FlowRecordEntity[]> {
     const flows = await getFlowEntities(ctx);
     const perFlow = await Promise.all(
-        flows.map(f => ctx.GET<FlowRecordEntity[]>(
+        flows.map(f => ctx.GETCollection<FlowRecordEntity>(
             organizationItem(ctx, 'flows', f.id)
                 + '/records/',
-        ).then(read => read.body().toValue())),
+        ).then(parts => parts.map((m) => m.body().toValue()))),
     );
     return perFlow.flat();
 }

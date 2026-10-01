@@ -30,10 +30,10 @@ async function getFlowRecordsForFlow(
     ctx: RequestContext,
     flowId: Id,
 ): Promise<FlowRecordEntity[]> {
-    return (await ctx.GET<FlowRecordEntity[]>(
+    return (await ctx.GETCollection<FlowRecordEntity>(
         organizationItem(ctx, 'flows', flowId)
             + '/records/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 // The bindings across EVERY flow the caller's org can see —
@@ -62,10 +62,10 @@ async function getAllFlowWorkOrderEntities(
 ): Promise<FlowWorkOrderEntity[]> {
     const list = flows ?? await getFlowEntities(ctx);
     const perFlow = await Promise.all(
-        list.map(f => ctx.GET<FlowWorkOrderEntity[]>(
+        list.map(f => ctx.GETCollection<FlowWorkOrderEntity>(
             organizationItem(ctx, 'flows', f.id)
                 + '/work-orders/',
-        ).then(read => read.body().toValue())),
+        ).then(parts => parts.map((m) => m.body().toValue()))),
     );
     return perFlow.flat();
 }

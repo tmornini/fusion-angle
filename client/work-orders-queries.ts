@@ -397,12 +397,10 @@ export async function getFlowWorkOrderEntities(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowWorkOrderEntity[]> {
-    return (await ctx.GET<
-        FlowWorkOrderEntity[]
-    >(
+    return (await ctx.GETCollection<FlowWorkOrderEntity>(
         organizationItem(ctx, 'flows', flowId)
             + '/work-orders/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 export async function getWorkOrder(

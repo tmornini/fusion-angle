@@ -63,7 +63,9 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -639,11 +641,14 @@ async () => {
             ),
         );
         assertStrictEquals(listRes.status, 200);
-        const wireList = await listRes.text();
+        const parts = await partsOf(listRes);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await deriveFlowRecords(
             db, organization, flowId,
         );
-        assertStrictEquals(wireList, JSON.stringify(derived));
+        assertEquals(
+            parts.map((part) => part.body().toValue()), derived,
+        );
         assertStrictEquals(derived.length, 1);
 
         const byIdRes = await handleRequest(
@@ -684,8 +689,8 @@ async () => {
             token,
         ),
     );
-    assertStrictEquals(emptyRes.status, 200);
-    assertStrictEquals(await emptyRes.text(), '[]');
+    assertStrictEquals(emptyRes.status, 204);
+    assertStrictEquals(await emptyRes.text(), '');
     assertEquals(
         await deriveFlowRecords(
             db, STARK_ORGANIZATION, EMPTY_FLOW_ID,

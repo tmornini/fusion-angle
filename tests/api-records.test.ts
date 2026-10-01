@@ -180,14 +180,16 @@ Deno.test(
 // organizations/:id/flows/:id/records) — UNTOUCHED
 
 Deno.test(
-    'GET organizations/:id/flows/:id/records returns an empty array',
+    'GET organizations/:id/flows/:id/records answers 204 when it'
+    + ' binds none',
     async () => {
         const db = await freshDb();
-        const out = (await GET<unknown[]>(
+        const read = await GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
-        assertEquals(out, []);
+                operationIdHeader());
+        assertStrictEquals(read.query('status').toNumber(), 204);
+        assertStrictEquals(read.body().exists(), false);
     },
 );
 

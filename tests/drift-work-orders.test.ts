@@ -14,6 +14,7 @@ import {
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
+    FlowWorkOrderEntity,
     Id,
 } from '../shared/types.ts';
 import {
@@ -25,6 +26,7 @@ import {
     responseRecordOf,
 } from '../api/message-pair.ts';
 import {
+    byIdAscending,
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import { validateWorkOrderVersion } from '../api/validators.ts';
@@ -366,18 +368,25 @@ Deno.test('flow-work-order join wire equals derive across every'
             ),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
+        // The parts come in write order (response_at, id); the
+        // derive sorts by id, so the bodies compare as one set.
+        const parts = await partsOf<FlowWorkOrderEntity>(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await deriveFlowWorkOrders(
             db, STARK_ORGANIZATION, flowId,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            parts.map((part) => part.body().toValue())
+                .toSorted(byIdAscending),
+            derived,
+        );
         assertStrictEquals(derived.length, count);
     }
     // Phase Final Stage B: flow_work_orders table retired.
 });
 
-Deno.test('a flow with no work orders derives an empty join list'
-+ ' on wire and on derive', async () => {
+Deno.test('a flow with no work orders answers 204 and derives an'
++ ' empty join list', async () => {
     const db = await seededDb();
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -391,8 +400,8 @@ Deno.test('a flow with no work orders derives an empty join list'
             token,
         ),
     );
-    assertStrictEquals(res.status, 200);
-    assertStrictEquals(await res.text(), '[]');
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
     assertEquals(
         await deriveFlowWorkOrders(
             db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
@@ -434,8 +443,9 @@ function createWorkOrderBody(
     };
 }
 
-// Wire-byte entity + join parity after a live write (pair
-// plane only; row plane empty post-strip).
+// Entity and join parity after a live write (pair plane
+// only; row plane empty post-strip): the entity by value,
+// the joins as their heads and by value.
 async function assertEntityAndJoinParity(
     db: MemoryDbAdapter, workOrderId: string, flowId: string,
 ): Promise<void> {
@@ -461,11 +471,16 @@ async function assertEntityAndJoinParity(
         ),
     );
     assertStrictEquals(joinRes.status, 200);
-    const joinText = await joinRes.text();
+    const joinParts = await partsOf<FlowWorkOrderEntity>(joinRes);
+    await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
     const derivedJoins = await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertStrictEquals(joinText, JSON.stringify(derivedJoins));
+    assertEquals(
+        joinParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedJoins,
+    );
 }
 
 // -- 5. live-write chain, re-compared on both planes -----------

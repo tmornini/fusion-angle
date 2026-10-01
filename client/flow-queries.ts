@@ -88,9 +88,9 @@ getFlowsWithProjectNames(
     const [
         flows, projectFlows, allProjects,
     ] = await Promise.all([
-        ctx.GET<FlowWithGraph[]>(
+        ctx.GETCollection<FlowWithGraph>(
             organizationCollection(ctx, 'flows'),
-        ).then(read => read.body().toValue()),
+        ).then(parts => parts.map((m) => m.body().toValue())),
         getProjectFlowEntities(ctx),
         ctx.GETCollection<ProjectEntity>(
             organizationCollection(ctx, 'projects'),
@@ -136,9 +136,9 @@ export async function getFlowsByProject(
     const [projectFlows, flows] =
         await Promise.all([
             getProjectFlowsForProject(ctx, projectId),
-            ctx.GET<FlowWithGraph[]>(
+            ctx.GETCollection<FlowWithGraph>(
                 organizationCollection(ctx, 'flows'),
-            ).then(read => read.body().toValue()),
+            ).then(parts => parts.map((m) => m.body().toValue())),
         ]);
 
     const flowIds = new Set(
@@ -180,9 +180,9 @@ export async function getFlowWithGraph(
 export async function getFlowsWithGraphs(
     ctx: RequestContext,
 ): Promise<FlowWithGraph[]> {
-    return (await ctx.GET<FlowWithGraph[]>(
+    return (await ctx.GETCollection<FlowWithGraph>(
         organizationCollection(ctx, 'flows'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 export async function getFlowGraph(

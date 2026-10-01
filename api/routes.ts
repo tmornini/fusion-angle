@@ -214,7 +214,6 @@ import {
 import {
     flowEntityOf,
     flowStoredEntityOf,
-    deriveFlows,
     resolveFlowUndoTarget,
     type FlowUndoResolution,
 } from './derive-flows.ts';
@@ -227,11 +226,10 @@ import {
     projectFlowEntityOf,
 } from './derive-project-flows.ts';
 import {
-    deriveFlowWorkOrders,
     flowWorkOrderEntityOf,
+    flowWorkOrdersUriPrefix,
 } from './derive-flow-work-orders.ts';
 import {
-    deriveFlowRecords,
     flowRecordEntityOf,
     flowRecordsUriPrefix,
     recordTypeIdsForWorkOrder,
@@ -4335,13 +4333,12 @@ export const routes: Route[] = [
             postIdeaSubmissionOp(db, param(p, 2), body, messagePair),
     }),
     route('organizations/:id/flows/', {
-        // GET stays deriveFlows: it omits a state-'deleted'
-        // head.
+        // GET serves the stored heads; the gate drops a
+        // state-'deleted' one.
+        select: collectionSelect(FLOWS_WIRING),
         // POST stays this hand-written create — unlike
         // ideas/projects, flows never folded genesis into
         // the document PUT (Decision 6).
-        get: (db, _p, _actor, organization) =>
-            deriveFlows(db, requireOrganization(organization)),
         // Member-tier POST — /flows carries POST in
         // MEMBER_VERBS. The flow and its project join are
         // declared geneses in one statement, the shape a
@@ -4605,19 +4602,18 @@ export const routes: Route[] = [
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
     // id is param 2; only PUT is exposed (the
-    // flat route never carried GET/DELETE on the leaf). GET is
-    // FLIPPED (Task 7): the join list derives from the message
-    // ledger at this flow's work-orders document rather than the
-    // old flow_work_orders table — deriveFlowWorkOrders is a
-    // bespoke derivation (not a DocumentFamilyWiring family; a
-    // join row carries no lifecycle state of its own), so this
-    // calls it directly rather than through a generic
-    // constructor, mirroring deriveProjectFlows' own precedent.
+    // flat route never carried GET/DELETE on the leaf). GET
+    // serves the stored join heads at this flow's prefix; a
+    // join row carries no lifecycle state of its own.
     route('organizations/:id/flows/:id/work-orders/', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowWorkOrders(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                flowWorkOrdersUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/flows/:id/work-orders/:woid', {
@@ -5122,19 +5118,21 @@ export const routes: Route[] = [
     // Flow↔record bindings nest under their parent flow:
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
-    // id is param 2. The collection rides deriveFlowRecords
-    // — a bespoke derivation (not a DocumentFamilyWiring
-    // family; a join row carries no lifecycle state of its
-    // own), mirroring deriveFlowWorkOrders' own precedent
-    // above. The by-id GET serves the join's stored head; a
-    // DELETE head is Gone (spec §5). flows/:id/versions
-    // table-backed nested read RETIRED Phase 15 Task 7 (zero
-    // callers).
+    // id is param 2. The collection serves the stored join
+    // heads at this flow's prefix (a join row carries no
+    // lifecycle state of its own); the by-id GET serves one
+    // of them, and a DELETE head is Gone (spec §5).
+    // flows/:id/versions table-backed nested read RETIRED
+    // Phase 15 Task 7 (zero callers).
     route('organizations/:id/flows/:id/records/', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowRecords(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                flowRecordsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/flows/:id/records/:frid', {

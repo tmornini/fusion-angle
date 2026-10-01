@@ -916,9 +916,9 @@ for (const c of NESTED_FLOW_CASES) {
             await organizationToken(fx.pb, fx.organizationB),
         ));
         assertStrictEquals(foreign.status, 200);
-        const foreignRows = await foreign.json() as {
+        const foreignRows = await partBodiesOf<{
             id: string;
-        }[];
+        }>(foreign);
         assert(
             foreignRows.some((r) => r.id === ids.b),
             'foreign ' + ids.b + ' missing on B plane',
@@ -927,7 +927,7 @@ for (const c of NESTED_FLOW_CASES) {
             fx.db, fx.organizationA,
             '/flows/' + fx.chainA.flow + '/' + c.seg + '/');
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), [ids.a]);
     });
 

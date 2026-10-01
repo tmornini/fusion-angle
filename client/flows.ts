@@ -5,9 +5,9 @@ import { organizationCollection } from './request-context.ts';
 export async function getFlowEntities(
     ctx: RequestContext,
 ): Promise<FlowEntity[]> {
-    return (await ctx.GET<FlowEntity[]>(
+    return (await ctx.GETCollection<FlowEntity>(
         organizationCollection(ctx, 'flows'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 export * from './flow-queries.ts';

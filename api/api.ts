@@ -1419,11 +1419,10 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-// The two live-head JSON lists still dated here: flows and
-// record-types, until each serves its stored heads.
+// The one live-head JSON list still dated here:
+// record-types, until it serves its stored heads.
 function isLiveHeadCollectionGet(
     routePattern: string,
 ): boolean {
-    return routePattern === RECORD_TYPES_COLLECTION_PATTERN
-        || routePattern === 'organizations/:id/flows/';
+    return routePattern === RECORD_TYPES_COLLECTION_PATTERN;
 }
