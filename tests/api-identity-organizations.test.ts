@@ -1,6 +1,7 @@
 import { operationIdHeader } from './operation-id-header.ts';
 import { assertEquals, assertStrictEquals } from '@std/assert';
-import { GET, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { routes, matchRoute } from
     '../api/routes.ts';
@@ -35,11 +36,11 @@ Deno.test('GET /identities/:id/organizations/ lists'
     + ' authorized organizations', async () => {
     const db = await seededMockDb();
     const identityId = buildMembers()[0]!.id;
-    const rows = await GET<OrganizationEntity[]>(
+    const rows = (await GET<OrganizationEntity[]>(
         db,
         'identities/' + identityId + '/organizations/',
         await devToken(identityId),
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(rows.length, 1);
 });
 
@@ -90,7 +91,7 @@ async () => {
     // Admin claims name both seeded orgs; the path
     // identity holds one live seat. Claims of the
     // caller must not shape this list.
-    const rows = await GET<OrganizationEntity[]>(
+    const rows = (await GET<OrganizationEntity[]>(
         db,
         'identities/' + identityId + '/organizations/',
         await claimToken({
@@ -101,7 +102,7 @@ async () => {
                 'admin:BBjWJsjYIDkTRKIIPrzWRw',
             ],
         }),
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(rows.length, 1);
 });
 
@@ -109,10 +110,10 @@ Deno.test('org-less GET identities/:id/organizations/'
     + ' returns an empty list', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const rows = await GET<OrganizationEntity[]>(
+    const rows = (await GET<OrganizationEntity[]>(
         db,
         'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         await devToken(),
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(rows, []);
 });

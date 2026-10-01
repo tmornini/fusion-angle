@@ -8,7 +8,8 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { PUT, GET, DELETE, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT, GET, DELETE } from './in-page-facade.ts';
 import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import {
     generateIdentifier, NIL_IDENTIFIER,
@@ -105,9 +106,9 @@ Deno.test('PUT then GET an identity round-trips', async () => {
     await PUT(
         db, 'identities/' + id, { kind: 'person' }, DEV_TOKEN,
         operationIdHeader());
-    const got = await GET<{ id: string; kind: string }>(
+    const got = (await GET<{ id: string; kind: string }>(
         db, 'identities/' + id, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(got, { id, kind: 'person' });
 });
 
@@ -117,12 +118,13 @@ async () => {
     const { postBootstrap } =
         await import('../api/mock-data.ts');
     await postBootstrap(db);
-    const sys = await GET<{ kind: string }>(
-        db, 'identities/' + SYSTEM_MEMBER_ID, DEV_TOKEN, operationIdHeader());
+    const sys = (await GET<{ kind: string }>(
+        db, 'identities/' + SYSTEM_MEMBER_ID, DEV_TOKEN, operationIdHeader()))
+        .body().toValue();
     assertStrictEquals(sys.kind, 'service');
-    const cur = await GET<{ kind: string }>(
+    const cur = (await GET<{ kind: string }>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
     assertStrictEquals(cur.kind, 'person');
 });
 
@@ -192,9 +194,10 @@ function piiReq(
 
 Deno.test('a member reads its own pii on the subtree', async () => {
     const db = await dbWithMember();
-    const pii = await GET<{ name: string }>(
+    const pii = (await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
-            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader());
+            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader()))
+        .body().toValue();
     assertStrictEquals(pii.name, 'Sarah');
 });
 
@@ -231,9 +234,10 @@ Deno.test('a member writes its own pii', async () => {
         { ...PII, name: 'Sarah Lee' }
             , await devToken('toccYYkLEABmlbpHJalgtQ'),
         operationIdHeader());
-    const pii = await GET<{ name: string }>(
+    const pii = (await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
-            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader());
+            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader()))
+        .body().toValue();
     assertStrictEquals(pii.name, 'Sarah Lee');
 });
 
@@ -242,9 +246,10 @@ Deno.test('an admin writes another identity pii', async () => {
     await PUT(db, 'identities/toccYYkLEABmlbpHJalgtQ/pii',
         { ...PII, name: 'By Admin' }, DEV_TOKEN,
         operationIdHeader());
-    const pii = await GET<{ name: string }>(
+    const pii = (await GET<{ name: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ/pii'
-            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader());
+            , await devToken('toccYYkLEABmlbpHJalgtQ'), operationIdHeader()))
+        .body().toValue();
     assertStrictEquals(pii.name, 'By Admin');
 });
 
@@ -266,8 +271,8 @@ async () => {
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/pii',
         await devToken('toccYYkLEABmlbpHJalgtQ')));
     assertStrictEquals(gone.status, 410);
-    const id = await GET<{ id: string }>(
+    const id = (await GET<{ id: string }>(
         db, 'identities/toccYYkLEABmlbpHJalgtQ', DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
     assertStrictEquals(id.id, 'toccYYkLEABmlbpHJalgtQ');
 });

@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -129,14 +130,14 @@ Deno.test('a byte-identical PUT resend to a seat converges'
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = { type: 'member', at: documentFields().at };
-    const first = await PUT(
+    const first = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
-        operationIdHeader());
-    const second = await PUT(
+        operationIdHeader())).body().toValue();
+    const second = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(first, second);
     // seedAdminSchema: org + current seat; one unique
     // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.

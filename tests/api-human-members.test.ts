@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { GET, PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -63,15 +64,15 @@ Deno.test(
         assert(
             seat.status === 201 || seat.status === 200,
         );
-        const row = await GET<{
+        const row = (await GET<{
             kind: string; title: string;
         }>(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');
-        const seats = await GET<{ id: string }[]>(
+        const seats = (await GET<{ id: string }[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assert(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
     },
 );
@@ -122,9 +123,9 @@ Deno.test(
             ]),
         }));
         assert(second.status === 201 || second.status === 200);
-        const row = await GET<{ strengths: string[] }>(
+        const row = (await GET<{ strengths: string[] }>(
             db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertEquals(row.strengths, [
             'Strategic Planning',
             'Stakeholder Management',

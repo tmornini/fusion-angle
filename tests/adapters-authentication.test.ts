@@ -7,17 +7,13 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET } from '../api/api.ts';
 import { testHashPassword } from './mock-seed.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
     type RequestContext,
 } from '../client/request-context.ts';
 import { responseMessage } from './fixtures/response-message.ts';
-import {
-    inPageClient,
-    inPageContext,
-} from './in-page-facade.ts';
+import { inPageClient, inPageContext, GET } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
@@ -99,8 +95,8 @@ async () => {
         ctx, 'demo@example.com', 's3cret');
     assert(creds);
     assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken, operationIdHeader())));
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , creds.accessToken, operationIdHeader())).body().toValue()));
 });
 
 Deno.test('postPasswordLogin issues a 30-day refresh token',

@@ -9,7 +9,8 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { canonicalPath } from '../api/message-pair.ts';
@@ -148,8 +149,8 @@ async () => {
     assertStrictEquals(tok.status, 200);
     const body = await presentedFields(tok) as { access_token: string };
     assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token, operationIdHeader())));
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token, operationIdHeader())).body().toValue()));
 });
 
 // authorization_code TTL: a code older than

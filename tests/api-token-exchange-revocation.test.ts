@@ -7,7 +7,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { PUT } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import { postToken } from '../api/authentication.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import {

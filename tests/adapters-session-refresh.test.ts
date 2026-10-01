@@ -3,10 +3,8 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import {
-    GET, handleRequest, UnauthorizedError,
-} from '../api/api.ts';
-import { inPageContext } from './in-page-facade.ts';
+import { handleRequest, UnauthorizedError } from '../api/api.ts';
+import { inPageContext, GET } from './in-page-facade.ts';
 import {
     postSessionRefresh,
 } from '../client/session-refresh.ts';
@@ -155,8 +153,8 @@ async () => {
         await postSessionRefresh(ctx, pair.refresh_token);
     assertNotStrictEquals(creds.refreshToken, pair.refresh_token);
     assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken, operationIdHeader())));
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , creds.accessToken, operationIdHeader())).body().toValue()));
 });
 
 Deno.test('a garbage refresh token throws UnauthorizedError',

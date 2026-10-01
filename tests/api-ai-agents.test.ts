@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { GET, PUT, handleRequest } from
-    '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -117,14 +117,14 @@ Deno.test('PUT /ai-agents/:id writes the four fields; GET'
     assertStrictEquals(written.description, body.description);
     assertStrictEquals(written.skill_focus, body.skill_focus);
     assertStrictEquals(written.model, body.model);
-    const got = await GET<{
+    const got = (await GET<{
         id: string;
         name: string;
         description: string;
         skill_focus: string;
         model: string;
     }>(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(got, written);
 });
 
@@ -189,12 +189,13 @@ Deno.test('a flow write with agentIds naming a live'
         res.status === 201 || res.status === 200,
         'expected 201 or 200, got ' + res.status,
     );
-    const flow = await GET<{
+    const flow = (await GET<{
         graph: {
             nodes: { agentIds?: string[] }[];
         };
     }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + 'aJJKPwIzmbFseMhGUrFyFQ', token, operationIdHeader());
+        + 'aJJKPwIzmbFseMhGUrFyFQ', token, operationIdHeader()))
+        .body().toValue();
     const node = flow.graph.nodes[0]!;
     assertEquals(node.agentIds, ['UxpkDaNMmbWLvCTkyrFfGA']);
 });

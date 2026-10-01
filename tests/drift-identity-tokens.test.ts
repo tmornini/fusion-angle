@@ -3,7 +3,8 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { handleRequest, PUT } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import type { DbAdapter } from '../api/db.ts';
 import {
     base64UrlDecode,

@@ -5,9 +5,8 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    GET, PUT, handleRequest,
-} from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import {
     devToken, expiredToken, notYetValidToken,
 } from './token-fixtures.ts';
@@ -48,8 +47,9 @@ async () => {
 
 Deno.test('protected route accepts a valid token', async () => {
     const db = await freshDb();
-    const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', await devToken(), operationIdHeader());
+    const rows = (await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        + '', await devToken(), operationIdHeader())).body().toValue();
     assert(Array.isArray(rows));
 });
 
@@ -124,10 +124,10 @@ async () => {
         operationIdHeader());
     // Still admitted — revocation bites at next mint/exchange.
     assertEquals(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live,
-            operationIdHeader()),
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , await devToken(), operationIdHeader()),
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live,
+            operationIdHeader())).body().toValue(),
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , await devToken(), operationIdHeader())).body().toValue(),
     );
 });
 
@@ -151,9 +151,9 @@ Deno.test('a token minted within a revocation second still'
         { identity_id: 'XXZruirZyAOoRpNxaDnpSA', at: revokedAt },
         await devToken(),
         operationIdHeader());
-    const rows = await GET<unknown[]>(
+    const rows = (await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', sameSecond,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assert(Array.isArray(rows));
 });
 
@@ -182,8 +182,8 @@ Deno.test('a jti revoked in the ledger still admits the access'
         },
         await devToken(),
         operationIdHeader());
-    const rows = await GET<unknown[]>(
+    const rows = (await GET<unknown[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', await devToken(),
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assert(Array.isArray(rows));
 });

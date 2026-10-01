@@ -4,7 +4,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET, PUT } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
@@ -55,19 +55,20 @@ async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
 Deno.test('an org-scoped token fences GET to its tenant',
 async () => {
     const db = await twoOrganizationIdeas();
-    const rows = await GET<{ id: string }[]>(
+    const rows = (await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             , await organizationToken('AjdvjuECVZEgZoFajaIEkg'),
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
 Deno.test('a flat token bridges to the default org',
 async () => {
     const db = await twoOrganizationIdeas();
-    const rows = await GET<{ id: string }[]>(
+    const rows = (await GET<{ id: string }[]>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            , await organizationToken(''), operationIdHeader());
+            , await organizationToken(''), operationIdHeader()))
+        .body().toValue();
     // No honest unscoped default since SP-6: the token
     // resolves to org 'AjdvjuECVZEgZoFajaIEkg', so the org '7' idea stays
     // hidden.

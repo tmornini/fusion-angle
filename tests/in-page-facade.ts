@@ -4,7 +4,10 @@ import {
 } from '../api/api.ts';
 import {
     createHttpFacade,
+    type HeaderFields,
+    type HttpFacade,
     type HttpTransport,
+    type TransportClient,
 } from '../client/http-facade.ts';
 import type { Client } from '../client/create-client.ts';
 import type { RequestContext } from '../client/request-context.ts';
@@ -76,4 +79,87 @@ export function inPageContext(
     token: string,
 ): RequestContext {
     return inPageClient(adapter).requestContext(token);
+}
+
+// A caller that holds no session: a 401 answers as it was
+// answered, with no refresh to try and nowhere to go.
+const NO_SESSION: TransportClient = {
+    runSingleFlightRefresh: () => Promise.resolve(null),
+    putSessionToken: () => {},
+    navigateToAuth: () => {},
+};
+
+function facadeOver(adapter: ClientFacadeAdapter): HttpFacade {
+    return wrapInPageAdapter(adapter)(NO_SESSION);
+}
+
+// The retired api/api.ts verbs' names and argument
+// order, answering what the real transport answers.
+export function GET<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).GET<T>(
+        resource, token, headerFields,
+    );
+}
+
+export function PUT<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).PUT<T>(
+        resource, payload, token, headerFields,
+    );
+}
+
+export function PATCH<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).PATCH<T>(
+        resource, payload, token, headerFields,
+    );
+}
+
+export function POST<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).POST<T>(
+        resource, payload, token, headerFields,
+    );
+}
+
+export function DELETE(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).DELETE(
+        resource, token, headerFields,
+    );
+}
+
+export function POSTUnauthenticated<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).POSTUnauthenticated<T>(
+        resource, payload, headerFields,
+    );
 }

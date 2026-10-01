@@ -9,7 +9,8 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
     claimToken, devToken, reachableToken,
@@ -442,8 +443,9 @@ async () => {
         undefined,
     );
     // the minted access token passes the SP-3 gate
-    const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', body.access_token, operationIdHeader());
+    const rows = (await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        + '', body.access_token, operationIdHeader())).body().toValue();
     assert(Array.isArray(rows));
 });
 
@@ -650,10 +652,10 @@ async () => {
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert(Array.isArray(
-        await GET(
+        (await GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
             body['access_token'] as string,
-            operationIdHeader())));
+            operationIdHeader())).body().toValue()));
 });
 
 Deno.test(
@@ -713,8 +715,8 @@ Deno.test('refresh rotates to a new pair', async () => {
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , pair2.access_token, operationIdHeader())));
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , pair2.access_token, operationIdHeader())).body().toValue()));
 });
 
 Deno.test('replaying a rotated refresh token revokes the chain',
@@ -850,8 +852,8 @@ async () => {
     assertStrictEquals(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
     // the delegated token passes the gate (current = admin)
     assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token, operationIdHeader())));
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token, operationIdHeader())).body().toValue()));
 });
 
 Deno.test('token-exchange 201 has no refresh Set-Cookie',
@@ -1039,8 +1041,8 @@ Deno.test('client_credentials issues a gate-valid token', async () => {
     assertStrictEquals(res.status, 200);
     const body = await presentedFields(res) as { access_token: string };
     assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , body.access_token, operationIdHeader())));
+        (await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+            , body.access_token, operationIdHeader())).body().toValue()));
     assertNotStrictEquals(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );

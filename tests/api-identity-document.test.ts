@@ -5,7 +5,8 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { PUT, GET, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT, GET } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -180,12 +181,12 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
     await seedAdminSchema(db);
     const body = identityFields();
     const id = generateIdentifier();
-    const first = await PUT(
+    const first = (await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
-        operationIdHeader());
-    const second = await PUT(
+        operationIdHeader())).body().toValue();
+    const second = (await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -324,9 +325,9 @@ Deno.test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
     await seedAdminSchema(db);
     const body = identityFields();
     const id = generateIdentifier();
-    const written = await PUT<Record<string, unknown>>(
+    const written = (await PUT<Record<string, unknown>>(
         db, 'identities/' + id, body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(
         Object.keys(written).sort(),
         ['id', 'kind'],
@@ -435,14 +436,15 @@ async () => {
         }),
     );
     assert(put.status === 201 || put.status === 200);
-    const got = await GET<{
+    const got = (await GET<{
         id: string;
         kind: string;
         title: string;
         department: string;
         strengths: string[];
         team_dimensions: Record<string, number>;
-    }>(db, 'identities/' + id, DEV_TOKEN, operationIdHeader());
+    }>(db, 'identities/' + id, DEV_TOKEN, operationIdHeader()))
+        .body().toValue();
     assertStrictEquals(got.id, id);
     assertStrictEquals(got.kind, 'person');
     assertStrictEquals(got.title, profile.title);
@@ -487,14 +489,14 @@ async () => {
     assert(
         piiPut.status === 201 || piiPut.status === 200,
     );
-    const pii = await GET<Record<string, unknown>>(
+    const pii = (await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA/pii', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(pii['name'], 'Ada');
     assertStrictEquals('title' in pii, false);
-    const identity = await GET<Record<string, unknown>>(
+    const identity = (await GET<Record<string, unknown>>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(identity['title'], 'CEO');
     assertStrictEquals('name' in identity, false);
 });

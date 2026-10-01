@@ -1,6 +1,7 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { GET, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -33,8 +34,9 @@ async () => {
 Deno.test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', await devToken(), operationIdHeader());
+    const rows = (await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        + '', await devToken(), operationIdHeader())).body().toValue();
     assert(Array.isArray(rows));   // 200, not 403
 });
 
