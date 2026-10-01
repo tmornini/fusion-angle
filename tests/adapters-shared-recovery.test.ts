@@ -486,9 +486,9 @@ Deno.test('a recovering context reads through the vessel token,'
     client.putSessionToken(await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_B,
     ));
-    const rows = (await ctx.GET<{ id: string }[]>(
+    const rows = (await ctx.GETCollection<{ id: string }>(
         'organizations/' + ORGANIZATION_A + '/ideas/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     // the read ran in the vessel's org A, not the global's B
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 }));
@@ -519,7 +519,7 @@ Deno.test('recovery re-scopes to the vessel org claim, not the'
     const ctx = client.recoveringRequestContext(deadA);
     // the 401 drives refresh + re-scope; recovery must honor the
     // vessel's own org A, never the preference another tab wrote
-    await ctx.GET('organizations/' + ORGANIZATION_A + '/ideas/');
+    await ctx.GETCollection('organizations/' + ORGANIZATION_A + '/ideas/');
     const scoped =
         principalFromToken(client.getSessionToken()).organization;
     // one vessel truth: the recovered session matches the
@@ -546,7 +546,7 @@ Deno.test('recovery leaves the cross-tab active-org preference'
     // the foreground tab is viewing org B
     localStorage.setItem(ACTIVE_ORGANIZATION_ID, ORGANIZATION_B);
     const ctx = client.recoveringRequestContext(deadA);
-    await ctx.GET('organizations/' + ORGANIZATION_A + '/ideas/');
+    await ctx.GETCollection('organizations/' + ORGANIZATION_A + '/ideas/');
     // the background recovery scopes ITS session to vessel org A...
     assertStrictEquals(
         principalFromToken(client.getSessionToken()).organization,
@@ -692,6 +692,13 @@ Deno.test(
                             organization_id: organization,
                         } as T));
                     }
+                    throw new Error('unexpected GET ' + resource);
+                },
+                GETCollection: <T>(
+                    _resource: string,
+                    _token: string,
+                    fields?: HeaderFields,
+                ): Promise<HttpMessage<T>[]> => {
                     record('read', fields);
                     reads += 1;
                     if (reads === 1) {
@@ -706,7 +713,7 @@ Deno.test(
                             ),
                         );
                     }
-                    return Promise.resolve(responseMessage([] as T));
+                    return Promise.resolve([]);
                 },
                 PUT: unused,
                 PATCH: unused,
@@ -749,10 +756,10 @@ Deno.test(
             const ctx = client.recoveringRequestContext(
                 dead,
             );
-            const rows = (await ctx.GET(
+            const rows = await ctx.GETCollection(
                 'organizations/' + organization
                     + '/ideas/',
-            )).body().toValue();
+            );
             assert(Array.isArray(rows));
             const kinds = seen.map((row) => row.kind);
             assertEquals(

@@ -49,6 +49,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import {
     documentCollectionGetHandler,
@@ -532,9 +533,7 @@ async () => {
             , token),
     );
     assertStrictEquals(listRes.status, 200);
-    const rows = await listRes.json() as {
-        id: string;
-    }[];
+    const rows = await partBodiesOf<{ id: string }>(listRes);
     assert(rows.length > 0);
     for (const row of rows) {
         const getRes = await handleRequest(
@@ -1344,9 +1343,9 @@ async () => {
             , woToken),
     );
     assertStrictEquals(woListRes.status, 200);
-    const workOrders = await woListRes.json() as {
+    const workOrders = await partBodiesOf<{
         flow_graph: Record<string, unknown>;
-    }[];
+    }>(woListRes);
     for (const wo of workOrders) {
         const graph = asWorkOrderFlowGraph(
             wo.flow_graph, 'work_orders.flow_graph',

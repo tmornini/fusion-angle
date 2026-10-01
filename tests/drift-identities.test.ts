@@ -57,6 +57,8 @@ import { identityByEmail } from '../api/authentication.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partsOf,
 } from './http-fixtures.ts';
 
 const INV_A = generateIdentifier();
@@ -308,7 +310,9 @@ Deno.test('identities collection wire equals derive (13 incl.'
         db, req('GET', '/identities/', token),
     );
     assertStrictEquals(res.status, 200);
-    assertEquals(await res.json(), derived);
+    const parts = await partsOf<{ id: Id; kind: string }>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), derived);
 
     for (const identity of derived) {
         const one = await derivedIdentity(

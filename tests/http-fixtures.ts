@@ -1,11 +1,26 @@
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
+import { Octets } from '../shared/http-message/octets.ts';
+import { splitParts } from '../shared/http-message/multipart.ts';
+import type { FieldLine } from '../shared/http-message/types.ts';
+import { handleRequest } from '../api/api.ts';
 import { messageStore } from '../api/message-store.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
+import {
+    servedResponse,
+    type Reader,
+} from '../api/served-response.ts';
 
 const BASE = 'http://localhost';
 
@@ -238,12 +253,104 @@ export async function storedPutBodyText(
     return storedMessageBodyText(stored.response);
 }
 
-export async function storedCollectionText(
+// A Response as the transport holds it: its status, its
+// header lines (set-cookie one line per cookie), and its
+// octets. The in-process server applies no content
+// coding, so every line is kept.
+export async function messageOfResponse(
+    response: Response,
+): Promise<HttpMessage> {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const fields: FieldLine[] = [];
+    response.headers.forEach((value, name) => {
+        if (name !== 'set-cookie') fields.push({ name, value });
+    });
+    for (const value of response.headers.getSetCookie()) {
+        fields.push({ name: 'set-cookie', value });
+    }
+    return HttpMessage.fromModel({
+        startLine: {
+            kind: 'response', version: 'HTTP/1.1',
+            status: response.status, reason: '',
+        },
+        fields,
+        body: bytes.byteLength > 0
+            ? Octets.fromBytes(bytes)
+            : undefined,
+        trailer: undefined,
+    });
+}
+
+// A collection's parts; a 204 has none.
+export async function partsOf<T>(
+    response: Response,
+): Promise<HttpMessage<T>[]> {
+    if (response.status === 204) {
+        await response.body?.cancel();
+        return [];
+    }
+    const type = response.headers.get('content-type') ?? '';
+    const message = await messageOfResponse(response);
+    return splitParts(
+        type, Octets.fromBytes(message.body().toBytes())
+            .toLatin1(),
+    ).map((part) => HttpMessage.fromWire<T>(part));
+}
+
+export async function partBodiesOf<T>(
+    response: Response,
+): Promise<T[]> {
+    return (await partsOf<T>(response))
+        .map((part) => part.body().toValue());
+}
+
+// Each part is its head's stored response served with
+// this transmission's two lines (spec §2), the parts in
+// the heads' (response_at, id) order (§4).
+export async function assertPartsAreHeads(
     db: DbAdapter,
-    collection: string,
-): Promise<string> {
-    const rows = await messageStore(db).getCollection(
-        collection,
+    parts: readonly HttpMessage[],
+    reader: Reader,
+): Promise<void> {
+    assert(parts.length > 0, 'the collection selects heads');
+    const heads = [];
+    for (const part of parts) {
+        const id = part.query('header.etag').toText()
+            .slice(1, -1);
+        const head = await db.messagePairs.getById(id);
+        heads.push(head);
+        assertStrictEquals(
+            part.toWire(),
+            servedResponse(head.response, {
+                date: part.query('header.date').toText(),
+                requestId: part.query('header.request-id')
+                    .toText(),
+            }, reader),
+        );
+    }
+    const order = [...heads].sort((a, b) =>
+        a.response_at < b.response_at ? -1
+            : a.response_at > b.response_at ? 1
+                : compareIdentifiers(a.id, b.id));
+    assertEquals(heads.map((h) => h.id), order.map((h) => h.id));
+}
+
+// A document GET and its part are one message but for
+// the two lines that name each transmission.
+function withoutTransmission(message: HttpMessage): string {
+    return message.withFieldDeleted('date')
+        .withFieldDeleted('request-id').toWire();
+}
+
+export async function assertPartIsDocumentGet(
+    db: DbAdapter, token: string, part: HttpMessage, path: string,
+): Promise<void> {
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    assertStrictEquals(
+        withoutTransmission(await messageOfResponse(got)),
+        withoutTransmission(part),
     );
-    return JSON.stringify(rows);
 }

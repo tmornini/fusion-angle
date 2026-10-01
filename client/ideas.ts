@@ -48,9 +48,9 @@ export function subscribeIdeaChanges(
 export async function getIdeaEntities(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
-    return (await ctx.GET<IdeaEntity[]>(
+    return (await ctx.GETCollection<IdeaEntity>(
         organizationCollection(ctx, 'ideas'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 export async function getIdeaEntity(

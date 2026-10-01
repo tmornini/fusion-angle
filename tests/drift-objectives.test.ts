@@ -55,9 +55,11 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partBodiesOf,
+    partsOf,
     storedPutBodyText,
-    storedCollectionText,
 } from './http-fixtures.ts';
 
 const IDEA_DRIFT_CHAIN_1_PROMOTED = generateIdentifier();
@@ -225,14 +227,11 @@ async () => {
             , tokenStark),
     );
     assertStrictEquals(resStark.status, 200);
-    const starkPrefix = '/organizations/'
-        + STARK_ORGANIZATION + '/objectives/';
     const stark = await derivedObjectives(
         db, STARK_ORGANIZATION,
     );
-    assertStrictEquals(
-        await resStark.text(),
-        await storedCollectionText(db, starkPrefix),
+    await assertPartsAreHeads(
+        db, await partsOf(resStark), { sees: 'whole' },
     );
     assertStrictEquals(stark.length, 4);
     assertEquals(
@@ -253,13 +252,8 @@ async () => {
     );
     assertStrictEquals(resTwo.status, 200);
     const org2 = await derivedObjectives(db, ORGANIZATION_TWO);
-    assertStrictEquals(
-        await resTwo.text(),
-        await storedCollectionText(
-            db,
-            '/organizations/' + ORGANIZATION_TWO
-                + '/objectives/',
-        ),
+    await assertPartsAreHeads(
+        db, await partsOf(resTwo), { sees: 'whole' },
     );
     assertStrictEquals(org2.length, 1);
     assertStrictEquals(org2[0]!.id, ORGANIZATION_TWO_OBJECTIVE.id);
@@ -679,7 +673,7 @@ Deno.test('live-write chain: create, reposition, revision edit,'
             db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                 + '', token),
         );
-        const list = await listRes.json() as { id: string }[];
+        const list = await partBodiesOf<{ id: string }>(listRes);
         assertStrictEquals(
             list.some((o) => o.id === objectiveId), true,
         );
@@ -1071,17 +1065,14 @@ async () => {
             , token),
     );
     assertStrictEquals(listRes.status, 200);
-    const listText = await listRes.text();
+    const parts = await partsOf<{ id: string }>(listRes);
     const derivedCollection = await derivedObjectives(
         db, STARK_ORGANIZATION,
     );
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
     assertStrictEquals(
-        listText,
-        await storedCollectionText(
-            db,
-            '/organizations/' + STARK_ORGANIZATION
-                + '/objectives/',
-        ),
+        parts.some((part) => part.body().toValue().id === objectiveId),
+        true,
     );
     assertStrictEquals(
         derivedCollection.some((o) => o.id === objectiveId),
@@ -1141,7 +1132,7 @@ async () => {
             , token),
     );
     assertStrictEquals(res.status, 200);
-    const list = await res.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(res);
     const added = list.filter((row) =>
         [
             OBJ_DRIFT_Z, OBJ_DRIFT_A, OBJ_DRIFT_M,

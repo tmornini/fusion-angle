@@ -1,5 +1,9 @@
-import { assert, assertStrictEquals } from '@std/assert';
-import { GET } from './in-page-facade.ts';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
+import { GET, GETCollection } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -21,16 +25,21 @@ import { operationIdHeader } from './operation-id-header.ts';
 // to end.
 const ANY_ID = generateIdentifier();
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
-const COLLECTION_ROUTES: readonly string[] = [
-    'identities/' + ANY_ID + '/organizations/',
-    'organizations/' + STARK + '/members/',
+// The collections that serve their heads as parts.
+const SERVED_COLLECTIONS: readonly string[] = [
     'ai-agents/',
     'organizations/' + STARK + '/ideas/',
     'organizations/' + STARK + '/projects/',
+    'organizations/' + STARK + '/work-orders/',
+    'organizations/' + STARK + '/objectives/',
+];
+// The collections still answering handler JSON.
+const PARTED_COLLECTIONS: readonly string[] = [
+    'identities/' + ANY_ID + '/organizations/',
+    'organizations/' + STARK + '/members/',
     'organizations/' + STARK + '/flows/',
     'organizations/' + STARK + '/projects/'
         + ANY_ID + '/flows/',
-    'organizations/' + STARK + '/work-orders/',
     'organizations/' + STARK + '/flows/'
         + ANY_ID + '/work-orders/',
     // GET states/:id/field-values RETIRED (C4); field values
@@ -40,7 +49,6 @@ const COLLECTION_ROUTES: readonly string[] = [
         + ANY_ID + '/records/',
     'organizations/' + STARK + '/ideas/'
         + ANY_ID + '/submissions/',
-    'organizations/' + STARK + '/objectives/',
     'organizations/' + STARK + '/objectives/'
         + ANY_ID + '/revisions/',
     'organizations/' + STARK + '/projects/'
@@ -51,7 +59,21 @@ const COLLECTION_ROUTES: readonly string[] = [
     // elimination C3).
 ];
 
-for (const route of COLLECTION_ROUTES) {
+for (const route of SERVED_COLLECTIONS) {
+    Deno.test(
+        `GET ${route} selects nothing on an empty db`,
+        async () => {
+            const db = memoryDbAdapter();
+            await seedAdminSchema(db);
+            const parts = await GETCollection(
+                db, route, await devToken(), operationIdHeader(),
+            );
+            assertEquals(parts, []);
+        },
+    );
+}
+
+for (const route of PARTED_COLLECTIONS) {
     Deno.test(
         `GET ${route} returns an array on an empty`
         + ` db`,

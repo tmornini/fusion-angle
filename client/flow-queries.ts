@@ -92,9 +92,9 @@ getFlowsWithProjectNames(
             organizationCollection(ctx, 'flows'),
         ).then(read => read.body().toValue()),
         getProjectFlowEntities(ctx),
-        ctx.GET<ProjectEntity[]>(
+        ctx.GETCollection<ProjectEntity>(
             organizationCollection(ctx, 'projects'),
-        ).then(read => read.body().toValue()),
+        ).then(parts => parts.map((m) => m.body().toValue())),
     ]);
     const projectNameById = new Map(
         allProjects.map(

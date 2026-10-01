@@ -8,8 +8,11 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { apiRequest, storedPutBodyText } from
-    './http-fixtures.ts';
+import {
+    apiRequest,
+    partsOf,
+    storedPutBodyText,
+} from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { nowUtc } from '../shared/types.ts';
@@ -119,6 +122,17 @@ async () => {
     assertEquals(await got.json(), {
         error: 'Gone: ideas/' + id,
     });
+    // The collection names no part for the deleted head.
+    const headId = (await db.messagePairs.getHeadPair(IDEAS, id))!
+        .id;
+    const parts = await partsOf(await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS, token,
+    })));
+    assertEquals(
+        parts.filter((p) => p.query('header.etag').toText()
+            === '"' + headId + '"'),
+        [],
+    );
 });
 
 Deno.test('a name never written answers 404', async () => {

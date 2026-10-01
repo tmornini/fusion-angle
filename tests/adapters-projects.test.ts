@@ -205,11 +205,10 @@ Deno.test(
         assertStrictEquals(
             projects[0]?.titleText(), 'Keep',
         );
-        // Collection GET streams live PUT heads, including a
-        // head whose state is `deleted`. getProjects filters
-        // it out.
+        // The collection serves no part for a state-deleted
+        // head (spec §5), so the rows are the projects.
         const rows = await getProjectEntities(ctx);
-        assertStrictEquals(rows.length, 2);
+        assertStrictEquals(rows.length, 1);
     },
 );
 

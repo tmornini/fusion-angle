@@ -98,9 +98,9 @@ function serviceFacet(
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
-    const identities = (await ctx.GET<IdentityEntity[]>(
+    const identities = (await ctx.GETCollection<IdentityEntity>(
         'identities/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     return Promise.all(identities.map(async identity =>
         identity.kind === 'service'
             ? {

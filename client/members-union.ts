@@ -49,8 +49,8 @@ export async function getMembers(
                 'organizations/' + organization
                     + '/members/',
             ).then(read => read.body().toValue()),
-        ctx.GET<AIAgentEntity[]>('ai-agents/')
-            .then(read => read.body().toValue()),
+        ctx.GETCollection<AIAgentEntity>('ai-agents/')
+            .then(parts => parts.map((m) => m.body().toValue())),
     ]);
     const humans = buildHumanMemberMap(seats);
     const ais = buildAIAgentMap(agents);

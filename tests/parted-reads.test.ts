@@ -8,10 +8,8 @@ import { routePatternOf } from '../api/route-surface.ts';
 // fourth spec empties the list, and the commit that does
 // adds `## A response is one unit` to ARCHITECTURE.md.
 const PARTED = [
-    'ai-agents/',
     'ai-agents/:id/versions/',
     'ai-agents/:id/versions/:etag',
-    'identities/',
     'identities/:id/credentials/',
     'identities/:id/invitations/',
     'identities/:id/invitations/:id',
@@ -27,7 +25,6 @@ const PARTED = [
     'organizations/:id/flows/:id/versions/',
     'organizations/:id/flows/:id/versions/:etag',
     'organizations/:id/flows/:id/work-orders/',
-    'organizations/:id/ideas/',
     'organizations/:id/ideas/:id/submissions/',
     'organizations/:id/ideas/:id/versions/',
     'organizations/:id/ideas/:id/versions/:etag',
@@ -35,11 +32,9 @@ const PARTED = [
     'organizations/:id/invitations/:id',
     'organizations/:id/invitations/:id/versions/',
     'organizations/:id/invitations/:id/versions/:etag',
-    'organizations/:id/objectives/',
     'organizations/:id/objectives/:id/revisions/',
     'organizations/:id/objectives/:id/versions/',
     'organizations/:id/objectives/:id/versions/:etag',
-    'organizations/:id/projects/',
     'organizations/:id/projects/:id/flows/',
     'organizations/:id/projects/:id/objective-actual-scores/',
     'organizations/:id/projects/:id/'
@@ -48,7 +43,6 @@ const PARTED = [
     'organizations/:id/projects/:id/versions/:etag',
     'organizations/:id/versions/',
     'organizations/:id/versions/:etag',
-    'organizations/:id/work-orders/',
     'organizations/:id/work-orders/:id/history',
     'organizations/:organization-id/former-members/',
     'organizations/:organization-id/members/',

@@ -58,7 +58,9 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partsOf,
 } from './http-fixtures.ts';
 
 const N_START = generateIdentifier();
@@ -263,11 +265,12 @@ Deno.test('seeded GET /work-orders wire equals derived collection,'
             , token),
     );
     assertStrictEquals(res.status, 200);
-    const wireText = await res.text();
+    const parts = await partsOf<WorkOrderVersion>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
     const derived = await derivedWorkOrders(
         db, STARK_ORGANIZATION,
     );
-    assertEquals(JSON.parse(wireText), derived);
+    assertEquals(parts.map((part) => part.body().toValue()), derived);
     assertStrictEquals(derived.length, 145);
     // Phase Final Stage B: work_orders table retired.
 });
@@ -288,8 +291,8 @@ Deno.test('org-2 carries no work orders; a foreign-org GET 404s'
             tokenTwo,
         ),
     );
-    assertStrictEquals(emptyRes.status, 200);
-    assertStrictEquals(await emptyRes.text(), '[]');
+    assertStrictEquals(emptyRes.status, 204);
+    assertStrictEquals(await emptyRes.text(), '');
     assertEquals(
         await derivedWorkOrders(db, ORGANIZATION_TWO), [],
     );

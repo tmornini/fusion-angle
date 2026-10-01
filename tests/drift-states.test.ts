@@ -36,6 +36,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    partBodiesOf,
     invitationLatched,
 } from './http-fixtures.ts';
 
@@ -330,10 +331,15 @@ async () => {
                 + '/work-orders/',
             token,
         ));
-        assertStrictEquals(woList.status, 200);
-        const workOrders = await woList.json() as {
-            id: string;
-        }[];
+        // Org two seeds no work order: its collection selects
+        // none and answers 204.
+        assertStrictEquals(
+            woList.status,
+            organization === STARK_ORGANIZATION ? 200 : 204,
+        );
+        const workOrders = await partBodiesOf<{ id: string }>(
+            woList,
+        );
         for (const row of workOrders) {
             const history = await handleRequest(
                 db, req(
@@ -358,9 +364,9 @@ async () => {
             token,
         ));
         assertStrictEquals(objList.status, 200);
-        const objectives = await objList.json() as {
-            id: string;
-        }[];
+        const objectives = await partBodiesOf<{ id: string }>(
+            objList,
+        );
         for (const row of objectives) {
             const versions = await handleRequest(
                 db, req(

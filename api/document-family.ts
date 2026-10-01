@@ -27,6 +27,7 @@ import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
 import {
+    selectHeadsAtPath,
     wholeHeadSelection,
     type Lifecycle,
 } from './head-reads.ts';
@@ -605,12 +606,29 @@ export function documentCollectionGetHandler(
     };
 }
 
+// A family's collection (spec §1 B): the live heads at
+// its prefix, (response_at, id). A deleted head is the
+// gate's to drop.
+export function collectionSelect(
+    wiring: DocumentFamilyWiring,
+): SelectHandler {
+    return (db, _params, _actor, organization) =>
+        selectHeadsAtPath(
+            db,
+            canonicalPath(
+                requireOrganization(organization),
+                '/' + wiring.family + '/',
+            ),
+            wiring.lifecycle,
+        );
+}
+
 export function documentCollectionRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
         segments: collectionSegments(wiring),
-        get: documentCollectionGetHandler(wiring),
+        select: collectionSelect(wiring),
     };
 }
 

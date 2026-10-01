@@ -86,6 +86,9 @@ async () => {
                 { status: 401 },
             );
         }
+        if (url.endsWith('/ideas/')) {
+            return new Response(null, { status: 204 });
+        }
         return Response.json([]);
     }, async () => {
         const facade = createHttpFacade(
@@ -94,11 +97,13 @@ async () => {
         )({ ...client, navigateToAuth: () => {} });
         const [a, b] = await Promise.all([
             facade.GET('members', 'dead-access'),
-            facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                , 'dead-access'),
+            facade.GETCollection(
+                'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+                'dead-access',
+            ),
         ]);
         assert(Array.isArray(a.body().toValue()));
-        assert(Array.isArray(b.body().toValue()));
+        assert(Array.isArray(b));
     });
     assertStrictEquals(refreshPosts, 1);
 });

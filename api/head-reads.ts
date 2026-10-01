@@ -9,6 +9,14 @@ import {
     type Transmission,
 } from './served-response.ts';
 import { bodyOf, DELETED_STATE } from './derive-documents.ts';
+import {
+    joinParts,
+    MULTIPART_MIXED,
+} from '../shared/http-message/multipart.ts';
+import { serializeWire } from '../shared/http-message/wire-codec.ts';
+import { Octets } from '../shared/http-message/octets.ts';
+import type { StatusLine } from '../shared/http-message/types.ts';
+import { HTTP_NO_CONTENT, HTTP_OK } from '../shared/http-errors.ts';
 
 // A family's lifecycle: in a 'state' family a head whose
 // body says `deleted` is a deleted document, as every
@@ -16,16 +24,25 @@ import { bodyOf, DELETED_STATE } from './derive-documents.ts';
 export type Lifecycle = 'state' | 'stateless';
 
 // What a GET selected (spec Decision 2). The selector
-// computes which head, after the fence; a miss is its to
-// throw (403 or 404). The head is served as stored.
-export type HeadSelection = {
-    readonly kind: 'document',
-    readonly head: MessagePairEntity,
-    readonly lifecycle: Lifecycle,
-    readonly table: string,
-    readonly id: Id,
-    readonly reader: Reader,
-};
+// computes which heads, after the fence; a document's miss
+// is its to throw (403 or 404). Each head is served as
+// stored. A collection's heads are a subsequence of one
+// store read, in its (response_at, id) order.
+export type HeadSelection =
+    | {
+        readonly kind: 'document',
+        readonly head: MessagePairEntity,
+        readonly lifecycle: Lifecycle,
+        readonly table: string,
+        readonly id: Id,
+        readonly reader: Reader,
+    }
+    | {
+        readonly kind: 'collection',
+        readonly heads: readonly MessagePairEntity[],
+        readonly lifecycle: Lifecycle,
+        readonly reader: Reader,
+    };
 
 // A head served whole needs no reader of its own: the
 // credential and the instance are the only projections.
@@ -37,6 +54,16 @@ export function wholeHeadSelection(
 ): HeadSelection {
     return {
         kind: 'document', head, lifecycle, table, id,
+        reader: { sees: 'whole' },
+    };
+}
+
+export function wholeCollectionSelection(
+    heads: readonly MessagePairEntity[],
+    lifecycle: Lifecycle,
+): HeadSelection {
+    return {
+        kind: 'collection', heads, lifecycle,
         reader: { sees: 'whole' },
     };
 }
@@ -54,6 +81,19 @@ export async function selectHeadAtPath(
         throw new EntityNotFoundError(table, name);
     }
     return wholeHeadSelection(head, 'stateless', table, name);
+}
+
+// The live heads at a prefix the gate has already fenced.
+// A deleted head among them is the gate's to drop.
+export async function selectHeadsAtPath(
+    db: DbAdapter,
+    prefix: string,
+    lifecycle: Lifecycle,
+): Promise<HeadSelection> {
+    return wholeCollectionSelection(
+        await db.messagePairs.getCollectionHeadPairs(prefix),
+        lifecycle,
+    );
 }
 
 export function isDeletedHead(
@@ -86,6 +126,9 @@ export function servedSelection(
     selection: HeadSelection,
     transmission: Transmission,
 ): Response {
+    if (selection.kind === 'collection') {
+        return servedCollection(selection, transmission);
+    }
     if (isDeletedHead(selection.head, selection.lifecycle)) {
         throw new RetiredEntityError(
             selection.table, selection.id,
@@ -96,4 +139,55 @@ export function servedSelection(
         transmission,
         selection.reader,
     ));
+}
+
+// A collection is multipart/mixed of the responses its
+// live heads serve (spec §4); a collection that selects
+// none answers 204, since a multipart body needs a part
+// (RFC 2046 §5.1.1). It carries no etag: it names no one
+// state.
+function servedCollection(
+    selection: Extract<HeadSelection, { kind: 'collection' }>,
+    transmission: Transmission,
+): Response {
+    const parts = selection.heads
+        .filter((head) =>
+            !isDeletedHead(head, selection.lifecycle))
+        .map((head) => servedResponse(
+            head.response, transmission, selection.reader,
+        ));
+    const lines = [
+        { name: 'date', value: transmission.date },
+        { name: 'request-id', value: transmission.requestId },
+    ];
+    if (parts.length === 0) {
+        return responseOfWire(serializeWire({
+            startLine: statusLine(HTTP_NO_CONTENT),
+            fields: lines,
+            body: undefined,
+            trailer: undefined,
+        }));
+    }
+    const boundary = crypto.randomUUID();
+    const body = joinParts(parts, boundary);
+    return responseOfWire(serializeWire({
+        startLine: statusLine(HTTP_OK),
+        fields: [
+            ...lines,
+            { name: 'content-length', value: String(body.length) },
+            {
+                name: 'content-type',
+                value: MULTIPART_MIXED + '; boundary=' + boundary,
+            },
+        ],
+        body: Octets.fromLatin1(body),
+        trailer: undefined,
+    }));
+}
+
+function statusLine(status: number): StatusLine {
+    return {
+        kind: 'response', version: 'HTTP/1.1',
+        status, reason: '',
+    };
 }

@@ -20,7 +20,6 @@ import type { Id } from '../shared/types.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
-    canonicalPath,
     storedPathAndNameOf,
     requestHeaderFields,
     requestTarget,
@@ -45,12 +44,8 @@ import {
 } from './family-registry.ts';
 import {
     documentFamilyWiring,
-    requireOrganization,
 } from './document-family.ts';
 import { servedSelection } from './head-reads.ts';
-import {
-    messageStore,
-} from './message-store.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -931,15 +926,6 @@ async function dispatched(
                         { status: HTTP_METHOD_NOT_ALLOWED },
                     );
                 }
-                const streamedCollection =
-                    await streamStoredCollectionGet(
-                        effective,
-                        routePattern,
-                        organization,
-                    );
-                if (streamedCollection !== undefined) {
-                    return streamedCollection;
-                }
                 const result = await matched.get(
                     effective,
                     params,
@@ -1433,65 +1419,11 @@ function documentEntityPattern(
         : wiring.family + '/:id';
 }
 
-function collectionFamilyOf(
-    routePattern: string,
-): string | undefined {
-    if (!routePattern.endsWith('/')) return undefined;
-    const rest = routePattern.slice(0, -1);
-    if (rest.startsWith('organizations/:id/')) {
-        const family = rest.slice(
-            'organizations/:id/'.length,
-        );
-        if (family.includes('/')) return undefined;
-        return family;
-    }
-    if (rest.includes('/')) return undefined;
-    return rest;
-}
-
-function streamCollectionWiring(
-    routePattern: string,
-): ReturnType<typeof documentFamilyWiring> {
-    const family = collectionFamilyOf(routePattern);
-    if (
-        family === undefined
-        || family === 'flows'
-        || family === 'members'
-    ) {
-        return undefined;
-    }
-    return documentFamilyWiring(family);
-}
-
-async function streamStoredCollectionGet(
-    db: DbAdapter,
-    routePattern: string,
-    organization: Id | undefined,
-): Promise<Response | undefined> {
-    const wiring = streamCollectionWiring(routePattern);
-    if (wiring === undefined) return undefined;
-    const organizationId = requireOrganization(organization);
-    const prefix = canonicalPath(
-        organizationId, '/' + wiring.family + '/',
-    );
-    const rows = await messageStore(db).getCollection(
-        prefix,
-    );
-    return attachDate(Response.json(rows), nowUtc());
-}
-
-// Stream family collection GET (live heads). members is
-// a memberships join (not this path). record-types is
-// org-nested, so its pattern is not the family name.
+// The two live-head JSON lists still dated here: flows and
+// record-types, until each serves its stored heads.
 function isLiveHeadCollectionGet(
     routePattern: string,
 ): boolean {
-    if (routePattern === RECORD_TYPES_COLLECTION_PATTERN) {
-        return true;
-    }
-    const family = collectionFamilyOf(routePattern);
-    if (family === undefined || family === 'members') {
-        return false;
-    }
-    return documentFamilyWiring(family) !== undefined;
+    return routePattern === RECORD_TYPES_COLLECTION_PATTERN
+        || routePattern === 'organizations/:id/flows/';
 }

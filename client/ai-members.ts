@@ -82,9 +82,9 @@ export function buildAIAgentMap(
 export async function getAIMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, AIMember>> {
-    const agents = (await ctx.GET<AIAgentEntity[]>(
+    const agents = (await ctx.GETCollection<AIAgentEntity>(
         'ai-agents/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     return buildAIAgentMap(agents);
 }
 

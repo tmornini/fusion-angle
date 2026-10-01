@@ -28,8 +28,10 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partBodiesOf,
+    partsOf,
     storedPutBodyText,
-    storedCollectionText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -191,11 +193,8 @@ Deno.test('seeded GET /projects wire equals stored live'
             ),
         );
         assertStrictEquals(res.status, 200);
-        const prefix = '/organizations/'
-            + organization + '/projects/';
-        assertStrictEquals(
-            await res.text(),
-            await storedCollectionText(db, prefix),
+        await assertPartsAreHeads(
+            db, await partsOf(res), { sees: 'whole' },
         );
     }
 });
@@ -294,7 +293,7 @@ async () => {
             , token),
     );
     assertStrictEquals(res.status, 200);
-    const list = await res.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(res);
     const added = list.filter((row) =>
         [
             PROJECT_DRIFT_Z,
@@ -415,9 +414,9 @@ async () => {
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             , token),
     );
-    const list = await listRes.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(listRes);
     assertStrictEquals(
-        list.some((p) => p.id === projectId), true,
+        list.some((p) => p.id === projectId), false,
     );
 });
 
@@ -514,7 +513,7 @@ Deno.test('live conversion case: a converted idea\'s project'
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             , token),
     );
-    const list = await listRes.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(listRes);
     assert(list.some((p) => p.id === projectId));
 
     const versions = await versionsOf(

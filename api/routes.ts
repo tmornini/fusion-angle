@@ -294,7 +294,7 @@ import {
     param,
     requireOrganization,
     withoutId,
-    documentCollectionGetHandler,
+    collectionSelect,
     documentCollectionRoute,
     documentEntityRoute,
     documentPutHandler,
@@ -3648,14 +3648,11 @@ export async function postOrganizationDocumentOp(
 
 export const routes: Route[] = [
     route('identities/', {
-        // GET is FLIPPED (Phase 10 Task 8): derived via
-        // documentCollectionGetHandler — wire-identical to the
-        // hand-written db.identities.getAll() dispatch it
-        // replaces (identities is organizationNested:false, so
-        // the derivation ignores whatever organization value the
-        // caller passes, exactly as the GLOBAL-plane scoped
-        // adapter's own db.identities alias already did).
-        get: documentCollectionGetHandler(IDENTITIES_WIRING),
+        // GET serves the stored heads at the global prefix
+        // (identities is organizationNested:false, so the
+        // selector ignores whatever organization value the
+        // caller passes).
+        select: collectionSelect(IDENTITIES_WIRING),
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
         // ROUTE_POLICY. The identity and, for a service, its
@@ -4537,8 +4534,8 @@ export const routes: Route[] = [
             }
         },
     }),
-    // The collection and entity GETs stream the stored heads
-    // (api/api.ts): a work order's head is its whole state.
+    // The collection and entity GETs serve the stored heads:
+    // a work order's head is its whole state.
     // POST stays this hand-written create — unlike
     // ideas/projects, work-orders never folded genesis into
     // the document PUT (Decision 6), mirroring flows' own
@@ -4546,7 +4543,7 @@ export const routes: Route[] = [
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS.
     route('organizations/:id/work-orders/', {
-        get: documentCollectionGetHandler(WORK_ORDERS_WIRING),
+        select: collectionSelect(WORK_ORDERS_WIRING),
         post: (
             db, _p, body, actor, messagePair, organization,
         ) => postWorkOrderCreationOp(
@@ -5480,16 +5477,13 @@ export const routes: Route[] = [
     // member_id); empty → missedReadError('projects').
     documentVersionListRoute(PROJECTS_WIRING),
     documentVersionRoute(PROJECTS_WIRING),
-    // GET is FLIPPED (Task 7): the collection derives from the
-    // message ledger rather than the old objectives table. Rides
-    // the generic documentCollectionGetHandler —
-    // objectiveDocumentEntityOf reads entity fields and `state`
-    // alike from the head body. POST stays this hand-written
+    // GET serves the stored heads through the generic
+    // collectionSelect. POST stays this hand-written
     // create — objectives' own create lands the document PLUS
     // its first revision in one statement, mirroring
     // records'/work-orders' own precedent.
     route('organizations/:id/objectives/', {
-        get: documentCollectionGetHandler(OBJECTIVES_WIRING),
+        select: collectionSelect(OBJECTIVES_WIRING),
         // The objective and its first revision are declared
         // geneses in one statement, the shape a genesis PUT
         // /objectives/:id and a PUT

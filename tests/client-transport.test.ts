@@ -5,6 +5,7 @@ import {
 } from '@std/assert';
 import { createHttpFacade } from '../client/http-facade.ts';
 import { RequestError } from '../shared/http-errors.ts';
+import { joinParts } from '../shared/http-message/multipart.ts';
 
 const NO_SESSION = {
     runSingleFlightRefresh: () => Promise.resolve(null),
@@ -75,6 +76,64 @@ async () => {
     assertStrictEquals(
         message.query('header.content-length').exists(),
         false,
+    );
+});
+
+Deno.test('a collection read splits its parts', async () => {
+    const part = (id: string) => 'HTTP/1.1 200 \r\n'
+        + 'content-length: 10\r\n'
+        + 'content-type: application/json\r\n'
+        + 'etag: "' + id + '"\r\n'
+        + '\r\n{"id":"' + id + '"}';
+    const boundary = '0e2c7a44-8f6b-4c1e-9d3a-2b5f7e9c1a00';
+    const facade = createHttpFacade('http://x', scripted(() =>
+        new Response(joinParts([part('a'), part('b')], boundary), {
+            headers: {
+                'content-type':
+                    'multipart/mixed; boundary=' + boundary,
+            },
+        })))(NO_SESSION);
+    const parts = await facade.GETCollection<{ id: string }>(
+        'ideas/', 't',
+    );
+    assertEquals(
+        parts.map((p) => p.body().toValue().id), ['a', 'b'],
+    );
+    assertEquals(
+        parts.map((p) => p.query('header.etag').toText()),
+        ['"a"', '"b"'],
+    );
+});
+
+Deno.test('an empty collection is no parts', async () => {
+    const facade = createHttpFacade('http://x', scripted(() =>
+        new Response(null, { status: 204 })))(NO_SESSION);
+    assertEquals(await facade.GETCollection('ideas/', 't'), []);
+});
+
+// A part is framed by its content-length in octets; a body
+// decoded as text before the split would count 'é' once
+// and misframe every part after it.
+Deno.test('a part keeps its non-ASCII octets', async () => {
+    const body = '{"name":"Zoë"}';
+    const octets = new TextEncoder().encode(body).byteLength;
+    const part = 'HTTP/1.1 200 \r\n'
+        + 'content-length: ' + octets + '\r\n'
+        + 'content-type: application/json\r\n'
+        + '\r\n' + body;
+    const boundary = '0e2c7a44-8f6b-4c1e-9d3a-2b5f7e9c1a00';
+    const facade = createHttpFacade('http://x', scripted(() =>
+        new Response(joinParts([part, part], boundary), {
+            headers: {
+                'content-type':
+                    'multipart/mixed; boundary=' + boundary,
+            },
+        })))(NO_SESSION);
+    const parts = await facade.GETCollection<{ name: string }>(
+        'identities/', 't',
+    );
+    assertEquals(
+        parts.map((p) => p.body().toValue().name), ['Zoë', 'Zoë'],
     );
 });
 

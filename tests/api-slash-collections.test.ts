@@ -1,4 +1,4 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from
     '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -22,8 +22,8 @@ async () => {
             },
         }),
     );
-    assertStrictEquals(res.status, 200);
-    assert(Array.isArray(await res.json()));
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
 });
 
 Deno.test('GET /identities is 404 when authenticated',

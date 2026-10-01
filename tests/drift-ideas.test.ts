@@ -26,8 +26,10 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partBodiesOf,
+    partsOf,
     storedPutBodyText,
-    storedCollectionText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -161,11 +163,8 @@ async () => {
             ),
         );
         assertStrictEquals(res.status, 200);
-        const prefix = '/organizations/'
-            + organization + '/ideas/';
-        assertStrictEquals(
-            await res.text(),
-            await storedCollectionText(db, prefix),
+        await assertPartsAreHeads(
+            db, await partsOf(res), { sees: 'whole' },
         );
     }
 });
@@ -267,7 +266,7 @@ async () => {
     assertStrictEquals(res.status, 200);
     assert(res.headers.get('Date'));
     assertStrictEquals(res.headers.get('ETag'), null);
-    const list = await res.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(res);
     const added = list.filter((row) =>
         [
             IDEA_DRIFT_Z, IDEA_DRIFT_A, IDEA_DRIFT_M,
@@ -418,9 +417,9 @@ Deno.test('live-write lifecycle: create + edit + transition +'
     const listRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token),
     );
-    const list = await listRes.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(listRes);
     assertStrictEquals(
-        list.some((idea) => idea.id === ideaId), true,
+        list.some((idea) => idea.id === ideaId), false,
     );
 });
 

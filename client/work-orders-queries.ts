@@ -262,9 +262,9 @@ export function projectTransitions(
 export async function getTransitionEventsByWorkOrder(
     ctx: RequestContext,
 ): Promise<Map<Id, TransitionEvent[]>> {
-    const orders = (await ctx.GET<{ id: Id }[]>(
+    const orders = (await ctx.GETCollection<{ id: Id }>(
         organizationCollection(ctx, 'work-orders'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     const histories = await getWorkOrderHistories(
         ctx, orders,
     );
@@ -381,9 +381,9 @@ export async function getWorkOrderTransitionEvents(
 export async function getWorkOrderEntities(
     ctx: RequestContext,
 ): Promise<WorkOrderEntity[]> {
-    return (await ctx.GET<WorkOrderEntity[]>(
+    return (await ctx.GETCollection<WorkOrderEntity>(
         organizationCollection(ctx, 'work-orders'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 export async function getWorkOrders(

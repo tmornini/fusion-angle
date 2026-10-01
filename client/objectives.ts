@@ -40,9 +40,9 @@ export function notifyObjectiveChange(): void {
 export async function getObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
-    return (await ctx.GET<ObjectiveEntity[]>(
+    return (await ctx.GETCollection<ObjectiveEntity>(
         organizationCollection(ctx, 'objectives'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 // The objective's head as read, which a merge latches.
@@ -92,9 +92,9 @@ export interface ObjectiveVersionRow
 export async function getObjectiveHistories(
     ctx: RequestContext,
 ): Promise<Map<Id, ObjectiveVersionRow[]>> {
-    const rows = (await ctx.GET<{ id: Id }[]>(
+    const rows = (await ctx.GETCollection<{ id: Id }>(
         organizationCollection(ctx, 'objectives'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     const pairs = await Promise.all(
         rows.map(async (row) => {
             const versions = (await ctx.GET<

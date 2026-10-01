@@ -22,6 +22,7 @@ import { sharedMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -270,7 +271,7 @@ Deno.test(
         );
         assertStrictEquals(list.status, 200);
         const foreign =
-            (await list.json() as { id: string }[])[0]!;
+            (await partBodiesOf<{ id: string }>(list))[0]!;
         const res = await handleRequest(
             db,
             req(
@@ -428,7 +429,7 @@ Deno.test(
         );
         assertStrictEquals(list.status, 200);
         const foreign =
-            (await list.json() as { id: string }[])[0]!;
+            (await partBodiesOf<{ id: string }>(list))[0]!;
         const res = await handleRequest(
             db,
             req(
@@ -991,7 +992,7 @@ Deno.test(
         );
         assertStrictEquals(list.status, 200);
         const foreign =
-            (await list.json() as { id: string }[])[0]!;
+            (await partBodiesOf<{ id: string }>(list))[0]!;
         const res = await handleRequest(
             db,
             req(

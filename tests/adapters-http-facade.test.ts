@@ -134,11 +134,11 @@ Deno.test(
                     { status: 401 },
                 );
             }
-            return Response.json([]);
+            return new Response(null, { status: 204 });
         }, async () => {
             const ctx =
                 client.recoveringRequestContext('');
-            await ctx.GET(
+            await ctx.GETCollection(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
@@ -226,11 +226,11 @@ Deno.test(
                     { status: 401 },
                 );
             }
-            return Response.json([]);
+            return new Response(null, { status: 204 });
         }, async () => {
             const ctx =
                 client.recoveringRequestContext(token);
-            await ctx.GET(
+            await ctx.GETCollection(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
@@ -264,13 +264,16 @@ Deno.test(
                 headers.get(OPERATION_ID_HEADER),
             );
             requestIds.push(headers.get('request-id'));
+            if (init?.method === 'GET') {
+                return new Response(null, { status: 204 });
+            }
             return Response.json({});
         }, async () => {
             const ctx = client.requestContext(DEV_TOKEN);
             const idea = 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'AjdvjuECVZEgZoFajaIEkg';
-            await ctx.GET(
+            await ctx.GETCollection(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );

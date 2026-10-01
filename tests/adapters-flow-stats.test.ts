@@ -222,6 +222,34 @@ Deno.test(
                     },
                 });
             },
+            // A collection read answers what GET answers for
+            // that path, one message per row, into the same
+            // record the assertions read.
+            GETCollection: async (path: string) => {
+                paths.push(path);
+                if (
+                    path.endsWith(
+                        '/flows/' + flowId
+                            + '/work-orders/',
+                    )
+                ) {
+                    return [responseMessage({
+                        work_order_id: 'w-join',
+                    })];
+                }
+                if (path.endsWith('/work-orders/')) {
+                    return [responseMessage({ id: 'w-coll' })];
+                }
+                if (
+                    path.endsWith('/history')
+                    || path.endsWith('/members/')
+                    || path.endsWith('/former-members/')
+                    || path === 'ai-agents/'
+                ) {
+                    return [];
+                }
+                throw new Error('not a collection: ' + path);
+            },
         } as unknown as RequestContext;
         await getFlowStats(ctx, flowId, 0);
         assertEquals(

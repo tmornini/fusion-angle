@@ -53,7 +53,10 @@ import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
 import { seededMockDb } from './mock-seed.ts';
-import { framedRequest } from './http-fixtures.ts';
+import {
+    framedRequest,
+    partBodiesOf,
+} from './http-fixtures.ts';
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
@@ -332,10 +335,10 @@ Deno.test('every work order belongs to org 1', async () => {
         }),
     );
     assertStrictEquals(res.status, 200);
-    const wos = await res.json() as {
+    const wos = await partBodiesOf<{
         id: string;
         organization_id: string;
-    }[];
+    }>(res);
     assert(wos.length > 0, 'work orders exist');
     for (const wo of wos) {
         assertStrictEquals(wo.organization_id, ORGANIZATION_ONE);
@@ -355,8 +358,8 @@ Deno.test('every work order belongs to org 1', async () => {
             },
         }),
     );
-    assertStrictEquals(empty.status, 200);
-    assertEquals(await empty.json(), []);
+    assertStrictEquals(empty.status, 204);
+    assertStrictEquals(await empty.text(), '');
 });
 
 Deno.test('every record attribute matches its parent record org',

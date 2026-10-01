@@ -47,6 +47,35 @@ Deno.test(
                 }
                 return responseMessage([]);
             },
+            // A collection read answers what GET answers for
+            // that path, one message per row, into the same
+            // record the assertions read.
+            GETCollection: async (path: string) => {
+                paths.push(path);
+                if (path.endsWith('/flows/')) {
+                    return [
+                        responseMessage({ id: flowA, name: 'A' }),
+                        responseMessage({ id: flowB, name: 'B' }),
+                    ];
+                }
+                if (
+                    /\/flows\/[^/]+\/records\/$/
+                        .test(path)
+                ) {
+                    pendingRecords++;
+                    await hold.promise;
+                    pendingRecords--;
+                    return [];
+                }
+                if (path.endsWith('/work-orders/')) {
+                    if (pendingRecords > 0) {
+                        joinDuringRecords = true;
+                    }
+                    hold.resolve();
+                    return [];
+                }
+                return [];
+            },
         } as unknown as RequestContext;
         const timer = setTimeout(
             () => hold.resolve(),

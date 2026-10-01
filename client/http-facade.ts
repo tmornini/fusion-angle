@@ -1,6 +1,7 @@
 import {
     UnauthorizedError,
     RequestError,
+    HTTP_NO_CONTENT,
     HTTP_UNAUTHORIZED,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
@@ -9,6 +10,7 @@ import { principalFromToken } from
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { Octets } from '../shared/http-message/octets.ts';
+import { splitParts } from '../shared/http-message/multipart.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { authParam } from './authentication.ts';
 
@@ -28,6 +30,13 @@ export interface HttpFacade {
         token: string,
         headerFields?: HeaderFields,
     ): Promise<HttpMessage<T>>;
+    // A collection's parts, each a document's whole
+    // message; a 204 is none.
+    GETCollection<T>(
+        resource: string,
+        token: string,
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>[]>;
     PUT<T>(
         resource: string,
         payload: Record<string, unknown>,
@@ -309,6 +318,33 @@ export function createHttpFacade(
                     'GET', resource, token,
                     undefined, headerFields,
                 )),
+            // The boundary is read from the raw line: the
+            // structured parser would take its leading digit
+            // for a number. The body is split as Latin-1, one
+            // char per octet, so a part's content-length
+            // counts what it framed.
+            GETCollection: async <T>(
+                resource: string,
+                token: string,
+                headerFields?: HeaderFields,
+            ): Promise<HttpMessage<T>[]> => {
+                const response = await exchangeOnce(
+                    'GET', resource, token,
+                    undefined, headerFields,
+                );
+                const type = response.headers.get(
+                    'content-type',
+                );
+                const message = await answered(response);
+                if (response.status === HTTP_NO_CONTENT) {
+                    return [];
+                }
+                return splitParts(
+                    type ?? '',
+                    Octets.fromBytes(message.body().toBytes())
+                        .toLatin1(),
+                ).map((part) => HttpMessage.fromWire<T>(part));
+            },
             PUT: async (resource, payload, token, headerFields) =>
                 answered(await exchangeOnce(
                     'PUT', resource, token,

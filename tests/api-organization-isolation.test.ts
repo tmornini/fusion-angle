@@ -37,6 +37,7 @@ import { deriveOrganization } from
 import {
     apiRequest,
     framedRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -111,7 +112,7 @@ async () => {
         'GET', '/organizations/' + organizationA + '/ideas/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA)));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 

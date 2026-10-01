@@ -1,6 +1,8 @@
 import { assert, assertEquals, assertNotEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext, GET } from './in-page-facade.ts';
+import {
+    inPageContext, GET, GETCollection,
+} from './in-page-facade.ts';
 import {
     getOrganizations,
 } from '../client/organizations.ts';
@@ -62,13 +64,13 @@ async () => {
             db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw/members/', tokB,
                 operationIdHeader())).body().toValue());
     const ideasA = idsOf(
-        (await GET<{ id: string }[]>(db
+        (await GETCollection<{ id: string }>(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA,
-                operationIdHeader())).body().toValue());
+                operationIdHeader())).map((m) => m.body().toValue()));
     const ideasB = idsOf(
-        (await GET<{ id: string }[]>(db
+        (await GETCollection<{ id: string }>(db
             , 'organizations/BBjWJsjYIDkTRKIIPrzWRw/ideas/', tokB,
-                operationIdHeader())).body().toValue());
+                operationIdHeader())).map((m) => m.body().toValue()));
 
     assert(
         membersA.length > 0 && membersB.length > 0,
@@ -92,16 +94,16 @@ async () => {
     const db = await seeded();
     const flat = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const flatIdeas = idsOf(
-        (await GET<{ id: string }[]>(db
+        (await GETCollection<{ id: string }>(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', flat,
-                operationIdHeader())).body().toValue());
+                operationIdHeader())).map((m) => m.body().toValue()));
     const ctx = inPageContext(db, flat);
     const tokA = await postOrganizationSessionExchange(ctx, flat
         , 'AjdvjuECVZEgZoFajaIEkg');
     const organization1Ideas = idsOf(
-        (await GET<{ id: string }[]>(db
+        (await GETCollection<{ id: string }>(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', tokA,
-                operationIdHeader())).body().toValue());
+                operationIdHeader())).map((m) => m.body().toValue()));
     // a flat token resolves to its primary org 'AjdvjuECVZEgZoFajaIEkg' (same
     // view)
     assertEquals(flatIdeas, organization1Ideas);

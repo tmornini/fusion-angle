@@ -31,6 +31,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     pairIdOf,
+    partBodiesOf,
     invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -301,17 +302,17 @@ Deno.test('ai-agents + identities wire equals GET (GLOBAL)'
         db, req('GET', '/ai-agents/', token),
     );
     assertStrictEquals(resAi.status, 200);
-    const agents = await resAi.json() as { id: string }[];
+    const agents = await partBodiesOf<{ id: string }>(resAi);
     assertStrictEquals(agents.length, 4);
 
     const resHuman = await handleRequest(
         db, req('GET', '/identities/', token),
     );
     assertStrictEquals(resHuman.status, 200);
-    const identities = await resHuman.json() as {
+    const identities = await partBodiesOf<{
         id: string;
         kind: string;
-    }[];
+    }>(resHuman);
     assertStrictEquals(
         identities.filter((row) => row.kind === 'person')
             .length,

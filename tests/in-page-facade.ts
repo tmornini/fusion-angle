@@ -106,6 +106,17 @@ export function GET<T>(
     );
 }
 
+export function GETCollection<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).GETCollection<T>(
+        resource, token, headerFields,
+    );
+}
+
 export function PUT<T>(
     adapter: ClientFacadeAdapter,
     resource: string,

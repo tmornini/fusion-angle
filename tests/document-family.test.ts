@@ -967,6 +967,7 @@ Deno.test('stateless lifecycle: a DELETE head is Gone carrying'
         db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg', [],
     );
+    assert(selection.kind === 'document');
     assertStrictEquals(selection.head.method, 'DELETE');
     const error = assertThrows(
         () => servedSelection(selection, {

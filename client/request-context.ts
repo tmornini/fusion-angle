@@ -145,6 +145,7 @@ export interface RequestContext {
     // replaces the session goes through it.
     readonly session: ClientSession;
     GET<T>(resource: string): Promise<HttpMessage<T>>;
+    GETCollection<T>(resource: string): Promise<HttpMessage<T>[]>;
     PUT<T>(
         resource: string,
         body: Record<string, unknown>,
@@ -254,6 +255,14 @@ function openRequestContext(
             return run<HttpMessage<T>>(tok => verbs.GET<T>(
                 resource, tok, headers,
             ));
+        },
+        GETCollection: <T>(resource: string) => {
+            core.recordRequest('GET', resource);
+            const headers = writeHeaders();
+            return run<HttpMessage<T>[]>(
+                tok => verbs.GETCollection<T>(
+                    resource, tok, headers,
+                ));
         },
         PUT: <T>(
             resource: string,

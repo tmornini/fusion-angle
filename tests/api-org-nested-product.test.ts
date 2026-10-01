@@ -28,7 +28,7 @@ Deno.test('GET /organizations/:id/ideas/ is the'
         pathSegmentsOf('/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'),
     );
     assert(match);
-    assertStrictEquals(typeof match.route.get, 'function');
+    assertStrictEquals(typeof match.route.select, 'function');
 });
 
 Deno.test('GET /organizations/:id/identities is 404',

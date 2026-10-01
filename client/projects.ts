@@ -4,7 +4,6 @@ import type {
 } from '../shared/types.ts';
 import {
     Project,
-    projectStateIsNotDeleted,
     assertProjectState,
 } from '../shared/types.ts';
 import type {
@@ -37,9 +36,9 @@ export function notifyProjectChange(): void {
 export async function getProjectEntities(
     ctx: RequestContext,
 ): Promise<ProjectEntity[]> {
-    return (await ctx.GET<ProjectEntity[]>(
+    return (await ctx.GETCollection<ProjectEntity>(
         organizationCollection(ctx, 'projects'),
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 // Domain state rides the ProjectEntity GET row; narrow it
@@ -56,13 +55,9 @@ export async function getProjects(
     ctx: RequestContext,
 ): Promise<Project[]> {
     const rows = await getProjectEntities(ctx);
-    return rows
-        .filter(row => projectStateIsNotDeleted(
-            projectStateOf(row),
-        ))
-        .map(row => new Project(
-            row, projectStateOf(row),
-        ));
+    return rows.map(row => new Project(
+        row, projectStateOf(row),
+    ));
 }
 
 export async function getProject(
