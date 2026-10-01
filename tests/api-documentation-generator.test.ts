@@ -244,3 +244,12 @@ Deno.test('every status a room lists has its page', () => {
         }
     }
 });
+
+Deno.test('a GET room names Operation-ID on every request',
+() => {
+    const html = verbRoomHtml(
+        'get', '/identities/', ['200'], 'none',
+    );
+    assertMatch(html, /Operation-ID: on every request/);
+    assertNotMatch(html, /Operation-ID: on writes/);
+});

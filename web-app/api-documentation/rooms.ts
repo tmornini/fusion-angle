@@ -23,7 +23,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -42,7 +42,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -61,7 +61,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -81,7 +81,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -101,7 +101,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -121,7 +121,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -142,7 +142,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -166,7 +166,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -190,7 +190,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -214,7 +214,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match (optional)',
         ],
         statuses:
@@ -234,7 +234,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -252,7 +252,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -269,7 +269,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -286,7 +286,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -303,7 +303,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -321,7 +321,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -338,7 +338,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -356,7 +356,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -373,7 +373,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -390,7 +390,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -407,7 +407,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -424,7 +424,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -441,7 +441,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -458,7 +458,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -476,7 +476,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -494,7 +494,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -512,7 +512,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -529,7 +529,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -547,7 +547,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -564,7 +564,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -582,7 +582,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -599,7 +599,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -616,7 +616,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -633,7 +633,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -651,7 +651,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -670,7 +670,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -689,7 +689,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -708,7 +708,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -727,7 +727,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -746,7 +746,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -764,7 +764,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -782,7 +782,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -801,7 +801,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -820,7 +820,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -839,7 +839,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -858,7 +858,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -876,7 +876,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -894,7 +894,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -912,7 +912,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -930,7 +930,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -948,7 +948,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -966,7 +966,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -985,7 +985,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1004,7 +1004,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1023,7 +1023,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1041,7 +1041,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1059,7 +1059,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1078,7 +1078,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1097,7 +1097,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1116,7 +1116,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1135,7 +1135,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1154,7 +1154,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1172,7 +1172,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1190,7 +1190,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1208,7 +1208,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1226,7 +1226,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1245,7 +1245,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1263,7 +1263,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1281,7 +1281,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1299,7 +1299,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1318,7 +1318,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1340,7 +1340,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1362,7 +1362,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1380,7 +1380,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1401,7 +1401,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1424,7 +1424,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1447,7 +1447,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1470,7 +1470,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1493,7 +1493,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1516,7 +1516,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1538,7 +1538,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1560,7 +1560,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1582,7 +1582,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1606,7 +1606,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
         statuses:
@@ -1630,7 +1630,7 @@ export const API_DOC_ROOMS:
             + '}',
         headers:
         [
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1648,7 +1648,7 @@ export const API_DOC_ROOMS:
             + '}',
         headers:
         [
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1665,7 +1665,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1683,7 +1683,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1700,7 +1700,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1723,7 +1723,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1742,7 +1742,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -1769,7 +1769,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -1793,7 +1793,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1814,7 +1814,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1839,7 +1839,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
         ],
         statuses:
         [
@@ -1861,7 +1861,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -1887,7 +1887,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -1911,7 +1911,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -1934,7 +1934,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -1957,7 +1957,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -1977,7 +1977,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -1999,7 +1999,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -2022,7 +2022,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2045,7 +2045,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2068,7 +2068,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2090,7 +2090,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2113,7 +2113,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2136,7 +2136,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2164,7 +2164,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
         statuses:
@@ -2188,7 +2188,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2209,7 +2209,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2232,7 +2232,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2258,7 +2258,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2281,7 +2281,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2304,7 +2304,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -2326,7 +2326,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2350,7 +2350,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2375,7 +2375,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2398,7 +2398,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2424,7 +2424,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2451,7 +2451,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2475,7 +2475,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
         statuses:
@@ -2497,7 +2497,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -2522,7 +2522,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
         statuses:
@@ -2544,7 +2544,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2569,7 +2569,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:
@@ -2597,7 +2597,7 @@ export const API_DOC_ROOMS:
         headers:
         [
             'Authorization: Bearer …',
-            'Operation-ID: on writes',
+            'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
         statuses:

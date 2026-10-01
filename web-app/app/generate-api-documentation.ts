@@ -701,7 +701,7 @@ function headersFor(
     if (!isGrantUri(uri)) {
         headers.push('Authorization: Bearer …');
     }
-    headers.push('Operation-ID: on writes');
+    headers.push('Operation-ID: on every request');
     const conditional = conditionalFor(lower, uri);
     if (conditional === 'in-order') {
         headers.push('If-Match: strong etag');
