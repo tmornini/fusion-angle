@@ -219,7 +219,7 @@ Deno.test(
 
 const STATE: ProjectState = 'approved';
 
-Deno.test('putProject persists a new project', async () => {
+Deno.test('a PUT of a fresh id persists a new project', async () => {
     const { ctx } = await adminContext();
     const { organization_id: _o, ...entity } =
         buildProject('pnXmXrxOWayANgDLdCjuBw', 'Created');
@@ -250,7 +250,7 @@ Deno.test('putProject updates an existing project', async () => {
 });
 
 Deno.test(
-    'putProject changes are visible to a fresh ctx',
+    'a project PUT is visible to a fresh ctx',
     async () => {
         const { db, ctx } = await adminContext();
         const { organization_id: _o, ...entity } =
