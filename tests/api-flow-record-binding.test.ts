@@ -1,4 +1,4 @@
-import { assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -158,4 +158,24 @@ async () => {
     assertStrictEquals(read.status, 200);
     const bound = await read.json() as { record_id: string };
     assertStrictEquals(bound.record_id, RECORD_ID);
+});
+
+Deno.test('a deleted binding answers 410', async () => {
+    const { db, token } = await seededDb();
+    const put = await handleRequest(db, req(
+        'PUT', BINDINGS + FR_ID, token,
+        { flow_id: FLOW_ID, record_id: RECORD_ID, at: AT },
+    ));
+    assertStrictEquals(put.status, 201);
+    const del = await handleRequest(db, req(
+        'DELETE', BINDINGS + FR_ID, token,
+    ));
+    assertStrictEquals(del.status, 204);
+    const got = await handleRequest(db, req(
+        'GET', BINDINGS + FR_ID, token,
+    ));
+    assertStrictEquals(got.status, 410);
+    assertEquals(await got.json(), {
+        error: 'Gone: flow_records/' + FR_ID,
+    });
 });
