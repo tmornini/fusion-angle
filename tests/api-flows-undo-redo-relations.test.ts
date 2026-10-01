@@ -38,7 +38,10 @@ import {
     storedGraph,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
-import { getFlowGraph } from '../client/flow-queries.ts';
+import {
+    flowGraphOf,
+    getFlowGraph,
+} from '../client/flow-queries.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import {
     documentMessagePairsAt,
@@ -149,26 +152,16 @@ function snapOf(
     edges: GraphEdge[] = [],
 ): FlowSnapshot {
     return buildInitialFlowSnapshot(
-        {
-            message: responseMessage<FlowWithGraph>({
-                id: FLOW_ID,
-                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-                name: 'Undo/Redo Flow',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: storedGraph({ nodes, edges }),
-            }),
+        flowGraphOf(responseMessage<FlowWithGraph>({
             id: FLOW_ID,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             name: 'Undo/Redo Flow',
-            isLocked: false,
-            isAutoLayout: false,
-            isAutoFit: false,
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            nodes,
-            edges,
-        },
+            is_locked: false,
+            is_auto_layout: false,
+            is_auto_fit: false,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: storedGraph({ nodes, edges }),
+        })),
         800, 600, [], [], [],
     );
 }

@@ -72,6 +72,7 @@ import { generateIdentifier } from
 import {
     getFlowGraph,
     getFlowVersions,
+    flowGraphOf,
     type FlowGraph,
 } from '../client/flow-queries.ts';
 import {
@@ -150,26 +151,16 @@ function buildGraph(
     nodes: GraphNode[],
     edges: GraphEdge[] = [],
 ): FlowGraph {
-    return {
-        message: responseMessage<FlowWithGraph>({
-            id: FLOW_ID,
-            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-            name: 'Test Flow',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: storedGraph({ nodes, edges }),
-        }),
+    return flowGraphOf(responseMessage<FlowWithGraph>({
         id: FLOW_ID,
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         name: 'Test Flow',
-        isLocked: false,
-        isAutoLayout: true,
-        isAutoFit: true,
-        lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        nodes,
-        edges,
-    };
+        is_locked: false,
+        is_auto_layout: true,
+        is_auto_fit: true,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: storedGraph({ nodes, edges }),
+    }));
 }
 
 function buildFlowVersion(

@@ -40,6 +40,36 @@ function parseGraph(
     return asStoredGraph(value, 'flow.graph');
 }
 
+// One place turns a flow's message into the graph the canvas
+// reads, so a fixture built from a message and the client's
+// own read agree on every field.
+export function flowGraphOf(
+    message: HttpMessage<FlowWithGraph>,
+): FlowGraph {
+    const flow = message.body().toValue();
+    const g = parseGraph(flow.graph);
+    return {
+        message,
+        id: flow.id,
+        name: flow.name,
+        isLocked: asBoolean(
+            flow.is_locked,
+            'is_locked',
+        ),
+        isAutoLayout: asBoolean(
+            flow.is_auto_layout,
+            'is_auto_layout',
+        ),
+        isAutoFit: asBoolean(
+            flow.is_auto_fit,
+            'is_auto_fit',
+        ),
+        lockTimeout: flow.lock_timeout,
+        nodes: g.nodes,
+        edges: g.edges,
+    };
+}
+
 export interface FlowSummary {
     readonly id: string;
     readonly name: string;
@@ -198,29 +228,7 @@ export async function getFlowGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowGraph> {
-    const message = await getFlowWithGraph(ctx, flowId);
-    const flow = message.body().toValue();
-    const g = parseGraph(flow.graph);
-    return {
-        message,
-        id: flow.id,
-        name: flow.name,
-        isLocked: asBoolean(
-            flow.is_locked,
-            'is_locked',
-        ),
-        isAutoLayout: asBoolean(
-            flow.is_auto_layout,
-            'is_auto_layout',
-        ),
-        isAutoFit: asBoolean(
-            flow.is_auto_fit,
-            'is_auto_fit',
-        ),
-        lockTimeout: flow.lock_timeout,
-        nodes: g.nodes,
-        edges: g.edges,
-    };
+    return flowGraphOf(await getFlowWithGraph(ctx, flowId));
 }
 
 // The flow's lifecycle rows, one per distinct state
