@@ -16,6 +16,13 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { nowUtc } from '../shared/types.ts';
+import {
+    attemptFor,
+    canonicalPath,
+    formWriteMessagePair,
+    runWrite,
+} from '../api/message-pair.ts';
 
 const ME = 'XXZruirZyAOoRpNxaDnpSA';
 
@@ -164,4 +171,46 @@ Deno.test('every written token, revocation, and provider head'
         await stampedIdentityOfEachWrite(db, other),
         [other, other, other],
     );
+});
+
+// The nested read reaches no flat prefix: a provider pair at
+// the retired /identity-providers/ path is invisible to
+// identities/:id/providers/:eid, so a fallback that returned
+// would serve it.
+Deno.test('a provider at the retired flat prefix is not served'
+    + ' nested', async () => {
+    const db = await seededMockDb();
+    const eid = generateIdentifier();
+    const body = {
+        identity_id: ME, provider: 'google',
+        provider_subject: 'sub-123', action: 'linked', at: AT,
+    };
+    const messagePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/identity-providers/' + eid,
+        routePattern: 'identity-providers/:id',
+        routeSegments: ['identity-providers', ':id'],
+        pathSegments: ['identity-providers', eid],
+        headerFields: [],
+        body,
+        requesterIdentityId: ME,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseBody: { id: eid, ...body },
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(db, attemptFor([messagePair]), [messagePair]);
+    const flat = canonicalPath(undefined, '/identity-providers/');
+    assertStrictEquals(
+        (await db.messagePairs.getHeadPair(flat, eid))?.id,
+        messagePair.id,
+    );
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/' + ME + '/providers/' + eid,
+        token: DEV_TOKEN,
+    }));
+    assertStrictEquals(got.status, 404);
+    await got.body?.cancel();
 });
