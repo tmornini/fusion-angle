@@ -108,7 +108,7 @@ export async function getRecordInstances(
     return rows.map(row => {
         // A list row with no tag leaves nothing for a
         // page to latch; this is a bug, not an absence.
-        if (row.etag === undefined) {
+        if (row.etag === undefined || row.etag === '') {
             throw new Error(
                 'the instance list row ' + row.id
                     + ' carried no ETag',

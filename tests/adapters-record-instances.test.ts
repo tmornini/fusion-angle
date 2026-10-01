@@ -7,6 +7,9 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import type { RequestContext } from
+    '../client/request-context.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -196,6 +199,30 @@ Deno.test(
             ),
             Error,
             'Gone',
+        );
+    },
+);
+
+// A list row carries its tag in the body until T30; a row
+// whose tag is empty leaves nothing to latch and is refused,
+// as a row with no tag is.
+Deno.test(
+    'getRecordInstances refuses a list row whose tag is empty',
+    async () => {
+        const ctx = {
+            identity: { organization: 'AjdvjuECVZEgZoFajaIEkg' },
+            GET: () => Promise.resolve(responseMessage([{
+                id: INSTANCE_ID,
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                record_type_id: TYPE_ID,
+                values: [],
+                etag: '',
+            }])),
+        } as unknown as RequestContext;
+        await assertRejects(
+            () => getRecordInstances(ctx, TYPE_ID),
+            Error,
+            'carried no ETag',
         );
     },
 );
