@@ -463,119 +463,20 @@ skew tests, which went with item 8's trio.
    nothing re-fills `supersedes` around a stale body,
    which would drop the winner's change, and only the
    blind PUT retries on the server, since it derives
-   nothing. Every unit a client reads carries its `etag`,
-   so the client always holds the latch. Flows keep their
-   event walk until item 11. A read
-   hands out the stored
-   response whole, and a DELETE head answers a document
-   GET 404 and yields no part, as today's head read and
-   `WHERE method = 'PUT'` already do
-   (`api/backend-postgres.ts:493-517`, `:544`): a
-   document GET is the
-   stored bytes with
-   three substitutions — the status line (201 → 200),
-   `date`, and `request-id`, the lines that describe this
-   transmission; `etag`, `content-type`, the body, and the
-   `operation-id` of the write that made the state stay —
-   made by ONE function on the head, the body
-   bytes untouched but for one projection: a document
-   whose fields carry read roles
-   (`api/attribute-acl.ts:33`) is served with the fields
-   this reader may read, by that same function, the
-   only place a body is ever transformed, and every
-   projection of one head carries the head's `etag`,
-   which names the state the client acted on — what
-   `If-Match` needs — and is safe under `no-store`;
-   a collection GET is `multipart/mixed`,
-   each part an `application/http; msgtype=response` unit
-   with the same three substitutions and the same
-   projection, so one head is one
-   unit from either source. The boundary is a fresh
-   UUID minted per response — 36 characters of
-   RFC 2046 §5.1.1's alphabet, under its 70 — so a part
-   holds it only by chance, one in 2^122 at a position,
-   which no joiner scans for, and the joiner and the
-   splitter live
-   in `shared/http-message`, beside the parser every
-   part goes through: one library for both sides, and
-   the client's only dependency outside its own
-   directory. Measured on the
-   mock data against today's arrays of bare bodies, a part
-   costs 293 bytes, 215 of them the stored response's own
-   lines: lists grow 33% in all — a tenth for large
-   documents (flows, work orders), while most small ones
-   double or triple — and gzipped, which nothing at the
-   origin does today, they double, because each part's
-   three ids do not compress. A JSON array of the same
-   bytes as strings measured larger (38%), and a rebuilt
-   JSON form is a second representation, so multipart
-   stands. A before-and-after
-   `./bin/measure --record --visualize` run on the
-   list-heavy pages adds both sets of numbers to the
-   history, gating nothing. A collection's heads come
-   from a skip walk of `fa_message_pairs_document` — a
-   recursive query that asks the index for the next name
-   after the last, then one head read per name — one
-   probe per document, where today's `DISTINCT ON`
-   (`api/backend-postgres.ts:523-547`) reads every entry
-   at the path, so its cost is every version of every
-   document there. The walked heads are then sorted by
-   `response_at, id`, the order today's read serves
-   (`api/backend-postgres.ts:545`) — a small set — so the
-   contract and the memory backend stay as they are.
-   Measured on 18.6, owner on the bare
-   table, 300-byte responses, medians of seven: 200
-   documents at 10 / 250 / 2,500 versions read 0.51 /
-   30.63 / 130.71 ms today and 1.11 / 1.43 / 1.93 ms by
-   the walk, 2.15 ms through item 2's fence; the walk
-   loses where documents are many and shallow — 10,000
-   of one version, 4.54 ms today against 39.48 — and
-   breaks even near 15 to 20 versions a document, a
-   depth documents are expected to pass. Both reads use
-   the index item 0 freezes; `EXPLAIN` pins the plan and
-   the memory backend is untouched. The API client keeps
-   each
-   response whole, and pages and presenters read from the
-   unit they were given; the packageable client closes
-   in this rebuild, since the rebuild touches every file
-   its three couplings name: `web-app/app/adapters/` is
-   the client in all but boundary — one transport facade
-   (`http-facade.ts`), a `RequestContext` passed first
-   (`shared.ts`), per-noun adapters named by HTTP verb,
-   57 files and about 10,000 lines — and it imports the
-   server (37 files reach into `api/` for types, errors,
-   and header names — `OPERATION_ID_HEADER` from
-   `api/message-pair.ts`, `REQUEST_ID_HEADER` from
-   `api/request-context.ts`, `MissingTableError` from
-   `api/db.ts` — so the wire contract moves to
-   `shared/`, which never imports `api/`), imports the
-   app (25 files reach into `web-app/app/` — the facade
-   navigates to the login page on a failed refresh
-   (`web-app/app/adapters/http-facade.ts:286-292`), and
-   `shared.ts` redirects, logs, and records page request
-   profiles — so navigation, logging, and profiling are
-   handed in at construction), and holds a singleton
-   (`facade-holder.ts` keeps one module-level facade, so
-   two origins or two sessions cannot coexist; the
-   facade becomes an instance its caller owns); the
-   barrel (`web-app/app/adapters/index.ts`) re-exports
-   API nouns beside clipboard, viewport, location, and
-   resize-observer adapters, and the client's barrel
-   exports the client alone; three raw fetches bypass
-   the facade (item 0's rides-along names them), and
-   auth recovery lives at two layers (the retries
-   bullet on the critical functionality path); the
-   rebuilt client imports nothing from `api/` or the
-   app, and its oracle is a test that walks the client
-   entry point's import graph and finds no module
-   outside the client's directory and `shared/`.
+   nothing. Flows keep their event walk until item 11.
+   Head reads landed
+   (`docs/superpowers/specs/2026-09-30-head-reads-design.md`):
+   43 GET routes serve stored responses; thirty stay
+   parted under `tests/parted-reads.test.ts`. Two specs
+   follow: version and history reads, the four
+   invitation reads, and `former-members/` (the fourth,
+   where the covenant lands); work-order events (the
+   fifth).
    ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
-   and today the facade's `GETWithEtag`, `PUTWithEtag`,
-   and `PATCHWithEtag` and `unwrapResponse` part every
-   response
-   (`web-app/app/adapters/http-facade.ts:32,44,58,80`). Its
+   and today thirty GET routes still answer handler JSON
+   (`tests/parted-reads.test.ts`). Its
    approved wording: "The API, the client, and the
    application treat a response — status line, headers,
    and body — as one unit. A stored response is a
@@ -602,21 +503,7 @@ skew tests, which went with item 8's trio.
    unit they were given. The application derives from
    `response` only, never from `request`." The landing
    commit adds the file references: the one read function
-   and the client's splitter. API
-   tests pin the headers a read serves and the headers it
-   must not. Today: a work-order operation answers the
-   work order's version, which the head's response
-   stores whole (`api/work-order-version.ts`), and
-   derivation reads no request body; a document GET
-   parses the stored response, keeps the body, and
-   rebuilds three headers, dropping `Operation-ID` on
-   purpose (`streamGetFromStored`,
-   `api/message-pair.ts:710-737`); a collection GET
-   dismantles every head into an array of bodies
-   (`entitiesOf`, `api/message-store.ts:59-68`); and the
-   client receives bare JSON. Merged: the API client,
-   packageable (the critical functionality path), which
-   keeps its oracle. Follows item 0.
+   and the client's splitter. Follows item 0.
    Work-order events become a sub-collection of an
    immutable document type. State by PUT keeps each
    version's own lifecycle events inside the work-order
