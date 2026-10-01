@@ -595,22 +595,14 @@ async () => {
     assert(pairsAt.some(r => r.id === headId));
 });
 
-// Task 8: the organizations/:id/flows/:id GET's ETag
-// source switched from the store's document head read
-// (`messageStore(db).getDocumentHead`) (message-pair.ts's ANY-method
-// LOCK head) to documentHeadMessagePairId
-// (document-family.ts's DOCUMENT head — the SAME
-// deriveDocumentsAt reduction the GET already runs to
-// build the entity). Design decision 6 means only PUT
-// ever writes at a document, so the two
-// reductions agree for a live flow — this proves the
-// wire ETag equals the store's document head
-// read (`messageStore(db).getDocumentHead`)'s own, independently
-// computed value, not merely that the route returns
-// SOME header.
+// The organizations/:id/flows/:id GET serves the stored
+// head, whose ETag is its own pair id. The store's document
+// head read (`messageStore(db).getDocumentHead`) finds that
+// head independently of the GET, so this proves the wire
+// ETag names it, not merely that the route returns SOME
+// header.
 Deno.test('e2e: the organizations/:id/flows/:id ETag'
-    + ' equals the store head read\'s own'
-+ ' reduction over the same document (documentHeadMessagePairId parity)',
+    + ' equals the store head read\'s own id',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();

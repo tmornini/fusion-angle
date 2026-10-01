@@ -67,8 +67,8 @@ export async function deriveRecordTypeCollection(
 }
 
 // The live type's head: the composed edit latches on it and
-// a nested read requires it. No head, or a tombstone, is a
-// miss.
+// a nested read or write requires it. No head, or a
+// tombstone, is a miss.
 export async function recordTypeHeadFor(
     db: DbAdapter,
     organization: Id,

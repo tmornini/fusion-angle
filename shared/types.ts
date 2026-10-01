@@ -1095,12 +1095,12 @@ export interface FlowEntity {
     lock_timeout: number;
 }
 
-// The GET-response shape for a flow: the stored row plus the
-// `graph` field (the head document message pair's OWN `graph`
-// field as native nested JSON — api/derive-flows.ts's
-// flowEntityOf; single GET /flows/:id and the list GET
-// /flows both serve this shape). The live graph rides the
-// flow document body; the frozen plane
+// The derived shape of a flow: the entity plus the `graph`
+// field (the head document's OWN `graph` as native nested
+// JSON — api/derive-flows.ts's flowEntityOf). The list GET
+// /flows serves it; the single GET /flows/:id serves the
+// stored head, flowStoredEntityOf's shape. The live graph
+// rides the flow document body; the frozen plane
 // (`work_orders.flow_graph`) keeps its own copy.
 export type FlowWithGraph = FlowEntity & {
     graph: Record<string, unknown>;

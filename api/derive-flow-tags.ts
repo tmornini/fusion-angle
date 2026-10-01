@@ -45,8 +45,7 @@ export function flowTagEntityOf(
 }
 
 // The head document body (the pinned response id) plus the
-// tag's own
-// name/flow_id; absent or a DELETE head throws
+// tag's own name/flow_id; absent or a DELETE head throws
 // EntityNotFoundError(FLOW_TAGS_TABLE, name) — deriveDocumentsAt's
 // own DELETE-head exclusion already collapses both cases into
 // "no document at this name", exactly like every sibling nested

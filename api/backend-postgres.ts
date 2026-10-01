@@ -542,12 +542,10 @@ async function selectHeadPair(
     `;
 }
 
-// A skip walk of the document index (spec §6): ask for
-// the first name at the path, then the next name after the
-// last, and read one head per name — one probe per
-// document, where DISTINCT ON read every version. A name
+// A skip walk of the document index (spec §6): one probe
+// per document, however many versions it holds. A name
 // with no PUT or DELETE pair has no head. The walked
-// heads, a small set, are then sorted.
+// heads, a small set, sort in memory.
 async function selectCollectionHeadPairs(
     sql: SqlClient,
     path: string,

@@ -172,7 +172,7 @@ async () => {
     // Phase Final Stage B: organizations table retired.
 });
 
-// ---- leg 2: :id wire is the stored head for each seeded org --
+// ---- leg 2: :id wire is the stored head per organization ----
 
 Deno.test('leg 2: the unfiltered collection equals derive; :id'
 + ' wire is the stored head and equals derive by value, for'
@@ -332,8 +332,8 @@ async () => {
     }
 });
 
-// Writer matches GET: successBody is organizationEntityOf
-// (id-first). The id-last pin is deleted.
+// The writer's answer is organizationEntityOf, id-first; the
+// GET serves the stored head, whose keys sort.
 Deno.test('leg 6b: organizations/:id successBody is id-first',
 () => {
     const entry = WRITE_RESPONSE_SPECS['organizations/:id'];

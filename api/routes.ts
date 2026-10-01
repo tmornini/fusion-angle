@@ -2722,8 +2722,8 @@ export async function postAiAgentDocumentOp(
 
 // Identity credential document write — Phase Final Task 2:
 // the identity_credentials ROW half is stripped — pure
-// message-plane write. No states interaction. `messagePair` is
-// optional so a below-facade caller keeps compiling.
+// message-plane write. No states interaction. A below-facade
+// caller passes no `messagePair` and stores nothing.
 export async function postIdentityCredentialDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -3728,13 +3728,12 @@ export const routes: Route[] = [
             });
         },
     }),
-    // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
-    // documentSelect(IDENTITIES_WIRING) — the SAME wiring row
-    // PUT already rides — wire-identical to the hand-written
-    // db.identities.getById dispatch it replaces. PUT rides the
-    // generic documentPutHandler(IDENTITIES_WIRING) — wire-
-    // identical to postIdentityDocumentOp's own direct dispatch
-    // it replaces. Verbs stay {get, put}.
+    // GET rides the generic documentSelect(IDENTITIES_WIRING)
+    // — the SAME wiring row PUT already rides — and serves the
+    // stored head. PUT rides the generic
+    // documentPutHandler(IDENTITIES_WIRING) — wire-identical to
+    // postIdentityDocumentOp's own direct dispatch it replaces.
+    // Verbs stay {get, put}.
     route('identities/:id', {
         select: documentSelect(IDENTITIES_WIRING),
         put: documentPutHandler(IDENTITIES_WIRING),
@@ -3785,9 +3784,10 @@ export const routes: Route[] = [
     // flat identity-pii collection (retired, router 404).
     // PUT/DELETE each append a message pair in the same
     // transaction as the write. DELETE is a marked tombstone.
-    // The pattern's last segment ('pii') is not a :param, so
-    // pathAndNameOf yields name '' (a singleton document at
-    // a collection-style path). GET serves the stored head.
+    // The pattern's last segment ('pii') is not a :param:
+    // storedPathAndNameOf keeps the document at the identity's
+    // own prefix under the name 'pii'. GET serves the stored
+    // head.
     // authorizeIdentityPii (the gate dispatch) restricts a GET
     // to self or admin. The selector then applies the same
     // viaMembership org fence credentials use: foreign 403,
@@ -3848,18 +3848,17 @@ export const routes: Route[] = [
     // the co-membership ledger). The collection projects the
     // opaque `secret` out (withoutSecret) and the leaf's reader
     // drops it, so the hash never crosses the boundary. The
-    // leaf id is param 1; GET
-    // and PUT are exposed exactly as the flat makeIdRoute carried
-    // them. ADMIN-ONLY: /identities is not member-tier, so these
-    // fall to the root admin entries — NO MEMBER_VERBS entry.
-    // GET is FLIPPED (Phase 10 Task 8):
-    // derived via deriveCredentialsFor, fenced via gate 15
-    // (keyed on the PARENT identity id rather than each
-    // row's own id) — a
-    // hidden identity's credentials read as an EMPTY array, byte-
-    // identical to parentScope.getAllWhere silently dropping every
-    // matched-but-invisible row (never a 404 — getAllWhere never
-    // throws).
+    // leaf id is param 1; GET and PUT are exposed exactly as
+    // the flat makeIdRoute carried them. ADMIN-ONLY:
+    // /identities is not member-tier, so these fall to the root
+    // admin entries — NO MEMBER_VERBS entry. GET is FLIPPED
+    // (Phase 10 Task 8): derived via deriveCredentialsFor,
+    // fenced via gate 15 (keyed on the PARENT identity id
+    // rather than each row's own id) — a hidden identity's
+    // credentials read as an EMPTY array, byte-identical to
+    // parentScope.getAllWhere silently dropping every
+    // matched-but-invisible row (never a 404 — getAllWhere
+    // never throws).
     // FENCE-INPUT FIX (post-session review): the path :id only
     // keys the ledger scan (deriveCredentialsFor reads the
     // /identities/{path id}/credentials/ prefix — that is where
@@ -5553,9 +5552,8 @@ export const routes: Route[] = [
     }),
     // objectives/:id is the seventh family. GET is FLIPPED
     // (Task 7): absorbed into the generic documentEntityRoute —
-    // GET dispatches to documentSelect(OBJECTIVES_WIRING);
-    // objectiveDocumentEntityOf reads entity fields and `state`
-    // alike from the head body. PUT stays
+    // GET dispatches to documentSelect(OBJECTIVES_WIRING) and
+    // serves the stored head. PUT stays
     // documentPutHandler(OBJECTIVES_WIRING), unchanged from
     // before this flip (Task 2); objectives/:id has no DELETE
     // today, mirroring the ideas/projects/work-orders
