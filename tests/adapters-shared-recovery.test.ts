@@ -333,7 +333,7 @@ Deno.test('a recover context silently refreshes a dead access token',
     const members = (await ctx.GETCollection(
         'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
     )).map(part => part.body().toValue());
-    assert(Array.isArray(members));
+    assertStrictEquals(members.length, 1);
 }));
 
 Deno.test('concurrent 401s share exactly one refresh grant',
@@ -359,8 +359,8 @@ Deno.test('concurrent 401s share exactly one refresh grant',
             'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         ).then(parts => parts.map(part => part.body().toValue())),
     ]);
-    assert(Array.isArray(members));
-    assert(Array.isArray(organizations));
+    assertStrictEquals(members.length, 1);
+    assertStrictEquals(organizations.length, 1);
     // exactly ONE rotation event: the refresh jti was spent once
     const rotations = (await deriveIdentityTokensFor(
         db, 'XXZruirZyAOoRpNxaDnpSA',
@@ -393,7 +393,7 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
     const members = (await ctx.GETCollection(
         'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
     )).map(part => part.body().toValue());
-    assert(Array.isArray(members));
+    assertStrictEquals(members.length, 1);
     // the live session is preserved (not scrubbed) and now scoped
     assertNotStrictEquals(client.getSessionCredentials(), null);
     assertNotStrictEquals(client.getSessionToken(), seed);
@@ -615,7 +615,7 @@ Deno.test('a concurrent facade refresh and remint present'
             'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
         ),
     );
-    const [members] = await Promise.all([
+    await Promise.all([
         reader.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/').then(parts =>
             parts.map(part => part.body().toValue())),
@@ -623,7 +623,6 @@ Deno.test('a concurrent facade refresh and remint present'
             acceptor, invitationId, ORGANIZATION_B,
         ),
     ]);
-    assert(Array.isArray(members));
     // Assert on `revoked`, not `rotated`: the loser was a
     // replay, so the rotation count was already one.
     const revoked = (await deriveIdentityTokensFor(
@@ -760,11 +759,10 @@ Deno.test(
             const ctx = client.recoveringRequestContext(
                 dead,
             );
-            const rows = await ctx.GETCollection(
+            await ctx.GETCollection(
                 'organizations/' + organization
                     + '/ideas/',
             );
-            assert(Array.isArray(rows));
             const kinds = seen.map((row) => row.kind);
             assertEquals(
                 kinds.filter((kind) => kind === 'read'),

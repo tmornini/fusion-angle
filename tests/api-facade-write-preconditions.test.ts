@@ -1,4 +1,8 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import { stub } from '@std/testing/mock';
 import { FakeTime } from '@std/testing/time';
 import {
@@ -101,6 +105,7 @@ async () => {
         + ideaId, token, operationIdHeader());
     assertStrictEquals(read.body().toValue().title, 'Plain');
     const etag = read.query('header.etag').toText();
+    assertMatch(etag, /^".*"$/);
     assert(isIdentifier(etag.slice(1, -1)));
 });
 

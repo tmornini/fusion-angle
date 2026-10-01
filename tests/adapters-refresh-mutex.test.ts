@@ -103,7 +103,7 @@ async () => {
             ),
         ]);
         assert(Array.isArray(a.body().toValue()));
-        assert(Array.isArray(b));
+        assertEquals(b, []);
     });
     assertStrictEquals(refreshPosts, 1);
 });

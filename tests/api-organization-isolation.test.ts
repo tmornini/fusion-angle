@@ -863,8 +863,7 @@ for (const name of LEAF_CASE_NAMES) {
         // facade, is fenced empty — the row resolves to org B.
         const res = await facadeGet(fx.db, fx.organizationA, c.bPath);
         assertStrictEquals(res.status, 204);
-        const rows = await partBodiesOf<{ id: string }>(res);
-        assertEquals(rows.map(r => r.id), []);
+        assertStrictEquals(await res.text(), '');
     });
 }
 

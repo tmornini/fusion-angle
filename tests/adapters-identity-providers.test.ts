@@ -24,6 +24,7 @@ import {
 } from './in-page-facade.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { UnauthorizedError } from '../shared/http-errors.ts';
 import {
     getProvidersFor,
 } from '../client/identity-providers.ts';
@@ -84,8 +85,10 @@ async () => {
     const anon = client.requestContext(
         await devToken('anonymous'));
     try {
-        await assertRejects(() => getProvidersFor(anon
-            , 'prBESZPjJDiuXCeZLmbiVw'));
+        await assertRejects(
+            () => getProvidersFor(anon, 'prBESZPjJDiuXCeZLmbiVw'),
+            UnauthorizedError,
+        );
     } finally {
         client.deleteRefreshChannel();
     }
