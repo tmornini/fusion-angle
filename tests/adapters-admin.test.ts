@@ -7,12 +7,17 @@ import {
     type RequestContext,
     organizationItem,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
+    getOrganizationEntity,
     getOrganizationSeats,
     getOrganizationStats,
+    putOrganizationGeneralInfo,
 } from '../client/admin.ts';
 import { getOrganization } from '../web-app/app/organization-view.ts';
 import { getIdeaEntity, putIdea } from '../client/ideas.ts';
@@ -254,6 +259,28 @@ Deno.test(
         );
         const organization = await getOrganization(ctx);
         assertStrictEquals(organization.usedSeats(), 2);
+    },
+);
+
+Deno.test(
+    'putOrganizationGeneralInfo latches the held organization',
+    async () => {
+        const { db } = await adminContext();
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        const held = await getOrganizationEntity(ctx);
+        sent.length = 0;
+        const saved = await putOrganizationGeneralInfo(
+            ctx, held, { name: 'Renamed', domain: 'renamed.test' },
+        );
+        await putOrganizationGeneralInfo(
+            ctx, saved, { name: 'Again', domain: 'renamed.test' },
+        );
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['PUT', held.query('header.etag').toText()],
+            ['PUT', saved.query('header.etag').toText()],
+        ]);
     },
 );
 

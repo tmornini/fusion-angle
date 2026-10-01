@@ -13,6 +13,8 @@ import {
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 
 const SIDEBAR_MEMBER_NAME_IDS = [
     'sidebar-member-name',
@@ -39,7 +41,7 @@ interface SidebarMember {
 
 async function getSidebarMember(
     bootOrganizations:
-        readonly OrganizationEntity[] | null = null,
+        readonly HttpMessage<OrganizationEntity>[] | null = null,
 ): Promise<SidebarMember> {
     const { sessionContext } = await import('./client.ts');
     const ctx = sessionContext();
@@ -54,16 +56,17 @@ async function getSidebarMember(
     // When boot already fetched organizations, pass them down
     // (identity-scoped pre/post-exchange — no second GET).
     // Self-fetch only for the null degraded edge.
-    let organizations: readonly OrganizationEntity[] = [];
+    let messages:
+        readonly HttpMessage<OrganizationEntity>[] = [];
     if (bootOrganizations !== null) {
-        organizations = bootOrganizations;
+        messages = bootOrganizations;
     } else {
         try {
             const { getOrganizations } =
                 await import(
                     '../../client/organizations.ts'
                 );
-            organizations = await getOrganizations(ctx);
+            messages = await getOrganizations(ctx);
         } catch (err) {
             if (!(err instanceof RequestError
                 && err.status === HTTP_FORBIDDEN)) {
@@ -71,6 +74,7 @@ async function getSidebarMember(
             }
         }
     }
+    const organizations = messages.map(m => m.body().toValue());
     const activeOrganizationId =
         ctx.identity.organization ?? '';
     const active = activeOrganizationId === ''
@@ -91,7 +95,7 @@ async function getSidebarMember(
 
 export async function mutateSidebarMember(
     bootOrganizations:
-        readonly OrganizationEntity[] | null = null,
+        readonly HttpMessage<OrganizationEntity>[] | null = null,
 ): Promise<void> {
     const sidebarMember = await getSidebarMember(
         bootOrganizations,

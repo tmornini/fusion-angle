@@ -40,7 +40,8 @@ async () => {
     const ctx = inPageContext(db, flat);
     const organizations = await getOrganizations(ctx);
     assertEquals(
-        [...organizations.map(o => o.id)].sort(), ['AjdvjuECVZEgZoFajaIEkg'
+        [...organizations.map(o => o.body().toValue().id)].sort()
+        , ['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw']);
 });
 

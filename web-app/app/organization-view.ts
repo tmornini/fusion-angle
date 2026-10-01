@@ -20,14 +20,16 @@ export interface OrganizationDerived {
 }
 
 export class Organization {
+    readonly message: HttpMessage<OrganizationEntity>;
     readonly #entity: OrganizationEntity;
     readonly #derived: OrganizationDerived;
 
     constructor(
-        entity: OrganizationEntity,
+        message: HttpMessage<OrganizationEntity>,
         derived: OrganizationDerived,
     ) {
-        this.#entity = entity;
+        this.message = message;
+        this.#entity = message.body().toValue();
         this.#derived = derived;
     }
 
@@ -107,9 +109,9 @@ export async function getOrganization(
     ctx: RequestContext,
     seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<Organization> {
-    const [entity, derived] = await Promise.all([
+    const [message, derived] = await Promise.all([
         getOrganizationEntity(ctx),
         deriveOrganizationFacts(ctx, seatsP),
     ]);
-    return new Organization(entity, derived);
+    return new Organization(message, derived);
 }

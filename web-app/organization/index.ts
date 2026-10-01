@@ -44,7 +44,10 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
-import type { ObjectiveEntity } from '../../shared/types.ts';
+import type {
+    ObjectiveEntity,
+    OrganizationEntity,
+} from '../../shared/types.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
 import {
@@ -648,10 +651,12 @@ async function handleSave(): Promise<void> {
         return;
     }
     const trimmed = trimStrings(state.draft);
+    const { organization: held, stats } = state;
     const ctx = sessionContext();
+    let saved: HttpMessage<OrganizationEntity>;
     try {
-        await putOrganizationGeneralInfo(
-            ctx, trimmed,
+        saved = await putOrganizationGeneralInfo(
+            ctx, held.message, trimmed,
         );
     } catch (err) {
         log.error(
@@ -666,12 +671,15 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Organization saved', 'success');
-    const [freshOrganization, freshStats] =
-        await organizationAndStats(ctx);
+    // The page goes on holding this organization, so its next
+    // save latches the head this one made. A name or domain
+    // moves no seat, so the derived usage carries over.
     state = {
         kind: 'reading',
-        organization: freshOrganization,
-        stats: freshStats,
+        organization: new Organization(saved, {
+            usedSeats: held.usedSeats(),
+        }),
+        stats,
     };
     await rerender();
 }

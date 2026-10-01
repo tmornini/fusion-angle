@@ -19,9 +19,9 @@ import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
 import { getHumanMembers } from './members.ts';
 
-export async function getOrganizationEntity(
+export function getOrganizationEntity(
     ctx: RequestContext,
-): Promise<OrganizationEntity> {
+): Promise<HttpMessage<OrganizationEntity>> {
     // The active org — the tenant the session is scoped to —
     // so the org page reflects an org switch. The session token
     // always carries it post-boot (activeOrganization crashes otherwise).
@@ -99,17 +99,18 @@ export interface GeneralInfoDraft {
     domain: string;
 }
 
-export async function
-putOrganizationGeneralInfo(
+// Merges the draft onto the held organization's body, so the
+// save reads nothing first and latches the head the page
+// shows.
+export function putOrganizationGeneralInfo(
     ctx: RequestContext,
+    held: HttpMessage<OrganizationEntity>,
     draft: GeneralInfoDraft,
-): Promise<void> {
-    const current = await getOrganizationEntity(ctx);
-    const { id: _id, ...rest } = current;
-    await putOrganization(
-        ctx, activeOrganization(ctx), {
-            ...rest,
-            name: draft.name,
-            domain: draft.domain,
-        });
+): Promise<HttpMessage<OrganizationEntity>> {
+    const { id: _id, ...rest } = held.body().toValue();
+    return putOrganization(ctx, held, {
+        ...rest,
+        name: draft.name,
+        domain: draft.domain,
+    });
 }

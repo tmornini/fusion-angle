@@ -106,7 +106,7 @@ function makeProject(overrides: {
 }
 
 function makeOrganization() {
-    return new Organization({
+    return new Organization(responseMessage({
         id: 'org-1',
         name: 'Acme Innovations',
         domain: 'acme.example',
@@ -114,7 +114,7 @@ function makeOrganization() {
         seats: 50,
         projects_limit: 100,
         ideas_limit: 200,
-    }, {
+    }), {
         usedSeats: 12,
     });
 }

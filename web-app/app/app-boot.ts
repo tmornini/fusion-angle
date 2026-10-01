@@ -27,6 +27,8 @@ import {
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
@@ -101,7 +103,9 @@ function bounceTo(
 // a bounce decision treat empty reachable as fail;
 // auth-exempt pages degrade anonymously.
 async function scopeBootToActiveOrganization(
-): Promise<readonly OrganizationEntity[] | null> {
+): Promise<
+    readonly HttpMessage<OrganizationEntity>[] | null
+> {
     const principal = principalFromToken(
         getClient().getSessionToken(),
     );
@@ -139,7 +143,9 @@ async function scopeBootToActiveOrganization(
         getOrganizations(ctx),
         getIdentityDefaultOrganization(ctx),
     ]);
-    const reachable = organizations.map(o => o.id);
+    const reachable = organizations.map(
+        o => o.body().toValue().id,
+    );
     if (reachable.length === 0) return [];
     const active = resolveActiveOrganization(
         reachable,
@@ -170,7 +176,9 @@ async function scopeBootToActiveOrganization(
 // auth); a dead or failed refresh degrades to the unscoped
 // state rather than aborting boot.
 async function scopeBootIfCredentialed(
-): Promise<readonly OrganizationEntity[] | null> {
+): Promise<
+    readonly HttpMessage<OrganizationEntity>[] | null
+> {
     let creds: SessionCredentials | null;
     try {
         creds = getClient().getSessionCredentials();
@@ -312,7 +320,7 @@ async function bootAuthGate(): Promise<boolean> {
 async function bootOrganizationGate(
 ): Promise<{
     readonly organizations:
-        readonly OrganizationEntity[] | null;
+        readonly HttpMessage<OrganizationEntity>[] | null;
 } | null> {
     const organizations =
         await scopeBootToActiveOrganization();
@@ -321,7 +329,7 @@ async function bootOrganizationGate(
     );
     const reachable = organizations === null
         ? (principal.organizations ?? [])
-        : organizations.map(o => o.id);
+        : organizations.map(o => o.body().toValue().id);
     const decided = resolveOrganizationGate(
         reachable, getPageName(),
     );
@@ -404,7 +412,7 @@ export async function bootApp(): Promise<void> {
     }
 
     let bootOrganizations:
-        readonly OrganizationEntity[] | null = [];
+        readonly HttpMessage<OrganizationEntity>[] | null = [];
     if (
         PAGE_REGISTRY[pageName]?.requiresAuth
             !== false

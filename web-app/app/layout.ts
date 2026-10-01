@@ -29,6 +29,8 @@ import { getClient, sessionContext } from './client.ts';
 import type {
     OrganizationEntity,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     postSessionLogout,
 } from '../../client/session-logout.ts';
@@ -87,7 +89,7 @@ function initSignOut(): void {
 
 async function initSidebarLayout(
     bootOrganizations:
-        readonly OrganizationEntity[] | null
+        readonly HttpMessage<OrganizationEntity>[] | null
         = null,
 ): Promise<void> {
     initActiveNavItem();
