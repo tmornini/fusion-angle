@@ -127,6 +127,51 @@ Deno.test(
 );
 
 Deno.test(
+    'a record-type change answers the type\'s new head',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedCurrentMember(db);
+        const ctx = inPageContext(db, await organizationToken());
+        const created = await postRecordChange(
+            ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
+                kind: 'create',
+                record: {
+                    name: 'Customer',
+                    description: 'A customer record',
+                    position: 1,
+                },
+                attributes: [],
+                initialState: 'active',
+            },
+        );
+        assertStrictEquals(
+            created.body().toValue().id, 'rbfHGatkwQzGZJVXKJEeyw',
+        );
+        const held = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        const saved = await postRecordChange(
+            ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
+                kind: 'edit',
+                record: {
+                    name: 'Customer',
+                    description: 'Renamed',
+                    position: 1,
+                },
+                attributes: [],
+                removedAttributeIds: [],
+                state: 'active',
+                held,
+            },
+        );
+        assertStrictEquals(
+            saved.query('header.etag').toText(),
+            (await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw'))
+                .query('header.etag').toText(),
+        );
+    },
+);
+
+Deno.test(
     'postRecordChange create writes attributes'
     + ' alongside the record',
     async () => {
