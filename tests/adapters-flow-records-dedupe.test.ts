@@ -25,9 +25,10 @@ Deno.test(
                 paths.push(path);
                 return responseMessage([]);
             },
-            // A collection read answers what GET answers for
-            // that path, one message per row, into the same
-            // record the assertions read.
+            // A collection read records its path, then answers
+            // the two flows for flows/, holds each records/
+            // read until the first work-orders/ read releases
+            // it, and answers every other path empty.
             GETCollection: async (path: string) => {
                 paths.push(path);
                 if (path.endsWith('/flows/')) {

@@ -205,9 +205,11 @@ Deno.test(
                     },
                 });
             },
-            // A collection read answers what GET answers for
-            // that path, one message per row, into the same
-            // record the assertions read.
+            // A collection read records its path, then answers
+            // the flow's one work-order join, the one work
+            // order, and empty members, former members, agents,
+            // and histories; any other collection path is a
+            // fault.
             GETCollection: async (path: string) => {
                 paths.push(path);
                 if (
