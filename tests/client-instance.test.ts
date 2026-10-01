@@ -94,16 +94,20 @@ async () => {
     const ctx = client.recoveringRequestContext(
         await expiredToken(),
     );
-    await withLocalStorageAsync({
-        getItem: () => null,
-        removeItem: () => {},
-    }, async () => {
-        await assertRejects(
-            () => ctx.GET('organizations/'),
-            UnauthorizedError,
-        );
-    });
-    assertEquals(calls, ['redirectToLogin']);
+    try {
+        await withLocalStorageAsync({
+            getItem: () => null,
+            removeItem: () => {},
+        }, async () => {
+            await assertRejects(
+                () => ctx.GET('organizations/'),
+                UnauthorizedError,
+            );
+        });
+    } finally {
+        client.deleteRefreshChannel();
+    }
+    assertEquals(calls, ['navigateToAuth', 'redirectToLogin']);
 });
 
 Deno.test('a client is never built without navigation', () => {

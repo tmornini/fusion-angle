@@ -1,3 +1,11 @@
+// Minimal DOM stubs so redirectToLogin (getPageName reads
+// data-page; navigateTo sets window.location.href) runs in Node.
+// @ts-expect-error — Node global stub
+globalThis.window = { location: { href: '', search: '' } };
+globalThis.document = {
+    documentElement: { getAttribute: () => 'dashboard' },
+} as unknown as Document;
+
 import {
     assert,
     assertEquals,
@@ -10,7 +18,10 @@ import {
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageClient,
+    inPageContext,
+} from './in-page-facade.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -76,10 +87,15 @@ Deno.test('an anonymous principal cannot read providers',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const anon = inPageContext(
-        db, await devToken('anonymous'));
-    await assertRejects(() => getProvidersFor(anon
-        , 'prBESZPjJDiuXCeZLmbiVw'));
+    const client = inPageClient(db);
+    const anon = client.requestContext(
+        await devToken('anonymous'));
+    try {
+        await assertRejects(() => getProvidersFor(anon
+            , 'prBESZPjJDiuXCeZLmbiVw'));
+    } finally {
+        client.deleteRefreshChannel();
+    }
 });
 
 Deno.test('linked providers are latest by at, not array order',
