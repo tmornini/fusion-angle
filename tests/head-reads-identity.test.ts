@@ -10,8 +10,10 @@ import { apiRequest } from './http-fixtures.ts';
 import { deriveCredentialsFor } from '../api/derive-identity-spine.ts';
 import { bodyOf } from '../api/derive-documents.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
-import { ORGANIZATION_TWO } from
-    '../api/mock-data/seed-constants.ts';
+import {
+    ORGANIZATION_TWO,
+    STARK_ORGANIZATION,
+} from '../api/mock-data/seed-constants.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -127,12 +129,14 @@ const IDENTITY_EVENT_WRITES = [
     },
 ];
 
-Deno.test('every written token, revocation, and provider head'
-    + ' stores its path identity', async () => {
-    const db = await seededMockDb();
+async function stampedIdentityOfEachWrite(
+    db: Awaited<ReturnType<typeof seededMockDb>>,
+    identity: string,
+): Promise<unknown[]> {
     const stamped: unknown[] = [];
     for (const { collection, body } of IDENTITY_EVENT_WRITES) {
-        const prefix = '/identities/' + ME + '/' + collection + '/';
+        const prefix = '/identities/' + identity + '/' + collection
+            + '/';
         const name = generateIdentifier();
         const put = await handleRequest(db, apiRequest({
             method: 'PUT', path: prefix + name, token: DEV_TOKEN, body,
@@ -143,5 +147,21 @@ Deno.test('every written token, revocation, and provider head'
         assert(head !== null);
         stamped.push(bodyOf(head.response)['identity_id']);
     }
-    assertEquals(stamped, [ME, ME, ME]);
+    return stamped;
+}
+
+Deno.test('every written token, revocation, and provider head'
+    + ' stores its path identity', async () => {
+    const db = await seededMockDb();
+    assertEquals(
+        await stampedIdentityOfEachWrite(db, ME), [ME, ME, ME],
+    );
+    // DEV_TOKEN's subject is ME: only at another identity's
+    // prefix do the path and the actor disagree, so only there
+    // does the stamp's source show.
+    const other = await seedSeatedIdentity(db, STARK_ORGANIZATION);
+    assertEquals(
+        await stampedIdentityOfEachWrite(db, other),
+        [other, other, other],
+    );
 });
