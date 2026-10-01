@@ -1421,19 +1421,23 @@ Off the critical path; each with its oracle.
   record instance's id for good: the never-written latch
   makes tombstone-wins the statement's rule, and a
   retired instance's read, update, and re-create answer
-  410 Gone (RFC 9110 §15.5.11). Every other family
-  re-creates over its tombstone (the nil latch lands over
-  a DELETE head) and answers 404 after a delete. An id is
+  410 Gone (RFC 9110 §15.5.11). Reads are done: every
+  family's deleted document — a DELETE head, or a
+  state-`deleted` head in a lifecycle family — answers
+  410 on GET after the fence and is no part of a
+  collection. The write half stays open: every other
+  family re-creates over its tombstone (the nil latch
+  lands over a DELETE head). An id is
   an identity: reusing one lets a stale reference — a
   binding, an export, an audit line, a client's cache —
   name a different document, as two customers sharing an
   id would. Consider tombstone-wins, and so 410, for
-  every document. It costs re-creation by PUT for the
-  class A families and `If-None-Match: *` over a
+  every document's writes. It costs re-creation by PUT
+  for the class A families and `If-None-Match: *` over a
   tombstone for flows and work orders; the POST creates
   already mint fresh ids. Oracle: for each family,
-  create, DELETE, then GET answers 410 and a declared
-  create answers 410; a never-written id answers 404; a
+  create, DELETE, then a declared create answers 410, as
+  a GET already does; a never-written id answers 404; a
   foreign organization's retired document answers what
   its live one does; history and past versions still
   answer 200.
