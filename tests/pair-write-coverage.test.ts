@@ -122,10 +122,13 @@ Deno.test('invitation writes import pair-formation primitives',
     );
 });
 
-Deno.test('api/api.ts awaits simulateLatency exactly 4 times', () => {
-    const text = sourceText('api/api.ts');
-    const hits = text.match(
-        /await adapter\.simulateLatency\(\);/g,
-    ) ?? [];
-    assertStrictEquals(hits.length, 4);
+Deno.test('the in-process fetch awaits simulateLatency'
+    + ' once per request', () => {
+    const count = (path: string) => (
+        sourceText(path).match(
+            /await adapter\.simulateLatency\(\);/g,
+        ) ?? []
+    ).length;
+    assertStrictEquals(count('tests/in-page-facade.ts'), 1);
+    assertStrictEquals(count('api/api.ts'), 0);
 });
