@@ -637,6 +637,12 @@ async function handleInstanceSave(
                         currentView.attributes,
                         fresh.values,
                     );
+                // A later delete latches the head this
+                // list holds, so the stale row yields.
+                loadedInstances = loadedInstances.map(
+                    (row) => row.id === fresh.id
+                        ? fresh : row,
+                );
                 pageState = {
                     kind: 'instances-editing',
                     instance: fresh,
