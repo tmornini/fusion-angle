@@ -4,9 +4,10 @@ import { ProjectView } from '../web-app/app/project-view.ts';
 import type {
     ObjectiveEntity,
 } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 function makeProject(): Project {
-    return new Project({
+    return new Project(responseMessage({
         id: 'pnXmXrxOWayANgDLdCjuBw',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 't',
@@ -16,7 +17,7 @@ function makeProject(): Project {
         estimated_cost: 0, actual_cost: 0,
         position: 0,
         state: 'approved',
-    }, 'approved');
+    }), 'approved');
 }
 
 const T1 = '2026-05-14T00:00:00.000000Z';

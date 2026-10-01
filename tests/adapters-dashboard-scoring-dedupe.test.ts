@@ -116,23 +116,26 @@ Deno.test(
                 await import(
                     './in-page-facade.ts'
                 );
-            const { putProject } = await import(
-                '../client/projects.ts'
-            );
             const seedCtx = inPageContext(
                 db, token,
             );
-            await putProject(seedCtx, PROJECT_ID, {
-                title: 't1',
-                description: 'd',
-                progress: 0,
-                start_date: '2026-05-14',
-                target_end_date: '2026-05-14',
-                estimated_cost: 0,
-                actual_cost: 0,
-                position: 0,
-                state: 'approved',
-            }, undefined);
+            await seedCtx.PUT(
+                'organizations/'
+                    + ORGANIZATION_ID
+                    + '/projects/'
+                    + PROJECT_ID,
+                {
+                    title: 't1',
+                    description: 'd',
+                    progress: 0,
+                    start_date: '2026-05-14',
+                    target_end_date: '2026-05-14',
+                    estimated_cost: 0,
+                    actual_cost: 0,
+                    position: 0,
+                    state: 'approved',
+                },
+            );
             await seedCtx.PUT(
                 'organizations/'
                     + ORGANIZATION_ID

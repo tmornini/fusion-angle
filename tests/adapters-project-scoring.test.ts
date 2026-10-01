@@ -31,7 +31,6 @@ import {
 import {
     getProjectEntity,
     postProjectStateChange,
-    putProject,
 } from '../client/projects.ts';
 import { latestPerPair } from '../web-app/app/scoring-format.ts';
 import { seedHumanMember } from './member-fixtures.ts';
@@ -137,7 +136,8 @@ Deno.test('getProjectScoring returns both lists',
     });
 
 // Seeds both projects through the SAME document PUT the live
-// route uses (putProject), so a message pair exists at each
+// route uses (an unlatched PUT of a fresh id: putProject latches
+// the head it replaces), so a message pair exists at each
 // project's document — required for the flipped GET projects
 // route (Phase 3 Task 6), which getPortfolioImpactSummary /
 // getObjectiveScoringInputs / getProjectsScoreColumn read, to
@@ -158,16 +158,18 @@ async function seedTwoApprovedProjects(
         target_end_date: '2026-05-14',
         estimated_cost: 0, actual_cost: 0,
     };
-    await putProject(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
+    await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+        + 'pnXmXrxOWayANgDLdCjuBw', {
         ...projectBody,
         title: 't1', position: 0,
         state: 'approved',
-    }, undefined);
-    await putProject(ctx, 'prBESZPjJDiuXCeZLmbiVw', {
+    });
+    await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+        + 'prBESZPjJDiuXCeZLmbiVw', {
         ...projectBody,
         title: 't2', position: 1,
         state: 'approved',
-    }, undefined);
+    });
     await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
         + 'ohqxgUBEaFQwYbXsonRPmg', {
         position: 0,
@@ -521,16 +523,10 @@ Deno.test(
                 objectiveId, score: 10,
             })),
         );
-        const {
-            id: _id,
-            organization_id: _organization,
-            state: _state,
-            ...fields
-        } = await getProjectEntity(
-            ctx, MARKET_SENTIMENT_ANALYZER,
-        );
         await postProjectStateChange(
-            ctx, MARKET_SENTIMENT_ANALYZER, fields, 'approved',
+            ctx,
+            await getProjectEntity(ctx, MARKET_SENTIMENT_ANALYZER),
+            'approved',
         );
         const before = buildObjectiveAggregates(
             getObjectiveScoringInputs(

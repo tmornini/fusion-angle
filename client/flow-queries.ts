@@ -71,7 +71,9 @@ export async function getProjectFlowEntities(
 ): Promise<ProjectFlowEntity[]> {
     const projects = await getProjectEntities(ctx);
     const perProject = await Promise.all(
-        projects.map(p => getProjectFlowsForProject(ctx, p.id)),
+        projects.map(p => getProjectFlowsForProject(
+            ctx, p.body().toValue().id,
+        )),
     );
     return perProject.flat();
 }

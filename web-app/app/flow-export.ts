@@ -460,7 +460,7 @@ export async function computeFlowBackupResolution(
         f => f.id === backup.flow.id,
     );
     const project = backup.projectId
-        ? projects.find(p =>
+        ? projects.map(m => m.body().toValue()).find(p =>
             p.id === backup.projectId
             && projectStateIsNotDeleted(
                 assertProjectState(

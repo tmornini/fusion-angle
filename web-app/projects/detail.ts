@@ -29,7 +29,7 @@ import {
 } from '../app/dialog.ts';
 import {
     getProjectEntity,
-    projectStateOf,
+    projectOf,
     putProjectFields,
     postProjectStateChange,
     getFlowsByProject,
@@ -53,13 +53,11 @@ import {
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
-import { Project } from '../../shared/types.ts';
 import { ProjectView } from '../app/project-view.ts';
 import type { FlowListItem } from '../../client/index.ts';
-import type {
-    ProjectEntity,
-    ProjectState,
-} from '../../shared/types.ts';
+import type { ProjectEntity } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     getMemberMap,
     memberName,
@@ -83,15 +81,13 @@ type PageState =
     | {
         kind: 'reading';
         view: ProjectView;
-        entity: ProjectEntity;
-        detail: ProjectState;
+        message: HttpMessage<ProjectEntity>;
         flows: FlowListItem[];
     }
     | {
         kind: 'editing';
         view: ProjectView;
-        entity: ProjectEntity;
-        detail: ProjectState;
+        message: HttpMessage<ProjectEntity>;
         flows: FlowListItem[];
         draft: ProjectDraftFields;
     };
@@ -122,13 +118,12 @@ const isFieldKey = makeFieldKeyValidator(FIELDS);
 // (progressPercent, costActualK) are display-transformed and
 // have no position accessor at all — composing a wire body
 // from the view would corrupt progress/actual_cost and fail
-// to compile on position. So the loader retains the RAW
-// entity + state beside the view. State is read off
-// the GET row by `projectStateOf`; no second states hop.
+// to compile on position. So the loader retains the project's
+// message beside the view: every write latches it and sends
+// its body.
 interface ProjectDetailData {
     view: ProjectView;
-    entity: ProjectEntity;
-    detail: ProjectState;
+    message: HttpMessage<ProjectEntity>;
     flows: FlowListItem[];
     active: Awaited<
         ReturnType<typeof getActiveObjectives>
@@ -142,11 +137,10 @@ async function loadProjectDetailData(
     projectId: string,
     ctx: RequestContext,
 ): Promise<ProjectDetailData> {
-    // One wave: entity + objectives + scoring + flows
-    // + active. Drop the wrapper getProject (verbatim
-    // getProjectEntity + Project); pass view.stateValue().
+    // One wave: the project + objectives + scoring + flows
+    // + active.
     const [
-        entity,
+        message,
         objectives,
         scoring,
         flows,
@@ -158,31 +152,37 @@ async function loadProjectDetailData(
         getFlowsByProject(ctx, projectId),
         getActiveObjectives(ctx),
     ]);
-    const detail = projectStateOf(entity);
     const view = new ProjectView(
-        new Project(entity, detail),
+        projectOf(message),
         objectives,
         scoring.baseline,
         scoring.actual,
     );
     return {
-        view, entity, detail, flows, active, scoring,
+        view, message, flows, active, scoring,
     };
 }
 
 export function reduceProjectSave(
     data: Pick<
         ProjectDetailData,
-        'view' | 'entity' | 'detail' | 'flows'
+        'view' | 'message' | 'flows'
     >,
 ): Extract<PageState, { kind: 'reading' }> {
     return {
         kind: 'reading',
         view: data.view,
-        entity: data.entity,
-        detail: data.detail,
+        message: data.message,
         flows: data.flows,
     };
+}
+
+// The page goes on holding this project, so its next write
+// latches the head the last write made.
+function holdProject(
+    message: HttpMessage<ProjectEntity>,
+): void {
+    if (state) state = { ...state, message };
 }
 
 async function refreshProjectDetail(
@@ -201,8 +201,7 @@ async function refreshProjectDetail(
     state = {
         kind: 'reading',
         view: data.view,
-        entity: data.entity,
-        detail: data.detail,
+        message: data.message,
         flows: data.flows,
     };
     rerender();
@@ -296,8 +295,7 @@ export async function init(
     state = {
         kind: 'reading',
         view: data.view,
-        entity: data.entity,
-        detail: data.detail,
+        message: data.message,
         flows: data.flows,
     };
     buildPresenter().renderShell(container);
@@ -352,11 +350,12 @@ export async function init(
                 .closest('[data-action]')
                 ?.getAttribute('data-action');
             if (action === 'confirm-approve') {
+                if (!state) return;
                 const ctx = sessionContext();
                 try {
-                    await postProjectApproval(
-                        ctx, projectId,
-                    );
+                    holdProject(await postProjectApproval(
+                        ctx, state.message,
+                    ));
                     closeDialog('approve');
                 } catch (err) {
                     const message = extractErrorMessage(err);
@@ -379,11 +378,12 @@ export async function init(
                 .closest('[data-action]')
                 ?.getAttribute('data-action');
             if (action === 'confirm-archive') {
+                if (!state) return;
                 const ctx = sessionContext();
                 try {
-                    await postProjectArchival(
-                        ctx, projectId,
-                    );
+                    holdProject(await postProjectArchival(
+                        ctx, state.message,
+                    ));
                     closeDialog('archive');
                 } catch (err) {
                     const message = extractErrorMessage(err);
@@ -558,8 +558,7 @@ function handleProjectActions(
             state = {
                 kind: 'editing',
                 view: state.view,
-                entity: state.entity,
-                detail: state.detail,
+                message: state.message,
                 flows: state.flows,
                 draft: projectDraftFromView(
                     state.view,
@@ -574,8 +573,7 @@ function handleProjectActions(
             state = {
                 kind: 'reading',
                 view: state.view,
-                entity: state.entity,
-                detail: state.detail,
+                message: state.message,
                 flows: state.flows,
             };
             rerender();
@@ -643,8 +641,7 @@ function onDocumentKeydown(
     state = {
         kind: 'reading',
         view: state.view,
-        entity: state.entity,
-        detail: state.detail,
+        message: state.message,
         flows: state.flows,
     };
     rerender();
@@ -655,8 +652,7 @@ async function handleSave(): Promise<void> {
         return;
     }
     const projectId = state.view.idForLink();
-    const entity = state.entity;
-    const detail = state.detail;
+    const held = state.message;
     const ctx = sessionContext();
     // Inside the first try: a draft with an empty/invalid
     // cost throws here and surfaces as the toast. The put
@@ -665,6 +661,7 @@ async function handleSave(): Promise<void> {
     let fields;
     let nextState;
     let stateChanged;
+    let saved: HttpMessage<ProjectEntity>;
     try {
         const patch = projectPatchFromDraft(
             state.view,
@@ -674,47 +671,24 @@ async function handleSave(): Promise<void> {
         nextState = patch.state;
         stateChanged =
             patch.state !== state.view.stateValue();
-        await putProjectFields(
-            ctx, projectId, fields, detail,
-        );
+        saved = await putProjectFields(ctx, held, fields);
     } catch (err) {
         reportFault(
             ctx, 'Failed to save project', err,
         );
         return;
     }
+    holdProject(saved);
     // Fields are now patched. If the lifecycle hop
     // fails, the entity carries new fields with a
     // stale state — name the half-state explicitly.
     if (stateChanged) {
-        // DATA-CORRUPTION TRAP: the eight fields come
-        // from the RETAINED RAW entity (progress,
-        // actual_cost, position never touched by this
-        // form) plus the patch's five edited fields —
-        // never from ProjectView's display-transformed
-        // accessors.
+        // The state change latches the fields save's answer:
+        // the head read before the save is already replaced.
         try {
-            const {
-                id: _id,
-                organization_id: _org,
-                state: _priorState,
-                ...entityFields
-            } = entity;
-            void _priorState;
-            await postProjectStateChange(
-                ctx, projectId,
-                {
-                    ...entityFields,
-                    title: fields.title,
-                    description: fields.description,
-                    start_date: fields.startDate,
-                    target_end_date:
-                        fields.targetEndDate,
-                    estimated_cost:
-                        fields.estimatedCost,
-                },
-                nextState,
-            );
+            holdProject(await postProjectStateChange(
+                ctx, saved, nextState,
+            ));
         } catch (err) {
             reportFault(
                 ctx,

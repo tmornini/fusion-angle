@@ -405,9 +405,9 @@ Deno.test(
         )).body().toValue();
         assertStrictEquals(idea.state, 'promoted');
 
-        const promotedProject = await getProjectEntity(
+        const promotedProject = (await getProjectEntity(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
-        );
+        )).body().toValue();
         assertStrictEquals(promotedProject.state, 'submitted');
 
         const mine =

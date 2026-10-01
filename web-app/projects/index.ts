@@ -12,6 +12,7 @@ import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
     getProjects,
+    projectOf,
     putProjectPosition,
     subscribeProjectChanges,
     subscribeProjectScoreChanges,
@@ -182,8 +183,20 @@ async function onProjectsLoaded(
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
-            await putProjectPosition(
-                sessionContext(), id, newPosition,
+            if (!projectState) return;
+            const project = projectState.projects
+                .find(p => p.idForLink() === id);
+            if (!project) return;
+            const saved = await putProjectPosition(
+                sessionContext(), project.message, newPosition,
+            );
+            // The next drag of this card latches the head this
+            // save made, not the one it replaced.
+            if (!projectState) return;
+            projectState = applyProjectListUpdate(
+                projectState,
+                projectState.projects.map(p =>
+                    p.idForLink() === id ? projectOf(saved) : p),
             );
         },
     );

@@ -4,6 +4,7 @@ import {
     ProjectListPresenter,
     buildInitialProjectListState,
 } from '../web-app/app/presenters/project.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // project.ts never reads localStorage (checked against
 // the full product tree); window/document are stubbed
@@ -21,7 +22,7 @@ globalThis.document = {
 function makeProject(id: string): InstanceType<
     typeof Project
 > {
-    return new Project({
+    return new Project(responseMessage({
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title: 't',
@@ -34,7 +35,7 @@ function makeProject(id: string): InstanceType<
         actual_cost: 0,
         position: 0,
         state: 'under_review',
-    }, 'under_review');
+    }), 'under_review');
 }
 
 Deno.test(

@@ -5,6 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     type RequestContext,
+    organizationItem,
 } from '../client/request-context.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -14,9 +15,6 @@ import {
     putFlow,
 } from
 '../client/flow-mutations.ts';
-import {
-    putProject,
-} from '../client/projects.ts';
 import {
     getFlowsByProject,
     getFlowGraph,
@@ -124,7 +122,8 @@ async function saveGraph(
 }
 
 // Seeds a project through the SAME document PUT the live route
-// uses (putProject), so a message pair exists at this project's
+// uses (an unlatched PUT of a fresh id: putProject latches the
+// head it replaces), so a message pair exists at this project's
 // document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getFlowsWithProjectNames /
 // getProjectFlowEntities read, to derive it. A synthesized
@@ -135,7 +134,7 @@ async function seedProject(
     id: string,
     title: string,
 ): Promise<void> {
-    await putProject(ctx, id, {
+    await ctx.PUT(organizationItem(ctx, 'projects', id), {
         title,
         description: '',
         progress: 0,
@@ -145,7 +144,7 @@ async function seedProject(
         actual_cost: 0,
         position: 0,
         state: 'approved',
-    }, undefined);
+    });
 }
 
 Deno.test(

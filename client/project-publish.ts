@@ -1,10 +1,11 @@
 import type {
-    Id,
     ObjectiveEntity,
     ObjectiveId,
+    ProjectEntity,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import type { RequestContext } from './request-context.ts';
-import { getProjectEntity } from './projects.ts';
 import type { ValidationResult } from './validation.ts';
 import { getActiveObjectives } from './objectives.ts';
 import {
@@ -88,56 +89,38 @@ export class ProjectNotReadyError extends Error {
     }
 }
 
+// The page holds the project, so its read retires; the
+// objectives and scores are read here because their bodies
+// decide whether the transition may go.
 export async function postProjectApproval(
     ctx: RequestContext,
-    projectId: Id,
-): Promise<void> {
-    const [entity, active, scoring] =
-        await Promise.all([
-            getProjectEntity(ctx, projectId),
-            getActiveObjectives(ctx),
-            getProjectScoring(ctx, projectId),
-        ]);
-    const {
-        id: _id,
-        organization_id: _org,
-        state: _state,
-        ...fields
-    } = entity;
-    void _state;
+    held: HttpMessage<ProjectEntity>,
+): Promise<HttpMessage<ProjectEntity>> {
+    const [active, scoring] = await Promise.all([
+        getActiveObjectives(ctx),
+        getProjectScoring(ctx, held.body().toValue().id),
+    ]);
     const v = validateProjectForApproval(
         active, scoring.baseline,
     );
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);
     }
-    await postProjectStateChange(
-        ctx, projectId, fields, 'approved',
-    );
+    return await postProjectStateChange(ctx, held, 'approved');
 }
 
 export async function postProjectArchival(
     ctx: RequestContext,
-    projectId: Id,
-): Promise<void> {
-    const [entity, scoring] = await Promise.all([
-        getProjectEntity(ctx, projectId),
-        getProjectScoring(ctx, projectId),
-    ]);
-    const {
-        id: _id,
-        organization_id: _org,
-        state: _state,
-        ...fields
-    } = entity;
-    void _state;
+    held: HttpMessage<ProjectEntity>,
+): Promise<HttpMessage<ProjectEntity>> {
+    const scoring = await getProjectScoring(
+        ctx, held.body().toValue().id,
+    );
     const v = validateProjectForArchival(
         scoring.baseline, scoring.actual,
     );
     if (!v.ready) {
         throw new ProjectNotReadyError(v.problems);
     }
-    await postProjectStateChange(
-        ctx, projectId, fields, 'archived',
-    );
+    return await postProjectStateChange(ctx, held, 'archived');
 }

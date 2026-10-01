@@ -11,6 +11,7 @@ import { ProjectView } from '../web-app/app/project-view.ts';
 import {
     ProjectDetailPresenter,
 } from '../web-app/app/presenters/project-detail.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // None of api/types.ts, adapters/projects.ts, or
 // presenters/project-detail.ts reads localStorage (checked
@@ -68,7 +69,7 @@ function makeRecordingContainer(): {
 }
 
 function makeProject() {
-    return new Project({
+    return new Project(responseMessage({
         id: 'pr-1',
         organization_id: 'org-1',
         title: 'Apollo',
@@ -80,7 +81,7 @@ function makeProject() {
         actual_cost: 50000,
         position: 0,
         state: 'approved',
-    }, 'approved');
+    }), 'approved');
 }
 
 const objectives: ObjectiveEntity[] = [

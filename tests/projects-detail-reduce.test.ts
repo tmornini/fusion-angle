@@ -7,6 +7,7 @@ import {
 } from '../web-app/app/presenters/project-detail.ts';
 import { reduceProjectSave } from
     '../web-app/projects/detail.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // None of these four modules reads localStorage (checked
 // against the full product tree); window/document are
@@ -83,14 +84,14 @@ Deno.test(
             state: 'approved',
         };
         const detail: ProjectState = 'approved';
+        const message = responseMessage(entity);
         const view = new ProjectView(
-            new Project(entity, detail),
+            new Project(message, detail),
             [], [], [],
         );
         const next = reduceProjectSave({
             view,
-            entity,
-            detail,
+            message,
             flows: [],
         });
         assertStrictEquals(next.kind, 'reading');

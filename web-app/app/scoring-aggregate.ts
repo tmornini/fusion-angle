@@ -253,12 +253,15 @@ export async function getProjectsScoreColumn(
     const [
         activeObjs,
         objectives,
-        projectRows,
+        projectMessages,
     ] = await Promise.all([
         getActiveObjectives(ctx),
         getObjectives(ctx),
         getProjectEntities(ctx),
     ]);
+    const projectRows = projectMessages.map(
+        (m) => m.body().toValue(),
+    );
     const [allBaseline, allActual] = await Promise.all([
         getAllBaselineScores(ctx, projectRows),
         getAllActualScores(ctx, projectRows),

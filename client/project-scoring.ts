@@ -141,7 +141,9 @@ export function startDashboardScoringReads(
     readonly bundleP: Promise<DashboardScoringBundle>;
     readonly objectivesP: Promise<ObjectiveEntity[]>;
 } {
-    const projectsP = getProjectEntities(ctx);
+    const projectsP = getProjectEntities(ctx).then(
+        (messages) => messages.map((m) => m.body().toValue()),
+    );
     const objectivesP = getObjectives(ctx);
     const bundleP = (async () => {
         const projects = await projectsP;

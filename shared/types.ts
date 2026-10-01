@@ -1541,6 +1541,7 @@ export class Idea {
 }
 
 export class Project {
+    readonly message: HttpMessage<ProjectEntity>;
     readonly #id: string;
     readonly #title: string;
     readonly #description: string;
@@ -1553,9 +1554,11 @@ export class Project {
     readonly #position: number;
 
     constructor(
-        entity: ProjectEntity,
+        message: HttpMessage<ProjectEntity>,
         state: ProjectState,
     ) {
+        this.message = message;
+        const entity = message.body().toValue();
         this.#id = entity.id;
         this.#title = entity.title;
         this.#description =

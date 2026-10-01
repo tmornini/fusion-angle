@@ -224,7 +224,7 @@ export async function getDashboardStats(
         },
         {
             label: 'Projects',
-            value: projects.filter(p =>
+            value: projects.map(m => m.body().toValue()).filter(p =>
                 projectStateIsNotDeleted(
                     assertProjectState(
                         p.state,

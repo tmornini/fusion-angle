@@ -35,7 +35,7 @@ function buildIdea(
 function buildProject(
     id: string, title: string,
 ): Project {
-    return new Project({
+    return new Project(responseMessage({
         id,
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         title,
@@ -48,7 +48,7 @@ function buildProject(
         actual_cost: 0,
         position: 1,
         state: 'approved',
-    }, 'approved');
+    }), 'approved');
 }
 
 function buildHumanMember(

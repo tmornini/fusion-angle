@@ -71,7 +71,8 @@ async function projectIdsByState(
     wanted: ProjectState,
 ): Promise<Id[]> {
     // Lifecycle state rides the project GET row.
-    const rows = await getProjectEntities(ctx);
+    const rows = (await getProjectEntities(ctx))
+        .map((m) => m.body().toValue());
     return rows
         .filter(p => p.state === wanted)
         .map(p => p.id);

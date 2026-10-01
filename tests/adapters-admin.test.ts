@@ -5,6 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     type RequestContext,
+    organizationItem,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -15,7 +16,10 @@ import {
 } from '../client/admin.ts';
 import { getOrganization } from '../web-app/app/organization-view.ts';
 import { getIdeaEntity, putIdea } from '../client/ideas.ts';
-import { putProject } from '../client/projects.ts';
+import {
+    getProjectEntity,
+    putProject,
+} from '../client/projects.ts';
 import {
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
@@ -64,7 +68,8 @@ function buildIdea(
 }
 
 // Seeds a project through the SAME document PUT the live route
-// uses (putProject), so a message pair exists at this project's
+// uses (an unlatched PUT of a fresh id: putProject latches the
+// head it replaces), so a message pair exists at this project's
 // document — required for the flipped GET projects route
 // (Phase 3 Task 6), which getProjects (getOrganizationStats'
 // project count) reads, to derive it. A fixed historical
@@ -76,10 +81,10 @@ async function seedProject(
 ): Promise<void> {
     const { organization_id: _organizationId, ...entity } =
         buildProject(id);
-    await putProject(ctx, id, {
+    await ctx.PUT(organizationItem(ctx, 'projects', id), {
         ...entity,
         state,
-    }, undefined);
+    });
 }
 
 // Seeds an idea through the SAME document PUT the live route
@@ -207,10 +212,10 @@ Deno.test(
 
         const { organization_id: _projectOrganizationId, ...pFields } =
             buildProject(projectId);
-        await putProject(ctx, projectId, {
+        await putProject(ctx, await getProjectEntity(ctx, projectId), {
             ...pFields,
             state: 'declined',
-        }, undefined);
+        });
         const { organization_id: _ideaOrganizationId, ...iFields } =
             buildIdea(ideaId);
         await putIdea(ctx, await getIdeaEntity(ctx, ideaId), {

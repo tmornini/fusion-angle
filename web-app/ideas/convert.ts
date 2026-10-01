@@ -583,7 +583,7 @@ async function performConversion(
     const fields = draft.fields;
     const projects = await getProjectEntities(ctx);
     const position = nextPosition(
-        projects.map(p => p.position),
+        projects.map(p => p.body().toValue().position),
     );
     const days = parseFiniteNumber(
         'time-days', fields['time-days'],
