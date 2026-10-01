@@ -106,8 +106,16 @@ function latchFields(latch: Latch): HeaderFields {
     if (latch === 'creates') return [['If-None-Match', '*']];
     return [[
         'If-Match',
-        latch.map((message) =>
-            message.query('header.etag').toText()).join(', '),
+        latch.map((message) => {
+            const tag = message.query('header.etag');
+            if (!tag.exists()) {
+                throw new Error(
+                    'a latched message carries no etag line;'
+                        + ' the write would go blind',
+                );
+            }
+            return tag.toText();
+        }).join(', '),
     ]];
 }
 

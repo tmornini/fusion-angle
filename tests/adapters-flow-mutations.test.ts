@@ -236,7 +236,7 @@ Deno.test(
                 edges: [],
             }),
             Error,
-            'queried value does not exist',
+            'the write would go blind',
         );
         assertStrictEquals(puts, 0);
     },
