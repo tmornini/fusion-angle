@@ -6,8 +6,9 @@ import type { HttpMessage } from
 import type { RequestContext } from './request-context.ts';
 import { compareIdentifiers } from '../shared/identifier.ts';
 
-// The organization vessel adapter — RequestContext is the sole
-// argument, HTTP-verb naming. `getOrganizations` lists the
+// The organization verbs — RequestContext first, HTTP-verb
+// naming; `getOrganization` takes the id and `putOrganization`
+// the held message it latches. `getOrganizations` lists the
 // caller's live seats at the identity nest, by id: the
 // collection orders by write, and an organization's edit
 // must move neither the boot fallback's first reachable
