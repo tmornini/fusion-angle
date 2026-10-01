@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -129,14 +130,14 @@ Deno.test('a byte-identical PUT resend to a seat converges'
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = { type: 'member', at: documentFields().at };
-    const first = await PUT(
+    const first = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
-        operationIdHeader());
-    const second = await PUT(
+        operationIdHeader())).body().toValue();
+    const second = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(first, second);
     // seedAdminSchema: org + current seat; one unique
     // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.
@@ -207,7 +208,7 @@ async () => {
     assertStrictEquals(secondBody.at, second.at);
 });
 
-Deno.test('a seat DELETE-head is absent', async () => {
+Deno.test('a seat DELETE-head is Gone', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await handleRequest(
@@ -233,7 +234,7 @@ Deno.test('a seat DELETE-head is absent', async () => {
         }),
     );
     assertStrictEquals(del.status, 204);
-    const missing = await handleRequest(
+    const gone = await handleRequest(
         db,
         apiRequest({
             method: 'GET',
@@ -242,7 +243,7 @@ Deno.test('a seat DELETE-head is absent', async () => {
             token: DEV_TOKEN,
         }),
     );
-    assertStrictEquals(missing.status, 404);
+    assertStrictEquals(gone.status, 410);
 });
 
 Deno.test('stored PUT body equals the seat wire entity',

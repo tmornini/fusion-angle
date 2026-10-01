@@ -12,7 +12,7 @@ import {
 // /identities/:id/default-organization/ — a singleton
 // (name '') like identities/:id/pii. GET returns that
 // document or 404; token resolution is a separate read.
-function defaultOrganizationPrefix(identityId: Id): string {
+export function defaultOrganizationPrefix(identityId: Id): string {
     return '/identities/' + identityId
         + '/default-organization/';
 }

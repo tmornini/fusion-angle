@@ -34,21 +34,6 @@ export interface InstanceHead {
     readonly values: readonly InstanceValue[];
 }
 
-export function projectionOmitsStored(
-    stored: readonly InstanceValue[],
-    projected: readonly InstanceValue[],
-): boolean {
-    if (projected.length !== stored.length) {
-        return true;
-    }
-    const visible = new Set(
-        projected.map((row) => row.attribute_id),
-    );
-    return stored.some(
-        (row) => !visible.has(row.attribute_id),
-    );
-}
-
 export function instancesUriPrefix(
     organization: Id,
     recordTypeId: Id,

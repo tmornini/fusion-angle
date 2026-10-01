@@ -94,16 +94,20 @@ async () => {
     const ctx = client.recoveringRequestContext(
         await expiredToken(),
     );
-    await withLocalStorageAsync({
-        getItem: () => null,
-        removeItem: () => {},
-    }, async () => {
-        await assertRejects(
-            () => ctx.GET('organizations/'),
-            UnauthorizedError,
-        );
-    });
-    assertEquals(calls, ['redirectToLogin']);
+    try {
+        await withLocalStorageAsync({
+            getItem: () => null,
+            removeItem: () => {},
+        }, async () => {
+            await assertRejects(
+                () => ctx.GET('organizations/'),
+                UnauthorizedError,
+            );
+        });
+    } finally {
+        client.deleteRefreshChannel();
+    }
+    assertEquals(calls, ['navigateToAuth', 'redirectToLogin']);
 });
 
 Deno.test('a client is never built without navigation', () => {
@@ -171,7 +175,7 @@ Deno.test(
                     releaseRefresh = resolve;
                 });
             }
-            return Promise.resolve(new Response('[]'));
+            return Promise.resolve(Response.json([]));
         };
         const client = createAppClient(createHttpFacade(
             '',
@@ -201,7 +205,7 @@ Deno.test(
                 },
             }));
             assertStrictEquals(await joined, fresh);
-            assertEquals(await read, []);
+            assertEquals((await read).body().toValue(), []);
             assertStrictEquals(ranOwn, false);
             assertStrictEquals(client.getSessionToken(), fresh);
         } finally {
@@ -312,8 +316,8 @@ Deno.test('a failed cookie refresh calls the injected navigation',
             Promise.resolve(
                 String(init?.body ?? '').includes('"refresh"')
                     ? new Response('', { status: 401 })
-                    : new Response(
-                        JSON.stringify({ error: 'expired' }),
+                    : Response.json(
+                        { error: 'expired' },
                         { status: 401 },
                     ),
             )),

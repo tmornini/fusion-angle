@@ -14,8 +14,11 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
+    type Latch,
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
@@ -60,8 +63,9 @@ import {
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import type {
-    FlowGraph,
+import {
+    getFlowVersions,
+    type FlowGraph,
 } from '../client/flow-queries.ts';
 import {
     seedHumanMember,
@@ -146,7 +150,6 @@ function buildGraph(
         isAutoLayout: true,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        hasUndoHistory: false,
         nodes,
         edges,
     };
@@ -239,7 +242,7 @@ async function setupFlow(): Promise<{
 }
 
 // A db with NO flow row: commitFlowMutation's / putFlow's own
-// baseline read (buildFlowPutBody's ctx.GETWithEtag)
+// baseline read (buildFlowPutBody's ctx.GET)
 // does
 // ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/flows/aEsGMmBEFaVdWihhHXwCbw'
 // ) which 404s, driving the catch
@@ -253,10 +256,10 @@ async function setupNoFlow(): Promise<MemoryDbAdapter> {
 async function persistedGraph(
     db: MemoryDbAdapter,
 ): Promise<StoredGraph> {
-    const flow = await inPageContext(db, DEV_TOKEN)
+    const flow = (await inPageContext(db, DEV_TOKEN)
         .GET<{ graph: Record<string, unknown> }>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID,
-        );
+        )).body().toValue();
     return flow.graph as unknown as StoredGraph;
 }
 
@@ -1408,6 +1411,24 @@ Deno.test(
     }),
 );
 
+Deno.test(
+    'the ledger answers whether a flow has an undo',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { ctx } = await setupFlow();
+        assertStrictEquals(
+            (await getFlowVersions(ctx, FLOW_ID)).length > 1,
+            false,
+        );
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A), buildNode(NODE_B),
+        ]);
+        assertStrictEquals(
+            (await getFlowVersions(ctx, FLOW_ID)).length > 1,
+            true,
+        );
+    }),
+);
+
 // -- performRedo ------------------------------
 
 Deno.test(
@@ -1500,7 +1521,7 @@ Deno.test(
 // comment originally described is retired — undo no longer
 // consumes it, so archiving before redo served no purpose).
 // putFlow's own baseline read (buildFlowPutBody's
-// ctx.GETWithEtag) 404s on a missing flow exactly as
+// ctx.GET) 404s on a missing flow exactly as
 // postFlowVersion's read used to, so the SAME graceful failOp
 // this test pins still holds, matching every sibling perform*
 // mutation's read-then-write covenant.
@@ -1553,33 +1574,18 @@ function faultingPostCtx(
     let count = 0;
     const wrapped: RequestContext = {
         ...ctx,
-        POSTWithHeaders: <T>(
-            resource: string,
-            body: Record<string, unknown>,
-            headerFields:
-                readonly (readonly [string, string])[],
-        ): Promise<T> => {
-            if (resource === faultResource) {
-                count += 1;
-                return Promise.reject(
-                    new Error('injected POST fault'),
-                );
-            }
-            return ctx.POSTWithHeaders<T>(
-                resource, body, headerFields,
-            );
-        },
         POST: <T>(
             resource: string,
             body: Record<string, unknown>,
-        ): Promise<T> => {
+            latch?: Latch,
+        ): Promise<HttpMessage<T>> => {
             if (resource === faultResource) {
                 count += 1;
                 return Promise.reject(
                     new Error('injected POST fault'),
                 );
             }
-            return ctx.POST<T>(resource, body);
+            return ctx.POST<T>(resource, body, latch);
         },
     };
     return { ctx: wrapped, posts: () => count };
@@ -1606,16 +1612,15 @@ function faultingPutCtx(
         PUT: <T>(
             resource: string,
             body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
-        ): Promise<T> => {
+            latch?: Latch,
+        ): Promise<HttpMessage<T>> => {
             if (resource === faultResource) {
                 count += 1;
                 return Promise.reject(
                     new Error('injected PUT fault'),
                 );
             }
-            return ctx.PUT<T>(resource, body, headerFields);
+            return ctx.PUT<T>(resource, body, latch);
         },
     };
     return { ctx: wrapped, puts: () => count };

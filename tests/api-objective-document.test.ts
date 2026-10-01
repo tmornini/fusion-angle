@@ -5,7 +5,8 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -258,15 +259,15 @@ Deno.test('a byte-identical PUT resend to'
     await seedAdminSchema(db);
     const id = generateIdentifier();
     const body = documentFields();
-    const first = await PUT(
+    const first = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + id, body, DEV_TOKEN,
-        operationIdHeader());
-    const second = await PUT(
+        operationIdHeader())).body().toValue();
+    const second = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + id
             , body, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);

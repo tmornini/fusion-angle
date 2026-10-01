@@ -29,7 +29,7 @@ export async function postOrganizationSessionExchange(
     subjectToken: string,
     organization: string,
 ): Promise<string> {
-    const answered = await ctx.postForHeaders(
+    const answered = await ctx.POSTUnauthenticated(
         'authentication/token', {
             grant_type: 'token-exchange',
             organization: organization,
@@ -41,10 +41,7 @@ export async function postOrganizationSessionExchange(
     );
     const refused = refusedDoor(answered);
     if (refused !== null) throw refused;
-    const accessToken = authParam(
-        answered.headers.get('authentication-info'),
-        'access_token',
-    );
+    const accessToken = authParam(answered, 'access_token');
     if (accessToken === null) {
         throw new Error(
             'authentication-info lacks access_token',

@@ -1,13 +1,11 @@
 import {
-    assert,
     assertEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    GET, PUT, handleRequest,
-} from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, GETCollection, PUT } from './in-page-facade.ts';
 import {
     devToken, expiredToken, notYetValidToken,
 } from './token-fixtures.ts';
@@ -48,9 +46,10 @@ async () => {
 
 Deno.test('protected route accepts a valid token', async () => {
     const db = await freshDb();
-    const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', await devToken(), operationIdHeader());
-    assert(Array.isArray(rows));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        await devToken(), operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('rejects an expired token', async () => {
@@ -124,10 +123,14 @@ async () => {
         operationIdHeader());
     // Still admitted — revocation bites at next mint/exchange.
     assertEquals(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live,
-            operationIdHeader()),
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , await devToken(), operationIdHeader()),
+        (await GETCollection(
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live,
+            operationIdHeader(),
+        )).map((part) => part.body().toValue()),
+        (await GETCollection(
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+            await devToken(), operationIdHeader(),
+        )).map((part) => part.body().toValue()),
     );
 });
 
@@ -151,10 +154,10 @@ Deno.test('a token minted within a revocation second still'
         { identity_id: 'XXZruirZyAOoRpNxaDnpSA', at: revokedAt },
         await devToken(),
         operationIdHeader());
-    const rows = await GET<unknown[]>(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', sameSecond,
-        operationIdHeader());
-    assert(Array.isArray(rows));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        sameSecond, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('a jti revoked in the ledger still admits the access'
@@ -182,8 +185,8 @@ Deno.test('a jti revoked in the ledger still admits the access'
         },
         await devToken(),
         operationIdHeader());
-    const rows = await GET<unknown[]>(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', await devToken(),
-        operationIdHeader());
-    assert(Array.isArray(rows));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        await devToken(), operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });

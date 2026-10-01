@@ -34,13 +34,16 @@ import {
     deriveFlow,
     deriveFlows,
     deriveFlowStateHistory,
+    flowEntityOf,
 } from '../api/derive-flows.ts';
 import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 
@@ -298,8 +301,7 @@ async function createFlow(
     ));
 }
 
-// Wire-byte GET helper: handleRequest text must equal
-// JSON.stringify(derive) for message-plane oracles.
+// Wire-byte GET helper: the octets a flow GET answers.
 async function wireFlowText(
     db: MemoryDbAdapter,
     organization: string,
@@ -320,10 +322,14 @@ async function wireFlowText(
     return res.text();
 }
 
-async function wireFlowsText(
+type ServedFlowBody = { id: string } & Record<string, unknown>;
+
+// The list's part bodies, each part its head's stored
+// response served.
+async function wireFlowBodies(
     db: MemoryDbAdapter,
     organization: string,
-): Promise<string> {
+): Promise<ServedFlowBody[]> {
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organization,
     );
@@ -335,14 +341,39 @@ async function wireFlowsText(
         ),
     );
     assertStrictEquals(res.status, 200);
-    return res.text();
+    const parts = await partsOf<ServedFlowBody>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    return parts.map((part) => part.body().toValue());
 }
 
-function assertWireEqualsDerived(
+// The flow GET serves its head's stored body octets. That
+// body deliberately differs from the derive (the lifecycle
+// trio and the sidecars are stored, organization_id is
+// stamped), so the octets alone do not prove the served
+// flow is the flow the list serves: read as a document, the
+// body must derive to what deriveFlow derives.
+async function assertWireEqualsDerived(
+    db: MemoryDbAdapter,
+    organization: string,
+    flowId: string,
     wireText: string,
-    derived: FlowWithGraph,
-): void {
-    assertStrictEquals(wireText, JSON.stringify(derived));
+): Promise<void> {
+    const prefix = canonicalPath(organization, '/flows/');
+    assertStrictEquals(
+        wireText,
+        await storedPutBodyText(db, prefix, flowId),
+    );
+    const head = await db.messagePairs.getHeadPair(prefix, flowId);
+    assert(head !== null);
+    assertEquals(
+        flowEntityOf({
+            name: flowId,
+            messagePairId: head.id,
+            method: 'PUT',
+            body: JSON.parse(wireText) as Record<string, unknown>,
+        }, organization),
+        await deriveFlow(db, organization, flowId),
+    );
 }
 
 // The SAME reduction deriveFlow calls internally (derive-
@@ -399,26 +430,39 @@ async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const wireText = await wireFlowsText(
-            db, organization,
-        );
+        const bodies = await wireFlowBodies(db, organization);
         const derived = await deriveFlows(db, organization);
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        // Each stored body, read as its document, derives to
+        // the derive's row (see assertWireEqualsDerived).
+        const prefix = canonicalPath(organization, '/flows/');
+        const served = [];
+        for (const body of bodies) {
+            const head = await db.messagePairs.getHeadPair(
+                prefix, body.id,
+            );
+            assert(head !== null);
+            served.push(flowEntityOf({
+                name: body.id, messagePairId: head.id,
+                method: 'PUT', body,
+            }, organization));
+        }
+        assertEquals(served, derived);
         assert(derived.length > 0);
     }
 });
 
-// -- 2. per-flow GET wire equals deriveFlow --------------------
+// -- 2. per-flow GET wire equals the stored head and derive ----
 
-Deno.test('per-flow GET wire equals deriveFlow for every seed',
-async () => {
+Deno.test('per-flow GET wire equals the stored head and its'
++ ' derive for every seed', async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
-        const derived = await deriveFlow(db, organization, id);
         const wireText = await wireFlowText(
             db, organization, id,
         );
-        assertWireEqualsDerived(wireText, derived);
+        await assertWireEqualsDerived(
+            db, organization, id, wireText,
+        );
     }
 });
 
@@ -484,16 +528,22 @@ Deno.test('project-flows wire equals derive across every'
                 '/flows/', token,
         ));
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
+        // The parts come in write order (response_at, id); the
+        // derive sorts by id, so the bodies compare as one set.
+        const parts = await partsOf<{ id: string }>(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await deriveProjectFlows(
             db, STARK_ORGANIZATION, projectId,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            sortById(parts.map((part) => part.body().toValue())),
+            sortById(derived),
+        );
     }
 });
 
-Deno.test('the two-flows project orders both join rows'
-+ ' on wire and derive', async () => {
+Deno.test('the two-flows project serves both join rows'
++ ' in write order, each its derived row', async () => {
     const db = await seededDb();
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -505,16 +555,16 @@ Deno.test('the two-flows project orders both join rows'
         token,
     ));
     assertStrictEquals(res.status, 200);
-    const wire = await res.json() as { flow_id: string }[];
+    // assertPartsAreHeads pins the write order.
+    const parts = await partsOf<{ id: string }>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
     const derived = await deriveProjectFlows(
         db, STARK_ORGANIZATION, TWO_FLOWS_PROJECT_ID,
     );
     assertStrictEquals(derived.length, 2);
-    assertStrictEquals(JSON.stringify(wire), JSON.stringify(derived));
-    // id-lex order is pinned by derive; wire equals derive.
     assertEquals(
-        wire.map((row) => row.flow_id),
-        derived.map((row) => row.flow_id),
+        sortById(parts.map((part) => part.body().toValue())),
+        sortById(derived),
     );
 });
 
@@ -540,7 +590,9 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         const wireText = await wireFlowText(
             db, STARK_ORGANIZATION, flowId,
         );
-        assertWireEqualsDerived(wireText, derived);
+        await assertWireEqualsDerived(
+            db, STARK_ORGANIZATION, flowId, wireText,
+        );
         return derived;
     }
 
@@ -690,7 +742,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
     derived = await assertStep();
 
     // Terminal: a state-'deleted' document PUT — vanishes from
-    // list, 404s on GET and derive.
+    // list, 410s on GET, 404s on derive.
     const tombstoneAt = '2026-03-07T00:00:00.000000Z';
     const tombstoned = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
@@ -710,18 +762,18 @@ Deno.test('live-write chain: create, save, node delete, undo, '
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + flowId, token),
     );
-    assertStrictEquals(gone.status, 404);
+    assertStrictEquals(gone.status, 410);
     const derivedList = await deriveFlows(
         db, STARK_ORGANIZATION,
     );
     assertStrictEquals(
         derivedList.some((f) => f.id === flowId), false,
     );
-    const listText = await wireFlowsText(
+    const listBodies = await wireFlowBodies(
         db, STARK_ORGANIZATION,
     );
     assertStrictEquals(
-        listText.includes('"' + flowId + '"'), false,
+        listBodies.some((body) => body.id === flowId), false,
     );
 
     const derivedHistory = await deriveFlowStateHistory(
@@ -756,17 +808,15 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
         db, req('GET', listPath, token),
     );
     assertStrictEquals(afterPutRes.status, 200);
-    const wireAfterPut = await afterPutRes.json() as {
-        id: string;
-    }[];
+    const partsAfterPut = await partsOf<{ id: string }>(afterPutRes);
+    await assertPartsAreHeads(db, partsAfterPut, { sees: 'whole' });
+    const wireAfterPut = partsAfterPut.map((part) =>
+        part.body().toValue());
     const derivedAfterPut = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
     assert(wireAfterPut.some((row) => row.id === pfid));
-    assertStrictEquals(
-        JSON.stringify(wireAfterPut),
-        JSON.stringify(derivedAfterPut),
-    );
+    assertEquals(sortById(wireAfterPut), sortById(derivedAfterPut));
 
     const delRes = await handleRequest(db, req(
         'DELETE',
@@ -777,9 +827,12 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
     const afterDelRes = await handleRequest(
         db, req('GET', listPath, token),
     );
-    const wireAfterDelete = await afterDelRes.json() as {
-        id: string;
-    }[];
+    const partsAfterDelete = await partsOf<{ id: string }>(
+        afterDelRes,
+    );
+    await assertPartsAreHeads(db, partsAfterDelete, { sees: 'whole' });
+    const wireAfterDelete = partsAfterDelete.map((part) =>
+        part.body().toValue());
     const derivedAfterDelete = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
@@ -789,9 +842,8 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
     assertStrictEquals(
         derivedAfterDelete.some((row) => row.id === pfid), false,
     );
-    assertStrictEquals(
-        JSON.stringify(wireAfterDelete),
-        JSON.stringify(derivedAfterDelete),
+    assertEquals(
+        sortById(wireAfterDelete), sortById(derivedAfterDelete),
     );
 });
 
@@ -827,13 +879,12 @@ async () => {
         (await db.messagePairs.getAll()).length, before,
     );
 
-    const derivedFlow = await deriveFlow(
-        db, STARK_ORGANIZATION, flowId,
-    );
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derivedFlow);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
 
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
@@ -844,11 +895,10 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId + '/flows/', token,
     ));
-    const wireJoins = (await joinsRes.json() as {
-        id: string;
-    }[]).filter(
-        (row) => row.id === pfidA || row.id === pfidB,
-    );
+    const joinParts = await partsOf<{ id: string }>(joinsRes);
+    await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
+    const wireJoins = joinParts.map((part) => part.body().toValue())
+        .filter((row) => row.id === pfidA || row.id === pfidB);
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
@@ -904,11 +954,10 @@ Deno.test('duplicate-create with an unchanged document'
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId + '/flows/', token,
     ));
-    const wireJoins = (await joinsRes.json() as {
-        id: string;
-    }[]).filter(
-        (row) => row.id === pfidA || row.id === pfidB,
-    );
+    const joinParts = await partsOf<{ id: string }>(joinsRes);
+    await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
+    const wireJoins = joinParts.map((part) => part.body().toValue())
+        .filter((row) => row.id === pfidA || row.id === pfidB);
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
@@ -953,13 +1002,12 @@ async () => {
     assertStrictEquals(history.length, 1);
     assertStrictEquals(history[0]!.state, 'active');
 
-    const derived = await deriveFlow(
-        db, STARK_ORGANIZATION, flowId,
-    );
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derived);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
 });
 
 // -- 10. sidecar insensitivity ----------------------------------
@@ -1018,7 +1066,9 @@ Deno.test('sidecar insensitivity: graphDelta/revivals disagreeing '
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derived);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
     // graphDelta node never becomes the working graph head.
     assertStrictEquals(
         derivedNodes.some(
@@ -1143,7 +1193,9 @@ async () => {
     const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertWireEqualsDerived(wireText, derived);
+    await assertWireEqualsDerived(
+        db, STARK_ORGANIZATION, flowId, wireText,
+    );
     // Graph content preserves both members/attrs regardless
     // of insertion order (normalizedGraph order-independence
     // still applies on the message plane).

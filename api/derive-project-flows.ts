@@ -19,11 +19,10 @@ import {
 // trio of its own — a DELETE tombstones it outright
 // (deriveDocumentsAt's own DELETE-head exclusion mirrors the
 // old plane's physical splice; parity, not a new mechanism).
-// Read-only and additive — no route reads this yet (Task 8
-// wires it); tests/drift-flows.test.ts proves equality against
-// project_flows.getAllWhere on project_id.
+// GET projects/:id/flows/ serves the joins' stored heads
+// (spec §1 B).
 
-function projectFlowsUriPrefix(
+export function projectFlowsUriPrefix(
     organization: Id,
     projectId: Id,
 ): string {
@@ -47,7 +46,7 @@ export function projectFlowEntityOf(
 // id-lex ordered (byIdAscending — the derivation's own
 // order, never the backend's); a DELETE head
 // excludes the row exactly as the old plane's physical splice
-// does (parity, not a new mechanism). NOT routed yet (Task 8).
+// does (parity, not a new mechanism).
 export async function deriveProjectFlows(
     db: DbAdapter,
     organization: Id,

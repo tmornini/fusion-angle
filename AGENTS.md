@@ -87,7 +87,12 @@ test --frozen --parallel --no-check
 --sanitize-ops --sanitize-resources` with three
 preloads, in two TZ passes: `TZ=UTC` on
 `tests/*.test.ts`, then `TZ=Pacific/Honolulu` on
-`tests/tz/*.test.ts` — then 78-character lint of code
+`tests/tz/*.test.ts`; the seven suites TODO.md names
+as racing under `--parallel` (`navigator.locks` and
+`BroadcastChannel` are process-global) are filtered
+out of the UTC glob and run serially, same flags and
+preloads, in a third invocation between the two — then
+78-character lint of code
 and scripts (not `.md`), the `org` identifier ban
 under `api/`, `client/`, `web-app/`, `tests/`, and `shared/`,
 then `generate-schema-svg --check` and

@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertInstanceOf,
     assertNotMatch,
     assertNotStrictEquals,
@@ -7,7 +8,10 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedCurrentMember,
@@ -30,8 +34,10 @@ import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 // Adapter instances surface (Task 21): create → list →
 // patch(with etag) → 412-on-stale → re-read → retry →
@@ -70,7 +76,7 @@ async function seededCtx() {
         ],
         initialState: 'active',
     });
-    return { db, ctx };
+    return { db, token, ctx };
 }
 
 Deno.test(
@@ -88,15 +94,21 @@ Deno.test(
                 },
             ],
         );
-        assert(created.etag.length > 0);
+        const createdEtag = created.message
+            .query('header.etag').toText();
+        assert(createdEtag.length > 0);
 
-        // list embeds etag
+        // each list row keeps its part, whose etag line
+        // names the head
         const list = await getRecordInstances(
             ctx(), TYPE_ID,
         );
         assertStrictEquals(list.length, 1);
         assertStrictEquals(list[0]!.id, INSTANCE_ID);
-        assertStrictEquals(list[0]!.etag, created.etag);
+        assertStrictEquals(
+            list[0]!.message.query('header.etag').toText(),
+            createdEtag,
+        );
         assertStrictEquals(
             list[0]!.values.get(ATTR_ID), 'v0',
         );
@@ -105,14 +117,17 @@ Deno.test(
         const detail = await getRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
-        assertStrictEquals(detail.etag, created.etag);
+        assertStrictEquals(
+            detail.message.query('header.etag').toText(),
+            createdEtag,
+        );
         assertStrictEquals(
             detail.values.get(ATTR_ID), 'v0',
         );
 
-        // patch with etag
+        // patch latching the head
         const patched = await patchRecordInstance(
-            ctx(), TYPE_ID, INSTANCE_ID, detail.etag, {
+            ctx(), TYPE_ID, INSTANCE_ID, detail.message, {
                 set: [
                     {
                         attributeId: ATTR_ID,
@@ -121,13 +136,18 @@ Deno.test(
                 ],
             },
         );
-        assertNotStrictEquals(patched.etag, detail.etag);
+        const patchedEtag = patched.query('header.etag')
+            .toText();
+        assertNotStrictEquals(
+            patchedEtag,
+            detail.message.query('header.etag').toText(),
+        );
 
         // stale If-Match → 412 (no auto-retry)
         const err = await assertRejects(
             () => patchRecordInstance(
                 ctx(), TYPE_ID, INSTANCE_ID,
-                detail.etag, {
+                detail.message, {
                     set: [
                         {
                             attributeId: ATTR_ID,
@@ -140,13 +160,16 @@ Deno.test(
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
 
-        // re-read → retry with fresh etag
+        // re-read → retry latching the fresh head
         const fresh = await getRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
-        assertStrictEquals(fresh.etag, patched.etag);
+        assertStrictEquals(
+            fresh.message.query('header.etag').toText(),
+            patchedEtag,
+        );
         const retried = await patchRecordInstance(
-            ctx(), TYPE_ID, INSTANCE_ID, fresh.etag, {
+            ctx(), TYPE_ID, INSTANCE_ID, fresh.message, {
                 set: [
                     {
                         attributeId: ATTR_ID,
@@ -155,7 +178,12 @@ Deno.test(
                 ],
             },
         );
-        assertNotStrictEquals(retried.etag, fresh.etag);
+        const retriedEtag = retried.query('header.etag')
+            .toText();
+        assertNotStrictEquals(
+            retriedEtag,
+            fresh.message.query('header.etag').toText(),
+        );
 
         const afterRetry = await getRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
@@ -163,23 +191,26 @@ Deno.test(
         assertStrictEquals(
             afterRetry.values.get(ATTR_ID), 'v2',
         );
-        assertStrictEquals(afterRetry.etag, retried.etag);
+        assertStrictEquals(
+            afterRetry.message.query('header.etag').toText(),
+            retriedEtag,
+        );
 
         // history DESC: head first
         const history = await getRecordInstanceHistory(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
         assert(history.length >= 3);
-        assertStrictEquals(history[0]!.etag, retried.etag);
+        assertStrictEquals(
+            '"' + history[0]!.etag + '"', retriedEtag,
+        );
         assertStrictEquals(
             history[0]!.values.get(ATTR_ID), 'v2',
         );
 
         // delete → list empty; a retired instance's detail
         // answers 410
-        await deleteRecordInstance(
-            ctx(), TYPE_ID, INSTANCE_ID,
-        );
+        await deleteRecordInstance(ctx(), afterRetry);
         const afterDelete = await getRecordInstances(
             ctx(), TYPE_ID,
         );
@@ -190,6 +221,29 @@ Deno.test(
             ),
             Error,
             'Gone',
+        );
+    },
+);
+
+Deno.test(
+    'deleteRecordInstance latches the row it was handed',
+    async () => {
+        const { db, token, ctx } = await seededCtx();
+        await putRecordInstance(
+            ctx(), TYPE_ID, INSTANCE_ID,
+            [{ attributeId: ATTR_ID, value: 'v0' }],
+        );
+        const { ctx: recorded, sent } =
+            recordedContext(db, token);
+        const [held] = await getRecordInstances(
+            recorded, TYPE_ID,
+        );
+        assert(held !== undefined, 'the list holds the row');
+        sent.length = 0;
+        await deleteRecordInstance(recorded, held);
+        assertEquals(
+            sent.map((r) => [r.method, r.ifMatch]),
+            [['DELETE', held.message.query('header.etag').toText()]],
         );
     },
 );
@@ -213,3 +267,19 @@ Deno.test(
         assertNotMatch(src, /64-hex/);
     },
 );
+
+Deno.test('getRecordInstances lists instances by id, not by write',
+async () => {
+    const { ctx } = await seededCtx();
+    const [low, high] = [generateIdentifier(), generateIdentifier()]
+        .sort(compareIdentifiers) as [string, string];
+    for (const id of [high, low]) {
+        await putRecordInstance(ctx(), TYPE_ID, id, [
+            { attributeId: ATTR_ID, value: 'v-' + id },
+        ]);
+    }
+    assertEquals(
+        (await getRecordInstances(ctx(), TYPE_ID)).map((r) => r.id),
+        [low, high],
+    );
+});

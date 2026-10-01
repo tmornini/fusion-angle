@@ -19,6 +19,7 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -147,15 +148,15 @@ async function putLiveType(
     assertStrictEquals(put.status, 201);
 }
 
-Deno.test('GET .../attributes under live type → 200 []',
+Deno.test('GET .../attributes under live type → 204',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
     const res = await handleRequest(db, req(
         'GET', ATTRS, adminToken,
     ));
-    assertStrictEquals(res.status, 200);
-    assertEquals(await res.json(), []);
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
 });
 
 Deno.test('GET .../attributes under absent type → 404 '
@@ -271,14 +272,14 @@ async () => {
         'GET', ATTRS, memberToken,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as AttributeWireRow[];
+    const rows = await partBodiesOf<AttributeWireRow>(list);
     assertStrictEquals(rows.length, 1);
     assertEquals(
         rows[0]!.read_roles, ['member', 'auditor'],
     );
 });
 
-Deno.test('DELETE unreferenced → 204; detail 404',
+Deno.test('DELETE unreferenced → 204; detail 410',
 async () => {
     const { db, adminToken } = await adminDb();
     await putLiveType(db, adminToken);
@@ -295,10 +296,10 @@ async () => {
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assertStrictEquals(get.status, 404);
+    assertStrictEquals(get.status, 410);
     assertEquals(await get.json(), {
         error:
-            'Not found: record_attributes/' + ATTR_ID,
+            'Gone: record_attributes/' + ATTR_ID,
     });
 });
 
@@ -470,7 +471,7 @@ async () => {
     const gone = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,
     ));
-    assertStrictEquals(gone.status, 404);
+    assertStrictEquals(gone.status, 410);
 });
 
 Deno.test('composed-op edit removedAttributeIds with a valued '
@@ -546,4 +547,29 @@ async () => {
         (await db.messagePairs.getAll()).length,
         responsesBefore.length,
     );
+});
+
+Deno.test('GET attribute detail under a deleted type → 404 '
++ 'record_types vocabulary', async () => {
+    const { db, adminToken } = await adminDb();
+    await putLiveType(db, adminToken);
+    const put = await handleRequest(db, req(
+        'PUT', ATTR_DETAIL, adminToken, attrCore({
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        }),
+    ));
+    assertStrictEquals(put.status, 201);
+    const deleted = await handleRequest(db, req(
+        'PUT', TYPE_DETAIL, adminToken,
+        { ...typeBody(), state: 'deleted' },
+    ));
+    assertStrictEquals(deleted.status, 200);
+    const get = await handleRequest(db, req(
+        'GET', ATTR_DETAIL, adminToken,
+    ));
+    assertStrictEquals(get.status, 404);
+    assertEquals(await get.json(), {
+        error: 'Not found: record_types/' + TYPE_ID,
+    });
 });

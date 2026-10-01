@@ -37,6 +37,7 @@ import { deriveOrganization } from
 import {
     apiRequest,
     framedRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -111,7 +112,7 @@ async () => {
         'GET', '/organizations/' + organizationA + '/ideas/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA)));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 });
 
@@ -181,7 +182,7 @@ async () => {
         'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
         token));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     // 'XXZruirZyAOoRpNxaDnpSA' is ALSO a member of seedRootAdmin's own org
     // 'AjdvjuECVZEgZoFajaIEkg'
     // (Phase 13 Task 3's fixture prerequisite gave it a real,
@@ -243,7 +244,7 @@ async () => {
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/organizations/',
         await organizationToken('toccYYkLEABmlbpHJalgtQ', organizationA)));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await partBodiesOf<{ id: string }>(res);
     assertEquals(rows.map(r => r.id), [organizationA]);
 });
 
@@ -841,16 +842,16 @@ for (const name of LEAF_CASE_NAMES) {
             await organizationToken(fx.pb, fx.organizationB),
         ));
         assertStrictEquals(foreign.status, 200);
-        const foreignRows = await foreign.json() as {
+        const foreignRows = await partBodiesOf<{
             id: string;
-        }[];
+        }>(foreign);
         assert(
             foreignRows.some((r) => r.id === c.b),
             'foreign ' + c.b + ' missing on B plane',
         );
         const res = await facadeGet(fx.db, fx.organizationA, c.aPath);
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), [c.a]);
     });
 
@@ -861,9 +862,8 @@ for (const name of LEAF_CASE_NAMES) {
         // The B-org parent's collection, read through the A
         // facade, is fenced empty — the row resolves to org B.
         const res = await facadeGet(fx.db, fx.organizationA, c.bPath);
-        assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
-        assertEquals(rows.map(r => r.id), []);
+        assertStrictEquals(res.status, 204);
+        assertStrictEquals(await res.text(), '');
     });
 }
 
@@ -915,9 +915,9 @@ for (const c of NESTED_FLOW_CASES) {
             await organizationToken(fx.pb, fx.organizationB),
         ));
         assertStrictEquals(foreign.status, 200);
-        const foreignRows = await foreign.json() as {
+        const foreignRows = await partBodiesOf<{
             id: string;
-        }[];
+        }>(foreign);
         assert(
             foreignRows.some((r) => r.id === ids.b),
             'foreign ' + ids.b + ' missing on B plane',
@@ -926,7 +926,7 @@ for (const c of NESTED_FLOW_CASES) {
             fx.db, fx.organizationA,
             '/flows/' + fx.chainA.flow + '/' + c.seg + '/');
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), [ids.a]);
     });
 
@@ -1042,9 +1042,9 @@ for (const seg of NESTED_PROJECT_SEGS) {
             await organizationToken(fx.pb, fx.organizationB),
         ));
         assertStrictEquals(foreign.status, 200);
-        const foreignRows = await foreign.json() as {
+        const foreignRows = await partBodiesOf<{
             id: string;
-        }[];
+        }>(foreign);
         assert(
             foreignRows.some((r) => r.id === ids.b),
             'foreign ' + ids.b + ' missing on B plane',
@@ -1054,7 +1054,7 @@ for (const seg of NESTED_PROJECT_SEGS) {
             '/projects/' + fx.chainA.project
                 + '/' + seg + '/');
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), [ids.a]);
     });
 }
@@ -1205,11 +1205,11 @@ async () => {
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as Array<{
+    const rows = await partBodiesOf<{
         id: string;
         identity_id: string;
         secret?: string;
-    }>;
+    }>(res);
     assertEquals(rows.map(r => r.id), [fx.paCred]);
     for (const r of rows) {
         assertStrictEquals(r.secret, undefined);
@@ -1386,9 +1386,9 @@ async () => {
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
     assertStrictEquals(res.status, 200);
-    const ids = (await res.json() as Array<{
+    const ids = (await partBodiesOf<{
         identity_id: string;
-    }>).map(r => r.identity_id);
+    }>(res)).map(r => r.identity_id);
     assertEquals(ids, [orphan]);
 });
 

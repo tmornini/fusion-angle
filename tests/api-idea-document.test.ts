@@ -270,9 +270,6 @@ Deno.test('the pair request body carries domain state;'
     assertStrictEquals('state_at' in parsed.body, false);
 });
 
-// Task 19: GET streams the stored PUT. Body octets match the
-// live PUT response JSON; Date is send-time now; no
-// Operation-ID on GET.
 Deno.test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
 + 'stored body', async () => {
     const db = await freshDb();
@@ -282,10 +279,12 @@ Deno.test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
         setClockForTest(
             () => Date.parse('2026-06-01T00:00:00Z'),
         );
+        const operationId = generateIdentifier();
         const put = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'uTrFecjHJxcgUGbYxyDPfw', token,
             ideaDocument('Streamed', 'active'),
+            operationId,
         ));
         assertStrictEquals(put.status, 201);
         const stored = await messageStore(db).getDocumentHead(
@@ -315,7 +314,7 @@ Deno.test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
             put.headers.get('Date'),
         );
         assertStrictEquals(
-            getRes.headers.get('Operation-ID'), null,
+            getRes.headers.get('Operation-ID'), operationId,
         );
     } finally {
         resetClock();

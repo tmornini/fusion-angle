@@ -26,7 +26,6 @@ import {
     formWriteMessagePair,
     latchesOf,
     runStateWrite,
-    unprojected,
 } from './message-pair.ts';
 import type {
     MessagePair, ReceivedRequest, StateSibling,
@@ -498,7 +497,7 @@ async function grantInvitation(
             state: invitation,
             condition: { kind: 'genesis', declarer: 'handler' },
         }],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'created', location: invitationId },
     });
     if (answer.outcome === 'land') {
@@ -654,7 +653,7 @@ async function transitionInvitation(
                 first,
                 ...rest,
             ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
     if (answer.outcome === 'land') {

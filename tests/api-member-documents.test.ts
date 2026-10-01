@@ -4,7 +4,8 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
 } from '../api/db-memory.ts';

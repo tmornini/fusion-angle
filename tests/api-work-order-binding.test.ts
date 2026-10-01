@@ -26,6 +26,7 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -572,9 +573,7 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as Record<
-        string, unknown
-    >[];
+    const rows = await partBodiesOf<Record<string, unknown>>(list);
     const bound = rows.find((r) => r['id'] === WO_ID);
     const unbound = rows.find(
         (r) => r['id'] === WO_UNBOUND,

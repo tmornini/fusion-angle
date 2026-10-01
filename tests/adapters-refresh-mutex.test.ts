@@ -81,12 +81,15 @@ async () => {
         const token = new Headers(init?.headers)
             .get('Authorization');
         if (token === 'Bearer dead-access') {
-            return new Response(
-                JSON.stringify({ error: 'invalid_token' }),
+            return Response.json(
+                { error: 'invalid_token' },
                 { status: 401 },
             );
         }
-        return new Response('[]', { status: 200 });
+        if (url.endsWith('/ideas/')) {
+            return new Response(null, { status: 204 });
+        }
+        return Response.json([]);
     }, async () => {
         const facade = createHttpFacade(
             'http://example.test',
@@ -94,11 +97,13 @@ async () => {
         )({ ...client, navigateToAuth: () => {} });
         const [a, b] = await Promise.all([
             facade.GET('members', 'dead-access'),
-            facade.GET('organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-                , 'dead-access'),
+            facade.GETCollection(
+                'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+                'dead-access',
+            ),
         ]);
-        assert(Array.isArray(a));
-        assert(Array.isArray(b));
+        assert(Array.isArray(a.body().toValue()));
+        assertEquals(b, []);
     });
     assertStrictEquals(refreshPosts, 1);
 });
@@ -121,13 +126,13 @@ async () => {
         const url = String(input);
         if (url.endsWith('/authentication/token')) {
             refreshPosts += 1;
-            return new Response(
-                JSON.stringify({ error: 'invalid_grant' }),
+            return Response.json(
+                { error: 'invalid_grant' },
                 { status: 401 },
             );
         }
-        return new Response(
-            JSON.stringify({ error: 'invalid_token' }),
+        return Response.json(
+            { error: 'invalid_token' },
             { status: 401 },
         );
     }, async () => {
@@ -247,14 +252,10 @@ async () => {
         }
         if (token === 'Bearer ' + flat
             || token === 'Bearer ' + rescoped) {
-            return new Response(
-                '[]', { status: 200 },
-            );
+            return Response.json([]);
         }
-        return new Response(
-            JSON.stringify({
-                error: 'invalid_token',
-            }),
+        return Response.json(
+            { error: 'invalid_token' },
             { status: 401 },
         );
     }, async () => {
@@ -266,7 +267,7 @@ async () => {
             'organizations/' + org + '/flows/x',
             scoped,
         );
-        assert(Array.isArray(rows));
+        assert(Array.isArray(rows.body().toValue()));
     });
     assertEquals(
         grants, ['refresh', 'token-exchange'],

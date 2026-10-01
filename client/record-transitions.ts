@@ -147,7 +147,7 @@ export async function validateRecordTransition(
                 organizationItem(
                     ctx, 'work-orders', workOrderId,
                 ),
-            ),
+            ).then(read => read.body().toValue()),
             getWorkOrderHistory(ctx, workOrderId),
             getRecordForWorkOrder(ctx, workOrderId),
         ]);

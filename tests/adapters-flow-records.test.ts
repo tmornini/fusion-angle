@@ -76,7 +76,7 @@ async function seedWorkOrder(
             flow_graph: storedWorkOrderFlowGraph(flowGraph),
             position,
         },
-        [['If-None-Match', '*']],
+        'creates',
     );
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
     // organizations/:id/flows/:id/work-orders through the flipped GET too —

@@ -10,7 +10,11 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
-    apiRequest, pairIdOf, storedPutBodyText,
+    apiRequest,
+    assertPartsAreHeads,
+    pairIdOf,
+    partsOf,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 import {
     deriveIdeaSubmissions,
@@ -182,7 +186,10 @@ async () => {
             + '/submissions/', token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals projectFlowEntityOf',
@@ -222,7 +229,10 @@ async () => {
             + projectId + '/flows/', token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals flowWorkOrderEntityOf',
@@ -263,7 +273,10 @@ async () => {
             + '/work-orders/', token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals flowRecordEntityOf',
@@ -324,7 +337,10 @@ async () => {
             + '/records/', token,
     ));
     assertStrictEquals(list.status, 200);
-    assertEquals(await list.json(), [stored]);
+    const parts = await partsOf(list);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
     const got = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId + '/records/'
@@ -436,7 +452,10 @@ async () => {
         token,
     ));
     assertStrictEquals(list.status, 200);
-    assertEquals(await list.json(), [stored]);
+    const parts = await partsOf(list);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals objectiveRevisionEntityOf',
@@ -489,7 +508,10 @@ async () => {
         token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals scoreEntityOf (baseline)',
@@ -532,7 +554,10 @@ async () => {
         token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals scoreEntityOf (actual)',
@@ -575,5 +600,8 @@ async () => {
         token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });

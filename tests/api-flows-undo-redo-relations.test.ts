@@ -153,7 +153,6 @@ function snapOf(
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            hasUndoHistory: true,
             nodes,
             edges,
         },
@@ -178,9 +177,9 @@ async function saveGraph(
 async function messagePairGraph(
     ctx: RequestContext,
 ): Promise<StoredGraph> {
-    const flow = await ctx.GET<FlowWithGraph>(
+    const flow = (await ctx.GET<FlowWithGraph>(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID,
-    );
+    )).body().toValue();
     return asStoredGraph(
         flow.graph, 'flow.graph',
     );

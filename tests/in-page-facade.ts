@@ -1,83 +1,71 @@
 import {
-    GET as httpGet,
-    GETWithEtag as httpGetWithEtag,
-    PUT as httpPut,
-    PUTWithEtag as httpPutWithEtag,
-    PATCH as httpPatch,
-    PATCHWithEtag as httpPatchWithEtag,
-    DELETE as httpDelete,
-    DELETEWithEtag as httpDeleteWithEtag,
-    POST as httpPost,
-    postForHeaders as httpPostForHeaders,
+    handleRequest,
     type ClientFacadeAdapter,
 } from '../api/api.ts';
-import type { HttpTransport } from
-    '../client/http-facade.ts';
+import {
+    createHttpFacade,
+    type HeaderFields,
+    type HttpFacade,
+    type HttpTransport,
+    type TransportClient,
+} from '../client/http-facade.ts';
 import type { Client } from '../client/create-client.ts';
 import type { RequestContext } from '../client/request-context.ts';
 import { createAppClient } from '../web-app/app/client.ts';
+import {
+    recordingFetch,
+    type SentRequest,
+} from './fixtures/recording-fetch.ts';
 
-// Test wrap: in-process handleRequest verbs as HttpFacade.
-// Product boot uses the fetch facade; this stays off the
-// server-core graph.
+// Test wrap: the real transport over a fetch that reaches
+// handleRequest in-process. Product boot uses the browser's
+// fetch; this stays off the server-core graph.
+
+export const IN_PROCESS_ORIGIN = 'http://localhost';
+const API_MOUNT = '/api';
+
+// What the server and the browser would do around
+// handleRequest: the adapter's simulated latency, once per
+// request; the /api mount stripped
+// (server/http-server.ts:111-117); and the body framed with
+// the content-length a browser sends.
+export function inProcessFetch(
+    adapter: ClientFacadeAdapter,
+): typeof fetch {
+    return async (input, init) => {
+        await adapter.simulateLatency();
+        const request = new Request(input, init);
+        const url = new URL(request.url);
+        if (!url.pathname.startsWith(API_MOUNT + '/')) {
+            throw new Error(
+                'the in-process fetch reaches only the API: '
+                    + url.pathname,
+            );
+        }
+        const bytes = new Uint8Array(await request.arrayBuffer());
+        const headers = new Headers(request.headers);
+        if (bytes.byteLength > 0) {
+            headers.set('content-length', String(bytes.byteLength));
+        }
+        return handleRequest(adapter, new Request(
+            IN_PROCESS_ORIGIN
+                + url.pathname.slice(API_MOUNT.length)
+                + url.search,
+            {
+                method: request.method,
+                headers,
+                ...(bytes.byteLength > 0 ? { body: bytes } : {}),
+            },
+        ));
+    };
+}
 
 export function wrapInPageAdapter(
     adapter: ClientFacadeAdapter,
 ): HttpTransport {
-    return () => ({
-        GET: (resource, token, headerFields) =>
-            httpGet(
-                adapter, resource, token, headerFields,
-            ),
-        GETWithEtag: (resource, token, headerFields) =>
-            httpGetWithEtag(
-                adapter, resource, token, headerFields,
-            ),
-        PUT: (
-            resource, payload, token, headerFields,
-        ) => httpPut(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-        PUTWithEtag: (
-            resource, payload, token, headerFields,
-        ) => httpPutWithEtag(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-        PATCH: (
-            resource, payload, token, headerFields,
-        ) => httpPatch(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-        PATCHWithEtag: (
-            resource, payload, token, headerFields,
-        ) => httpPatchWithEtag(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-        DELETE: (resource, token, headerFields) =>
-            httpDelete(
-                adapter, resource, token, headerFields,
-            ),
-        DELETEWithEtag: (resource, token, headerFields) =>
-            httpDeleteWithEtag(
-                adapter, resource, token, headerFields,
-            ),
-        POST: (
-            resource, payload, token, headerFields,
-        ) => httpPost(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-        postForHeaders: (
-            resource, payload, token, headerFields,
-        ) => httpPostForHeaders(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-    });
+    return createHttpFacade(
+        IN_PROCESS_ORIGIN, inProcessFetch(adapter),
+    );
 }
 
 // A client over the in-process handler, with the app's
@@ -95,4 +83,107 @@ export function inPageContext(
     token: string,
 ): RequestContext {
     return inPageClient(adapter).requestContext(token);
+}
+
+// A context over the in-process fetch whose requests are
+// recorded, for a pin that counts them.
+export type RecordedContext = {
+    readonly ctx: RequestContext,
+    readonly sent: SentRequest[],
+};
+
+export function recordedContext(
+    adapter: ClientFacadeAdapter,
+    token: string,
+): RecordedContext {
+    const recorded = recordingFetch(inProcessFetch(adapter));
+    return {
+        ctx: createAppClient(createHttpFacade(
+            IN_PROCESS_ORIGIN, recorded.fetch,
+        )).requestContext(token),
+        sent: recorded.sent,
+    };
+}
+
+// A caller that holds no session: a 401 answers as it was
+// answered, with no refresh to try and nowhere to go.
+const NO_SESSION: TransportClient = {
+    runSingleFlightRefresh: () => Promise.resolve(null),
+    putSessionToken: () => {},
+    navigateToAuth: () => {},
+};
+
+function facadeOver(adapter: ClientFacadeAdapter): HttpFacade {
+    return wrapInPageAdapter(adapter)(NO_SESSION);
+}
+
+// The retired api/api.ts verbs' names and argument
+// order, answering what the real transport answers.
+export function GET<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).GET<T>(
+        resource, token, headerFields,
+    );
+}
+
+export function GETCollection<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).GETCollection<T>(
+        resource, token, headerFields,
+    );
+}
+
+export function PUT<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).PUT<T>(
+        resource, payload, token, headerFields,
+    );
+}
+
+export function PATCH<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).PATCH<T>(
+        resource, payload, token, headerFields,
+    );
+}
+
+export function POST<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).POST<T>(
+        resource, payload, token, headerFields,
+    );
+}
+
+export function DELETE(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    headerFields?: HeaderFields,
+) {
+    return facadeOver(adapter).DELETE(
+        resource, token, headerFields,
+    );
 }

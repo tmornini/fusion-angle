@@ -15,7 +15,7 @@ import { messageStore } from './message-store.ts';
 // Org-nested record-types derive surface: head reads, the
 // same primitives as document-family.
 
-const RECORD_TYPES_TABLE = 'record_types';
+export const RECORD_TYPES_TABLE = 'record_types';
 
 // Wire row for a live record-type document.
 export interface RecordTypeWireRow {
@@ -49,26 +49,9 @@ export function recordTypeEntityOf(
     };
 }
 
-export async function deriveRecordTypeCollection(
-    db: DbAdapter,
-    organization: Id,
-): Promise<RecordTypeWireRow[]> {
-    const prefix = recordTypesUriPrefix(organization);
-    const heads = await db.messagePairs.getCollectionHeadPairs(
-        prefix,
-    );
-    const rows: RecordTypeWireRow[] = [];
-    for (const head of heads) {
-        const document = headDocumentOf(head);
-        if (documentIsTombstone(document)) continue;
-        rows.push(recordTypeEntityOf(document, organization));
-    }
-    return rows;
-}
-
-// The live type's head: the GET answers from it and the
-// composed edit latches on it. No head, or a tombstone, is a
-// miss.
+// The live type's head: the composed edit latches on it and
+// a nested read or write requires it. No head, or a
+// tombstone, is a miss.
 export async function recordTypeHeadFor(
     db: DbAdapter,
     organization: Id,

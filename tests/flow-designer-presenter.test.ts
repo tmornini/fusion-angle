@@ -28,7 +28,6 @@ const emptyGraph = {
     isAutoLayout: false,
     isAutoFit: false,
     lockTimeout: 0,
-    hasUndoHistory: false,
     nodes: [],
     edges: [],
 };

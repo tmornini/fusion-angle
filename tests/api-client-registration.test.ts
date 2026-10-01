@@ -6,9 +6,9 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    PUT, GET, DELETE, handleRequest,
-    UnauthorizedError, RequestError,
+    handleRequest, UnauthorizedError, RequestError,
 } from '../api/api.ts';
+import { PUT, GET, DELETE } from './in-page-facade.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -127,14 +127,14 @@ Deno.test('PUT registers; GET reads it back; a second PUT'
 + ' overwrites (rotate-JWKS)', async () => {
     const db = await freshDb();
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    const put = await PUT<Record<string, unknown>>(
+    const put = (await PUT<Record<string, unknown>>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...REGISTRATION }, DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(put, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
-    const got = await GET<Record<string, unknown>>(
+    const got = (await GET<Record<string, unknown>>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertEquals(got, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
     const rotated = {
         ...REGISTRATION, jwks: '{"keys":[{"kty":"EC"}]}',
@@ -142,9 +142,9 @@ Deno.test('PUT registers; GET reads it back; a second PUT'
     await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...rotated }, DEV_TOKEN,
         operationIdHeader());
-    const reread = await GET<{ jwks: string }>(
+    const reread = (await GET<{ jwks: string }>(
         db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(reread.jwks, rotated.jwks);
 });
 
@@ -159,7 +159,7 @@ Deno.test('GET with no registration yet is 404 (identity'
     );
 });
 
-Deno.test('DELETE deregisters: a marked tombstone, then 404',
+Deno.test('DELETE deregisters: a marked tombstone, then 410',
 async () => {
     const db = await freshDb();
     await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
@@ -192,7 +192,7 @@ async () => {
     await rejectsWithStatus(
         () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
             DEV_TOKEN, operationIdHeader()),
-        404,
+        410,
     );
 });
 

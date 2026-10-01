@@ -242,13 +242,9 @@ async () => {
     const list = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
     ));
-    assertStrictEquals(list.status, 200);
-    const rows = await list.json() as { id: string }[];
-    assertStrictEquals(
-        rows.some((r) => r.id === INSTANCE_ID),
-        false,
-        'tombstoned instance omitted from collection',
-    );
+    // The tombstoned instance was the type's only one.
+    assertStrictEquals(list.status, 204);
+    assertStrictEquals(await list.text(), '');
 
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,

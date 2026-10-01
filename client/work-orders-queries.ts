@@ -17,9 +17,10 @@ import type { RequestContext } from './request-context.ts';
 import {
     organizationCollection,
     organizationItem,
-    requiredEtag,
 } from './request-context.ts';
-import { compareIdentifiers } from
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { byAtThenIdAscending } from
     '../shared/identifier.ts';
 
 /* ── Types ───────────────── */
@@ -168,13 +169,13 @@ export async function getWorkOrderHistories(
 ): Promise<Map<Id, WorkOrderHistoryEventEntity[]>> {
     const pairs = await Promise.all(
         orders.map(async (row) => {
-            const history = await ctx.GET<
+            const history = (await ctx.GET<
                 WorkOrderHistoryEventEntity[]
             >(
                 organizationItem(
                     ctx, 'work-orders', row.id,
                 ) + '/history',
-            );
+            )).body().toValue();
             return [row.id, history] as const;
         }),
     );
@@ -227,11 +228,7 @@ export function projectTransitions(
     // equal-timestamp ties (same second, later id first).
     const transitions = events
         .filter(ev => !isClaimState(ev.state))
-        .toSorted((a, b) => {
-            const byAt = a.at.localeCompare(b.at);
-            if (byAt !== 0) return byAt;
-            return compareIdentifiers(a.id, b.id);
-        });
+        .toSorted(byAtThenIdAscending);
     const out: TransitionEvent[] = [];
     let prior: Id | null = null;
     for (const ev of transitions) {
@@ -261,9 +258,9 @@ export function projectTransitions(
 export async function getTransitionEventsByWorkOrder(
     ctx: RequestContext,
 ): Promise<Map<Id, TransitionEvent[]>> {
-    const orders = await ctx.GET<{ id: Id }[]>(
+    const orders = (await ctx.GETCollection<{ id: Id }>(
         organizationCollection(ctx, 'work-orders'),
-    );
+    )).map((m) => m.body().toValue());
     const histories = await getWorkOrderHistories(
         ctx, orders,
     );
@@ -288,10 +285,10 @@ export async function getWorkOrderHistory(
     ctx: RequestContext,
     id: Id,
 ): Promise<WorkOrderHistoryEventEntity[]> {
-    return ctx.GET<WorkOrderHistoryEventEntity[]>(
+    return (await ctx.GET<WorkOrderHistoryEventEntity[]>(
         organizationItem(ctx, 'work-orders', id)
             + '/history',
-    );
+    )).body().toValue();
 }
 
 // History is DESC: the first non-claim event is the
@@ -380,9 +377,9 @@ export async function getWorkOrderTransitionEvents(
 export async function getWorkOrderEntities(
     ctx: RequestContext,
 ): Promise<WorkOrderEntity[]> {
-    return ctx.GET<WorkOrderEntity[]>(
+    return (await ctx.GETCollection<WorkOrderEntity>(
         organizationCollection(ctx, 'work-orders'),
-    );
+    )).map((m) => m.body().toValue());
 }
 
 export async function getWorkOrders(
@@ -396,35 +393,36 @@ export async function getFlowWorkOrderEntities(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowWorkOrderEntity[]> {
-    return ctx.GET<
-        FlowWorkOrderEntity[]
-    >(
+    return (await ctx.GETCollection<FlowWorkOrderEntity>(
         organizationItem(ctx, 'flows', flowId)
             + '/work-orders/',
-    );
+    )).map((m) => m.body().toValue());
 }
 
 export async function getWorkOrder(
     ctx: RequestContext,
     id: string,
 ): Promise<WorkOrder> {
-    const row = await ctx.GET<WorkOrderEntity>(
+    const row = (await ctx.GET<WorkOrderEntity>(
         organizationItem(ctx, 'work-orders', id),
-    );
+    )).body().toValue();
     return toWorkOrder(row);
 }
 
-// The work order and the tag of the head it came from, for
-// the If-Match of an operation on it.
+// The work order and the head it came from, which an
+// operation on it latches.
 export async function getWorkOrderWithEtag(
     ctx: RequestContext,
     id: string,
-): Promise<{ workOrder: WorkOrder, etag: string }> {
-    const read = await ctx.GETWithEtag<WorkOrderEntity>(
+): Promise<{
+    workOrder: WorkOrder;
+    read: HttpMessage<WorkOrderEntity>;
+}> {
+    const read = await ctx.GET<WorkOrderEntity>(
         organizationItem(ctx, 'work-orders', id),
     );
     return {
-        workOrder: toWorkOrder(read.body),
-        etag: requiredEtag(read.etag, 'the work order GET'),
+        workOrder: toWorkOrder(read.body().toValue()),
+        read,
     };
 }

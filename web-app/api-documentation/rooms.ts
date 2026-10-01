@@ -1230,24 +1230,6 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/organizations/id/work-orders/id/claim',
-        verb: 'GET',
-        uri: '/api/organizations/:id/work-orders/:id/claim',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on writes',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '403',
-            '404',
-        ],
-    },
-    {
         hash: 'get/organizations/id/work-orders/id/history',
         verb: 'GET',
         uri: '/api/organizations/:id/work-orders/:id/history',

@@ -1,9 +1,11 @@
 import type {
     FlowWithGraph,
+    Id,
     ProjectEntity,
     ProjectFlowEntity,
     GraphNode,
     GraphEdge,
+    StateEntity,
     StoredGraph,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
@@ -24,12 +26,6 @@ export interface FlowGraph {
     lockTimeout: number;
     nodes: GraphNode[];
     edges: GraphEdge[];
-    // Phase 14 Task 8 (undo-as-replay): a cheap, approximate
-    // "has this flow ever been edited past genesis" signal,
-    // carried verbatim from FlowWithGraph.hasUndoHistory — see
-    // that field's own doc comment (api/types.ts) for the
-    // approximation and its degrade-gracefully failure mode.
-    hasUndoHistory: boolean;
 }
 
 function parseGraph(
@@ -59,10 +55,10 @@ async function getProjectFlowsForProject(
     ctx: RequestContext,
     projectId: string,
 ): Promise<ProjectFlowEntity[]> {
-    return ctx.GET<ProjectFlowEntity[]>(
+    return (await ctx.GETCollection<ProjectFlowEntity>(
         organizationItem(ctx, 'projects', projectId)
             + '/flows/',
-    );
+    )).map((m) => m.body().toValue());
 }
 
 // The project↔flow joins across EVERY project the caller's org
@@ -92,13 +88,13 @@ getFlowsWithProjectNames(
     const [
         flows, projectFlows, allProjects,
     ] = await Promise.all([
-        ctx.GET<FlowWithGraph[]>(
+        ctx.GETCollection<FlowWithGraph>(
             organizationCollection(ctx, 'flows'),
-        ),
+        ).then(parts => parts.map((m) => m.body().toValue())),
         getProjectFlowEntities(ctx),
-        ctx.GET<ProjectEntity[]>(
+        ctx.GETCollection<ProjectEntity>(
             organizationCollection(ctx, 'projects'),
-        ),
+        ).then(parts => parts.map((m) => m.body().toValue())),
     ]);
     const projectNameById = new Map(
         allProjects.map(
@@ -140,9 +136,9 @@ export async function getFlowsByProject(
     const [projectFlows, flows] =
         await Promise.all([
             getProjectFlowsForProject(ctx, projectId),
-            ctx.GET<FlowWithGraph[]>(
+            ctx.GETCollection<FlowWithGraph>(
                 organizationCollection(ctx, 'flows'),
-            ),
+            ).then(parts => parts.map((m) => m.body().toValue())),
         ]);
 
     const flowIds = new Set(
@@ -168,15 +164,15 @@ export async function getFlowsByProject(
     return result;
 }
 
-// The flow document as stored: its scalar fields, its graph
-// as the wire carries it, and the undo signal.
+// The flow document as stored: its scalar fields and its
+// graph as the wire carries it.
 export async function getFlowWithGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowWithGraph> {
-    return ctx.GET<FlowWithGraph>(
+    return (await ctx.GET<FlowWithGraph>(
         organizationItem(ctx, 'flows', flowId),
-    );
+    )).body().toValue();
 }
 
 // Every flow the organization holds, each with its graph —
@@ -184,9 +180,9 @@ export async function getFlowWithGraph(
 export async function getFlowsWithGraphs(
     ctx: RequestContext,
 ): Promise<FlowWithGraph[]> {
-    return ctx.GET<FlowWithGraph[]>(
+    return (await ctx.GETCollection<FlowWithGraph>(
         organizationCollection(ctx, 'flows'),
-    );
+    )).map((m) => m.body().toValue());
 }
 
 export async function getFlowGraph(
@@ -213,6 +209,18 @@ export async function getFlowGraph(
         lockTimeout: flow.lock_timeout,
         nodes: g.nodes,
         edges: g.edges,
-        hasUndoHistory: flow.hasUndoHistory,
     };
+}
+
+// The flow's lifecycle rows, one per distinct state
+// event (api/derive-documents.ts documentLifecycleEvents).
+// More than one row is something to undo (spec §10). The
+// route answers JSON until the fourth spec.
+export async function getFlowVersions(
+    ctx: RequestContext,
+    flowId: Id,
+): Promise<StateEntity[]> {
+    return (await ctx.GET<StateEntity[]>(
+        organizationItem(ctx, 'flows', flowId) + '/versions/',
+    )).body().toValue();
 }

@@ -151,7 +151,7 @@ import type {
 import { instancesUriPrefix } from
     './derive-record-instances.ts';
 import { workOrderHeadFor } from './derive-states.ts';
-import { compareIdentifiers } from
+import { byAtThenIdAscending } from
     '../shared/identifier.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
@@ -304,7 +304,7 @@ async function hashSeedCredentials(
 
 // Pass 2's last wave: the credential documents, through
 // the op every live PUT identities/:id/credentials/:cid
-// rides.
+// rides. The seed reads no answer, so it sees the whole.
 async function postSeedCredentialsIn(
     adapter: DbAdapter,
     plan: SeedCredentialPlan,
@@ -327,6 +327,7 @@ async function postSeedCredentialsIn(
                         cred.id,
                     ),
                 ),
+                { sees: 'whole' },
             )),
         postIdentityCredentialDocumentOp(
             adapter,
@@ -343,6 +344,7 @@ async function postSeedCredentialsIn(
                     plan.system.id,
                 ),
             ),
+            { sees: 'whole' },
         ),
     ]);
 }
@@ -537,12 +539,6 @@ async function postValueBearingTransitionIn(
     );
 }
 
-function atIdAscending(a: StateEntity, b: StateEntity): number {
-    return a.at < b.at ? -1
-        : a.at > b.at ? 1
-            : compareIdentifiers(a.id, b.id);
-}
-
 // Each work order's trace is one chain in (at, id) order: a
 // transition lands a version, so no wave holds two writers
 // of one document (Interpretation R). Chains run
@@ -561,7 +557,7 @@ async function postWorkOrderChainsIn(
         [chain.complete.event.id, chain.complete],
     ]);
     await Promise.all([...traces.values()].map(async (trace) => {
-        const ordered = trace.toSorted(atIdAscending);
+        const ordered = trace.toSorted(byAtThenIdAscending);
         const firstValueBearing = ordered.find(
             (event) => valueBearing.has(event.id),
         );

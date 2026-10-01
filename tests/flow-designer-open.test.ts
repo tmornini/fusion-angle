@@ -28,6 +28,7 @@ import {
 import {
     buildStartAndCompleteNodes,
 } from '../client/flow-defaults.ts';
+import { getFlowVersions } from '../client/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -190,7 +191,8 @@ Deno.test(
             new FlowDesignerPresenter(
                 snap, CANVAS_W, CANVAS_H,
                 buildFlowHistorySnapshot(
-                    graph.hasUndoHistory,
+                    (await getFlowVersions(ctx, flowId))
+                        .length > 1,
                 ),
                 true,
             );
@@ -236,7 +238,9 @@ Deno.test(
         );
         const presenter = new FlowDesignerPresenter(
             snap, CANVAS_W, CANVAS_H,
-            buildFlowHistorySnapshot(graph.hasUndoHistory),
+            buildFlowHistorySnapshot(
+                (await getFlowVersions(ctx, flowId)).length > 1,
+            ),
         );
         const n = await flowDocumentPairCount(db, flowId);
         presenter.withNodeNamed('missing', 'typed');

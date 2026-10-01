@@ -6,11 +6,10 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
+import { RequestError, handleRequest } from '../api/api.ts';
 import {
-    GET, PUT, POST,
-    RequestError,
-    handleRequest,
-} from '../api/api.ts';
+    GET, GETCollection, PUT, POST,
+} from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedHumanMember,
@@ -49,9 +48,9 @@ Deno.test('GET on unknown route throws', async () => {
 
 Deno.test('GET ideas returns array', async () => {
     const db = await freshDb();
-    const ideas =
-        await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + '', DEV_TOKEN, operationIdHeader());
+    const ideas = await GETCollection(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+        + '', DEV_TOKEN, operationIdHeader());
     assertEquals(ideas, []);
 });
 
@@ -85,10 +84,10 @@ Deno.test('PUT then GET round-trips an entity', async () => {
         + 'fndCYAsXazdzMUlEGMNIZw', payload, DEV_TOKEN,
         operationIdHeader());
     const fetched =
-        await GET<{ title: string }>(
+        (await GET<{ title: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
     assertStrictEquals(fetched.title, 'Test');
 });
 
@@ -115,9 +114,9 @@ Deno.test(
 Deno.test('GET organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
     + ' normalizes to collection', async () => {
     const db = await freshDb();
-    const result =
-        await GET<unknown[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
-            + '', DEV_TOKEN, operationIdHeader());
+    const result = await GETCollection(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+        + '', DEV_TOKEN, operationIdHeader());
     assertEquals(result, []);
 });
 
@@ -128,9 +127,10 @@ Deno.test(
         const humanId = generateIdentifier();
         await seedHumanMember(db, humanId, 'Sarah Chen');
         const members =
-            await GET<{ id: string }[]>(
+            (await GETCollection<{ id: string }>(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
-                await organizationToken(), operationIdHeader());
+                await organizationToken(), operationIdHeader()))
+                    .map((part) => part.body().toValue());
         assert(
             members.some(row => row.id === humanId),
         );
@@ -144,9 +144,9 @@ Deno.test(
         await seedAIMember(
             db, generateIdentifier(), 'Opus',
         );
-        const ais =
-            await GET<unknown[]>(
-                db, 'ai-agents/', DEV_TOKEN, operationIdHeader());
+        const ais = (await GETCollection(
+            db, 'ai-agents/', DEV_TOKEN, operationIdHeader()))
+                .map((m) => m.body().toValue());
         assertStrictEquals(ais.length, 1);
     },
 );

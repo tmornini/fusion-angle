@@ -6,12 +6,8 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    handleRequest,
-    POST,
-    PUT,
-    RequestError,
-} from '../api/api.ts';
+import { handleRequest, RequestError } from '../api/api.ts';
+import { POST, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -66,14 +62,14 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-function rotate(
+async function rotate(
     db: MemoryDbAdapter,
     jti: string,
 ): Promise<{ jti: string }> {
-    return POST(
+    return (await POST<{ jti: string }>(
         db, `identities/XXZruirZyAOoRpNxaDnpSA/tokens/${jti}/rotation`, {},
         DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
 }
 
 Deno.test(

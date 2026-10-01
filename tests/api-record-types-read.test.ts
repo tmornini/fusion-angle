@@ -20,6 +20,7 @@ import {
 } from '../api/family-registry.ts';
 import {
     apiRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -140,7 +141,7 @@ async function seedOrganizationWithMember(
     return organizationToken(identityId, organization);
 }
 
-Deno.test('GET .../record-types → 200 [] on empty org',
+Deno.test('GET .../record-types → 204 on empty org',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -151,8 +152,8 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
-    assertStrictEquals(res.status, 200);
-    assertEquals(await res.json(), []);
+    assertStrictEquals(res.status, 204);
+    assertStrictEquals(await res.text(), '');
 });
 
 Deno.test('GET .../record-types → 200 oldest live head '
@@ -179,7 +180,7 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', token,
     ));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as RecordTypeWireRow[];
+    const rows = await partBodiesOf<RecordTypeWireRow>(res);
     assertStrictEquals(rows.length, 2);
     assertStrictEquals(rows[0]!.id, typeB);
     assertStrictEquals(rows[1]!.id, typeA);

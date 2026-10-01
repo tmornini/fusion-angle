@@ -28,7 +28,7 @@ import {
 
 export const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 
-function tokensPrefixFor(identityId: Id): string {
+export function tokensPrefixFor(identityId: Id): string {
     return canonicalPath(
         undefined,
         '/identities/' + identityId + '/tokens/',

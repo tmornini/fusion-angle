@@ -9,8 +9,16 @@ import {
 } from './member-fixtures.ts';
 import {
     reduceRefresh, reduceSave, humanMemberPiiPatchIfDirty,
+    isAbsentMember,
 } from '../web-app/members/detail.ts';
+import {
+    RequestError,
+    HTTP_NOT_FOUND,
+    HTTP_GONE,
+    HTTP_FORBIDDEN,
+} from '../shared/http-errors.ts';
 import { HumanMember } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     HumanMemberDetailPresenter,
     type SeatRemoval,
@@ -290,6 +298,56 @@ Deno.test(
         assertMatch(out, /data-member-action="edit"/);
         assertNotMatch(
             out, /data-member-action="save"/,
+        );
+    },
+);
+
+Deno.test(
+    'a missing member is absent',
+    () => {
+        assertStrictEquals(
+            isAbsentMember(
+                new RequestError(
+                    'Not found',
+                    HTTP_NOT_FOUND,
+                    responseMessage(
+                        { error: 'Not found' }, {}, HTTP_NOT_FOUND,
+                    ),
+                ),
+            ),
+            true,
+        );
+    },
+);
+
+Deno.test(
+    'a removed seat is absent, as a missing member is',
+    () => {
+        assertStrictEquals(
+            isAbsentMember(new RequestError(
+                'Gone',
+                HTTP_GONE,
+                responseMessage({ error: 'Gone' }, {}, HTTP_GONE),
+            )),
+            true,
+        );
+    },
+);
+
+Deno.test(
+    'a forbidden read is a fault, never absence',
+    () => {
+        assertStrictEquals(
+            isAbsentMember(
+                new RequestError(
+                    'Forbidden',
+                    HTTP_FORBIDDEN,
+                    responseMessage(
+                        { error: 'Forbidden' }, {}, HTTP_FORBIDDEN,
+                    ),
+                ),
+            ),
+            false,
         );
     },
 );

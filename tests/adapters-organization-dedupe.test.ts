@@ -135,6 +135,16 @@ Deno.test(
                         resource, token, requestId,
                     );
                 },
+                GETCollection: async (
+                    resource,
+                    token,
+                    requestId,
+                ) => {
+                    paths.push(resource);
+                    return inner.GETCollection(
+                        resource, token, requestId,
+                    );
+                },
             }));
             client.putSessionToken(await organizationToken());
             putClient(client);

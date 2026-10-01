@@ -403,6 +403,21 @@ Deno.test(
 );
 
 Deno.test(
+    'the collection head read walks names, not versions',
+    async () => {
+        const fake = fakeClient();
+        const backend = new PostgresBackend(fake.sql);
+        await backend.transaction('readonly', async (tx) => {
+            await tx.getCollectionHeadPairs(
+                MESSAGE_PAIR_ROW.path,
+            );
+        });
+        assertMatch(fake.calls[0]!.text, /WITH RECURSIVE/);
+        assertNotMatch(fake.calls[0]!.text, /DISTINCT ON/);
+    },
+);
+
+Deno.test(
     'append casts the response stamp to timestamptz',
     async () => {
         const fake = fakeClient();

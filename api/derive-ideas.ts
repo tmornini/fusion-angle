@@ -19,11 +19,11 @@ import {
 // Ideas' own reshaping of the generic message-plane reduction
 // (derive-documents.ts) for idea submissions — a bespoke
 // derivation, not a DocumentFamilyWiring family (a nested
-// document carries no lifecycle state of its own), so the
-// route calls it directly rather than through a generic
-// document-family constructor.
+// document carries no lifecycle state of its own). GET
+// ideas/:id/submissions/ serves the stored heads at this
+// prefix (spec §1 B).
 
-function submissionsUriPrefix(
+export function submissionsUriPrefix(
     organization: Id,
     ideaId: Id,
 ): string {

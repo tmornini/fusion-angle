@@ -67,7 +67,7 @@ Deno.test(
             const headers = new Headers(init?.headers);
             operationId = headers.get(OPERATION_ID_HEADER);
             requestId = headers.get('request-id');
-            return new Response('{}', { status: 200 });
+            return Response.json({});
         }, async () => {
             const facade = createHttpFacade(
                 'http://example.test',
@@ -129,18 +129,16 @@ Deno.test(
             }
             ideas += 1;
             if (ideas === 1) {
-                return new Response(
-                    JSON.stringify({
-                        error: 'invalid_token',
-                    }),
+                return Response.json(
+                    { error: 'invalid_token' },
                     { status: 401 },
                 );
             }
-            return new Response('[]', { status: 200 });
+            return new Response(null, { status: 204 });
         }, async () => {
             const ctx =
                 client.recoveringRequestContext('');
-            await ctx.GET(
+            await ctx.GETCollection(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
@@ -223,18 +221,16 @@ Deno.test(
             }
             ideas += 1;
             if (ideas === 1) {
-                return new Response(
-                    JSON.stringify({
-                        error: 'invalid_token',
-                    }),
+                return Response.json(
+                    { error: 'invalid_token' },
                     { status: 401 },
                 );
             }
-            return new Response('[]', { status: 200 });
+            return new Response(null, { status: 204 });
         }, async () => {
             const ctx =
                 client.recoveringRequestContext(token);
-            await ctx.GET(
+            await ctx.GETCollection(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
@@ -268,18 +264,21 @@ Deno.test(
                 headers.get(OPERATION_ID_HEADER),
             );
             requestIds.push(headers.get('request-id'));
-            return new Response('{}', { status: 200 });
+            if (init?.method === 'GET') {
+                return new Response(null, { status: 204 });
+            }
+            return Response.json({});
         }, async () => {
             const ctx = client.requestContext(DEV_TOKEN);
             const idea = 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'AjdvjuECVZEgZoFajaIEkg';
-            await ctx.GET(
+            await ctx.GETCollection(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
             );
             await ctx.PUT(idea, { name: 'x' });
-            await ctx.PATCH(idea, { name: 'y' });
+            await ctx.PATCH(idea, { name: 'y' }, 'creates');
             await ctx.POST(
                 'organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/ideas/',
@@ -313,8 +312,8 @@ Deno.test(
         } as unknown as Document;
         // @ts-expect-error — Node stub for navigateTo
         globalThis.window = { location: { href: '' } };
-        await withMockFetch(async () => new Response(
-            JSON.stringify({ error: 'invalid_token' }),
+        await withMockFetch(async () => Response.json(
+            { error: 'invalid_token' },
             { status: 401 },
         ), async () => {
             const facade = createHttpFacade(
@@ -346,10 +345,8 @@ Deno.test(
         const urls: string[] = [];
         await withMockFetch(async (input) => {
             urls.push(String(input));
-            return new Response(
-                JSON.stringify({
-                    error: 'invalid_grant',
-                }),
+            return Response.json(
+                { error: 'invalid_grant' },
                 { status: 401 },
             );
         }, async () => {
@@ -395,10 +392,8 @@ Deno.test(
         const urls: string[] = [];
         await withMockFetch(async (input) => {
             urls.push(String(input));
-            return new Response(
-                JSON.stringify({
-                    error: 'invalid_grant',
-                }),
+            return Response.json(
+                { error: 'invalid_grant' },
                 { status: 401 },
             );
         }, async () => {

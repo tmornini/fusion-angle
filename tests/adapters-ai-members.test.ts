@@ -42,9 +42,9 @@ Deno.test(
 
         const detail = await getAIMemberEntity(ctx, agentId);
         assertStrictEquals(detail.name, 'Claude');
-        const agent = await ctx.GET<{
+        const agent = (await ctx.GET<{
             id: string; name: string;
-        }>('ai-agents/' + agentId);
+        }>('ai-agents/' + agentId)).body().toValue();
         assertStrictEquals(agent.name, 'Claude');
     },
 );

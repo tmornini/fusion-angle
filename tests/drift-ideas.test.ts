@@ -23,11 +23,14 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     deriveIdeaSubmissions,
 } from '../api/derive-ideas.ts';
+import { byIdAscending } from '../api/derive-documents.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partBodiesOf,
+    partsOf,
     storedPutBodyText,
-    storedCollectionText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -161,11 +164,8 @@ async () => {
             ),
         );
         assertStrictEquals(res.status, 200);
-        const prefix = '/organizations/'
-            + organization + '/ideas/';
-        assertStrictEquals(
-            await res.text(),
-            await storedCollectionText(db, prefix),
+        await assertPartsAreHeads(
+            db, await partsOf(res), { sees: 'whole' },
         );
     }
 });
@@ -267,7 +267,7 @@ async () => {
     assertStrictEquals(res.status, 200);
     assert(res.headers.get('Date'));
     assertStrictEquals(res.headers.get('ETag'), null);
-    const list = await res.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(res);
     const added = list.filter((row) =>
         [
             IDEA_DRIFT_Z, IDEA_DRIFT_A, IDEA_DRIFT_M,
@@ -331,9 +331,11 @@ async () => {
             + '/submissions/', token,
     ));
     assertStrictEquals(listRes.status, 200);
-    assertStrictEquals(
-        await listRes.text(),
-        JSON.stringify([expectedSub]),
+    const parts = await partsOf(listRes);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(
+        parts.map((part) => part.body().toValue()),
+        [expectedSub],
     );
     const derived = await deriveIdeaSubmissions(
         db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
@@ -362,8 +364,14 @@ Deno.test('seeded idea submissions: derive non-empty for every'
             token,
         ));
         assertStrictEquals(res.status, 200);
-        assertStrictEquals(
-            await res.text(), JSON.stringify(derived),
+        // The parts come in write order (response_at, id); the
+        // derive sorts by id, so the bodies compare as one set.
+        const parts = await partsOf<{ id: string }>(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        assertEquals(
+            parts.map((part) => part.body().toValue())
+                .toSorted(byIdAscending),
+            derived,
         );
     }
 });
@@ -402,17 +410,13 @@ Deno.test('live-write lifecycle: create + edit + transition +'
         ideaDocument('Lifecycle Idea Edited', 'deleted', 2),
     ));
 
-    // Trio-deleted is still a live PUT head. GET streams it.
-    // Derive still 404s the deleted state.
+    // A state-deleted head is Gone (spec §5).
     const afterDelete = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + ideaId, token),
     );
-    assertStrictEquals(afterDelete.status, 200);
-    assertStrictEquals(
-        await afterDelete.text(),
-        await storedPutBodyText(db, prefix, ideaId),
-    );
+    assertStrictEquals(afterDelete.status, 410);
+    await afterDelete.body?.cancel();
     await assertRejects(
         () => getDocument(
             db, 'ideas', 'AjdvjuECVZEgZoFajaIEkg', ideaId,
@@ -422,9 +426,9 @@ Deno.test('live-write lifecycle: create + edit + transition +'
     const listRes = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token),
     );
-    const list = await listRes.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(listRes);
     assertStrictEquals(
-        list.some((idea) => idea.id === ideaId), true,
+        list.some((idea) => idea.id === ideaId), false,
     );
 });
 

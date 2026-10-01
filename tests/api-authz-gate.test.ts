@@ -1,6 +1,7 @@
-import { assert, assertMatch, assertStrictEquals } from '@std/assert';
+import { assertMatch, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { GET, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -33,9 +34,10 @@ async () => {
 Deno.test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const rows = await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + '', await devToken(), operationIdHeader());
-    assert(Array.isArray(rows));   // 200, not 403
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        await devToken(), operationIdHeader(),
+    )).query('status').toNumber(), 200);   // 200, not 403
 });
 
 Deno.test('role-grants routes are retired (404)', async () => {

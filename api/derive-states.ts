@@ -93,7 +93,7 @@ const ORGANIZATIONS_PATH_PREFIX =
     canonicalPath(undefined, '/organizations/');
 
 // ALL-orgs, server-side ownership resolution — distinct from
-// getIdentityOrganizations, which filters to the path
+// selectIdentityOrganizations, which filters to the path
 // identity's live seats. This walk NEVER
 // filters by caller: it resolves which org OWNS an entity,
 // independent of who is asking (Phase 12 Task 5: the row source

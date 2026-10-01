@@ -12,12 +12,16 @@ import { UnauthorizedError } from
     '../shared/http-errors.ts';
 import { handlePageLoadError } from
     '../web-app/app/page-loader.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 Deno.test('UnauthorizedError bounces to login', () => {
     window.location.href = '';
     handlePageLoadError(
         'dashboard',
-        new UnauthorizedError('invalid_token'),
+        new UnauthorizedError(
+            'invalid_token',
+            responseMessage({ error: 'invalid_token' }, {}, 401),
+        ),
     );
     assertMatch(
         window.location.href,

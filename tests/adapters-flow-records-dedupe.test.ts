@@ -6,6 +6,7 @@ import { getFlowEntities } from
 import {
     loadRecordFlowJoins,
 } from '../client/flow-records.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 Deno.test(
     'record-detail load GETs flows/ once and each'
@@ -22,10 +23,17 @@ Deno.test(
             identity: { organization },
             GET: async (path: string) => {
                 paths.push(path);
+                return responseMessage([]);
+            },
+            // A collection read answers what GET answers for
+            // that path, one message per row, into the same
+            // record the assertions read.
+            GETCollection: async (path: string) => {
+                paths.push(path);
                 if (path.endsWith('/flows/')) {
                     return [
-                        { id: flowA, name: 'A' },
-                        { id: flowB, name: 'B' },
+                        responseMessage({ id: flowA, name: 'A' }),
+                        responseMessage({ id: flowB, name: 'B' }),
                     ];
                 }
                 if (

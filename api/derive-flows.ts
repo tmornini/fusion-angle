@@ -87,20 +87,10 @@ function flowsUriPrefix(organization: Id): string {
 // shared normalizer — derivation reads ONLY the document's own
 // fields, never the graphDelta/revivals sidecars (Internal
 // Defense: tests/drift-flows.test.ts's sidecar-insensitivity
-// case proves this, not just asserts it). `messagePairCount`
-// is this flow's OWN document-pair count (Phase 14 Task 8) —
-// the cheap hasUndoHistory approximation; deriveFlow/
-// deriveFlows (below) supply it, since both already group
-// pairs per flow for their own lifecycle walk (no second
-// pass here). OPTIONAL only so this function keeps satisfying
-// DocumentFamilyWiring's fixed 2-arg `entityOf` contract in
-// FLOWS_WIRING (api/routes.ts). Live GET stays on deriveFlow/
-// deriveFlows (messagePairCount supplied) so a state-'deleted'
-// head 404s; stored PUT omits the stamp.
+// case proves this, not just asserts it).
 export function flowEntityOf(
     document: DerivedDocument,
     organization: Id,
-    messagePairCount?: number,
 ): FlowWithGraph {
     const body = document.body;
     return {
@@ -112,32 +102,25 @@ export function flowEntityOf(
         is_auto_fit: pickBoolean(body, 'is_auto_fit'),
         lock_timeout: pickNumber(body, 'lock_timeout'),
         graph: normalizedStoredGraph(body['graph']),
-        hasUndoHistory: (messagePairCount ?? 0) > 1,
     };
 }
 
-// G2 stored PUT: flowEntityOf minus the read-time stamp.
-// hasUndoHistory is COUNT(*) > 1 of PUT+DELETE pairs at the
-// flow document — GET adds it; the stored blob never carries
-// it. The lifecycle trio stays, so a state change does not
-// match the previous response and fail to land. The
-// graphDelta/revivals sidecars are part of the flow's whole
-// state, so the stored PUT carries them; GET (flowEntityOf)
-// still drops them.
+// G2 stored PUT: flowEntityOf plus the lifecycle trio, so a
+// state change does not match the previous response and fail
+// to land. The graphDelta/revivals sidecars are part of the
+// flow's whole state, so the stored PUT carries them; the GET
+// serves them as stored.
 export function flowStoredEntityOf(
     document: DerivedDocument,
     organization: Id,
-): Omit<FlowWithGraph, 'hasUndoHistory'> & {
+): Readonly<FlowWithGraph> & {
     readonly state?: string;
     readonly state_at?: string;
     readonly state_event_id?: string;
     readonly graphDelta: FlowGraphDelta;
     readonly revivals: readonly GraphRevival[];
 } {
-    const {
-        hasUndoHistory: _hasUndoHistory,
-        ...stored
-    } = flowEntityOf(document, organization);
+    const stored = flowEntityOf(document, organization);
     const body = document.body;
     const state = body['state'];
     const stateAt = body['state_at'];
@@ -239,10 +222,7 @@ export async function deriveFlows(
         if (currentDocumentState(history) === DELETED_STATE) {
             continue;
         }
-        byId.set(flowId, flowEntityOf(
-            document, organization,
-            messagePairsByFlowId.get(flowId)?.length ?? 0,
-        ));
+        byId.set(flowId, flowEntityOf(document, organization));
     }
     const live = await messageStore(db).getCollection(prefix);
     const flows: FlowWithGraph[] = [];
@@ -275,9 +255,7 @@ export async function deriveFlow(
             db, flowId, organization, FLOWS_TABLE,
         );
     }
-    return flowEntityOf(
-        document, organization, messagePairs.length,
-    );
+    return flowEntityOf(document, organization);
 }
 
 // Undo-as-replay's own resolution (Phase 14 Task 8): given this

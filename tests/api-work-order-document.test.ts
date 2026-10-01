@@ -4,7 +4,8 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
-import { GETWithEtag, PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -226,19 +227,22 @@ Deno.test('a same-body PUT resend under the head\'s tag to'
 + ' to one stored request/response pair', async () => {
     const db = await freshDb();
     const body = documentFields();
-    const first = await PUT(
+    const first = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO_RESEND, body, DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
-    const { etag } = await GETWithEtag(
+        operationIdHeader([['If-None-Match', '*']]))).body().toValue();
+    const read = await GET(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO_RESEND, DEV_TOKEN, operationIdHeader(),
     );
-    const second = await PUT(
+    const second = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WO_RESEND
             , body, DEV_TOKEN,
-        operationIdHeader([['If-Match', '"' + etag + '"']]));
+        operationIdHeader([
+            ['If-Match', read.query('header.etag').toText()],
+        ])))
+            .body().toValue();
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -572,7 +576,7 @@ async function claimedBoundWorkOrder(
         assertStrictEquals(res.status, 201, method + ' ' + path);
         await res.body?.cancel();
     }
-    const { etag } = await GETWithEtag(
+    const read = await GET(
         db, ENTITY_PREFIX.slice(1) + KEEP_WO, DEV_TOKEN,
         operationIdHeader(),
     );
@@ -584,7 +588,7 @@ async function claimedBoundWorkOrder(
             instance_id: KEEP_INSTANCE,
             record_type_id: KEEP_TYPE,
         },
-        headers: { 'If-Match': '"' + etag + '"' },
+        headers: { 'If-Match': read.query('header.etag').toText() },
     }));
     assertStrictEquals(bound.status, 200);
     await bound.body?.cancel();
@@ -593,7 +597,7 @@ async function claimedBoundWorkOrder(
 Deno.test('a work-order PUT keeps the head\'s facets', async () => {
     const db = await freshDb();
     await claimedBoundWorkOrder(db);
-    const read = await GETWithEtag<Record<string, unknown>>(
+    const read = await GET<Record<string, unknown>>(
         db, ENTITY_PREFIX.slice(1) + KEEP_WO, DEV_TOKEN,
         operationIdHeader(),
     );
@@ -603,15 +607,15 @@ Deno.test('a work-order PUT keeps the head\'s facets', async () => {
         path: ENTITY_PREFIX + KEEP_WO,
         token: DEV_TOKEN,
         body: fields,
-        headers: { 'If-Match': '"' + read.etag + '"' },
+        headers: { 'If-Match': read.query('header.etag').toText() },
     }));
     assertStrictEquals(res.status, 200);
     assertEquals(await res.json(), {
-        ...read.body,
+        ...read.body().toValue(),
         ...fields,
         events: [],
     });
-    const head = read.body as {
+    const head = read.body().toValue() as {
         state?: string;
         claim?: unknown;
         instance_id?: string;

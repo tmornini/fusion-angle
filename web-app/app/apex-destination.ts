@@ -29,17 +29,14 @@ export async function probeRefreshSession(
     const ctx = client.requestContext('');
     const access = await client.runSingleFlightRefresh(
         async () => {
-            const answered = await ctx.postForHeaders(
+            const answered = await ctx.POSTUnauthenticated(
                 'authentication/token',
                 { grant_type: 'refresh' },
             );
-            if (answered.status !== 200) return null;
-            return authParam(
-                answered.headers.get(
-                    'authentication-info',
-                ),
-                'access_token',
-            );
+            if (answered.query('status').toNumber() !== 200) {
+                return null;
+            }
+            return authParam(answered, 'access_token');
         },
     );
     return access !== null;

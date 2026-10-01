@@ -30,7 +30,10 @@ import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partBodiesOf,
+    partsOf,
     invitationLatched,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -159,8 +162,10 @@ async () => {
     const stark = await deriveOrganizationMemberSeats(
         db, STARK_ORGANIZATION,
     );
+    const starkParts = await partsOf<MembershipEntity>(resStark);
+    await assertPartsAreHeads(db, starkParts, { sees: 'whole' });
     assertEquals(
-        sortById(await resStark.json() as MembershipEntity[]),
+        sortById(starkParts.map((part) => part.body().toValue())),
         sortById(stark),
     );
     assertStrictEquals(stark.length, 6);
@@ -180,8 +185,10 @@ async () => {
     const org2 = await deriveOrganizationMemberSeats(
         db, ORGANIZATION_TWO,
     );
+    const twoParts = await partsOf<MembershipEntity>(resTwo);
+    await assertPartsAreHeads(db, twoParts, { sees: 'whole' });
     assertEquals(
-        sortById(await resTwo.json() as MembershipEntity[]),
+        sortById(twoParts.map((part) => part.body().toValue())),
         sortById(org2),
     );
     assertStrictEquals(org2.length, 6);
@@ -198,7 +205,8 @@ async () => {
 // -- 2. per-membership GET wire equals derive; DELETE tombstone
 
 Deno.test('per-seat GET wire equals derive (all 12); missing-'
-+ 'id 404; a DELETE-then-derive tombstone', async () => {
++ 'id 404; a DELETE-then-derive tombstone; a removed seat is'
++ ' Gone', async () => {
     const db = await seededDb();
     const allMemberships = sortById([
         ...await derivedMemberships(db, STARK_ORGANIZATION),
@@ -283,11 +291,10 @@ Deno.test('per-seat GET wire equals derive (all 12); missing-'
             'XXZruirZyAOoRpNxaDnpSA', target.organization_id,
         ),
     ));
-    assertStrictEquals(tombstoneRes.status, 404);
-    assertStrictEquals(
-        (await tombstoneRes.json() as { error: string }).error,
-        expectedTargetMessage,
-    );
+    assertStrictEquals(tombstoneRes.status, 410);
+    assertEquals(await tombstoneRes.json(), {
+        error: 'Gone: organization_members/' + target.id,
+    });
 });
 
 // -- 3. ai-members + human-members wire equals derive ----------
@@ -301,17 +308,17 @@ Deno.test('ai-agents + identities wire equals GET (GLOBAL)'
         db, req('GET', '/ai-agents/', token),
     );
     assertStrictEquals(resAi.status, 200);
-    const agents = await resAi.json() as { id: string }[];
+    const agents = await partBodiesOf<{ id: string }>(resAi);
     assertStrictEquals(agents.length, 4);
 
     const resHuman = await handleRequest(
         db, req('GET', '/identities/', token),
     );
     assertStrictEquals(resHuman.status, 200);
-    const identities = await resHuman.json() as {
+    const identities = await partBodiesOf<{
         id: string;
         kind: string;
-    }[];
+    }>(resHuman);
     assertStrictEquals(
         identities.filter((row) => row.kind === 'person')
             .length,
@@ -395,8 +402,10 @@ Deno.test('seat collection counts per org; current identity;'
         ),
     );
     assertStrictEquals(resStark.status, 200);
+    const rosterParts = await partsOf<MembershipEntity>(resStark);
+    await assertPartsAreHeads(db, rosterParts, { sees: 'whole' });
     assertEquals(
-        sortById(await resStark.json() as MembershipEntity[]),
+        sortById(rosterParts.map((part) => part.body().toValue())),
         sortById(starkRoster),
     );
 

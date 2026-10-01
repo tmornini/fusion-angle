@@ -10,6 +10,7 @@ import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
+    RetiredEntityError,
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
@@ -62,7 +63,11 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
     pairIdOf,
+    partBodiesOf,
+    partsOf,
+    storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -167,14 +172,14 @@ async function derivedRecordAttributes(
             token,
         ),
     );
-    if (typesRes.status !== 200) {
+    // A 204 is an empty collection: it contributes no row.
+    if (typesRes.status !== 200 && typesRes.status !== 204) {
         throw new Error(
             'derivedRecordAttributes: types GET '
             + typesRes.status,
         );
     }
-    const types =
-        await typesRes.json() as { id: string }[];
+    const types = await partBodiesOf<{ id: string }>(typesRes);
     const out: RecordAttributeEntity[] = [];
     for (const type of types) {
         const res = await handleRequest(
@@ -187,14 +192,14 @@ async function derivedRecordAttributes(
                 token,
             ),
         );
-        if (res.status !== 200) {
+        if (res.status !== 200 && res.status !== 204) {
             throw new Error(
                 'derivedRecordAttributes: GET '
                 + res.status,
             );
         }
         out.push(
-            ...await res.json() as RecordAttributeEntity[],
+            ...await partBodiesOf<RecordAttributeEntity>(res),
         );
     }
     return out;
@@ -266,6 +271,11 @@ async function derivedRecordAttribute(
     }
     if (res.status === 403) {
         throw new ForeignOrganizationError(
+            'record_attributes', id,
+        );
+    }
+    if (res.status === 410) {
+        throw new RetiredEntityError(
             'record_attributes', id,
         );
     }
@@ -382,9 +392,12 @@ Deno.test('seeded GET nested record-types wire equals derived'
             ),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
+        const parts = await partsOf(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await derivedRecords(db, organization);
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            parts.map((part) => part.body().toValue()), derived,
+        );
     }
     const org1 = await derivedRecords(db, STARK_ORGANIZATION);
     const org2 = await derivedRecords(db, ORGANIZATION_TWO);
@@ -488,10 +501,11 @@ async () => {
     assertStrictEquals(joinErr.message, expectedJoinMessage);
 });
 
-// -- 3. per-record + per-attribute GET wire equals derive --------
+// -- 3. per-record + per-attribute GET wire is the stored head ---
 
-Deno.test('per-record GET wire equals derive; per-attribute GET'
-+ ' wire equals derive; attribute collection 10/4 split',
+Deno.test('per-record GET wire is the stored head and equals derive'
++ ' by value; per-attribute GET wire is the stored head; attribute'
++ ' collection 10/4 split',
 async () => {
     const db = await seededDb();
     const records = [
@@ -518,10 +532,19 @@ async () => {
         );
         assertStrictEquals(res.status, 200);
         const wireText = await res.text();
-        const derived = await derivedRecord(
-            db, organization, id,
+        assertStrictEquals(
+            wireText,
+            await storedPutBodyText(
+                db,
+                '/organizations/' + organization
+                    + '/record-types/',
+                id,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            JSON.parse(wireText),
+            await derivedRecord(db, organization, id),
+        );
     }
 
     const attributeOrganizationByRecordId:
@@ -555,7 +578,16 @@ async () => {
         const derived = await derivedRecordAttribute(
             db, organization, attribute.id,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertStrictEquals(
+            wireText,
+            await storedPutBodyText(
+                db,
+                '/organizations/' + organization
+                    + '/record-types/' + attribute.record_id
+                    + '/attributes/',
+                attribute.id,
+            ),
+        );
         assertStrictEquals(derived.name, attribute.name);
     }
 
@@ -613,11 +645,14 @@ async () => {
             ),
         );
         assertStrictEquals(listRes.status, 200);
-        const wireList = await listRes.text();
+        const parts = await partsOf(listRes);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await deriveFlowRecords(
             db, organization, flowId,
         );
-        assertStrictEquals(wireList, JSON.stringify(derived));
+        assertEquals(
+            parts.map((part) => part.body().toValue()), derived,
+        );
         assertStrictEquals(derived.length, 1);
 
         const byIdRes = await handleRequest(
@@ -631,10 +666,21 @@ async () => {
         );
         assertStrictEquals(byIdRes.status, 200);
         const wireById = await byIdRes.text();
-        const derivedById = await deriveFlowRecord(
-            db, organization, flowId, joinId,
+        assertStrictEquals(
+            wireById,
+            await storedPutBodyText(
+                db,
+                '/organizations/' + organization
+                    + '/flows/' + flowId + '/records/',
+                joinId,
+            ),
         );
-        assertStrictEquals(wireById, JSON.stringify(derivedById));
+        assertEquals(
+            JSON.parse(wireById),
+            await deriveFlowRecord(
+                db, organization, flowId, joinId,
+            ),
+        );
     }
 
     const token = await organizationToken();
@@ -647,8 +693,8 @@ async () => {
             token,
         ),
     );
-    assertStrictEquals(emptyRes.status, 200);
-    assertStrictEquals(await emptyRes.text(), '[]');
+    assertStrictEquals(emptyRes.status, 204);
+    assertStrictEquals(await emptyRes.text(), '');
     assertEquals(
         await deriveFlowRecords(
             db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
@@ -677,10 +723,19 @@ async () => {
         );
         assertStrictEquals(res.status, 200);
         const wireText = await res.text();
-        const derived = await derivedRecord(
-            db, STARK_ORGANIZATION, recordId,
+        assertStrictEquals(
+            wireText,
+            await storedPutBodyText(
+                db,
+                '/organizations/' + STARK_ORGANIZATION
+                    + '/record-types/',
+                recordId,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            JSON.parse(wireText),
+            await derivedRecord(db, STARK_ORGANIZATION, recordId),
+        );
     }
 
     async function assertAttributeWire(id: string): Promise<void> {
@@ -690,11 +745,16 @@ async () => {
                 + '/attributes/' + id, token),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
-        const derived = await derivedRecordAttribute(
-            db, STARK_ORGANIZATION, id,
+        assertStrictEquals(
+            await res.text(),
+            await storedPutBodyText(
+                db,
+                '/organizations/' + STARK_ORGANIZATION
+                    + '/record-types/' + recordId
+                    + '/attributes/',
+                id,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
     }
 
     async function assertAttributeAbsent(id: string): Promise<void> {
@@ -703,12 +763,12 @@ async () => {
                 + '/record-types/' + recordId
                 + '/attributes/' + id, token),
         );
-        assertStrictEquals(res.status, 404);
+        assertStrictEquals(res.status, 410);
         await assertRejects(
             () => derivedRecordAttribute(
                 db, STARK_ORGANIZATION, id,
             ),
-            EntityNotFoundError,
+            RetiredEntityError,
         );
     }
 
@@ -829,7 +889,7 @@ async () => {
         afterArchive.some((r) => r.id === recordId), true,
     );
 
-    // Step 6: deleted lifecycle — wire + derive 404.
+    // Step 6: deleted lifecycle — wire 410, derive 404.
     const deletedTransition = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token, {
@@ -844,7 +904,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assertStrictEquals(deletedGet.status, 404);
+    assertStrictEquals(deletedGet.status, 410);
     await assertRejects(
         () => derivedRecord(db, STARK_ORGANIZATION, recordId),
         EntityNotFoundError,
@@ -877,7 +937,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + secondRecordId, token),
     );
-    assertStrictEquals(secondGet.status, 404);
+    assertStrictEquals(secondGet.status, 410);
     await assertRejects(
         () => derivedRecord(
             db, STARK_ORGANIZATION, secondRecordId,
@@ -889,7 +949,8 @@ async () => {
 // -- 6. duplicate-create refusal ---------------------------------
 
 Deno.test('duplicate-create: the second create is 409 and stores'
-+ ' nothing; wire equals derive', async () => {
++ ' nothing; wire is the stored head and equals derive by value',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = generateIdentifier();
@@ -948,7 +1009,16 @@ Deno.test('duplicate-create: the second create is 409 and stores'
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(
+        wireText,
+        await storedPutBodyText(
+            db,
+            '/organizations/' + STARK_ORGANIZATION
+                + '/record-types/',
+            recordId,
+        ),
+    );
+    assertEquals(JSON.parse(wireText), derived);
     assertStrictEquals(derived.name, 'Dup First');
 });
 
@@ -1033,8 +1103,8 @@ async () => {
 
 // -- 9. non-lex collection order (craftsmanship) -----------------
 
-Deno.test('GET /records collection is wire byte-identical to a'
-+ ' literal id-lex reconstruction after non-lex PUTs',
+Deno.test('GET /record-types/ serves non-lex PUTs in (at, id)'
++ ' order, each part its head, and equals the derive',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1079,7 +1149,9 @@ async () => {
                 + '/record-types/', token),
     );
     assertStrictEquals(res.status, 200);
-    const list = await res.json() as { id: string }[];
+    const parts = await partsOf<{ id: string }>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    const list = parts.map((part) => part.body().toValue());
     const added = list.filter((row) =>
         [
             REC_DRIFT_Z, REC_DRIFT_A, REC_DRIFT_M,
@@ -1088,9 +1160,7 @@ async () => {
         added.map((r) => r.id), expectedIds,
     );
     const derived = await derivedRecords(db, STARK_ORGANIZATION);
-    assertStrictEquals(
-        JSON.stringify(list), JSON.stringify(derived),
-    );
+    assertEquals(list, derived);
 });
 
 // -- 10. delete-then-recreate ------------------------------------
@@ -1123,7 +1193,7 @@ async () => {
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
     );
-    assertStrictEquals(miss.status, 404);
+    assertStrictEquals(miss.status, 410);
     await assertRejects(
         () => derivedRecord(db, STARK_ORGANIZATION, recordId),
         EntityNotFoundError,
@@ -1150,7 +1220,16 @@ async () => {
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assertStrictEquals(wireText, JSON.stringify(derived));
+    assertStrictEquals(
+        wireText,
+        await storedPutBodyText(
+            db,
+            '/organizations/' + STARK_ORGANIZATION
+                + '/record-types/',
+            recordId,
+        ),
+    );
+    assertEquals(JSON.parse(wireText), derived);
     assertStrictEquals(derived.name, 'Second Life');
 
     const listRes = await handleRequest(
@@ -1158,7 +1237,7 @@ async () => {
                 + '/record-types/', token),
     );
     assertStrictEquals(listRes.status, 200);
-    const list = await listRes.json() as { id: string }[];
+    const list = await partBodiesOf<{ id: string }>(listRes);
     assertStrictEquals(
         list.some((r) => r.id === recordId), true,
     );

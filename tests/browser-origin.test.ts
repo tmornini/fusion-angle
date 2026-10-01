@@ -11,6 +11,7 @@ import { fetchDiscardingBody } from
     './fixtures/fetch-discarding-body.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { partBodiesOf } from './http-fixtures.ts';
 
 // The list route the API actually exposes: there is no
 // /api/organizations/ collection, so the origin proves
@@ -48,9 +49,9 @@ async () => {
             } },
         );
         assertStrictEquals(bearer.status, 200);
-        const rows = await bearer.json() as Array<{
+        const rows = await partBodiesOf<{
             identity_id: string;
-        }>;
+        }>(bearer);
         assert(rows.length > 0);
     } finally {
         await origin.close();

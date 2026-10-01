@@ -11,9 +11,7 @@ import {
 } from '../shared/types.ts';
 import {
     activeOrganization,
-    ifMatchField,
     organizationItem,
-    requiredEtag,
     type RequestContext,
 } from './request-context.ts';
 import {
@@ -31,10 +29,10 @@ async function getAllFlowRecords(
 ): Promise<FlowRecordEntity[]> {
     const flows = await getFlowEntities(ctx);
     const perFlow = await Promise.all(
-        flows.map(f => ctx.GET<FlowRecordEntity[]>(
+        flows.map(f => ctx.GETCollection<FlowRecordEntity>(
             organizationItem(ctx, 'flows', f.id)
                 + '/records/',
-        )),
+        ).then(parts => parts.map((m) => m.body().toValue()))),
     );
     return perFlow.flat();
 }
@@ -75,33 +73,18 @@ function recordTypePath(
 export async function getRecordEntities(
     ctx: RequestContext,
 ): Promise<RecordEntity[]> {
-    return ctx.GET<RecordEntity[]>(
+    return (await ctx.GETCollection<RecordEntity>(
         recordTypesPath(ctx),
-    );
+    )).map((m) => m.body().toValue());
 }
 
 export async function getRecord(
     ctx: RequestContext,
     id: RecordId,
 ): Promise<RecordEntity> {
-    return ctx.GET<RecordEntity>(
+    return (await ctx.GET<RecordEntity>(
         recordTypePath(ctx, id),
-    );
-}
-
-// The type with the tag of the head it was read from, which
-// a composed edit latches.
-export async function getRecordWithEtag(
-    ctx: RequestContext,
-    id: RecordId,
-): Promise<{ record: RecordEntity, etag: string }> {
-    const read = await ctx.GETWithEtag<RecordEntity>(
-        recordTypePath(ctx, id),
-    );
-    return {
-        record: read.body,
-        etag: requiredEtag(read.etag, 'the record type GET'),
-    };
+    )).body().toValue();
 }
 
 // Domain state rides the RecordEntity GET row; narrow it
@@ -138,12 +121,12 @@ export async function getRecords(
     // Per-type nested attributes collection — server-side
     // filter replaces the retired flat bulk + client filter.
     const attrLists = await Promise.all(
-        rows.map(row => ctx.GET<
-            RecordAttributeEntity[]
+        rows.map(row => ctx.GETCollection<
+            RecordAttributeEntity
         >(
             recordTypePath(ctx, row.id)
             + '/attributes/',
-        )),
+        ).then(parts => parts.map((m) => m.body().toValue()))),
     );
     const attrCountByRecord = new Map<
         string, number
@@ -265,8 +248,10 @@ export async function postRecordChange(
         // The edit is an operation on the type: it names the
         // head it was read from, so a 412 surfaces as
         // RequestError.
-        const { etag } = await getRecordWithEtag(ctx, id);
-        await ctx.POSTWithHeaders(recordTypesPath(ctx), {
+        const read = await ctx.GET<RecordEntity>(
+            recordTypePath(ctx, id),
+        );
+        await ctx.POST(recordTypesPath(ctx), {
             kind: 'edit',
             id,
             record,
@@ -274,7 +259,7 @@ export async function postRecordChange(
             state: change.state,
             removedAttributeIds:
                 change.removedAttributeIds,
-        }, [ifMatchField(etag)]);
+        }, [read]);
     }
     recordChanges.notify();
 }

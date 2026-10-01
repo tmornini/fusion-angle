@@ -21,7 +21,7 @@ import { generateIdentifier } from
 // but a gate-level regression could still shift these. A future
 // change to any of these statuses must re-derive the
 // covenant deliberately, not by accident of refactoring.
-// Task 61: claim is GET/PUT/DELETE (404 when unclaimed);
+// Task 61: claim is PUT/DELETE, its GET retired (405);
 // binding is create-only PUT (POST gone); release POST is
 // gone. Transition GET/PUT/DELETE stay 405.
 
@@ -109,7 +109,7 @@ async () => {
     assertStrictEquals(res.status, 405);
 });
 
-Deno.test('GET organizations/:id/work-orders/:id/claim 404s when unclaimed',
+Deno.test('GET organizations/:id/work-orders/:id/claim is 405',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -118,7 +118,7 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA/claim', token),
     );
-    assertStrictEquals(res.status, 404);
+    assertStrictEquals(res.status, 405);
 });
 
 Deno.test('PUT organizations/:id/work-orders/:id/claim empty body is 400',

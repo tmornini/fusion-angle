@@ -34,6 +34,8 @@ import { mintAccessToken, TOKEN_AUDIENCE } from
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
@@ -88,7 +90,7 @@ const MULTI_ORGANIZATION_IDENTITY_ID: Id = 'XXZruirZyAOoRpNxaDnpSA';
 const SINGLE_ORGANIZATION_IDENTITY_ID: Id =
     buildMembers()[0]!.id;
 
-// The derived-source twin of getIdentityOrganizations:
+// The derived-source twin of selectIdentityOrganizations:
 // live seats of the path identity, then
 // deriveOrganizations filtered to those ids.
 // Token for drift: claim organizations/roles match live
@@ -139,7 +141,9 @@ async function wireReachableOrganizations(
         await membershipClaimToken(db, identityId),
     ));
     assertStrictEquals(res.status, 200);
-    return (await res.json()) as OrganizationEntity[];
+    const parts = await partsOf<OrganizationEntity>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    return parts.map((part) => part.body().toValue());
 }
 
 // ---- leg 1: collection wire equals derive PER CALLER ---------
@@ -172,10 +176,11 @@ async () => {
     // Phase Final Stage B: organizations table retired.
 });
 
-// ---- leg 2: :id wire equals derive for each seeded org -------
+// ---- leg 2: :id wire is the stored head per organization ----
 
-Deno.test('leg 2: the unfiltered collection + :id wire equals'
-+ ' derive for BOTH seeded organizations', async () => {
+Deno.test('leg 2: the unfiltered collection equals derive; :id'
++ ' wire is the stored head and equals derive by value, for'
++ ' BOTH seeded organizations', async () => {
     const db = await seededDb();
     const derivedAll = sortById(await deriveOrganizations(db));
     assertStrictEquals(derivedAll.length, 2);
@@ -195,10 +200,16 @@ Deno.test('leg 2: the unfiltered collection + :id wire equals'
         ));
         assertStrictEquals(res.status, 200);
         const wireText = await res.text();
-        const derived = await deriveOrganization(
-            db, organizationId,
+        assertStrictEquals(
+            wireText,
+            await storedPutBodyText(
+                db, '/organizations/', organizationId,
+            ),
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            JSON.parse(wireText),
+            await deriveOrganization(db, organizationId),
+        );
     }
     // Phase Final Stage B: organizations table retired.
 });
@@ -325,8 +336,8 @@ async () => {
     }
 });
 
-// Writer matches GET: successBody is organizationEntityOf
-// (id-first). The id-last pin is deleted.
+// The writer's answer is organizationEntityOf, id-first; the
+// GET serves the stored head, whose keys sort.
 Deno.test('leg 6b: organizations/:id successBody is id-first',
 () => {
     const entry = WRITE_RESPONSE_SPECS['organizations/:id'];

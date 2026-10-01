@@ -6,6 +6,7 @@ import {
 import {
     type RequestContext,
 } from '../client/request-context.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -579,7 +580,6 @@ Deno.test(
             is_auto_fit: false,
             lock_timeout: 0,
             graph: { nodes: stacked, edges: [] },
-            hasUndoHistory: false,
         };
         const ctx = {
             identity: {
@@ -589,7 +589,7 @@ Deno.test(
                 organization: 'XXZruirZyAOoRpNxaDnpSB',
             },
             GET: <T>() => Promise.resolve(
-                flow as unknown as T,
+                responseMessage(flow as unknown as T),
             ),
         } as unknown as RequestContext;
         const read = await getFlowGraph(ctx, flow.id);

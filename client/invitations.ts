@@ -7,8 +7,6 @@ import {
 } from '../shared/identifier.ts';
 import {
     activeOrganization,
-    ifMatchField,
-    requiredEtag,
     type RequestContext,
 } from './request-context.ts';
 import {
@@ -86,10 +84,10 @@ interface SentRow {
 export async function getInvitations(
     ctx: RequestContext,
 ): Promise<InvitationView[]> {
-    const rows = await ctx.GET<InviteeRow[]>(
+    const rows = (await ctx.GET<InviteeRow[]>(
         'identities/' + ctx.identity.id
             + '/invitations/',
-    );
+    )).body().toValue();
     return rows.map(inviteeViewOf);
 }
 
@@ -112,31 +110,16 @@ function invitationPath(ctx: RequestContext, id: Id): string {
     return 'identities/' + ctx.identity.id + '/invitations/' + id;
 }
 
-// One of the caller's own invitations, with the tag of the
-// head it was read from, which accept and decline latch.
-export async function getInvitationWithEtag(
-    ctx: RequestContext,
-    id: Id,
-): Promise<{ invitation: InvitationView, etag: string }> {
-    const read = await ctx.GETWithEtag<InviteeRow>(
-        invitationPath(ctx, id),
-    );
-    return {
-        invitation: inviteeViewOf(read.body),
-        etag: requiredEtag(read.etag, 'the invitation GET'),
-    };
-}
-
 // The active org's outstanding invitations, for an admin — the
 // inviter-side counterpart of getInvitations.
 export async function getSentInvitations(
     ctx: RequestContext,
 ): Promise<SentInvitation[]> {
-    const rows = await ctx.GET<SentRow[]>(
+    const rows = (await ctx.GET<SentRow[]>(
         'organizations/'
             + activeOrganization(ctx)
             + '/invitations/',
-    );
+    )).body().toValue();
     return rows.map(row => ({
         id: row.id,
         organizationId: row.organization_id,
@@ -218,7 +201,9 @@ export async function postInvitationAcceptance(
     id: Id,
     organizationId: Id,
 ): Promise<void> {
-    const { etag } = await getInvitationWithEtag(ctx, id);
+    const read = await ctx.GET<InviteeRow>(
+        invitationPath(ctx, id),
+    );
     await ctx.PUT(
         invitationPath(ctx, id),
         {
@@ -227,7 +212,7 @@ export async function postInvitationAcceptance(
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
-        [ifMatchField(etag)],
+        [read],
     );
     try {
         await remintSessionClaims(ctx, organizationId);
@@ -324,7 +309,9 @@ export async function postInvitationDecline(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    const { etag } = await getInvitationWithEtag(ctx, id);
+    const read = await ctx.GET<InviteeRow>(
+        invitationPath(ctx, id),
+    );
     await ctx.PUT(
         invitationPath(ctx, id),
         {
@@ -332,7 +319,7 @@ export async function postInvitationDecline(
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
-        [ifMatchField(etag)],
+        [read],
     );
     invitationChanges.notify();
 }
@@ -348,7 +335,7 @@ export async function postInvitationRevocation(
     const path = 'organizations/'
         + activeOrganization(ctx)
         + '/invitations/' + id;
-    const read = await ctx.GETWithEtag<SentRow>(path);
+    const read = await ctx.GET<SentRow>(path);
     await ctx.PUT(
         path,
         {
@@ -356,9 +343,7 @@ export async function postInvitationRevocation(
             eventId: generateIdentifier(),
             at: nowUtc(),
         },
-        [ifMatchField(
-            requiredEtag(read.etag, 'the invitation GET'),
-        )],
+        [read],
     );
     invitationChanges.notify();
 }

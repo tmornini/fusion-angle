@@ -12,10 +12,14 @@ import {
 } from '../api/db-memory.ts';
 import {
     organizationItem,
+    type Latch,
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { RequestError } from '../shared/http-errors.ts';
 import { inPageContext } from './in-page-facade.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getObjectives,
@@ -436,8 +440,8 @@ Deno.test(
         // and before its PUT.
         const racing: RequestContext = {
             ...ctx,
-            GETWithEtag: async <T>(resource: string) => {
-                const read = await ctx.GETWithEtag<T>(resource);
+            GET: async <T>(resource: string) => {
+                const read = await ctx.GET<T>(resource);
                 await ctx.PUT(
                     organizationItem(ctx, 'objectives', id),
                     objectiveDoc(2, 'active'),
@@ -450,10 +454,10 @@ Deno.test(
             RequestError,
         );
         assertStrictEquals(error.status, 412);
-        const stored = await ctx.GET<{
+        const stored = (await ctx.GET<{
             position: number;
             state: string;
-        }>(organizationItem(ctx, 'objectives', id));
+        }>(organizationItem(ctx, 'objectives', id))).body().toValue();
         assertStrictEquals(stored.state, 'active');
         assertStrictEquals(stored.position, 2);
     },
@@ -463,19 +467,18 @@ type RecordedCall = {
     method: string;
     path: string;
     body?: Record<string, unknown>;
-    headerFields?:
-        readonly (readonly [string, string])[]
-        | undefined;
+    latch?: Latch | undefined;
+    answer?: HttpMessage;
 };
 
 // Recording fake RequestContext — pins the hop shape of
-// get-then-put writers without spinning up a MemoryDb.
+// get-then-put writers without spinning up a MemoryDb. A
+// GET answers the handler's row as a message carrying the
+// handler's tag on its etag line; a PUT records the latch
+// it was handed.
 function recordingCtx(
     handlers: {
         GET?: (
-            path: string,
-        ) => Promise<unknown>;
-        GETWithEtag?: (
             path: string,
         ) => Promise<{ body: unknown; etag: string }>;
         PUT?: (
@@ -489,46 +492,39 @@ function recordingCtx(
         requestId: 'rOEPOcVMQdJiiiMuiiEhlg',
         identity: { id: 'XXZruirZyAOoRpNxaDnpSA'
             , organization: 'AjdvjuECVZEgZoFajaIEkg' },
-        GET: async <T>(path: string): Promise<T> => {
-            calls.push({ method: 'GET', path });
+        GET: async <T>(
+            path: string,
+        ): Promise<HttpMessage<T>> => {
             if (!handlers.GET) {
                 throw new Error('unexpected GET ' + path);
             }
-            return handlers.GET(path) as Promise<T>;
+            const { body, etag } = await handlers.GET(path);
+            const answer = responseMessage<T>(
+                body as T, { etag: '"' + etag + '"' },
+            );
+            calls.push({ method: 'GET', path, answer });
+            return answer;
         },
         PUT: async <T>(
             path: string,
             body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
-        ): Promise<T> => {
+            latch?: Latch,
+        ): Promise<HttpMessage<T>> => {
             calls.push({
-                method: 'PUT', path, body, headerFields,
+                method: 'PUT', path, body, latch,
             });
             if (!handlers.PUT) {
                 throw new Error('unexpected PUT ' + path);
             }
-            return handlers.PUT(path, body) as Promise<T>;
+            return responseMessage<T>(
+                await handlers.PUT(path, body) as T,
+            );
         },
         POST: async () => {
             throw new Error('unexpected POST');
         },
         DELETE: async () => {
             throw new Error('unexpected DELETE');
-        },
-        GETWithEtag: async <T>(
-            path: string,
-        ): Promise<{ body: T; etag: string }> => {
-            calls.push({ method: 'GETWithEtag', path });
-            if (!handlers.GETWithEtag) {
-                throw new Error(
-                    'unexpected GETWithEtag ' + path,
-                );
-            }
-            return handlers.GETWithEtag(path) as Promise<{
-                body: T;
-                etag: string;
-            }>;
         },
     } as unknown as RequestContext;
     return { ctx, calls };
@@ -539,7 +535,7 @@ Deno.test(
     + ' archived state and the current position',
     async () => {
         const { ctx, calls } = recordingCtx({
-            GETWithEtag: async (path) => {
+            GET: async (path) => {
                 assertStrictEquals(path
                     , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
                     + 'ohqxgUBEaFQwYbXsonRPmg');
@@ -557,14 +553,14 @@ Deno.test(
         });
         await postObjectiveArchival(ctx, 'ohqxgUBEaFQwYbXsonRPmg');
         assertStrictEquals(calls.length, 2);
-        assertStrictEquals(calls[0]!.method, 'GETWithEtag');
+        assertStrictEquals(calls[0]!.method, 'GET');
         assertStrictEquals(calls[0]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
         assertStrictEquals(calls[1]!.method, 'PUT');
-        assertEquals(calls[1]!.headerFields, [
-            ['If-Match', '"objectiveHeadEtagXXXXXX"'],
-        ]);
+        const latch = calls[1]!.latch;
+        assert(latch !== undefined && latch !== 'creates');
+        assertStrictEquals(latch[0], calls[0]!.answer);
         assertStrictEquals(calls[1]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
@@ -580,7 +576,7 @@ Deno.test(
     + ' only the position from the caller',
     async () => {
         const { ctx, calls } = recordingCtx({
-            GETWithEtag: async () => ({
+            GET: async () => ({
                 body: {
                     id: 'ohqxgUBEaFQwYbXsonRPmg',
                     organization_id: 'AjdvjuECVZEgZoFajaIEkg',
@@ -595,14 +591,14 @@ Deno.test(
             ctx, 'ohqxgUBEaFQwYbXsonRPmg', 1.5,
         );
         assertStrictEquals(calls.length, 2);
-        assertStrictEquals(calls[0]!.method, 'GETWithEtag');
+        assertStrictEquals(calls[0]!.method, 'GET');
         assertStrictEquals(calls[1]!.method, 'PUT');
         assertStrictEquals(calls[1]!.path
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg');
-        assertEquals(calls[1]!.headerFields, [
-            ['If-Match', '"objectiveHeadEtagXXXXXX"'],
-        ]);
+        const latch = calls[1]!.latch;
+        assert(latch !== undefined && latch !== 'creates');
+        assertStrictEquals(latch[0], calls[0]!.answer);
         assertEquals(calls[1]!.body, {
             position: 1.5,
             state: 'archived',

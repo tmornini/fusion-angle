@@ -180,7 +180,7 @@ Deno.test(
             let revisionsDuringScores = false;
             const client = createAppClient(() => ({
                 ...inner,
-                GET: async (
+                GETCollection: async (
                     resource,
                     token,
                     requestId,
@@ -193,11 +193,6 @@ Deno.test(
                         await holdObjectives
                             .promise;
                         objectivesHeld = false;
-                        return inner.GET(
-                            resource,
-                            token,
-                            requestId,
-                        );
                     }
                     if (isScorePath(resource)) {
                         pendingScores++;
@@ -208,11 +203,6 @@ Deno.test(
                         holdObjectives.resolve();
                         await holdScores.promise;
                         pendingScores--;
-                        return inner.GET(
-                            resource,
-                            token,
-                            requestId,
-                        );
                     }
                     if (resource.includes(
                         '/revisions/',
@@ -222,12 +212,17 @@ Deno.test(
                                 true;
                         }
                         holdScores.resolve();
-                        return inner.GET(
-                            resource,
-                            token,
-                            requestId,
-                        );
                     }
+                    return inner.GETCollection(
+                        resource, token, requestId,
+                    );
+                },
+                GET: async (
+                    resource,
+                    token,
+                    requestId,
+                ) => {
+                    paths.push(resource);
                     return inner.GET(
                         resource, token, requestId,
                     );

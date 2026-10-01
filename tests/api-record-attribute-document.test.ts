@@ -1,5 +1,5 @@
 import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
-import { PUT } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -199,18 +199,18 @@ async () => {
     const operationId = generateIdentifier();
     const opHeaders: readonly (readonly [string, string])[] =
         [['operation-id', operationId]];
-    const first = await PUT(
+    const first = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
         body, DEV_TOKEN,
         operationIdHeader(opHeaders),
-    );
-    const second = await PUT(
+    )).body().toValue();
+    const second = (await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/rTiMgnMtYSIDYKegGxixMA',
         body, DEV_TOKEN,
         operationIdHeader(opHeaders),
-    );
+    )).body().toValue();
     assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
     assertStrictEquals((await db.messagePairs.getAll()).length, 5);

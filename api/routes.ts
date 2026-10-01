@@ -48,7 +48,6 @@ import type {
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
-    nowUtc,
 } from '../shared/types.ts';
 import { hashPassword } from
     '../shared/password-hash.ts';
@@ -99,7 +98,6 @@ import {
     attemptFor,
     runWrite,
     runStateWrite,
-    unprojected,
     sameAsHead,
     entityTagsOf,
     latchesOf,
@@ -107,15 +105,22 @@ import {
     documentHeadAt,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
-    attachEtag,
+    PII_DOCUMENT_NAME,
 } from './message-pair.ts';
 import type {
     MessagePair,
     ParentSibling,
     ReceivedRequest,
-    StateProjection,
     StateSibling,
 } from './message-pair.ts';
+import type { Reader } from './served-response.ts';
+import {
+    selectHeadAtPath,
+    selectHeadsAtPath,
+    wholeCollectionSelection,
+    wholeHeadSelection,
+    type HeadSelection,
+} from './head-reads.ts';
 import { messageStore } from './message-store.ts';
 import {
     generateIdentifier,
@@ -150,15 +155,15 @@ import {
     storedGraph,
 } from '../shared/types.ts';
 import {
-    deriveIdeaSubmissions,
     ideaEntityOf,
     ideaSubmissionEntityOf,
+    submissionsUriPrefix,
 } from './derive-ideas.ts';
 import {
     projectEntityOf,
 } from './derive-projects.ts';
 import {
-    deriveRecordTypeCollection,
+    RECORD_TYPES_TABLE,
     recordTypeEntityOf,
     recordTypeHeadFor,
     recordTypesUriPrefix,
@@ -178,6 +183,9 @@ import {
     ORGANIZATION_MEMBERS_COLLECTION_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN,
+    CREDENTIALS_COLLECTION_PATTERN,
+    CREDENTIAL_DETAIL_PATTERN,
+    CREDENTIAL_KEY_READ_ROLES,
 } from './family-registry.ts';
 import {
     deriveDocumentsAt,
@@ -188,7 +196,6 @@ import {
 import {
     instancesUriPrefix,
     deriveInstanceHead,
-    deriveInstanceCollection,
     deriveInstanceRevisions,
     mergeInstanceValues,
     revisionValuesOf,
@@ -205,8 +212,6 @@ import {
 import {
     flowEntityOf,
     flowStoredEntityOf,
-    deriveFlow,
-    deriveFlows,
     resolveFlowUndoTarget,
     type FlowUndoResolution,
 } from './derive-flows.ts';
@@ -215,52 +220,47 @@ import {
     buildFlowGraphRevivals,
 } from './flow-graph-diff.ts';
 import {
-    deriveProjectFlows,
     projectFlowEntityOf,
+    projectFlowsUriPrefix,
 } from './derive-project-flows.ts';
 import {
-    deriveFlowWorkOrders,
     flowWorkOrderEntityOf,
+    flowWorkOrdersUriPrefix,
 } from './derive-flow-work-orders.ts';
 import {
-    deriveFlowRecords,
-    deriveFlowRecord,
     flowRecordEntityOf,
+    flowRecordsUriPrefix,
     recordTypeIdsForWorkOrder,
 } from './derive-flow-records.ts';
 import {
-    deriveFlowTag,
     flowTagEntityOf,
+    flowTagsUriPrefix,
 } from './derive-flow-tags.ts';
 import {
-    deriveObjectiveRevisions,
     objectiveRevisionEntityOf,
+    objectiveRevisionsUriPrefix,
 } from './derive-objective-revisions.ts';
 import {
-    deriveBaselineScores,
-    deriveActualScores,
     scoreEntityOf,
+    scoresUriPrefix,
 } from './derive-project-scores.ts';
 import {
     deriveOrganizationMemberSeats,
-    deriveOrganizationMemberSeat,
     deriveOrganizationFormerSeats,
     seatsPrefixFor,
     seatEntityOf,
 } from './derive-memberships.ts';
 import {
-    deriveIdentityPii,
-    deriveCredentialsFor,
-    deriveCredential,
-    deriveClientRegistration,
+    credentialsPrefixFor,
     deriveIdentityKind,
-    deriveIdentityProvidersFor,
-    deriveIdentityProvider,
-    deriveTokenRevocation,
+    providersPrefixFor,
+    tokenRevocationsPrefixFor,
     piiEntityOf,
     registrationEntityOf,
     identityProviderEntityOf,
     tokenRevocationEntityOf,
+    identityPrefixFor,
+    registrationPrefixFor,
 } from './derive-identity-spine.ts';
 import {
     workOrderHeadFor,
@@ -271,30 +271,28 @@ import {
     claimedVersion,
     createdVersion,
     fieldsVersion,
-    isClaimLive,
     releasedVersion,
     transitionedVersion,
     type WorkOrderVersion,
 } from './work-order-version.ts';
 import {
-    deriveOrganization,
     deriveOrganizations,
     organizationEntityOf,
 } from './derive-organizations.ts';
 import {
-    deriveIdentityTokensFor,
-    deriveIdentityToken,
     identityTokenEntityOf,
+    IDENTITY_TOKENS_TABLE,
+    tokensPrefixFor,
 } from './derive-identity-tokens.ts';
 import {
     param,
     requireOrganization,
     withoutId,
-    documentCollectionGetHandler,
+    collectionSelect,
     documentCollectionRoute,
     documentEntityRoute,
-    documentGetHandler,
     documentPutHandler,
+    documentSelect,
     documentVersionListRoute,
     documentVersionRoute,
     storedRevisionDocument,
@@ -306,9 +304,9 @@ import {
     type DocumentFamilyWiring,
 } from './document-family.ts';
 import {
-    getIdentityDefaultOrganization,
-    getIdentityOrganizations,
+    selectIdentityOrganizations,
     putIdentityDefaultOrganization,
+    selectIdentityDefaultOrganization,
 } from './organization-requests.ts';
 import {
     getOrganizationInvitations,
@@ -383,14 +381,9 @@ const PROJECTS_WIRING: DocumentFamilyWiring = {
     documentOp: postProjectDocumentOp,
     entityOf: projectEntityOf,
 };
-// The flows wiring row. entityOf is derive-flows.ts's OWN
-// flowEntityOf. G2 stored PUT is flowStoredEntityOf (that
-// mapper minus hasUndoHistory). Live GET stays on
-// deriveFlow/deriveFlows so a state-'deleted' head 404s
-// (stored PUT has no trio) and hasUndoHistory is stamped
-// from pair count. This slot stays the 2-arg assignability
-// shim (pairCount omitted). flowEntityOf's third param is
-// pairCount (number), not StateEntity.
+// The GET serves the stored head, which carries the flow's
+// state, sidecars, and trio; a state-'deleted' head is Gone
+// (spec §5).
 const FLOWS_WIRING: DocumentFamilyWiring = {
     family: 'flows',
     httpNest: 'organization',
@@ -398,8 +391,7 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'flows',
     validateDocument: validateFlowDocumentBody,
     documentOp: postFlowDocumentOp,
-    entityOf: (document, organization) =>
-        flowEntityOf(document, organization),
+    entityOf: flowEntityOf,
 };
 // The work-orders wiring row — the fourth family, and the
 // FIRST 'stateless' one (Decision 7's state-in-entity design
@@ -573,6 +565,16 @@ export type GetHandler = (
     roles: readonly string[],
 ) => Promise<unknown>;
 
+// A GET that serves stored responses (spec §2): the handler
+// fences and selects; the gate serves what it selected.
+export type SelectHandler = (
+    adapter: DbAdapter,
+    params: string[],
+    actor: Id,
+    organization: Id | undefined,
+    roles: readonly string[],
+) => Promise<HeadSelection>;
+
 // PutHandler, PatchHandler, PostHandler, and DeleteHandler
 // carry a trailing pair: it is undefined for bearer-exempt and
 // not-yet-wired writes (TypeScript cannot prove bearerExempt
@@ -646,6 +648,7 @@ type PostHandler = (
 export interface Route {
     segments: string[];
     get?: GetHandler;
+    select?: SelectHandler;
     put?: PutHandler;
     patch?: PatchHandler;
     delete?: DeleteHandler;
@@ -656,6 +659,7 @@ export function route(
     pattern: string,
     handlers: {
         get?: GetHandler;
+        select?: SelectHandler;
         put?: PutHandler;
         patch?: PatchHandler;
         delete?: DeleteHandler;
@@ -666,17 +670,6 @@ export function route(
         segments: pattern.split('/'),
         ...handlers,
     };
-}
-
-// Project the opaque `secret` out of a credential before it
-// crosses the API boundary — reads expose existence and
-// lifecycle, never the hash. Makes true the non-leakage
-// covenant in types.ts and SCHEMA.md § Secrets.
-function withoutSecret(
-    cred: IdentityCredentialEntity,
-): Omit<IdentityCredentialEntity, 'secret'> {
-    const { secret: _secret, ...rest } = cred;
-    return rest;
 }
 
 // GATE 15 — THE PRODUCTION MEMBERSHIP PAIR PLANE (Phase 10 Task
@@ -894,22 +887,9 @@ export async function loadAttributeSchemaById(
     return map;
 }
 
-// An attribute's stored response is its wire, which
-// repeats the path's keys; the path owns them.
-function attributeStateOf(
-    body: Record<string, unknown>,
-): Record<string, unknown> {
-    const {
-        id: _id,
-        organization_id: _organization,
-        record_type_id: _recordType,
-        ...state
-    } = body;
-    return state;
-}
-
-// G6: GET derive is the stored PUT. Document echoes plus
-// the stored nested document body (both ACL keys required).
+// G6: the stored PUT body, which a GET serves. Document
+// echoes plus the stored nested document body (both ACL
+// keys required).
 export function nestedAttributeWireOf(
     organization: Id,
     recordTypeId: Id,
@@ -1087,7 +1067,7 @@ async function postRecordTypeEditOp(
                 first,
                 ...rest,
             ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -1470,7 +1450,7 @@ export async function postFlowUndoOp(
                 kind: 'in-order', head: latches.heads[0]!,
             },
         }],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -1732,7 +1712,7 @@ async function postWorkOrderCreationOp(
                 },
             },
         ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'created', location: b.id },
     });
 }
@@ -1796,7 +1776,7 @@ async function workOrderOperation<Input>(
                 : head.version,
             condition: { kind: 'in-order', head: latch },
         }],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -2062,7 +2042,7 @@ async function landWorkOrderTransition(
                     },
                 },
             ],
-        project: unprojected,
+        reader: { sees: 'whole' },
         answer: { kind: 'parent' },
     });
 }
@@ -2647,7 +2627,7 @@ export async function postIdentityPiiDocumentOp(
     messagePair?: MessagePair,
 ): Promise<IdentityPiiEntity> {
     const entity = piiEntityOf(id, {
-        name: 'pii',
+        name: PII_DOCUMENT_NAME,
         messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
@@ -2712,14 +2692,15 @@ export async function postAiAgentDocumentOp(
 
 // Identity credential document write — Phase Final Task 2:
 // the identity_credentials ROW half is stripped — pure
-// message-plane write. No states interaction. `messagePair` is
-// optional so a below-facade caller keeps compiling.
+// message-plane write. No states interaction. A below-facade
+// caller passes no `messagePair` and stores nothing.
 export async function postIdentityCredentialDocumentOp(
     db: DbAdapter,
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    messagePair?: MessagePair,
+    messagePair: MessagePair | undefined,
+    reader: Reader,
 ): Promise<Omit<IdentityCredentialEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<IdentityCredentialEntity, 'id'>;
@@ -2730,6 +2711,8 @@ export async function postIdentityCredentialDocumentOp(
             db,
             attemptFor([messagePair]),
             [messagePair],
+            undefined,
+            reader,
         );
     }
     return entity;
@@ -3104,18 +3087,16 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => piiEntityOf(
             param(params, 0),
             {
-                name: 'pii',
+                name: PII_DOCUMENT_NAME,
                 messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             },
         ),
     },
-    // The written row's `secret` rides the wire here — a
-    // deliberate zero-change carry-over (see the route comment
-    // above 'identities/:id/credentials/:cid' in the routes
-    // array).
-    'identities/:id/credentials/:cid': {
+    // The stored state keeps secret; the answer is projected
+    // (credentialReader).
+    [CREDENTIAL_DETAIL_PATTERN]: {
         conditional: 'optional',
         successBody: (params, body) => ({
             id: param(params, 1),
@@ -3434,17 +3415,40 @@ export function instanceStateOf(
     };
 }
 
-// What this requester may read of an instance's state.
-export function instanceProjection(
+// What this requester may read of an instance's values.
+export function instanceReader(
     attributesById: ReadonlyMap<string, AttributeSchemaRow>,
     roles: readonly string[],
-): StateProjection {
-    return (state) => ({
-        ...state,
-        values: projectReadableValues(
-            revisionValuesOf(state), attributesById, roles,
-        ),
-    });
+): Reader {
+    return { sees: 'values', attributesById, roles };
+}
+
+// The PUT validator admits no credential without its
+// identity, so a stored head lacking it is the store's
+// fault, never the reader's: it fails the request, as a
+// state head with no state does.
+function storedCredentialIdentityOf(
+    head: MessagePairEntity,
+): Id {
+    const identity = bodyOf(head.response)['identity_id'];
+    if (typeof identity !== 'string') {
+        throw new Error(
+            'stored credential has no identity_id: '
+                + head.path + head.name + ' (' + head.id + ')',
+        );
+    }
+    return identity;
+}
+
+// A credential's secret reaches no reader (§3).
+export function credentialReader(
+    roles: readonly string[],
+): Reader {
+    return {
+        sees: 'keys',
+        readRoles: CREDENTIAL_KEY_READ_ROLES,
+        roles,
+    };
 }
 
 // Instance create: PATCH with If-None-Match: * (§3). The
@@ -3490,7 +3494,7 @@ async function postInstanceCreateOp(
                 kind: 'never-written', declarer: 'client',
             },
         }],
-        project: instanceProjection(attributesById, roles),
+        reader: instanceReader(attributesById, roles),
         answer: { kind: 'parent' },
     });
 }
@@ -3585,7 +3589,7 @@ export async function postInstancePatchOp(
             ),
             condition: { kind: 'in-order', head: tag },
         }],
-        project: instanceProjection(attributesById, roles),
+        reader: instanceReader(attributesById, roles),
         answer: { kind: 'parent' },
     });
 }
@@ -3631,14 +3635,11 @@ export async function postOrganizationDocumentOp(
 
 export const routes: Route[] = [
     route('identities/', {
-        // GET is FLIPPED (Phase 10 Task 8): derived via
-        // documentCollectionGetHandler — wire-identical to the
-        // hand-written db.identities.getAll() dispatch it
-        // replaces (identities is organizationNested:false, so
-        // the derivation ignores whatever organization value the
-        // caller passes, exactly as the GLOBAL-plane scoped
-        // adapter's own db.identities alias already did).
-        get: documentCollectionGetHandler(IDENTITIES_WIRING),
+        // GET serves the stored heads at the global prefix
+        // (identities is organizationNested:false, so the
+        // selector ignores whatever organization value the
+        // caller passes).
+        select: collectionSelect(IDENTITIES_WIRING),
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
         // ROUTE_POLICY. The identity and, for a service, its
@@ -3706,20 +3707,19 @@ export const routes: Route[] = [
                 kind: 'siblings',
                 received: requirePair(messagePair),
                 siblings: [identity, ...credentials],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
     }),
-    // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
-    // documentGetHandler(IDENTITIES_WIRING) — the SAME wiring row
-    // PUT already rides — wire-identical to the hand-written
-    // db.identities.getById dispatch it replaces. PUT rides the
-    // generic documentPutHandler(IDENTITIES_WIRING) — wire-
-    // identical to postIdentityDocumentOp's own direct dispatch
-    // it replaces. Verbs stay {get, put}.
+    // GET rides the generic documentSelect(IDENTITIES_WIRING)
+    // — the SAME wiring row PUT already rides — and serves the
+    // stored head. PUT rides the generic
+    // documentPutHandler(IDENTITIES_WIRING) — wire-identical to
+    // postIdentityDocumentOp's own direct dispatch it replaces.
+    // Verbs stay {get, put}.
     route('identities/:id', {
-        get: documentGetHandler(IDENTITIES_WIRING),
+        select: documentSelect(IDENTITIES_WIRING),
         put: documentPutHandler(IDENTITIES_WIRING),
     }),
     // Singleton SET document. Self-only in the handler
@@ -3727,11 +3727,11 @@ export const routes: Route[] = [
     // substitute. Storage prefix stays
     // /identities/:id/default-organization/.
     route('identities/:id/default-organization', {
-        get: getIdentityDefaultOrganization,
+        select: selectIdentityDefaultOrganization,
         put: putIdentityDefaultOrganization,
     }),
     route('identities/:id/organizations/', {
-        get: getIdentityOrganizations,
+        select: selectIdentityOrganizations,
     }),
     // Invitation receive nest. Storage prefix stays
     // /invitations/. Two HTTP nests are filters and
@@ -3754,7 +3754,7 @@ export const routes: Route[] = [
     ),
     documentCollectionRoute(AI_AGENTS_WIRING),
     route('ai-agents/:id', {
-        get: documentGetHandler(AI_AGENTS_WIRING),
+        select: documentSelect(AI_AGENTS_WIRING),
         put: documentPutHandler(AI_AGENTS_WIRING),
     }),
     documentVersionListRoute(IDENTITIES_WIRING),
@@ -3768,26 +3768,23 @@ export const routes: Route[] = [
     // flat identity-pii collection (retired, router 404).
     // PUT/DELETE each append a message pair in the same
     // transaction as the write. DELETE is a marked tombstone.
-    // The pattern's last segment ('pii') is not a :param, so
-    // pathAndNameOf yields name '' (a singleton document at
-    // a collection-style path). GET is FLIPPED (Phase 10
-    // Task 8): derived via deriveIdentityPii — wire-identical
-    // to the hand-written db.identityPii.getById dispatch it
-    // replaces.
+    // The pattern's last segment ('pii') is not a :param:
+    // storedPathAndNameOf keeps the document at the identity's
+    // own prefix under the name 'pii'. GET serves the stored
+    // head.
     // authorizeIdentityPii (the gate dispatch) restricts a GET
-    // to self or admin. The handler then applies the same
+    // to self or admin. The selector then applies the same
     // viaMembership org fence credentials use: foreign 403,
     // orphan visible. A member never reads another identity's
-    // pii.
+    // pii. The fence runs before the head is read, so a
+    // foreign identity's absent or erased PII answers 403,
+    // never a 404 or 410 that would describe it.
     route('identities/:id/pii', {
-        get: async (db, p, actor, organization) => {
+        select: async (db, p, actor, organization) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
-            const row = await deriveIdentityPii(
-                db, identityId,
-            );
             const memberships =
                 await membershipsAcrossAllOrganizations(
                     db, actor,
@@ -3802,7 +3799,17 @@ export const routes: Route[] = [
                     'identity_pii', identityId,
                 );
             }
-            return row;
+            const head = await db.messagePairs.getHeadPair(
+                identityPrefixFor(identityId), PII_DOCUMENT_NAME,
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'identity_pii', identityId,
+                );
+            }
+            return wholeHeadSelection(
+                head, 'stateless', 'identity_pii', identityId,
+            );
         },
         put: (db, p, body, actor, messagePair) =>
             postIdentityPiiDocumentOp(
@@ -3818,114 +3825,100 @@ export const routes: Route[] = [
             }
         },
     }),
-    // Credentials nest under their parent identity: the identity
-    // id is param 0, so the SERVER filters the collection to that
-    // identity by its identity_id FK (the org fence still rides
-    // the facade re-entry — viaMembership derives visibility from
-    // the co-membership ledger). Both the collection and the leaf
-    // GET project the opaque `secret` out (withoutSecret) so the
-    // hash never crosses the boundary. The leaf id is param 1; GET
-    // and PUT are exposed exactly as the flat makeIdRoute carried
-    // them. ADMIN-ONLY: /identities is not member-tier, so these
-    // fall to the root admin entries — NO MEMBER_VERBS entry. The
-    // PUT wire response carries `secret` — a deliberate zero-
-    // change carry-over from the un-wired behavior (see
-    // WRITE_RESPONSE_SPECS's 'identities/:id/credentials/:cid'
-    // entry, which reconstructs the FULL entity, unlike the GETs'
-    // withoutSecret projection). GET is FLIPPED (Phase 10 Task 8):
-    // derived via deriveCredentialsFor, fenced via gate 15
-    // (keyed on the PARENT identity id rather than each
-    // row's own id) — a
-    // hidden identity's credentials read as an EMPTY array, byte-
-    // identical to parentScope.getAllWhere silently dropping every
-    // matched-but-invisible row (never a 404 — getAllWhere never
-    // throws).
-    // FENCE-INPUT FIX (post-session review): the path :id only
-    // keys the ledger scan (deriveCredentialsFor reads the
-    // /identities/{path id}/credentials/ prefix — that is where
-    // the pairs live); the pre-flip fence read each ROW's OWN
-    // identity_id field (parentScope's getAllWhere on identity_id,
-    // path id) filters the OLD-plane store by that field BEFORE
-    // fencing, then viaMembership fences on that SAME field). A
-    // below-facade write whose body.identity_id disagrees with
-    // its own document (producible below-facade, or via a hand-
-    // crafted admin PUT — no validator ties body.identity_id to
-    // the path :id, so an admin-crafted request CAN produce it;
-    // only a web-app-generated request cannot) would otherwise
-    // fence on the wrong identity. Reproduced here by filtering the
-    // derived rows to identity_id === the path id FIRST — exactly
-    // the OLD plane's WHERE — so a mismatched row never survives
-    // to the fence step, on either plane.
-    route('identities/:id/credentials/', {
-        get: async (db, p, actor, organization) => {
+    // Credentials nest under their parent identity: the
+    // identity id is param 0, and the path :id only keys the
+    // prefix the heads live at. No validator ties a stored
+    // body's identity_id to that path, so a hand-crafted admin
+    // PUT can store a credential whose identity disagrees with
+    // it: the collection keeps the heads whose stored
+    // identity_id is the path identity, then fences on that
+    // identity (gate 15's co-membership ledger), as the row
+    // plane's WHERE did before it fenced. A collection none of
+    // whose heads survive is empty, never a 403. ADMIN-ONLY:
+    // /identities is not member-tier, so these fall to the
+    // root admin entries — NO MEMBER_VERBS entry. The secret
+    // reaches no reader (credentialReader).
+    route(CREDENTIALS_COLLECTION_PATTERN, {
+        select: async (db, p, actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
-            const rows = (
-                await deriveCredentialsFor(db, identityId)
-            ).filter(
-                (credential) => credential.identity_id === identityId,
-            );
-            if (rows.length === 0) return [];
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
-            const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships, identityId, organizationId,
-            );
-            if (owner !== null && owner !== organizationId) {
-                throw new ForeignOrganizationError(
-                    'identity_credentials', identityId,
-                );
+            const heads = (
+                await db.messagePairs.getCollectionHeadPairs(
+                    credentialsPrefixFor(identityId),
+                )
+            ).filter((head) =>
+                storedCredentialIdentityOf(head) === identityId);
+            if (heads.length > 0) {
+                const memberships =
+                    await membershipsAcrossAllOrganizations(
+                        db, actor,
+                    );
+                const owner =
+                    ownerOrganizationViaMembershipPairPlane(
+                        memberships, identityId, organizationId,
+                    );
+                if (owner !== null && owner !== organizationId) {
+                    throw new ForeignOrganizationError(
+                        'identity_credentials', identityId,
+                    );
+                }
             }
-            return rows.map(withoutSecret);
+            return {
+                ...wholeCollectionSelection(heads, 'stateless'),
+                reader: credentialReader(roles),
+            };
         },
     }),
-    // GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveCredential, fenced the SAME way (gate 15) — a
-    // foreign identity's credential 403s; a genuinely absent
-    // one still 404s via EntityNotFoundError. FENCE-INPUT FIX
-    // (post-session review): the path :id only keys the
-    // scan (deriveCredential reads the row at
-    // /identities/{path id}/credentials/{cid} — that is where
-    // the pair lives); the pre-flip fence read the ROW's OWN
-    // identity_id field — the hand-written route this flip
-    // replaced ignored the path entirely, fetching by cid
-    // alone via parentScope.getById, which then fenced via
-    // viaMembership on the ROW's stored identity_id. So the
-    // fence input below is `credential.identity_id`, never the
-    // path — a below-facade write whose body.identity_id
-    // disagrees with its own document now fences EXACTLY as the
-    // row plane did.
-    route('identities/:id/credentials/:cid', {
-        get: async (db, p, actor, organization) => {
+    // The fence input is the head's own identity_id, never
+    // the path: the path :id only keys the prefix the pair
+    // lives at, and no validator ties body.identity_id to
+    // it, so a hand-crafted admin PUT can store a credential
+    // whose identity disagrees with its path. The row plane
+    // this replaced fenced on the stored field; so does this.
+    // A foreign identity's credential 403s; an absent one
+    // 404s. The secret reaches no reader (credentialReader).
+    route(CREDENTIAL_DETAIL_PATTERN, {
+        select: async (db, p, actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
             const cid = param(p, 1);
-            const credential = await deriveCredential(
-                db, identityId, cid,
+            const head = await db.messagePairs.getHeadPair(
+                credentialsPrefixFor(identityId), cid,
             );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'identity_credentials', cid,
+                );
+            }
+            const identityOfHead =
+                storedCredentialIdentityOf(head);
             const memberships =
                 await membershipsAcrossAllOrganizations(
                     db, actor,
                 );
             const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships, credential.identity_id, organizationId,
+                memberships, identityOfHead, organizationId,
             );
             if (owner !== null && owner !== organizationId) {
                 throw new ForeignOrganizationError(
                     'identity_credentials', cid,
                 );
             }
-            return withoutSecret(credential);
+            return {
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'identity_credentials', id: cid,
+                reader: credentialReader(roles),
+            };
         },
-        put: (db, p, body, actor, messagePair) =>
+        put: (db, p, body, actor, messagePair, _organization, roles) =>
             postIdentityCredentialDocumentOp(
                 db, param(p, 1), body, actor, messagePair,
+                credentialReader(roles),
             ),
     }),
     // The client-registration facet (clients elimination):
@@ -3939,10 +3932,21 @@ export const routes: Route[] = [
     // deregistration; the gate forms the 204 pair, the
     // handler appends it — idempotent by construction.
     route('identities/:id/registration', {
-        get: async (db, p) => {
+        select: async (db, p) => {
             const identityId = param(p, 0);
             await requireServiceIdentity(db, identityId);
-            return deriveClientRegistration(db, identityId);
+            const head = await db.messagePairs.getHeadPair(
+                registrationPrefixFor(identityId), '',
+            );
+            if (head === null) {
+                throw new EntityNotFoundError(
+                    'client_registration', identityId,
+                );
+            }
+            return wholeHeadSelection(
+                head, 'stateless', 'client_registration',
+                identityId,
+            );
         },
         put: async (db, p, body, actor, messagePair) => {
             const identityId = param(p, 0);
@@ -3970,12 +3974,13 @@ export const routes: Route[] = [
     // keeps it self-only (path identity vs actor). Flat
     // /identity-token-revocations is retired (router 404).
     // EVENT-APPEND: no head-read, no Supersedes. Path
-    // identity is the document — stamped on write and GET.
+    // identity is the document — stamped on write, so the
+    // stored head carries it.
     route('identities/:id/token-revocations/:rid', {
-        get: (db, p) =>
-            deriveTokenRevocation(
-                db, param(p, 0), param(p, 1),
-            ),
+        select: (db, p) => selectHeadAtPath(
+            db, tokenRevocationsPrefixFor(param(p, 0)),
+            param(p, 1), 'identity_token_revocations',
+        ),
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const id = param(p, 1);
@@ -4014,19 +4019,20 @@ export const routes: Route[] = [
     // '/identities/:id/tokens' POST. Flat /identity-tokens
     // is retired (router 404).
     route('identities/:id/tokens/', {
-        get: (db, p) =>
-            deriveIdentityTokensFor(db, param(p, 0)),
+        select: (db, p) => selectHeadsAtPath(
+            db, tokensPrefixFor(param(p, 0)), 'stateless',
+        ),
     }),
     // Hand-written so PUT can stamp identity_id from the
     // path (the Task 3 hole: omit-PUT must not poison GET)
     // and append its message pair without a row write.
-    // GET is FLIPPED: derived via deriveIdentityToken —
-    // 404 body unchanged. PUT is PAIR-ONLY.
+    // GET serves the stored head — 404 body unchanged. PUT
+    // is PAIR-ONLY.
     route('identities/:id/tokens/:jti', {
-        get: (db, p) =>
-            deriveIdentityToken(
-                db, param(p, 0), param(p, 1),
-            ),
+        select: (db, p) => selectHeadAtPath(
+            db, tokensPrefixFor(param(p, 0)), param(p, 1),
+            IDENTITY_TOKENS_TABLE,
+        ),
         put: async (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const jti = param(p, 1);
@@ -4120,20 +4126,21 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Nested provider events (credentials shape). Dual-read
-    // still sees leftover /identity-providers/ pairs. No fence:
+    // Nested provider events (credentials shape). Both reads
+    // see the nested prefix alone. No fence:
     // GLOBAL-plane (no organization_id). ADMIN-ONLY — not in
     // MEMBER_VERBS. Flat /identity-providers is retired
     // (router 404).
     route('identities/:id/providers/', {
-        get: (db, p) =>
-            deriveIdentityProvidersFor(db, param(p, 0)),
+        select: (db, p) => selectHeadsAtPath(
+            db, providersPrefixFor(param(p, 0)), 'stateless',
+        ),
     }),
     route('identities/:id/providers/:eid', {
-        get: (db, p) =>
-            deriveIdentityProvider(
-                db, param(p, 0), param(p, 1),
-            ),
+        select: (db, p) => selectHeadAtPath(
+            db, providersPrefixFor(param(p, 0)), param(p, 1),
+            'identity_providers',
+        ),
         put: (db, p, body, actor, messagePair) =>
             postIdentityProviderDocumentOp(
                 db, param(p, 0), param(p, 1),
@@ -4278,7 +4285,7 @@ export const routes: Route[] = [
                         },
                     })),
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'parent' },
             });
         },
@@ -4292,17 +4299,19 @@ export const routes: Route[] = [
     // Idea submissions nest under their parent idea: param 0 is
     // the path org, param 1 is the idea, so the SERVER filters
     // the collection to that idea (the org fence still rides
-    // the facade re-entry). GET is FLIPPED (Phase 2 Task 5):
-    // the collection derives from the message ledger at this
-    // idea's submissions document rather than the old
-    // idea_submissions table. The leaf id is param 2; only PUT
+    // the facade re-entry). GET serves the stored heads at
+    // this idea's prefix. The leaf id is param 2; only PUT
     // is exposed on ideas/:id/submissions/:sid, exactly as the
     // flat makeIdRoute carried it.
     route('organizations/:id/ideas/:id/submissions/', {
-        get: (db, p, _actor, organization) =>
-            deriveIdeaSubmissions(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                submissionsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/ideas/:id/submissions/:sid', {
@@ -4310,13 +4319,12 @@ export const routes: Route[] = [
             postIdeaSubmissionOp(db, param(p, 2), body, messagePair),
     }),
     route('organizations/:id/flows/', {
-        // GET stays deriveFlows: stamps hasUndoHistory from
-        // pair count and omits a state-'deleted' head.
+        // GET serves the stored heads; the gate drops a
+        // state-'deleted' one.
+        select: collectionSelect(FLOWS_WIRING),
         // POST stays this hand-written create — unlike
         // ideas/projects, flows never folded genesis into
         // the document PUT (Decision 6).
-        get: (db, _p, _actor, organization) =>
-            deriveFlows(db, requireOrganization(organization)),
         // Member-tier POST — /flows carries POST in
         // MEMBER_VERBS. The flow and its project join are
         // declared geneses in one statement, the shape a
@@ -4380,26 +4388,21 @@ export const routes: Route[] = [
                         },
                     },
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
     }),
-    // flows/:id takes a conditional PUT ('required').
-    // G2 GET stays deriveFlow (stamp hasUndoHistory; 404
-    // a state-'deleted' head). PUT stays
-    // documentPutHandler; the statement judges its latch.
-    // graphDelta/revivals ride the pair body (SIDECAR-KEEP).
-    // Member-tier PUT.
+    // flows/:id takes a conditional PUT ('required'); the
+    // statement judges its latch. Member-tier PUT.
+    // The GET serves the stored head, which carries the
+    // flow's state, sidecars, and trio; a state-'deleted'
+    // head is Gone (spec §5).
     {
         segments: [
             'organizations', ':id', 'flows', ':id',
         ],
-        get: (db, p, _actor, organization) =>
-            deriveFlow(
-                db, requireOrganization(organization),
-                param(p, 1),
-            ),
+        select: documentSelect(FLOWS_WIRING),
         put: documentPutHandler(FLOWS_WIRING),
     },
     // GET flows/:id/versions/: pair-chain index. Old
@@ -4448,18 +4451,18 @@ export const routes: Route[] = [
     // SERVER filters the collection to that project (the org
     // fence still rides the facade re-entry). The leaf id is
     // param 2; PUT and DELETE are exposed exactly as the
-    // flat makeIdRoute carried them. GET is FLIPPED (Phase 4
-    // Task 8): the join list derives from the
-    // message ledger at this project's flows document rather than
-    // the old project_flows table — deriveProjectFlows is a
-    // bespoke derivation (not a DocumentFamilyWiring family; a
-    // join row carries no lifecycle state of its own), so this
-    // calls it directly rather than through a generic constructor.
+    // flat makeIdRoute carried them. GET serves the stored
+    // join heads at this project's prefix, in write order (a
+    // join row carries no lifecycle state of its own).
     route('organizations/:id/projects/:id/flows/', {
-        get: (db, p, _actor, organization) =>
-            deriveProjectFlows(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                projectFlowsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/projects/:id/flows/:pfid', {
@@ -4493,8 +4496,8 @@ export const routes: Route[] = [
             }
         },
     }),
-    // The collection and entity GETs stream the stored heads
-    // (api/api.ts): a work order's head is its whole state.
+    // The collection and entity GETs serve the stored heads:
+    // a work order's head is its whole state.
     // POST stays this hand-written create — unlike
     // ideas/projects, work-orders never folded genesis into
     // the document PUT (Decision 6), mirroring flows' own
@@ -4502,7 +4505,7 @@ export const routes: Route[] = [
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS.
     route('organizations/:id/work-orders/', {
-        get: documentCollectionGetHandler(WORK_ORDERS_WIRING),
+        select: collectionSelect(WORK_ORDERS_WIRING),
         post: (
             db, _p, body, actor, messagePair, organization,
         ) => postWorkOrderCreationOp(
@@ -4514,34 +4517,13 @@ export const routes: Route[] = [
     // via MEMBER_VERBS['/work-orders']. Verbs stay
     // {get, put} — no DELETE.
     route('organizations/:id/work-orders/:id', {
-        get: documentGetHandler(WORK_ORDERS_WIRING),
+        select: documentSelect(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
     // PUT claims and DELETE releases: operations on the work
-    // order, answering its state. GET reads the head's live
-    // claim (404 when none). Member-tier via MEMBER_VERBS
+    // order, answering its state. Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.
     route('organizations/:id/work-orders/:id/claim', {
-        get: async (db, p, _actor, organization) => {
-            const workOrderId = param(p, 1);
-            const head = await workOrderHeadFor(
-                db, requireOrganization(organization),
-                workOrderId,
-            );
-            const claim = head?.version.claim;
-            if (
-                claim === undefined
-                || !isClaimLive(claim, nowUtc())
-            ) {
-                throw new EntityNotFoundError(
-                    'work_order_claims', workOrderId,
-                );
-            }
-            return {
-                member_id: claim.member_id,
-                expires_at: claim.expires_at,
-            };
-        },
         put: (db, p, body, actor, messagePair, organization) =>
             postWorkOrderClaimOp(
                 db, param(p, 1), body, actor,
@@ -4606,19 +4588,18 @@ export const routes: Route[] = [
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
     // id is param 2; only PUT is exposed (the
-    // flat route never carried GET/DELETE on the leaf). GET is
-    // FLIPPED (Task 7): the join list derives from the message
-    // ledger at this flow's work-orders document rather than the
-    // old flow_work_orders table — deriveFlowWorkOrders is a
-    // bespoke derivation (not a DocumentFamilyWiring family; a
-    // join row carries no lifecycle state of its own), so this
-    // calls it directly rather than through a generic
-    // constructor, mirroring deriveProjectFlows' own precedent.
+    // flat route never carried GET/DELETE on the leaf). GET
+    // serves the stored join heads at this flow's prefix; a
+    // join row carries no lifecycle state of its own.
     route('organizations/:id/flows/:id/work-orders/', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowWorkOrders(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                flowWorkOrdersUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/flows/:id/work-orders/:woid', {
@@ -4647,9 +4628,15 @@ export const routes: Route[] = [
     // the former, split by the body's kind.
     // DELETE is inline records/:id posture plus type RESTRICT.
     route(RECORD_TYPES_COLLECTION_PATTERN, {
-        get: (db, _p, _actor, organization) =>
-            deriveRecordTypeCollection(
-                db, requireOrganization(organization),
+        // The stored heads; the gate drops a state-'deleted'
+        // one.
+        select: (db, _p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                recordTypesUriPrefix(
+                    requireOrganization(organization),
+                ),
+                'state',
             ),
         // Admin-only composed create/edit (MEMBER_VERBS has
         // GET only). A create lands the type and each
@@ -4718,23 +4705,29 @@ export const routes: Route[] = [
                     },
                     ...attributes,
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
     }),
     route(RECORD_TYPE_DETAIL_PATTERN, {
-        // The head's ETag is the tag a composed edit latches.
-        get: async (db, p, _actor, organization) => {
-            const fenced = requireOrganization(organization);
-            const head = await recordTypeHeadFor(
-                db, fenced, param(p, 1),
+        // The stored head's ETag is the tag a composed edit
+        // latches; a deleted type is Gone (spec §5).
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
             );
-            return attachEtag(
-                Response.json(recordTypeEntityOf(
-                    headDocumentOf(head), fenced,
-                )),
-                head.id,
+            const id = param(p, 1);
+            const head = await db.messagePairs.getHeadPair(
+                recordTypesUriPrefix(organizationId), id,
+            );
+            if (head === null) {
+                throw await missedReadError(
+                    db, id, organizationId, RECORD_TYPES_TABLE,
+                );
+            }
+            return wholeHeadSelection(
+                head, 'state', RECORD_TYPES_TABLE, id,
             );
         },
         put: (db, p, body, actor, messagePair) =>
@@ -4822,29 +4815,23 @@ export const routes: Route[] = [
     }),
     // Nested attributes collection (Task 7): member GET under
     // a live type. Parent probe first (record_types 404);
-    // heads at .../attributes/, id-lex. No POST (parity with
-    // the flat family — composed op + PUT are the creators).
+    // then the stored heads at .../attributes/. No POST
+    // (parity with the flat family — composed op + PUT are
+    // the creators).
     route(ATTRIBUTES_COLLECTION_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
-            await requireRecordTypeExists(db, org, typeId);
-            const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getCollectionPairs(
-                prefix,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            const documents = deriveDocumentsAt(
-                messagePairs, prefix,
+            return selectHeadsAtPath(
+                db,
+                attributesUriPrefix(organizationId, typeId),
+                'stateless',
             );
-            const rows: { id: string }[] = [];
-            for (const [id, document] of documents) {
-                const wire = nestedAttributeWireOf(
-                    org, typeId, id,
-                    attributeStateOf(document.body),
-                );
-                rows.push(wire as { id: string });
-            }
-            return rows.sort(byIdAscending);
         },
     }),
     // Nested attribute detail (Task 7): member GET, admin
@@ -4852,26 +4839,30 @@ export const routes: Route[] = [
     // with four-leg RESTRICT. No WRITE_AUTHORIZERS (deep
     // sub-family — parent type 404 + path org gate).
     route(ATTRIBUTE_DETAIL_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
+        // A missing or deleted parent type stays 404; the
+        // stored body already carries the path keys the PUT
+        // stamped, and a removed attribute is Gone (spec §5).
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const attrId = param(p, 2);
-            await requireRecordTypeExists(db, org, typeId);
-            const prefix = attributesUriPrefix(org, typeId);
-            const messagePairs = await db.messagePairs.getCollectionPairs(
-                prefix,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            const document = deriveDocumentsAt(
-                messagePairs, prefix,
-            ).get(attrId);
-            if (document === undefined) {
+            const head = await db.messagePairs.getHeadPair(
+                attributesUriPrefix(organizationId, typeId),
+                attrId,
+            );
+            if (head === null) {
                 throw await missedReadError(
-                    db, attrId, org, 'record_attributes',
+                    db, attrId, organizationId,
+                    'record_attributes',
                 );
             }
-            return nestedAttributeWireOf(
-                org, typeId, attrId,
-                attributeStateOf(document.body),
+            return wholeHeadSelection(
+                head, 'stateless', 'record_attributes', attrId,
             );
         },
         put: async (db, p, body, _actor, messagePair) => {
@@ -4921,38 +4912,35 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Nested instances collection (Task 16): member GET
-    // under a live type. Parent probe first; heads via
-    // deriveInstanceCollection; each row projects values
-    // by attribute ACL and embeds etag (pair id, no quotes).
+    // Nested instances collection: member GET under a live
+    // type. Parent probe first, so a type never written
+    // answers 404; each live head is served as its document
+    // GET serves it, projected by the reader's attribute
+    // roles.
     route(INSTANCES_COLLECTION_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
-            const typeId = param(p, 1);
-            await requireRecordTypeExists(db, org, typeId);
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
-                );
-            const heads = await deriveInstanceCollection(
-                db, org, typeId,
+            const organizationId = requireOrganization(
+                organization,
             );
-            const rows = [];
-            for (const head of heads) {
-                const values = projectReadableValues(
-                    head.values, attributesById, roles,
-                );
-                rows.push({
-                    id: head.id,
-                    organization_id: org,
-                    record_type_id: typeId,
-                    values,
-                    etag: head.messagePairId,
-                });
-            }
-            return rows;
+            const typeId = param(p, 1);
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
+            );
+            return {
+                ...await selectHeadsAtPath(
+                    db,
+                    instancesUriPrefix(organizationId, typeId),
+                    'stateless',
+                ),
+                reader: instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
+                ),
+            };
         },
     }),
     // Nested instance value-revision versions (Task 19).
@@ -5057,44 +5045,46 @@ export const routes: Route[] = [
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-
     // complete). No WRITE_AUTHORIZERS (deep sub-family).
-    // GET/write ETag attaches in api.ts. DELETE takes its
-    // conditional from the spec's delete slot and forms no
-    // response body.
+    // DELETE takes its conditional from the spec's delete
+    // slot and forms no response body.
     route(INSTANCE_DETAIL_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
-            await requireRecordTypeExists(db, org, typeId);
-            const head = await deriveInstanceHead(
-                db, org, typeId, instanceId,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            if (head === undefined) {
-                const retired = await documentHeadAt(
-                    db, instancesUriPrefix(org, typeId),
-                    instanceId,
-                ) !== null;
-                throw retired
-                    ? await retiredInstanceError(
-                        db, instanceId, org,
-                    )
-                    : await missedReadError(
-                        db, instanceId, org,
-                        'record_instances',
-                    );
-            }
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
+            const head = await db.messagePairs.getHeadPair(
+                instancesUriPrefix(organizationId, typeId),
+                instanceId,
+            );
+            if (head === null) {
+                throw await missedReadError(
+                    db, instanceId, organizationId,
+                    'record_instances',
                 );
+            }
+            // The gate's own 410 would skip the owner probe,
+            // and a foreign retired instance must answer 403.
+            if (head.method === 'DELETE') {
+                throw await retiredInstanceError(
+                    db, instanceId, organizationId,
+                );
+            }
             return {
-                id: head.id,
-                organization_id: org,
-                record_type_id: typeId,
-                values: projectReadableValues(
-                    head.values, attributesById, roles,
+                kind: 'document', head,
+                lifecycle: 'stateless',
+                table: 'record_instances', id: instanceId,
+                reader: instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
                 ),
             };
         },
@@ -5111,27 +5101,47 @@ export const routes: Route[] = [
     // Flow↔record bindings nest under their parent flow:
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
-    // id is param 2. GET is FLIPPED (Task 7): both
-    // the collection and the by-id read now ride deriveFlowRecords
-    // / deriveFlowRecord — a bespoke derivation (not a
-    // DocumentFamilyWiring family; a join row carries no lifecycle
-    // state of its own), so this calls it directly rather than
-    // through a generic constructor, mirroring deriveFlowWorkOrders'
-    // own precedent above. flows/:id/versions table-backed
-    // nested read RETIRED Phase 15 Task 7 (zero callers).
+    // id is param 2. The collection serves the stored join
+    // heads at this flow's prefix (a join row carries no
+    // lifecycle state of its own); the by-id GET serves one
+    // of them, and a DELETE head is Gone (spec §5).
+    // flows/:id/versions table-backed nested read RETIRED
+    // Phase 15 Task 7 (zero callers).
     route('organizations/:id/flows/:id/records/', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowRecords(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                flowRecordsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/flows/:id/records/:frid', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowRecord(
-                db, requireOrganization(organization),
-                param(p, 1), param(p, 2),
-            ),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const flowId = param(p, 1);
+            const joinId = param(p, 2);
+            const head = await db.messagePairs.getHeadPair(
+                flowRecordsUriPrefix(organizationId, flowId),
+                joinId,
+            );
+            if (head === null) {
+                // Probe the parent flow: a foreign flow's
+                // join 403s; a miss on an own or absent flow
+                // stays 404.
+                throw await missedReadError(
+                    db, joinId, organizationId, 'flow_records',
+                    flowId,
+                );
+            }
+            return wholeHeadSelection(
+                head, 'stateless', 'flow_records', joinId,
+            );
+        },
         put: (db, p, body, actor, messagePair, organization) =>
             postFlowRecordDocumentOp(
                 db, param(p, 2), body, actor,
@@ -5166,9 +5176,9 @@ export const routes: Route[] = [
     // param is unchecked on read (a document that never validly
     // wrote can never be found either way). DELETE is MARKED, not
     // physical: postFlowTagDocumentOp appends a DELETE pair at the
-    // SAME document, and deriveFlowTag's own deriveDocumentsAt call
-    // already excludes a DELETE head, exactly like every other
-    // document family. PUT and DELETE share ONE op
+    // SAME document, and the GET serves the tag's stored head,
+    // so a DELETE head is Gone (spec §5), exactly like every
+    // other document family. PUT and DELETE share ONE op
     // (postFlowTagDocumentOp) since NEITHER needs `id` or `body` —
     // the pair alone (formed by the gate from the matched route)
     // carries the document and the method; a hand-written DELETE
@@ -5179,11 +5189,27 @@ export const routes: Route[] = [
     // MEMBER_VERBS (api/authorization.ts), mirroring
     // '/flows/:id/records'.
     route('organizations/:id/flows/:id/tags/:name', {
-        get: (db, p, _actor, organization) =>
-            deriveFlowTag(
-                db, requireOrganization(organization),
-                param(p, 1), param(p, 2),
-            ),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const flowId = param(p, 1);
+            const name = param(p, 2);
+            const head = await db.messagePairs.getHeadPair(
+                flowTagsUriPrefix(organizationId, flowId), name,
+            );
+            if (head === null) {
+                // Probe the parent flow: a foreign flow's tag
+                // 403s; a miss on an own or absent flow stays
+                // 404.
+                throw await missedReadError(
+                    db, name, organizationId, 'flow_tags', flowId,
+                );
+            }
+            return wholeHeadSelection(
+                head, 'stateless', 'flow_tags', name,
+            );
+        },
         put: (db, _p, _body, _actor, messagePair) =>
             postFlowTagDocumentOp(db, messagePair),
         delete: (db, _p, _actor, messagePair) =>
@@ -5193,20 +5219,24 @@ export const routes: Route[] = [
     // Hand-written in place of makeIdRoute<OrganizationEntity>
     // so PUT can append its message pair — the factory's fixed
     // closures have no per-family pair selector (see
-    // message-pair.ts). GET reproduces the factory closure
-    // byte-equivalently; verbs stay {get, put}. organizations
+    // message-pair.ts). Verbs stay {get, put}. organizations
     // is DOCUMENT-class: a repeat PUT records Supersedes.
     // GLOBAL plane — no organization_id stamp (this table IS
-    // the tenant root). GET dispatches to deriveOrganization
-    // (api/derive-organizations.ts). A bespoke call, not the
-    // generic documentGetHandler(wiring): that machinery
-    // requires a wiring row's documentOp, and organizations has
-    // none. Phase Final Task 2: the organizations ROW half is
-    // stripped — pure message-plane write (postFlowTagDocumentOp
-    // shape). WRITE_RESPONSE_SPECS successBody forms the wire
-    // bytes via organizationEntityOf (id-first; GET wins).
+    // the tenant root). A bespoke selector, not the generic
+    // documentSelect(wiring): that machinery requires a wiring
+    // row's documentOp, and organizations has none. The gate's
+    // membership fence answers a foreign organization 403
+    // before this selector runs, so a miss here is genuine
+    // absence. Phase Final Task 2: the organizations ROW half
+    // is stripped — pure message-plane write
+    // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
+    // successBody forms the stored bytes via
+    // organizationEntityOf; GET serves them as stored.
     route('organizations/:id', {
-        get: (db, p) => deriveOrganization(db, param(p, 0)),
+        select: (db, p) => selectHeadAtPath(
+            db, canonicalPath(undefined, '/organizations/'),
+            param(p, 0), 'organizations',
+        ),
         put: postOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
@@ -5286,18 +5316,19 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
             ),
     }),
+    // The roster serves in write order; a reader that wants
+    // grant order sorts the seat bodies by `at`.
     route(ORGANIZATION_MEMBERS_COLLECTION_PATTERN, {
-        get: (db, _p, _actor, organization) =>
-            deriveOrganizationMemberSeats(
-                db, requireOrganization(organization),
-            ),
+        select: (db, _p, _actor, organization) => selectHeadsAtPath(
+            db, seatsPrefixFor(requireOrganization(organization)),
+            'stateless',
+        ),
     }),
     route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-        get: (db, p, _actor, organization) =>
-            deriveOrganizationMemberSeat(
-                db, requireOrganization(organization),
-                param(p, 1),
-            ),
+        select: (db, p, _actor, organization) => selectHeadAtPath(
+            db, seatsPrefixFor(requireOrganization(organization)),
+            param(p, 1), 'organization_members',
+        ),
         put: (db, p, body, actor, messagePair) =>
             postMembershipDocumentOp(
                 db, param(p, 1), body, actor, messagePair,
@@ -5408,16 +5439,13 @@ export const routes: Route[] = [
     // member_id); empty → missedReadError('projects').
     documentVersionListRoute(PROJECTS_WIRING),
     documentVersionRoute(PROJECTS_WIRING),
-    // GET is FLIPPED (Task 7): the collection derives from the
-    // message ledger rather than the old objectives table. Rides
-    // the generic documentCollectionGetHandler —
-    // objectiveDocumentEntityOf reads entity fields and `state`
-    // alike from the head body. POST stays this hand-written
+    // GET serves the stored heads through the generic
+    // collectionSelect. POST stays this hand-written
     // create — objectives' own create lands the document PLUS
     // its first revision in one statement, mirroring
     // records'/work-orders' own precedent.
     route('organizations/:id/objectives/', {
-        get: documentCollectionGetHandler(OBJECTIVES_WIRING),
+        select: collectionSelect(OBJECTIVES_WIRING),
         // The objective and its first revision are declared
         // geneses in one statement, the shape a genesis PUT
         // /objectives/:id and a PUT
@@ -5473,16 +5501,15 @@ export const routes: Route[] = [
                         },
                     },
                 ],
-                project: unprojected,
+                reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
         },
     }),
     // objectives/:id is the seventh family. GET is FLIPPED
     // (Task 7): absorbed into the generic documentEntityRoute —
-    // GET dispatches to documentGetHandler(OBJECTIVES_WIRING);
-    // objectiveDocumentEntityOf reads entity fields and `state`
-    // alike from the head body. PUT stays
+    // GET dispatches to documentSelect(OBJECTIVES_WIRING) and
+    // serves the stored head. PUT stays
     // documentPutHandler(OBJECTIVES_WIRING), unchanged from
     // before this flip (Task 2); objectives/:id has no DELETE
     // today, mirroring the ideas/projects/work-orders
@@ -5498,18 +5525,18 @@ export const routes: Route[] = [
     // param 0 is the path org, param 1 is the objective, so
     // the SERVER filters the collection to that objective
     // (the org fence still rides the facade re-entry). GET
-    // is FLIPPED (Task 7): rides deriveObjectiveRevisions —
-    // a bespoke derivation, not a DocumentFamilyWiring family
-    // (a nested document carries no lifecycle state of its
-    // own), so this calls it directly rather than through a
-    // generic constructor, mirroring deriveFlowRecords' own
-    // precedent above. The leaf id is param 2; only PUT is
-    // exposed, unchanged from before this flip.
+    // serves the stored heads at this objective's prefix (a
+    // nested document carries no lifecycle state of its
+    // own). The leaf id is param 2; only PUT is exposed.
     route('organizations/:id/objectives/:id/revisions/', {
-        get: (db, p, _actor, organization) =>
-            deriveObjectiveRevisions(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                objectiveRevisionsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     // Hand-written so PUT can append its message pair in the
@@ -5543,20 +5570,22 @@ export const routes: Route[] = [
     // project: param 0 is the path org, param 1 is the
     // project, so the SERVER filters the collection to that
     // project (the org fence still rides the facade
-    // re-entry). GET is FLIPPED (Task 7): rides
-    // deriveBaselineScores — the SAME bespoke-derivation
-    // reasoning as deriveObjectiveRevisions above (a project-
-    // nested document, not a DocumentFamilyWiring family). The
-    // leaf id is param 2; only PUT is exposed, unchanged from
-    // before this flip.
+    // re-entry). GET serves the stored heads at this
+    // project's prefix, as the revisions above do. The leaf
+    // id is param 2; only PUT is exposed.
     route(
         'organizations/:id/projects/:id'
         + '/objective-baseline-scores/',
         {
-        get: (db, p, _actor, organization) =>
-            deriveBaselineScores(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                scoresUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                    'objective-baseline-scores',
+                ),
+                'stateless',
             ),
     }),
     route(
@@ -5571,17 +5600,20 @@ export const routes: Route[] = [
     // Objective actual scores nest under their parent project,
     // identically: param 0 is the path org, param 1 is the
     // project (server filter), leaf id is param 2, PUT only.
-    // GET is FLIPPED (Task 7): rides
-    // deriveActualScores, the actuals byte-twin of
-    // deriveBaselineScores above.
+    // GET serves the stored heads at this project's prefix.
     route(
         'organizations/:id/projects/:id'
         + '/objective-actual-scores/',
         {
-        get: (db, p, _actor, organization) =>
-            deriveActualScores(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                scoresUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                    'objective-actual-scores',
+                ),
+                'stateless',
             ),
     }),
     route(

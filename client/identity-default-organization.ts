@@ -23,12 +23,12 @@ export async function getIdentityDefaultOrganization(
     ctx: RequestContext,
 ): Promise<string | null> {
     try {
-        const res = await ctx.GET<{
+        const res = (await ctx.GET<{
             organization_id: string;
         }>(
             'identities/' + ctx.identity.id
                 + '/default-organization',
-        );
+        )).body().toValue();
         return res.organization_id;
     } catch (err) {
         if (

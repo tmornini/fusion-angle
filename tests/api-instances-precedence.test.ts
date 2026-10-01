@@ -27,6 +27,7 @@ import {
 import {
     apiRequest,
     pairIdOf,
+    partsOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -566,7 +567,7 @@ async () => {
     assertStrictEquals(header, strongEtagOf(head.messagePairId));
 });
 
-Deno.test('list-row etag == detail ETag validator sans quotes',
+Deno.test('list part etag line == detail ETag validator',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -580,21 +581,16 @@ async () => {
         'GET', INSTANCES, memberToken,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as {
-        id: string;
-        etag: string;
-    }[];
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.id, INSTANCE_ID);
-    assert(isIdentifier(rows[0]!.etag));
+    const parts = await partsOf<{ id: string }>(list);
+    assertStrictEquals(parts.length, 1);
+    assertStrictEquals(parts[0]!.body().toValue().id, INSTANCE_ID);
+    const partEtag = parts[0]!.query('header.etag').toText();
+    assert(isIdentifier(partEtag.slice(1, -1)));
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assertStrictEquals(detail.status, 200);
     const detailEtag = detail.headers.get('ETag');
     assert(detailEtag !== null);
-    assertStrictEquals(
-        rows[0]!.etag,
-        detailEtag.slice(1, -1),
-    );
+    assertStrictEquals(partEtag, detailEtag);
 });

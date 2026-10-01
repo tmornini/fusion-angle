@@ -15,6 +15,7 @@ import {
     apiRequest, pairIdOf, storedPutBodyText,
     framedRequest,
     invitationLatched,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
@@ -375,7 +376,7 @@ async () => {
         await organizationToken(),
     ));
     assertStrictEquals(roster.status, 200);
-    const rosterText = JSON.stringify(await roster.json());
+    const rosterText = JSON.stringify(await partBodiesOf(roster));
     assert(!rosterText.includes(ERASED_NAME));
     assert(!rosterText.includes(EDITED_NAME));
     assert(!rosterText.includes(ERASED_EMAIL));

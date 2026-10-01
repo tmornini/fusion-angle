@@ -6,10 +6,9 @@ import {
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    ifMatchField,
-    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -120,11 +119,11 @@ async function transitionWorkOrder(
     targetState: string,
     at: string,
 ): Promise<void> {
-    const { etag } = await ctx.GETWithEtag(
+    const read = await ctx.GET(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId,
     );
-    await ctx.POSTWithHeaders(
+    await ctx.POST(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId
         + '/transition',
@@ -133,7 +132,7 @@ async function transitionWorkOrder(
         targetState,
         release: null,
         transitionAt: at,
-    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
+    }, [read]);
 }
 
 // c→a→z graph: c isCreate, z isArchive, a regular
@@ -186,30 +185,13 @@ Deno.test(
             identity: { organization },
             GET: async (path: string) => {
                 paths.push(path);
-                if (
-                    path.endsWith(
-                        '/flows/' + flowId
-                            + '/work-orders/',
-                    )
-                ) {
-                    return [{
-                        work_order_id: 'w-join',
-                    }];
-                }
-                if (path.endsWith('/work-orders/')) {
-                    return [{ id: 'w-coll' }];
-                }
                 if (path.endsWith('/history')) {
-                    return [];
+                    return responseMessage([]);
                 }
-                if (
-                    path.endsWith('/members/')
-                    || path.endsWith('/former-members/')
-                    || path === 'ai-agents/'
-                ) {
-                    return [];
+                if (path.endsWith('/former-members/')) {
+                    return responseMessage([]);
                 }
-                return {
+                return responseMessage({
                     id: flowId,
                     organization_id: organization,
                     name: 'Stats',
@@ -221,8 +203,35 @@ Deno.test(
                         nodes: [],
                         edges: [],
                     },
-                    hasUndoHistory: false,
-                };
+                });
+            },
+            // A collection read answers what GET answers for
+            // that path, one message per row, into the same
+            // record the assertions read.
+            GETCollection: async (path: string) => {
+                paths.push(path);
+                if (
+                    path.endsWith(
+                        '/flows/' + flowId
+                            + '/work-orders/',
+                    )
+                ) {
+                    return [responseMessage({
+                        work_order_id: 'w-join',
+                    })];
+                }
+                if (path.endsWith('/work-orders/')) {
+                    return [responseMessage({ id: 'w-coll' })];
+                }
+                if (
+                    path.endsWith('/history')
+                    || path.endsWith('/members/')
+                    || path.endsWith('/former-members/')
+                    || path === 'ai-agents/'
+                ) {
+                    return [];
+                }
+                throw new Error('not a collection: ' + path);
             },
         } as unknown as RequestContext;
         await getFlowStats(ctx, flowId, 0);
@@ -288,7 +297,7 @@ Deno.test(
                 lockTimeout: 0, nodes: [], edges: [],
             },
             position: 1,
-        }, [['If-None-Match', '*']]);
+        }, 'creates');
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNXXsTEwShOozlQCEWKIIw', {
             display_id: 'WO-2',
@@ -297,7 +306,7 @@ Deno.test(
                 lockTimeout: 0, nodes: [], edges: [],
             },
             position: 2,
-        }, [['If-None-Match', '*']]);
+        }, 'creates');
 
         // yNSSnbrpacodQTzUEcdEVA belongs to ZOousbbnzpqlxJExVAruYQ;
         // yNXXsTEwShOozlQCEWKIIw belongs to OTHER. NAMED re-pin
@@ -410,7 +419,7 @@ Deno.test(
                 lockTimeout: 0, nodes: [], edges: [],
             },
             position: 1,
-        }, [['If-None-Match', '*']]);
+        }, 'creates');
         // NAMED re-pin (Task 7): same reason as above.
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/'

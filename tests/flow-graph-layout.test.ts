@@ -57,7 +57,6 @@ function flowGraph(o: {
         isAutoLayout: o.isAutoLayout ?? false,
         isAutoFit: true,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
-        hasUndoHistory: false,
         nodes: o.nodes,
         edges: o.edges,
     };

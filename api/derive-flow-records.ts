@@ -25,19 +25,15 @@ import {
 // (deriveDocumentsAt's own DELETE-head exclusion mirrors the old
 // plane's physical splice; parity, not a new mechanism). Unlike
 // deriveFlowWorkOrders, this join's own :frid document carries a
-// LIVE GET route (flows/:id/records/:frid), so a by-id read
-// (deriveFlowRecord) is needed alongside the collection read —
+// by-id read (deriveFlowRecord) alongside the collection read —
 // deriveFlow's own absent/DELETE-head -> Entity
 // NotFoundError shape, applied to a join rather than a document
-// family. LIVE: GET flows/:id/records and GET flows/:id/
-// records/:frid are wired to deriveFlowRecords/deriveFlowRecord
-// below (Phase 6 Task 7); tests/drift-records.test.ts proves
-// equality against flow_records.getAllWhere on flow_id and
-// flow_records.getById(...).
+// family. GET flows/:id/records/ and GET flows/:id/records/
+// :frid serve the joins' stored heads (spec §1).
 
 const FLOW_RECORDS_TABLE = 'flow_records';
 
-function flowRecordsUriPrefix(
+export function flowRecordsUriPrefix(
     organization: Id,
     flowId: Id,
 ): string {
@@ -72,8 +68,7 @@ async function fetchFlowRecordDocuments(
 // id-lex ordered (byIdAscending — the derivation's own
 // order, never the backend's); a DELETE head
 // excludes the row exactly as the old plane's physical splice
-// does (parity, not a new mechanism). Serves the live GET
-// flows/:id/records route (Phase 6 Task 7).
+// does (parity, not a new mechanism).
 export async function deriveFlowRecords(
     db: DbAdapter,
     organization: Id,
@@ -89,8 +84,7 @@ export async function deriveFlowRecords(
     return rows.sort(byIdAscending);
 }
 
-// Serves the live GET flows/:id/records/:frid route (Phase 6
-// Task 7): the head document body + id; absent (never written
+// The head document body + id; absent (never written
 // under this flow/organization) or a DELETE head throws
 // EntityNotFoundError('flow_records', id) — deriveDocumentsAt's
 // own DELETE-head exclusion already collapses both cases into

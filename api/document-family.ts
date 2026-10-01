@@ -20,11 +20,17 @@ import type {
     Route,
     GetHandler,
     PutHandler,
+    SelectHandler,
     WriteResponseSpec,
 } from './routes.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
+import {
+    selectHeadsAtPath,
+    wholeHeadSelection,
+    type Lifecycle,
+} from './head-reads.ts';
 
 // param/requireOrganization/withoutId live HERE, not in
 // routes.ts, so this module has NO runtime (value) dependency on
@@ -105,7 +111,7 @@ export interface DocumentFamilyWiring {
     // tombstone. A 'stateless' family carries entity fields
     // only; its lifecycle, if any, lives in operation-path
     // event pairs, never the document.
-    readonly lifecycle: 'state' | 'stateless';
+    readonly lifecycle: Lifecycle;
     // The identifier the wire 404 body speaks —
     // EntityNotFoundError's table. Family name for ideas/
     // projects/flows; 'work_orders' for work-orders (the
@@ -280,18 +286,33 @@ export function documentGetHandler(
         );
 }
 
-// Live PUT pair id at this document — the store's document
-// head read (`messageStore(db).getDocumentHead`). A DELETE head or
-// virgin document is undefined.
-export async function documentHeadMessagePairId(
-    db: DbAdapter,
-    path: string,
-    id: Id,
-): Promise<string | undefined> {
-    const stored = await messageStore(db).getDocumentHead(
-        path, id,
-    );
-    return stored?.id;
+// A family's document head (spec §5, rungs 1–2): the
+// gate's fence has run; no head is this family's miss,
+// 403 for a foreign id and 404 otherwise. Whether the
+// head is deleted is the gate's to judge.
+export function documentSelect(
+    wiring: DocumentFamilyWiring,
+): SelectHandler {
+    return async (db, params, _actor, organization) => {
+        const organizationId = requireOrganization(
+            organization,
+        );
+        const id = entityIdParam(wiring, params);
+        const head = await db.messagePairs.getHeadPair(
+            canonicalPath(
+                organizationId, '/' + wiring.family + '/',
+            ),
+            id,
+        );
+        if (head === null) {
+            throw await throwDocumentMiss(
+                wiring, db, organizationId, id,
+            );
+        }
+        return wholeHeadSelection(
+            head, wiring.lifecycle, wiring.notFoundTable, id,
+        );
+    };
 }
 
 // The route body is plain dispatch to the documentOp for
@@ -314,7 +335,7 @@ export function documentEntityRoute(
 ): Route {
     return {
         segments: entitySegments(wiring),
-        get: documentGetHandler(wiring),
+        select: documentSelect(wiring),
         put: documentPutHandler(wiring),
     };
 }
@@ -585,12 +606,29 @@ export function documentCollectionGetHandler(
     };
 }
 
+// A family's collection (spec §1 B): the live heads at
+// its prefix, (response_at, id). A deleted head is the
+// gate's to drop.
+export function collectionSelect(
+    wiring: DocumentFamilyWiring,
+): SelectHandler {
+    return (db, _params, _actor, organization) =>
+        selectHeadsAtPath(
+            db,
+            canonicalPath(
+                requireOrganization(organization),
+                '/' + wiring.family + '/',
+            ),
+            wiring.lifecycle,
+        );
+}
+
 export function documentCollectionRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
         segments: collectionSegments(wiring),
-        get: documentCollectionGetHandler(wiring),
+        select: collectionSelect(wiring),
     };
 }
 
@@ -604,30 +642,6 @@ const STREAM_FAMILIES: ReadonlySet<string> = new Set([
     'identities',
     'ai-agents',
 ]);
-
-const ID_PATTERN_SUFFIX = '/:id';
-
-const ORGANIZATION_NEST_PREFIX = 'organizations/:id/';
-
-export function idFamilyOf(
-    pattern: string,
-): string | undefined {
-    if (!pattern.endsWith(ID_PATTERN_SUFFIX)) {
-        return undefined;
-    }
-    const rest = pattern.slice(
-        0, -ID_PATTERN_SUFFIX.length,
-    );
-    if (rest.startsWith(ORGANIZATION_NEST_PREFIX)) {
-        const family = rest.slice(
-            ORGANIZATION_NEST_PREFIX.length,
-        );
-        if (family.includes('/')) return undefined;
-        return family;
-    }
-    if (rest.includes('/')) return undefined;
-    return rest;
-}
 
 function documentFromBody(
     id: Id,

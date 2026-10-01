@@ -23,7 +23,7 @@ export async function postSessionRefresh(
     if (organization !== undefined) {
         body.organization = organization;
     }
-    const answered = await ctx.postForHeaders(
+    const answered = await ctx.POSTUnauthenticated(
         'authentication/token',
         body,
         [[
@@ -33,10 +33,7 @@ export async function postSessionRefresh(
     );
     const refused = refusedDoor(answered);
     if (refused !== null) throw refused;
-    const accessToken = authParam(
-        answered.headers.get('authentication-info'),
-        'access_token',
-    );
+    const accessToken = authParam(answered, 'access_token');
     if (accessToken === null) {
         throw new Error(
             'authentication-info lacks access_token',
@@ -44,6 +41,6 @@ export async function postSessionRefresh(
     }
     return {
         accessToken,
-        refreshToken: refreshFromHeaders(answered.headers),
+        refreshToken: refreshFromHeaders(answered),
     };
 }

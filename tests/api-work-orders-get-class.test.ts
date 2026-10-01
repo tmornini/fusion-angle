@@ -17,8 +17,10 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    assertPartsAreHeads,
+    partBodiesOf,
+    partsOf,
     storedPutBodyText,
-    storedCollectionText,
 } from './http-fixtures.ts';
 
 // GET work-orders (inbox) and GET
@@ -289,23 +291,17 @@ async () => {
     const { db, token } = await seededDb();
     await bindWorkOrder(db, token);
 
-    const storedHeads = JSON.parse(
-        await storedCollectionText(db, DOCUMENT_PREFIX),
-    ) as Record<string, unknown>[];
-    assert(storedHeads.length > 0);
-
     const list = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as Record<
-        string, unknown
-    >[];
+    const parts = await partsOf<Record<string, unknown>>(list);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    const rows = parts.map((part) => part.body().toValue());
     const bound = rows.find((row) => row['id'] === WO_ID);
     assert(bound !== undefined);
     assertStrictEquals(bound['instance_id'], INSTANCE_ID);
     assertStrictEquals(bound['record_type_id'], TYPE_ID);
-    assertEquals(rows, storedHeads);
 });
 
 Deno.test('unbound GET omits bind keys (absent, not null)',
@@ -330,9 +326,7 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/', token,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as Record<
-        string, unknown
-    >[];
+    const rows = await partBodiesOf<Record<string, unknown>>(list);
     const unbound = rows.find(
         (row) => row['id'] === WO_UNBOUND,
     );

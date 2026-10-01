@@ -33,7 +33,10 @@ import {
 import {
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import type { ClientSession } from '../client/client-session.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import {
     organizationToken,
@@ -65,19 +68,11 @@ const AT = '2026-01-01T00:00:00.000000Z';
 
 // A fresh Map-backed fake per test — session-token adapters
 // used throughout this file read/write it lazily.
-function accessAnswer(token: string): {
-    readonly status: number;
-    readonly headers: Headers;
-    readonly body: string;
-} {
-    return {
-        status: 200,
-        headers: new Headers({
-            'authentication-info':
-                'access_token="' + token + '"',
-        }),
-        body: '',
-    };
+function accessAnswer<T>(token: string): HttpMessage<T> {
+    return responseMessage({ token_type: 'Bearer' }, {
+        'authentication-info':
+            'access_token="' + token + '"',
+    }) as HttpMessage<T>;
 }
 
 function freshStorage(): Partial<Storage> {
@@ -258,14 +253,14 @@ async function newestVersion(
     organization: string,
     id: string,
 ): Promise<{ etag: string; at: string; member_id: string }> {
-    const versions = await admin.GET<{
+    const versions = (await admin.GET<{
         etag: string;
         at: string;
         member_id: string;
     }[]>(
         'organizations/' + organization + '/invitations/'
             + id + '/versions/',
-    );
+    )).body().toValue();
     const newest = versions[0];
     assert(newest !== undefined, 'the invitation has no version');
     return newest;
@@ -898,7 +893,7 @@ Deno.test('cookie-session accept remints via refresh POST',
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...toccYYkLEABmlbpHJalgtQ,
-            postForHeaders: async (
+            POSTUnauthenticated: async (
                 resource,
                 body,
                 headerFields,
@@ -908,7 +903,7 @@ Deno.test('cookie-session accept remints via refresh POST',
                     return accessAnswer(minted);
                 }
                 return toccYYkLEABmlbpHJalgtQ
-                    .postForHeaders(
+                    .POSTUnauthenticated(
                         resource, body, headerFields,
                     );
             },
@@ -943,10 +938,11 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
         session.putSessionToken('pre-accept');
         const refused = new UnauthorizedError(
             'invalid_grant',
+            responseMessage({ error: 'invalid_grant' }, {}, 401),
         );
         const recording: RequestContext = {
             ...sarah,
-            postForHeaders: (
+            POSTUnauthenticated: (
                 resource,
                 body,
                 headerFields,
@@ -954,7 +950,7 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
                 if (resource === 'authentication/token') {
                     return Promise.reject(refused);
                 }
-                return sarah.postForHeaders(
+                return sarah.POSTUnauthenticated(
                     resource, body, headerFields,
                 );
             },
@@ -1020,7 +1016,7 @@ Deno.test('the remint waits for an in-flight facade refresh',
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...sarah,
-            postForHeaders: (
+            POSTUnauthenticated: (
                 resource,
                 body,
                 headerFields,
@@ -1031,7 +1027,7 @@ Deno.test('the remint waits for an in-flight facade refresh',
                         accessAnswer(minted),
                     );
                 }
-                return sarah.postForHeaders(
+                return sarah.POSTUnauthenticated(
                     resource, body, headerFields,
                 );
             },
@@ -1086,7 +1082,7 @@ Deno.test('a re-minted token without the seat earns one more'
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...sarah,
-            postForHeaders: (
+            POSTUnauthenticated: (
                 resource,
                 body,
                 headerFields,
@@ -1100,7 +1096,7 @@ Deno.test('a re-minted token without the seat earns one more'
                         accessAnswer(token),
                     );
                 }
-                return sarah.postForHeaders(
+                return sarah.POSTUnauthenticated(
                     resource, body, headerFields,
                 );
             },
@@ -1136,7 +1132,7 @@ Deno.test('two re-minted tokens without the seat surface a'
         const refreshBodies: unknown[] = [];
         const recording: RequestContext = {
             ...sarah,
-            postForHeaders: (
+            POSTUnauthenticated: (
                 resource,
                 body,
                 headerFields,
@@ -1147,7 +1143,7 @@ Deno.test('two re-minted tokens without the seat surface a'
                         accessAnswer(stale),
                     );
                 }
-                return sarah.postForHeaders(
+                return sarah.POSTUnauthenticated(
                     resource, body, headerFields,
                 );
             },

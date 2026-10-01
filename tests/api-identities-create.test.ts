@@ -4,7 +4,8 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { GET, POST, PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, POST, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
@@ -84,9 +85,9 @@ Deno.test(
             kind: 'person',
         }, DEV_TOKEN,
             operationIdHeader());
-        const identity = await GET<{ kind: string }>(
+        const identity = (await GET<{ kind: string }>(
             db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(identity.kind, 'person');
         // No PII yet — create body no longer carries pii.
         // Phase Final Task 2: identity spine ROW halves stripped.
@@ -117,9 +118,9 @@ Deno.test(
             credential: credential('syWUUcdBSbBgMwBiCrgbDw'),
         }, DEV_TOKEN,
             operationIdHeader());
-        const identity = await GET<{ kind: string }>(
+        const identity = (await GET<{ kind: string }>(
             db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(identity.kind, 'service');
         const creds = await deriveCredentialsFor(db
             , 'syWUUcdBSbBgMwBiCrgbDw');
@@ -184,8 +185,9 @@ Deno.test(
                 operationIdHeader()),
         );
         // The identity survives; it simply carries no PII yet.
-        const identity = await GET<{ kind: string }>(
-            db, 'identities/' + torn, DEV_TOKEN, operationIdHeader());
+        const identity = (await GET<{ kind: string }>(
+            db, 'identities/' + torn, DEV_TOKEN, operationIdHeader()))
+            .body().toValue();
         assertStrictEquals(identity.kind, 'person');
         await assertRejects(
             () => deriveIdentityPii(db, torn));

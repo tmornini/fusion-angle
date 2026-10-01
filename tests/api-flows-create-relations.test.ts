@@ -50,9 +50,9 @@ async function getFlowGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<StoredGraph> {
-    const flow = await ctx.GET<FlowWithGraph>(
+    const flow = (await ctx.GET<FlowWithGraph>(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
-    );
+    )).body().toValue();
     return asStoredGraph(
         flow.graph, 'flow.graph',
     );
@@ -153,10 +153,10 @@ Deno.test(
             projectId: generateIdentifier(),
             name: 'State Event Test Flow',
         });
-        const events = await ctx.GET<StateEntity[]>(
+        const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
                 + '/versions/',
-        );
+        )).body().toValue();
         assertStrictEquals(events.length, 1);
         const ev = events[0]!;
         assertStrictEquals(ev.entity_id, flowId);

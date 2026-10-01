@@ -59,7 +59,7 @@ Deno.test('unmatched slashless organizations ideas is 404',
         assertStrictEquals(res.status, 404);
     });
 
-Deno.test('in-table slashed organizations ideas is 200',
+Deno.test('in-table slashed organizations ideas is 204',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -67,7 +67,7 @@ Deno.test('in-table slashed organizations ideas is 200',
         const res = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', token,
         ));
-        assertStrictEquals(res.status, 200);
+        assertStrictEquals(res.status, 204);
     });
 
 Deno.test('unauthenticated in-table nested path answers the '

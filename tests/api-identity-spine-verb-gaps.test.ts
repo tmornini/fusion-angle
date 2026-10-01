@@ -9,6 +9,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { seedIdentityProvider } from './identity-fixtures.ts';
 import { generateIdentifier } from
@@ -550,11 +551,11 @@ async () => {
             , token),
     );
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as readonly {
+    const rows = await partBodiesOf<{
         readonly provider: string;
         readonly provider_subject: string;
         readonly action: string;
-    }[];
+    }>(res);
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.provider, 'google');
     assertStrictEquals(rows[0]!.provider_subject, 'sub-sarah');
@@ -720,11 +721,11 @@ async () => {
         db, req('GET', '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/', token),
     );
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as readonly {
+    const rows = await partBodiesOf<{
         readonly jti: string;
         readonly identity_id: string;
         readonly action: string;
-    }[];
+    }>(res);
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.jti, TOKEN_JTI);
     assertStrictEquals(rows[0]!.identity_id, 'XXZruirZyAOoRpNxaDnpSA');

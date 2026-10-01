@@ -148,9 +148,9 @@ async function readPairGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<StoredGraph> {
-    const flow = await ctx.GET<FlowWithGraph>(
+    const flow = (await ctx.GET<FlowWithGraph>(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
-    );
+    )).body().toValue();
     return asStoredGraph(
         flow.graph, 'flow.graph',
     );
@@ -325,7 +325,6 @@ Deno.test(
                     toNodeId: endId,
                 },
             ],
-            hasUndoHistory: false,
         });
         await postFlowFromMermaid(
             ctx, flowId, mmd, generateIdentifier(),

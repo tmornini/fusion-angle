@@ -1,5 +1,6 @@
 import { assert, assertStrictEquals } from '@std/assert';
-import { GET, PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -47,9 +48,9 @@ Deno.test('PUT /ai-agents/:id writes the agent', async () => {
         agentFields('Claude'),
     ));
     assert(put.status === 201 || put.status === 200);
-    const got = await GET<{ name: string }>(
+    const got = (await GET<{ name: string }>(
         db, 'ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(got.name, 'Claude');
 });
 

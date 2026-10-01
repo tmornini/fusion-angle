@@ -6,7 +6,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import { inPageContext, GET } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
@@ -17,7 +17,6 @@ import {
     deriveIdentityPii,
     deriveCredentialsFor,
 } from '../api/derive-identity-spine.ts';
-import { GET } from '../api/api.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { RequestError } from '../shared/http-errors.ts';
 
@@ -44,9 +43,9 @@ Deno.test('postIdentityCreation mints a person identity'
             phone: '555-0100', bio: 'bio',
         },
     });
-    const identity = await GET<{ kind: string }>(
+    const identity = (await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(identity.kind, 'person');
     const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
     assertStrictEquals(pii.email, 'pat@example.com');
@@ -60,9 +59,9 @@ Deno.test('postIdentityCreation mints a service identity'
     await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', {
         kind: 'service', secret: 'top-secret',
     });
-    const identity = await GET<{ kind: string }>(
+    const identity = (await GET<{ kind: string }>(
         db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(identity.kind, 'service');
     const creds = await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw');
     const cred = creds.find(r => r.kind === 'client_secret');
@@ -96,9 +95,9 @@ Deno.test('a resent postIdentityCreation is 409 and leaves'
     );
     assertStrictEquals(resent.status, 409);
     // Message-plane document at identities/:id is one head.
-    const identity = await GET<{ kind: string }>(
+    const identity = (await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-        operationIdHeader());
+        operationIdHeader())).body().toValue();
     assertStrictEquals(identity.kind, 'person');
     const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
     assertStrictEquals(pii.email, 'a@example.com');

@@ -9,9 +9,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ifMatchField,
     organizationItem,
-    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -321,10 +319,10 @@ Deno.test(
         // Hand-stitch a transition onto the complete node
         // via the named op (states/:id retired). Dated after
         // the create events so the inbox sees a finished WO.
-        const { etag } = await ctx.GETWithEtag(
+        const read = await ctx.GET(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId,
         );
-        await ctx.POSTWithHeaders(
+        await ctx.POST(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
                 + '/transition', {
                 transitionEventId: 'extra',
@@ -332,9 +330,7 @@ Deno.test(
                 release: null,
                 transitionAt: '2030-01-01T00:00:00.000000Z',
             },
-            [ifMatchField(
-                requiredEtag(etag, 'the work order GET'),
-            )],
+            [read],
         );
         const {
             workOrders, transitionsByWo, memberMap,
@@ -524,13 +520,13 @@ Deno.test(
         // named POST flows/:id/undo replay (the
         // server restores the prior body's graph
         // verbatim, same edge id).
-        const undoHead = await ctx.GETWithEtag<unknown>(
+        const undoHead = await ctx.GET<unknown>(
             organizationItem(
                 ctx, 'flows',
                 'ZOousbbnzpqlxJExVAruYQ',
             ),
         );
-        await ctx.POSTWithHeaders(
+        await ctx.POST(
             organizationItem(
                 ctx, 'flows',
                 'ZOousbbnzpqlxJExVAruYQ',
@@ -539,9 +535,7 @@ Deno.test(
                 eventId: generateIdentifier(),
                 at: nowUtc(),
             },
-            [ifMatchField(
-                requiredEtag(undoHead.etag, 'the flow GET'),
-            )],
+            [undoHead],
         );
         // A work order born AFTER the restore —
         // WB5a's most damning witness.

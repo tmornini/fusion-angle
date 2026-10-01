@@ -10,7 +10,6 @@ import {
 } from '../shared/identifier.ts';
 import {
     deriveFlowStateHistory,
-    flowEntityOf,
     flowStoredEntityOf,
 } from '../api/derive-flows.ts';
 import {
@@ -153,7 +152,7 @@ async function createFlow(
 // body) is no longer the document's head — its synthesized
 // document message pair (appended after, so strictly later)
 // is. A save must echo THIS id, read fresh via GET, exactly
-// as the real client (buildFlowPutBody's ctx.GETWithEtag)
+// as the real client (buildFlowPutBody's ctx.GET)
 // does.
 async function headResponseId(
     db: MemoryDbAdapter,
@@ -596,22 +595,14 @@ async () => {
     assert(pairsAt.some(r => r.id === headId));
 });
 
-// Task 8: the organizations/:id/flows/:id GET's ETag
-// source switched from the store's document head read
-// (`messageStore(db).getDocumentHead`) (message-pair.ts's ANY-method
-// LOCK head) to documentHeadMessagePairId
-// (document-family.ts's DOCUMENT head — the SAME
-// deriveDocumentsAt reduction the GET already runs to
-// build the entity). Design decision 6 means only PUT
-// ever writes at a document, so the two
-// reductions agree for a live flow — this proves the
-// wire ETag equals the store's document head
-// read (`messageStore(db).getDocumentHead`)'s own, independently
-// computed value, not merely that the route returns
-// SOME header.
+// The organizations/:id/flows/:id GET serves the stored
+// head, whose ETag is its own pair id. The store's document
+// head read (`messageStore(db).getDocumentHead`) finds that
+// head independently of the GET, so this proves the wire
+// ETag names it, not merely that the route returns SOME
+// header.
 Deno.test('e2e: the organizations/:id/flows/:id ETag'
-    + ' equals the store head read\'s own'
-+ ' reduction over the same document (documentHeadMessagePairId parity)',
+    + ' equals the store head read\'s own id',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -1250,7 +1241,6 @@ async function assertStoredPutOmitsUndoHistory(
     db: MemoryDbAdapter,
     flowId: string,
     body: Record<string, unknown>,
-    messagePairCount: number,
     token: string,
 ): Promise<void> {
     const stored = JSON.parse(
@@ -1277,31 +1267,13 @@ async function assertStoredPutOmitsUndoHistory(
     );
     assertStrictEquals(got.status, 200);
     const wire = await got.json() as Record<string, unknown>;
-    assertStrictEquals(
-        wire['hasUndoHistory'], messagePairCount > 1,
-        'GET stamps hasUndoHistory when COUNT(*) > 1',
-    );
-    assertStrictEquals('state' in wire, false);
-    assertEquals(
-        wire,
-        flowEntityOf(
-            {
-                name: flowId,
-                messagePairId: flowId,
-                method: 'PUT',
-                body,
-            },
-            'AjdvjuECVZEgZoFajaIEkg',
-            messagePairCount,
-        ) as unknown as Record<string, unknown>,
-    );
+    assertStrictEquals('state' in wire, true);
+    assertEquals(wire, stored);
 }
 
-// G2: stored PUT = flowEntityOf minus hasUndoHistory.
-// GET adds the stamp when this document has more than one
-// PUT or DELETE pair. Covers every G2 writer.
-Deno.test('hasUndoHistory is absent from the stored PUT and '
-+ 'present on GET when COUNT(*) > 1',
+// The GET serves the head as stored: no read-time stamp,
+// the lifecycle trio kept. Covers every G2 writer.
+Deno.test('the flow GET serves the stored state',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -1310,8 +1282,7 @@ async () => {
     assertStrictEquals(created.status, 201);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 1);
     await assertStoredPutOmitsUndoHistory(
-        db, flowId, await latestPutResponseBody(db, flowId), 1,
-        token,
+        db, flowId, await latestPutResponseBody(db, flowId), token,
     );
 
     const saveBody = documentBody(
@@ -1337,7 +1308,7 @@ async () => {
     assertStrictEquals(saved.status, 200);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 2);
     await assertStoredPutOmitsUndoHistory(
-        db, flowId, withoutId(saveBody), 2, token,
+        db, flowId, withoutId(saveBody), token,
     );
     const putJson = await saved.json() as {
         hasUndoHistory?: boolean;
@@ -1357,8 +1328,7 @@ async () => {
     assertStrictEquals(undone.status, 200);
     assertStrictEquals(await documentMessagePairCount(db, flowId), 3);
     await assertStoredPutOmitsUndoHistory(
-        db, flowId, await latestPutResponseBody(db, flowId), 3,
-        token,
+        db, flowId, await latestPutResponseBody(db, flowId), token,
     );
 });
 
@@ -1462,7 +1432,7 @@ async () => {
     ));
     assertStrictEquals(got.status, 200);
     const wire = await got.json() as Record<string, unknown>;
-    assertStrictEquals('graphDelta' in wire, false);
-    assertStrictEquals('revivals' in wire, false);
-    assertStrictEquals('hasUndoHistory' in wire, true);
+    assertStrictEquals('graphDelta' in wire, true);
+    assertStrictEquals('revivals' in wire, true);
+    assertStrictEquals('hasUndoHistory' in wire, false);
 });

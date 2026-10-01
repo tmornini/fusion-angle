@@ -20,7 +20,6 @@ import type { Id } from '../shared/types.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWriteMessagePair,
-    canonicalPath,
     storedPathAndNameOf,
     requestHeaderFields,
     requestTarget,
@@ -28,8 +27,7 @@ import {
     writeAnswerOf,
     ownWireOf,
     attachEtag,
-    attachDate,
-    streamGetFromStored,
+    httpDateOf,
     parseEntityTags,
     MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
@@ -41,25 +39,9 @@ import type {
     MessagePair, AuthMessagePairSeed,
 } from './message-pair.ts';
 import {
-    INSTANCE_DETAIL_PATTERN,
-    RECORD_TYPES_COLLECTION_PATTERN,
-} from './family-registry.ts';
-import {
     documentFamilyWiring,
-    documentHeadMessagePairId,
-    entityIdParam,
-    idFamilyOf,
-    throwDocumentMiss,
-    requireOrganization,
 } from './document-family.ts';
-import {
-    messageStore,
-} from './message-store.ts';
-import {
-    deriveInstanceHead,
-    projectionOmitsStored,
-} from './derive-record-instances.ts';
-import { projectReadableValues } from './attribute-acl.ts';
+import { servedSelection } from './head-reads.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -78,13 +60,10 @@ import {
     postToken,
     postAuthorize,
     refreshClearCookie,
-    refreshTokenFromCookieHeader,
     wireGrantError,
 } from './authentication.ts';
 import {
     ApiError,
-    UnauthorizedError,
-    RequestError,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
@@ -111,7 +90,6 @@ import {
     matchRoute,
     param,
     WRITE_RESPONSE_SPECS,
-    loadAttributeSchemaById,
     conditionalOf,
     type Conditional,
     type Route,
@@ -150,8 +128,6 @@ export {
 } from '../shared/http-errors.ts';
 
 const routeTable: readonly Route[] = routes;
-
-const BASE_URL = 'http://localhost';
 
 // The gate-side Decision 5 post: fired once per successful
 // write, AFTER the route handler's promise resolves — the
@@ -321,42 +297,6 @@ function preconditionRefusal(
         );
     }
     return undefined;
-}
-
-async function instanceAdvertised(
-    db: DbAdapter,
-    organization: string,
-    typeId: string,
-    instanceId: string,
-    roles: readonly string[],
-): Promise<{
-    tag: string;
-    limited: boolean;
-} | undefined> {
-    const head = await deriveInstanceHead(
-        db, organization, typeId, instanceId,
-    );
-    if (head === undefined) return undefined;
-    const attributesById = await loadAttributeSchemaById(
-        db, organization, typeId,
-    );
-    const projected = projectReadableValues(
-        head.values, attributesById, roles,
-    );
-    return {
-        tag: head.messagePairId,
-        limited: projectionOmitsStored(
-            head.values, projected,
-        ),
-    };
-}
-
-function limitedHeaders(
-    limited: boolean,
-): Record<string, string> {
-    return limited
-        ? { 'Authorization-Limited-Attributes': 'true' }
-        : {};
 }
 
 // The one catch shared by both pre-dispatch ownership regions
@@ -959,6 +899,18 @@ async function dispatched(
         };
         switch (method) {
             case 'GET': {
+                if (matched.select !== undefined) {
+                    return servedSelection(
+                        await matched.select(
+                            effective, params, actor,
+                            organization, roles,
+                        ),
+                        {
+                            date: httpDateOf(nowUtc()),
+                            requestId: ctx.requestId,
+                        },
+                    );
+                }
                 if (!matched.get) {
                     return Response.json(
                         {
@@ -969,25 +921,6 @@ async function dispatched(
                         },
                         { status: HTTP_METHOD_NOT_ALLOWED },
                     );
-                }
-                const streamedDocument =
-                    await streamStoredDocumentGet(
-                        effective,
-                        routePattern,
-                        params,
-                        organization,
-                    );
-                if (streamedDocument !== undefined) {
-                    return streamedDocument;
-                }
-                const streamedCollection =
-                    await streamStoredCollectionGet(
-                        effective,
-                        routePattern,
-                        organization,
-                    );
-                if (streamedCollection !== undefined) {
-                    return streamedCollection;
                 }
                 const result = await matched.get(
                     effective,
@@ -1001,55 +934,6 @@ async function dispatched(
                 if (result instanceof Response) {
                     return result;
                 }
-                // ETag attach: the document GET of a family
-                // whose PUT requires a conditional carries the
-                // current head pair id — the client save's
-                // baseline AND its echo source. Keyed through
-                // the SAME wiring consult + exact-pattern match
-                // the write side uses above (never a flows
-                // literal).
-                const readWiring = wiringForSegments(
-                    matched.segments,
-                );
-                if (
-                    readWiring !== undefined
-                    && routePattern
-                        === documentEntityPattern(
-                            readWiring,
-                        )
-                    && conditionalOf(
-                        documentEntityPattern(readWiring),
-                        'PUT',
-                    ) === 'required'
-                ) {
-                    const prefix = canonicalPath(
-                        organization,
-                        '/' + readWiring.family + '/',
-                    );
-                    // The derivation's OWN head pair id (Phase 4
-                    // Task 8) — the SAME reduction the flipped GET
-                    // above just ran to build `result`, not a
-                    // second, divergent one
-                    // (the store's document head read
-                    // (`messageStore(db).getDocumentHead`) — the
-                    // ANY-method LOCK head, still the write path's
-                    // source above). Same value for a document-
-                    // class route (tests/api-flow-document.test.ts
-                    // pins the equality); one mechanism now.
-                    const headMessagePairId =
-                        await documentHeadMessagePairId(
-                            effective, prefix,
-                            entityIdParam(
-                                readWiring, params,
-                            ),
-                        );
-                    if (headMessagePairId !== undefined) {
-                        return attachEtag(
-                            Response.json(result),
-                            headMessagePairId,
-                        );
-                    }
-                }
                 // Document /versions/:etag: ETag is the
                 // path token.
                 if (
@@ -1062,39 +946,6 @@ async function dispatched(
                         param(
                             params, params.length - 1,
                         ),
-                    );
-                }
-                // Instance detail ETag: the head pair id.
-                if (
-                    routePattern
-                        === INSTANCE_DETAIL_PATTERN
-                ) {
-                    const advertisedGet =
-                        await instanceAdvertised(
-                            effective,
-                            param(params, 0),
-                            param(params, 1),
-                            param(params, 2),
-                            roles,
-                        );
-                    if (advertisedGet !== undefined) {
-                        return attachEtag(
-                            Response.json(result, {
-                                headers: limitedHeaders(
-                                    advertisedGet.limited,
-                                ),
-                            }),
-                            advertisedGet.tag,
-                        );
-                    }
-                }
-                // Stream collection GET: one Date: now. No
-                // collection ETag. No 304. Assemble surfaces
-                // (organizations, invitations, members join)
-                // stay Date-free.
-                if (isLiveHeadCollectionGet(routePattern)) {
-                    return attachDate(
-                        Response.json(result), nowUtc(),
                     );
                 }
                 return Response.json(result);
@@ -1536,132 +1387,6 @@ async function dispatched(
 export type ClientFacadeAdapter =
     GuardedDbAdapter & LatencySimulation;
 
-function setCookieFromResponse(response: Response): string {
-    const cookies = typeof response.headers.getSetCookie
-        === 'function'
-        ? response.headers.getSetCookie()
-        : [];
-    if (cookies.length > 0) {
-        return cookies.join('; ');
-    }
-    return response.headers.get('Set-Cookie') ?? '';
-}
-
-async function unwrapResponse<T>(
-    response: Response,
-): Promise<T> {
-    if (response.ok) {
-        const text = await response.text();
-        if (text === '') return undefined as T;
-        const parsed: unknown = JSON.parse(text);
-        const refresh = refreshTokenFromCookieHeader(
-            setCookieFromResponse(response),
-        );
-        if (
-            refresh !== ''
-            && typeof parsed === 'object'
-            && parsed !== null
-            && !Array.isArray(parsed)
-            && !('refresh_token' in parsed)
-        ) {
-            return {
-                ...(parsed as Record<string, unknown>),
-                refresh_token: refresh,
-            } as T;
-        }
-        return parsed as T;
-    }
-    const { error } =
-        (await response.json()) as {
-            error: string;
-        };
-    if (response.status === HTTP_UNAUTHORIZED) {
-        throw new UnauthorizedError(error);
-    }
-    throw new RequestError(
-        `${error} (${response.url})`,
-        response.status,
-    );
-}
-
-// Authorization and Content-Type only. operation-id is a
-// caller header. request-id is the server's; this function
-// neither copies nor mints one.
-function facadeHeaders(
-    token: string,
-    contentType: boolean,
-): Record<string, string> {
-    const headers: Record<string, string> = {};
-    if (token !== '') {
-        headers['Authorization'] = 'Bearer ' + token;
-    }
-    if (contentType) {
-        headers['Content-Type'] = 'application/json';
-    }
-    return headers;
-}
-
-// The ONE await site for a GET-shaped facade call — GET
-// and GETWithEtag are thin wrappers over this, so the
-// simulateLatency literal-count pin
-// (pair-write-coverage.test.ts) stays at exactly 4 no matter
-// how many GET-shaped verbs read from it (delegation, not a
-// copy-pasted fifth await site).
-async function getResponse(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    headerFields?:
-        readonly (readonly [string, string])[],
-): Promise<Response> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, false);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
-    return handleRequest(
-        adapter,
-        new Request(
-            `${BASE_URL}/${resource}`,
-            { headers },
-        ),
-    );
-}
-
-// The ONE await site for a body-write facade call — PUT,
-// PUTWithEtag, PATCH, and PATCHWithEtag all share it so the
-// latency pin stays 4 (R3: never a fifth bare
-// await adapter.simulateLatency()).
-async function bodyWriteResponse(
-    adapter: ClientFacadeAdapter,
-    method: 'PUT' | 'PATCH',
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<Response> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, true);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
-    const body = JSON.stringify(payload);
-    headers['content-length'] = String(
-        new TextEncoder().encode(body).byteLength,
-    );
-    return handleRequest(
-        adapter,
-        new Request(
-            `${BASE_URL}/${resource}`,
-            {
-                method,
-                headers,
-                body,
-            },
-        ),
-    );
-}
-
 function wiringForSegments(
     segments: readonly string[],
 ): ReturnType<typeof documentFamilyWiring> {
@@ -1679,343 +1404,4 @@ function documentEntityPattern(
     return wiring.httpNest === 'organization'
         ? 'organizations/:id/' + wiring.family + '/:id'
         : wiring.family + '/:id';
-}
-
-// Stream families read the stored head: a work order's is
-// its whole state. Flows stay on derive for
-// hasUndoHistory.
-function streamFamilyWiring(
-    routePattern: string,
-): ReturnType<typeof documentFamilyWiring> {
-    const family = idFamilyOf(routePattern);
-    if (
-        family === undefined
-        || family === 'flows'
-    ) {
-        return undefined;
-    }
-    return documentFamilyWiring(family);
-}
-
-function collectionFamilyOf(
-    routePattern: string,
-): string | undefined {
-    if (!routePattern.endsWith('/')) return undefined;
-    const rest = routePattern.slice(0, -1);
-    if (rest.startsWith('organizations/:id/')) {
-        const family = rest.slice(
-            'organizations/:id/'.length,
-        );
-        if (family.includes('/')) return undefined;
-        return family;
-    }
-    if (rest.includes('/')) return undefined;
-    return rest;
-}
-
-function streamCollectionWiring(
-    routePattern: string,
-): ReturnType<typeof documentFamilyWiring> {
-    const family = collectionFamilyOf(routePattern);
-    if (
-        family === undefined
-        || family === 'flows'
-        || family === 'members'
-    ) {
-        return undefined;
-    }
-    return documentFamilyWiring(family);
-}
-
-async function streamStoredDocumentGet(
-    db: DbAdapter,
-    routePattern: string,
-    params: string[],
-    organization: Id | undefined,
-): Promise<Response | undefined> {
-    const wiring = streamFamilyWiring(routePattern);
-    if (wiring === undefined) return undefined;
-    const organizationId = requireOrganization(organization);
-    const id = entityIdParam(wiring, params);
-    const prefix = canonicalPath(
-        organizationId, '/' + wiring.family + '/',
-    );
-    const stored = await messageStore(db).getDocumentHead(prefix, id);
-    if (stored === null) {
-        throw await throwDocumentMiss(
-            wiring, db, organizationId, id,
-        );
-    }
-    return streamGetFromStored(stored, nowUtc());
-}
-
-async function streamStoredCollectionGet(
-    db: DbAdapter,
-    routePattern: string,
-    organization: Id | undefined,
-): Promise<Response | undefined> {
-    const wiring = streamCollectionWiring(routePattern);
-    if (wiring === undefined) return undefined;
-    const organizationId = requireOrganization(organization);
-    const prefix = canonicalPath(
-        organizationId, '/' + wiring.family + '/',
-    );
-    const rows = await messageStore(db).getCollection(
-        prefix,
-    );
-    return attachDate(Response.json(rows), nowUtc());
-}
-
-// Stream family collection GET (live heads). members is
-// a memberships join (not this path). record-types is
-// org-nested, so its pattern is not the family name.
-function isLiveHeadCollectionGet(
-    routePattern: string,
-): boolean {
-    if (routePattern === RECORD_TYPES_COLLECTION_PATTERN) {
-        return true;
-    }
-    const family = collectionFamilyOf(routePattern);
-    if (family === undefined || family === 'members') {
-        return false;
-    }
-    return documentFamilyWiring(family) !== undefined;
-}
-
-// Strong ETag header → unquoted validator (strip
-// surrounding quotes when present). Absent / empty →
-// undefined.
-function etagFromHeader(
-    response: Response,
-): string | undefined {
-    const raw = response.headers.get('ETag');
-    if (raw === null || raw === '') {
-        return undefined;
-    }
-    if (
-        raw.length >= 2
-        && raw[0] === '"'
-        && raw[raw.length - 1] === '"'
-    ) {
-        return raw.slice(1, -1);
-    }
-    return raw;
-}
-
-export async function GET<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    headerFields?:
-        readonly (readonly [string, string])[],
-): Promise<T> {
-    return unwrapResponse<T>(
-        await getResponse(
-            adapter, resource, token, headerFields,
-        ),
-    );
-}
-
-// GET plus the strong ETag (quotes stripped), for the
-// If-Match of a later conditional PUT or PATCH.
-export async function GETWithEtag<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    headerFields?:
-        readonly (readonly [string, string])[],
-): Promise<{ body: T; etag: string | undefined }> {
-    const response = await getResponse(
-        adapter, resource, token, headerFields,
-    );
-    const body = await unwrapResponse<T>(response);
-    return {
-        body,
-        etag: etagFromHeader(response),
-    };
-}
-
-export async function PUT<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<T> {
-    return unwrapResponse<T>(
-        await bodyWriteResponse(
-            adapter, 'PUT', resource, payload, token,
-            headerFields,
-        ),
-    );
-}
-
-export async function PUTWithEtag<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<{ body: T; etag: string | undefined }> {
-    const response = await bodyWriteResponse(
-        adapter, 'PUT', resource, payload, token,
-        headerFields,
-    );
-    const body = await unwrapResponse<T>(response);
-    return {
-        body,
-        etag: etagFromHeader(response),
-    };
-}
-
-export async function PATCH<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<T> {
-    return unwrapResponse<T>(
-        await bodyWriteResponse(
-            adapter, 'PATCH', resource, payload, token,
-            headerFields,
-        ),
-    );
-}
-
-export async function PATCHWithEtag<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<{ body: T; etag: string | undefined }> {
-    const response = await bodyWriteResponse(
-        adapter, 'PATCH', resource, payload, token,
-        headerFields,
-    );
-    const body = await unwrapResponse<T>(response);
-    return {
-        body,
-        etag: etagFromHeader(response),
-    };
-}
-
-// The ONE await site for a DELETE-shaped facade call —
-// DELETE and DELETEWithEtag share it so the latency pin
-// stays 4.
-async function deleteResponse(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<Response> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, false);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
-    return handleRequest(
-        adapter,
-        new Request(
-            `${BASE_URL}/${resource}`,
-            {
-                method: 'DELETE',
-                headers,
-            },
-        ),
-    );
-}
-
-export async function DELETE(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<void> {
-    await unwrapResponse(
-        await deleteResponse(
-            adapter, resource, token, headerFields,
-        ),
-    );
-}
-
-// DELETE plus the strong ETag of the state it answers: a
-// release answers its work order's version.
-export async function DELETEWithEtag(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<{ etag: string | undefined }> {
-    const response = await deleteResponse(
-        adapter, resource, token, headerFields,
-    );
-    await unwrapResponse(response);
-    return { etag: etagFromHeader(response) };
-}
-
-async function postResponse(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<Response> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, true);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
-    const body = JSON.stringify(payload);
-    headers['content-length'] = String(
-        new TextEncoder().encode(body).byteLength,
-    );
-    return handleRequest(
-        adapter,
-        new Request(
-            `${BASE_URL}/${resource}`,
-            {
-                method: 'POST',
-                headers,
-                body,
-            },
-        ),
-    );
-}
-
-export async function POST<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<T> {
-    return unwrapResponse<T>(
-        await postResponse(
-            adapter, resource, payload, token,
-            headerFields,
-        ),
-    );
-}
-
-export async function postForHeaders(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    payload: Record<string, unknown>,
-    token: string,
-    headerFields?: readonly (readonly [string, string])[],
-): Promise<{
-    readonly status: number;
-    readonly headers: Headers;
-    readonly body: string;
-}> {
-    const response = await postResponse(
-        adapter, resource, payload, token, headerFields,
-    );
-    return {
-        status: response.status,
-        headers: response.headers,
-        body: await response.text(),
-    };
 }

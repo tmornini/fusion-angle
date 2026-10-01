@@ -1,7 +1,5 @@
-import { assertEquals, assertRejects, assertStrictEquals } from '@std/assert';
-import {
-    GET, PUT, DELETE,
-} from '../api/api.ts';
+import { assertRejects, assertStrictEquals } from '@std/assert';
+import { DELETE, GET, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -29,13 +27,13 @@ const ATTR = ATTRS + 'UQBiHFcwJeCDSnmkPBoYRA';
 // record-types
 
 Deno.test(
-    'GET nested record-types returns an empty array'
-    + ' on an empty db',
+    'GET nested record-types answers 204 on an empty db',
     async () => {
         const db = await freshDb();
-        const out =
-            await GET<unknown[]>(db, TYPES, DEV_TOKEN, operationIdHeader());
-        assertEquals(out, []);
+        const read =
+            await GET(db, TYPES, DEV_TOKEN, operationIdHeader());
+        assertStrictEquals(read.query('status').toNumber(), 204);
+        assertStrictEquals(read.body().exists(), false);
     },
 );
 
@@ -52,13 +50,13 @@ Deno.test(
             state: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const stored = await GET<{
+        const stored = (await GET<{
             id: string;
             name: string;
             description: string;
             position: number;
             state: string;
-        }>(db, TYPE, DEV_TOKEN, operationIdHeader());
+        }>(db, TYPE, DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.name, 'Customer');
         assertStrictEquals(stored.position, 1);
@@ -91,7 +89,7 @@ Deno.test(
 // nested attributes
 
 Deno.test(
-    'GET nested attributes returns an empty array',
+    'GET nested attributes answers 204 when the type has none',
     async () => {
         const db = await freshDb();
         await PUT(db, TYPE, {
@@ -103,10 +101,10 @@ Deno.test(
             state: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const out = await GET<unknown[]>(
-            db, ATTRS, DEV_TOKEN,
-            operationIdHeader());
-        assertEquals(out, []);
+        const read = await GET(
+            db, ATTRS, DEV_TOKEN, operationIdHeader());
+        assertStrictEquals(read.query('status').toNumber(), 204);
+        assertStrictEquals(read.body().exists(), false);
     },
 );
 
@@ -133,11 +131,11 @@ Deno.test(
             write_roles: ['member', 'admin'],
         }, DEV_TOKEN,
             operationIdHeader());
-        const stored = await GET<{
+        const stored = (await GET<{
             id: string;
             record_type_id: string;
             attribute_type: string;
-        }>(db, ATTR, DEV_TOKEN, operationIdHeader());
+        }>(db, ATTR, DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(stored.id, 'UQBiHFcwJeCDSnmkPBoYRA');
         assertStrictEquals(stored.record_type_id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(
@@ -181,14 +179,16 @@ Deno.test(
 // organizations/:id/flows/:id/records) — UNTOUCHED
 
 Deno.test(
-    'GET organizations/:id/flows/:id/records returns an empty array',
+    'GET organizations/:id/flows/:id/records answers 204 when it'
+    + ' binds none',
     async () => {
         const db = await freshDb();
-        const out = await GET<unknown[]>(
+        const read = await GET(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/', DEV_TOKEN,
                 operationIdHeader());
-        assertEquals(out, []);
+        assertStrictEquals(read.query('status').toNumber(), 204);
+        assertStrictEquals(read.body().exists(), false);
     },
 );
 
@@ -215,13 +215,13 @@ Deno.test(
             at: '2026-05-01T00:00:00.000000Z',
         }, DEV_TOKEN,
             operationIdHeader());
-        const stored = await GET<{
+        const stored = (await GET<{
             id: string;
             flow_id: string;
             record_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw'
-            , DEV_TOKEN, operationIdHeader());
+            , DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(stored.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
         assertStrictEquals(stored.record_id, 'rbfHGatkwQzGZJVXKJEeyw');
     },

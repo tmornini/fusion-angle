@@ -13,6 +13,7 @@ import {
     RequestError,
     HTTP_NOT_FOUND,
     HTTP_FORBIDDEN,
+    HTTP_GONE,
 } from '../shared/http-errors.ts';
 import type { RequestContext } from './request-context.ts';
 import {
@@ -35,9 +36,9 @@ export async function getIdentity(
     ctx: RequestContext,
     id: Id,
 ): Promise<Identity> {
-    const entity = await ctx.GET<IdentityEntity>(
+    const entity = (await ctx.GET<IdentityEntity>(
         `identities/${id}`,
-    );
+    )).body().toValue();
     return new Identity(entity);
 }
 
@@ -97,9 +98,9 @@ function serviceFacet(
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
-    const identities = await ctx.GET<IdentityEntity[]>(
+    const identities = (await ctx.GETCollection<IdentityEntity>(
         'identities/',
-    );
+    )).map((m) => m.body().toValue());
     return Promise.all(identities.map(async identity =>
         identity.kind === 'service'
             ? {
@@ -114,17 +115,17 @@ export async function getIdentityRoster(
             }));
 }
 
-// Nested facet only. 404 (absent/erased) and 403
-// (not self, not admin) both surface as erased —
+// Nested facet only. 404 (absent), 410 (erased), and 403
+// (not self, not admin) all surface as erased —
 // the CALLER, not this adapter, decides the display.
 export async function getMemberPii(
     ctx: RequestContext,
     id: Id,
 ): Promise<MemberPii> {
     try {
-        const row = await ctx.GET<IdentityPiiEntity>(
+        const row = (await ctx.GET<IdentityPiiEntity>(
             `identities/${id}/pii`,
-        );
+        )).body().toValue();
         return {
             erased: false,
             name: row.name,
@@ -135,6 +136,7 @@ export async function getMemberPii(
     } catch (error) {
         if (error instanceof RequestError
             && (error.status === HTTP_NOT_FOUND
+                || error.status === HTTP_GONE
                 || error.status === HTTP_FORBIDDEN)) {
             return { erased: true };
         }
@@ -191,9 +193,9 @@ export async function getClientRegistration(
 ): Promise<ClientRegistration> {
     try {
         const row =
-            await ctx.GET<ClientRegistrationEntity>(
+            (await ctx.GET<ClientRegistrationEntity>(
                 `identities/${id}/registration`,
-            );
+            )).body().toValue();
         return {
             registered: true,
             grantTypes: row.grant_types,
@@ -205,7 +207,8 @@ export async function getClientRegistration(
     } catch (err) {
         if (
             err instanceof RequestError
-            && err.status === HTTP_NOT_FOUND
+            && (err.status === HTTP_NOT_FOUND
+                || err.status === HTTP_GONE)
         ) {
             return { registered: false };
         }

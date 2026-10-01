@@ -7,16 +7,13 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET } from '../api/api.ts';
 import { testHashPassword } from './mock-seed.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
     type RequestContext,
 } from '../client/request-context.ts';
-import {
-    inPageClient,
-    inPageContext,
-} from './in-page-facade.ts';
+import { responseMessage } from './fixtures/response-message.ts';
+import { inPageClient, inPageContext, GET } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postPasswordLogin,
@@ -97,9 +94,10 @@ async () => {
     const creds = await postPasswordLogin(
         ctx, 'demo@example.com', 's3cret');
     assert(creds);
-    assert(Array.isArray(
-        await GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , creds.accessToken, operationIdHeader())));
+    assertStrictEquals((await GET(
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        creds.accessToken, operationIdHeader(),
+    )).query('status').toNumber(), 200);
 });
 
 Deno.test('postPasswordLogin issues a 30-day refresh token',
@@ -137,7 +135,7 @@ async () => {
     // password — it must surface, not collapse to null.
     const ctx = {
         session: inPageClient(memoryDbAdapter()),
-        postForHeaders: async () => {
+        POSTUnauthenticated: async () => {
             throw new Error('upstream 500');
         },
     } as unknown as RequestContext;
@@ -156,7 +154,7 @@ async () => {
     }[] = [];
     const ctx = {
         session: inPageClient(memoryDbAdapter()),
-        postForHeaders: async (
+        POSTUnauthenticated: async (
             _path: string,
             body: Record<string, unknown>,
             headers?: readonly (readonly [string, string])[],
@@ -168,25 +166,17 @@ async () => {
                     : {}),
             });
             if (posted.length === 1) {
-                return {
-                    status: 200,
-                    headers: new Headers({
-                        'authentication-info':
-                            'code="issued-code"',
-                    }),
-                    body: '',
-                };
-            }
-            return {
-                status: 200,
-                headers: new Headers({
+                return responseMessage({}, {
                     'authentication-info':
-                        'access_token="a"',
-                    'set-cookie':
-                        'refresh_token=r; HttpOnly',
-                }),
-                body: '{"token_type":"Bearer"}',
-            };
+                        'code="issued-code"',
+                });
+            }
+            return responseMessage({ token_type: 'Bearer' }, {
+                'authentication-info':
+                    'access_token="a"',
+                'set-cookie':
+                    'refresh_token=r; HttpOnly',
+            });
         },
     } as unknown as RequestContext;
     await postPasswordLogin(ctx, 'a@b.c', 'pw');

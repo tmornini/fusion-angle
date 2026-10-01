@@ -1,5 +1,5 @@
-// shared/http-message/multipart.ts
 import { HttpMessageError } from './types.ts';
+import { CONTENT_LENGTH } from './framing.ts';
 
 // A collection is multipart/mixed of the responses its
 // documents serve (RFC 2046 §5.1; RFC 9112 §10.1). Every
@@ -159,11 +159,10 @@ export function splitParts(
 // The one content-length line of a part's message head;
 // none means the part has no body.
 function contentLengthOf(head: string): number {
+    const line = CONTENT_LENGTH + ':';
     const values = head.split(CRLF).slice(1)
-        .filter((line) => line.toLowerCase()
-            .startsWith('content-length:'))
-        .map((line) => line.slice('content-length:'.length)
-            .trim());
+        .filter((field) => field.toLowerCase().startsWith(line))
+        .map((field) => field.slice(line.length).trim());
     if (values.length === 0) return 0;
     const [value] = values;
     if (values.length > 1 || !/^\d+$/.test(value!)) {

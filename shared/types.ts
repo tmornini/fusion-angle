@@ -516,7 +516,7 @@ export type IdentityCredentialStatus =
 // Append-only credential lifecycle event. One row per
 // event; current validity = the latest event per
 // (identity_id, kind). `secret` is OPAQUE material
-// projected out at every read route (api.ts `withoutSecret`),
+// projected out at every read route (credentialReader),
 // so it never crosses the API boundary — never rendered.
 // Revocation is a NEW 'revoked' event, never a splice
 // (contrast identity_pii). The client-assertion crypto is
@@ -1095,25 +1095,15 @@ export interface FlowEntity {
     lock_timeout: number;
 }
 
-// The GET-response shape for a flow: the stored row plus the
-// `graph` field (the head document message pair's OWN `graph`
-// field as native nested JSON — api/derive-flows.ts's
-// flowEntityOf; single GET /flows/:id and the list GET
-// /flows both serve this shape). The live graph rides the
-// flow document body; the frozen plane
+// The derived shape of a flow: the entity plus the `graph`
+// field (the head document's OWN `graph` as native nested
+// JSON — api/derive-flows.ts's flowEntityOf). The list GET
+// /flows serves it; the single GET /flows/:id serves the
+// stored head, flowStoredEntityOf's shape. The live graph
+// rides the flow document body; the frozen plane
 // (`work_orders.flow_graph`) keeps its own copy.
-// `hasUndoHistory` (Phase 14 Task 8) is a CHEAP, approximate
-// signal — this flow's own flows/:id document-message-pair
-// count exceeds 1 (i.e. it has been edited past genesis) —
-// reusing whatever GET already fetched the flow (page load,
-// the post-undo refresh) rather than a new wire read; a rare
-// false positive (undo has already reached genesis, but a
-// save/undo cycle since kept the pair count above 1)
-// degrades to a silent server-side no-op on the next undo,
-// never a crash or wrong restore.
 export type FlowWithGraph = FlowEntity & {
     graph: Record<string, unknown>;
-    hasUndoHistory: boolean;
 };
 
 export type FlowNodeId = Id;

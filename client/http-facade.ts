@@ -1,11 +1,20 @@
 import {
     UnauthorizedError,
     RequestError,
+    HTTP_NO_CONTENT,
     HTTP_UNAUTHORIZED,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { Octets } from '../shared/http-message/octets.ts';
+import { splitParts } from '../shared/http-message/multipart.ts';
+import {
+    HttpMessageError,
+    type FieldLine,
+} from '../shared/http-message/types.ts';
 import { authParam } from './authentication.ts';
 
 // Fetch transport for the server ZIP. Same RequestContext
@@ -16,97 +25,107 @@ import { authParam } from './authentication.ts';
 // single-flights a cookie refresh POST carrying that id,
 // retries once, and bounces to /auth if the refresh fails.
 
+export type HeaderFields = readonly (readonly [string, string])[];
+
 export interface HttpFacade {
     GET<T>(
         resource: string,
         token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<T>;
-    GETWithEtag<T>(
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>>;
+    // A collection's parts, each a document's whole
+    // message; a 204 is none.
+    GETCollection<T>(
         resource: string,
         token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<{ body: T; etag: string | undefined }>;
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>[]>;
     PUT<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<T>;
-    PUTWithEtag<T>(
-        resource: string,
-        payload: Record<string, unknown>,
-        token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<{ body: T; etag: string | undefined }>;
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>>;
     PATCH<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<T>;
-    PATCHWithEtag<T>(
-        resource: string,
-        payload: Record<string, unknown>,
-        token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<{ body: T; etag: string | undefined }>;
-    DELETE(
-        resource: string,
-        token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<void>;
-    DELETEWithEtag(
-        resource: string,
-        token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<{ etag: string | undefined }>;
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>>;
     POST<T>(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<T>;
-    postForHeaders(
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>>;
+    DELETE(
+        resource: string,
+        token: string,
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage>;
+    POSTUnauthenticated<T>(
         resource: string,
         payload: Record<string, unknown>,
-        token: string,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<{
-        readonly status: number;
-        readonly headers: Headers;
-        readonly body: string;
-    }>;
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>>;
 }
 
-async function unwrapResponse<T>(
+// The response whole: status, header lines, and octets.
+// Fetch has removed any content coding already, so a
+// coded response's content-encoding and content-length
+// lines, which describe octets this message does not hold,
+// are not kept. set-cookie stays one line per cookie.
+async function messageOf<T>(
     response: Response,
-): Promise<T> {
-    if (response.ok) {
-        const text = await response.text();
-        if (text === '') return undefined as T;
-        return JSON.parse(text) as T;
+): Promise<HttpMessage<T>> {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const coded = response.headers.has('content-encoding');
+    const fields: FieldLine[] = [];
+    response.headers.forEach((value, name) => {
+        if (name === 'set-cookie') return;
+        if (coded && (name === 'content-encoding'
+            || name === 'content-length')) return;
+        fields.push({ name, value });
+    });
+    const cookies = typeof response.headers.getSetCookie
+        === 'function'
+        ? response.headers.getSetCookie()
+        : [];
+    for (const value of cookies) {
+        fields.push({ name: 'set-cookie', value });
     }
-    const { error } =
-        (await response.json()) as {
-            error: string;
-        };
+    return HttpMessage.fromModel<T>({
+        startLine: {
+            kind: 'response',
+            version: 'HTTP/1.1',
+            status: response.status,
+            reason: '',
+        },
+        fields,
+        body: bytes.byteLength > 0
+            ? Octets.fromBytes(bytes)
+            : undefined,
+        trailer: undefined,
+    });
+}
+
+// A 2xx is the message; anything else throws, its text
+// the content's `error`, carrying the message it was
+// answered. What a body that is not JSON does stays with
+// the retries bullet.
+async function answered<T>(
+    response: Response,
+): Promise<HttpMessage<T>> {
+    const message = await messageOf<T>(response);
+    if (response.ok) return message;
+    const error = message.query('body.error').toText();
     if (response.status === HTTP_UNAUTHORIZED) {
-        throw new UnauthorizedError(error);
+        throw new UnauthorizedError(error, message);
     }
     throw new RequestError(
         `${error} (${response.url})`,
         response.status,
+        message,
     );
 }
 
@@ -128,23 +147,6 @@ function organizationToRestore(
     } catch {
         return undefined;
     }
-}
-
-function etagFromHeader(
-    response: Response,
-): string | undefined {
-    const raw = response.headers.get('ETag');
-    if (raw === null || raw === '') {
-        return undefined;
-    }
-    if (
-        raw.length >= 2
-        && raw[0] === '"'
-        && raw[raw.length - 1] === '"'
-    ) {
-        return raw.slice(1, -1);
-    }
-    return raw;
 }
 
 function requestHeaders(
@@ -315,105 +317,67 @@ export function createHttpFacade(
 
         const facade: HttpFacade = {
             GET: async (resource, token, headerFields) =>
-                unwrapResponse(
-                    await exchangeOnce(
-                        'GET', resource, token,
-                        undefined, headerFields,
-                    ),
-                ),
-            GETWithEtag: async (
-                resource, token, headerFields,
-            ) => {
+                answered(await exchangeOnce(
+                    'GET', resource, token,
+                    undefined, headerFields,
+                )),
+            // The boundary is read from the raw line: the
+            // structured parser would take its leading digit
+            // for a number. The body is split as Latin-1, one
+            // char per octet, so a part's content-length
+            // counts what it framed.
+            GETCollection: async <T>(
+                resource: string,
+                token: string,
+                headerFields?: HeaderFields,
+            ): Promise<HttpMessage<T>[]> => {
                 const response = await exchangeOnce(
                     'GET', resource, token,
                     undefined, headerFields,
                 );
-                return {
-                    body: await unwrapResponse(response),
-                    etag: etagFromHeader(response),
-                };
+                const type = response.headers.get(
+                    'content-type',
+                );
+                const message = await answered(response);
+                if (response.status === HTTP_NO_CONTENT) {
+                    return [];
+                }
+                if (type === null) {
+                    throw new HttpMessageError(
+                        'a collection answer has no content-type',
+                    );
+                }
+                return splitParts(
+                    type,
+                    Octets.fromBytes(message.body().toBytes())
+                        .toLatin1(),
+                ).map((part) => HttpMessage.fromWire<T>(part));
             },
-            PUT: async (
-                resource, payload, token, headerFields,
-            ) => unwrapResponse(
-                await exchangeOnce(
+            PUT: async (resource, payload, token, headerFields) =>
+                answered(await exchangeOnce(
                     'PUT', resource, token,
                     payload, headerFields,
-                ),
-            ),
-            PUTWithEtag: async (
-                resource, payload, token, headerFields,
-            ) => {
-                const response = await exchangeOnce(
-                    'PUT', resource, token,
-                    payload, headerFields,
-                );
-                return {
-                    body: await unwrapResponse(response),
-                    etag: etagFromHeader(response),
-                };
-            },
-            PATCH: async (
-                resource, payload, token, headerFields,
-            ) => unwrapResponse(
-                await exchangeOnce(
+                )),
+            PATCH: async (resource, payload, token, headerFields) =>
+                answered(await exchangeOnce(
                     'PATCH', resource, token,
                     payload, headerFields,
-                ),
-            ),
-            PATCHWithEtag: async (
-                resource, payload, token, headerFields,
-            ) => {
-                const response = await exchangeOnce(
-                    'PATCH', resource, token,
+                )),
+            POST: async (resource, payload, token, headerFields) =>
+                answered(await exchangeOnce(
+                    'POST', resource, token,
                     payload, headerFields,
-                );
-                return {
-                    body: await unwrapResponse(response),
-                    etag: etagFromHeader(response),
-                };
-            },
-            DELETE: async (
-                resource, token, headerFields,
-            ) => {
-                await unwrapResponse(
-                    await exchangeOnce(
-                        'DELETE', resource, token,
-                        undefined, headerFields,
-                    ),
-                );
-            },
-            DELETEWithEtag: async (
-                resource, token, headerFields,
-            ) => {
-                const response = await exchangeOnce(
+                )),
+            DELETE: async (resource, token, headerFields) =>
+                answered(await exchangeOnce(
                     'DELETE', resource, token,
                     undefined, headerFields,
-                );
-                await unwrapResponse(response);
-                return { etag: etagFromHeader(response) };
-            },
-            POST: async (
-                resource, payload, token, headerFields,
-            ) => unwrapResponse(
-                await exchangeOnce(
-                    'POST', resource, token,
-                    payload, headerFields,
-                ),
-            ),
-            postForHeaders: async (
-                resource, payload, token, headerFields,
-            ) => {
-                const response = await exchange(
-                    'POST', resource, token,
-                    payload, headerFields,
-                );
-                return {
-                    status: response.status,
-                    headers: response.headers,
-                    body: await response.text(),
-                };
-            },
+                )),
+            POSTUnauthenticated: async (
+                resource, payload, headerFields,
+            ) => messageOf(await exchange(
+                'POST', resource, '', payload, headerFields,
+            )),
         };
         return facade;
     };

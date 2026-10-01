@@ -6,9 +6,8 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    GET, UnauthorizedError, RequestError,
-} from '../api/api.ts';
+import { UnauthorizedError, RequestError } from '../api/api.ts';
+import { GET } from './in-page-facade.ts';
 import { devToken, expiredToken } from './token-fixtures.ts';
 import { operationIdHeader } from './operation-id-header.ts';
 

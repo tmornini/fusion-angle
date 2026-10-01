@@ -234,7 +234,7 @@ Deno.test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     assertStrictEquals('follows' in secondRow!, false);
 });
 
-Deno.test('e2e: DELETE marks the tag — GET 404s after, and the'
+Deno.test('e2e: DELETE marks the tag — GET 410s after, and the'
 + ' DELETE pair carries Supersedes to the live head, never a'
 + ' physical splice', async () => {
     const db = await freshDb();
@@ -274,7 +274,7 @@ Deno.test('e2e: DELETE marks the tag — GET 404s after, and the'
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'cKweIyGvtrOHqQULtGJUZQ/tags/xDyDkxEPwtcNmJVknUHDsg', token,
     ));
-    assertStrictEquals(get.status, 404);
+    assertStrictEquals(get.status, 410);
 });
 
 Deno.test('e2e: a malformed tag body (extra key) 400s and stores'

@@ -10,10 +10,11 @@ import { deriveIdentityPii } from
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import {
-    HTTP_NOT_FOUND,
+    HTTP_GONE,
     RequestError,
 } from '../shared/http-errors.ts';
 import {
+    buildHumanMemberMap,
     deleteHumanMemberSeat,
     featuredHumanMembers,
     getAdminSeatIds,
@@ -21,7 +22,10 @@ import {
     postHumanMemberCreation,
     type HumanMemberDraft,
 } from '../client/members.ts';
-import { type HumanMember } from '../shared/types.ts';
+import {
+    type HumanMember,
+    type MembershipEntity,
+} from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -60,17 +64,17 @@ Deno.test(
 
         // Phase Final Task 2: members/human_members ROW
         // halves stripped — parent via message-plane GET.
-        const row = await ctx.GET<{
+        const row = (await ctx.GET<{
             id: string; kind: string; title: string;
-        }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
+        }>('identities/xdaJyuuPyHfffCGLhqDrOQ')).body().toValue();
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');
         const pii = await deriveIdentityPii(db, 'xdaJyuuPyHfffCGLhqDrOQ');
         assertStrictEquals(pii.name, 'Alice');
-        const seat = await ctx.GET<{
+        const seat = (await ctx.GET<{
             identity_id: string; type: string;
         }>('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'xdaJyuuPyHfffCGLhqDrOQ');
+            + 'xdaJyuuPyHfffCGLhqDrOQ')).body().toValue();
         assertStrictEquals(seat.identity_id, 'xdaJyuuPyHfffCGLhqDrOQ');
         assertStrictEquals(seat.type, 'member');
     },
@@ -93,9 +97,9 @@ Deno.test(
                 team_dimensions: {},
             },
         );
-        const after = await ctx.GET<{
+        const after = (await ctx.GET<{
             id: string; title: string;
-        }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
+        }>('identities/xdaJyuuPyHfffCGLhqDrOQ')).body().toValue();
         assertStrictEquals(after.title, 'Lead');
     },
 );
@@ -160,7 +164,7 @@ Deno.test('deleteHumanMemberSeat removes the seat', async () => {
         ),
     ) as Error;
     assert(err instanceof RequestError);
-    assertStrictEquals(err.status, HTTP_NOT_FOUND);
+    assertStrictEquals(err.status, HTTP_GONE);
     assertEquals(await deriveMembershipsForIdentity(db, id), []);
 });
 
@@ -173,4 +177,22 @@ async () => {
         await getAdminSeatIds(ctx),
         ['XXZruirZyAOoRpNxaDnpSA'],
     );
+});
+
+Deno.test('buildHumanMemberMap takes the seats in grant order',
+() => {
+    const later = generateIdentifier();
+    const earlier = generateIdentifier();
+    const seat = (
+        identity: string, at: string,
+    ): MembershipEntity => ({
+        id: generateIdentifier(),
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        identity_id: identity, type: 'member', at,
+    });
+    const map = buildHumanMemberMap([
+        seat(later, '2026-01-02T00:00:00.000000Z'),
+        seat(earlier, '2026-01-01T00:00:00.000000Z'),
+    ]);
+    assertEquals([...map.keys()], [earlier, later]);
 });

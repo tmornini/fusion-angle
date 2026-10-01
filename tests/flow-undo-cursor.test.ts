@@ -33,9 +33,13 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
+    type Latch,
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { inPageContext } from './in-page-facade.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { sessionContext } from '../web-app/app/client.ts';
 import {
     postFlowCreation,
@@ -44,6 +48,7 @@ import {
 } from '../client/flow-mutations.ts';
 import { getRenderableFlowGraph } from
     '../web-app/app/flow-graph-layout.ts';
+import { getFlowVersions } from '../client/flow-queries.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -456,12 +461,11 @@ Deno.test(
         let posts = 0;
         const flaky: RequestContext = {
             ...ctx,
-            POSTWithHeaders: <T>(
+            POST: <T>(
                 resource: string,
                 body: Record<string, unknown>,
-                headerFields:
-                    readonly (readonly [string, string])[],
-            ): Promise<T> => {
+                latch?: Latch,
+            ): Promise<HttpMessage<T>> => {
                 if (resource === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + '' + flowId +
                     '/undo') {
@@ -470,19 +474,16 @@ Deno.test(
                         return Promise.reject(
                             new RequestError(
                                 'stale head', 412,
+                                responseMessage(
+                                    { error: 'stale head' },
+                                    {},
+                                    412,
+                                ),
                             ),
                         );
                     }
                 }
-                return ctx.POSTWithHeaders<T>(
-                    resource, body, headerFields,
-                );
-            },
-            POST: <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
-                return ctx.POST<T>(resource, body);
+                return ctx.POST<T>(resource, body, latch);
             },
         };
 
@@ -518,7 +519,6 @@ function snapOf(
             isAutoLayout: false,
             isAutoFit: false,
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            hasUndoHistory: false,
             nodes,
             edges: [],
         },
@@ -858,7 +858,9 @@ Deno.test(
             return new FlowDesignerPresenter(
                 snap, 800, 600,
                 buildFlowHistorySnapshot(
-                    graph.hasUndoHistory,
+                    (await getFlowVersions(
+                        sessionContext(), flowId,
+                    )).length > 1,
                 ),
                 migrateToCenter,
             );

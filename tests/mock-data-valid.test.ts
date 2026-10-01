@@ -460,11 +460,9 @@ async () => {
             'flows empty in org ' + organization,
         );
         for (const flow of flows) {
-            // FlowWithGraph carries graph + hasUndoHistory —
-            // strip those before validateFlowEntity.
-            const {
-                graph: _g, hasUndoHistory: _h, ...entity
-            } = flow;
+            // FlowWithGraph carries graph — strip it before
+            // validateFlowEntity.
+            const { graph: _g, ...entity } = flow;
             validateFlowEntity(withoutId(entity));
             assert(
                 typeof flow.graph === 'object'
