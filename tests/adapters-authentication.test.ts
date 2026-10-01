@@ -13,6 +13,7 @@ import { decodeAccessToken } from '../api/access-token.ts';
 import {
     type RequestContext,
 } from '../client/request-context.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     inPageClient,
     inPageContext,
@@ -168,25 +169,17 @@ async () => {
                     : {}),
             });
             if (posted.length === 1) {
-                return {
-                    status: 200,
-                    headers: new Headers({
-                        'authentication-info':
-                            'code="issued-code"',
-                    }),
-                    body: '',
-                };
-            }
-            return {
-                status: 200,
-                headers: new Headers({
+                return responseMessage({}, {
                     'authentication-info':
-                        'access_token="a"',
-                    'set-cookie':
-                        'refresh_token=r; HttpOnly',
-                }),
-                body: '{"token_type":"Bearer"}',
-            };
+                        'code="issued-code"',
+                });
+            }
+            return responseMessage({ token_type: 'Bearer' }, {
+                'authentication-info':
+                    'access_token="a"',
+                'set-cookie':
+                    'refresh_token=r; HttpOnly',
+            });
         },
     } as unknown as RequestContext;
     await postPasswordLogin(ctx, 'a@b.c', 'pw');

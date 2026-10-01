@@ -82,9 +82,9 @@ export function buildAIAgentMap(
 export async function getAIMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, AIMember>> {
-    const agents = await ctx.GET<AIAgentEntity[]>(
+    const agents = (await ctx.GET<AIAgentEntity[]>(
         'ai-agents/',
-    );
+    )).body().toValue();
     return buildAIAgentMap(agents);
 }
 
@@ -99,9 +99,9 @@ export async function getAIMember(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<AIMember> {
-    const agent = await ctx.GET<AIAgentEntity>(
+    const agent = (await ctx.GET<AIAgentEntity>(
         `ai-agents/${id}`,
-    );
+    )).body().toValue();
     return new AIMember(
         agentParent(id),
         {
@@ -118,9 +118,9 @@ export async function getAIMemberEntity(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<AIAgentEntity> {
-    return ctx.GET<AIAgentEntity>(
+    return (await ctx.GET<AIAgentEntity>(
         `ai-agents/${id}`,
-    );
+    )).body().toValue();
 }
 
 export async function putAIMember(

@@ -39,9 +39,9 @@ export async function getProviderEvents(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<ProviderEvent[]> {
-    const rows = await ctx.GET<IdentityProviderEntity[]>(
+    const rows = (await ctx.GET<IdentityProviderEntity[]>(
         `identities/${identityId}/providers/`,
-    );
+    )).body().toValue();
     return rows.map(ev => ({
         provider: ev.provider,
         providerSubject: ev.provider_subject,
@@ -57,9 +57,9 @@ export async function getProvidersFor(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<string[]> {
-    const rows = await ctx.GET<IdentityProviderEntity[]>(
+    const rows = (await ctx.GET<IdentityProviderEntity[]>(
         `identities/${identityId}/providers/`,
-    );
+    )).body().toValue();
     // Latest by `at`, not array order — latestByKey's default
     // >= tiebreak is the secure direction the siblings share.
     const latest = latestByKey(rows, ev => ev.provider);

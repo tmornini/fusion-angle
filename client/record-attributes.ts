@@ -93,9 +93,9 @@ export async function getRecordAttributesByRecord(
     ctx: RequestContext,
     recordId: RecordId,
 ): Promise<RecordAttribute[]> {
-    const rows = await ctx.GET<AttributeWire[]>(
+    const rows = (await ctx.GET<AttributeWire[]>(
         attributesPath(ctx, recordId),
-    );
+    )).body().toValue();
     return rows
         .map(toRecordAttribute)
         .toSorted(

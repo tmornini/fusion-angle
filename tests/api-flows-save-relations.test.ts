@@ -4,10 +4,11 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ifMatchField,
-    requiredEtag,
+    type Latch,
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -37,7 +38,6 @@ import {
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 
 const NODE_A = generateIdentifier();
 const NODE_B = generateIdentifier();
@@ -124,9 +124,9 @@ async function messagePairPlaneGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<StoredGraph> {
-    const flow = await ctx.GET<FlowWithGraph>(
+    const flow = (await ctx.GET<FlowWithGraph>(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
-    );
+    )).body().toValue();
     return asStoredGraph(
         flow.graph, 'flow.graph',
     );
@@ -443,33 +443,22 @@ Deno.test(
         const working = buildWorkingGraph();
         // Capture ONE PUT body (with one graphDelta) AND its
         // If-Match echo, and replay both.
-        // A resend of one operation carries its operation id.
-        const operationId = generateIdentifier();
+        // A resend of one operation carries its operation
+        // id: the replay rides the context the save rode.
         let captured: Record<string, unknown> | null = null;
-        let capturedHeaders:
-            readonly (readonly [string, string])[]
-            | undefined;
-        const origPut = ctx.PUT.bind(ctx);
         const spyCtx: RequestContext = {
             ...ctx,
             PUT: async <T,>(
                 path: string,
                 body: Record<string, unknown>,
-                headerFields?:
-                    readonly (readonly [string, string])[],
-            ): Promise<T> => {
-                const headers:
-                    readonly (readonly [string, string])[] = [
-                        [OPERATION_ID_HEADER, operationId],
-                        ...(headerFields ?? []),
-                    ];
+                latch?: Latch,
+            ): Promise<HttpMessage<T>> => {
                 if (path === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + flowId
                     && captured === null) {
                     captured = body;
-                    capturedHeaders = headers;
                 }
-                return origPut<T>(path, body, headers);
+                return ctx.PUT<T>(path, body, latch);
             },
         };
         await putFlow(spyCtx, flowId, save(
@@ -483,22 +472,13 @@ Deno.test(
 
         // Same response body with the current latch stores
         // nothing. The captured echo names the prior head.
-        const { etag: fresh } = await ctx.GETWithEtag<unknown>(
+        const fresh = await ctx.GET<unknown>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
         );
-        const latch = ifMatchField(
-            requiredEtag(fresh, 'the flow GET'),
-        );
-        const replayHeaders = [
-            ...(capturedHeaders ?? []).filter(
-                (field) => field[0] !== latch[0],
-            ),
-            latch,
-        ];
-        await origPut(
+        await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
             captured,
-            replayHeaders,
+            [fresh],
         );
 
         // Derived state identical (byte-identical resend).
@@ -522,9 +502,9 @@ Deno.test(
             working.nodes, working.edges,
         ));
 
-        const flow = await ctx.GET<FlowWithGraph>(
+        const flow = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId,
-        );
+        )).body().toValue();
         const blob = asStoredGraph(
             flow.graph, 'flow.graph',
         );
@@ -547,10 +527,10 @@ Deno.test(
         await putFlow(ctx, flowId, save(
             working.nodes, working.edges,
         ));
-        const events = await ctx.GET<StateEntity[]>(
+        const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
                 + '/versions/',
-        );
+        )).body().toValue();
         // Family history is DESC — current first.
         assertEquals(
             events.map(e => e.state),

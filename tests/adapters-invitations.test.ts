@@ -33,7 +33,10 @@ import {
 import {
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import type { ClientSession } from '../client/client-session.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import {
     organizationToken,
@@ -65,19 +68,11 @@ const AT = '2026-01-01T00:00:00.000000Z';
 
 // A fresh Map-backed fake per test — session-token adapters
 // used throughout this file read/write it lazily.
-function accessAnswer(token: string): {
-    readonly status: number;
-    readonly headers: Headers;
-    readonly body: string;
-} {
-    return {
-        status: 200,
-        headers: new Headers({
-            'authentication-info':
-                'access_token="' + token + '"',
-        }),
-        body: '',
-    };
+function accessAnswer<T>(token: string): HttpMessage<T> {
+    return responseMessage({ token_type: 'Bearer' }, {
+        'authentication-info':
+            'access_token="' + token + '"',
+    }) as HttpMessage<T>;
 }
 
 function freshStorage(): Partial<Storage> {
@@ -258,14 +253,14 @@ async function newestVersion(
     organization: string,
     id: string,
 ): Promise<{ etag: string; at: string; member_id: string }> {
-    const versions = await admin.GET<{
+    const versions = (await admin.GET<{
         etag: string;
         at: string;
         member_id: string;
     }[]>(
         'organizations/' + organization + '/invitations/'
             + id + '/versions/',
-    );
+    )).body().toValue();
     const newest = versions[0];
     assert(newest !== undefined, 'the invitation has no version');
     return newest;

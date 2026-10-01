@@ -8,8 +8,6 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ifMatchField,
-    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -121,21 +119,21 @@ async function seedWorkOrder(
             flow_graph: storedWorkOrderFlowGraph(flowGraph),
             position: 0,
         },
-        [['If-None-Match', '*']],
+        'creates',
     );
-    const { etag } = await ctx.GETWithEtag(
+    const read = await ctx.GET(
         'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
     );
     // Genesis transition via the named op (states/:id
     // retired). pure-move instance shape; no claim release.
-    await ctx.POSTWithHeaders(
+    await ctx.POST(
         'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
         + '/transition', {
         transitionEventId: 't-create-' + id,
         targetState: currentNodeId,
         release: null,
         transitionAt: AT_CREATED,
-    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
+    }, [read]);
 }
 
 // The binding PUT and the attribute PUT (below) both need

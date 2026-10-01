@@ -4,8 +4,6 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ifMatchField,
-    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -175,8 +173,9 @@ Deno.test(
         // GET must return the intended graph from the
         // document message pair's graph field (message-plane truth).
         const fetched =
-            await ctx.GET<FlowWithGraph>('organizations/'
-                + 'AjdvjuECVZEgZoFajaIEkg/flows/' + flowId);
+            (await ctx.GET<FlowWithGraph>('organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/flows/' + flowId))
+                .body().toValue();
         const got = asStoredGraph(
             fetched.graph, 'flow.graph',
         );
@@ -289,26 +288,25 @@ Deno.test(
         // graphDelta/revivals from CURRENT (advancedGraph) vs
         // TARGET, re-introducing what the advance dropped and
         // deleting what it added.
-        const undoHead = await ctx.GETWithEtag<unknown>(
+        const undoHead = await ctx.GET<unknown>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId,
         );
-        await ctx.POSTWithHeaders(
+        await ctx.POST(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + flowId + '/undo',
             {
                 eventId: generateIdentifier(),
                 at: nowUtc(),
             },
-            [ifMatchField(
-                requiredEtag(undoHead.etag, 'the flow GET'),
-            )],
+            [undoHead],
         );
 
         // Step 5: GET must return the target (undone) graph.
         const fetched =
-            await ctx.GET<FlowWithGraph>('organizations/'
-                + 'AjdvjuECVZEgZoFajaIEkg/flows/' + flowId);
+            (await ctx.GET<FlowWithGraph>('organizations/'
+                + 'AjdvjuECVZEgZoFajaIEkg/flows/' + flowId))
+                .body().toValue();
         const got = asStoredGraph(
             fetched.graph, 'flow.graph',
         );

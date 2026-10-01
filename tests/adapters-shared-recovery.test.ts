@@ -50,8 +50,13 @@ import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
-import type { HttpFacade } from
-    '../client/http-facade.ts';
+import type {
+    HeaderFields,
+    HttpFacade,
+} from '../client/http-facade.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
@@ -325,8 +330,8 @@ Deno.test('a recover context silently refreshes a dead access token',
     const ctx = client.recoveringRequestContext(
         deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
-    const members = await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
-        + 'members/');
+    const members = (await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
+        + 'members/')).body().toValue();
     assert(Array.isArray(members));
 }));
 
@@ -347,8 +352,10 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     // both reads 401 in parallel; a second refresh would be
     // branded reuse and revoke the fresh chain
     const [members, organizations] = await Promise.all([
-        ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/'),
-        ctx.GET('identities/XXZruirZyAOoRpNxaDnpSA/organizations/'),
+        ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
+            .then(read => read.body().toValue()),
+        ctx.GET('identities/XXZruirZyAOoRpNxaDnpSA/organizations/')
+            .then(read => read.body().toValue()),
     ]);
     assert(Array.isArray(members));
     assert(Array.isArray(organizations));
@@ -381,8 +388,8 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
     const ctx = client.recoveringRequestContext(
         seed);
     // recovery re-installs the live token, re-scopes, and retries
-    const members = await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
-        + 'members/');
+    const members = (await ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
+        + 'members/')).body().toValue();
     assert(Array.isArray(members));
     // the live session is preserved (not scrubbed) and now scoped
     assertNotStrictEquals(client.getSessionCredentials(), null);
@@ -479,9 +486,9 @@ Deno.test('a recovering context reads through the vessel token,'
     client.putSessionToken(await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_B,
     ));
-    const rows = await ctx.GET<{ id: string }[]>(
+    const rows = (await ctx.GET<{ id: string }[]>(
         'organizations/' + ORGANIZATION_A + '/ideas/',
-    );
+    )).body().toValue();
     // the read ran in the vessel's org A, not the global's B
     assertEquals(rows.map(r => r.id), ['UQTJZvCoKlFjEoDlDUwekw']);
 }));
@@ -607,7 +614,7 @@ Deno.test('a concurrent facade refresh and remint present'
     );
     const [members] = await Promise.all([
         reader.GET('organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/'),
+            + 'members/').then(read => read.body().toValue()),
         postInvitationAcceptance(
             acceptor, invitationId, ORGANIZATION_B,
         ),
@@ -667,27 +674,23 @@ Deno.test(
                 GET: <T>(
                     resource: string,
                     _token: string,
-                    fields?:
-                        readonly (readonly [
-                            string,
-                            string,
-                        ])[],
-                ): Promise<T> => {
+                    fields?: HeaderFields,
+                ): Promise<HttpMessage<T>> => {
                     if (resource.endsWith(
                         '/organizations/',
                     )) {
                         record('re-scope', fields);
-                        return Promise.resolve([{
+                        return Promise.resolve(responseMessage([{
                             id: organization,
-                        }] as T);
+                        }] as T));
                     }
                     if (resource.endsWith(
                         '/default-organization',
                     )) {
                         record('re-scope', fields);
-                        return Promise.resolve({
+                        return Promise.resolve(responseMessage({
                             organization_id: organization,
-                        } as T);
+                        } as T));
                     }
                     record('read', fields);
                     reads += 1;
@@ -698,19 +701,17 @@ Deno.test(
                             ),
                         );
                     }
-                    return Promise.resolve([] as T);
+                    return Promise.resolve(responseMessage([] as T));
                 },
-                GETWithEtag: unused,
                 PUT: unused,
-                PUTWithEtag: unused,
                 PATCH: unused,
-                PATCHWithEtag: unused,
                 DELETE: unused,
-                DELETEWithEtag: unused,
                 POST: unused,
-                POSTUnauthenticated: (
-                    _resource, payload, _token, fields,
-                ) => {
+                POSTUnauthenticated: <T>(
+                    _resource: string,
+                    payload: Record<string, unknown>,
+                    fields?: HeaderFields,
+                ): Promise<HttpMessage<T>> => {
                     const grant = payload.grant_type;
                     const kind = grant === 'refresh'
                         ? 'refresh'
@@ -719,23 +720,18 @@ Deno.test(
                     const access = grant === 'refresh'
                         ? flat
                         : scoped;
-                    const headers = new Headers();
-                    headers.set(
-                        'authentication-info',
-                        'access_token="' + access + '"',
-                    );
+                    const lines: Record<string, string> = {
+                        'authentication-info':
+                            'access_token="' + access + '"',
+                    };
                     if (grant === 'refresh') {
-                        headers.append(
-                            'set-cookie',
+                        lines['set-cookie'] =
                             'refresh_token=' + refresh
-                                + '; HttpOnly',
-                        );
+                                + '; HttpOnly';
                     }
-                    return Promise.resolve({
-                        status: 200,
-                        headers,
-                        body: '',
-                    });
+                    return Promise.resolve(responseMessage(
+                        { token_type: 'Bearer' } as T, lines,
+                    ));
                 },
             };
             const client = createAppClient(() => facade);
@@ -748,10 +744,10 @@ Deno.test(
             const ctx = client.recoveringRequestContext(
                 dead,
             );
-            const rows = await ctx.GET(
+            const rows = (await ctx.GET(
                 'organizations/' + organization
                     + '/ideas/',
-            );
+            )).body().toValue();
             assert(Array.isArray(rows));
             const kinds = seen.map((row) => row.kind);
             assertEquals(

@@ -60,17 +60,17 @@ Deno.test(
 
         // Phase Final Task 2: members/human_members ROW
         // halves stripped — parent via message-plane GET.
-        const row = await ctx.GET<{
+        const row = (await ctx.GET<{
             id: string; kind: string; title: string;
-        }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
+        }>('identities/xdaJyuuPyHfffCGLhqDrOQ')).body().toValue();
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');
         const pii = await deriveIdentityPii(db, 'xdaJyuuPyHfffCGLhqDrOQ');
         assertStrictEquals(pii.name, 'Alice');
-        const seat = await ctx.GET<{
+        const seat = (await ctx.GET<{
             identity_id: string; type: string;
         }>('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'xdaJyuuPyHfffCGLhqDrOQ');
+            + 'xdaJyuuPyHfffCGLhqDrOQ')).body().toValue();
         assertStrictEquals(seat.identity_id, 'xdaJyuuPyHfffCGLhqDrOQ');
         assertStrictEquals(seat.type, 'member');
     },
@@ -93,9 +93,9 @@ Deno.test(
                 team_dimensions: {},
             },
         );
-        const after = await ctx.GET<{
+        const after = (await ctx.GET<{
             id: string; title: string;
-        }>('identities/xdaJyuuPyHfffCGLhqDrOQ');
+        }>('identities/xdaJyuuPyHfffCGLhqDrOQ')).body().toValue();
         assertStrictEquals(after.title, 'Lead');
     },
 );

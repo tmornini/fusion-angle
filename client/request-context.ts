@@ -27,7 +27,9 @@ import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
 } from './organization-session.ts';
-import type { HttpFacade } from './http-facade.ts';
+import type { HeaderFields, HttpFacade } from './http-facade.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 
 // The app's hands, given to a client at construction.
 export interface ClientNavigation {
@@ -89,28 +91,24 @@ export function filterByField<T, K extends keyof T>(
     return rows.filter(row => row[field] === value);
 }
 
-// A write latches the head its read returned. A read that
-// carried no tag leaves nothing to latch, so the write is
-// never sent blind.
-export function requiredEtag(
-    etag: string | undefined,
-    read: string,
-): string {
-    if (etag === undefined || etag === '') {
-        throw new Error(read + ' carried no ETag');
-    }
-    return etag;
-}
+// What a write derives from: the messages it latches,
+// parent first, in the order its route judges them, or
+// the declaration that it creates a document.
+export type Latch =
+    | readonly [HttpMessage, ...HttpMessage[]]
+    | 'creates';
 
-// The If-Match field naming each head a write latches, in
-// the order its route judges them.
-export function ifMatchField(
-    ...etags: readonly [string, ...string[]]
-): readonly [string, string] {
-    return [
+// The precondition a latch sends: each message's etag
+// line as received, or If-None-Match: * for a create. A
+// latched message with no etag line is a bug: the write
+// would go blind.
+function latchFields(latch: Latch): HeaderFields {
+    if (latch === 'creates') return [['If-None-Match', '*']];
+    return [[
         'If-Match',
-        etags.map((etag) => '"' + etag + '"').join(', '),
-    ];
+        latch.map((message) =>
+            message.query('header.etag').toText()).join(', '),
+    ]];
 }
 
 export function organizationCollection(
@@ -138,62 +136,30 @@ export interface RequestContext {
     // This context's client session. A verb that reads or
     // replaces the session goes through it.
     readonly session: ClientSession;
-    GET<T>(resource: string): Promise<T>;
-    // Body plus strong ETag (quotes stripped) for If-Match.
-    GETWithEtag<T>(
-        resource: string,
-    ): Promise<{ body: T; etag: string | undefined }>;
+    GET<T>(resource: string): Promise<HttpMessage<T>>;
     PUT<T>(
         resource: string,
         body: Record<string, unknown>,
-        headerFields?: readonly (readonly [string, string])[],
-    ): Promise<T>;
-    PUTWithEtag<T>(
-        resource: string,
-        body: Record<string, unknown>,
-        headerFields?: readonly (readonly [string, string])[],
-    ): Promise<{ body: T; etag: string | undefined }>;
+        latch?: Latch,
+    ): Promise<HttpMessage<T>>;
     PATCH<T>(
         resource: string,
         body: Record<string, unknown>,
-        headerFields?: readonly (readonly [string, string])[],
-    ): Promise<T>;
-    PATCHWithEtag<T>(
-        resource: string,
-        body: Record<string, unknown>,
-        headerFields?: readonly (readonly [string, string])[],
-    ): Promise<{ body: T; etag: string | undefined }>;
-    DELETE(resource: string): Promise<void>;
-    // DELETE plus the strong ETag of the state it answers.
-    DELETEWithEtag(
-        resource: string,
-        headerFields: readonly (readonly [string, string])[],
-    ): Promise<{ etag: string | undefined }>;
+        latch: Latch,
+    ): Promise<HttpMessage<T>>;
     POST<T>(
         resource: string,
         body: Record<string, unknown>,
-    ): Promise<T>;
-    // Sibling of POST that carries extra headers
-    // (If-Match on value-bearing transitions). Existing
-    // POST callers stay header-free.
-    POSTWithHeaders<T>(
-        resource: string,
-        body: Record<string, unknown>,
-        headerFields:
-            readonly (readonly [string, string])[],
-    ): Promise<T>;
+        latch?: Latch,
+    ): Promise<HttpMessage<T>>;
+    DELETE(resource: string, latch?: Latch): Promise<HttpMessage>;
     // Door POST. Token is always empty, so the session
     // bearer never rides the grant's authorization line.
-    POSTUnauthenticated(
+    POSTUnauthenticated<T>(
         resource: string,
         body: Record<string, unknown>,
-        headerFields?:
-            readonly (readonly [string, string])[],
-    ): Promise<{
-        readonly status: number;
-        readonly headers: Headers;
-        readonly body: string;
-    }>;
+        headerFields?: HeaderFields,
+    ): Promise<HttpMessage<T>>;
 }
 
 // The recovery-free context: each verb runs directly on its
@@ -258,9 +224,8 @@ function openRequestContext(
     }
 
     function writeHeaders(
-        extra?:
-            readonly (readonly [string, string])[],
-    ): readonly (readonly [string, string])[] {
+        extra?: HeaderFields,
+    ): HeaderFields {
         if (extra?.some(([name]) =>
             name.toLowerCase() === OPERATION_ID_HEADER
         )) {
@@ -271,6 +236,11 @@ function openRequestContext(
             ...(extra ?? []),
         ];
     }
+    function latchHeaders(latch: Latch | undefined): HeaderFields {
+        return latch === undefined
+            ? writeHeaders()
+            : writeHeaders(latchFields(latch));
+    }
     const ctx: RequestContext = {
         operationId,
         identity,
@@ -278,136 +248,63 @@ function openRequestContext(
         GET: <T>(resource: string) => {
             core.recordRequest('GET', resource);
             const headers = writeHeaders();
-            return run<T>(tok => verbs.GET<T>(
+            return run<HttpMessage<T>>(tok => verbs.GET<T>(
                 resource, tok, headers,
             ));
-        },
-        GETWithEtag: <T>(resource: string) => {
-            core.recordRequest('GET', resource);
-            const headers = writeHeaders();
-            return run<{
-                body: T;
-                etag: string | undefined;
-            }>(
-                tok => verbs.GETWithEtag<T>(
-                    resource, tok, headers,
-                ),
-            );
         },
         PUT: <T>(
             resource: string,
             body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
+            latch?: Latch,
         ) => {
             core.recordRequest('PUT', resource);
-            const headers = writeHeaders(headerFields);
-            return run<T>(
+            const headers = latchHeaders(latch);
+            return run<HttpMessage<T>>(
                 tok => verbs.PUT<T>(
                     resource, body, tok, headers,
                 ));
         },
-        PUTWithEtag: <T>(
-            resource: string,
-            body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
-        ) => {
-            core.recordRequest('PUT', resource);
-            const headers = writeHeaders(headerFields);
-            return run<{
-                body: T;
-                etag: string | undefined;
-            }>(
-                tok => verbs.PUTWithEtag<T>(
-                    resource, body, tok, headers,
-                ),
-            );
-        },
         PATCH: <T>(
             resource: string,
             body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
+            latch: Latch,
         ) => {
             core.recordRequest('PATCH', resource);
-            const headers = writeHeaders(headerFields);
-            return run<T>(
+            const headers = latchHeaders(latch);
+            return run<HttpMessage<T>>(
                 tok => verbs.PATCH<T>(
                     resource, body, tok, headers,
-                ));
-        },
-        PATCHWithEtag: <T>(
-            resource: string,
-            body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
-        ) => {
-            core.recordRequest('PATCH', resource);
-            const headers = writeHeaders(headerFields);
-            return run<{
-                body: T;
-                etag: string | undefined;
-            }>(
-                tok => verbs.PATCHWithEtag<T>(
-                    resource, body, tok, headers,
-                ),
-            );
-        },
-        DELETE: (resource: string) => {
-            core.recordRequest('DELETE', resource);
-            const headers = writeHeaders();
-            return run<void>(
-                tok => verbs.DELETE(
-                    resource, tok, headers,
-                ));
-        },
-        DELETEWithEtag: (
-            resource: string,
-            headerFields:
-                readonly (readonly [string, string])[],
-        ) => {
-            core.recordRequest('DELETE', resource);
-            const headers = writeHeaders(headerFields);
-            return run<{ etag: string | undefined }>(
-                tok => verbs.DELETEWithEtag(
-                    resource, tok, headers,
                 ));
         },
         POST: <T>(
             resource: string,
             body: Record<string, unknown>,
+            latch?: Latch,
         ) => {
             core.recordRequest('POST', resource);
-            const headers = writeHeaders();
-            return run<T>(
+            const headers = latchHeaders(latch);
+            return run<HttpMessage<T>>(
                 tok => verbs.POST<T>(
                     resource, body, tok, headers,
                 ));
         },
-        POSTWithHeaders: <T>(
-            resource: string,
-            body: Record<string, unknown>,
-            headerFields:
-                readonly (readonly [string, string])[],
-        ) => {
-            core.recordRequest('POST', resource);
-            const headers = writeHeaders(headerFields);
-            return run<T>(
-                tok => verbs.POST<T>(
-                    resource, body, tok, headers,
+        DELETE: (resource: string, latch?: Latch) => {
+            core.recordRequest('DELETE', resource);
+            const headers = latchHeaders(latch);
+            return run<HttpMessage>(
+                tok => verbs.DELETE(
+                    resource, tok, headers,
                 ));
         },
-        POSTUnauthenticated: (
+        POSTUnauthenticated: <T>(
             resource: string,
             body: Record<string, unknown>,
-            headerFields?:
-                readonly (readonly [string, string])[],
+            headerFields?: HeaderFields,
         ) => {
             core.recordRequest('POST', resource);
             const headers = writeHeaders(headerFields);
-            return verbs.POSTUnauthenticated(
-                resource, body, '', headers,
+            return verbs.POSTUnauthenticated<T>(
+                resource, body, headers,
             );
         },
     };

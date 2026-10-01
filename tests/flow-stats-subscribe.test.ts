@@ -122,11 +122,7 @@ Deno.test(
             const { inPageContext } = await import(
                 './in-page-facade.ts'
             );
-            const {
-                ifMatchField,
-                organizationItem,
-                requiredEtag,
-            } = await import(
+            const { organizationItem } = await import(
                 '../client/request-context.ts'
             );
             const { postFlowCreation } = await import(
@@ -156,12 +152,10 @@ Deno.test(
             // the same graph back, a new name and trio —
             // minus the same-tab notify, so only the
             // BroadcastChannel below can wake this page.
-            const { body: current, etag } =
-                await ctx.GETWithEtag<FlowWithGraph>(
-                    organizationItem(
-                        ctx, 'flows', flowId,
-                    ),
-                );
+            const read = await ctx.GET<FlowWithGraph>(
+                organizationItem(ctx, 'flows', flowId),
+            );
+            const current = read.body().toValue();
             await ctx.PUT(
                 organizationItem(ctx, 'flows', flowId),
                 {
@@ -183,9 +177,7 @@ Deno.test(
                     },
                     revivals: [],
                 },
-                [ifMatchField(
-                    requiredEtag(etag, 'the flow GET'),
-                )],
+                [read],
             );
             for (let i = 0; i < 25; i++) {
                 await new Promise(

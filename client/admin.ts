@@ -33,10 +33,10 @@ export async function getOrganizationSeats(
     if (organization === undefined) {
         return [];
     }
-    return ctx.GET<MembershipEntity[]>(
+    return (await ctx.GET<MembershipEntity[]>(
         'organizations/' + organization
             + '/members/',
-    );
+    )).body().toValue();
 }
 
 export interface OrganizationStats {

@@ -11,12 +11,8 @@ import { generateSecret } from
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from
     '../shared/base64url.ts';
-
-export interface HeaderAnswer {
-    readonly status: number;
-    readonly headers: Headers;
-    readonly body: string;
-}
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 
 export function basicAuthorization(
     userId: string,
@@ -50,16 +46,14 @@ export function authParam(
     return header.slice(at + prefix.length, end);
 }
 
+// The refresh cookie the door set, from the answer's
+// set-cookie lines (one per cookie, joined as a query
+// reads them), or '' when it set none.
 export function refreshFromHeaders(
-    headers: Headers,
+    answered: HttpMessage,
 ): string {
-    const listed = typeof headers.getSetCookie
-        === 'function'
-        ? headers.getSetCookie()
-        : [];
-    const raw = listed.length > 0
-        ? listed.join('\n')
-        : (headers.get('set-cookie') ?? '');
+    const cookies = answered.query('header.set-cookie');
+    const raw = cookies.exists() ? cookies.toText() : '';
     const match = /(?:^|[\n,])\s*refresh_token=([^;\n]+)/
         .exec(raw);
     const value = match?.[1];
@@ -67,25 +61,26 @@ export function refreshFromHeaders(
 }
 
 export function refusedDoor(
-    answered: HeaderAnswer,
+    answered: HttpMessage,
 ): Error | null {
-    if (answered.status >= 200 && answered.status < 300) {
+    const status = answered.query('status').toNumber();
+    if (status >= 200 && status < 300) {
         return null;
     }
     let error = 'request failed';
-    if (answered.body !== '') {
-        const parsed = JSON.parse(answered.body) as {
-            error?: string,
+    if (answered.body().exists()) {
+        const content = answered.body().toValue() as {
+            error?: unknown,
         };
-        if (typeof parsed.error === 'string') {
-            error = parsed.error;
+        if (typeof content.error === 'string') {
+            error = content.error;
         }
     }
-    if (answered.status === 401) {
+    if (status === 401) {
         return new UnauthorizedError(error);
     }
     return new RequestError(
-        error + ' ()', answered.status,
+        error + ' ()', status,
     );
 }
 
@@ -131,7 +126,10 @@ export async function postPasswordLogin(
     }
     if (authorizeRefusal !== null) throw authorizeRefusal;
     const code = authParam(
-        authorized.headers.get('authentication-info'),
+        authorized.query('header.authentication-info').exists()
+            ? authorized.query('header.authentication-info')
+                .toText()
+            : null,
         'code',
     );
     if (code === null) {
@@ -155,7 +153,9 @@ export async function postPasswordLogin(
     }
     if (grantRefusal !== null) throw grantRefusal;
     const accessToken = authParam(
-        granted.headers.get('authentication-info'),
+        granted.query('header.authentication-info').exists()
+            ? granted.query('header.authentication-info').toText()
+            : null,
         'access_token',
     );
     if (accessToken === null) {
@@ -167,6 +167,6 @@ export async function postPasswordLogin(
         accessToken,
         refreshToken: ctx.session.isCookieSession()
             ? ''
-            : refreshFromHeaders(granted.headers),
+            : refreshFromHeaders(granted),
     };
 }

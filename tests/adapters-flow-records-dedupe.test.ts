@@ -6,6 +6,7 @@ import { getFlowEntities } from
 import {
     loadRecordFlowJoins,
 } from '../client/flow-records.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 Deno.test(
     'record-detail load GETs flows/ once and each'
@@ -23,10 +24,10 @@ Deno.test(
             GET: async (path: string) => {
                 paths.push(path);
                 if (path.endsWith('/flows/')) {
-                    return [
+                    return responseMessage([
                         { id: flowA, name: 'A' },
                         { id: flowB, name: 'B' },
-                    ];
+                    ]);
                 }
                 if (
                     /\/flows\/[^/]+\/records\/$/
@@ -35,16 +36,16 @@ Deno.test(
                     pendingRecords++;
                     await hold.promise;
                     pendingRecords--;
-                    return [];
+                    return responseMessage([]);
                 }
                 if (path.endsWith('/work-orders/')) {
                     if (pendingRecords > 0) {
                         joinDuringRecords = true;
                     }
                     hold.resolve();
-                    return [];
+                    return responseMessage([]);
                 }
-                return [];
+                return responseMessage([]);
             },
         } as unknown as RequestContext;
         const timer = setTimeout(

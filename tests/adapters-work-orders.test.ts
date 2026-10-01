@@ -13,9 +13,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ifMatchField,
     organizationItem,
-    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -260,7 +258,7 @@ async function seedClaim(
     workOrderId: string,
     claimAt: string,
 ): Promise<void> {
-    const { etag } = await ctx.GETWithEtag(
+    const read = await ctx.GET(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId,
     );
@@ -272,21 +270,21 @@ async function seedClaim(
         claimAt,
         expireEventId: generateIdentifier(),
         expireAt: claimAt,
-    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
+    }, [read]);
 }
 
 async function seedRelease(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    const { etag } = await ctx.GETWithEtag(
+    const read = await ctx.GET(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId,
     );
-    await ctx.DELETEWithEtag(
+    await ctx.DELETE(
         'organizations/AjdvjuECVZEgZoFajaIEkg'
         + '/work-orders/' + workOrderId + '/claim',
-        [ifMatchField(requiredEtag(etag, 'the work order GET'))],
+        [read],
     );
 }
 
@@ -307,7 +305,7 @@ async function seedBareWorkOrder(
             },
             position: 0,
         },
-        [['If-None-Match', '*']],
+        'creates',
     );
 }
 
@@ -389,13 +387,13 @@ async function moveDisplayId(
     id: string,
 ): Promise<void> {
     const path = organizationItem(ctx, 'work-orders', id);
-    const { body, etag } =
-        await ctx.GETWithEtag<WorkOrderEntity>(path);
+    const read = await ctx.GET<WorkOrderEntity>(path);
+    const body = read.body().toValue();
     await ctx.PUT(path, {
         display_id: 'ffffffff',
         flow_graph: body.flow_graph,
         position: body.position,
-    }, [ifMatchField(requiredEtag(etag, 'the work order GET'))]);
+    }, [read]);
 }
 
 Deno.test(
@@ -435,8 +433,8 @@ Deno.test(
         // read and before its PUT.
         const racing: RequestContext = {
             ...ctx,
-            GETWithEtag: async <T>(resource: string) => {
-                const read = await ctx.GETWithEtag<T>(resource);
+            GET: async <T>(resource: string) => {
+                const read = await ctx.GET<T>(resource);
                 await moveDisplayId(ctx, id);
                 return read;
             },
@@ -796,7 +794,8 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            head.values.get(ATTR_ID), 'xDyDkxEPwtcNmJVknUHDsg',
+            head.instance.values.get(ATTR_ID),
+            'xDyDkxEPwtcNmJVknUHDsg',
         );
         assertStrictEquals(
             await getWorkOrderCurrentNodeId(
@@ -826,7 +825,7 @@ Deno.test(
                 ctx, woId,
             );
         await patchRecordInstance(
-            ctx, RT_ID, INST_ID, loaded.etag, {
+            ctx, RT_ID, INST_ID, loaded.read, {
                 set: [{
                     attributeId: ATTR_ID,
                     value: 'vB',
@@ -838,7 +837,7 @@ Deno.test(
                 workOrderId: woId,
                 edgeId: EDGE_MIDDLE_FINISH,
                 values: { [ATTR_ID]: 'vStale' },
-                instanceEtag: loaded.etag,
+                instance: loaded.read,
             }),
         ) as RequestError;
         assertInstanceOf(err, RequestError);
@@ -847,7 +846,7 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            head.values.get(ATTR_ID), 'vB',
+            head.instance.values.get(ATTR_ID), 'vB',
         );
         assertStrictEquals(
             await getWorkOrderCurrentNodeId(
@@ -881,7 +880,7 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         assertStrictEquals(
-            head.values.has(ATTR_ID), false,
+            head.instance.values.has(ATTR_ID), false,
         );
     },
 );
@@ -913,9 +912,11 @@ Deno.test(
         const after = await getRecordInstance(
             ctx, RT_ID, INST_ID,
         );
-        assertStrictEquals(after.etag, before.etag);
         assertStrictEquals(
-            after.values.get(ATTR_ID), 'v0',
+            after.instance.etag, before.instance.etag,
+        );
+        assertStrictEquals(
+            after.instance.values.get(ATTR_ID), 'v0',
         );
         assertStrictEquals(
             await getWorkOrderCurrentNodeId(
@@ -1182,10 +1183,10 @@ Deno.test(
         // on the claim path ends it.
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await deleteWorkOrderClaim(ctx, woId);
-        const events = await ctx.GET<StateEntity[]>(
+        const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
                 + '/history',
-        );
+        )).body().toValue();
         const released = events.filter(
             (e) => e.state === 'claim_released',
         );

@@ -7,13 +7,16 @@ import {
     projectStateIsNotDeleted,
     assertProjectState,
 } from '../shared/types.ts';
-import type { RequestContext } from './request-context.ts';
+import type {
+    Latch,
+    RequestContext,
+} from './request-context.ts';
 import {
-    ifMatchField,
     organizationCollection,
     organizationItem,
-    requiredEtag,
 } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
@@ -34,9 +37,9 @@ export function notifyProjectChange(): void {
 export async function getProjectEntities(
     ctx: RequestContext,
 ): Promise<ProjectEntity[]> {
-    return ctx.GET<ProjectEntity[]>(
+    return (await ctx.GET<ProjectEntity[]>(
         organizationCollection(ctx, 'projects'),
-    );
+    )).body().toValue();
 }
 
 // Domain state rides the ProjectEntity GET row; narrow it
@@ -76,9 +79,9 @@ export async function getProjectEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<ProjectEntity> {
-    return ctx.GET<ProjectEntity>(
+    return (await ctx.GET<ProjectEntity>(
         organizationItem(ctx, 'projects', id),
-    );
+    )).body().toValue();
 }
 
 // The wire document PUT /projects/:id now takes today's
@@ -98,13 +101,13 @@ export async function putProject(
     ctx: RequestContext,
     id: string,
     document: ProjectDocumentFields,
-    etag: string | undefined,
+    latch: Latch | undefined,
 ): Promise<void> {
     const { state, ...entity } = document;
     await ctx.PUT(
         organizationItem(ctx, 'projects', id),
         { ...entity, state },
-        etag === undefined ? undefined : [ifMatchField(etag)],
+        latch,
     );
     projectChanges.notify();
 }
@@ -114,7 +117,8 @@ export async function putProject(
 // caller ever holding the wire shape. The GET-stamped state
 // is split out of the fields: a field edit sends the
 // caller's state, a reorder keeps the head's. The head's
-// etag rides along too: a merge latches the head it merged.
+// message rides along too: a merge latches the head it
+// merged.
 async function projectRowFields(
     ctx: RequestContext,
     id: string,
@@ -126,9 +130,9 @@ async function projectRowFields(
         | 'state'
     >;
     state: ProjectEntity['state'];
-    etag: string;
+    read: HttpMessage<ProjectEntity>;
 }> {
-    const read = await ctx.GETWithEtag<ProjectEntity>(
+    const read = await ctx.GET<ProjectEntity>(
         organizationItem(ctx, 'projects', id),
     );
     const {
@@ -136,12 +140,8 @@ async function projectRowFields(
         organization_id: _org,
         state,
         ...fields
-    } = read.body;
-    return {
-        fields,
-        state,
-        etag: requiredEtag(read.etag, 'the project GET'),
-    };
+    } = read.body().toValue();
+    return { fields, state, read };
 }
 
 // The camelCase patch for a project's editable fields.
@@ -161,7 +161,7 @@ export async function putProjectFields(
     patch: ProjectFieldsPatch,
     state: ProjectState,
 ): Promise<void> {
-    const { fields, etag } = await projectRowFields(ctx, id);
+    const { fields, read } = await projectRowFields(ctx, id);
     await putProject(ctx, id, {
         ...fields,
         title: patch.title,
@@ -170,7 +170,7 @@ export async function putProjectFields(
         target_end_date: patch.targetEndDate,
         estimated_cost: patch.estimatedCost,
         state,
-    }, etag);
+    }, [read]);
 }
 
 export async function putProjectPosition(
@@ -178,13 +178,13 @@ export async function putProjectPosition(
     id: string,
     position: number,
 ): Promise<void> {
-    const { fields, state, etag } =
+    const { fields, state, read } =
         await projectRowFields(ctx, id);
     await putProject(ctx, id, {
         ...fields,
         position,
         state,
-    }, etag);
+    }, [read]);
 }
 
 // State transition for an existing project: sends the new

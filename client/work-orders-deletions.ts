@@ -1,8 +1,5 @@
 import type { RequestContext } from './request-context.ts';
-import {
-    ifMatchField,
-    organizationItem,
-} from './request-context.ts';
+import { organizationItem } from './request-context.ts';
 import { notifyWorkOrderChanges } from './work-orders-mutations.ts';
 import { getWorkOrderWithEtag } from './work-orders-queries.ts';
 
@@ -14,13 +11,13 @@ export async function deleteWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    const { etag } = await getWorkOrderWithEtag(
+    const { read } = await getWorkOrderWithEtag(
         ctx, workOrderId,
     );
-    await ctx.DELETEWithEtag(
+    await ctx.DELETE(
         organizationItem(ctx, 'work-orders', workOrderId)
             + '/claim',
-        [ifMatchField(etag)],
+        [read],
     );
     notifyWorkOrderChanges();
 }

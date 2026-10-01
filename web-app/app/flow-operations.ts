@@ -29,10 +29,8 @@ import type {
     FlowSaveShape,
 } from '../../client/flow-mutations.ts';
 import {
-    ifMatchField,
     jitteredBackoff,
     organizationItem,
-    requiredEtag,
 } from '../../client/request-context.ts';
 import {
     NODE_WIDTH,
@@ -742,18 +740,15 @@ async function postFlowUndo(
         // re-resolves one step back from it.
         const resource =
             organizationItem(ctx, 'flows', flowId);
-        const { etag } =
-            await ctx.GETWithEtag<unknown>(resource);
+        const read = await ctx.GET<unknown>(resource);
         try {
-            await ctx.POSTWithHeaders(
+            await ctx.POST(
                 resource + '/undo',
                 {
                     eventId: generateIdentifier(),
                     at: nowUtc(),
                 },
-                [ifMatchField(
-                    requiredEtag(etag, 'the flow GET'),
-                )],
+                [read],
             );
             return;
         } catch (err) {

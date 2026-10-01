@@ -26,11 +26,11 @@ import type {
 } from './request-context.ts';
 import {
     filterByField,
-    ifMatchField,
     organizationCollection,
     organizationItem,
-    requiredEtag,
 } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     generateIdentifier,
 } from '../shared/identifier.ts';
@@ -188,11 +188,11 @@ export interface WorkOrderTransitionInput {
     workOrderId: string;
     edgeId: string;
     values: Record<string, string>;
-    // Snapshot etag of the instance the operator
-    // is looking at. Value-bearing If-Match uses
-    // this, never a submit-time GET, so a
+    // The instance head the operator is looking
+    // at. A value-bearing transition latches this
+    // snapshot, never a submit-time GET, so a
     // concurrent PATCH 412s (WB19a / WB19b).
-    instanceEtag?: string;
+    instance?: HttpMessage;
 }
 
 // Diff form pending vs instance head into set/clear.
@@ -239,13 +239,13 @@ export async function postWorkOrderTransition(
     input: WorkOrderTransitionInput,
 ): Promise<void> {
     const {
-        workOrderId, edgeId, values, instanceEtag,
+        workOrderId, edgeId, values, instance: heldInstance,
     } = input;
-    // Wave 1: wo with its tag + history + record binding
+    // Wave 1: wo with its head + history + record binding
     // (all keyed by workOrderId).
     const [read, history, recordId] =
         await Promise.all([
-            ctx.GETWithEtag<WorkOrderEntity>(
+            ctx.GET<WorkOrderEntity>(
                 organizationItem(
                     ctx, 'work-orders', workOrderId,
                 ),
@@ -253,10 +253,7 @@ export async function postWorkOrderTransition(
             getWorkOrderHistory(ctx, workOrderId),
             getRecordForWorkOrder(ctx, workOrderId),
         ]);
-    const wo = read.body;
-    const workOrderEtag = requiredEtag(
-        read.etag, 'the work order GET',
-    );
+    const wo = read.body().toValue();
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
@@ -270,7 +267,7 @@ export async function postWorkOrderTransition(
         );
     }
 
-    // Bound embed → one instance GET for head + etag.
+    // Bound embed → one instance GET for values + head.
     // Unbound → null storedValues (A3 gate mirror).
     const boundInstanceId = wo.instance_id;
     const boundRecordTypeId = wo.record_type_id;
@@ -279,7 +276,7 @@ export async function postWorkOrderTransition(
         && boundRecordTypeId !== undefined;
     // Wave 2: instance head (if bound) ∥ attributes
     // (if a record is bound to the flow).
-    const [instance, attributes] =
+    const [bound, attributes] =
         await Promise.all([
             needsInstance
                 ? getRecordInstance(
@@ -294,13 +291,13 @@ export async function postWorkOrderTransition(
                     ctx, recordId,
                 ),
         ]);
-    const storedValues = instance === null
+    const storedValues = bound === null
         ? null
-        : instance.values;
-    const etag = instanceEtag
-        ?? (instance === null
+        : bound.instance.values;
+    const held = heldInstance
+        ?? (bound === null
             ? undefined
-            : instance.etag);
+            : bound.read);
 
     const pendingValues = new Map(
         Object.entries(values),
@@ -368,7 +365,7 @@ export async function postWorkOrderTransition(
         if (
             boundInstanceId === undefined
             || boundRecordTypeId === undefined
-            || etag === undefined
+            || held === undefined
         ) {
             throw new Error(
                 'value-bearing transition requires'
@@ -380,22 +377,22 @@ export async function postWorkOrderTransition(
         body['set'] = set;
         body['clear'] = clear;
         // NO auto-retry on 412 — the page owns recovery.
-        // The work order's tag, then the instance's.
-        await ctx.POSTWithHeaders(
+        // The work order's head, then the instance's.
+        await ctx.POST(
             organizationItem(
                 ctx, 'work-orders', workOrderId,
             ) + '/transition',
             body,
-            [ifMatchField(workOrderEtag, etag)],
+            [read, held],
         );
     } else {
-        // Pure move: no delta; the work order's tag alone.
-        await ctx.POSTWithHeaders(
+        // Pure move: no delta; the work order's head alone.
+        await ctx.POST(
             organizationItem(
                 ctx, 'work-orders', workOrderId,
             ) + '/transition',
             body,
-            [ifMatchField(workOrderEtag)],
+            [read],
         );
     }
 
@@ -411,7 +408,7 @@ export async function putWorkOrderBinding(
     instanceId: string,
     recordTypeId: string,
 ): Promise<void> {
-    const { etag } = await getWorkOrderWithEtag(
+    const { read } = await getWorkOrderWithEtag(
         ctx, workOrderId,
     );
     await ctx.PUT(
@@ -422,7 +419,7 @@ export async function putWorkOrderBinding(
             instance_id: instanceId,
             record_type_id: recordTypeId,
         },
-        [ifMatchField(etag)],
+        [read],
     );
     workOrderChanges.notify();
 }
@@ -436,7 +433,7 @@ export async function putWorkOrderPosition(
     id: string,
     position: number,
 ): Promise<void> {
-    const { workOrder, etag } =
+    const { workOrder, read } =
         await getWorkOrderWithEtag(ctx, id);
     await ctx.PUT(
         organizationItem(ctx, 'work-orders', id),
@@ -447,7 +444,7 @@ export async function putWorkOrderPosition(
             ),
             position,
         },
-        [ifMatchField(etag)],
+        [read],
     );
     workOrderChanges.notify();
 }
@@ -465,7 +462,7 @@ export async function putWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    const { workOrder, etag } = await getWorkOrderWithEtag(
+    const { workOrder, read } = await getWorkOrderWithEtag(
         ctx, workOrderId,
     );
     const expireAt = nowUtc();
@@ -483,7 +480,7 @@ export async function putWorkOrderClaim(
             expireAt,
             expires_at: expiresAt,
         },
-        [ifMatchField(etag)],
+        [read],
     );
     workOrderChanges.notify();
 }

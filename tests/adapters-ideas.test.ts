@@ -324,10 +324,10 @@ Deno.test(
 
         // Phase Final Task 2: projects row half stripped —
         // read via GET /organizations/:id/projects/:id.
-        const project = await ctx.GET<{ title: string }>(
+        const project = (await ctx.GET<{ title: string }>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw',
-        );
+        )).body().toValue();
         assertStrictEquals(project.title, 'P1');
 
         const idea = await getIdeaEntity(
@@ -341,13 +341,13 @@ Deno.test(
         assertStrictEquals(promotedProject.state, 'submitted');
 
         const mine =
-            await ctx.GET<
+            (await ctx.GET<
                 ProjectObjectiveBaselineScoreEntity[]
             >(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                     + 'pnXmXrxOWayANgDLdCjuBw/objective'
                 + '-baseline-scores/',
-            );
+            )).body().toValue();
         assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [

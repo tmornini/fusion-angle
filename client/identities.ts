@@ -36,9 +36,9 @@ export async function getIdentity(
     ctx: RequestContext,
     id: Id,
 ): Promise<Identity> {
-    const entity = await ctx.GET<IdentityEntity>(
+    const entity = (await ctx.GET<IdentityEntity>(
         `identities/${id}`,
-    );
+    )).body().toValue();
     return new Identity(entity);
 }
 
@@ -98,9 +98,9 @@ function serviceFacet(
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
-    const identities = await ctx.GET<IdentityEntity[]>(
+    const identities = (await ctx.GET<IdentityEntity[]>(
         'identities/',
-    );
+    )).body().toValue();
     return Promise.all(identities.map(async identity =>
         identity.kind === 'service'
             ? {
@@ -123,9 +123,9 @@ export async function getMemberPii(
     id: Id,
 ): Promise<MemberPii> {
     try {
-        const row = await ctx.GET<IdentityPiiEntity>(
+        const row = (await ctx.GET<IdentityPiiEntity>(
             `identities/${id}/pii`,
-        );
+        )).body().toValue();
         return {
             erased: false,
             name: row.name,
@@ -193,9 +193,9 @@ export async function getClientRegistration(
 ): Promise<ClientRegistration> {
     try {
         const row =
-            await ctx.GET<ClientRegistrationEntity>(
+            (await ctx.GET<ClientRegistrationEntity>(
                 `identities/${id}/registration`,
-            );
+            )).body().toValue();
         return {
             registered: true,
             grantTypes: row.grant_types,

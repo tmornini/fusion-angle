@@ -9,19 +9,19 @@ import type { RequestContext } from './request-context.ts';
 export async function getOrganizations(
     ctx: RequestContext,
 ): Promise<OrganizationEntity[]> {
-    return ctx.GET<OrganizationEntity[]>(
+    return (await ctx.GET<OrganizationEntity[]>(
         'identities/' + ctx.identity.id
             + '/organizations/',
-    );
+    )).body().toValue();
 }
 
 export async function getOrganization(
     ctx: RequestContext,
     id: string,
 ): Promise<OrganizationEntity> {
-    return ctx.GET<OrganizationEntity>(
+    return (await ctx.GET<OrganizationEntity>(
         'organizations/' + id,
-    );
+    )).body().toValue();
 }
 
 export async function putOrganization(

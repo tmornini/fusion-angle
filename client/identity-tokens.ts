@@ -54,9 +54,9 @@ export async function getTokenChainsFor(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<TokenChain[]> {
-    const rows = await ctx.GET<IdentityTokenEntity[]>(
+    const rows = (await ctx.GET<IdentityTokenEntity[]>(
         `identities/${identityId}/tokens/`,
-    );
+    )).body().toValue();
     const byChain = new Map<string, TokenEvent[]>();
     for (const row of rows) {
         const event: TokenEvent = {

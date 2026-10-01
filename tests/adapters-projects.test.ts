@@ -338,8 +338,8 @@ Deno.test(
         // and before its PUT.
         const racing: RequestContext = {
             ...ctx,
-            GETWithEtag: async <T>(resource: string) => {
-                const read = await ctx.GETWithEtag<T>(resource);
+            GET: async <T>(resource: string) => {
+                const read = await ctx.GET<T>(resource);
                 await seedProject(
                     ctx, 'pnXmXrxOWayANgDLdCjuBw', 'Moved',
                 );

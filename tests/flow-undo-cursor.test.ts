@@ -33,8 +33,11 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
+    type Latch,
     type RequestContext,
 } from '../client/request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { sessionContext } from '../web-app/app/client.ts';
 import {
@@ -457,12 +460,11 @@ Deno.test(
         let posts = 0;
         const flaky: RequestContext = {
             ...ctx,
-            POSTWithHeaders: <T>(
+            POST: <T>(
                 resource: string,
                 body: Record<string, unknown>,
-                headerFields:
-                    readonly (readonly [string, string])[],
-            ): Promise<T> => {
+                latch?: Latch,
+            ): Promise<HttpMessage<T>> => {
                 if (resource === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + '' + flowId +
                     '/undo') {
@@ -475,15 +477,7 @@ Deno.test(
                         );
                     }
                 }
-                return ctx.POSTWithHeaders<T>(
-                    resource, body, headerFields,
-                );
-            },
-            POST: <T>(
-                resource: string,
-                body: Record<string, unknown>,
-            ): Promise<T> => {
-                return ctx.POST<T>(resource, body);
+                return ctx.POST<T>(resource, body, latch);
             },
         };
 

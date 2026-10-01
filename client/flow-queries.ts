@@ -55,10 +55,10 @@ async function getProjectFlowsForProject(
     ctx: RequestContext,
     projectId: string,
 ): Promise<ProjectFlowEntity[]> {
-    return ctx.GET<ProjectFlowEntity[]>(
+    return (await ctx.GET<ProjectFlowEntity[]>(
         organizationItem(ctx, 'projects', projectId)
             + '/flows/',
-    );
+    )).body().toValue();
 }
 
 // The project↔flow joins across EVERY project the caller's org
@@ -90,11 +90,11 @@ getFlowsWithProjectNames(
     ] = await Promise.all([
         ctx.GET<FlowWithGraph[]>(
             organizationCollection(ctx, 'flows'),
-        ),
+        ).then(read => read.body().toValue()),
         getProjectFlowEntities(ctx),
         ctx.GET<ProjectEntity[]>(
             organizationCollection(ctx, 'projects'),
-        ),
+        ).then(read => read.body().toValue()),
     ]);
     const projectNameById = new Map(
         allProjects.map(
@@ -138,7 +138,7 @@ export async function getFlowsByProject(
             getProjectFlowsForProject(ctx, projectId),
             ctx.GET<FlowWithGraph[]>(
                 organizationCollection(ctx, 'flows'),
-            ),
+            ).then(read => read.body().toValue()),
         ]);
 
     const flowIds = new Set(
@@ -170,9 +170,9 @@ export async function getFlowWithGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<FlowWithGraph> {
-    return ctx.GET<FlowWithGraph>(
+    return (await ctx.GET<FlowWithGraph>(
         organizationItem(ctx, 'flows', flowId),
-    );
+    )).body().toValue();
 }
 
 // Every flow the organization holds, each with its graph —
@@ -180,9 +180,9 @@ export async function getFlowWithGraph(
 export async function getFlowsWithGraphs(
     ctx: RequestContext,
 ): Promise<FlowWithGraph[]> {
-    return ctx.GET<FlowWithGraph[]>(
+    return (await ctx.GET<FlowWithGraph[]>(
         organizationCollection(ctx, 'flows'),
-    );
+    )).body().toValue();
 }
 
 export async function getFlowGraph(
@@ -220,7 +220,7 @@ export async function getFlowVersions(
     ctx: RequestContext,
     flowId: Id,
 ): Promise<StateEntity[]> {
-    return ctx.GET<StateEntity[]>(
+    return (await ctx.GET<StateEntity[]>(
         organizationItem(ctx, 'flows', flowId) + '/versions/',
-    );
+    )).body().toValue();
 }

@@ -9,11 +9,16 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
-    ifMatchField,
-    requiredEtag,
+    type Latch,
     type RequestContext,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { createAppClient } from '../web-app/app/client.ts';
+import {
+    inPageContext,
+    wrapInPageAdapter,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
@@ -39,7 +44,6 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -115,10 +119,10 @@ Deno.test(
         await createBaseFlow(
             ctx, 'aEsGMmBEFaVdWihhHXwCbw', projectId,
         );
-        const flow = await ctx.GET<FlowWithGraph>(
+        const flow = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
-        );
+        )).body().toValue();
         assertStrictEquals(flow.id, 'aEsGMmBEFaVdWihhHXwCbw');
         assertStrictEquals(flow.name, 'Test Flow');
         assertStrictEquals(
@@ -126,14 +130,14 @@ Deno.test(
             DEFAULT_LOCK_TIMEOUT,
         );
         const links =
-            await ctx.GET<{
+            (await ctx.GET<{
                 id: string;
                 project_id: string;
                 flow_id: string;
             }[]>(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                     + projectId + '/flows/',
-            );
+            )).body().toValue();
         const link = links.find(
             l => l.flow_id === 'aEsGMmBEFaVdWihhHXwCbw',
         );
@@ -150,10 +154,10 @@ Deno.test(
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
         const events =
-            await ctx.GET<StateEntity[]>(
+            (await ctx.GET<StateEntity[]>(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-            );
+            )).body().toValue();
         assertStrictEquals(events.length, 1);
         const ev = events[0]!;
         assertStrictEquals(ev.entity_id, 'aEsGMmBEFaVdWihhHXwCbw');
@@ -176,10 +180,10 @@ Deno.test(
             edges: [],
         });
         const events =
-            await ctx.GET<StateEntity[]>(
+            (await ctx.GET<StateEntity[]>(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-            );
+            )).body().toValue();
         assertStrictEquals(events.length, 2);
         // Family history is DESC — current first.
         const states = events.map(e => e.state);
@@ -193,20 +197,32 @@ Deno.test(
     'putFlow throws naming the missing ETag, sending no'
     + ' blind PUT',
     async () => {
-        const { ctx } = await setupMemDb();
+        const { db, ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
+        // The context refuses a latch with no tag, so the
+        // spy that counts sent PUTs sits at the transport.
         let puts = 0;
+        const transport = wrapInPageAdapter(db);
+        const spied = createAppClient((session) => {
+            const inner = transport(session);
+            return {
+                ...inner,
+                PUT: (resource, payload, token, headerFields) => {
+                    puts++;
+                    return inner.PUT(
+                        resource, payload, token, headerFields,
+                    );
+                },
+            };
+        });
+        const spiedCtx = spied.requestContext(
+            await organizationToken(),
+        );
         const untagged: RequestContext = {
-            ...ctx,
-            GETWithEtag: async <T>(resource: string) => {
-                const read = await ctx.GETWithEtag<T>(resource);
-                return { body: read.body, etag: undefined };
-            },
-            PUT: async <T>(
-                ...args: Parameters<RequestContext['PUT']>
-            ) => {
-                puts++;
-                return ctx.PUT<T>(...args);
+            ...spiedCtx,
+            GET: async <T>(resource: string) => {
+                const read = await spiedCtx.GET<T>(resource);
+                return read.withFieldDeleted('etag');
             },
         };
         await assertRejects(
@@ -220,7 +236,7 @@ Deno.test(
                 edges: [],
             }),
             Error,
-            'ETag',
+            'queried value does not exist',
         );
         assertStrictEquals(puts, 0);
     },
@@ -254,10 +270,10 @@ Deno.test(
             nodes: [start, middle, complete],
             edges: [edge],
         });
-        const flow = await ctx.GET<FlowWithGraph>(
+        const flow = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
-        );
+        )).body().toValue();
         assertStrictEquals(flow.name, 'Renamed');
         assertStrictEquals(flow.is_locked, true);
         assertStrictEquals(flow.is_auto_layout, true);
@@ -304,10 +320,10 @@ Deno.test(
             nodes: [a],
             edges: [],
         });
-        const flow = await ctx.GET<FlowWithGraph>(
+        const flow = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
-        );
+        )).body().toValue();
         const graph =
             flow.graph as unknown as StoredGraph;
         assertStrictEquals(graph.nodes.length, 1);
@@ -349,10 +365,10 @@ Deno.test(
             nodes: callerBNodes,
             edges: [],
         });
-        const flow = await ctx.GET<FlowWithGraph>(
+        const flow = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
-        );
+        )).body().toValue();
         assertStrictEquals(flow.name, 'caller-B');
         const graph =
             flow.graph as unknown as StoredGraph;
@@ -377,13 +393,11 @@ Deno.test(
     'PUT organizations/:id/flows/:id replays identically'
     + ' as one updated event',
     async () => {
-        const { ctx } = await setupMemDb();
+        const { db, ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
-        const { etag } =
-            await ctx.GETWithEtag<FlowWithGraph>(
-                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-                    + 'aEsGMmBEFaVdWihhHXwCbw',
-            );
+        const path = 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'aEsGMmBEFaVdWihhHXwCbw';
+        const read = await ctx.GET<FlowWithGraph>(path);
         const body = {
             ...buildFlowBody({
                 name: 'Replayed',
@@ -401,27 +415,18 @@ Deno.test(
             graphDelta: EMPTY_GRAPH_DELTA,
             revivals: [],
         };
-        // A resend of one operation carries its operation id.
-        const operationId = generateIdentifier();
-        const headers: readonly (readonly [string, string])[] = [
-            [OPERATION_ID_HEADER, operationId],
-            ifMatchField(requiredEtag(etag, 'the flow GET')),
-        ];
-        const path = 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'aEsGMmBEFaVdWihhHXwCbw';
-        await ctx.PUT(path, body, headers);
+        // A resend of one operation carries its operation
+        // id: both PUTs ride one context.
+        const resend = inPageContext(db, await organizationToken());
+        await resend.PUT(path, body, [read]);
         // Same response body, current latch: 200, no
         // second row. The first echo is stale.
-        const { etag: fresh } =
-            await ctx.GETWithEtag<FlowWithGraph>(path);
-        await ctx.PUT(path, body, [
-            [OPERATION_ID_HEADER, operationId],
-            ifMatchField(requiredEtag(fresh, 'the flow GET')),
-        ]);
-        const events = await ctx.GET<StateEntity[]>(
+        const fresh = await ctx.GET<FlowWithGraph>(path);
+        await resend.PUT(path, body, [fresh]);
+        const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-        );
+        )).body().toValue();
         assertStrictEquals(events.length, 2);
     },
 );
@@ -451,25 +456,23 @@ Deno.test(
             nodes: [],
             edges: [],
         });
-        const undoHead = await ctx.GETWithEtag<unknown>(
+        const undoHead = await ctx.GET<unknown>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
         );
-        await ctx.POSTWithHeaders(
+        await ctx.POST(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/undo',
             {
                 eventId: generateIdentifier(),
                 at: '2099-01-02T00:00:00.000000Z',
             },
-            [ifMatchField(
-                requiredEtag(undoHead.etag, 'the flow GET'),
-            )],
+            [undoHead],
         );
-        const events = await ctx.GET<StateEntity[]>(
+        const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-        );
+        )).body().toValue();
         // Family history is DESC — index 0 is current.
         assertStrictEquals(
             events[0]!.at,
@@ -486,11 +489,10 @@ Deno.test(
         await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
         // versions POST RETIRED (Phase 15 Task 7); redo is
         // client-side document PUT only (performRedo).
-        const { etag } =
-            await ctx.GETWithEtag<FlowWithGraph>(
-                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-                    + 'aEsGMmBEFaVdWihhHXwCbw',
-            );
+        const read = await ctx.GET<FlowWithGraph>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw',
+        );
         await ctx.PUT(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
@@ -511,12 +513,12 @@ Deno.test(
                 graphDelta: EMPTY_GRAPH_DELTA,
                 revivals: [],
             },
-            [ifMatchField(requiredEtag(etag, 'the flow GET'))],
+            [read],
         );
-        const events = await ctx.GET<StateEntity[]>(
+        const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-        );
+        )).body().toValue();
         // Family history is DESC — index 0 is current.
         assertStrictEquals(
             events[0]!.at,
@@ -552,10 +554,10 @@ Deno.test(
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
-        const flow0 = await ctx.GET<FlowWithGraph>(
+        const flow0 = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
-        );
+        )).body().toValue();
         const baseline0 =
             flow0.graph as unknown as StoredGraph;
         const start = baseline0.nodes.find(
@@ -591,9 +593,8 @@ Deno.test(
             PUT: async <T,>(
                 path: string,
                 body: Record<string, unknown>,
-                headerFields?:
-                    readonly (readonly [string, string])[],
-            ): Promise<T> => {
+                latch?: Latch,
+            ): Promise<HttpMessage<T>> => {
                 if (path === 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                     + 'aEsGMmBEFaVdWihhHXwCbw') {
                     putCalls += 1;
@@ -612,7 +613,7 @@ Deno.test(
                         secondBody = body;
                     }
                 }
-                return ctx.PUT<T>(path, body, headerFields);
+                return ctx.PUT<T>(path, body, latch);
             },
         };
 
@@ -650,10 +651,10 @@ Deno.test(
         );
 
         // Behavioral confirmation: 'mid' is visible again.
-        const flow = await ctx.GET<FlowWithGraph>(
+        const flow = (await ctx.GET<FlowWithGraph>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw',
-        );
+        )).body().toValue();
         const graph =
             flow.graph as unknown as StoredGraph;
         assert(

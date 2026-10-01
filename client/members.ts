@@ -93,9 +93,9 @@ export function buildHumanMemberMap(
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const seats = await ctx.GET<MembershipEntity[]>(
+    const seats = (await ctx.GET<MembershipEntity[]>(
         seatsCollection(ctx),
-    );
+    )).body().toValue();
     const map = buildHumanMemberMap(seats);
     const filled = await Promise.all(
         [...map.entries()].map(async ([id]) => {
@@ -147,7 +147,7 @@ export async function getHumanMember(
             ),
             ctx.GET<IdentityEntity>(
                 `identities/${id}`,
-            ),
+            ).then(read => read.body().toValue()),
             getMemberPii(ctx, id),
         ]);
     return new HumanMember(
@@ -161,9 +161,9 @@ export async function getHumanMemberProfile(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanProfile> {
-    const identity = await ctx.GET<IdentityEntity>(
+    const identity = (await ctx.GET<IdentityEntity>(
         `identities/${id}`,
-    );
+    )).body().toValue();
     return profileOf(identity);
 }
 
@@ -242,9 +242,9 @@ export async function deleteHumanMemberSeat(
 export async function getAdminSeatIds(
     ctx: RequestContext,
 ): Promise<MemberId[]> {
-    const seats = await ctx.GET<MembershipEntity[]>(
+    const seats = (await ctx.GET<MembershipEntity[]>(
         seatsCollection(ctx),
-    );
+    )).body().toValue();
     return seats
         .filter(seat => seat.type === 'admin')
         .map(seat => seat.identity_id);

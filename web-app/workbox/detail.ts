@@ -54,16 +54,18 @@ import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
 } from '../../shared/http-errors.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 
 /* ── Module state ────────── */
 
 // Flow's record type for the unbound bind picker
 // (also equals the binding's type when bound).
 let heldRecordTypeId: string | null = null;
-// Instance etag from the GET that filled the form.
-// Transition If-Match uses this snapshot, never a
+// Instance head from the GET that filled the form. A
+// transition latches this snapshot, never a
 // submit-time GET (WB19a / WB19b).
-let heldInstanceEtag: string | null = null;
+let heldInstance: HttpMessage | null = null;
 let conflictNotice: string | null = null;
 
 /* ── Helpers ─────────────── */
@@ -167,12 +169,11 @@ function initTransitionButtons(
                                 detail.idValue(),
                             edgeId,
                             values,
-                            ...(heldInstanceEtag
-                                === null
+                            ...(heldInstance === null
                                 ? {}
                                 : {
-                                    instanceEtag:
-                                        heldInstanceEtag,
+                                    instance:
+                                        heldInstance,
                                 }),
                         },
                     );
@@ -398,7 +399,7 @@ async function loadPresenter(
     type InstanceWave = {
         instanceValues:
             ReadonlyMap<string, string> | null;
-        instanceEtag: string | null;
+        instance: HttpMessage | null;
         pickerItems: readonly {
             readonly id: string;
             readonly fields: readonly {
@@ -412,16 +413,16 @@ async function loadPresenter(
     const instanceWavePromise: Promise<InstanceWave> =
         (async (): Promise<InstanceWave> => {
             if (bound !== null) {
-                // ONE GET for {values, etag}.
-                const instance =
+                // ONE GET for the values and the head.
+                const detail =
                     await getRecordInstance(
                         ctx,
                         bound.recordTypeId,
                         bound.instanceId,
                     );
                 return {
-                    instanceValues: instance.values,
-                    instanceEtag: instance.etag,
+                    instanceValues: detail.instance.values,
+                    instance: detail.read,
                     pickerItems: [],
                     heldTypeId: bound.recordTypeId,
                 };
@@ -435,7 +436,7 @@ async function loadPresenter(
                     );
                 return {
                     instanceValues: null,
-                    instanceEtag: null,
+                    instance: null,
                     pickerItems: instanceListItems(
                         instances, attributes,
                     ),
@@ -444,7 +445,7 @@ async function loadPresenter(
             }
             return {
                 instanceValues: null,
-                instanceEtag: null,
+                instance: null,
                 pickerItems: [],
                 heldTypeId: recordId,
             };
@@ -461,7 +462,7 @@ async function loadPresenter(
         ),
     );
     heldRecordTypeId = instanceWave.heldTypeId;
-    heldInstanceEtag = instanceWave.instanceEtag;
+    heldInstance = instanceWave.instance;
 
     return new WorkboxDetailPresenter(
         workOrder,

@@ -192,14 +192,15 @@ async () => {
         chain_id: generateIdentifier(),
         at: '2026-01-01T00:00:00.000000Z',
     });
-    const a = await ctx.POST<IdentityTokenEntity>(
+    const a = (await ctx.POST<IdentityTokenEntity>(
         tokens + root + '/rotation', {},
-    );
-    const b = await ctx.POST<IdentityTokenEntity>(
+    )).body().toValue();
+    const b = (await ctx.POST<IdentityTokenEntity>(
         tokens + a.jti + '/rotation', {},
-    );
+    )).body().toValue();
     await ctx.POST(tokens + b.jti + '/revocation', {});
-    const heads = await ctx.GET<IdentityTokenEntity[]>(tokens);
+    const heads = (await ctx.GET<IdentityTokenEntity[]>(tokens))
+        .body().toValue();
     const headA = heads.find((head) => head.jti === a.jti);
     const headB = heads.find((head) => head.jti === b.jti);
     assert(headA && headB, 'both successors listed');

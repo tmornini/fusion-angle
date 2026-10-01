@@ -2,8 +2,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
 import {
-    ifMatchField,
-    requiredEtag,
     type RequestContext,
 } from '../client/request-context.ts';
 import {
@@ -143,10 +141,10 @@ async function tombstoneFlow(
     id: string,
 ): Promise<void> {
     await seedFlow(ctx, id);
-    const { body: current, etag } =
-        await ctx.GETWithEtag<FlowWithGraph>(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id,
-        );
+    const read = await ctx.GET<FlowWithGraph>(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id,
+    );
+    const current = read.body().toValue();
     await ctx.PUT(
         'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id,
         {
@@ -165,7 +163,7 @@ async function tombstoneFlow(
             },
             revivals: [],
         },
-        [ifMatchField(requiredEtag(etag, 'the flow GET'))],
+        [read],
     );
 }
 

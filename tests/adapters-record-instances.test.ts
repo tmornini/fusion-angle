@@ -88,7 +88,9 @@ Deno.test(
                 },
             ],
         );
-        assert(created.etag.length > 0);
+        const createdEtag = created.query('header.etag')
+            .toText().slice(1, -1);
+        assert(createdEtag.length > 0);
 
         // list embeds etag
         const list = await getRecordInstances(
@@ -96,7 +98,7 @@ Deno.test(
         );
         assertStrictEquals(list.length, 1);
         assertStrictEquals(list[0]!.id, INSTANCE_ID);
-        assertStrictEquals(list[0]!.etag, created.etag);
+        assertStrictEquals(list[0]!.etag, createdEtag);
         assertStrictEquals(
             list[0]!.values.get(ATTR_ID), 'v0',
         );
@@ -105,14 +107,14 @@ Deno.test(
         const detail = await getRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
-        assertStrictEquals(detail.etag, created.etag);
+        assertStrictEquals(detail.instance.etag, createdEtag);
         assertStrictEquals(
-            detail.values.get(ATTR_ID), 'v0',
+            detail.instance.values.get(ATTR_ID), 'v0',
         );
 
-        // patch with etag
+        // patch latching the head
         const patched = await patchRecordInstance(
-            ctx(), TYPE_ID, INSTANCE_ID, detail.etag, {
+            ctx(), TYPE_ID, INSTANCE_ID, detail.read, {
                 set: [
                     {
                         attributeId: ATTR_ID,
@@ -121,13 +123,15 @@ Deno.test(
                 ],
             },
         );
-        assertNotStrictEquals(patched.etag, detail.etag);
+        const patchedEtag = patched.query('header.etag')
+            .toText().slice(1, -1);
+        assertNotStrictEquals(patchedEtag, detail.instance.etag);
 
         // stale If-Match → 412 (no auto-retry)
         const err = await assertRejects(
             () => patchRecordInstance(
                 ctx(), TYPE_ID, INSTANCE_ID,
-                detail.etag, {
+                detail.read, {
                     set: [
                         {
                             attributeId: ATTR_ID,
@@ -140,13 +144,13 @@ Deno.test(
         assertInstanceOf(err, RequestError);
         assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
 
-        // re-read → retry with fresh etag
+        // re-read → retry latching the fresh head
         const fresh = await getRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
-        assertStrictEquals(fresh.etag, patched.etag);
+        assertStrictEquals(fresh.instance.etag, patchedEtag);
         const retried = await patchRecordInstance(
-            ctx(), TYPE_ID, INSTANCE_ID, fresh.etag, {
+            ctx(), TYPE_ID, INSTANCE_ID, fresh.read, {
                 set: [
                     {
                         attributeId: ATTR_ID,
@@ -155,22 +159,24 @@ Deno.test(
                 ],
             },
         );
-        assertNotStrictEquals(retried.etag, fresh.etag);
+        const retriedEtag = retried.query('header.etag')
+            .toText().slice(1, -1);
+        assertNotStrictEquals(retriedEtag, fresh.instance.etag);
 
         const afterRetry = await getRecordInstance(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
         assertStrictEquals(
-            afterRetry.values.get(ATTR_ID), 'v2',
+            afterRetry.instance.values.get(ATTR_ID), 'v2',
         );
-        assertStrictEquals(afterRetry.etag, retried.etag);
+        assertStrictEquals(afterRetry.instance.etag, retriedEtag);
 
         // history DESC: head first
         const history = await getRecordInstanceHistory(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
         assert(history.length >= 3);
-        assertStrictEquals(history[0]!.etag, retried.etag);
+        assertStrictEquals(history[0]!.etag, retriedEtag);
         assertStrictEquals(
             history[0]!.values.get(ATTR_ID), 'v2',
         );

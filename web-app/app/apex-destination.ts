@@ -33,11 +33,15 @@ export async function probeRefreshSession(
                 'authentication/token',
                 { grant_type: 'refresh' },
             );
-            if (answered.status !== 200) return null;
+            if (answered.query('status').toNumber() !== 200) {
+                return null;
+            }
             return authParam(
-                answered.headers.get(
-                    'authentication-info',
-                ),
+                answered.query('header.authentication-info')
+                    .exists()
+                    ? answered.query('header.authentication-info')
+                        .toText()
+                    : null,
                 'access_token',
             );
         },

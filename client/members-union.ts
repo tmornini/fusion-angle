@@ -48,8 +48,9 @@ export async function getMembers(
             : ctx.GET<MembershipEntity[]>(
                 'organizations/' + organization
                     + '/members/',
-            ),
-        ctx.GET<AIAgentEntity[]>('ai-agents/'),
+            ).then(read => read.body().toValue()),
+        ctx.GET<AIAgentEntity[]>('ai-agents/')
+            .then(read => read.body().toValue()),
     ]);
     const humans = buildHumanMemberMap(seats);
     const ais = buildAIAgentMap(agents);
@@ -128,10 +129,10 @@ async function getFormerMembers(
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
     if (organization === undefined) return [];
-    const seats = await ctx.GET<FormerSeatEntity[]>(
+    const seats = (await ctx.GET<FormerSeatEntity[]>(
         'organizations/' + organization
             + '/former-members/',
-    );
+    )).body().toValue();
     return seats.map(seat => new FormerMember(seat));
 }
 

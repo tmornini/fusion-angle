@@ -9,11 +9,11 @@ import {
 } from '../shared/types.ts';
 import {
     type RequestContext,
-    ifMatchField,
     organizationCollection,
     organizationItem,
-    requiredEtag,
 } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
@@ -40,24 +40,19 @@ export function notifyObjectiveChange(): void {
 export async function getObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
-    return ctx.GET<ObjectiveEntity[]>(
+    return (await ctx.GET<ObjectiveEntity[]>(
         organizationCollection(ctx, 'objectives'),
-    );
+    )).body().toValue();
 }
 
-// The objective with the tag of the head it was read from,
-// which a merge latches.
-async function getObjectiveWithEtag(
+// The objective's head as read, which a merge latches.
+function getObjectiveWithEtag(
     ctx: RequestContext,
     id: ObjectiveId,
-): Promise<{ objective: ObjectiveEntity; etag: string }> {
-    const read = await ctx.GETWithEtag<ObjectiveEntity>(
+): Promise<HttpMessage<ObjectiveEntity>> {
+    return ctx.GET<ObjectiveEntity>(
         organizationItem(ctx, 'objectives', id),
     );
-    return {
-        objective: read.body,
-        etag: requiredEtag(read.etag, 'the objective GET'),
-    };
 }
 
 export function activeObjectivesOf(
@@ -97,17 +92,17 @@ export interface ObjectiveVersionRow
 export async function getObjectiveHistories(
     ctx: RequestContext,
 ): Promise<Map<Id, ObjectiveVersionRow[]>> {
-    const rows = await ctx.GET<{ id: Id }[]>(
+    const rows = (await ctx.GET<{ id: Id }[]>(
         organizationCollection(ctx, 'objectives'),
-    );
+    )).body().toValue();
     const pairs = await Promise.all(
         rows.map(async (row) => {
-            const versions = await ctx.GET<
+            const versions = (await ctx.GET<
                 ObjectiveVersionRow[]
             >(
                 organizationItem(ctx, 'objectives', row.id)
                     + '/versions/',
-            );
+            )).body().toValue();
             return [row.id, versions] as const;
         }),
     );
@@ -193,10 +188,10 @@ async function getRevisionsForObjective(
     ctx: RequestContext,
     objectiveId: ObjectiveId,
 ): Promise<ObjectiveRevisionEntity[]> {
-    return ctx.GET<ObjectiveRevisionEntity[]>(
+    return (await ctx.GET<ObjectiveRevisionEntity[]>(
         organizationItem(ctx, 'objectives', objectiveId)
             + '/revisions/',
-    );
+    )).body().toValue();
 }
 
 // The revisions for each supplied objective, grouped — reassembled
@@ -342,15 +337,15 @@ export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    const { objective, etag } =
-        await getObjectiveWithEtag(ctx, id);
+    const read = await getObjectiveWithEtag(ctx, id);
+    const objective = read.body().toValue();
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
             position: objective.position,
             state: 'archived',
         },
-        [ifMatchField(etag)],
+        [read],
     );
     notifyObjectiveChange();
 }
@@ -359,15 +354,15 @@ export async function postObjectiveReactivation(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    const { objective, etag } =
-        await getObjectiveWithEtag(ctx, id);
+    const read = await getObjectiveWithEtag(ctx, id);
+    const objective = read.body().toValue();
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
             position: objective.position,
             state: 'active',
         },
-        [ifMatchField(etag)],
+        [read],
     );
     notifyObjectiveChange();
 }
@@ -381,15 +376,15 @@ export async function putObjectivePosition(
     id: ObjectiveId,
     position: number,
 ): Promise<void> {
-    const { objective, etag } =
-        await getObjectiveWithEtag(ctx, id);
+    const read = await getObjectiveWithEtag(ctx, id);
+    const objective = read.body().toValue();
     await ctx.PUT(
         organizationItem(ctx, 'objectives', id),
         {
             position,
             state: objective.state,
         },
-        [ifMatchField(etag)],
+        [read],
     );
     notifyObjectiveChange();
 }

@@ -152,7 +152,7 @@ async function createFlow(
 // body) is no longer the document's head — its synthesized
 // document message pair (appended after, so strictly later)
 // is. A save must echo THIS id, read fresh via GET, exactly
-// as the real client (buildFlowPutBody's ctx.GETWithEtag)
+// as the real client (buildFlowPutBody's ctx.GET)
 // does.
 async function headResponseId(
     db: MemoryDbAdapter,

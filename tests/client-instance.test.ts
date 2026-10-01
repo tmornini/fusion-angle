@@ -175,7 +175,7 @@ Deno.test(
                     releaseRefresh = resolve;
                 });
             }
-            return Promise.resolve(new Response('[]'));
+            return Promise.resolve(Response.json([]));
         };
         const client = createAppClient(createHttpFacade(
             '',
@@ -205,7 +205,7 @@ Deno.test(
                 },
             }));
             assertStrictEquals(await joined, fresh);
-            assertEquals(await read, []);
+            assertEquals((await read).body().toValue(), []);
             assertStrictEquals(ranOwn, false);
             assertStrictEquals(client.getSessionToken(), fresh);
         } finally {
@@ -316,8 +316,8 @@ Deno.test('a failed cookie refresh calls the injected navigation',
             Promise.resolve(
                 String(init?.body ?? '').includes('"refresh"')
                     ? new Response('', { status: 401 })
-                    : new Response(
-                        JSON.stringify({ error: 'expired' }),
+                    : Response.json(
+                        { error: 'expired' },
                         { status: 401 },
                     ),
             )),

@@ -58,6 +58,8 @@ import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
 } from '../../shared/http-errors.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     projectClaimRolesForOrganization,
 } from '../../api/authorization.ts';
@@ -77,7 +79,7 @@ type PageState =
         kind: 'instances-editing';
         instanceId: string;
         draft: Record<string, string>;
-        etag: string;
+        held: HttpMessage;
         fields: readonly InstanceFieldView[];
         conflictNotice: string | null;
     };
@@ -540,7 +542,7 @@ async function handleNewInstance(
             kind: 'instances-editing',
             instanceId,
             draft: draftFromFields(fields),
-            etag: created.etag,
+            held: created,
             fields,
             conflictNotice: null,
         };
@@ -550,7 +552,8 @@ async function handleNewInstance(
                 id: instanceId,
                 recordTypeId: recordId,
                 values: new Map(),
-                etag: created.etag,
+                etag: created.query('header.etag').toText()
+                    .slice(1, -1),
             },
         ];
         render(root);
@@ -577,13 +580,13 @@ async function handleEditInstance(
         );
         const fields = fieldsFromAttributes(
             currentView.attributes,
-            detail.values,
+            detail.instance.values,
         );
         pageState = {
             kind: 'instances-editing',
             instanceId,
             draft: draftFromFields(fields),
-            etag: detail.etag,
+            held: detail.read,
             fields,
             conflictNotice: null,
         };
@@ -606,7 +609,7 @@ async function handleInstanceSave(
     if (saveInProgress) return;
     const ctx = sessionContext();
     const {
-        instanceId, draft, etag, fields,
+        instanceId, draft, held, fields,
     } = pageState;
     // Empty string is rejected at the gate; only ship
     // non-empty writable values in this minimal UI
@@ -621,16 +624,15 @@ async function handleInstanceSave(
         .filter(entry => entry.value !== '');
     saveInProgress = true;
     try {
-        const result = await patchRecordInstance(
+        await patchRecordInstance(
             ctx,
             recordId,
             instanceId,
-            etag,
+            held,
             { set },
         );
         pageState = { kind: 'reading' };
         showToast('Instance saved', 'success');
-        void result.etag;
         await load(root);
     } catch (err) {
         if (
@@ -649,7 +651,7 @@ async function handleInstanceSave(
                 const freshFields =
                     fieldsFromAttributes(
                         currentView.attributes,
-                        fresh.values,
+                        fresh.instance.values,
                     );
                 pageState = {
                     kind: 'instances-editing',
@@ -657,7 +659,7 @@ async function handleInstanceSave(
                     draft: draftFromFields(
                         freshFields,
                     ),
-                    etag: fresh.etag,
+                    held: fresh.read,
                     fields: freshFields,
                     conflictNotice:
                         INSTANCE_CONFLICT_NOTICE,

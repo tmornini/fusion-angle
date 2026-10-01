@@ -34,7 +34,9 @@ export async function postSessionRefresh(
     const refused = refusedDoor(answered);
     if (refused !== null) throw refused;
     const accessToken = authParam(
-        answered.headers.get('authentication-info'),
+        answered.query('header.authentication-info').exists()
+            ? answered.query('header.authentication-info').toText()
+            : null,
         'access_token',
     );
     if (accessToken === null) {
@@ -44,6 +46,6 @@ export async function postSessionRefresh(
     }
     return {
         accessToken,
-        refreshToken: refreshFromHeaders(answered.headers),
+        refreshToken: refreshFromHeaders(answered),
     };
 }

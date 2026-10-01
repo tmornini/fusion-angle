@@ -1,9 +1,7 @@
 import type { RequestContext } from './request-context.ts';
-import {
-    activeOrganization,
-    ifMatchField,
-    requiredEtag,
-} from './request-context.ts';
+import { activeOrganization } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 
 // Domain face of a record instance: values as a map keyed
 // by attribute id. etag is the unquoted pair id for
@@ -13,6 +11,13 @@ export interface RecordInstance {
     readonly recordTypeId: string;
     readonly values: ReadonlyMap<string, string>;
     readonly etag: string;
+}
+
+// The instance and the head it was read from, which the
+// page holds across an edit and its PATCH latches.
+export interface RecordInstanceRead {
+    readonly instance: RecordInstance;
+    readonly read: HttpMessage<InstanceDetailWire>;
 }
 
 export interface RecordInstanceHistoryEntry {
@@ -97,65 +102,69 @@ export async function getRecordInstances(
     ctx: RequestContext,
     recordTypeId: string,
 ): Promise<RecordInstance[]> {
-    const rows = await ctx.GET<InstanceDetailWire[]>(
+    const rows = (await ctx.GET<InstanceDetailWire[]>(
         instancesPath(ctx, recordTypeId),
-    );
-    return rows.map(row => toRecordInstance(
-        row,
-        requiredEtag(
-            row.etag,
-            'the instance list row ' + row.id,
-        ),
-    ));
+    )).body().toValue();
+    return rows.map(row => {
+        // A list row with no tag leaves nothing for a
+        // page to latch; this is a bug, not an absence.
+        if (row.etag === undefined) {
+            throw new Error(
+                'the instance list row ' + row.id
+                    + ' carried no ETag',
+            );
+        }
+        return toRecordInstance(row, row.etag);
+    });
 }
 
-// Detail: ETag is header-authoritative (not body-embedded).
+// Detail: the tag is header-authoritative (not
+// body-embedded); the message the page keeps carries it.
 export async function getRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
-): Promise<RecordInstance> {
-    const { body, etag } = await ctx.GETWithEtag<
-        InstanceDetailWire
-    >(instancePath(ctx, recordTypeId, id));
-    return toRecordInstance(
-        body,
-        requiredEtag(etag, 'the instance GET ' + id),
+): Promise<RecordInstanceRead> {
+    const read = await ctx.GET<InstanceDetailWire>(
+        instancePath(ctx, recordTypeId, id),
     );
+    return {
+        instance: toRecordInstance(
+            read.body().toValue(),
+            read.query('header.etag').toText().slice(1, -1),
+        ),
+        read,
+    };
 }
 
-// PATCH create, declared by If-None-Match: *. Returns the
-// fresh etag so the caller can enter edit without a re-GET.
-export async function putRecordInstance(
+// PATCH create, declared as creating. Answers the create's
+// message so the caller can enter edit without a re-GET.
+export function putRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
     set: readonly InstanceValueSet[],
-): Promise<{ etag: string }> {
-    const { etag } = await ctx.PATCHWithEtag(
+): Promise<HttpMessage> {
+    return ctx.PATCH(
         instancePath(ctx, recordTypeId, id),
         { set: setWire(set) },
-        [['If-None-Match', '*']],
+        'creates',
     );
-    return {
-        etag: requiredEtag(
-            etag, 'the instance PATCH create ' + id,
-        ),
-    };
 }
 
-// If-Match: '"' + etag + '"'. 412 surfaces as RequestError
-// — the adapter does NOT auto-retry (client owns the loop).
-export async function patchRecordInstance(
+// Latches the head the page holds and answers the new one.
+// 412 surfaces as RequestError — the adapter does NOT
+// auto-retry (client owns the loop).
+export function patchRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
-    etag: string,
+    held: HttpMessage,
     delta: {
         set?: readonly InstanceValueSet[];
         clear?: readonly string[];
     },
-): Promise<{ etag: string }> {
+): Promise<HttpMessage> {
     const body: Record<string, unknown> = {};
     if (delta.set !== undefined) {
         body['set'] = setWire(delta.set);
@@ -163,16 +172,11 @@ export async function patchRecordInstance(
     if (delta.clear !== undefined) {
         body['clear'] = [...delta.clear];
     }
-    const result = await ctx.PATCHWithEtag(
+    return ctx.PATCH(
         instancePath(ctx, recordTypeId, id),
         body,
-        [ifMatchField(etag)],
+        [held],
     );
-    return {
-        etag: requiredEtag(
-            result.etag, 'the instance PATCH ' + id,
-        ),
-    };
 }
 
 export async function deleteRecordInstance(
@@ -190,10 +194,10 @@ export async function getRecordInstanceHistory(
     recordTypeId: string,
     id: string,
 ): Promise<RecordInstanceHistoryEntry[]> {
-    const rows = await ctx.GET<InstanceHistoryWire[]>(
+    const rows = (await ctx.GET<InstanceHistoryWire[]>(
         instancePath(ctx, recordTypeId, id)
         + '/versions',
-    );
+    )).body().toValue();
     return rows.map(row => ({
         at: row.at,
         etag: row.etag,

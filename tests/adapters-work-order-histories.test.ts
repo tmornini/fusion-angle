@@ -7,6 +7,7 @@ import {
 } from '../client/work-orders-queries.ts';
 import type { RequestContext } from
     '../client/request-context.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 Deno.test(
     'getWorkOrderHistories does not GET work-orders/',
@@ -18,7 +19,7 @@ Deno.test(
             },
             GET: async (path: string) => {
                 paths.push(path);
-                return [];
+                return responseMessage([]);
             },
         } as unknown as RequestContext;
         await getWorkOrderHistories(

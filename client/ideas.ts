@@ -13,10 +13,8 @@ import {
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import {
-    ifMatchField,
     organizationCollection,
     organizationItem,
-    requiredEtag,
 } from './request-context.ts';
 import {
     getCurrentHumanMember,
@@ -50,18 +48,18 @@ export function subscribeIdeaChanges(
 export async function getIdeaEntities(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
-    return ctx.GET<IdeaEntity[]>(
+    return (await ctx.GET<IdeaEntity[]>(
         organizationCollection(ctx, 'ideas'),
-    );
+    )).body().toValue();
 }
 
 export async function getIdeaEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<IdeaEntity> {
-    return ctx.GET<IdeaEntity>(
+    return (await ctx.GET<IdeaEntity>(
         organizationItem(ctx, 'ideas', id),
-    );
+    )).body().toValue();
 }
 
 // The submissions for ONE idea — the server filters the nested
@@ -70,10 +68,10 @@ async function getIdeaSubmissionsForIdea(
     ctx: RequestContext,
     ideaId: string,
 ): Promise<IdeaSubmissionEntity[]> {
-    return ctx.GET<IdeaSubmissionEntity[]>(
+    return (await ctx.GET<IdeaSubmissionEntity[]>(
         organizationItem(ctx, 'ideas', ideaId)
             + '/submissions/',
-    );
+    )).body().toValue();
 }
 
 // The submissions across EVERY supplied idea — reassembled from
@@ -354,12 +352,11 @@ export async function postIdeaConversion(
     // head it was read from, so a 412 surfaces as RequestError.
     const [member, idea] = await Promise.all([
         getCurrentHumanMember(ctx),
-        ctx.GETWithEtag<IdeaEntity>(
+        ctx.GET<IdeaEntity>(
             organizationItem(ctx, 'ideas', ideaId),
         ),
     ]);
-    const ideaEtag = requiredEtag(idea.etag, 'the idea GET');
-    await ctx.POSTWithHeaders(
+    await ctx.POST(
         organizationItem(ctx, 'ideas', ideaId)
             + '/conversion',
         {
@@ -382,7 +379,7 @@ export async function postIdeaConversion(
                 at: ideaStateAt,
             },
         })),
-    }, [ifMatchField(ideaEtag)]);
+    }, [idea]);
     notifyProjectChange();
     notifyProjectScoreChange();
     ideaChanges.notify();

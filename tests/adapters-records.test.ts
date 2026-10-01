@@ -77,13 +77,13 @@ Deno.test(
             ],
             initialState: 'active',
         });
-        const attrs = await ctx.GET<
+        const attrs = (await ctx.GET<
             { id: string; name: string }[]
         >(
             'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/',
-        );
+        )).body().toValue();
         assertStrictEquals(attrs.length, 1);
         assertStrictEquals(attrs[0]!.name, 'Fee');
     },
@@ -170,13 +170,13 @@ Deno.test(
             state: head.stateValue(),
             removedAttributeIds: [oldAttrId],
         });
-        const attrs = await ctx.GET<
+        const attrs = (await ctx.GET<
             { id: string }[]
         >(
             'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/',
-        );
+        )).body().toValue();
         assertStrictEquals(attrs.length, 1);
         assertStrictEquals(attrs[0]!.id, newAttrId);
     },

@@ -37,12 +37,12 @@ import type {
     RequestContext,
 } from './request-context.ts';
 import {
-    ifMatchField,
     jitteredBackoff,
     organizationCollection,
     organizationItem,
-    requiredEtag,
 } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 
 const flowChanges =
     createSubscriptionChannel();
@@ -423,11 +423,11 @@ export function buildRevivals(
 // revivals diffed against that SAME fresh baseline (empty for
 // every ordinary edit; performRedo is the one caller that
 // supplies a revivalTarget — see putFlow below). ONE GET
-// (ctx.GETWithEtag, never getFlowGraph — the split moved
+// (ctx.GET, never getFlowGraph — the split moved
 // layout to the app's getRenderableFlowGraph, so this
 // helper returns the parsed, unlaid graph and still
-// hides the ETag this builder also needs) serves BOTH the
-// baseline diff source AND the echo to carry as If-Match —
+// hides the message this builder also needs) serves BOTH
+// the baseline diff source AND the head the PUT latches —
 // calling getFlowGraph plus a separate header read would
 // silently add a hop to every save path. Not
 // exported: putFlow (below) is the ONLY caller since the C6
@@ -443,13 +443,13 @@ async function buildFlowPutBody(
     revivalTarget: StoredGraph | undefined,
 ): Promise<{
     body: Record<string, unknown>;
-    etag: string | undefined;
+    read: HttpMessage<FlowWithGraph>;
 }> {
     const now = nowUtc();
-    const { body: current, etag } =
-        await ctx.GETWithEtag<FlowWithGraph>(
-            organizationItem(ctx, 'flows', id),
-        );
+    const read = await ctx.GET<FlowWithGraph>(
+        organizationItem(ctx, 'flows', id),
+    );
+    const current = read.body().toValue();
     const baseline = asStoredGraph(
         current.graph, 'flow.graph',
     );
@@ -476,7 +476,7 @@ async function buildFlowPutBody(
             graphDelta: delta,
             revivals,
         },
-        etag,
+        read,
     };
 }
 
@@ -568,7 +568,7 @@ export async function putFlow(
         attempt <= MAX_PUT_ATTEMPTS;
         attempt++
     ) {
-        const { body, etag } =
+        const { body, read } =
             await buildFlowPutBody(
                 ctx, id, save, revivalTarget,
             );
@@ -576,9 +576,7 @@ export async function putFlow(
             await ctx.PUT(
                 organizationItem(ctx, 'flows', id),
                 body,
-                [ifMatchField(
-                    requiredEtag(etag, 'the flow GET'),
-                )],
+                [read],
             );
             flowChanges.notify();
             return;
