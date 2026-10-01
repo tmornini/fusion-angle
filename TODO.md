@@ -1308,7 +1308,25 @@ Off the critical path; each with its oracle.
   transport — a rejection, a stall, a 429 with
   `Retry-After`, a 503, an HTML 502 — asserting the
   attempts, the delays, and that a POST with an unknown
-  outcome is never resent
+  outcome is never resent. Head reads hands this bullet
+  the 412 a latched save now answers and the errors that
+  carry their response (`RequestError.response`,
+  `shared/http-errors.ts`): a page that holds a message
+  and is refused keeps the stale head
+  (`web-app/ideas/detail.ts`, `web-app/ideas/index.ts`,
+  `web-app/projects/detail.ts`,
+  `web-app/projects/index.ts`,
+  `web-app/records/detail.ts`,
+  `web-app/records/index.ts`,
+  `web-app/organization/index.ts`,
+  `web-app/workbox/index.ts`, and the PII hop of
+  `putHumanMember` in `client/members.ts`), so every
+  retry refuses until a bell refetch or a reload; the
+  drag reorders surface nothing on a refusal (ideas,
+  projects, records, organization — workbox toasts); the
+  flow save's per-attempt read and `postFlowUndo`'s
+  read-on-412 are the model; and a held-item miss on a
+  drop also says nothing
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
