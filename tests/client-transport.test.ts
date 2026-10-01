@@ -72,6 +72,10 @@ async () => {
         message.query('header.content-encoding').exists(),
         false,
     );
+    assertStrictEquals(
+        message.query('header.content-length').exists(),
+        false,
+    );
 });
 
 Deno.test('a refusal still throws with its status',
