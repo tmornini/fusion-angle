@@ -2963,6 +2963,27 @@ Off the critical path; each with its oracle.
   in `shared/`; the generator is a tool and may read
   the server. Oracle: an import-graph walk from every
   `PAGE_REGISTRY` entry finds no module under `api/`
+- The client hands the app three shapes. Head reads
+  made each raw row a message: a verb that read a wire
+  row answers `HttpMessage<Row>`, or an array of them
+  for a collection's parts. The five named values
+  (`Idea`, `Project`, `RecordModel`, `WorkOrder`,
+  `RecordInstance`) and the values a write latches
+  through (`HumanMember` by its `seat`, `MemberPii`
+  present, `ClientRegistration` registered, the app's
+  `Organization`, and `FlowGraph`) keep the message
+  they were built from. The aggregates and the
+  camelCase values nothing writes through — `AIMember`,
+  `Identity`, the roster, `RecordAttribute`,
+  `ObjectiveScore`, `ObjectiveRevision`,
+  `ProviderEvent`, `TokenChain`, the credential state,
+  `FlowSummary`, `FlowListItem`, `BoundFlowSummary`,
+  and the transition and claim projections — keep
+  their shapes and drop the responses they were built
+  from. Oracle: every client read verb returns a
+  message, an array of messages, or a value whose
+  `message` members name every response it was built
+  from
 - Comments name absent code. `appendMessagePairOnce`
   and `appendMessagePairAlways` left with the store's
   one statement, and the comments citing them stayed:
