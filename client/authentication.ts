@@ -113,7 +113,7 @@ export async function postPasswordLogin(
     const challenge = bytesToBase64Url(
         await sha256Bytes(verifier),
     );
-    const authorized = await ctx.postForHeaders(
+    const authorized = await ctx.POSTUnauthenticated(
         'authentication/authorize', {
             method: 'password',
             client_id: WEB_CLIENT_ID,
@@ -139,7 +139,7 @@ export async function postPasswordLogin(
             'authentication-info lacks code',
         );
     }
-    const granted = await ctx.postForHeaders(
+    const granted = await ctx.POSTUnauthenticated(
         'authentication/token', {
             grant_type: 'authorization_code',
             client_id: WEB_CLIENT_ID,

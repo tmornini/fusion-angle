@@ -29,7 +29,7 @@ export async function probeRefreshSession(
     const ctx = client.requestContext('');
     const access = await client.runSingleFlightRefresh(
         async () => {
-            const answered = await ctx.postForHeaders(
+            const answered = await ctx.POSTUnauthenticated(
                 'authentication/token',
                 { grant_type: 'refresh' },
             );

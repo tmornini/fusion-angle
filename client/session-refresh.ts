@@ -23,7 +23,7 @@ export async function postSessionRefresh(
     if (organization !== undefined) {
         body.organization = organization;
     }
-    const answered = await ctx.postForHeaders(
+    const answered = await ctx.POSTUnauthenticated(
         'authentication/token',
         body,
         [[

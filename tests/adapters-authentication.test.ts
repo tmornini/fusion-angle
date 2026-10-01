@@ -137,7 +137,7 @@ async () => {
     // password — it must surface, not collapse to null.
     const ctx = {
         session: inPageClient(memoryDbAdapter()),
-        postForHeaders: async () => {
+        POSTUnauthenticated: async () => {
             throw new Error('upstream 500');
         },
     } as unknown as RequestContext;
@@ -156,7 +156,7 @@ async () => {
     }[] = [];
     const ctx = {
         session: inPageClient(memoryDbAdapter()),
-        postForHeaders: async (
+        POSTUnauthenticated: async (
             _path: string,
             body: Record<string, unknown>,
             headers?: readonly (readonly [string, string])[],

@@ -708,7 +708,7 @@ Deno.test(
                 DELETE: unused,
                 DELETEWithEtag: unused,
                 POST: unused,
-                postForHeaders: (
+                POSTUnauthenticated: (
                     _resource, payload, _token, fields,
                 ) => {
                     const grant = payload.grant_type;

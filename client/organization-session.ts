@@ -29,7 +29,7 @@ export async function postOrganizationSessionExchange(
     subjectToken: string,
     organization: string,
 ): Promise<string> {
-    const answered = await ctx.postForHeaders(
+    const answered = await ctx.POSTUnauthenticated(
         'authentication/token', {
             grant_type: 'token-exchange',
             organization: organization,

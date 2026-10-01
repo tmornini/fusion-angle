@@ -184,7 +184,7 @@ export interface RequestContext {
     ): Promise<T>;
     // Door POST. Token is always empty, so the session
     // bearer never rides the grant's authorization line.
-    postForHeaders(
+    POSTUnauthenticated(
         resource: string,
         body: Record<string, unknown>,
         headerFields?:
@@ -398,7 +398,7 @@ function openRequestContext(
                     resource, body, tok, headers,
                 ));
         },
-        postForHeaders: (
+        POSTUnauthenticated: (
             resource: string,
             body: Record<string, unknown>,
             headerFields?:
@@ -406,7 +406,7 @@ function openRequestContext(
         ) => {
             core.recordRequest('POST', resource);
             const headers = writeHeaders(headerFields);
-            return verbs.postForHeaders(
+            return verbs.POSTUnauthenticated(
                 resource, body, '', headers,
             );
         },

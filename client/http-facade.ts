@@ -76,7 +76,7 @@ export interface HttpFacade {
         headerFields?:
             readonly (readonly [string, string])[],
     ): Promise<T>;
-    postForHeaders(
+    POSTUnauthenticated(
         resource: string,
         payload: Record<string, unknown>,
         token: string,
@@ -401,7 +401,7 @@ export function createHttpFacade(
                     payload, headerFields,
                 ),
             ),
-            postForHeaders: async (
+            POSTUnauthenticated: async (
                 resource, payload, token, headerFields,
             ) => {
                 const response = await exchange(
