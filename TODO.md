@@ -409,11 +409,12 @@ skew tests, which went with item 8's trio.
    token pairs, or a 401 with its refresh, its exchange,
    and its resend, read as one operation in the ledger and
    in the logs, which carry both ids. The gate requires it
-   on every request but `/status` (item 4): today it skips
-   reads and the two bearer-exempt routes
-   (`requireOperationId`, `api/message-pair.ts:156-189`),
-   and a side channel reads it `?? ''`
-   (`api/api.ts:1634-1636`). It stops naming one write,
+   on every request but `/status` (item 4); today it
+   requires it on every request, reads and the two
+   bearer-exempt routes included (`api/api.ts:403-417`),
+   and two handler calls read it `?? ''`
+   (`api/api.ts:975-977`, `:1265-1267`). It stops naming
+   one write,
    and one reader depended on that: the join from a PATCH
    pair to its revision (`revisionMessagePairIdForPatch`,
    `api/api.ts:309-328`), there only to attach the
@@ -2766,8 +2767,9 @@ Off the critical path; each with its oracle.
   405 carries no `Allow` (`api/api.ts:2004-2013`) —
   RFC 9110 §9.1 requires GET and HEAD of a
   general-purpose server and §15.5.6 requires `Allow` on
-  a 405 — while `requireOperationId` already skips a
-  method never served (`api/message-pair.ts:163`). Add
+  a 405 — while the gate requires `operation-id` on
+  every request, a method never served included
+  (`api/api.ts:403-417`). Add
   `HEAD` to the API: once item 1 makes a document GET the
   stored bytes with three substitutions, `HEAD` is that
   function without the body. Conditional requests
