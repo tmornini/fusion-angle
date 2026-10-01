@@ -20,7 +20,7 @@ import {
 } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import { compareIdentifiers } from
+import { byAtThenIdAscending } from
     '../shared/identifier.ts';
 
 /* ── Types ───────────────── */
@@ -228,11 +228,7 @@ export function projectTransitions(
     // equal-timestamp ties (same second, later id first).
     const transitions = events
         .filter(ev => !isClaimState(ev.state))
-        .toSorted((a, b) => {
-            const byAt = a.at.localeCompare(b.at);
-            if (byAt !== 0) return byAt;
-            return compareIdentifiers(a.id, b.id);
-        });
+        .toSorted(byAtThenIdAscending);
     const out: TransitionEvent[] = [];
     let prior: Id | null = null;
     for (const ev of transitions) {

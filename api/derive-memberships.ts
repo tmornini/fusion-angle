@@ -15,7 +15,7 @@ import {
     documentMessagePairsAt,
     type DerivedDocument,
 } from './derive-documents.ts';
-import { compareIdentifiers } from
+import { byAtThenIdAscending } from
     '../shared/identifier.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
@@ -149,14 +149,6 @@ export function seatEntityOf(
 }
 
 const DELETE_METHOD = 'DELETE';
-
-function byAtThenIdAscending<
-    T extends { at: string; id: string },
->(a: T, b: T): number {
-    return a.at < b.at ? -1
-        : a.at > b.at ? 1
-            : compareIdentifiers(a.id, b.id);
-}
 
 // Every LIVE membership row naming `identityId`, across EVERY
 // organization — ascending by (at, id) (the defined order, see

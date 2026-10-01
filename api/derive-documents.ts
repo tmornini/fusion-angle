@@ -5,8 +5,10 @@ import type {
 } from '../shared/types.ts';
 import { pickString } from './validators.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
-import { compareIdentifiers } from
-    '../shared/identifier.ts';
+import {
+    byAtThenIdAscending,
+    compareIdentifiers,
+} from '../shared/identifier.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 
@@ -98,10 +100,7 @@ export function documentMessagePairsAt(
                 messagePair.requester_identity_id,
         });
     }
-    return out.sort((left, right) =>
-        left.at < right.at ? -1
-            : left.at > right.at ? 1
-                : compareIdentifiers(left.id, right.id));
+    return out.sort(byAtThenIdAscending);
 }
 
 // The head document per name at a prefix. Family-agnostic and
@@ -220,10 +219,7 @@ export function stateHistoryFrom(
         at: event.stateAt,
         etag: event.etag,
     }));
-    return rows.sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-                : compareIdentifiers(a.id, b.id));
+    return rows.sort(byAtThenIdAscending);
 }
 
 // The CURRENT lifecycle event: the (state_at, state_event_id)

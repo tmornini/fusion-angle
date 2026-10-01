@@ -3,7 +3,7 @@ import {
     type IdentityTokenEntity,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
-import { compareIdentifiers } from '../shared/identifier.ts';
+import { byAtThenIdAscending } from '../shared/identifier.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
@@ -60,9 +60,7 @@ export async function getTokenChainsFor(
     const rows = (await ctx.GETCollection<IdentityTokenEntity>(
         `identities/${identityId}/tokens/`,
     )).map((m) => m.body().toValue())
-        .sort((a, b) => a.at < b.at ? -1
-            : a.at > b.at ? 1
-                : compareIdentifiers(a.jti, b.jti));
+        .toSorted(byAtThenIdAscending);
     const byChain = new Map<string, TokenEvent[]>();
     for (const row of rows) {
         const event: TokenEvent = {

@@ -4,7 +4,7 @@ import {
     type OrganizationEntity,
     type MembershipEntity,
 } from '../shared/types.ts';
-import { compareIdentifiers } from '../shared/identifier.ts';
+import { byAtThenIdAscending } from '../shared/identifier.ts';
 import {
     getOrganization as fetchOrganization,
     putOrganization,
@@ -40,9 +40,7 @@ export async function getOrganizationSeats(
         'organizations/' + organization
             + '/members/',
     )).map((m) => m.body().toValue())
-        .sort((a, b) => a.at < b.at ? -1
-            : a.at > b.at ? 1
-                : compareIdentifiers(a.id, b.id));
+        .toSorted(byAtThenIdAscending);
 }
 
 export interface OrganizationStats {

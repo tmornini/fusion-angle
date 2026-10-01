@@ -12,7 +12,7 @@ import {
     nowUtc,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
-import { compareIdentifiers } from '../shared/identifier.ts';
+import { byAtThenIdAscending } from '../shared/identifier.ts';
 import { getMemberPii } from './identities.ts';
 import {
     createSubscriptionChannel,
@@ -80,9 +80,7 @@ export function buildHumanMemberMap(
     seats: readonly MembershipEntity[],
 ): Map<MemberId, HumanMember> {
     const map = new Map<MemberId, HumanMember>();
-    const granted = seats.toSorted((a, b) => a.at < b.at ? -1
-        : a.at > b.at ? 1
-            : compareIdentifiers(a.id, b.id));
+    const granted = seats.toSorted(byAtThenIdAscending);
     for (const seat of granted) {
         map.set(
             seat.identity_id,
