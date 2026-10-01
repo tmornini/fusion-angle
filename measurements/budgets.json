@@ -1,89 +1,89 @@
 {
     "api-documentation": {
-        "readyMs": 43
-    },
-    "auth": {
-        "readyMs": 32
-    },
-    "billing": {
-        "readyMs": 42
-    },
-    "dashboard": {
-        "readyMs": 57
-    },
-    "design-system": {
-        "readyMs": 48
-    },
-    "flow-detail": {
-        "readyMs": 54
-    },
-    "flow-stats": {
-        "readyMs": 66
-    },
-    "flows": {
-        "readyMs": 50
-    },
-    "idea-convert": {
-        "readyMs": 48
-    },
-    "idea-create": {
-        "readyMs": 41
-    },
-    "idea-detail": {
-        "readyMs": 47
-    },
-    "ideas": {
-        "readyMs": 49
-    },
-    "identities": {
         "readyMs": 51
     },
-    "identity-detail": {
-        "readyMs": 44
+    "auth": {
+        "readyMs": 35
     },
-    "identity-providers": {
-        "readyMs": 42
-    },
-    "identity-tokens": {
-        "readyMs": 43
-    },
-    "invitations": {
-        "readyMs": 43
-    },
-    "landing": {
-        "readyMs": 30
-    },
-    "member-detail": {
-        "readyMs": 44
-    },
-    "members": {
+    "billing": {
         "readyMs": 50
     },
-    "not-found": {
-        "readyMs": 33
+    "dashboard": {
+        "readyMs": 63
     },
-    "organization": {
-        "readyMs": 49
+    "design-system": {
+        "readyMs": 58
     },
-    "project-detail": {
-        "readyMs": 48
-    },
-    "projects": {
-        "readyMs": 55
-    },
-    "record-create": {
-        "readyMs": 42
-    },
-    "record-detail": {
+    "flow-detail": {
         "readyMs": 64
     },
+    "flow-stats": {
+        "readyMs": 77
+    },
+    "flows": {
+        "readyMs": 59
+    },
+    "idea-convert": {
+        "readyMs": 57
+    },
+    "idea-create": {
+        "readyMs": 50
+    },
+    "idea-detail": {
+        "readyMs": 59
+    },
+    "ideas": {
+        "readyMs": 60
+    },
+    "identities": {
+        "readyMs": 61
+    },
+    "identity-detail": {
+        "readyMs": 49
+    },
+    "identity-providers": {
+        "readyMs": 51
+    },
+    "identity-tokens": {
+        "readyMs": 50
+    },
+    "invitations": {
+        "readyMs": 50
+    },
+    "landing": {
+        "readyMs": 36
+    },
+    "member-detail": {
+        "readyMs": 54
+    },
+    "members": {
+        "readyMs": 58
+    },
+    "not-found": {
+        "readyMs": 36
+    },
+    "organization": {
+        "readyMs": 57
+    },
+    "project-detail": {
+        "readyMs": 57
+    },
+    "projects": {
+        "readyMs": 66
+    },
+    "record-create": {
+        "readyMs": 50
+    },
+    "record-detail": {
+        "readyMs": 92
+    },
     "records": {
-        "readyMs": 52
+        "readyMs": 58
     },
     "workbox": {
-        "readyMs": 106
+        "readyMs": 145
     },
     "workbox-detail": {
-        "readyMs": 59
+        "readyMs": 72
     }
 }
