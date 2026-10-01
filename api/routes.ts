@@ -3925,14 +3925,25 @@ export const routes: Route[] = [
                     'identity_credentials', cid,
                 );
             }
+            // The PUT validator admits no credential without
+            // its identity, so a stored head lacking it is the
+            // store's fault, never the reader's: it fails the
+            // request, as a state head with no state does.
+            const identityOfHead =
+                bodyOf(head.response)['identity_id'];
+            if (typeof identityOfHead !== 'string') {
+                throw new Error(
+                    'stored credential has no identity_id: '
+                        + head.path + head.name
+                        + ' (' + head.id + ')',
+                );
+            }
             const memberships =
                 await membershipsAcrossAllOrganizations(
                     db, actor,
                 );
             const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships,
-                pickString(bodyOf(head.response), 'identity_id'),
-                organizationId,
+                memberships, identityOfHead, organizationId,
             );
             if (owner !== null && owner !== organizationId) {
                 throw new ForeignOrganizationError(

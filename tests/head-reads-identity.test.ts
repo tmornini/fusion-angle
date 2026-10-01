@@ -1,6 +1,7 @@
 import {
     assert,
     assertEquals,
+    assertMatch,
     assertStrictEquals,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
@@ -23,6 +24,9 @@ import {
     formWriteMessagePair,
     runWrite,
 } from '../api/message-pair.ts';
+import { CREDENTIAL_DETAIL_PATTERN } from
+    '../api/family-registry.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 
 const ME = 'XXZruirZyAOoRpNxaDnpSA';
 
@@ -213,4 +217,49 @@ Deno.test('a provider at the retired flat prefix is not served'
     }));
     assertStrictEquals(got.status, 404);
     await got.body?.cancel();
+});
+
+// The credential PUT validator admits no body without its
+// identity_id, so a stored head lacking it is the store's
+// fault, never the reader's: the request crashes, as a state
+// head with no state does.
+Deno.test('a credential head without an identity answers 500',
+async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const cid = generateIdentifier();
+    const body = { kind: 'password', status: 'set', at: AT };
+    const messagePair = await formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/identities/' + ME + '/credentials/' + cid,
+        routePattern: CREDENTIAL_DETAIL_PATTERN,
+        routeSegments: ['identities', ':id', 'credentials', ':cid'],
+        pathSegments: ['identities', ME, 'credentials', cid],
+        headerFields: [],
+        body,
+        requesterIdentityId: ME,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseBody: { id: cid, ...body },
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(db, attemptFor([messagePair]), [messagePair]);
+    const { result: got, calls } = await captureConsole(
+        'error',
+        () => handleRequest(db, apiRequest({
+            method: 'GET',
+            path: '/identities/' + ME + '/credentials/' + cid,
+            token,
+        })),
+    );
+    assertStrictEquals(got.status, 500);
+    assertEquals(await got.json(), { error: 'internal error' });
+    assertStrictEquals(calls.length, 1);
+    const [event, , error] = calls[0]!;
+    assertStrictEquals(event, 'request failed');
+    assertMatch(
+        (error as Error).message,
+        new RegExp(ME + '/credentials/' + cid + '.*' + messagePair.id),
+    );
 });
