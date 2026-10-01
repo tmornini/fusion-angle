@@ -1,7 +1,5 @@
 import { assertEquals, assertRejects, assertStrictEquals } from '@std/assert';
-import {
-    GET, PUT, DELETE,
-} from '../api/api.ts';
+import { DELETE, GET, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -34,7 +32,8 @@ Deno.test(
     async () => {
         const db = await freshDb();
         const out =
-            await GET<unknown[]>(db, TYPES, DEV_TOKEN, operationIdHeader());
+            (await GET<unknown[]>(db, TYPES, DEV_TOKEN, operationIdHeader()))
+                .body().toValue();
         assertEquals(out, []);
     },
 );
@@ -52,13 +51,13 @@ Deno.test(
             state: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const stored = await GET<{
+        const stored = (await GET<{
             id: string;
             name: string;
             description: string;
             position: number;
             state: string;
-        }>(db, TYPE, DEV_TOKEN, operationIdHeader());
+        }>(db, TYPE, DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.name, 'Customer');
         assertStrictEquals(stored.position, 1);
@@ -103,9 +102,9 @@ Deno.test(
             state: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const out = await GET<unknown[]>(
+        const out = (await GET<unknown[]>(
             db, ATTRS, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertEquals(out, []);
     },
 );
@@ -133,11 +132,11 @@ Deno.test(
             write_roles: ['member', 'admin'],
         }, DEV_TOKEN,
             operationIdHeader());
-        const stored = await GET<{
+        const stored = (await GET<{
             id: string;
             record_type_id: string;
             attribute_type: string;
-        }>(db, ATTR, DEV_TOKEN, operationIdHeader());
+        }>(db, ATTR, DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(stored.id, 'UQBiHFcwJeCDSnmkPBoYRA');
         assertStrictEquals(stored.record_type_id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(
@@ -184,10 +183,10 @@ Deno.test(
     'GET organizations/:id/flows/:id/records returns an empty array',
     async () => {
         const db = await freshDb();
-        const out = await GET<unknown[]>(
+        const out = (await GET<unknown[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/records/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertEquals(out, []);
     },
 );
@@ -215,13 +214,13 @@ Deno.test(
             at: '2026-05-01T00:00:00.000000Z',
         }, DEV_TOKEN,
             operationIdHeader());
-        const stored = await GET<{
+        const stored = (await GET<{
             id: string;
             flow_id: string;
             record_id: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'aEsGMmBEFaVdWihhHXwCbw/records/dCnpryxCNwuTnCrBBDIMOw'
-            , DEV_TOKEN, operationIdHeader());
+            , DEV_TOKEN, operationIdHeader())).body().toValue();
         assertStrictEquals(stored.flow_id, 'aEsGMmBEFaVdWihhHXwCbw');
         assertStrictEquals(stored.record_id, 'rbfHGatkwQzGZJVXKJEeyw');
     },

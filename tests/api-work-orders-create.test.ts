@@ -1,7 +1,8 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
-import { GET, POST, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, POST } from './in-page-facade.ts';
 import { apiRequest, pairIdOf } from './http-fixtures.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -131,7 +132,7 @@ Deno.test(
             DEV_TOKEN,
             operationIdHeader());
 
-        const wo = await GET<{
+        const wo = (await GET<{
             id: string;
             display_id: string;
             position: number;
@@ -141,7 +142,7 @@ Deno.test(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WO_ID,
             DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(wo.display_id, 'abcd');
         assertStrictEquals(wo.position, 1);
         // The fence stamped the bound org — never the body.
@@ -150,13 +151,13 @@ Deno.test(
         // Row plane empty; join lives on the message plane.
         // Phase Final Stage B: work_orders +
         // flow_work_orders tables retired.
-        const links = await GET<{
+        const links = (await GET<{
             id: string;
             flow_id: string;
             work_order_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
             + 'ZOousbbnzpqlxJExVAruYQ/work-orders/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(links.length, 1);
         assertStrictEquals(links[0]!.id, FWO_ID);
         assertStrictEquals(links[0]!.flow_id, 'ZOousbbnzpqlxJExVAruYQ');
@@ -227,10 +228,10 @@ Deno.test(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 , createBody(), DEV_TOKEN,
             operationIdHeader());
-        const wo = await GET<{ id: string }>(
+        const wo = (await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
                 + WO_ID, DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(wo.id, WO_ID);
         const woEvents = await workOrderLifecycleStatesFor(
             db, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,

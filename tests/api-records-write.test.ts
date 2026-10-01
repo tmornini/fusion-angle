@@ -3,7 +3,7 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { GET, POST } from '../api/api.ts';
+import { GET, POST } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedCurrentMember,
@@ -57,26 +57,27 @@ Deno.test(
             initialState: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const record = await GET<{
+        const record = (await GET<{
             id: string;
             name: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN, operationIdHeader());
+            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN, operationIdHeader()))
+                .body().toValue();
         assertStrictEquals(record.name, 'Quarterly Renewals');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
-        const history = await GET<{
+        const history = (await GET<{
             state: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw/versions/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(history.length, 1);
         assertStrictEquals(history[0]!.state, 'active');
-        const attrs = await GET<unknown[]>(
+        const attrs = (await GET<unknown[]>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(attrs.length, 1);
     },
 );
@@ -101,19 +102,19 @@ Deno.test(
             initialState: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const record = await GET<{ name: string }>(
+        const record = (await GET<{ name: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rcaSzEaORBkezCxyhLhecA', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(record.name, 'Empty');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7).
-        const history = await GET<{
+        const history = (await GET<{
             state: string;
             member_id: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(history.length, 1);
         assertStrictEquals(history[0]!.state, 'active');
         assertStrictEquals(typeof history[0]!.member_id, 'string');
@@ -165,19 +166,20 @@ Deno.test(
             operationIdHeader([
                 ['If-Match', '"' + head!.id + '"'],
             ]));
-        const record = await GET<{
+        const record = (await GET<{
             name: string;
             description: string;
         }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
-            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN, operationIdHeader());
+            + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN, operationIdHeader()))
+                .body().toValue();
         assertStrictEquals(record.name, 'After');
         assertStrictEquals(
             record.description, 'updated',
         );
-        const after = await GET<{ state: string }>(
+        const after = (await GET<{ state: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(
             after.state, 'active',
             'edit must not change state',
@@ -249,12 +251,12 @@ Deno.test(
             operationIdHeader([
                 ['If-Match', '"' + head!.id + '"'],
             ]));
-        const all = await GET<{
+        const all = (await GET<{
             id: string;
             name: string;
         }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(all.length, 1);
         assertStrictEquals(all[0]!.id, newAttrId);
         assertStrictEquals(all[0]!.name, 'New');
@@ -321,7 +323,7 @@ Deno.test(
             operationIdHeader([
                 ['If-Match', '"' + head!.id + '"'],
             ]));
-        const stored = await GET<{
+        const stored = (await GET<{
             name: string;
             attribute_type: string;
         }>(
@@ -330,7 +332,7 @@ Deno.test(
                 + 'rbfHGatkwQzGZJVXKJEeyw'
             + '/attributes/UQBiHFcwJeCDSnmkPBoYRA',
             DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(stored.name, 'Renamed');
         assertStrictEquals(
             stored.attribute_type, 'number',
@@ -540,10 +542,10 @@ Deno.test(
             initialState: 'active',
         }, DEV_TOKEN,
             operationIdHeader());
-        const rec = await GET<{ id: string }>(
+        const rec = (await GET<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + recId, DEV_TOKEN,
-                operationIdHeader());
+                operationIdHeader())).body().toValue();
         assertStrictEquals(rec.id, recId);
     },
 );

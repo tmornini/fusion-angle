@@ -2,7 +2,8 @@ import { assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { fromFileUrl, join, relative } from '@std/path';
-import { GETWithEtag, handleRequest, PUT } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -90,11 +91,11 @@ function req(
 async function workOrderTag(
     db: MemoryDbAdapter,
 ): Promise<Record<string, string>> {
-    const { etag } = await GETWithEtag(
+    const read = await GET(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID,
         DEV_TOKEN, operationIdHeader(),
     );
-    return { 'If-Match': '"' + etag + '"' };
+    return { 'If-Match': read.query('header.etag').toText() };
 }
 
 function graphJson(): Record<string, unknown> {

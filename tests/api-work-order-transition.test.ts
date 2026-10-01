@@ -9,12 +9,8 @@ import {
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
-import {
-    GETWithEtag,
-    POST,
-    PUT,
-    RequestError,
-} from '../api/api.ts';
+import { RequestError } from '../api/api.ts';
+import { GET, POST, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -92,12 +88,14 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 async function latched(
     db: MemoryDbAdapter,
 ): Promise<readonly (readonly [string, string])[]> {
-    const { etag } = await GETWithEtag(
+    const read = await GET(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA',
         DEV_TOKEN, operationIdHeader(),
     );
-    return operationIdHeader([['If-Match', '"' + etag + '"']]);
+    return operationIdHeader([
+        ['If-Match', read.query('header.etag').toText()],
+    ]);
 }
 
 function eventsFor(

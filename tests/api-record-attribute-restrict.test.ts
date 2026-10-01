@@ -7,14 +7,8 @@ import {
 } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import {
-    DELETE,
-    GET,
-    PATCH,
-    POST,
-    PUT,
-    RequestError,
-} from '../api/api.ts';
+import { RequestError } from '../api/api.ts';
+import { DELETE, GET, PATCH, POST, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -284,9 +278,10 @@ Deno.test(
             write_roles: ['member', 'admin'],
         }, DEV_TOKEN,
             operationIdHeader());
-        const before = await GET<{
+        const before = (await GET<{
             organization_id: string;
-        }>(db, ATTR_PAIR_PATH, DEV_TOKEN, operationIdHeader());
+        }>(db, ATTR_PAIR_PATH, DEV_TOKEN, operationIdHeader()))
+            .body().toValue();
         assertStrictEquals(before.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
         await DELETE(
             db, ATTR_PAIR_PATH, DEV_TOKEN,
@@ -334,9 +329,9 @@ Deno.test(
             err.message, 'instance(s) ' + INSTANCE_ID,
         );
         // RESTRICT 409: attribute still served on message plane.
-        const still = await GET<{ id: string }>(
+        const still = (await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(still.id, 'VXTdVVRluJDRBqbXWZBntA');
     },
 );
@@ -571,13 +566,13 @@ Deno.test(
         assertStrictEquals(err.status, 409);
         // the batch applied NOTHING: message-plane document
         // survives and zero pairs append
-        const record = await GET<{ name: string }>(
+        const record = (await GET<{ name: string }>(
             db, TYPE_PATH, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(record.name, 'Asset');
-        const attr = await GET<{ id: string }>(
+        const attr = (await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
-            operationIdHeader());
+            operationIdHeader())).body().toValue();
         assertStrictEquals(attr.id, 'VXTdVVRluJDRBqbXWZBntA');
         // pair-balance: the whole bundle is pairs-or-nothing,
         // so a 409 rollback appends NEITHER table any rows.

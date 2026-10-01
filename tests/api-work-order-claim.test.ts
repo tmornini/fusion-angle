@@ -4,13 +4,8 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    PUT,
-    DELETE,
-    GETWithEtag,
-    RequestError,
-    handleRequest,
-} from '../api/api.ts';
+import { RequestError, handleRequest } from '../api/api.ts';
+import { DELETE, GET, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -64,15 +59,16 @@ async function headTag(
     db: MemoryDbAdapter,
     workOrderId = 'yNSSnbrpacodQTzUEcdEVA',
 ): Promise<string> {
-    const { etag } = await GETWithEtag(
+    const read = await GET(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId,
         DEV_TOKEN, operationIdHeader(),
     );
-    if (etag === undefined) {
+    const tag = read.query('header.etag');
+    if (!tag.exists()) {
         throw new Error('the work order GET carried no ETag');
     }
-    return etag;
+    return tag.toText().slice(1, -1);
 }
 
 async function latched(
@@ -451,7 +447,7 @@ async () => {
             expires_at: expiresAt,
         }, DEV_TOKEN,
         await latched(db));
-    const head = await GETWithEtag<{
+    const head = await GET<{
         claim: { member_id: string; expires_at: string };
     }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -460,8 +456,8 @@ async () => {
     );
     assertEquals(
         {
-            member_id: head.body.claim.member_id,
-            expires_at: head.body.claim.expires_at,
+            member_id: head.body().toValue().claim.member_id,
+            expires_at: head.body().toValue().claim.expires_at,
         },
         {
             member_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -485,12 +481,12 @@ async () => {
     ));
     assertStrictEquals(del.status, 200);
     await del.body?.cancel();
-    const head = await GETWithEtag<Record<string, unknown>>(
+    const head = await GET<Record<string, unknown>>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yNSSnbrpacodQTzUEcdEVA',
         DEV_TOKEN, operationIdHeader(),
     );
-    assertStrictEquals(Object.hasOwn(head.body, 'claim'), false);
+    assertStrictEquals(Object.hasOwn(head.body().toValue(), 'claim'), false);
 });
 
 

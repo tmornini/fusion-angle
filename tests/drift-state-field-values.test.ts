@@ -3,7 +3,8 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { PUT, handleRequest } from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { PUT } from './in-page-facade.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';

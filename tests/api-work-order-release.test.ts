@@ -3,11 +3,8 @@ import {
     assertEquals,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    PUT,
-    GETWithEtag,
-    handleRequest,
-} from '../api/api.ts';
+import { handleRequest } from '../api/api.ts';
+import { GET, PUT } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -57,15 +54,16 @@ async function headTag(
     db: MemoryDbAdapter,
     workOrderId = WO_ID,
 ): Promise<string> {
-    const { etag } = await GETWithEtag(
+    const read = await GET(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + workOrderId,
         DEV_TOKEN, operationIdHeader(),
     );
-    if (etag === undefined) {
+    const tag = read.query('header.etag');
+    if (!tag.exists()) {
         throw new Error('the work order GET carried no ETag');
     }
-    return etag;
+    return tag.toText().slice(1, -1);
 }
 
 async function ifMatch(
