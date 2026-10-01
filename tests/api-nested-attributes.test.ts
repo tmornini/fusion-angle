@@ -547,3 +547,28 @@ async () => {
         responsesBefore.length,
     );
 });
+
+Deno.test('GET attribute detail under a deleted type → 404 '
++ 'record_types vocabulary', async () => {
+    const { db, adminToken } = await adminDb();
+    await putLiveType(db, adminToken);
+    const put = await handleRequest(db, req(
+        'PUT', ATTR_DETAIL, adminToken, attrCore({
+            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        }),
+    ));
+    assertStrictEquals(put.status, 201);
+    const deleted = await handleRequest(db, req(
+        'PUT', TYPE_DETAIL, adminToken,
+        { ...typeBody(), state: 'deleted' },
+    ));
+    assertStrictEquals(deleted.status, 200);
+    const get = await handleRequest(db, req(
+        'GET', ATTR_DETAIL, adminToken,
+    ));
+    assertStrictEquals(get.status, 404);
+    assertEquals(await get.json(), {
+        error: 'Not found: record_types/' + TYPE_ID,
+    });
+});
