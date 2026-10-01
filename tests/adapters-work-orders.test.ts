@@ -16,7 +16,10 @@ import {
     organizationItem,
     type RequestContext,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import {
     organizationToken,
 } from './token-fixtures.ts';
@@ -370,7 +373,9 @@ Deno.test(
 
         const firstId =
             await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
-        await putWorkOrderPosition(ctx, firstId, 7.5);
+        await putWorkOrderPosition(
+            ctx, await getWorkOrder(ctx, firstId), 7.5,
+        );
 
         const secondId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
 
@@ -411,7 +416,9 @@ Deno.test(
         // write has since moved its displayId.
         const cached = await getWorkOrder(ctx, id);
         await moveDisplayId(ctx, id);
-        await putWorkOrderPosition(ctx, id, 7.5);
+        await putWorkOrderPosition(
+            ctx, await getWorkOrder(ctx, id), 7.5,
+        );
         const head = await getWorkOrder(ctx, id);
         assertStrictEquals(head.displayId, 'ffffffff');
         assertStrictEquals(head.position, 7.5);
@@ -429,18 +436,12 @@ Deno.test(
         const id = await createWorkOrder(
             ctx, 'ZOousbbnzpqlxJExVAruYQ',
         );
-        // Another write moves the head after the reorder's
-        // read and before its PUT.
-        const racing: RequestContext = {
-            ...ctx,
-            GET: async <T>(resource: string) => {
-                const read = await ctx.GET<T>(resource);
-                await moveDisplayId(ctx, id);
-                return read;
-            },
-        };
+        const held = await getWorkOrder(ctx, id);
+        // Another write moves the head after the page's
+        // read and before the reorder.
+        await moveDisplayId(ctx, id);
         const error = await assertRejects(
-            () => putWorkOrderPosition(racing, id, 7.5),
+            () => putWorkOrderPosition(ctx, held, 7.5),
             RequestError,
         );
         assertStrictEquals(
@@ -627,7 +628,7 @@ Deno.test(
         assert(beforeClaim !== null);
 
         await postWorkOrderTransition(ctx, {
-            workOrderId: woId,
+            workOrder: await getWorkOrder(ctx, woId),
             edgeId: EDGE_MIDDLE_FINISH,
             values: {},
         });
@@ -662,7 +663,7 @@ Deno.test(
         await seedRelease(ctx, woId);
 
         await postWorkOrderTransition(ctx, {
-            workOrderId: woId,
+            workOrder: await getWorkOrder(ctx, woId),
             edgeId: EDGE_MIDDLE_FINISH,
             values: {},
         });
@@ -689,10 +690,11 @@ Deno.test(
             await createWorkOrder(
                 ctx, 'ZOousbbnzpqlxJExVAruYQ',
             );
+        const workOrder = await getWorkOrder(ctx, woId);
         await assertRejects(
             () =>
                 postWorkOrderTransition(ctx, {
-                    workOrderId: woId,
+                    workOrder,
                     edgeId: generateIdentifier(),
                     values: {},
                 }),
@@ -779,12 +781,12 @@ Deno.test(
         await seedTypeInstanceAndJoin(ctx, 'ZOousbbnzpqlxJExVAruYQ', 'v0');
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await putWorkOrderBinding(
-            ctx, woId, INST_ID, RT_ID,
+            ctx, await getWorkOrder(ctx, woId), INST_ID, RT_ID,
         );
         await pause(2);
 
         await postWorkOrderTransition(ctx, {
-            workOrderId: woId,
+            workOrder: await getWorkOrder(ctx, woId),
             edgeId: EDGE_MIDDLE_FINISH,
             // ATTR changed; no other keys → set only.
             values: { [ATTR_ID]: 'xDyDkxEPwtcNmJVknUHDsg' },
@@ -815,8 +817,11 @@ Deno.test(
         await seedTypeInstanceAndJoin(ctx, 'ZOousbbnzpqlxJExVAruYQ', 'v0');
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await putWorkOrderBinding(
-            ctx, woId, INST_ID, RT_ID,
+            ctx, await getWorkOrder(ctx, woId), INST_ID, RT_ID,
         );
+        // The binding moved the head, so the page holds the
+        // work order it read after the binding.
+        const workOrder = await getWorkOrder(ctx, woId);
         const loaded = await getRecordInstance(
             ctx, RT_ID, INST_ID,
         );
@@ -834,7 +839,7 @@ Deno.test(
         );
         const err = await assertRejects(
             () => postWorkOrderTransition(ctx, {
-                workOrderId: woId,
+                workOrder,
                 edgeId: EDGE_MIDDLE_FINISH,
                 values: { [ATTR_ID]: 'vStale' },
                 instance: loaded.message,
@@ -866,12 +871,12 @@ Deno.test(
         await seedTypeInstanceAndJoin(ctx, 'ZOousbbnzpqlxJExVAruYQ', 'v0');
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await putWorkOrderBinding(
-            ctx, woId, INST_ID, RT_ID,
+            ctx, await getWorkOrder(ctx, woId), INST_ID, RT_ID,
         );
         await pause(2);
 
         await postWorkOrderTransition(ctx, {
-            workOrderId: woId,
+            workOrder: await getWorkOrder(ctx, woId),
             edgeId: EDGE_MIDDLE_FINISH,
             values: { [ATTR_ID]: '' },
         });
@@ -894,7 +899,7 @@ Deno.test(
         await seedTypeInstanceAndJoin(ctx, 'ZOousbbnzpqlxJExVAruYQ', 'v0');
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await putWorkOrderBinding(
-            ctx, woId, INST_ID, RT_ID,
+            ctx, await getWorkOrder(ctx, woId), INST_ID, RT_ID,
         );
         const before = await getRecordInstance(
             ctx, RT_ID, INST_ID,
@@ -904,7 +909,7 @@ Deno.test(
         // Unchanged values → pure move (no If-Match
         // path; instance etag must not advance).
         await postWorkOrderTransition(ctx, {
-            workOrderId: woId,
+            workOrder: await getWorkOrder(ctx, woId),
             edgeId: EDGE_MIDDLE_FINISH,
             values: { [ATTR_ID]: 'v0' },
         });
@@ -937,7 +942,7 @@ Deno.test(
         await seedTypeInstanceAndJoin(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         await putWorkOrderBinding(
-            ctx, woId, INST_ID, RT_ID,
+            ctx, await getWorkOrder(ctx, woId), INST_ID, RT_ID,
         );
         const wo = await getWorkOrder(ctx, woId);
         assertStrictEquals(wo.instanceId, INST_ID);
@@ -960,7 +965,9 @@ Deno.test(
         // without the expiration-notice branch.
         await seedRelease(ctx, woId);
         await pause(2);
-        await putWorkOrderClaim(ctx, woId);
+        await putWorkOrderClaim(
+            ctx, await getWorkOrder(ctx, woId),
+        );
 
         const claim =
             await getWorkOrderActiveClaim(
@@ -984,9 +991,13 @@ Deno.test(
         // only contributors to the count.
         await seedRelease(ctx, woId);
         await pause(2);
-        await putWorkOrderClaim(ctx, woId);
+        await putWorkOrderClaim(
+            ctx, await getWorkOrder(ctx, woId),
+        );
         await pause(2);
-        await putWorkOrderClaim(ctx, woId);
+        await putWorkOrderClaim(
+            ctx, await getWorkOrder(ctx, woId),
+        );
         const events =
             await workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
                 , woId);
@@ -1002,6 +1013,64 @@ Deno.test(
             'expected exactly 3 claimed events,'
             + ' got ' + claimed.length,
         );
+    },
+);
+
+Deno.test(
+    'a claim and its release latch the work order they'
+    + ' hold',
+    async () => {
+        const { db } = await setupDb();
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+        );
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        const workOrderId = await createWorkOrder(
+            ctx, 'ZOousbbnzpqlxJExVAruYQ',
+        );
+        const workOrder = await getWorkOrder(ctx, workOrderId);
+        sent.length = 0;
+        const claimed = await putWorkOrderClaim(ctx, workOrder);
+        const released = await deleteWorkOrderClaim(
+            ctx, claimed,
+        );
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['PUT', workOrder.message.query('header.etag').toText()],
+            ['DELETE', claimed.message.query('header.etag').toText()],
+        ]);
+        assertStrictEquals(
+            released.message.body().toValue().claim, undefined,
+        );
+    },
+);
+
+Deno.test(
+    'a binding sends no GET before its PUT',
+    async () => {
+        const { db } = await setupScopedDb();
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+        );
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        await seedTypeInstanceAndJoin(
+            ctx, 'ZOousbbnzpqlxJExVAruYQ',
+        );
+        const workOrderId = await createWorkOrder(
+            ctx, 'ZOousbbnzpqlxJExVAruYQ',
+        );
+        const workOrder = await getWorkOrder(ctx, workOrderId);
+        sent.length = 0;
+        const bound = await putWorkOrderBinding(
+            ctx, workOrder, INST_ID, RT_ID,
+        );
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['PUT', workOrder.message.query('header.etag').toText()],
+        ]);
+        assertStrictEquals(bound.instanceId, INST_ID);
     },
 );
 
@@ -1053,13 +1122,15 @@ Deno.test(
             await getFlowWorkOrderEntities(ctx, flow1);
         assertStrictEquals(flow1Rows.length, 1);
         assertStrictEquals(
-            flow1Rows[0]!.work_order_id, 'yNSSnbrpacodQTzUEcdEVA',
+            flow1Rows[0]!.body().toValue().work_order_id,
+            'yNSSnbrpacodQTzUEcdEVA',
         );
         const flow2Rows =
             await getFlowWorkOrderEntities(ctx, flow2);
         assertStrictEquals(flow2Rows.length, 1);
         assertStrictEquals(
-            flow2Rows[0]!.work_order_id, 'yNXXsTEwShOozlQCEWKIIw',
+            flow2Rows[0]!.body().toValue().work_order_id,
+            'yNXXsTEwShOozlQCEWKIIw',
         );
     },
 );
@@ -1183,7 +1254,9 @@ Deno.test(
         // Birth create leaves a live claim; DELETE
         // on the claim path ends it.
         const woId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
-        await deleteWorkOrderClaim(ctx, woId);
+        await deleteWorkOrderClaim(
+            ctx, await getWorkOrder(ctx, woId),
+        );
         const events = (await ctx.GET<StateEntity[]>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
                 + '/history',
@@ -1221,7 +1294,7 @@ Deno.test(
         );
 
         await postWorkOrderTransition(ctx, {
-            workOrderId: woId,
+            workOrder: await getWorkOrder(ctx, woId),
             edgeId: EDGE_MIDDLE_FINISH,
             values: {},
         });

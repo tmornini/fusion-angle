@@ -379,9 +379,8 @@ Deno.test(
         const created = await getWorkOrders(ctx);
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {
-            const id = created[i]!.id;
             await putWorkOrderPosition(
-                ctx, id, explicit[i]!,
+                ctx, created[i]!, explicit[i]!,
             );
         }
         const tables = await collectTables(db);

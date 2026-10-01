@@ -37,11 +37,13 @@ export async function getFlowStats(
     ]);
     const histories = await getWorkOrderHistories(
         ctx,
-        fwoRows.map(r => ({ id: r.work_order_id })),
+        fwoRows.map(r => ({
+            id: r.body().toValue().work_order_id,
+        })),
     );
 
     const woIds = new Set(
-        fwoRows.map(r => r.work_order_id),
+        fwoRows.map(r => r.body().toValue().work_order_id),
     );
     // projectTransitions sorts ASC; bulk wire is DESC.
     const transitions: TransitionEvent[] = [];

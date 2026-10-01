@@ -165,8 +165,8 @@ function initTransitionButtons(
                     await postWorkOrderTransition(
                         ctx,
                         {
-                            workOrderId:
-                                detail.idValue(),
+                            workOrder:
+                                detail.workOrder(),
                             edgeId,
                             values,
                             ...(heldInstance === null
@@ -262,14 +262,13 @@ function initUnclaimButton(
     if (!btn) return;
     const claim = detail.claimStatus();
     if (claim.kind !== 'claimed') return;
-    const workOrderId = detail.idValue();
     btn.addEventListener(
         'click',
         async () => {
             const ctx = sessionContext();
             try {
                 await deleteWorkOrderClaim(
-                    ctx, workOrderId,
+                    ctx, detail.workOrder(),
                 );
             } catch (err) {
                 reportFault(
@@ -320,7 +319,7 @@ function initBindPicker(
                 try {
                     await putWorkOrderBinding(
                         ctx,
-                        workOrderId,
+                        detail.workOrder(),
                         instanceId,
                         recordTypeId,
                     );
@@ -590,7 +589,7 @@ export async function init(
             ) {
                 await putWorkOrderClaim(
                     ctx,
-                    id,
+                    presenter.workOrder(),
                 );
                 // Reuse the settled member-id promise.
                 presenter =

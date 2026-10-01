@@ -36,7 +36,7 @@ export async function createWorkOrderFromFlow(
         ...input,
         flow,
         position: nextPosition(
-            existing.map((w) => w.position),
+            existing.map((w) => w.body().toValue().position),
         ),
     });
 }
