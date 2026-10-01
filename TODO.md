@@ -468,9 +468,11 @@ skew tests, which went with item 8's trio.
    43 GET routes serve stored responses; thirty stay
    parted under `tests/parted-reads.test.ts`. Two specs
    follow: version and history reads, the four
-   invitation reads, and `former-members/` (the fourth,
-   where the covenant lands); work-order events (the
-   fifth).
+   invitation reads, and `former-members/` (the fourth);
+   work-order events (the fifth). The covenant lands
+   with the spec that empties the census — the fourth,
+   or the fifth if `…/work-orders/:id/history` waits for
+   it (spec §1 D, `## For the next brainstorms`).
    ARCHITECTURE.md gains a NAMED COVENANT,
    `## A response is one unit`, in the commit that makes
    it true and not before — that file states only what is,
