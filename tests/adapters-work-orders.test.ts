@@ -402,8 +402,8 @@ async function moveDisplayId(
 }
 
 Deno.test(
-    'putWorkOrderPosition keeps the head'
-    + ' displayId and flow graph another write moved',
+    'putWorkOrderPosition keeps the held'
+    + ' displayId and flow graph',
     async () => {
         const { db, ctx } = await setupDb();
         await seedFlow(
@@ -412,10 +412,12 @@ Deno.test(
         const id = await createWorkOrder(
             ctx, 'ZOousbbnzpqlxJExVAruYQ',
         );
-        // The page cached the work order at load; another
-        // write has since moved its displayId.
         const cached = await getWorkOrder(ctx, id);
         await moveDisplayId(ctx, id);
+        // The page holds the head after another write moved
+        // its displayId; the position PUT carries the held
+        // fields, so the reorder keeps that displayId and the
+        // flow graph.
         await putWorkOrderPosition(
             ctx, await getWorkOrder(ctx, id), 7.5,
         );
