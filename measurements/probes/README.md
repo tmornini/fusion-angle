@@ -80,7 +80,9 @@ Run from the repository root under the memory backend.
 - `head-etag.ts` (2026-09-30) — item 1: whether every PUT
   head's stored `etag` line names its own pair and carries
   a body and a `content-type`, which a head read serves
-  as stored.
+  as stored. Done: head reads serve these lines
+  (`tests/head-names-itself.test.ts` pins the
+  invariant).
 
 ## store/ (2026-09-23)
 

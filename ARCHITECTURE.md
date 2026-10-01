@@ -196,7 +196,17 @@ whole state. The store sorts JSON keys on write
 a stored body's keys are in sorted order. Every family
 derives from those stored responses — `api/derive-*.ts`
 — through one parser, `bodyOf`
-(`api/derive-documents.ts`). Nothing
+(`api/derive-documents.ts`). A read serves them: a GET
+selects heads (`api/head-reads.ts`), and the gate serves
+each head's stored response through `servedResponse`
+(`api/served-response.ts`), whose `projectedBody` is the
+only body transform. A collection joins those responses
+as `multipart/mixed`, and on Postgres its heads come from
+a skip walk of the document index
+(`selectCollectionHeadPairs`,
+`api/backend-postgres.ts`). Thirty GET routes still
+answer handler JSON (`tests/parted-reads.test.ts`).
+Nothing
 derives from the `request` column;
 `tests/request-readers.test.ts` pins that. The
 view-accepting convention is five rules, not a

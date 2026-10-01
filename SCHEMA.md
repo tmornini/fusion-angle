@@ -139,10 +139,12 @@ fields `username`, `password`, `code`,
 `client_assertion`, and `refresh_token`.
 
 Reads of an identity credential expose existence and
-lifecycle, never the hash. `withoutSecret` in
-`api/routes.ts` projects the opaque `secret` out of
-a credential document before it crosses the API
-boundary.
+lifecycle, never the hash. The credential's opaque
+`secret` is a key declared with no read roles
+(`CREDENTIAL_KEY_READ_ROLES`, `api/family-registry.ts`),
+which `projectedBody` (`api/served-response.ts`) drops
+from every read and every write's answer, admins
+included.
 
 ## PII erasure is a tombstone
 

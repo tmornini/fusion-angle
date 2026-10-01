@@ -68,9 +68,18 @@ every request (`incomingContext`), then `dispatched`:
    row the write forms (Conditional classes says
    how). A stale latch answers 412, even for a
    byte-identical resend.
-8. **Handler.** Matched verb with `ctx.base`. Auth
-   grants intercept into `postToken` / `postAuthorize`.
-   Missing verb → 405.
+8. **Handler.** Matched verb with `ctx.base`. A GET
+   route either selects heads (`select`,
+   `api/head-reads.ts`) and the gate serves them
+   through `servedResponse`
+   (`api/served-response.ts`), or answers handler JSON
+   (`get`: the thirty routes
+   `tests/parted-reads.test.ts` names). A selector
+   runs after the fence and throws a document's miss
+   (403 for a foreign owner, 404 otherwise); the gate
+   then answers a deleted head 410 and serves a live
+   one (`servedSelection`). Auth grants intercept into
+   `postToken` / `postAuthorize`. Missing verb → 405.
 
 ## Bearer-exempt set
 
@@ -103,33 +112,57 @@ the former answers with its received pair's response:
 the parent document's state, projected for the
 requester, and an ETag naming the parent's new pair. A
 no-op stores nothing, not even the received pair, and
-answers 200 with this request's request-id, no date
-line, the head's etag and operation-id, and the head's
-body projected for the requester. If-Match is one
+answers 200 through the served response: this
+request's date and request-id, the head's etag and
+operation-id, and the head's body projected for the
+requester. If-Match is one
 strong validator (`"<identifier>"`); an `in-order`
 route also takes a comma-separated list of them, one
 per document. `*`, weak, unquoted, or 64-hex yield
 400, as does a list elsewhere. If-None-Match is `*`
 alone.
 
+A read serves what was stored. A document GET answers
+its head's stored response with three substitutions,
+the lines that describe this transmission: the status
+line (200), `date`, and `request-id`. `etag`,
+`operation-id`, and `content-type` stay as stored, and
+`content-length` counts the body served. A hoisted
+credential line is never spliced back. The body is the
+stored octets but for one projection, the only body
+change (`projectedBody`): a credential's `secret`
+reaches no reader, admins included, and an instance
+keeps the values whose attributes the reader may read.
+A collection GET is `multipart/mixed` of
+`application/http; msgtype=response` parts, ordered
+`response_at, id`, each the response a document GET of
+that head serves. It carries no `etag`, since it names
+no one state. A deleted head is no part of it, and a
+collection that selects none answers 204.
+
 Status ladder:
 
 - **200** — a landed PUT over a live head; a write
   whose parent lands in order; a landed
-  authentication door. Also a no-op: this request's request-id, no
-  date line, the head's etag and operation-id, the
-  head's body, and nothing stored
+  authentication door; a document GET of a live head;
+  a collection GET that selects a head. Also a no-op,
+  through the served response: this request's date
+  and request-id, the head's etag and operation-id,
+  the head's body projected, and nothing stored
 - **201** — a genesis: a landed PUT with no live
   head, including a PUT after a DELETE; a POST
   create, with `Location`; an instance create
-- **204** — DELETE success (landed, or already-gone)
+- **204** — DELETE success (landed, or already-gone);
+  a collection GET that selects none
 - **400** — bad JSON / Request-ID / Operation-ID /
   validators; a malformed If-Match or If-None-Match;
   If-None-Match on an `in-order` route; any
   conditional on a `none` route
 - **404** — authenticated unmatched; DELETE
-  never-written; genuine absence
-- **405** — no handler; public instance PUT
+  never-written; genuine absence, as a GET of a name
+  never written
+- **405** — no handler; public instance PUT; GET
+  `…/work-orders/:id/claim`
 - **409** — domain conflict (a rebind, a live claim by
   another member, an invitation not pending, a
   RESTRICT); a handler's genesis over a live document
@@ -137,8 +170,12 @@ Status ladder:
   never-written latch refused twice with no stated
   head, the same body; a blind PUT that loses three
   times (`Document remained contended at <path><name>`)
-- **410** — a retired record instance: its GET, its
-  PATCH, and a create over its tombstone (the create's
+- **410** — a GET of a deleted document, answered
+  after the fence (`Gone: <table>/<id>`): a DELETE
+  head, or a state-`deleted` head in a lifecycle
+  family (ideas, projects, objectives, flows, record
+  types). Beside it, a retired record instance's
+  PATCH and a create over its tombstone (the create's
   body: `Document is gone at <path><name>`)
 - **411** — A request body requires Content-Length.
   The same sentence answers a Transfer-Encoding
