@@ -10,9 +10,9 @@ import {
 } from './served-response.ts';
 import { bodyOf, DELETED_STATE } from './derive-documents.ts';
 
-// A family's lifecycle (api/document-family.ts:108): in
-// a 'state' family a head whose body says `deleted` is a
-// deleted document, as every family's DELETE head is.
+// A family's lifecycle: in a 'state' family a head whose
+// body says `deleted` is a deleted document, as every
+// family's DELETE head is.
 export type Lifecycle = 'state' | 'stateless';
 
 // What a GET selected (spec Decision 2). The selector

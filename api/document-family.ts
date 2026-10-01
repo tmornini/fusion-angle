@@ -26,7 +26,10 @@ import type {
 import { liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
-import { wholeHeadSelection } from './head-reads.ts';
+import {
+    wholeHeadSelection,
+    type Lifecycle,
+} from './head-reads.ts';
 
 // param/requireOrganization/withoutId live HERE, not in
 // routes.ts, so this module has NO runtime (value) dependency on
@@ -107,7 +110,7 @@ export interface DocumentFamilyWiring {
     // tombstone. A 'stateless' family carries entity fields
     // only; its lifecycle, if any, lives in operation-path
     // event pairs, never the document.
-    readonly lifecycle: 'state' | 'stateless';
+    readonly lifecycle: Lifecycle;
     // The identifier the wire 404 body speaks —
     // EntityNotFoundError's table. Family name for ideas/
     // projects/flows; 'work_orders' for work-orders (the
