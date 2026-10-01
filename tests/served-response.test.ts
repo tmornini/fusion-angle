@@ -29,10 +29,7 @@ const TRANSMISSION = {
 };
 const WHOLE: Reader = { sees: 'whole' };
 
-function stored(
-    body: unknown,
-    extra: { name: string, value: string }[] = [],
-): string {
+function stored(body: unknown): string {
     return storedWire(buildResponseModel({
         status: 201,
         fields: [
@@ -43,7 +40,6 @@ function stored(
                 value: 'OpOpOpOpOpOpOpOpOpOpOQ' },
             { name: 'request-id',
                 value: 'OldOldOldOldOldOldOldQ' },
-            ...extra,
         ],
         body,
     }));
@@ -203,6 +199,8 @@ const ATTRIBUTES = new Map<string, AttributeSchemaRow>([
     ['closed', attribute('closed', ['finance'])],
 ]);
 
+// The closed value is a bare 20-digit number: JSON.parse would
+// round it, so the re-serializing path must keep its digits.
 const INSTANCE = bodyOf(stored({
     id: 'x', organization_id: 'o', record_type_id: 't',
     values: [
@@ -210,7 +208,7 @@ const INSTANCE = bodyOf(stored({
         { attribute_id: 'closed', value: '12345678901234567890' },
         { attribute_id: 'gone', value: '3' },
     ],
-}));
+})).replace('"12345678901234567890"', '12345678901234567890');
 
 Deno.test('values keep the attributes the reader may read',
 () => {
@@ -235,7 +233,7 @@ Deno.test('an admin reads every attribute the schema holds',
         '{"id":"x","organization_id":"o",'
             + '"record_type_id":"t","values":['
             + '{"attribute_id":"open","value":"1"},'
-            + '{"attribute_id":"closed","value":"12345678901234567890"}'
+            + '{"attribute_id":"closed","value":12345678901234567890}'
             + ']}',
     );
 });
