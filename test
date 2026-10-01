@@ -44,7 +44,7 @@ run_memory() {
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-seed"
     ALLOW_RUN="$ALLOW_RUN,./bin/measure"
     DENO_TEST=(
-        deno test --frozen --parallel --no-check
+        deno test --frozen --no-check
         --sanitize-ops --sanitize-resources
         --allow-env --allow-read --allow-write
         --allow-net
@@ -53,8 +53,38 @@ run_memory() {
         --preload ./tests/local-storage-stub.ts
         --preload ./tests/session-storage-stub.ts
     )
-    TZ=UTC "${DENO_TEST[@]}" tests/*.test.ts
-    TZ=Pacific/Honolulu "${DENO_TEST[@]}" \
+    # Under --parallel every file is a worker in one
+    # process, and navigator.locks and BroadcastChannel
+    # are process-global: a refresh in one file waits on
+    # a peer's lock and adopts its broadcast, and a
+    # drain reads a peer's delivery. The suites TODO.md
+    # names as racing run in their own serial pass. The
+    # glob is filtered here because deno 2.9.6 honors
+    # only the first path given to --ignore.
+    SERIAL_SUITES=(
+        tests/adapters-invitations.test.ts
+        tests/adapters-refresh-mutex.test.ts
+        tests/adapters-shared-recovery.test.ts
+        tests/apex-destination.test.ts
+        tests/api-shadow-ledger-tokens.test.ts
+        tests/flow-stats-subscribe.test.ts
+        tests/ideas-empty-subscribe.test.ts
+    )
+    PARALLEL_SUITES=()
+    for SUITE in tests/*.test.ts; do
+        SERIAL=no
+        for RACER in "${SERIAL_SUITES[@]}"; do
+            if [ "$SUITE" = "$RACER" ]; then
+                SERIAL=yes
+            fi
+        done
+        if [ "$SERIAL" = no ]; then
+            PARALLEL_SUITES+=("$SUITE")
+        fi
+    done
+    TZ=UTC "${DENO_TEST[@]}" --parallel "${PARALLEL_SUITES[@]}"
+    TZ=UTC "${DENO_TEST[@]}" "${SERIAL_SUITES[@]}"
+    TZ=Pacific/Honolulu "${DENO_TEST[@]}" --parallel \
         tests/tz/*.test.ts
 }
 
