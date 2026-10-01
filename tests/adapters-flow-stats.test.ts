@@ -185,27 +185,10 @@ Deno.test(
             identity: { organization },
             GET: async (path: string) => {
                 paths.push(path);
-                if (
-                    path.endsWith(
-                        '/flows/' + flowId
-                            + '/work-orders/',
-                    )
-                ) {
-                    return responseMessage([{
-                        work_order_id: 'w-join',
-                    }]);
-                }
-                if (path.endsWith('/work-orders/')) {
-                    return responseMessage([{ id: 'w-coll' }]);
-                }
                 if (path.endsWith('/history')) {
                     return responseMessage([]);
                 }
-                if (
-                    path.endsWith('/members/')
-                    || path.endsWith('/former-members/')
-                    || path === 'ai-agents/'
-                ) {
+                if (path.endsWith('/former-members/')) {
                     return responseMessage([]);
                 }
                 return responseMessage({

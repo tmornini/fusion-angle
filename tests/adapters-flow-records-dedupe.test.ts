@@ -23,28 +23,6 @@ Deno.test(
             identity: { organization },
             GET: async (path: string) => {
                 paths.push(path);
-                if (path.endsWith('/flows/')) {
-                    return responseMessage([
-                        { id: flowA, name: 'A' },
-                        { id: flowB, name: 'B' },
-                    ]);
-                }
-                if (
-                    /\/flows\/[^/]+\/records\/$/
-                        .test(path)
-                ) {
-                    pendingRecords++;
-                    await hold.promise;
-                    pendingRecords--;
-                    return responseMessage([]);
-                }
-                if (path.endsWith('/work-orders/')) {
-                    if (pendingRecords > 0) {
-                        joinDuringRecords = true;
-                    }
-                    hold.resolve();
-                    return responseMessage([]);
-                }
                 return responseMessage([]);
             },
             // A collection read answers what GET answers for
