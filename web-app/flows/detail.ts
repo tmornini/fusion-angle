@@ -46,6 +46,8 @@ import type {
     RecordId,
     StateEntity,
 } from '../../shared/types.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     postBlobDownload,
 } from '../app/adapters/blob-download.ts';
@@ -1464,7 +1466,7 @@ function bindPanelActions(
 
 function renderBindingSlot(
     container: HTMLElement,
-    records: readonly RecordEntity[],
+    records: readonly HttpMessage<RecordEntity>[],
     boundRecordId: RecordId | null,
 ): void {
     const slot = $(
@@ -1473,7 +1475,7 @@ function renderBindingSlot(
     if (!slot) return;
     const sorted = bindableRecords(
         records, boundRecordId,
-    ).toSorted(
+    ).map((message) => message.body().toValue()).toSorted(
         (a, b) => a.name.localeCompare(b.name),
     );
     setHtml(

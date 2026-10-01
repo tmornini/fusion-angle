@@ -9,6 +9,8 @@ import {
     RecordModel,
     assertRecordState,
 } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     activeOrganization,
     organizationItem,
@@ -72,19 +74,19 @@ function recordTypePath(
 
 export async function getRecordEntities(
     ctx: RequestContext,
-): Promise<RecordEntity[]> {
-    return (await ctx.GETCollection<RecordEntity>(
+): Promise<HttpMessage<RecordEntity>[]> {
+    return await ctx.GETCollection<RecordEntity>(
         recordTypesPath(ctx),
-    )).map((m) => m.body().toValue());
+    );
 }
 
 export async function getRecord(
     ctx: RequestContext,
     id: RecordId,
-): Promise<RecordEntity> {
-    return (await ctx.GET<RecordEntity>(
+): Promise<HttpMessage<RecordEntity>> {
+    return await ctx.GET<RecordEntity>(
         recordTypePath(ctx, id),
-    )).body().toValue();
+    );
 }
 
 // Domain state rides the RecordEntity GET row; narrow it
@@ -95,45 +97,51 @@ function recordStateOf(row: RecordEntity): RecordState {
     );
 }
 
+export function recordOf(
+    message: HttpMessage<RecordEntity>,
+): RecordModel {
+    return new RecordModel(
+        message, recordStateOf(message.body().toValue()),
+    );
+}
+
 // The record detail page's read: one domain facet
-// carrying identity, content, and lifecycle state —
-// the raw row and its separate state never cross the
-// seam, so a plain field edit (the detail page's
-// no-attribute-change save) can echo the GET-stamped state
-// without minting a fresh event.
+// carrying identity, content, lifecycle state, and the
+// message it was read from, so a plain field edit (the
+// detail page's no-attribute-change save) can echo the
+// GET-stamped state without minting a fresh event, and
+// every write latches the head the page holds.
 export async function getRecordModel(
     ctx: RequestContext,
     id: RecordId,
 ): Promise<RecordModel> {
-    const row = await getRecord(ctx, id);
-    return new RecordModel(
-        row, recordStateOf(row),
-    );
+    return recordOf(await getRecord(ctx, id));
 }
 
 export async function getRecords(
     ctx: RequestContext,
 ): Promise<RecordWithCounts[]> {
-    const [rows, flowRecords] = await Promise.all([
+    const [messages, flowRecords] = await Promise.all([
         getRecordEntities(ctx),
         getAllFlowRecords(ctx),
     ]);
+    const records = messages.map(recordOf);
     // Per-type nested attributes collection — server-side
     // filter replaces the retired flat bulk + client filter.
     const attrLists = await Promise.all(
-        rows.map(row => ctx.GETCollection<
+        records.map(record => ctx.GETCollection<
             RecordAttributeEntity
         >(
-            recordTypePath(ctx, row.id)
+            recordTypePath(ctx, record.idForLink())
             + '/attributes/',
         ).then(parts => parts.map((m) => m.body().toValue()))),
     );
     const attrCountByRecord = new Map<
         string, number
     >();
-    for (let i = 0; i < rows.length; i++) {
+    for (let i = 0; i < records.length; i++) {
         attrCountByRecord.set(
-            rows[i]!.id,
+            records[i]!.idForLink(),
             attrLists[i]!.length,
         );
     }
@@ -147,15 +155,13 @@ export async function getRecords(
                 .get(fr.record_id) ?? 0) + 1,
         );
     }
-    return rows.map(row => ({
-        record: new RecordModel(
-            row, recordStateOf(row),
-        ),
+    return records.map(record => ({
+        record,
         attributeCount:
-            attrCountByRecord.get(row.id)
+            attrCountByRecord.get(record.idForLink())
             ?? 0,
         boundFlowCount:
-            flowCountByRecord.get(row.id)
+            flowCountByRecord.get(record.idForLink())
             ?? 0,
     }));
 }
@@ -175,17 +181,21 @@ export type RecordDocumentFields =
         | 'organization_id'
     >;
 
+// A save from the held record type names the head it
+// replaces, so a write over a newer head is refused rather
+// than lost.
 export async function putRecord(
     ctx: RequestContext,
-    id: RecordId,
+    held: HttpMessage<RecordEntity>,
     document: RecordDocumentFields,
-): Promise<void> {
-    const { state, ...entity } = document;
-    await ctx.PUT(recordTypePath(ctx, id), {
-        ...entity,
-        state,
-    });
+): Promise<HttpMessage<RecordEntity>> {
+    const saved = await ctx.PUT<RecordEntity>(
+        recordTypePath(ctx, held.body().toValue().id),
+        { ...document },
+        [held],
+    );
     recordChanges.notify();
+    return saved;
 }
 
 export interface RecordChangeCreate {
@@ -215,6 +225,7 @@ export interface RecordChangeEdit {
     >[];
     readonly removedAttributeIds: readonly string[];
     readonly state: RecordState;
+    readonly held: HttpMessage<RecordEntity>;
 }
 
 export type RecordChange =
@@ -246,11 +257,8 @@ export async function postRecordChange(
         });
     } else {
         // The edit is an operation on the type: it names the
-        // head it was read from, so a 412 surfaces as
+        // head the page holds, so a 412 surfaces as
         // RequestError.
-        const read = await ctx.GET<RecordEntity>(
-            recordTypePath(ctx, id),
-        );
         await ctx.POST(recordTypesPath(ctx), {
             kind: 'edit',
             id,
@@ -259,30 +267,26 @@ export async function postRecordChange(
             state: change.state,
             removedAttributeIds:
                 change.removedAttributeIds,
-        }, [read]);
+        }, [change.held]);
     }
     recordChanges.notify();
 }
 
 // A transition: composes the document PUT with a FRESH state
 // (mint-once-reuse — a retry of the SAME transition resends
-// this same pinned pair, converging at the op) over the
-// record's CURRENT entity fields — hop count 1 -> 1 (one
-// ctx.PUT, via putRecord). Strip the GET-stamped state so the
-// new state is the only lifecycle value in the PUT body.
+// this same pinned pair, converging at the op) over the held
+// record's entity fields — hop count 1 -> 1 (one ctx.PUT,
+// via putRecord, latched on the held record). The new state
+// replaces the held one in the PUT body.
 export async function postRecordStateChange(
     ctx: RequestContext,
-    record: RecordEntity,
+    held: HttpMessage<RecordEntity>,
     state: RecordState,
-): Promise<void> {
+): Promise<HttpMessage<RecordEntity>> {
     const {
-        id,
-        state: _priorState,
-        ...entity
-    } = record;
-    void _priorState;
-    await putRecord(ctx, id, {
-        ...entity,
-        state,
-    });
+        id: _id,
+        organization_id: _organizationId,
+        ...fields
+    } = held.body().toValue();
+    return await putRecord(ctx, held, { ...fields, state });
 }

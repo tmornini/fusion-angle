@@ -16,8 +16,8 @@ import { navigateTo } from '../app/navigation.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     getRecords,
-    getRecord,
     putRecord,
+    recordOf,
     subscribeRecordChanges,
     type RecordWithCounts,
 } from '../../client/index.ts';
@@ -138,20 +138,26 @@ function onRecordsLoaded(
                         === id,
                 );
             if (!found) return;
-            const ctx = sessionContext();
-            // The entity fields still need a fresh fetch
-            // (this handler is 2-hop, unlike ideas' 1-hop
-            // reorder) — state alone comes from the
-            // already-loaded list model's accessors below.
-            const fresh = await getRecord(
-                ctx, id,
+            const held = found.record.message;
+            const {
+                id: _id,
+                organization_id: _organizationId,
+                ...fields
+            } = held.body().toValue();
+            const saved = await putRecord(
+                sessionContext(), held,
+                { ...fields, position: newPosition },
             );
-            await putRecord(ctx, id, {
-                name: fresh.name,
-                description: fresh.description,
-                position: newPosition,
-                state: found.record.stateValue(),
-            });
+            // The next drag of this card latches the head this
+            // save made, not the one it replaced.
+            if (!recordState) return;
+            recordState = applyRecordListUpdate(
+                recordState,
+                recordState.records.map(r =>
+                    r.record.idForLink() === id
+                        ? { ...r, record: recordOf(saved) }
+                        : r),
+            );
         },
     );
 }

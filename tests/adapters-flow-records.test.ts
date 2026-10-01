@@ -14,7 +14,6 @@ import {
 import {
     postFlowCreation,
 } from '../client/flow-mutations.ts';
-import { putRecord } from '../client/records.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     storedWorkOrderFlowGraph,
@@ -95,17 +94,22 @@ async function seedWorkOrder(
 
 // The binding PUT probes the bound record's own existence,
 // so every record_id a test binds must be seeded first —
-// the SAME record-types PUT the live route serves, same
-// precedent as seedFlow/seedWorkOrder above.
+// the SAME record-types PUT the live route serves (an
+// unlatched PUT of a fresh id: putRecord latches the head
+// it replaces), same precedent as seedFlow/seedWorkOrder
+// above.
 async function seedRecord(
     db: MemoryDbAdapter,
     id: string,
 ): Promise<void> {
     const ctx = inPageContext(db, await organizationToken());
-    await putRecord(ctx, id, {
-        name: 'Record', description: '', position: 1,
-        state: 'active',
-    });
+    await ctx.PUT(
+        'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id,
+        {
+            name: 'Record', description: '', position: 1,
+            state: 'active',
+        },
+    );
 }
 
 Deno.test(

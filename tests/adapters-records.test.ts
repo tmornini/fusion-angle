@@ -5,7 +5,10 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     getRecord,
@@ -42,10 +45,84 @@ Deno.test(
             attributes: [],
             initialState: 'active',
         });
-        const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        const stored = (await getRecord(
+            ctx, 'rbfHGatkwQzGZJVXKJEeyw',
+        )).body().toValue();
         assertStrictEquals(stored.id, 'rbfHGatkwQzGZJVXKJEeyw');
         assertStrictEquals(stored.name, 'Customer');
         assertStrictEquals(stored.state, 'active');
+    },
+);
+
+Deno.test(
+    'a record save then a state change both latch',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedCurrentMember(db);
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
+            kind: 'create',
+            record: {
+                name: 'Customer',
+                description: 'A customer record',
+                position: 1,
+            },
+            attributes: [],
+            initialState: 'active',
+        });
+        const held = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        sent.length = 0;
+        const saved = await putRecord(ctx, held, {
+            name: 'Customer', description: 'Renamed',
+            position: 1, state: 'active',
+        });
+        await postRecordStateChange(ctx, saved, 'archived');
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['PUT', held.query('header.etag').toText()],
+            ['PUT', saved.query('header.etag').toText()],
+        ]);
+    },
+);
+
+Deno.test(
+    'a record edit latches its held head with no read',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedCurrentMember(db);
+        const { ctx, sent } = recordedContext(
+            db, await organizationToken(),
+        );
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
+            kind: 'create',
+            record: {
+                name: 'Customer',
+                description: 'A customer record',
+                position: 1,
+            },
+            attributes: [],
+            initialState: 'active',
+        });
+        const held = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        sent.length = 0;
+        await postRecordChange(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
+            kind: 'edit',
+            record: {
+                name: 'Customer',
+                description: 'Renamed',
+                position: 1,
+            },
+            attributes: [],
+            removedAttributeIds: [],
+            state: 'active',
+            held,
+        });
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['POST', held.query('header.etag').toText()],
+        ]);
     },
 );
 
@@ -106,13 +183,18 @@ Deno.test(
             attributes: [],
             initialState: 'active',
         });
-        await putRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw', {
-            name: 'B',
-            description: 'second',
-            position: 1,
-            state: 'active',
-        });
-        const stored = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        await putRecord(
+            ctx, await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw'),
+            {
+                name: 'B',
+                description: 'second',
+                position: 1,
+                state: 'active',
+            },
+        );
+        const stored = (await getRecord(
+            ctx, 'rbfHGatkwQzGZJVXKJEeyw',
+        )).body().toValue();
         assertStrictEquals(stored.name, 'B');
         assertStrictEquals(stored.description, 'second');
     },
@@ -169,6 +251,7 @@ Deno.test(
             ],
             state: head.stateValue(),
             removedAttributeIds: [oldAttrId],
+            held: head.message,
         });
         const attrs = (await ctx.GETCollection<
             { id: string }
@@ -240,11 +323,14 @@ Deno.test(
             attributes: [],
             initialState: 'active',
         });
-        const before = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        const held = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        const before = held.body().toValue();
         await postRecordStateChange(
-            ctx, before, 'archived',
+            ctx, held, 'archived',
         );
-        const after = await getRecord(ctx, 'rbfHGatkwQzGZJVXKJEeyw');
+        const after = (await getRecord(
+            ctx, 'rbfHGatkwQzGZJVXKJEeyw',
+        )).body().toValue();
         // Entity content fields unchanged; GET state advances
         // to the transition event (lifecycle-current stamp).
         assertStrictEquals(after.name, before.name);

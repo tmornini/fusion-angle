@@ -13,7 +13,6 @@ import {
     closeDialog,
 } from '../app/dialog.ts';
 import {
-    getRecord,
     getRecordModel,
     getRecordAttributesByRecord,
     loadRecordFlowJoins,
@@ -712,12 +711,11 @@ async function handleDeleteInstance(
 
 async function handleArchive(): Promise<void> {
     if (pageState.kind !== 'reading') return;
-    if (!recordId) return;
+    if (!currentView) return;
     const ctx = sessionContext();
-    const entity = await getRecord(ctx, recordId);
     try {
         await postRecordStateChange(
-            ctx, entity, 'archived',
+            ctx, currentView.record.message, 'archived',
         );
     } catch (err) {
         reportFault(
@@ -1079,11 +1077,12 @@ async function handleSave(
                     attributes: draftEntities,
                     removedAttributeIds,
                     state: originalRecord.stateValue(),
+                    held: originalRecord.message,
                 },
             );
         } else {
             await putRecord(
-                ctx, recordId,
+                ctx, originalRecord.message,
                 {
                     ...recordFields,
                     state: originalRecord.stateValue(),

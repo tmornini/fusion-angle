@@ -1669,6 +1669,7 @@ export class Project {
 }
 
 export class RecordModel {
+    readonly message: HttpMessage<RecordEntity>;
     readonly #id: string;
     readonly #name: string;
     readonly #description: string;
@@ -1676,9 +1677,11 @@ export class RecordModel {
     readonly #state: RecordState;
 
     constructor(
-        entity: RecordEntity,
+        message: HttpMessage<RecordEntity>,
         state: RecordState,
     ) {
+        this.message = message;
+        const entity = message.body().toValue();
         this.#id = entity.id;
         this.#name = entity.name;
         this.#description = entity.description;
