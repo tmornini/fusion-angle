@@ -55,10 +55,10 @@ async function getProjectFlowsForProject(
     ctx: RequestContext,
     projectId: string,
 ): Promise<ProjectFlowEntity[]> {
-    return (await ctx.GET<ProjectFlowEntity[]>(
+    return (await ctx.GETCollection<ProjectFlowEntity>(
         organizationItem(ctx, 'projects', projectId)
             + '/flows/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 // The project↔flow joins across EVERY project the caller's org

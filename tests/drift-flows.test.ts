@@ -528,16 +528,22 @@ Deno.test('project-flows wire equals derive across every'
                 '/flows/', token,
         ));
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
+        // The parts come in write order (response_at, id); the
+        // derive sorts by id, so the bodies compare as one set.
+        const parts = await partsOf<{ id: string }>(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
         const derived = await deriveProjectFlows(
             db, STARK_ORGANIZATION, projectId,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        assertEquals(
+            sortById(parts.map((part) => part.body().toValue())),
+            sortById(derived),
+        );
     }
 });
 
-Deno.test('the two-flows project orders both join rows'
-+ ' on wire and derive', async () => {
+Deno.test('the two-flows project serves both join rows'
++ ' in write order, each its derived row', async () => {
     const db = await seededDb();
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -549,16 +555,16 @@ Deno.test('the two-flows project orders both join rows'
         token,
     ));
     assertStrictEquals(res.status, 200);
-    const wire = await res.json() as { flow_id: string }[];
+    // assertPartsAreHeads pins the write order.
+    const parts = await partsOf<{ id: string }>(res);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
     const derived = await deriveProjectFlows(
         db, STARK_ORGANIZATION, TWO_FLOWS_PROJECT_ID,
     );
     assertStrictEquals(derived.length, 2);
-    assertStrictEquals(JSON.stringify(wire), JSON.stringify(derived));
-    // id-lex order is pinned by derive; wire equals derive.
     assertEquals(
-        wire.map((row) => row.flow_id),
-        derived.map((row) => row.flow_id),
+        sortById(parts.map((part) => part.body().toValue())),
+        sortById(derived),
     );
 });
 
@@ -802,17 +808,15 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
         db, req('GET', listPath, token),
     );
     assertStrictEquals(afterPutRes.status, 200);
-    const wireAfterPut = await afterPutRes.json() as {
-        id: string;
-    }[];
+    const partsAfterPut = await partsOf<{ id: string }>(afterPutRes);
+    await assertPartsAreHeads(db, partsAfterPut, { sees: 'whole' });
+    const wireAfterPut = partsAfterPut.map((part) =>
+        part.body().toValue());
     const derivedAfterPut = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
     assert(wireAfterPut.some((row) => row.id === pfid));
-    assertStrictEquals(
-        JSON.stringify(wireAfterPut),
-        JSON.stringify(derivedAfterPut),
-    );
+    assertEquals(sortById(wireAfterPut), sortById(derivedAfterPut));
 
     const delRes = await handleRequest(db, req(
         'DELETE',
@@ -823,9 +827,12 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
     const afterDelRes = await handleRequest(
         db, req('GET', listPath, token),
     );
-    const wireAfterDelete = await afterDelRes.json() as {
-        id: string;
-    }[];
+    const partsAfterDelete = await partsOf<{ id: string }>(
+        afterDelRes,
+    );
+    await assertPartsAreHeads(db, partsAfterDelete, { sees: 'whole' });
+    const wireAfterDelete = partsAfterDelete.map((part) =>
+        part.body().toValue());
     const derivedAfterDelete = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
@@ -835,9 +842,8 @@ Deno.test('live join-row chain: PUT appears on wire/derive, '
     assertStrictEquals(
         derivedAfterDelete.some((row) => row.id === pfid), false,
     );
-    assertStrictEquals(
-        JSON.stringify(wireAfterDelete),
-        JSON.stringify(derivedAfterDelete),
+    assertEquals(
+        sortById(wireAfterDelete), sortById(derivedAfterDelete),
     );
 });
 
@@ -889,11 +895,10 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId + '/flows/', token,
     ));
-    const wireJoins = (await joinsRes.json() as {
-        id: string;
-    }[]).filter(
-        (row) => row.id === pfidA || row.id === pfidB,
-    );
+    const joinParts = await partsOf<{ id: string }>(joinsRes);
+    await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
+    const wireJoins = joinParts.map((part) => part.body().toValue())
+        .filter((row) => row.id === pfidA || row.id === pfidB);
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
@@ -949,11 +954,10 @@ Deno.test('duplicate-create with an unchanged document'
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + projectId + '/flows/', token,
     ));
-    const wireJoins = (await joinsRes.json() as {
-        id: string;
-    }[]).filter(
-        (row) => row.id === pfidA || row.id === pfidB,
-    );
+    const joinParts = await partsOf<{ id: string }>(joinsRes);
+    await assertPartsAreHeads(db, joinParts, { sees: 'whole' });
+    const wireJoins = joinParts.map((part) => part.body().toValue())
+        .filter((row) => row.id === pfidA || row.id === pfidB);
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);

@@ -130,14 +130,14 @@ Deno.test(
             DEFAULT_LOCK_TIMEOUT,
         );
         const links =
-            (await ctx.GET<{
+            (await ctx.GETCollection<{
                 id: string;
                 project_id: string;
                 flow_id: string;
-            }[]>(
+            }>(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                     + projectId + '/flows/',
-            )).body().toValue();
+            )).map((part) => part.body().toValue());
         const link = links.find(
             l => l.flow_id === 'aEsGMmBEFaVdWihhHXwCbw',
         );

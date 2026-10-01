@@ -1,7 +1,7 @@
 import { assert, assertRejects, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { GET, POST } from './in-page-facade.ts';
+import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -68,13 +68,13 @@ Deno.test(
         // The leaf revision route is PUT-only; read the nested
         // per-objective collection and find the revision the
         // create synthesized (the server filters to this id).
-        const revisions = (await GET<Array<{
+        const revisions = (await GETCollection<{
             id: string;
             objective_id: string;
             name: string;
-        }>>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
             + '/revisions/', DEV_TOKEN, operationIdHeader()))
-                .body().toValue();
+                .map((part) => part.body().toValue());
         const revision = revisions.find(
             r => r.id === 'sVWUntTCtQYFCpONjkzAKg');
         assert(revision);

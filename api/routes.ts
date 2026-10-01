@@ -155,9 +155,9 @@ import {
     storedGraph,
 } from '../shared/types.ts';
 import {
-    deriveIdeaSubmissions,
     ideaEntityOf,
     ideaSubmissionEntityOf,
+    submissionsUriPrefix,
 } from './derive-ideas.ts';
 import {
     projectEntityOf,
@@ -220,8 +220,8 @@ import {
     buildFlowGraphRevivals,
 } from './flow-graph-diff.ts';
 import {
-    deriveProjectFlows,
     projectFlowEntityOf,
+    projectFlowsUriPrefix,
 } from './derive-project-flows.ts';
 import {
     flowWorkOrderEntityOf,
@@ -237,13 +237,12 @@ import {
     flowTagsUriPrefix,
 } from './derive-flow-tags.ts';
 import {
-    deriveObjectiveRevisions,
     objectiveRevisionEntityOf,
+    objectiveRevisionsUriPrefix,
 } from './derive-objective-revisions.ts';
 import {
-    deriveBaselineScores,
-    deriveActualScores,
     scoreEntityOf,
+    scoresUriPrefix,
 } from './derive-project-scores.ts';
 import {
     deriveOrganizationMemberSeats,
@@ -4300,17 +4299,19 @@ export const routes: Route[] = [
     // Idea submissions nest under their parent idea: param 0 is
     // the path org, param 1 is the idea, so the SERVER filters
     // the collection to that idea (the org fence still rides
-    // the facade re-entry). GET is FLIPPED (Phase 2 Task 5):
-    // the collection derives from the message ledger at this
-    // idea's submissions document rather than the old
-    // idea_submissions table. The leaf id is param 2; only PUT
+    // the facade re-entry). GET serves the stored heads at
+    // this idea's prefix. The leaf id is param 2; only PUT
     // is exposed on ideas/:id/submissions/:sid, exactly as the
     // flat makeIdRoute carried it.
     route('organizations/:id/ideas/:id/submissions/', {
-        get: (db, p, _actor, organization) =>
-            deriveIdeaSubmissions(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                submissionsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/ideas/:id/submissions/:sid', {
@@ -4450,18 +4451,18 @@ export const routes: Route[] = [
     // SERVER filters the collection to that project (the org
     // fence still rides the facade re-entry). The leaf id is
     // param 2; PUT and DELETE are exposed exactly as the
-    // flat makeIdRoute carried them. GET is FLIPPED (Phase 4
-    // Task 8): the join list derives from the
-    // message ledger at this project's flows document rather than
-    // the old project_flows table — deriveProjectFlows is a
-    // bespoke derivation (not a DocumentFamilyWiring family; a
-    // join row carries no lifecycle state of its own), so this
-    // calls it directly rather than through a generic constructor.
+    // flat makeIdRoute carried them. GET serves the stored
+    // join heads at this project's prefix, in write order (a
+    // join row carries no lifecycle state of its own).
     route('organizations/:id/projects/:id/flows/', {
-        get: (db, p, _actor, organization) =>
-            deriveProjectFlows(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                projectFlowsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     route('organizations/:id/projects/:id/flows/:pfid', {
@@ -5522,18 +5523,18 @@ export const routes: Route[] = [
     // param 0 is the path org, param 1 is the objective, so
     // the SERVER filters the collection to that objective
     // (the org fence still rides the facade re-entry). GET
-    // is FLIPPED (Task 7): rides deriveObjectiveRevisions —
-    // a bespoke derivation, not a DocumentFamilyWiring family
-    // (a nested document carries no lifecycle state of its
-    // own), so this calls it directly rather than through a
-    // generic constructor, mirroring deriveFlowRecords' own
-    // precedent above. The leaf id is param 2; only PUT is
-    // exposed, unchanged from before this flip.
+    // serves the stored heads at this objective's prefix (a
+    // nested document carries no lifecycle state of its
+    // own). The leaf id is param 2; only PUT is exposed.
     route('organizations/:id/objectives/:id/revisions/', {
-        get: (db, p, _actor, organization) =>
-            deriveObjectiveRevisions(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                objectiveRevisionsUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                ),
+                'stateless',
             ),
     }),
     // Hand-written so PUT can append its message pair in the
@@ -5567,20 +5568,22 @@ export const routes: Route[] = [
     // project: param 0 is the path org, param 1 is the
     // project, so the SERVER filters the collection to that
     // project (the org fence still rides the facade
-    // re-entry). GET is FLIPPED (Task 7): rides
-    // deriveBaselineScores — the SAME bespoke-derivation
-    // reasoning as deriveObjectiveRevisions above (a project-
-    // nested document, not a DocumentFamilyWiring family). The
-    // leaf id is param 2; only PUT is exposed, unchanged from
-    // before this flip.
+    // re-entry). GET serves the stored heads at this
+    // project's prefix, as the revisions above do. The leaf
+    // id is param 2; only PUT is exposed.
     route(
         'organizations/:id/projects/:id'
         + '/objective-baseline-scores/',
         {
-        get: (db, p, _actor, organization) =>
-            deriveBaselineScores(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                scoresUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                    'objective-baseline-scores',
+                ),
+                'stateless',
             ),
     }),
     route(
@@ -5595,17 +5598,20 @@ export const routes: Route[] = [
     // Objective actual scores nest under their parent project,
     // identically: param 0 is the path org, param 1 is the
     // project (server filter), leaf id is param 2, PUT only.
-    // GET is FLIPPED (Task 7): rides
-    // deriveActualScores, the actuals byte-twin of
-    // deriveBaselineScores above.
+    // GET serves the stored heads at this project's prefix.
     route(
         'organizations/:id/projects/:id'
         + '/objective-actual-scores/',
         {
-        get: (db, p, _actor, organization) =>
-            deriveActualScores(
-                db, requireOrganization(organization),
-                param(p, 1),
+        select: (db, p, _actor, organization) =>
+            selectHeadsAtPath(
+                db,
+                scoresUriPrefix(
+                    requireOrganization(organization),
+                    param(p, 1),
+                    'objective-actual-scores',
+                ),
+                'stateless',
             ),
     }),
     route(

@@ -20,7 +20,10 @@ import type {
     ObjectiveRevisionEntity,
 } from '../shared/types.ts';
 import { canonicalPath } from '../api/message-pair.ts';
-import { documentMessagePairsAt } from '../api/derive-documents.ts';
+import {
+    byIdAscending,
+    documentMessagePairsAt,
+} from '../api/derive-documents.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,
@@ -340,7 +343,7 @@ async () => {
 
 Deno.test('revisions GET wire equals derive per objective (all 5,'
 + ' one seeded revision each); foreign-parent nested-'
-+ ' collection is 200 [] on wire and derive',
++ ' collection is 204 on wire and empty on derive',
 async () => {
     const db = await seededDb();
     const targets = [
@@ -362,11 +365,16 @@ async () => {
             db, req('GET', path, token),
         );
         assertStrictEquals(res.status, 200);
-        const wireText = await res.text();
         const derived = await deriveObjectiveRevisions(
             db, organization, id,
         );
-        assertStrictEquals(wireText, JSON.stringify(derived));
+        const parts = await partsOf<{ id: string }>(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        assertEquals(
+            parts.map((part) => part.body().toValue())
+                .toSorted(byIdAscending),
+            derived,
+        );
         assertStrictEquals(derived.length, 1);
     }
 
@@ -380,8 +388,8 @@ async () => {
             + '/objectives/' + foreignId + '/revisions/',
         tokenTwo,
     ));
-    assertStrictEquals(foreignRes.status, 200);
-    assertStrictEquals(await foreignRes.text(), '[]');
+    assertStrictEquals(foreignRes.status, 204);
+    assertStrictEquals(await foreignRes.text(), '');
     assertEquals(
         await deriveObjectiveRevisions(
             db, ORGANIZATION_TWO, foreignId,
@@ -420,12 +428,15 @@ Deno.test('score collection wire equals derive per project: an'
         db, req('GET', fullBasePath, tokenStark),
     );
     assertStrictEquals(fullBaseRes.status, 200);
-    const fullBaseText = await fullBaseRes.text();
     const derivedFullBaselines = await deriveBaselineScores(
         db, STARK_ORGANIZATION, fullCoverageProjectId,
     );
-    assertStrictEquals(
-        fullBaseText, JSON.stringify(derivedFullBaselines),
+    const fullBaseParts = await partsOf<{ id: string }>(fullBaseRes);
+    await assertPartsAreHeads(db, fullBaseParts, { sees: 'whole' });
+    assertEquals(
+        fullBaseParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedFullBaselines,
     );
     assertStrictEquals(derivedFullBaselines.length, 4);
 
@@ -436,9 +447,12 @@ Deno.test('score collection wire equals derive per project: an'
     const derivedFullActuals = await deriveActualScores(
         db, STARK_ORGANIZATION, fullCoverageProjectId,
     );
-    assertStrictEquals(
-        await fullActRes.text(),
-        JSON.stringify(derivedFullActuals),
+    const fullActParts = await partsOf<{ id: string }>(fullActRes);
+    await assertPartsAreHeads(db, fullActParts, { sees: 'whole' });
+    assertEquals(
+        fullActParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedFullActuals,
     );
     assertStrictEquals(derivedFullActuals.length, 5);
 
@@ -453,9 +467,12 @@ Deno.test('score collection wire equals derive per project: an'
     const derivedPartialBaselines = await deriveBaselineScores(
         db, STARK_ORGANIZATION, partialProjectId,
     );
-    assertStrictEquals(
-        await partialBaseRes.text(),
-        JSON.stringify(derivedPartialBaselines),
+    const partialBaseParts = await partsOf<{ id: string }>(partialBaseRes);
+    await assertPartsAreHeads(db, partialBaseParts, { sees: 'whole' });
+    assertEquals(
+        partialBaseParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedPartialBaselines,
     );
     assertStrictEquals(derivedPartialBaselines.length, 2);
     assertEquals(
@@ -521,8 +538,8 @@ Deno.test('score collection wire equals derive per project: an'
             + '/objective-baseline-scores/',
         tokenTwo,
     ));
-    assertStrictEquals(foreignRes.status, 200);
-    assertStrictEquals(await foreignRes.text(), '[]');
+    assertStrictEquals(foreignRes.status, 204);
+    assertStrictEquals(await foreignRes.text(), '');
     assertEquals(
         await deriveBaselineScores(
             db, ORGANIZATION_TWO, fullCoverageProjectId,
@@ -583,8 +600,12 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         const revs = await deriveObjectiveRevisions(
             db, STARK_ORGANIZATION, objectiveId,
         );
-        assertStrictEquals(
-            await revRes.text(), JSON.stringify(revs),
+        const revParts = await partsOf<{ id: string }>(revRes);
+        await assertPartsAreHeads(db, revParts, { sees: 'whole' });
+        assertEquals(
+            revParts.map((part) => part.body().toValue())
+                .toSorted(byIdAscending),
+            revs,
         );
         assertStrictEquals(revs.length, 1);
     }
@@ -797,9 +818,12 @@ Deno.test('live-write chain: create, reposition, revision edit,'
         await deriveBaselineScores(
             db, STARK_ORGANIZATION, projectId,
         );
-    assertStrictEquals(
-        await baseRes.text(),
-        JSON.stringify(derivedBaselinesAfterConversion),
+    const baseParts = await partsOf<{ id: string }>(baseRes);
+    await assertPartsAreHeads(db, baseParts, { sees: 'whole' });
+    assertEquals(
+        baseParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedBaselinesAfterConversion,
     );
     assertStrictEquals(derivedBaselinesAfterConversion.length, 2);
 
@@ -834,9 +858,12 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     const derivedBaselinesFinal = await deriveBaselineScores(
         db, STARK_ORGANIZATION, projectId,
     );
-    assertStrictEquals(
-        await baseFinalRes.text(),
-        JSON.stringify(derivedBaselinesFinal),
+    const baseFinalParts = await partsOf<{ id: string }>(baseFinalRes);
+    await assertPartsAreHeads(db, baseFinalParts, { sees: 'whole' });
+    assertEquals(
+        baseFinalParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedBaselinesFinal,
     );
     assertStrictEquals(derivedBaselinesFinal.length, 3);
 
@@ -849,9 +876,12 @@ Deno.test('live-write chain: create, reposition, revision edit,'
     const derivedActualsFinal = await deriveActualScores(
         db, STARK_ORGANIZATION, projectId,
     );
-    assertStrictEquals(
-        await actFinalRes.text(),
-        JSON.stringify(derivedActualsFinal),
+    const actFinalParts = await partsOf<{ id: string }>(actFinalRes);
+    await assertPartsAreHeads(db, actFinalParts, { sees: 'whole' });
+    assertEquals(
+        actFinalParts.map((part) => part.body().toValue())
+            .toSorted(byIdAscending),
+        derivedActualsFinal,
     );
     assertStrictEquals(derivedActualsFinal.length, 1);
 

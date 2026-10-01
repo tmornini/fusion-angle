@@ -341,13 +341,13 @@ Deno.test(
         assertStrictEquals(promotedProject.state, 'submitted');
 
         const mine =
-            (await ctx.GET<
-                ProjectObjectiveBaselineScoreEntity[]
+            (await ctx.GETCollection<
+                ProjectObjectiveBaselineScoreEntity
             >(
                 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                     + 'pnXmXrxOWayANgDLdCjuBw/objective'
                 + '-baseline-scores/',
-            )).body().toValue();
+            )).map((part) => part.body().toValue());
         assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [

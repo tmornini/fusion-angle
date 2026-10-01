@@ -1,5 +1,7 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { GET, POST, PUT } from './in-page-facade.ts';
+import {
+    GET, GETCollection, POST, PUT,
+} from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -206,14 +208,15 @@ Deno.test(
             projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
         );
 
-        const mine = (await GET<
-            ProjectObjectiveBaselineScoreEntity[]
+        const mine = (await GETCollection<
+            ProjectObjectiveBaselineScoreEntity
         >(
             db,
             'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
                 + 'pnXmXrxOWayANgDLdCjuBw/objective-baseline-scores/',
             DEV_TOKEN,
-            operationIdHeader())).body().toValue();
+            operationIdHeader()))
+                .map((part) => part.body().toValue());
         assertStrictEquals(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [b.objective_id, b.score]),

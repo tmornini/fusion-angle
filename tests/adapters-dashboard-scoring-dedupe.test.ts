@@ -194,6 +194,25 @@ Deno.test(
                             .promise;
                         objectivesHeld = false;
                     }
+                    if (isScorePath(resource)) {
+                        pendingScores++;
+                        if (objectivesHeld) {
+                            scoresDuringObjectives =
+                                true;
+                        }
+                        holdObjectives.resolve();
+                        await holdScores.promise;
+                        pendingScores--;
+                    }
+                    if (resource.includes(
+                        '/revisions/',
+                    )) {
+                        if (pendingScores > 0) {
+                            revisionsDuringScores =
+                                true;
+                        }
+                        holdScores.resolve();
+                    }
                     return inner.GETCollection(
                         resource, token, requestId,
                     );
@@ -204,35 +223,6 @@ Deno.test(
                     requestId,
                 ) => {
                     paths.push(resource);
-                    if (isScorePath(resource)) {
-                        pendingScores++;
-                        if (objectivesHeld) {
-                            scoresDuringObjectives =
-                                true;
-                        }
-                        holdObjectives.resolve();
-                        await holdScores.promise;
-                        pendingScores--;
-                        return inner.GET(
-                            resource,
-                            token,
-                            requestId,
-                        );
-                    }
-                    if (resource.includes(
-                        '/revisions/',
-                    )) {
-                        if (pendingScores > 0) {
-                            revisionsDuringScores =
-                                true;
-                        }
-                        holdScores.resolve();
-                        return inner.GET(
-                            resource,
-                            token,
-                            requestId,
-                        );
-                    }
                     return inner.GET(
                         resource, token, requestId,
                     );

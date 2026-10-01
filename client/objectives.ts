@@ -188,10 +188,10 @@ async function getRevisionsForObjective(
     ctx: RequestContext,
     objectiveId: ObjectiveId,
 ): Promise<ObjectiveRevisionEntity[]> {
-    return (await ctx.GET<ObjectiveRevisionEntity[]>(
+    return (await ctx.GETCollection<ObjectiveRevisionEntity>(
         organizationItem(ctx, 'objectives', objectiveId)
             + '/revisions/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 // The revisions for each supplied objective, grouped — reassembled

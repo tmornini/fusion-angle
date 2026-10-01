@@ -39,14 +39,8 @@ const SERVED_COLLECTIONS: readonly string[] = [
     'organizations/' + STARK + '/flows/'
         + ANY_ID + '/records/',
     'organizations/' + STARK + '/record-types/',
-];
-// The collections still answering handler JSON.
-const PARTED_COLLECTIONS: readonly string[] = [
-    'organizations/' + STARK + '/members/',
     'organizations/' + STARK + '/projects/'
         + ANY_ID + '/flows/',
-    // GET states/:id/field-values RETIRED (C4); field values
-    // fold on work-orders/:id/history.
     'organizations/' + STARK + '/ideas/'
         + ANY_ID + '/submissions/',
     'organizations/' + STARK + '/objectives/'
@@ -55,6 +49,12 @@ const PARTED_COLLECTIONS: readonly string[] = [
         + ANY_ID + '/objective-baseline-scores/',
     'organizations/' + STARK + '/projects/'
         + ANY_ID + '/objective-actual-scores/',
+];
+// The collections still answering handler JSON.
+const PARTED_COLLECTIONS: readonly string[] = [
+    'organizations/' + STARK + '/members/',
+    // GET states/:id/field-values RETIRED (C4); field values
+    // fold on work-orders/:id/history.
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
 ];

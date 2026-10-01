@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import { deriveFlowStateHistory } from
     '../api/derive-flows.ts';
-import { GET, POST } from './in-page-facade.ts';
+import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -110,13 +110,14 @@ Deno.test(
 
         // Phase Final Task 2: project_flows row half stripped —
         // join derives from the message plane.
-        const links = (await GET<{
+        const links = (await GETCollection<{
             id: string;
             project_id: string;
             flow_id: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/flows/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader()))
+                    .map((part) => part.body().toValue());
         assertStrictEquals(links.length, 1);
         assertStrictEquals(links[0]!.id, body.projectFlowId);
         assertStrictEquals(links[0]!.project_id, 'pnXmXrxOWayANgDLdCjuBw');

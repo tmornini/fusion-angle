@@ -78,12 +78,12 @@ export async function getBaselineScoresForProject(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<ObjectiveScore[]> {
-    const rows = (await ctx.GET<
-        ProjectObjectiveBaselineScoreEntity[]
+    const rows = (await ctx.GETCollection<
+        ProjectObjectiveBaselineScoreEntity
     >(
         organizationItem(ctx, 'projects', projectId)
             + '/objective-baseline-scores/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     return rows.map(toObjectiveScore);
 }
 
@@ -92,12 +92,12 @@ export async function getActualScoresForProject(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<ObjectiveScore[]> {
-    const rows = (await ctx.GET<
-        ProjectObjectiveActualScoreEntity[]
+    const rows = (await ctx.GETCollection<
+        ProjectObjectiveActualScoreEntity
     >(
         organizationItem(ctx, 'projects', projectId)
             + '/objective-actual-scores/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
     return rows.map(toObjectiveScore);
 }
 

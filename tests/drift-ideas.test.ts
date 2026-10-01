@@ -23,6 +23,7 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     deriveIdeaSubmissions,
 } from '../api/derive-ideas.ts';
+import { byIdAscending } from '../api/derive-documents.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -330,9 +331,11 @@ async () => {
             + '/submissions/', token,
     ));
     assertStrictEquals(listRes.status, 200);
-    assertStrictEquals(
-        await listRes.text(),
-        JSON.stringify([expectedSub]),
+    const parts = await partsOf(listRes);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(
+        parts.map((part) => part.body().toValue()),
+        [expectedSub],
     );
     const derived = await deriveIdeaSubmissions(
         db, 'AjdvjuECVZEgZoFajaIEkg', ideaId,
@@ -361,8 +364,14 @@ Deno.test('seeded idea submissions: derive non-empty for every'
             token,
         ));
         assertStrictEquals(res.status, 200);
-        assertStrictEquals(
-            await res.text(), JSON.stringify(derived),
+        // The parts come in write order (response_at, id); the
+        // derive sorts by id, so the bodies compare as one set.
+        const parts = await partsOf<{ id: string }>(res);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        assertEquals(
+            parts.map((part) => part.body().toValue())
+                .toSorted(byIdAscending),
+            derived,
         );
     }
 });

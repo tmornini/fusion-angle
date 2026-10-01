@@ -27,6 +27,7 @@ import type { Reader } from '../api/served-response.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 
@@ -584,6 +585,96 @@ async () => {
     const got = await handleRequest(db, apiRequest({
         method: 'GET', path: RECORD_TYPES + id + '/instances/',
         token,
+    }));
+    assertStrictEquals(got.status, 204);
+    assertStrictEquals(await got.text(), '');
+    assertMatch(got.headers.get('date')!, /GMT$/);
+});
+
+const ORGANIZATION = '/organizations/' + STARK;
+// The first seeded idea carries a submission; the two-flows
+// project carries two flow joins, four baselines, and five
+// actuals; every seeded objective carries one revision.
+const SUBMITTED_IDEA = 'YvOylAxOjQcgmNmsSoVBPQ';
+const TWO_FLOWS_PROJECT = 'wqGTTFdYUGnmBxWCppmkOQ';
+const REVISED_OBJECTIVE = 'JobGWBxUTEBusPcVhYEKtA';
+// A submitted project is scored by no one yet.
+const SUBMITTED_PROJECT = 'PIfhHMLQQxTxKFDdabXbOw';
+
+const CHILDREN: readonly [string, string, string][] = [
+    [
+        ORGANIZATION + '/ideas/' + SUBMITTED_IDEA + '/submissions/',
+        'idea_id', SUBMITTED_IDEA,
+    ],
+    [
+        ORGANIZATION + '/projects/' + TWO_FLOWS_PROJECT + '/flows/',
+        'project_id', TWO_FLOWS_PROJECT,
+    ],
+    [
+        ORGANIZATION + '/objectives/' + REVISED_OBJECTIVE
+            + '/revisions/',
+        'objective_id', REVISED_OBJECTIVE,
+    ],
+    [
+        ORGANIZATION + '/projects/' + TWO_FLOWS_PROJECT
+            + '/objective-baseline-scores/',
+        'project_id', TWO_FLOWS_PROJECT,
+    ],
+    [
+        ORGANIZATION + '/projects/' + TWO_FLOWS_PROJECT
+            + '/objective-actual-scores/',
+        'project_id', TWO_FLOWS_PROJECT,
+    ],
+];
+
+for (const [collection, parentField, parentId] of CHILDREN) {
+    Deno.test(collection + ' serves its heads as parts',
+    async () => {
+        const db = await seededMockDb();
+        const got = await handleRequest(db, apiRequest({
+            method: 'GET', path: collection,
+            token: await organizationToken(),
+        }));
+        assertStrictEquals(got.status, 200);
+        assertMatch(
+            got.headers.get('content-type')!,
+            /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
+        );
+        assertStrictEquals(got.headers.get('etag'), null);
+        const parts = await partsOf<Record<string, unknown>>(got);
+        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        for (const part of parts) {
+            assertStrictEquals(
+                part.body().toValue()[parentField], parentId,
+            );
+        }
+    });
+}
+
+Deno.test('a submitted project\'s baseline scores answer 204',
+async () => {
+    const db = await seededMockDb();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: ORGANIZATION + '/projects/' + SUBMITTED_PROJECT
+            + '/objective-baseline-scores/',
+        token: await organizationToken(),
+    }));
+    assertStrictEquals(got.status, 204);
+    assertStrictEquals(await got.text(), '');
+    assertMatch(got.headers.get('date')!, /GMT$/);
+});
+
+// The path fence admits the caller's own organization; the
+// foreign objective's revisions live under another prefix.
+Deno.test('a foreign objective\'s revisions answer 204',
+async () => {
+    const db = await seededMockDb();
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/organizations/' + ORGANIZATION_TWO
+            + '/objectives/' + REVISED_OBJECTIVE + '/revisions/',
+        token: await organizationToken(ME, ORGANIZATION_TWO),
     }));
     assertStrictEquals(got.status, 204);
     assertStrictEquals(await got.text(), '');

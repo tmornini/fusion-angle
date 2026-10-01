@@ -41,7 +41,7 @@ import {
 // pre-existing H7-class surfaces; these two derivations
 // join them.
 
-function scoresUriPrefix(
+export function scoresUriPrefix(
     organization: Id,
     projectId: Id,
     segment: string,
@@ -85,11 +85,12 @@ async function fetchScoreDocuments(
 }
 
 // id-lex ordered (byIdAscending — the derivation's own
-// order, never the backend's). Serves a future live
-// GET projects/:id/objective-baseline-scores route: the SERVER
-// already filters by the parent project through this
-// derivation's own nested prefix, so the org fence and the
-// parent scope are both closed by the document alone.
+// order, never the backend's). GET projects/:id/objective-
+// baseline-scores/ serves the stored heads at this prefix
+// (spec §1 B): the SERVER already filters by the parent
+// project through this derivation's own nested prefix, so
+// the org fence and the parent scope are both closed by the
+// document alone.
 export async function deriveBaselineScores(
     db: DbAdapter,
     organization: Id,

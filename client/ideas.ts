@@ -68,10 +68,10 @@ async function getIdeaSubmissionsForIdea(
     ctx: RequestContext,
     ideaId: string,
 ): Promise<IdeaSubmissionEntity[]> {
-    return (await ctx.GET<IdeaSubmissionEntity[]>(
+    return (await ctx.GETCollection<IdeaSubmissionEntity>(
         organizationItem(ctx, 'ideas', ideaId)
             + '/submissions/',
-    )).body().toValue();
+    )).map((m) => m.body().toValue());
 }
 
 // The submissions across EVERY supplied idea — reassembled from

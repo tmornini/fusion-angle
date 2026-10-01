@@ -842,16 +842,16 @@ for (const name of LEAF_CASE_NAMES) {
             await organizationToken(fx.pb, fx.organizationB),
         ));
         assertStrictEquals(foreign.status, 200);
-        const foreignRows = await foreign.json() as {
+        const foreignRows = await partBodiesOf<{
             id: string;
-        }[];
+        }>(foreign);
         assert(
             foreignRows.some((r) => r.id === c.b),
             'foreign ' + c.b + ' missing on B plane',
         );
         const res = await facadeGet(fx.db, fx.organizationA, c.aPath);
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), [c.a]);
     });
 
@@ -862,8 +862,8 @@ for (const name of LEAF_CASE_NAMES) {
         // The B-org parent's collection, read through the A
         // facade, is fenced empty — the row resolves to org B.
         const res = await facadeGet(fx.db, fx.organizationA, c.bPath);
-        assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        assertStrictEquals(res.status, 204);
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), []);
     });
 }
@@ -1043,9 +1043,9 @@ for (const seg of NESTED_PROJECT_SEGS) {
             await organizationToken(fx.pb, fx.organizationB),
         ));
         assertStrictEquals(foreign.status, 200);
-        const foreignRows = await foreign.json() as {
+        const foreignRows = await partBodiesOf<{
             id: string;
-        }[];
+        }>(foreign);
         assert(
             foreignRows.some((r) => r.id === ids.b),
             'foreign ' + ids.b + ' missing on B plane',
@@ -1055,7 +1055,7 @@ for (const seg of NESTED_PROJECT_SEGS) {
             '/projects/' + fx.chainA.project
                 + '/' + seg + '/');
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as { id: string }[];
+        const rows = await partBodiesOf<{ id: string }>(res);
         assertEquals(rows.map(r => r.id), [ids.a]);
     });
 }

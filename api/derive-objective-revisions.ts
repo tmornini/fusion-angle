@@ -47,7 +47,7 @@ import {
 // objective's own lifecycle, never its revisions, which carry no
 // lifecycle concept at all.
 
-function objectiveRevisionsUriPrefix(
+export function objectiveRevisionsUriPrefix(
     organization: Id,
     objectiveId: Id,
 ): string {
@@ -71,8 +71,8 @@ export function objectiveRevisionEntityOf(
 }
 
 // id-lex ordered (byIdAscending — the derivation's own
-// order, never the backend's). Serves the live GET
-// objectives/:id/revisions route (a future task's flip): the
+// order, never the backend's). GET objectives/:id/revisions/
+// serves the stored heads at this prefix (spec §1 B): the
 // SERVER already filters by the parent objective through this
 // derivation's own nested prefix, so the org fence and the
 // parent scope are both closed by the document alone — no

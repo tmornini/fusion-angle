@@ -5,7 +5,7 @@ import { STARK_ORGANIZATION } from
     '../../api/mock-data/seed-constants.ts';
 import { generateIdentifier } from
     '../../shared/identifier.ts';
-import { apiRequest } from '../http-fixtures.ts';
+import { apiRequest, partBodiesOf } from '../http-fixtures.ts';
 import {
     ADMIN_EMAIL, SECOND_EMAIL, adminToken, signIn,
     startOrigin, useBrowser, type Origin,
@@ -77,8 +77,9 @@ async function createIdea(
             token: await adminToken(),
         }),
     );
-    const submissions = await readBack.json() as
-        { idea_id: string }[];
+    const submissions = await partBodiesOf<{ idea_id: string }>(
+        readBack,
+    );
     assertStrictEquals(submissions.length, 1);
     assertStrictEquals(submissions[0]?.idea_id, ideaId);
 }

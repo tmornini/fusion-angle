@@ -186,7 +186,10 @@ async () => {
             + '/submissions/', token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals projectFlowEntityOf',
@@ -226,7 +229,10 @@ async () => {
             + projectId + '/flows/', token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals flowWorkOrderEntityOf',
@@ -502,7 +508,10 @@ async () => {
         token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals scoreEntityOf (baseline)',
@@ -545,7 +554,10 @@ async () => {
         token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
 
 Deno.test('stored PUT body equals scoreEntityOf (actual)',
@@ -588,5 +600,8 @@ async () => {
         token,
     ));
     assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), [stored]);
+    const parts = await partsOf(got);
+    assertStrictEquals(parts.length, 1);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(parts.map((part) => part.body().toValue()), [stored]);
 });
