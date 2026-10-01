@@ -27,6 +27,10 @@ import type { StatusDocument } from
     '../../api/http-status-documents.ts';
 import { AUTHENTICATION_ROUTES } from
     '../../api/request-auth.ts';
+import { documentFamilyWiring } from
+    '../../api/document-family.ts';
+import { RECORD_TYPE_DETAIL_PATTERN } from
+    '../../api/family-registry.ts';
 
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
@@ -619,18 +623,39 @@ function conditionalFor(
     return conditionalOf(uri.slice(1), method);
 }
 
+// A selected head that is deleted answers 410 (spec §5):
+// a DELETE head, which only a route offering DELETE can
+// store, or a state-`deleted` head in a lifecycle family.
+// A family's document is the segment before its id.
+function isDeletableDocument(row: Route): boolean {
+    if (offeredVerbs(row).includes('delete')) return true;
+    if (routePatternOf(row) === RECORD_TYPE_DETAIL_PATTERN) {
+        return true;
+    }
+    const id = row.segments.at(-1);
+    const family = row.segments.at(-2);
+    return id !== undefined
+        && id.startsWith(':')
+        && family !== undefined
+        && documentFamilyWiring(family)?.lifecycle === 'state';
+}
+
 function statusCodesFor(
     row: Route,
     verb: HttpVerb,
 ): string[] {
     const codes: number[] = [];
+    const selects = verb === 'get' && row.select !== undefined;
     if (verb === 'delete') codes.push(204);
     else codes.push(200);
+    // A collection that selects no head answers 204.
+    if (selects && uriOf(row).endsWith('/')) codes.push(204);
     const body = exampleBodyFor(uriOf(row), verb);
     if (body !== 'none') codes.push(400);
     codes.push(401);
     if (isOrganizationNested(row)) codes.push(403);
     if (!isAuthGrant(row)) codes.push(404);
+    if (selects && isDeletableDocument(row)) codes.push(410);
     const conditional = conditionalFor(verb, uriOf(row));
     if (conditional !== undefined && conditional !== 'none') {
         codes.push(412);

@@ -177,3 +177,70 @@ Deno.test('every status document has a catalog status',
         assert(hashes.has(hash), hash);
     }
 });
+
+// The statuses a GET room links, read from its page.
+function getStatusesOf(
+    rooms: ReadonlyMap<string, string>,
+    uri: string,
+): string[] {
+    const row = routes.find((r) => uriOf(r) === uri);
+    assert(row, uri);
+    const html = rooms.get(roomPathOf('get', row.segments));
+    assert(html, uri);
+    return [...html.matchAll(/statuses\/(\d+)\//g)]
+        .map((match) => match[1]!);
+}
+
+Deno.test('a GET of a document that can be deleted'
+    + ' lists 410', () => {
+    const rooms = generateAll();
+    for (const uri of [
+        '/organizations/:id/ideas/:id',
+        '/organizations/:id/flows/:id',
+        '/organizations/:organization-id/record-types/'
+            + ':record-type-id',
+        '/identities/:id/pii',
+    ]) {
+        assert(getStatusesOf(rooms, uri).includes('410'), uri);
+    }
+    for (const uri of [
+        '/identities/:id',
+        '/organizations/:id',
+        '/organizations/:id/ideas/',
+        '/organizations/:id/invitations/:id',
+    ]) {
+        assert(
+            !getStatusesOf(rooms, uri).includes('410'), uri,
+        );
+    }
+});
+
+Deno.test('a GET of a selected collection lists 204',
+() => {
+    const rooms = generateAll();
+    for (const uri of [
+        '/identities/',
+        '/organizations/:id/ideas/',
+    ]) {
+        assert(getStatusesOf(rooms, uri).includes('204'), uri);
+    }
+    for (const uri of [
+        '/identities/:id',
+        '/organizations/:id/invitations/',
+    ]) {
+        assert(
+            !getStatusesOf(rooms, uri).includes('204'), uri,
+        );
+    }
+});
+
+Deno.test('every status a room lists has its page', () => {
+    const pages = new Set(
+        STATUS_DOCUMENTS.map((doc) => String(doc.code)),
+    );
+    for (const room of API_DOC_ROOMS) {
+        for (const status of room.statuses) {
+            assert(pages.has(status), room.hash + ' ' + status);
+        }
+    }
+});

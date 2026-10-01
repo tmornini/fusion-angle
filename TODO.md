@@ -3068,7 +3068,8 @@ Off the critical path; each with its oracle.
   reads the route table and its surface
   (`api/routes.ts`, `api/route-surface.ts`,
   `api/http-status-documents.ts`, `api/request-auth.ts`,
-  `api/family-registry.ts`, `api/path-segments.ts`) under
+  `api/family-registry.ts`, `api/document-family.ts`,
+  `api/path-segments.ts`) under
   `deno run`, never in a page; two presenters
   (`web-app/app/presenters/ai-member-detail.ts`,
   `presenters/member.ts`) read the provider-model
