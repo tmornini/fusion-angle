@@ -4,6 +4,8 @@ import type {
 } from '../../shared/types.ts';
 import { formatCalendarDate } from './format.ts';
 import type { RequestContext } from '../../client/request-context.ts';
+import type { HttpMessage } from
+    '../../shared/http-message/http-message.ts';
 import {
     getOrganizationEntity,
     getOrganizationSeats,
@@ -88,13 +90,13 @@ export class Organization {
 // so the count is the active org's slice.
 async function deriveOrganizationFacts(
     ctx: RequestContext,
-    seatsP?: Promise<readonly MembershipEntity[]>,
+    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<OrganizationDerived> {
     const seats = seatsP !== undefined
         ? await seatsP
         : await getOrganizationSeats(ctx);
     const identities = new Set(
-        seats.map(m => m.identity_id),
+        seats.map(m => m.body().toValue().identity_id),
     );
     return {
         usedSeats: identities.size,
@@ -103,7 +105,7 @@ async function deriveOrganizationFacts(
 
 export async function getOrganization(
     ctx: RequestContext,
-    seatsP?: Promise<readonly MembershipEntity[]>,
+    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<Organization> {
     const [entity, derived] = await Promise.all([
         getOrganizationEntity(ctx),

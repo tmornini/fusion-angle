@@ -1,6 +1,9 @@
-import { assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     postAIMemberCreation,
@@ -40,7 +43,8 @@ Deno.test(
             ctx, agentId, aiDraft('Claude'),
         );
 
-        const detail = await getAIMemberEntity(ctx, agentId);
+        const detail = (await getAIMemberEntity(ctx, agentId))
+            .body().toValue();
         assertStrictEquals(detail.name, 'Claude');
         const agent = (await ctx.GET<{
             id: string; name: string;
@@ -60,12 +64,35 @@ Deno.test(
         const ctx = inPageContext(db, await devToken());
 
         await putAIMember(
-            ctx, agentId,
+            ctx, await getAIMemberEntity(ctx, agentId),
             { ...aiDraft('Renamed'), skill_focus: 'qa' },
         );
 
-        const detail = await getAIMemberEntity(ctx, agentId);
+        const detail = (await getAIMemberEntity(ctx, agentId))
+            .body().toValue();
         assertStrictEquals(detail.name, 'Renamed');
         assertStrictEquals(detail.skill_focus, 'qa');
+    },
+);
+
+Deno.test(
+    'an AI member save latches its read and answers the'
+    + ' new head',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
+        const agentId = generateIdentifier();
+        await seedAIMember(db, agentId, 'Claude');
+        const { ctx, sent } = recordedContext(db, await devToken());
+        const held = await getAIMemberEntity(ctx, agentId);
+        sent.length = 0;
+        const saved = await putAIMember(
+            ctx, held, aiDraft('Renamed'),
+        );
+        assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
+            ['PUT', held.query('header.etag').toText()],
+        ]);
+        assertStrictEquals(saved.body().toValue().name, 'Renamed');
     },
 );

@@ -2,6 +2,8 @@ import { assertMatch, assertNotMatch } from '@std/assert';
 import {
     IdentityRosterPresenter,
 } from '../web-app/app/presenters/identity-list.ts';
+import type { IdentityPiiEntity } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // identity-list.ts never reads localStorage (checked
 // against the full product tree); window/document are
@@ -42,6 +44,11 @@ Deno.test('person row shows name, email, and Person badge',
             pii: {
                 erased: false, name: 'Ada',
                 email: 'ada@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
+                message: responseMessage<IdentityPiiEntity>({
+                    id: 'pnXmXrxOWayANgDLdCjuBw', name: 'Ada',
+                    email: 'ada@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg',
+                    bio: 'b',
+                }),
             },
         },
     ]).render(rec.container);

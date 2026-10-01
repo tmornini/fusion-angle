@@ -5,6 +5,7 @@ import type {
     IdentityEntity,
     HumanProfile,
     IdentityPiiEntity,
+    MemberPii,
     MembershipEntity,
 } from '../shared/types.ts';
 import {
@@ -12,6 +13,8 @@ import {
     nowUtc,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import { byAtThenIdAscending } from '../shared/identifier.ts';
 import { getMemberPii } from './identities.ts';
 import {
@@ -77,17 +80,21 @@ function seatedHumanParent(
 // The roster serves in write order; the members page and
 // the palette's featured six read the seats in grant order.
 export function buildHumanMemberMap(
-    seats: readonly MembershipEntity[],
+    seats: readonly HttpMessage<MembershipEntity>[],
 ): Map<MemberId, HumanMember> {
     const map = new Map<MemberId, HumanMember>();
-    const granted = seats.toSorted(byAtThenIdAscending);
+    const granted = seats.toSorted((a, b) => byAtThenIdAscending(
+        a.body().toValue(), b.body().toValue(),
+    ));
     for (const seat of granted) {
+        const identityId = seat.body().toValue().identity_id;
         map.set(
-            seat.identity_id,
+            identityId,
             new HumanMember(
-                seatedHumanParent(seat.identity_id),
+                seatedHumanParent(identityId),
                 { present: false },
                 { erased: true },
+                seat,
             ),
         );
     }
@@ -97,12 +104,13 @@ export function buildHumanMemberMap(
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const seats = (await ctx.GETCollection<MembershipEntity>(
-        seatsCollection(ctx),
-    )).map((m) => m.body().toValue());
-    const map = buildHumanMemberMap(seats);
+    const map = buildHumanMemberMap(
+        await ctx.GETCollection<MembershipEntity>(
+            seatsCollection(ctx),
+        ),
+    );
     const filled = await Promise.all(
-        [...map.entries()].map(async ([id]) => {
+        [...map.entries()].map(async ([id, member]) => {
             const pii = await getMemberPii(ctx, id);
             return [
                 id,
@@ -110,6 +118,7 @@ export async function getHumanMemberMap(
                     seatedHumanParent(id),
                     { present: false },
                     pii,
+                    member.seat,
                 ),
             ] as const;
         }),
@@ -144,7 +153,7 @@ export async function getHumanMember(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMember> {
-    const [, identity, pii] =
+    const [seat, identity, pii] =
         await Promise.all([
             ctx.GET<MembershipEntity>(
                 seatsCollection(ctx) + id,
@@ -158,17 +167,23 @@ export async function getHumanMember(
         seatedHumanParent(id),
         profileOf(identity),
         pii,
+        seat,
     );
 }
 
+// The profile with the read it came from, so a save over
+// it names the head it replaces.
 export async function getHumanMemberProfile(
     ctx: RequestContext,
     id: string,
-): Promise<HumanProfile> {
-    const identity = (await ctx.GET<IdentityEntity>(
+): Promise<{
+    profile: HumanProfile;
+    read: HttpMessage<IdentityEntity>;
+}> {
+    const read = await ctx.GET<IdentityEntity>(
         `identities/${id}`,
-    )).body().toValue();
-    return profileOf(identity);
+    );
+    return { profile: profileOf(read.body().toValue()), read };
 }
 
 export class HumanMemberPiiIntakeFailedError extends Error {
@@ -184,21 +199,35 @@ export class HumanMemberPiiIntakeFailedError extends Error {
     }
 }
 
+// The identity save latches the identity read it was formed
+// from; the PII save, when there is one, latches the held
+// PII, and goes unlatched when the member had none (a
+// singleton's first write).
 export async function putHumanMember(
     ctx: RequestContext,
     id: string,
-    detail: Omit<HumanMemberEntity, 'id'>,
-    pii?: Omit<IdentityPiiEntity, 'id'>,
+    identity: {
+        held: HttpMessage<IdentityEntity>;
+        body: Omit<HumanMemberEntity, 'id'>;
+    },
+    pii?: {
+        current: MemberPii;
+        body: Omit<IdentityPiiEntity, 'id'>;
+    },
 ): Promise<void> {
     await ctx.PUT(`identities/${id}`, {
         kind: 'person',
-        title: detail.title,
-        department: detail.department,
-        strengths: detail.strengths,
-        team_dimensions: detail.team_dimensions,
-    });
+        title: identity.body.title,
+        department: identity.body.department,
+        strengths: identity.body.strengths,
+        team_dimensions: identity.body.team_dimensions,
+    }, [identity.held]);
     if (pii !== undefined) {
-        await ctx.PUT(`identities/${id}/pii`, { ...pii });
+        await ctx.PUT(
+            `identities/${id}/pii`,
+            { ...pii.body },
+            pii.current.erased ? undefined : [pii.current.message],
+        );
     }
     humanMemberChanges.notify();
 }
@@ -235,11 +264,15 @@ export async function postHumanMemberCreation(
 // place in this organization goes. The API refuses the last
 // admin seat (409); the page mirrors that guard through
 // getAdminSeatIds below rather than discovering it here.
+// The removal names the seat the member was read through.
 export async function deleteHumanMemberSeat(
     ctx: RequestContext,
-    id: MemberId,
+    member: HumanMember,
 ): Promise<void> {
-    await ctx.DELETE(seatsCollection(ctx) + id);
+    await ctx.DELETE(
+        seatsCollection(ctx) + member.idForLink(),
+        [member.seat],
+    );
     humanMemberChanges.notify();
 }
 

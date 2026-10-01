@@ -11,6 +11,8 @@ import type {
 import {
     Idea, Project, HumanMember,
     type IdeaState,
+    type IdentityPiiEntity,
+    type MembershipEntity,
 } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
@@ -57,6 +59,13 @@ function buildHumanMember(
     title = 'engineer',
     department = 'Eng',
 ): HumanMember {
+    const pii = {
+        name: first + ' ' + last,
+        email: first.toLowerCase()
+            + '@example.com',
+        phone: '',
+        bio: '',
+    };
     return new HumanMember(
         {
             id,
@@ -71,12 +80,18 @@ function buildHumanMember(
         },
         {
             erased: false,
-            name: first + ' ' + last,
-            email: first.toLowerCase()
-                + '@example.com',
-            phone: '',
-            bio: '',
+            ...pii,
+            message: responseMessage<IdentityPiiEntity>({
+                id, ...pii,
+            }),
         },
+        responseMessage<MembershipEntity>({
+            id,
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: id,
+            type: 'member',
+            at: '2026-01-01T00:00:00.000000Z',
+        }),
     );
 }
 

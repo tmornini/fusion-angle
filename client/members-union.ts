@@ -12,6 +12,8 @@ import {
     SYSTEM_MEMBER_ID,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     buildHumanMemberMap,
     getHumanMemberProfile,
@@ -44,11 +46,13 @@ export async function getMembers(
         ?? ctx.identity.organizations?.[0];
     const [seats, agents] = await Promise.all([
         organization === undefined
-            ? Promise.resolve([] as MembershipEntity[])
+            ? Promise.resolve(
+                [] as HttpMessage<MembershipEntity>[],
+            )
             : ctx.GETCollection<MembershipEntity>(
                 'organizations/' + organization
                     + '/members/',
-            ).then(parts => parts.map((m) => m.body().toValue())),
+            ),
         ctx.GETCollection<AIAgentEntity>('ai-agents/')
             .then(parts => parts.map((m) => m.body().toValue())),
     ]);
@@ -81,6 +85,7 @@ export async function fillHumanMemberPii(
             },
             member.profile(),
             pii,
+            member.seat,
         );
     }));
 }
@@ -98,7 +103,7 @@ export async function fillHumanMemberProfile(
         }
         const id = member.idForLink();
         try {
-            const profile =
+            const { profile } =
                 await getHumanMemberProfile(
                     ctx, id,
                 );
@@ -106,6 +111,7 @@ export async function fillHumanMemberProfile(
                 { id, type: 'human' },
                 profile,
                 member.pii(),
+                member.seat,
             );
         } catch (error) {
             if (error instanceof RequestError

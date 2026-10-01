@@ -16,6 +16,8 @@ import {
     HTTP_GONE,
 } from '../shared/http-errors.ts';
 import type { RequestContext } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
@@ -123,15 +125,17 @@ export async function getMemberPii(
     id: Id,
 ): Promise<MemberPii> {
     try {
-        const row = (await ctx.GET<IdentityPiiEntity>(
+        const message = await ctx.GET<IdentityPiiEntity>(
             `identities/${id}/pii`,
-        )).body().toValue();
+        );
+        const row = message.body().toValue();
         return {
             erased: false,
             name: row.name,
             email: row.email,
             phone: row.phone,
             bio: row.bio,
+            message,
         };
     } catch (error) {
         if (error instanceof RequestError
@@ -155,11 +159,17 @@ export async function getServiceFacet(
     return serviceFacet(undefined);
 }
 
+// An erase over held PII names the head it replaces; over
+// absent PII there is no head to name.
 export async function deleteIdentityPii(
     ctx: RequestContext,
     id: Id,
+    current: MemberPii,
 ): Promise<void> {
-    await ctx.DELETE(`identities/${id}/pii`);
+    await ctx.DELETE(
+        `identities/${id}/pii`,
+        current.erased ? undefined : [current.message],
+    );
     identityChanges.notify();
 }
 
@@ -167,7 +177,9 @@ export async function deleteIdentityPii(
 // (never registered, or deregistered) is a branch, never a
 // null — the CALLER renders the unregistered state. Wire
 // snake_case crosses to domain camelCase HERE (the adapter
-// is the divorce point of vocabulary).
+// is the divorce point of vocabulary). A registration
+// keeps the message it was read from, so a write over it
+// names the head it replaces.
 export type ClientRegistration =
     | {
         readonly registered: true;
@@ -176,6 +188,7 @@ export type ClientRegistration =
         readonly jwks: string;
         readonly aud: string;
         readonly status: ClientStatus;
+        readonly message: HttpMessage<ClientRegistrationEntity>;
     }
     | { readonly registered: false };
 
@@ -192,10 +205,11 @@ export async function getClientRegistration(
     id: Id,
 ): Promise<ClientRegistration> {
     try {
-        const row =
-            (await ctx.GET<ClientRegistrationEntity>(
+        const message =
+            await ctx.GET<ClientRegistrationEntity>(
                 `identities/${id}/registration`,
-            )).body().toValue();
+            );
+        const row = message.body().toValue();
         return {
             registered: true,
             grantTypes: row.grant_types,
@@ -203,6 +217,7 @@ export async function getClientRegistration(
             jwks: row.jwks,
             aud: row.aud,
             status: row.status,
+            message,
         };
     } catch (err) {
         if (
@@ -216,26 +231,39 @@ export async function getClientRegistration(
     }
 }
 
+// A write over a held registration names the head it
+// replaces; an unregistered identity has none, so its
+// first registration goes unlatched.
 export async function putClientRegistration(
     ctx: RequestContext,
     id: Id,
     fields: ClientRegistrationFields,
-): Promise<void> {
-    await ctx.PUT(`identities/${id}/registration`, {
-        grant_types: fields.grantTypes,
-        redirect_uris: fields.redirectUris,
-        jwks: fields.jwks,
-        aud: fields.aud,
-        status: fields.status,
-    });
+    current: ClientRegistration,
+): Promise<HttpMessage<ClientRegistrationEntity>> {
+    const saved = await ctx.PUT<ClientRegistrationEntity>(
+        `identities/${id}/registration`,
+        {
+            grant_types: fields.grantTypes,
+            redirect_uris: fields.redirectUris,
+            jwks: fields.jwks,
+            aud: fields.aud,
+            status: fields.status,
+        },
+        current.registered ? [current.message] : undefined,
+    );
     identityChanges.notify();
+    return saved;
 }
 
 export async function deleteClientRegistration(
     ctx: RequestContext,
     id: Id,
+    current: ClientRegistration,
 ): Promise<void> {
-    await ctx.DELETE(`identities/${id}/registration`);
+    await ctx.DELETE(
+        `identities/${id}/registration`,
+        current.registered ? [current.message] : undefined,
+    );
     identityChanges.notify();
 }
 

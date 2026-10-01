@@ -17,7 +17,11 @@ import {
     HTTP_GONE,
     HTTP_FORBIDDEN,
 } from '../shared/http-errors.ts';
-import { HumanMember } from '../shared/types.ts';
+import {
+    HumanMember,
+    type IdentityPiiEntity,
+    type MembershipEntity,
+} from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import {
     HumanMemberDetailPresenter,
@@ -146,12 +150,19 @@ Deno.test(
 // detail save's dirty check — a detail-only save must omit the
 // PUT identities/:id/pii second hop.
 
-const ORIGINAL_PII = {
-    erased: false as const,
+const ORIGINAL_PII_FIELDS = {
     name: 'Sarah Chen',
     email: 'sarah@example.com',
     phone: '555-0100',
     bio: 'Builds things.',
+};
+
+const ORIGINAL_PII = {
+    erased: false as const,
+    ...ORIGINAL_PII_FIELDS,
+    message: responseMessage<IdentityPiiEntity>({
+        id: 'hw_1', ...ORIGINAL_PII_FIELDS,
+    }),
 };
 
 Deno.test(
@@ -281,7 +292,21 @@ Deno.test(
                 email: 'sarah@example.com',
                 phone: '555-0199',
                 bio: 'Ships things.',
+                message: responseMessage<IdentityPiiEntity>({
+                    id: 'hw_1',
+                    name: 'Sarah Chen',
+                    email: 'sarah@example.com',
+                    phone: '555-0199',
+                    bio: 'Ships things.',
+                }),
             },
+            responseMessage<MembershipEntity>({
+                id: 'hw_1',
+                organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+                identity_id: 'hw_1',
+                type: 'member',
+                at: '2026-01-01T00:00:00.000000Z',
+            }),
         );
         const next = reduceSave(fresh);
         assertStrictEquals(next.kind, 'reading');

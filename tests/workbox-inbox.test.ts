@@ -58,8 +58,10 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { deleteHumanMemberSeat } from
-    '../client/members.ts';
+import {
+    deleteHumanMemberSeat,
+    getHumanMember,
+} from '../client/members.ts';
 
 const N_START = generateIdentifier();
 const N_MIDDLE = generateIdentifier();
@@ -603,7 +605,9 @@ Deno.test(
         const admin = inPageContext(
             db, await organizationToken(),
         );
-        await deleteHumanMemberSeat(admin, leaverId);
+        await deleteHumanMemberSeat(
+            admin, await getHumanMember(admin, leaverId),
+        );
         const {
             workOrders, transitionsByWo,
             activeClaimsByWo, memberMap,

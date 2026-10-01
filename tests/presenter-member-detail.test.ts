@@ -3,7 +3,13 @@ import {
     assertMatch,
     assertStrictEquals,
 } from '@std/assert';
-import { HumanMember, AIMember } from '../shared/types.ts';
+import {
+    HumanMember,
+    AIMember,
+    type IdentityPiiEntity,
+    type MembershipEntity,
+} from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
     HumanMemberDetailPresenter,
@@ -102,7 +108,21 @@ function makeHumanMember() {
             email: 'sarah@example.com',
             phone: '555-0100',
             bio: 'Builds things.',
+            message: responseMessage<IdentityPiiEntity>({
+                id: 'hw_1',
+                name: 'Sarah Chen',
+                email: 'sarah@example.com',
+                phone: '555-0100',
+                bio: 'Builds things.',
+            }),
         },
+        responseMessage<MembershipEntity>({
+            id: 'hw_1',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'hw_1',
+            type: 'member',
+            at: '2026-01-01T00:00:00.000000Z',
+        }),
     );
 }
 

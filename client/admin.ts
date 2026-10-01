@@ -5,6 +5,8 @@ import {
     type MembershipEntity,
 } from '../shared/types.ts';
 import { byAtThenIdAscending } from '../shared/identifier.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     getOrganization as fetchOrganization,
     putOrganization,
@@ -28,7 +30,7 @@ export async function getOrganizationEntity(
 
 export async function getOrganizationSeats(
     ctx: RequestContext,
-): Promise<MembershipEntity[]> {
+): Promise<HttpMessage<MembershipEntity>[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
     if (organization === undefined) {
@@ -41,8 +43,9 @@ export async function getOrganizationSeats(
     return (await ctx.GETCollection<MembershipEntity>(
         'organizations/' + organization
             + '/members/',
-    )).map((m) => m.body().toValue())
-        .toSorted(byAtThenIdAscending);
+    )).toSorted((a, b) => byAtThenIdAscending(
+        a.body().toValue(), b.body().toValue(),
+    ));
 }
 
 export interface OrganizationStats {
@@ -59,7 +62,7 @@ export interface OrganizationStats {
 // reader and the entities it counts.
 export async function getOrganizationStats(
     ctx: RequestContext,
-    seatsP?: Promise<readonly MembershipEntity[]>,
+    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
 ): Promise<OrganizationStats> {
     const [projects, ideaMessages, activePeopleCount] =
         await Promise.all([
@@ -67,7 +70,7 @@ export async function getOrganizationStats(
             getIdeaEntities(ctx),
             seatsP !== undefined
                 ? seatsP.then(seats => new Set(
-                    seats.map(m => m.identity_id),
+                    seats.map(m => m.body().toValue().identity_id),
                 ).size)
                 : getHumanMembers(ctx).then(
                     humans => humans.length,

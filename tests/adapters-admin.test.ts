@@ -32,8 +32,10 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { deleteHumanMemberSeat } from
-    '../client/members.ts';
+import {
+    deleteHumanMemberSeat,
+    getHumanMember,
+} from '../client/members.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 function buildProject(
@@ -267,7 +269,9 @@ Deno.test(
         await seedIdea(
             ctx, generateIdentifier(), 'active', leaverId,
         );
-        await deleteHumanMemberSeat(ctx, leaverId);
+        await deleteHumanMemberSeat(
+            ctx, await getHumanMember(ctx, leaverId),
+        );
         const stats = await getOrganizationStats(ctx);
         assertStrictEquals(stats.ideasCurrent, 1);
         assertStrictEquals(stats.activePeopleCount, 1);
@@ -289,7 +293,7 @@ async () => {
     );
     assertEquals(
         (await getOrganizationSeats(ctx))
-            .map((seat) => seat.identity_id)
+            .map((seat) => seat.body().toValue().identity_id)
             .filter((id) => id === earlier || id === later),
         [earlier, later],
     );

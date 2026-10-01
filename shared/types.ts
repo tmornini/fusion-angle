@@ -641,7 +641,9 @@ export interface IdentityProviderEntity {
 // The person-PII display facet as a tagged union, so the
 // ABSENCE of the row (erased PII) is represented without
 // null and DECIDED AT THE CALL SITE. Presenters switch on
-// `erased` and supply their own fallback constant.
+// `erased` and supply their own fallback constant. Present
+// PII keeps the message it was read from, so a write over
+// it names the head it replaces.
 export type MemberPii =
     | {
         readonly erased: false;
@@ -649,6 +651,7 @@ export type MemberPii =
         readonly email: string;
         readonly phone: string;
         readonly bio: string;
+        readonly message: HttpMessage<IdentityPiiEntity>;
     }
     | { readonly erased: true };
 
@@ -717,6 +720,9 @@ export type HumanProfile =
 
 export class HumanMember {
     readonly kind = 'human' as const;
+    // The seat this member was read through: its removal
+    // names the head it replaces.
+    readonly seat: HttpMessage<MembershipEntity>;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
     readonly #profile: HumanProfile;
@@ -725,7 +731,9 @@ export class HumanMember {
         parent: MemberEntity,
         profile: HumanProfile,
         pii: MemberPii,
+        seat: HttpMessage<MembershipEntity>,
     ) {
+        this.seat = seat;
         this.#id = parent.id;
         this.#pii = pii;
         this.#profile = profile;

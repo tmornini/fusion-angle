@@ -5,6 +5,8 @@ import {
     SYSTEM_MEMBER_ID,
     nowUtc,
     type Id,
+    type IdentityPiiEntity,
+    type MembershipEntity,
 } from '../shared/types.ts';
 import {
     getModelsByProvider,
@@ -23,6 +25,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 
 // The catalog's first model — the fixture default.
 export function firstProviderModel() {
@@ -64,16 +67,29 @@ export function makeHumanMember(
     id: string,
     name: string,
 ): HumanMember {
+    const pii = {
+        name,
+        email: `${id}@example.com`.toLowerCase(),
+        phone: '',
+        bio: '',
+    };
     return new HumanMember(
         memberParentEntity(id, 'human'),
         { present: true, ...humanDetail() },
         {
             erased: false,
-            name,
-            email: `${id}@example.com`.toLowerCase(),
-            phone: '',
-            bio: '',
+            ...pii,
+            message: responseMessage<IdentityPiiEntity>({
+                id, ...pii,
+            }),
         },
+        responseMessage<MembershipEntity>({
+            id,
+            organization_id: MEMBER_ORGANIZATION,
+            identity_id: id,
+            type: 'member',
+            at: '2026-01-01T00:00:00.000000Z',
+        }),
     );
 }
 

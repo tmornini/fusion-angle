@@ -5,6 +5,8 @@ import type {
 } from '../shared/types.ts';
 import { AIMember } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
@@ -114,27 +116,32 @@ export async function getAIMember(
     );
 }
 
-export async function getAIMemberEntity(
+export function getAIMemberEntity(
     ctx: RequestContext,
     id: MemberId,
-): Promise<AIAgentEntity> {
-    return (await ctx.GET<AIAgentEntity>(
-        `ai-agents/${id}`,
-    )).body().toValue();
+): Promise<HttpMessage<AIAgentEntity>> {
+    return ctx.GET<AIAgentEntity>(`ai-agents/${id}`);
 }
 
+// A save from the held agent names the head it replaces,
+// so a write over a newer head is refused rather than lost.
 export async function putAIMember(
     ctx: RequestContext,
-    id: MemberId,
+    held: HttpMessage<AIAgentEntity>,
     input: AIMemberDraft,
-): Promise<void> {
-    await ctx.PUT(`ai-agents/${id}`, {
-        name: input.name,
-        description: input.description,
-        skill_focus: input.skill_focus,
-        model: input.model,
-    });
+): Promise<HttpMessage<AIAgentEntity>> {
+    const saved = await ctx.PUT<AIAgentEntity>(
+        `ai-agents/${held.body().toValue().id}`,
+        {
+            name: input.name,
+            description: input.description,
+            skill_focus: input.skill_focus,
+            model: input.model,
+        },
+        [held],
+    );
     aiMemberChanges.notify();
+    return saved;
 }
 
 export async function postAIMemberCreation(
