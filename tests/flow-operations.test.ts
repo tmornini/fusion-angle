@@ -1366,6 +1366,52 @@ Deno.test(
     }),
 );
 
+// A fast second undo latches the head the first one made,
+// without waiting for the bell's refetch (spec §9).
+Deno.test(
+    'a second undo latches the first\'s post-undo head',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await setupFlow();
+        await seedCurrentGraph(ctx, [buildNode(NODE_A)]);
+        await seedCurrentGraph(ctx, [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+        ]);
+        const currentNodes = [
+            buildNode(NODE_A),
+            buildNode(NODE_B),
+            buildNode(NODE_C),
+        ];
+        await seedCurrentGraph(ctx, currentNodes);
+        const snap = snapFrom(buildGraph(currentNodes));
+        const { ctx: recorded, sent } = recordedContext(
+            db, DEV_TOKEN,
+        );
+        const held = await getFlowGraph(recorded, FLOW_ID);
+        const first = await performUndo(
+            recorded, snap, buildFlowHistorySnapshot(true),
+            held.message,
+        );
+        assertStrictEquals(first.kind, 'ok');
+        if (first.kind !== 'ok') return;
+        sent.length = 0;
+        const second = await performUndo(
+            recorded, first.freshSnap, first.newHistory,
+            first.message,
+        );
+        assertStrictEquals(second.kind, 'ok');
+        assertEquals(
+            sent.filter((r) => r.method === 'POST')
+                .map((r) => r.ifMatch),
+            [first.message.query('header.etag').toText()],
+        );
+        assertEquals(
+            sent.findIndex((r) => r.method === 'POST'),
+            0,
+        );
+    }),
+);
+
 Deno.test(
     'performUndo: keeps the panel open on a'
     + ' surviving node and restores memberIds',

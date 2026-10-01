@@ -643,6 +643,14 @@ export interface HistoryOpOk {
     readonly newHistory: FlowHistorySnapshot;
 }
 
+// The head the designer holds after an undo: the post-undo
+// read, or the held message untouched when there was nothing
+// to undo. The next undo latches it without waiting for the
+// bell's refetch (spec §9).
+export interface UndoOpOk extends HistoryOpOk {
+    readonly message: HttpMessage<FlowWithGraph>;
+}
+
 function selectionSurvivesRestore(
     selection: FlowSnapshot[
         'interaction'
@@ -775,7 +783,7 @@ export async function performUndo(
     snap: FlowSnapshot,
     history: FlowHistorySnapshot,
     held: HttpMessage<FlowWithGraph>,
-): Promise<OpResult<HistoryOpOk>> {
+): Promise<OpResult<UndoOpOk>> {
     const locked = requireFlowNotLocked(snap);
     if (locked) return locked;
     // Undo-as-replay (Phase 14 Task 8): exhaustion is a CLIENT-
@@ -792,6 +800,7 @@ export async function performUndo(
             kind: 'ok',
             freshSnap: snap,
             newHistory: history,
+            message: held,
         };
     }
     const stagedHistory = appendToRedoStack(
@@ -835,6 +844,7 @@ export async function performUndo(
         kind: 'ok',
         freshSnap: applyServerGraph(snap, graph),
         newHistory,
+        message: graph.message,
     };
 }
 
