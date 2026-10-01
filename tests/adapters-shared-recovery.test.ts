@@ -698,6 +698,11 @@ Deno.test(
                         return Promise.reject(
                             new UnauthorizedError(
                                 'invalid_token',
+                                responseMessage(
+                                    { error: 'invalid_token' },
+                                    {},
+                                    401,
+                                ),
                             ),
                         );
                     }

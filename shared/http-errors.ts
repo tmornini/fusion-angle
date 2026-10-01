@@ -1,3 +1,5 @@
+import type { HttpMessage } from './http-message/http-message.ts';
+
 export class ApiError {
     readonly message: string;
     readonly status: number;
@@ -18,11 +20,13 @@ export class ApiError {
 // see it; `reason` carries the gate's message verbatim.
 export class UnauthorizedError extends Error {
     readonly reason: string;
+    readonly response: HttpMessage;
 
-    constructor(reason: string) {
+    constructor(reason: string, response: HttpMessage) {
         super(reason);
         this.name = 'UnauthorizedError';
         this.reason = reason;
+        this.response = response;
     }
 }
 
@@ -33,11 +37,17 @@ export class UnauthorizedError extends Error {
 // `instanceof Error` still see it; `status` carries the HTTP code.
 export class RequestError extends Error {
     readonly status: number;
+    readonly response: HttpMessage;
 
-    constructor(message: string, status: number) {
+    constructor(
+        message: string,
+        status: number,
+        response: HttpMessage,
+    ) {
         super(message);
         this.name = 'RequestError';
         this.status = status;
+        this.response = response;
     }
 }
 

@@ -18,6 +18,7 @@ import {
     HTTP_FORBIDDEN,
 } from '../shared/http-errors.ts';
 import { HumanMember } from '../shared/types.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import {
     HumanMemberDetailPresenter,
     type SeatRemoval,
@@ -306,7 +307,13 @@ Deno.test(
     () => {
         assertStrictEquals(
             isAbsentMember(
-                new RequestError('Not found', HTTP_NOT_FOUND),
+                new RequestError(
+                    'Not found',
+                    HTTP_NOT_FOUND,
+                    responseMessage(
+                        { error: 'Not found' }, {}, HTTP_NOT_FOUND,
+                    ),
+                ),
             ),
             true,
         );
@@ -317,7 +324,11 @@ Deno.test(
     'a removed seat is absent, as a missing member is',
     () => {
         assertStrictEquals(
-            isAbsentMember(new RequestError('Gone', HTTP_GONE)),
+            isAbsentMember(new RequestError(
+                'Gone',
+                HTTP_GONE,
+                responseMessage({ error: 'Gone' }, {}, HTTP_GONE),
+            )),
             true,
         );
     },
@@ -328,7 +339,13 @@ Deno.test(
     () => {
         assertStrictEquals(
             isAbsentMember(
-                new RequestError('Forbidden', HTTP_FORBIDDEN),
+                new RequestError(
+                    'Forbidden',
+                    HTTP_FORBIDDEN,
+                    responseMessage(
+                        { error: 'Forbidden' }, {}, HTTP_FORBIDDEN,
+                    ),
+                ),
             ),
             false,
         );

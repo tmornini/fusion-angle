@@ -938,6 +938,7 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
         session.putSessionToken('pre-accept');
         const refused = new UnauthorizedError(
             'invalid_grant',
+            responseMessage({ error: 'invalid_grant' }, {}, 401),
         );
         const recording: RequestContext = {
             ...sarah,

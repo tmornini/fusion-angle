@@ -86,10 +86,10 @@ export function refusedDoor(
         }
     }
     if (status === 401) {
-        return new UnauthorizedError(error);
+        return new UnauthorizedError(error, answered);
     }
     return new RequestError(
-        error + ' ()', status,
+        error + ' ()', status, answered,
     );
 }
 

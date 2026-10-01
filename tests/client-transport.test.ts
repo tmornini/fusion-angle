@@ -105,3 +105,24 @@ Deno.test('an unauthenticated POST answers whatever it was'
     );
     assertStrictEquals(message.query('status').toNumber(), 401);
 });
+
+Deno.test('an error carries the response it was answered',
+async () => {
+    const facade = createHttpFacade('http://x', scripted(() =>
+        Response.json(
+            { error: 'If-Match does not match' },
+            { status: 412, headers: { etag: '"NewHead"' } },
+        )))(NO_SESSION);
+    const error = await assertRejects(
+        () => facade.PUT('ideas/a', {}, 't'),
+        RequestError,
+        'If-Match does not match',
+    );
+    assertStrictEquals(
+        error.response.query('header.etag').toText(),
+        '"NewHead"',
+    );
+    assertStrictEquals(
+        error.response.query('status').toNumber(), 412,
+    );
+});

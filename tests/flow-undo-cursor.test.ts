@@ -39,6 +39,7 @@ import {
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { inPageContext } from './in-page-facade.ts';
+import { responseMessage } from './fixtures/response-message.ts';
 import { sessionContext } from '../web-app/app/client.ts';
 import {
     postFlowCreation,
@@ -473,6 +474,11 @@ Deno.test(
                         return Promise.reject(
                             new RequestError(
                                 'stale head', 412,
+                                responseMessage(
+                                    { error: 'stale head' },
+                                    {},
+                                    412,
+                                ),
                             ),
                         );
                     }

@@ -98,9 +98,9 @@ async function messageOf<T>(
 }
 
 // A 2xx is the message; anything else throws, its text
-// the content's `error` as today (Task 25 gives the error
-// the message it was answered). What a body that is not
-// JSON does stays with the retries bullet.
+// the content's `error`, carrying the message it was
+// answered. What a body that is not JSON does stays with
+// the retries bullet.
 async function answered<T>(
     response: Response,
 ): Promise<HttpMessage<T>> {
@@ -108,11 +108,12 @@ async function answered<T>(
     if (response.ok) return message;
     const error = message.query('body.error').toText();
     if (response.status === HTTP_UNAUTHORIZED) {
-        throw new UnauthorizedError(error);
+        throw new UnauthorizedError(error, message);
     }
     throw new RequestError(
         `${error} (${response.url})`,
         response.status,
+        message,
     );
 }
 
