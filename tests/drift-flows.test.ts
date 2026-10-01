@@ -326,7 +326,7 @@ type ServedFlowBody = { id: string } & Record<string, unknown>;
 
 // The list's part bodies, each part its head's stored
 // response served.
-async function wireFlowsText(
+async function wireFlowBodies(
     db: MemoryDbAdapter,
     organization: string,
 ): Promise<ServedFlowBody[]> {
@@ -430,7 +430,7 @@ async () => {
     const db = await seededDb();
     for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
         , 'BBjWJsjYIDkTRKIIPrzWRw']) {
-        const bodies = await wireFlowsText(db, organization);
+        const bodies = await wireFlowBodies(db, organization);
         const derived = await deriveFlows(db, organization);
         // Each stored body, read as its document, derives to
         // the derive's row (see assertWireEqualsDerived).
@@ -769,7 +769,7 @@ Deno.test('live-write chain: create, save, node delete, undo, '
     assertStrictEquals(
         derivedList.some((f) => f.id === flowId), false,
     );
-    const listBodies = await wireFlowsText(
+    const listBodies = await wireFlowBodies(
         db, STARK_ORGANIZATION,
     );
     assertStrictEquals(
