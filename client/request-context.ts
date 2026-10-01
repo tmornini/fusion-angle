@@ -234,11 +234,6 @@ function openRequestContext(
     function writeHeaders(
         extra?: HeaderFields,
     ): HeaderFields {
-        if (extra?.some(([name]) =>
-            name.toLowerCase() === OPERATION_ID_HEADER
-        )) {
-            return extra;
-        }
         return [
             [OPERATION_ID_HEADER, operationId],
             ...(extra ?? []),
