@@ -12,3 +12,8 @@ Deno.test('codes are unique and sorted', () => {
     assertEquals(codes, [...codes].sort((a, b) => a - b));
     assertStrictEquals(new Set(codes).size, codes.length);
 });
+
+Deno.test('410 is the one Gone shape', () => {
+    const row = STATUS_DOCUMENTS.find((d) => d.code === 410);
+    assertEquals(row?.body, { error: 'Gone: table/id' });
+});
