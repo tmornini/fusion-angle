@@ -187,7 +187,7 @@ Deno.test('a seat removal latches the held seat', async () => {
     sent.length = 0;
     await deleteHumanMemberSeat(ctx, member);
     assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
-        ['DELETE', member.seat.query('header.etag').toText()],
+        ['DELETE', member.membership.query('header.etag').toText()],
     ]);
 });
 

@@ -85,7 +85,7 @@ export async function fillHumanMemberPii(
             },
             member.profile(),
             pii,
-            member.seat,
+            member.membership,
         );
     }));
 }
@@ -111,7 +111,7 @@ export async function fillHumanMemberProfile(
                 { id, type: 'human' },
                 profile,
                 member.pii(),
-                member.seat,
+                member.membership,
             );
         } catch (error) {
             if (error instanceof RequestError

@@ -718,7 +718,7 @@ export class HumanMember {
     readonly kind = 'human' as const;
     // The seat this member was read through: its removal
     // names the head it replaces.
-    readonly seat: HttpMessage<SeatEntity>;
+    readonly membership: HttpMessage<SeatEntity>;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
     readonly #profile: HumanProfile;
@@ -727,9 +727,9 @@ export class HumanMember {
         parent: MemberEntity,
         profile: HumanProfile,
         pii: MemberPii,
-        seat: HttpMessage<SeatEntity>,
+        membership: HttpMessage<SeatEntity>,
     ) {
-        this.seat = seat;
+        this.membership = membership;
         this.#id = parent.id;
         this.#pii = pii;
         this.#profile = profile;

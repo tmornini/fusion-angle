@@ -118,7 +118,7 @@ export async function getHumanMemberMap(
                     seatedHumanParent(id),
                     { present: false },
                     pii,
-                    member.seat,
+                    member.membership,
                 ),
             ] as const;
         }),
@@ -271,7 +271,7 @@ export async function deleteHumanMemberSeat(
 ): Promise<void> {
     await ctx.DELETE(
         seatsCollection(ctx) + member.idForLink(),
-        [member.seat],
+        [member.membership],
     );
     humanMemberChanges.notify();
 }
