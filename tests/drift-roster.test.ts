@@ -11,7 +11,7 @@ import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
-    MembershipEntity,
+    SeatEntity,
 } from '../shared/types.ts';
 import { nowUtc } from
     '../shared/types.ts';
@@ -117,13 +117,13 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 async function derivedMemberships(
     db: DbAdapter, organization: Id,
-): Promise<MembershipEntity[]> {
+): Promise<SeatEntity[]> {
     return deriveOrganizationMemberSeats(db, organization);
 }
 
 async function derivedMembership(
     db: DbAdapter, organization: Id, id: Id,
-): Promise<MembershipEntity> {
+): Promise<SeatEntity> {
     return deriveOrganizationMemberSeat(db, organization, id);
 }
 
@@ -162,7 +162,7 @@ async () => {
     const stark = await deriveOrganizationMemberSeats(
         db, STARK_ORGANIZATION,
     );
-    const starkParts = await partsOf<MembershipEntity>(resStark);
+    const starkParts = await partsOf<SeatEntity>(resStark);
     await assertPartsAreHeads(db, starkParts, { sees: 'whole' });
     assertEquals(
         sortById(starkParts.map((part) => part.body().toValue())),
@@ -185,7 +185,7 @@ async () => {
     const org2 = await deriveOrganizationMemberSeats(
         db, ORGANIZATION_TWO,
     );
-    const twoParts = await partsOf<MembershipEntity>(resTwo);
+    const twoParts = await partsOf<SeatEntity>(resTwo);
     await assertPartsAreHeads(db, twoParts, { sees: 'whole' });
     assertEquals(
         sortById(twoParts.map((part) => part.body().toValue())),
@@ -229,7 +229,7 @@ Deno.test('per-seat GET wire equals derive (all 12); missing-'
             db, membership.organization_id, membership.id,
         );
         assertStrictEquals(derived.id, membership.id);
-        const wire = await res.json() as MembershipEntity;
+        const wire = await res.json() as SeatEntity;
         assertStrictEquals(wire.id, derived.id);
         assertStrictEquals(
             wire.organization_id, derived.organization_id,
@@ -402,7 +402,7 @@ Deno.test('seat collection counts per org; current identity;'
         ),
     );
     assertStrictEquals(resStark.status, 200);
-    const rosterParts = await partsOf<MembershipEntity>(resStark);
+    const rosterParts = await partsOf<SeatEntity>(resStark);
     await assertPartsAreHeads(db, rosterParts, { sees: 'whole' });
     assertEquals(
         sortById(rosterParts.map((part) => part.body().toValue())),

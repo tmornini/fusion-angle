@@ -718,7 +718,7 @@ export class HumanMember {
     readonly kind = 'human' as const;
     // The seat this member was read through: its removal
     // names the head it replaces.
-    readonly seat: HttpMessage<MembershipEntity>;
+    readonly seat: HttpMessage<SeatEntity>;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
     readonly #profile: HumanProfile;
@@ -727,7 +727,7 @@ export class HumanMember {
         parent: MemberEntity,
         profile: HumanProfile,
         pii: MemberPii,
-        seat: HttpMessage<MembershipEntity>,
+        seat: HttpMessage<SeatEntity>,
     ) {
         this.seat = seat;
         this.#id = parent.id;
@@ -1368,7 +1368,7 @@ export type MembershipType = 'admin' | 'member';
 // member.id === identity.id stays global (one profile, many
 // memberships). Not a pure join: `type` is a privilege
 // attribute of the relationship.
-export interface MembershipEntity {
+export interface SeatEntity {
     id: Id;
     organization_id: Id;
     identity_id: Id;

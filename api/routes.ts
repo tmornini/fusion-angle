@@ -36,7 +36,7 @@ import type {
     ProjectObjectiveActualScoreEntity,
     RecordEntity,
     RecordAttributeEntity,
-    MembershipEntity,
+    SeatEntity,
     IdentityProviderEntity,
     WorkOrderFlowGraph,
     MessagePairEntity,
@@ -697,7 +697,7 @@ export function route(
 // actually exist, not only the ones a test happened to seed.
 async function membershipsAcrossAllOrganizations(
     db: DbAdapter, _actor: Id,
-): Promise<MembershipEntity[]> {
+): Promise<SeatEntity[]> {
     const organizations = await deriveOrganizations(db);
     const perOrganization = await Promise.all(
         organizations.map((organization) =>
@@ -718,7 +718,7 @@ async function membershipsAcrossAllOrganizations(
 // (orphan, visible), the bound org (co-member, visible), or a
 // DIFFERENT org (foreign, hidden).
 function ownerOrganizationViaMembershipPairPlane(
-    memberships: readonly MembershipEntity[],
+    memberships: readonly SeatEntity[],
     identityId: Id,
     boundOrganization: Id,
 ): Id | null {
@@ -2522,9 +2522,9 @@ export async function postMembershipDocumentOp(
     body: Record<string, unknown>,
     _actor: Id,
     messagePair?: MessagePair,
-): Promise<Omit<MembershipEntity, 'id'>> {
+): Promise<Omit<SeatEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
-        Omit<MembershipEntity, 'id'>;
+        Omit<SeatEntity, 'id'>;
     // Phase Final Task 2: memberships ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(

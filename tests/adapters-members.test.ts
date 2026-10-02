@@ -29,7 +29,7 @@ import {
 } from '../client/members.ts';
 import {
     type HumanMember,
-    type MembershipEntity,
+    type SeatEntity,
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -266,7 +266,7 @@ Deno.test('buildHumanMemberMap takes the seats in grant order',
     const later = generateIdentifier();
     const earlier = generateIdentifier();
     const seat = (identity: string, at: string) =>
-        responseMessage<MembershipEntity>({
+        responseMessage<SeatEntity>({
             id: generateIdentifier(),
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: identity, type: 'member', at,

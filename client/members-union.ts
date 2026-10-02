@@ -1,7 +1,7 @@
 import type {
     MemberId,
     Member,
-    MembershipEntity,
+    SeatEntity,
     AIAgentEntity,
     FormerSeatEntity,
 } from '../shared/types.ts';
@@ -47,9 +47,9 @@ export async function getMembers(
     const [seats, agents] = await Promise.all([
         organization === undefined
             ? Promise.resolve(
-                [] as HttpMessage<MembershipEntity>[],
+                [] as HttpMessage<SeatEntity>[],
             )
-            : ctx.GETCollection<MembershipEntity>(
+            : ctx.GETCollection<SeatEntity>(
                 'organizations/' + organization
                     + '/members/',
             ),

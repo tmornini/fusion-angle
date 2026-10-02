@@ -6,7 +6,7 @@ import type {
     HumanProfile,
     IdentityPiiEntity,
     MemberPii,
-    MembershipEntity,
+    SeatEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -80,7 +80,7 @@ function seatedHumanParent(
 // The roster serves in write order; the members page and
 // the palette's featured six read the seats in grant order.
 export function buildHumanMemberMap(
-    seats: readonly HttpMessage<MembershipEntity>[],
+    seats: readonly HttpMessage<SeatEntity>[],
 ): Map<MemberId, HumanMember> {
     const map = new Map<MemberId, HumanMember>();
     const granted = seats.toSorted((a, b) => byAtThenIdAscending(
@@ -105,7 +105,7 @@ export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
     const map = buildHumanMemberMap(
-        await ctx.GETCollection<MembershipEntity>(
+        await ctx.GETCollection<SeatEntity>(
             seatsCollection(ctx),
         ),
     );
@@ -155,7 +155,7 @@ export async function getHumanMember(
 ): Promise<HumanMember> {
     const [seat, identity, pii] =
         await Promise.all([
-            ctx.GET<MembershipEntity>(
+            ctx.GET<SeatEntity>(
                 seatsCollection(ctx) + id,
             ),
             ctx.GET<IdentityEntity>(
@@ -279,7 +279,7 @@ export async function deleteHumanMemberSeat(
 export async function getAdminSeatIds(
     ctx: RequestContext,
 ): Promise<MemberId[]> {
-    const seats = (await ctx.GETCollection<MembershipEntity>(
+    const seats = (await ctx.GETCollection<SeatEntity>(
         seatsCollection(ctx),
     )).map((m) => m.body().toValue());
     return seats

@@ -67,7 +67,7 @@ Deno.test('validateMembershipDocumentBody rejects a stray key with'
     }
     assertStrictEquals(
         documentMessage,
-        'unexpected key "bogus" for MembershipEntity',
+        'unexpected key "bogus" for SeatEntity',
     );
     assertStrictEquals(documentMessage, entityMessage);
 });
@@ -97,7 +97,7 @@ Deno.test('validateMembershipDocumentBody rejects each missing key,'
         assertStrictEquals(
             documentMessage,
             'missing required key "' + key
-                + '" for MembershipEntity',
+                + '" for SeatEntity',
         );
         assertStrictEquals(documentMessage, entityMessage);
     }

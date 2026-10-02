@@ -6,7 +6,7 @@ import {
     nowUtc,
     type Id,
     type IdentityPiiEntity,
-    type MembershipEntity,
+    type SeatEntity,
 } from '../shared/types.ts';
 import {
     getModelsByProvider,
@@ -83,7 +83,7 @@ export function makeHumanMember(
                 id, ...pii,
             }),
         },
-        responseMessage<MembershipEntity>({
+        responseMessage<SeatEntity>({
             id,
             organization_id: MEMBER_ORGANIZATION,
             identity_id: id,

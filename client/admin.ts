@@ -2,7 +2,7 @@ import {
     ideaIsVisible,
     assertIdeaState,
     type OrganizationEntity,
-    type MembershipEntity,
+    type SeatEntity,
 } from '../shared/types.ts';
 import { byAtThenIdAscending } from '../shared/identifier.ts';
 import type { HttpMessage } from
@@ -30,7 +30,7 @@ export function getOrganizationEntity(
 
 export async function getOrganizationSeats(
     ctx: RequestContext,
-): Promise<HttpMessage<MembershipEntity>[]> {
+): Promise<HttpMessage<SeatEntity>[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
     if (organization === undefined) {
@@ -40,7 +40,7 @@ export async function getOrganizationSeats(
     // grant order, the one order a seat list has (see
     // buildHumanMemberMap), though today's readers only
     // count them.
-    return (await ctx.GETCollection<MembershipEntity>(
+    return (await ctx.GETCollection<SeatEntity>(
         'organizations/' + organization
             + '/members/',
     )).toSorted((a, b) => byAtThenIdAscending(
@@ -62,7 +62,7 @@ export interface OrganizationStats {
 // reader and the entities it counts.
 export async function getOrganizationStats(
     ctx: RequestContext,
-    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
+    seatsP?: Promise<readonly HttpMessage<SeatEntity>[]>,
 ): Promise<OrganizationStats> {
     const [projects, ideaMessages, activePeopleCount] =
         await Promise.all([

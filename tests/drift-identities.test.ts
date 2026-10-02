@@ -16,7 +16,7 @@ import type {
     Id,
     IdentityCredentialEntity,
     IdentityPiiEntity,
-    MembershipEntity,
+    SeatEntity,
 } from '../shared/types.ts';
 import { nowUtc } from
     '../shared/types.ts';
@@ -231,7 +231,7 @@ async function derivedIdentity(
 
 async function pairPlaneMembershipsAcrossKnownOrganizations(
     db: DbAdapter,
-): Promise<MembershipEntity[]> {
+): Promise<SeatEntity[]> {
     const perOrganization = await Promise.all(
         [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
             (organization) =>
@@ -249,7 +249,7 @@ async function pairPlaneMembershipsAcrossKnownOrganizations(
 // visible), the bound org (co-member, visible), or a DIFFERENT
 // org (foreign, hidden).
 function pairPlaneOwnerOrganization(
-    memberships: readonly MembershipEntity[],
+    memberships: readonly SeatEntity[],
     identityId: Id,
     boundOrganization: Id,
 ): Id | null {

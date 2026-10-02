@@ -20,7 +20,7 @@ import {
 import {
     HumanMember,
     type IdentityPiiEntity,
-    type MembershipEntity,
+    type SeatEntity,
 } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import {
@@ -300,7 +300,7 @@ Deno.test(
                     bio: 'Ships things.',
                 }),
             },
-            responseMessage<MembershipEntity>({
+            responseMessage<SeatEntity>({
                 id: 'hw_1',
                 organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 identity_id: 'hw_1',

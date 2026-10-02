@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type {
     Id,
-    MembershipEntity,
+    SeatEntity,
     FormerSeatEntity,
     OrganizationEntity,
 } from '../shared/types.ts';
@@ -100,7 +100,7 @@ import { latestByKey } from '../shared/ledger-reduction.ts';
 // transaction of its own.
 //
 // Reads db.messagePairs (+ pickString/validate-
-// MembershipEntity over their decoded bodies) ONLY — never
+// SeatEntity over their decoded bodies) ONLY — never
 // db.memberships, the row-plane table Task 3 retires this
 // derivation to replace.
 
@@ -125,7 +125,7 @@ function seatStateOf(
 export function seatEntityOf(
     document: DerivedDocument,
     organization: Id,
-): MembershipEntity {
+): SeatEntity {
     const body = validateSeatDocumentBody(
         seatStateOf(document.body),
     );
@@ -139,7 +139,7 @@ export function seatEntityOf(
         // stamps a DIFFERENT `at` on top of this entity —
         // the message pair's own arrival time
         // (versionSnapshotsAt, document-family.ts). Same
-        // name, different fact — see MembershipEntity.at
+        // name, different fact — see SeatEntity.at
         // (api/types.ts) and the pin at
         // tests/api-versions-etag.test.ts ('member versions
         // at is the ledger arrival time, not the seat grant
@@ -159,11 +159,11 @@ export async function deriveMembershipsForIdentity(
     db: DbAdapter,
     identityId: Id,
     organizations?: readonly OrganizationEntity[],
-): Promise<MembershipEntity[]> {
+): Promise<SeatEntity[]> {
     const run = async (
         view: DbAdapter,
         orgs: readonly OrganizationEntity[],
-    ): Promise<MembershipEntity[]> => {
+    ): Promise<SeatEntity[]> => {
         const perSeat = await Promise.all(
             orgs.map(async (organization) => {
                 const seatPrefix = seatsPrefixFor(
@@ -184,7 +184,7 @@ export async function deriveMembershipsForIdentity(
                     );
             }),
         );
-        const rows: MembershipEntity[] = [];
+        const rows: SeatEntity[] = [];
         for (const row of perSeat) {
             if (row !== null) rows.push(row);
         }
@@ -224,12 +224,12 @@ export async function membershipExistsFor(
 export async function deriveOrganizationMemberSeats(
     db: DbAdapter,
     organization: Id,
-): Promise<MembershipEntity[]> {
+): Promise<SeatEntity[]> {
     const prefix = seatsPrefixFor(organization);
     const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );
     const documents = deriveDocumentsAt(messagePairs, prefix);
-    const rows: MembershipEntity[] = [];
+    const rows: SeatEntity[] = [];
     for (const document of documents.values()) {
         rows.push(seatEntityOf(document, organization));
     }
@@ -240,7 +240,7 @@ export async function deriveOrganizationMemberSeat(
     db: DbAdapter,
     organization: Id,
     identityId: Id,
-): Promise<MembershipEntity> {
+): Promise<SeatEntity> {
     const prefix = seatsPrefixFor(organization);
     const messagePairs = await db.messagePairs.getCollectionPairs(prefix,
     );

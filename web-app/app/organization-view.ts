@@ -1,5 +1,5 @@
 import type {
-    MembershipEntity,
+    SeatEntity,
     OrganizationEntity,
 } from '../../shared/types.ts';
 import { formatCalendarDate } from './format.ts';
@@ -92,7 +92,7 @@ export class Organization {
 // so the count is the active org's slice.
 async function deriveOrganizationFacts(
     ctx: RequestContext,
-    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
+    seatsP?: Promise<readonly HttpMessage<SeatEntity>[]>,
 ): Promise<OrganizationDerived> {
     const seats = seatsP !== undefined
         ? await seatsP
@@ -107,7 +107,7 @@ async function deriveOrganizationFacts(
 
 export async function getOrganization(
     ctx: RequestContext,
-    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
+    seatsP?: Promise<readonly HttpMessage<SeatEntity>[]>,
 ): Promise<Organization> {
     const [message, derived] = await Promise.all([
         getOrganizationEntity(ctx),

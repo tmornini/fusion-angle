@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import type { Id, MembershipEntity } from '../shared/types.ts';
+import type { Id, SeatEntity } from '../shared/types.ts';
 import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import {
     deriveMembershipsForIdentity,
@@ -82,7 +82,7 @@ function allSeededIdentityIds(): readonly Id[] {
 // pairPlaneOwnerOrganization precedent, tests/drift-
 // identities.test.ts: mirror the algorithm, never the privacy).
 function primaryOrganizationOf(
-    rows: readonly MembershipEntity[],
+    rows: readonly SeatEntity[],
 ): Id | null {
     let best: { organization: Id; at: string } | null = null;
     for (const row of rows) {
