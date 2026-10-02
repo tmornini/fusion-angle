@@ -11,7 +11,10 @@ import {
 } from '../api/db-memory.ts';
 import { seededMockDb } from './mock-seed.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    seedAdminSchema,
+    seedOrganizationDocument,
+} from './test-fixtures.ts';
 import {
     apiRequest,
     assertPartIsDocumentGet,
@@ -27,10 +30,14 @@ import type { Reader } from '../api/served-response.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { landMembership } from './membership-fixtures.ts';
+import { deriveOrganizationMemberSeat } from
+    '../api/derive-memberships.ts';
 import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
     attemptFor,
+    canonicalPath,
     formWriteMessagePair,
     runWrite,
 } from '../api/message-pair.ts';
@@ -176,7 +183,7 @@ Deno.test('no credential part holds its secret', async () => {
 });
 
 Deno.test('an identity\'s organizations are the organizations'
-    + ' it holds a live seat in', async () => {
+    + ' it holds an accepted membership in', async () => {
     const db = await seededMockDb();
     const id = generateIdentifier();
     await seedPersonIdentity(db, id, {
@@ -218,6 +225,122 @@ async () => {
     }));
     assertStrictEquals(got.status, 204);
     assertStrictEquals(await got.text(), '');
+});
+
+Deno.test('an accepted membership with no seat lists'
+    + ' that organization', async () => {
+    const db = await seededMockDb();
+    const id = generateIdentifier();
+    await seedPersonIdentity(db, id, {
+        name: 'Member', email: id.toLowerCase() + '@example.com',
+        phone: '', bio: '',
+    });
+    await seedOrganizationDocument(db, STARK, 'Stark');
+    await landMembership(
+        db, STARK, id, 'accepted', 'member', AT,
+    );
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/' + id + '/organizations/',
+        token: await devToken(id),
+    }));
+    assertStrictEquals(got.status, 200);
+    const parts = await partsOf<{ id: string }>(got);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    assertEquals(
+        parts.map((part) => part.body().toValue().id),
+        [STARK],
+    );
+    await assertPartIsDocumentGet(
+        db, await organizationToken(id), parts[0]!,
+        '/organizations/' + STARK,
+    );
+});
+
+// seedSeat's accepted mirror, then a head that is not
+// accepted. The seat stays; the list does not keep it.
+const NON_ACCEPTED = [
+    'pending', 'declined', 'revoked', 'removed',
+] as const;
+
+for (const state of NON_ACCEPTED) {
+    Deno.test('a ' + state
+        + ' membership head lists no organization',
+    async () => {
+        const db = await seededMockDb();
+        const id = generateIdentifier();
+        await seedPersonIdentity(db, id, {
+            name: 'Head',
+            email: id.toLowerCase() + '@example.com',
+            phone: '', bio: '',
+        });
+        await seedOrganizationDocument(db, STARK, 'Stark');
+        await seedSeat(db, STARK, id, 'member');
+        await landMembership(
+            db, STARK, id, state, 'member',
+            '2026-07-01T00:00:00.000000Z',
+        );
+        const seat = await deriveOrganizationMemberSeat(
+            db, STARK, id,
+        );
+        assertStrictEquals(seat.type, 'member');
+        const got = await handleRequest(db, apiRequest({
+            method: 'GET',
+            path: '/identities/' + id + '/organizations/',
+            token: await devToken(id),
+        }));
+        assertStrictEquals(got.status, 204);
+        assertStrictEquals(await got.text(), '');
+    });
+}
+
+Deno.test('organizations follow head order, not'
+    + ' membership at', async () => {
+    const db = await seededMockDb();
+    const id = generateIdentifier();
+    await seedPersonIdentity(db, id, {
+        name: 'Ordered',
+        email: id.toLowerCase() + '@example.com',
+        phone: '', bio: '',
+    });
+    const heads = await db.messagePairs
+        .getCollectionHeadPairs(
+            canonicalPath(undefined, '/organizations/'),
+        );
+    const storeOrder = heads
+        .map((head) => head.name)
+        .filter((name) =>
+            name === STARK || name === ORGANIZATION_TWO
+        );
+    const leading = storeOrder[0];
+    const trailing = storeOrder[1];
+    assert(leading !== undefined);
+    assert(trailing !== undefined);
+    assert(leading !== trailing);
+    await landMembership(
+        db, leading, id, 'accepted', 'member',
+        '2026-06-01T00:00:00.000000Z',
+    );
+    await landMembership(
+        db, trailing, id, 'accepted', 'member',
+        '2026-01-01T00:00:00.000000Z',
+    );
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/' + id + '/organizations/',
+        token: await devToken(id),
+    }));
+    assertStrictEquals(got.status, 200);
+    const parts = await partsOf<{ id: string }>(got);
+    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    const ids = parts.map(
+        (part) => part.body().toValue().id,
+    );
+    assertEquals(ids, [leading, trailing]);
+    assert(
+        ids[0] !== trailing,
+        'parts follow organization heads, not at',
+    );
 });
 
 const FLOWS = '/organizations/' + STARK + '/flows/';

@@ -22,15 +22,15 @@ import {
     defaultOrganizationPrefix,
 } from './derive-default-organization.ts';
 import {
-    deriveMembershipsForIdentity,
-} from './derive-memberships.ts';
-import { membershipOf } from './memberships.ts';
+    membershipOf,
+    membershipsOfIdentity,
+} from './memberships.ts';
 import {
     validateDefaultOrganizationBody,
 } from './validators.ts';
 
 // GET /identities/:id/organizations/ — the organization
-// heads the path identity holds a live seat in. Self or
+// heads the path identity holds an accepted membership in. Self or
 // admin. Caller claims must not shape another identity's
 // list.
 export async function selectIdentityOrganizations(
@@ -56,13 +56,13 @@ export async function selectIdentityOrganizations(
             await view.messagePairs.getCollectionHeadPairs(
                 canonicalPath(undefined, '/organizations/'),
             );
-        const seats = new Set(
-            (await deriveMembershipsForIdentity(
+        const accepted = new Set(
+            (await membershipsOfIdentity(
                 view, identityId,
             )).map((membership) => membership.organization_id),
         );
         return wholeCollectionSelection(
-            heads.filter((head) => seats.has(head.name)),
+            heads.filter((head) => accepted.has(head.name)),
             'stateless',
         );
     });
