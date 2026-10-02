@@ -249,7 +249,6 @@ import {
     scoresUriPrefix,
 } from './derive-project-scores.ts';
 import {
-    deriveOrganizationMemberSeats,
     deriveOrganizationFormerSeats,
     seatsPrefixFor,
     seatEntityOf,
@@ -328,6 +327,7 @@ import {
     MEMBERSHIPS_PATH,
     membershipOfHead,
     membershipsOfIdentity,
+    organizationMembershipHeads,
 } from './memberships.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
@@ -5432,7 +5432,7 @@ export const routes: Route[] = [
             ),
         // The last admin seat cannot be removed: the actor
         // is authorized, the organization's state forbids.
-        // The admin seats are derived INSIDE the transaction
+        // The accepted admin memberships are derived INSIDE the transaction
         // — a row op. The refusal is thrown after it, the
         // invitations-domain shape.
         delete: async (
@@ -5443,10 +5443,16 @@ export const routes: Route[] = [
             const lastAdmin = await db.readTransaction(
                 async (view) => {
                     const admins = (
-                        await deriveOrganizationMemberSeats(
-                            view, fenced,
+                        await organizationMembershipHeads(
+                            view, fenced, {
+                                kind: 'state',
+                                state: 'accepted',
+                            },
                         )
-                    ).filter(seat => seat.type === 'admin');
+                    ).map(membershipOfHead).filter(
+                        (membership) =>
+                            membership.type === 'admin',
+                    );
                     return admins.length === 1
                         && admins[0]!.identity_id
                             === identityId;

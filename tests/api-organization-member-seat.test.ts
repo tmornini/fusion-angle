@@ -6,8 +6,10 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import { documentMessagePairsAt } from '../api/derive-documents.ts';
-import { membershipExistsFor } from
-    '../api/derive-memberships.ts';
+import {
+    deriveOrganizationMemberSeat,
+    membershipExistsFor,
+} from '../api/derive-memberships.ts';
 import { writeAuthorizerFor } from
     '../api/write-authorizer.ts';
 import { ORGANIZATION_TWO } from
@@ -31,6 +33,8 @@ import {
     presentedFields,
     invitationLatched,
 } from './http-fixtures.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
@@ -324,6 +328,37 @@ Deno.test('the last admin seat refuses removal', async () => {
         'GET', path, admin,
     ));
     assertStrictEquals(still.status, 200);
+});
+
+// The second admin's seat remains, but the membership
+// head is removed. One accepted admin is the last.
+Deno.test('a removed co-admin membership refuses the'
++ ' last admin seat', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const second = generateIdentifier();
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', second, 'admin', AT,
+    );
+    await landMembership(
+        db, 'AjdvjuECVZEgZoFajaIEkg', second,
+        'removed', 'admin', AT,
+    );
+    const seat = await deriveOrganizationMemberSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', second,
+    );
+    assertStrictEquals(seat.type, 'admin');
+    const admin = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
+    const path = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/members/XXZruirZyAOoRpNxaDnpSA';
+    const refused = await handleRequest(db, req(
+        'DELETE', path, admin,
+    ));
+    assertStrictEquals(refused.status, 409);
+    assertEquals(await refused.json(), {
+        error: 'the last admin seat cannot be removed',
+    });
 });
 
 Deno.test('an admin seat beside another admin is removable,'
