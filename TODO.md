@@ -3234,6 +3234,29 @@ Off the critical path; each with its oracle.
   fresh, so nothing stored migrates. Oracle: the root
   head's response parses as a JSON object whose `id` is
   `0000-root`, in both backends.
+- Test ids are identifiers, post-ship. Every id a
+  test stores or sends — an identity, an
+  organization, a document, an etag — is a canonical
+  identifier, the 22-character encoding of a UUID
+  (`isIdentifier` and `identifierOfUuidText` in
+  `shared/identifier.ts`). A short label is not one.
+  Witness: `the token sub is the caller identity`
+  (`tests/api-actor-from-token.test.ts`) seeded
+  `alice`, and `membershipsOfIdentity` rejected the
+  mirrored membership with "identity_id must be a
+  22-character identifier". That test now encodes
+  `6f0b9c1e-4a27-4d5b-8e31-7c9a2f10b6d4`. The suite
+  still mints tokens for `anonymous`
+  (`tests/adapters-authentication.test.ts`,
+  `tests/adapters-identity-providers.test.ts`) and
+  `agent-7`
+  (`tests/api-authentication-token.test.ts`).
+  Display names and search text stay words. This
+  waits until membership-and-versions has shipped.
+  It is not a pin inside that plan. Oracle: one test
+  walks the ids the suite stores and fails when
+  `isIdentifier` rejects one, with named exceptions
+  for display names and search text.
 
 ## Sequencing
 
