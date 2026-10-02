@@ -723,6 +723,18 @@ async function putMembership(
     const from = head === null
         ? null
         : membershipOfHead(head);
+    // Pending belongs to the email POST. An item PUT
+    // must not mint one.
+    if (request.state === 'pending') {
+        const fromState = from === null
+            ? 'none'
+            : from.state;
+        throw new ApiError(
+            'no transition from ' + fromState
+                + ' to pending for the ' + actorKind,
+            HTTP_CONFLICT,
+        );
+    }
     const outcome = membershipTransition(
         actorKind, parsed, from, request,
     );

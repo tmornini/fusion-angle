@@ -259,6 +259,111 @@ Deno.test('a grant on a pending head is 200 and stores'
     assertStrictEquals(await putCount(db, name), 1);
 });
 
+Deno.test('an admin pending PUT from none is 409'
++ ' and stores nothing', async () => {
+    const { db, admin } = await basis();
+    const invitee = await person(db, 'fresh@example.com');
+    const at = '2026-04-01T00:00:00.000000Z';
+    const name = membershipNameOf(ORG, invitee.id);
+    const before = (await db.messagePairs.getAll()).length;
+    const response = await handleRequest(db, req(
+        'PUT',
+        itemPath('organizations', ORG, name),
+        admin,
+        { state: 'pending', type: 'member', at },
+        { 'If-None-Match': '*' },
+    ));
+    await assertError(
+        response, 409,
+        'no transition from none to pending'
+            + ' for the admin',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+Deno.test('an admin pending PUT on a pending head is 409'
++ ' and a second grant stays 200', async () => {
+    const { db, admin } = await basis();
+    const invitee = await person(db, 'still@example.com');
+    const name = membershipNameOf(ORG, invitee.id);
+    const at = '2026-04-01T00:00:00.000000Z';
+    const granted = await grant(
+        db, admin, 'still@example.com', at,
+    );
+    assertStrictEquals(granted.status, 201);
+    assertEquals(
+        await membershipOf(granted),
+        expected(invitee.id, 'pending', at),
+    );
+    const before = (await db.messagePairs.getAll()).length;
+    const refused = await putState(
+        db, 'organizations', ORG, name, admin, {
+            state: 'pending',
+            type: 'member',
+            at: '2026-04-01T00:00:01.000000Z',
+        },
+    );
+    await assertError(
+        refused, 409,
+        'no transition from pending to pending'
+            + ' for the admin',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    const second = await grant(
+        db, admin, 'still@example.com',
+        '2026-04-02T00:00:00.000000Z',
+    );
+    assertStrictEquals(second.status, 200);
+    await second.body?.cancel();
+});
+
+Deno.test('an admin pending PUT on a declined head'
++ ' is 409 and the head stays declined', async () => {
+    const { db, admin } = await basis();
+    const invitee = await person(db, 'later@example.com');
+    const name = membershipNameOf(ORG, invitee.id);
+    const declineAt = '2026-04-01T00:00:01.000000Z';
+    const granted = await grant(
+        db, admin, 'later@example.com',
+        '2026-04-01T00:00:00.000000Z',
+    );
+    await granted.body?.cancel();
+    const declined = await putState(
+        db, 'identities', invitee.id, name, invitee.token, {
+            state: 'declined',
+            at: declineAt,
+        },
+    );
+    assertStrictEquals(declined.status, 200);
+    await declined.body?.cancel();
+    const refused = await putState(
+        db, 'organizations', ORG, name, admin, {
+            state: 'pending',
+            type: 'member',
+            at: '2026-04-01T00:00:02.000000Z',
+        },
+    );
+    await assertError(
+        refused, 409,
+        'no transition from declined to pending'
+            + ' for the admin',
+    );
+    const head = await handleRequest(db, req(
+        'GET',
+        itemPath('organizations', ORG, name),
+        admin,
+    ));
+    assertStrictEquals(head.status, 200);
+    assertEquals(
+        await membershipOf(head),
+        expected(invitee.id, 'declined', declineAt),
+    );
+});
+
 Deno.test('a grant on an accepted head is 409', async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'seated@example.com');
