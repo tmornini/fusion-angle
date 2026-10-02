@@ -1,7 +1,9 @@
 import {
-    assert, assertEquals, assertStrictEquals,
+    assert, assertEquals, assertRejects, assertStrictEquals,
 } from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
+import { BODY_INDEXED_PATH } from
+    '../api/schema-postgres.ts';
 import { handleRequest } from '../api/api.ts';
 import { messageStore } from '../api/message-store.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -188,6 +190,33 @@ function pairRow(
         // Distinct supersedes: one PUT or DELETE per
         // (path, name, supersedes).
         supersedes: supersedes ?? id,
+    });
+}
+
+function bodyPairRow(
+    id: string,
+    name: string,
+    method: string,
+    responseAt: string,
+    n: number,
+    body: string,
+    contentType: string,
+): Promise<Omit<MessagePairEntity, 'id'>> {
+    return ledgerFields({
+        id,
+        path: BODY_INDEXED_PATH,
+        name,
+        requester_identity_id: ORDER_REQUESTER,
+        method,
+        response_at: responseAt,
+        request: method + ' ' + BODY_INDEXED_PATH + name
+            + ' HTTP/1.1\r\n'
+            + 'x-n: ' + String(n) + '\r\n\r\n',
+        response: 'HTTP/1.1 200 OK\r\n'
+            + 'content-type: ' + contentType + '\r\n\r\n'
+            + body,
+        operation_id: ORDER_OPERATION,
+        supersedes: id,
     });
 }
 
@@ -485,6 +514,83 @@ export function defineStoreAcceptance(
             ['revised', 'posted', 'untouched'],
         );
         assert(heads.every((row) => row.method === 'PUT'));
+    });
+
+    Deno.test(name + ': containing heads are the live PUT'
+    + ' heads of documents with a matching version',
+    async () => {
+        const { db } = await ready();
+        const json = 'application/json';
+        const id = (): string => generateIdentifier();
+        const [a1, a2, b1, c1, c2, d1, e1, f1] =
+            [id(), id(), id(), id(), id(), id(), id(), id()];
+        const rows: [
+            string, string, string, string, string,
+        ][] = [
+            // An older version matches; the head does not.
+            // The document is selected and its head served.
+            [a1, 'a', 'PUT', '{"k":"v","s":"old"}', json],
+            [a2, 'a', 'PUT', '{"k":"w","s":"new"}', json],
+            // Never matches.
+            [b1, 'b', 'PUT', '{"k":"x"}', json],
+            // Matches, then a DELETE head: not live.
+            [c1, 'c', 'PUT', '{"k":"v"}', json],
+            [c2, 'c', 'DELETE', '', json],
+            // A POST matches; there is no PUT head.
+            [d1, 'd', 'POST', '{"k":"v"}', json],
+            // Not JSON: it inserts and never matches.
+            [e1, 'e', 'PUT', 'k=v', 'text/plain'],
+            // Content type says JSON; the body does not.
+            [f1, 'f', 'PUT', '{"k":"v"', json],
+        ];
+        let k = 1;
+        for (
+            const [rowId, docName, method, body, type] of rows
+        ) {
+            await db.messagePairs.append(
+                rowId,
+                // Each row supersedes itself, as pairRow's
+                // do: one PUT or DELETE per
+                // (path, name, supersedes).
+                await bodyPairRow(
+                    rowId, docName, method, stamp(k), k,
+                    body, type,
+                ),
+            );
+            k += 1;
+        }
+        const heads = await db.messagePairs
+            .getCollectionHeadPairsContaining(
+                BODY_INDEXED_PATH, { k: 'v' },
+            );
+        assertEquals(heads.map((row) => row.id), [a2]);
+        assertEquals(
+            (await db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    BODY_INDEXED_PATH, { k: 'w', s: 'new' },
+                )).map((row) => row.id),
+            [a2],
+        );
+        assertEquals(
+            await db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    BODY_INDEXED_PATH, { k: 'w', s: 'old' },
+                ),
+            [],
+        );
+    });
+
+    Deno.test(name + ': containing heads refuse a path with'
+    + ' no body index', async () => {
+        const { db } = await ready();
+        await assertRejects(
+            () => db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    HEAD_PATH, { k: 'v' },
+                ),
+            Error,
+            'no body index at ' + HEAD_PATH,
+        );
     });
 
     Deno.test(name + ': head pair is the latest PUT or'
