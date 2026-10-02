@@ -32,13 +32,11 @@ export async function init(): Promise<void> {
         container,
         skeleton: buildSkeleton('table', 3),
         fetch: () => getInvitations(
-            sessionContext(),
+            sessionContext(), 'pending',
         ),
         retry: init,
         onData: loaded => {
-            pending = loaded.filter(
-                inv => inv.state === 'pending',
-            );
+            pending = loaded;
             rerender();
             container.addEventListener(
                 'click', onListClick, { signal });
@@ -56,8 +54,9 @@ function rerender(): void {
 
 async function refresh(): Promise<void> {
     if (!listEl) return;
-    const all = await getInvitations(sessionContext());
-    pending = all.filter(inv => inv.state === 'pending');
+    pending = await getInvitations(
+        sessionContext(), 'pending',
+    );
     rerender();
 }
 
@@ -71,20 +70,20 @@ async function onListClick(e: MouseEvent): Promise<void> {
         .closest('[data-invitation-id]')
         ?.getAttribute('data-invitation-id');
     if (!id) return;
+    const invitation = pending.find(
+        inv => inv.id === id,
+    );
+    if (invitation === undefined) return;
     try {
         if (action === 'accept') {
-            const invitation = pending.find(
-                inv => inv.id === id,
-            );
-            if (invitation === undefined) return;
             await postInvitationAcceptance(
-                sessionContext(), id,
-                invitation.organizationId,
+                sessionContext(), invitation,
             );
             showToast('Invitation accepted', 'success');
         } else if (action === 'decline') {
             await postInvitationDecline(
-                sessionContext(), id);
+                sessionContext(), invitation,
+            );
             showToast('Invitation declined', 'success');
         } else {
             return;

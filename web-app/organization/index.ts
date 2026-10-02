@@ -41,6 +41,7 @@ import {
     getSentInvitations,
     postInvitationRevocation,
     subscribeInvitationChanges,
+    type SentInvitation,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
@@ -89,6 +90,7 @@ type PageState =
 
 let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
+let sentInvitations: readonly SentInvitation[] = [];
 
 const FIELDS: ReadonlySet<GeneralInfoFieldKey> =
     new Set(['name', 'domain']);
@@ -490,6 +492,7 @@ function paintSentInvitations(
 ): void {
     const box = $('#sent-invitations-box', document);
     const list = $('#sent-invitations-list', document);
+    sentInvitations = sent;
     if (!box || !list) return;
     new SentInvitationsPresenter(sent).render(list);
     box.classList.remove('hidden');
@@ -514,9 +517,13 @@ async function onSentInvitationClick(
         .closest('[data-invitation-id]')
         ?.getAttribute('data-invitation-id');
     if (!id) return;
+    const invitation = sentInvitations.find(
+        (row) => row.id === id,
+    );
+    if (invitation === undefined) return;
     try {
         await postInvitationRevocation(
-            sessionContext(), id);
+            sessionContext(), invitation);
         showToast('Invitation revoked', 'success');
     } catch (err) {
         log.error(

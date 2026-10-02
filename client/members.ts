@@ -20,22 +20,17 @@ import { membershipNameOf } from
     '../shared/membership-name.ts';
 import { getMemberPii } from './identities.ts';
 import {
-    createSubscriptionChannel,
-} from './channels.ts';
+    notifyHumanMemberChanges,
+    notifyMembershipChanges,
+} from './membership-changes.ts';
+export {
+    subscribeHumanMemberChanges,
+} from './membership-changes.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,
     HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
-
-const humanMemberChanges =
-    createSubscriptionChannel();
-
-export function subscribeHumanMemberChanges(
-    fn: () => void,
-): () => void {
-    return humanMemberChanges.subscribe(fn);
-}
 
 export type HumanMemberDraft =
     Omit<HumanMemberEntity, 'id'>
@@ -275,7 +270,7 @@ export async function putHumanMember(
             pii.current.erased ? undefined : [pii.current.message],
         );
     }
-    humanMemberChanges.notify();
+    notifyHumanMemberChanges();
 }
 
 export async function postHumanMemberCreation(
@@ -323,7 +318,7 @@ export async function postHumanMemberCreation(
             await ctx.PUT(item, body, [held]);
         }
     }
-    humanMemberChanges.notify();
+    notifyMembershipChanges();
 }
 
 // The membership PUT that ends the place — the identity
@@ -340,7 +335,7 @@ export async function postMembershipRemoval(
         { state: 'removed', at: nowUtc() },
         [member.membership],
     );
-    humanMemberChanges.notify();
+    notifyMembershipChanges();
 }
 
 export async function getAdminSeatIds(

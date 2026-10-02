@@ -59,7 +59,10 @@ import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc } from '../shared/types.ts';
+import {
+    nowUtc,
+    type MembershipEntity,
+} from '../shared/types.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
@@ -614,13 +617,22 @@ Deno.test('a concurrent facade refresh and remint present'
             'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
         ),
     );
+    const held = await acceptor.GET<MembershipEntity>(
+        'identities/XXZruirZyAOoRpNxaDnpSA/invitations/'
+            + invitationId,
+    );
+    const row = held.body().toValue();
     await Promise.all([
         reader.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/').then(parts =>
             parts.map(part => part.body().toValue())),
-        postInvitationAcceptance(
-            acceptor, invitationId, ORGANIZATION_B,
-        ),
+        postInvitationAcceptance(acceptor, {
+            id: row.id,
+            organizationId: row.organization_id,
+            invitedAt: row.at,
+            state: row.state,
+            message: held,
+        }),
     ]);
     // Assert on `revoked`, not `rotated`: the loser was a
     // replay, so the rotation count was already one.

@@ -38,8 +38,9 @@ async function renderBell(
     const { sessionContext } = await import('./client.ts');
     const { getInvitations } =
         await import('../../client/index.ts');
-    const pending = (await getInvitations(sessionContext()))
-        .filter(inv => inv.state === 'pending');
+    const pending = await getInvitations(
+        sessionContext(), 'pending',
+    );
     if (pending.length === 0) {
         bell.classList.add('hidden');
         if (badge) badge.textContent = '';

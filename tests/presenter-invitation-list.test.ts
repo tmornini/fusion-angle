@@ -3,6 +3,24 @@ import {
     InvitationListPresenter,
     SentInvitationsPresenter,
 } from '../web-app/app/presenters/invitation-list.ts';
+import type { MembershipEntity } from '../shared/types.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { responseMessage } from
+    './fixtures/response-message.ts';
+
+function heldMessage(
+    id: string,
+): HttpMessage<MembershipEntity> {
+    return responseMessage({
+        id,
+        organization_id: 'BBjWJsjYIDkTRKIIPrzWRw',
+        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        type: 'member',
+        state: 'pending',
+        at: '2026-01-01T00:00:00.000000Z',
+    });
+}
 
 // invitation-list.ts never reads localStorage (checked
 // against the full product tree); window/document are
@@ -39,6 +57,7 @@ const PENDING = {
     organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
     invitedAt: '2026-01-01T00:00:00.000000Z',
     state: 'pending' as const,
+    message: heldMessage('jEoYCFtPjXFEgZqZNtOcEA'),
 };
 
 Deno.test('a pending invitation shows the absence marker'
@@ -73,6 +92,7 @@ Deno.test('an absent inviter omits the Invited by line', () => {
         organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
+        message: heldMessage('inv3'),
     }]).render(rec.container);
     assertNotMatch(rec.html(), /Invited by/);
 });
@@ -84,6 +104,7 @@ Deno.test('the org name renders the absence glyph', () => {
         organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
+        message: heldMessage('inv4'),
     }]).render(rec.container);
     assertMatch(rec.html(), /—/);
 });
@@ -104,6 +125,7 @@ Deno.test('a sent invitation shows the absence marker'
             identityId: 'toccYYkLEABmlbpHJalgtQ',
             invitedAt: '2026-01-01T00:00:00.000000Z',
             state: 'pending' as const,
+            message: heldMessage('inv2'),
         },
     ]).render(rec.container);
     const out = rec.html();
@@ -122,6 +144,7 @@ Deno.test('an absent invitee email renders the absence glyph',
         identityId: 'toccYYkLEABmlbpHJalgtQ',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
+        message: heldMessage('inv5'),
     }]).render(rec.container);
     assertMatch(rec.html(), /—/);
 });

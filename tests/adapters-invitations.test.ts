@@ -32,13 +32,17 @@ import {
     UnauthorizedError,
 } from '../shared/http-errors.ts';
 import {
+    activeOrganization,
     type RequestContext,
 } from '../client/request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import type { ClientSession } from '../client/client-session.ts';
 import { responseMessage } from './fixtures/response-message.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import {
     organizationToken,
     reachableToken,
@@ -53,8 +57,18 @@ import {
     postInvitationRevocation,
     getInvitations,
     getSentInvitations,
+    subscribeInvitationChanges,
     SessionRemintFailedError,
+    type InvitationView,
+    type SentInvitation,
 } from '../client/invitations.ts';
+import {
+    getHumanMemberProfile,
+    postHumanMemberCreation,
+    putHumanMember,
+    subscribeHumanMemberChanges,
+} from '../client/members.ts';
+import { deleteBellSession } from '../client/channels.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
@@ -301,6 +315,76 @@ async function ctxOn(
     );
 }
 
+async function recordingOn(
+    db: ClientFacadeAdapter,
+    sub: string,
+    organization: string,
+) {
+    return recordedContext(
+        db, await organizationToken(sub, organization),
+    );
+}
+
+function inviteeFrom(
+    message: HttpMessage<MembershipEntity>,
+): InvitationView {
+    const row = message.body().toValue();
+    return {
+        id: row.id,
+        organizationId: row.organization_id,
+        invitedAt: row.at,
+        state: row.state,
+        message,
+    };
+}
+
+function sentFrom(
+    message: HttpMessage<MembershipEntity>,
+): SentInvitation {
+    const row = message.body().toValue();
+    return {
+        id: row.id,
+        organizationId: row.organization_id,
+        identityId: row.identity_id,
+        invitedAt: row.at,
+        state: row.state,
+        message,
+    };
+}
+
+async function heldInvitee(
+    ctx: RequestContext,
+    id: string,
+): Promise<InvitationView> {
+    return inviteeFrom(await ctx.GET<MembershipEntity>(
+        'identities/' + ctx.identity.id
+            + '/invitations/' + id,
+    ));
+}
+
+async function heldSent(
+    ctx: RequestContext,
+    id: string,
+): Promise<SentInvitation> {
+    return sentFrom(await ctx.GET<MembershipEntity>(
+        'organizations/' + activeOrganization(ctx)
+            + '/invitations/' + id,
+    ));
+}
+
+function itemRequests(
+    sent: readonly {
+        method: string;
+        path: string;
+        ifMatch: string | null;
+    }[],
+    id: string,
+) {
+    const suffix = '/invitations/' + id;
+    return sent.filter((request) =>
+        request.path.endsWith(suffix));
+}
+
 // Erase a pii slot through the LIVE facade (Phase 10 Task 8
 // Session B), not a raw db.identityPii.delete: the enrichment
 // joins below now read deriveIdentityPiiRows (the message
@@ -442,7 +526,7 @@ Deno.test('a non-admin cannot grant',
     const { ctx } = await ctxFor('toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await assertRejects(
-        () => postInvitationGrant(ctx, 'dave@x.com'));
+        async () => postInvitationGrant(ctx, 'dave@x.com'));
 }));
 
 Deno.test('the invitee reads their own pending invitation',
@@ -503,9 +587,22 @@ Deno.test('accept writes a membership in the invitation org',
     const inv = await invitationOf(db, WAYNE, SARAH);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationAcceptance(
+    const held = await heldInvitee(
         toccYYkLEABmlbpHJalgtQ, inv.id,
-        'BBjWJsjYIDkTRKIIPrzWRw',
+    );
+    const { ctx, sent } = await recordingOn(
+        db, 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg',
+    );
+    sent.length = 0;
+    await postInvitationAcceptance(ctx, held);
+    assertEquals(
+        itemRequests(sent, inv.id).map((request) => [
+            request.method, request.ifMatch,
+        ]),
+        [[
+            'PUT',
+            held.message.query('header.etag').toText(),
+        ]],
     );
     const memberships = (await deriveMembershipsAll(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ');
@@ -526,11 +623,12 @@ Deno.test('accept by a non-invitee is rejected',
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = await invitationOf(db, WAYNE, SARAH);
     // Dave tries to accept Sarah's invitation.
+    const sarah = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
+        , 'AjdvjuECVZEgZoFajaIEkg');
+    const held = await heldInvitee(sarah, inv.id);
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
     await assertRejects(
-        () => postInvitationAcceptance(
-            dave, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
-        ));
+        async () => postInvitationAcceptance(dave, held));
 }));
 
 Deno.test('decline records declined and writes no membership',
@@ -544,7 +642,21 @@ Deno.test('decline records declined and writes no membership',
     // Decline is identity-gated, not org-gated: Dave acts on his
     // own invitation regardless of any active org.
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationDecline(dave, inv.id);
+    const held = await heldInvitee(dave, inv.id);
+    const { ctx, sent } = await recordingOn(
+        db, daveId, 'AjdvjuECVZEgZoFajaIEkg',
+    );
+    sent.length = 0;
+    await postInvitationDecline(ctx, held);
+    assertEquals(
+        itemRequests(sent, inv.id).map((request) => [
+            request.method, request.ifMatch,
+        ]),
+        [[
+            'PUT',
+            held.message.query('header.etag').toText(),
+        ]],
+    );
     const views = await getInvitations(dave);
     assertStrictEquals(
         views.find(v => v.id === inv.id)?.state, 'declined');
@@ -561,7 +673,21 @@ Deno.test('revoke records revoked (admin only)',
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = await invitationOf(db, WAYNE, SARAH);
-    await postInvitationRevocation(tony, inv.id);
+    const held = await heldSent(tony, inv.id);
+    const { ctx, sent } = await recordingOn(
+        db, 'XXZruirZyAOoRpNxaDnpSA', 'BBjWJsjYIDkTRKIIPrzWRw',
+    );
+    sent.length = 0;
+    await postInvitationRevocation(ctx, held);
+    assertEquals(
+        itemRequests(sent, inv.id).map((request) => [
+            request.method, request.ifMatch,
+        ]),
+        [[
+            'PUT',
+            held.message.query('header.etag').toText(),
+        ]],
+    );
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const views = await getInvitations(toccYYkLEABmlbpHJalgtQ);
@@ -577,11 +703,12 @@ Deno.test('a non-admin cannot revoke',
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = await invitationOf(db, WAYNE, SARAH);
+    const held = await heldSent(tony, inv.id);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await assertRejects(
-        () => postInvitationRevocation(
-            toccYYkLEABmlbpHJalgtQ, inv.id,
+        async () => postInvitationRevocation(
+            toccYYkLEABmlbpHJalgtQ, held,
         ));
 }));
 
@@ -593,13 +720,17 @@ Deno.test('accept after revoke is rejected, no membership',
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = await invitationOf(db, WAYNE, SARAH);
-    await postInvitationRevocation(tony, inv.id);
+    await postInvitationRevocation(
+        tony, await heldSent(tony, inv.id),
+    );
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
+    const current = await heldInvitee(
+        toccYYkLEABmlbpHJalgtQ, inv.id,
+    );
     const err = await assertRejects(
-        () => postInvitationAcceptance(
-            toccYYkLEABmlbpHJalgtQ, inv.id,
-            'BBjWJsjYIDkTRKIIPrzWRw',
+        async () => postInvitationAcceptance(
+            toccYYkLEABmlbpHJalgtQ, current,
         )) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, HTTP_CONFLICT);
@@ -619,11 +750,14 @@ Deno.test('accept after decline is rejected',
     const inv = await invitationOf(db, WAYNE, SARAH);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationDecline(toccYYkLEABmlbpHJalgtQ, inv.id);
+    await postInvitationDecline(
+        toccYYkLEABmlbpHJalgtQ,
+        await heldInvitee(toccYYkLEABmlbpHJalgtQ, inv.id),
+    );
     const err = await assertRejects(
-        () => postInvitationAcceptance(
-            toccYYkLEABmlbpHJalgtQ, inv.id,
-            'BBjWJsjYIDkTRKIIPrzWRw',
+        async () => postInvitationAcceptance(
+            toccYYkLEABmlbpHJalgtQ,
+            await heldInvitee(toccYYkLEABmlbpHJalgtQ, inv.id),
         )) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, HTTP_CONFLICT);
@@ -640,12 +774,13 @@ Deno.test('decline after accept is rejected',
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationAcceptance(
-        toccYYkLEABmlbpHJalgtQ, inv.id,
-        'BBjWJsjYIDkTRKIIPrzWRw',
+        toccYYkLEABmlbpHJalgtQ,
+        await heldInvitee(toccYYkLEABmlbpHJalgtQ, inv.id),
     );
     const err = await assertRejects(
-        () => postInvitationDecline(
-            toccYYkLEABmlbpHJalgtQ, inv.id,
+        async () => postInvitationDecline(
+            toccYYkLEABmlbpHJalgtQ,
+            await heldInvitee(toccYYkLEABmlbpHJalgtQ, inv.id),
         )) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, HTTP_CONFLICT);
@@ -675,7 +810,10 @@ Deno.test('re-inviting a declined invitee lands pending on the'
     const first = await invitationOf(db, WAYNE, SARAH);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationDecline(toccYYkLEABmlbpHJalgtQ, first.id);
+    await postInvitationDecline(
+        toccYYkLEABmlbpHJalgtQ,
+        await heldInvitee(toccYYkLEABmlbpHJalgtQ, first.id),
+    );
 
     assertStrictEquals(
         await postInvitationGrant(tony, 'sarah@x.com'), 'sent');
@@ -762,8 +900,8 @@ Deno.test('accept: event author is server-derived, membership lands',
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationAcceptance(
-        toccYYkLEABmlbpHJalgtQ, inv.id,
-        'BBjWJsjYIDkTRKIIPrzWRw',
+        toccYYkLEABmlbpHJalgtQ,
+        await heldInvitee(toccYYkLEABmlbpHJalgtQ, inv.id),
     );
     // The version landed with a non-empty etag + at.
     const ev = await newestVersion(
@@ -789,7 +927,9 @@ Deno.test('decline: event author is server-derived',
     await postInvitationGrant(tony, 'dave@x.com');
     const inv = await invitationOf(db, WAYNE, daveId);
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationDecline(dave, inv.id);
+    await postInvitationDecline(
+        dave, await heldInvitee(dave, inv.id),
+    );
     const ev = await newestVersion(
         db, tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
@@ -806,7 +946,9 @@ Deno.test('revoke: event author is server-derived',
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = await invitationOf(db, WAYNE, SARAH);
-    await postInvitationRevocation(tony, inv.id);
+    await postInvitationRevocation(
+        tony, await heldSent(tony, inv.id),
+    );
     const ev = await newestVersion(
         db, tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
@@ -840,13 +982,13 @@ Deno.test('a repeated accept posts no notification',
     const inv = await invitationOf(db, WAYNE, SARAH);
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    const pending = await toccYYkLEABmlbpHJalgtQ.GET(
+    const pending = await toccYYkLEABmlbpHJalgtQ
+        .GET<MembershipEntity>(
         'identities/toccYYkLEABmlbpHJalgtQ/invitations/'
             + inv.id,
     );
     await postInvitationAcceptance(
-        toccYYkLEABmlbpHJalgtQ, inv.id,
-        'BBjWJsjYIDkTRKIIPrzWRw',
+        toccYYkLEABmlbpHJalgtQ, inviteeFrom(pending),
     );
     assertStrictEquals(posted.length, 2);   // grant, accept
     const err = await assertRejects(
@@ -876,10 +1018,14 @@ Deno.test('a repeated decline posts no notification',
     await postInvitationGrant(tony, 'dave@x.com');
     const inv = await invitationOf(db, WAYNE, daveId);
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
-    await postInvitationDecline(dave, inv.id);
+    await postInvitationDecline(
+        dave, await heldInvitee(dave, inv.id),
+    );
     assertStrictEquals(posted.length, 2);   // grant, decline
     const err = await assertRejects(
-        () => postInvitationDecline(dave, inv.id),
+        async () => postInvitationDecline(
+            dave, await heldInvitee(dave, inv.id),
+        ),
     ) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, HTTP_CONFLICT);
@@ -894,10 +1040,14 @@ Deno.test('a repeated revoke posts no notification',
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitationGrant(tony, 'sarah@x.com');
     const inv = await invitationOf(db, WAYNE, SARAH);
-    await postInvitationRevocation(tony, inv.id);
+    await postInvitationRevocation(
+        tony, await heldSent(tony, inv.id),
+    );
     assertStrictEquals(posted.length, 2);   // grant, revoke
     const err = await assertRejects(
-        () => postInvitationRevocation(tony, inv.id),
+        async () => postInvitationRevocation(
+            tony, await heldSent(tony, inv.id),
+        ),
     ) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, HTTP_CONFLICT);
@@ -941,7 +1091,8 @@ Deno.test('cookie-session accept remints via refresh POST',
             },
         };
         await postInvitationAcceptance(
-            recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            recording,
+            await heldInvitee(toccYYkLEABmlbpHJalgtQ, inv.id),
         );
         assertStrictEquals(refreshBodies.length, 1);
         assertEquals(refreshBodies[0], {
@@ -988,8 +1139,8 @@ Deno.test('a failed re-mint after accept surfaces, seat kept',
             },
         };
         const err = await assertRejects(
-            () => postInvitationAcceptance(
-                recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            async () => postInvitationAcceptance(
+                recording, await heldInvitee(sarah, inv.id),
             ),
         ) as Error;
         assertInstanceOf(err, SessionRemintFailedError);
@@ -1027,6 +1178,7 @@ Deno.test('the remint waits for an in-flight facade refresh',
         const inv = await invitationOf(db, WAYNE, SARAH);
         const sarah = await ctxOn(db
             , 'toccYYkLEABmlbpHJalgtQ', 'AjdvjuECVZEgZoFajaIEkg');
+        const held = await heldInvitee(sarah, inv.id);
         session = sarah.session;
         session.setCookieSession(true);
         const minted = await reachableToken(
@@ -1065,7 +1217,7 @@ Deno.test('the remint waits for an in-flight facade refresh',
             },
         };
         const accepting = postInvitationAcceptance(
-            recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            recording, held,
         );
         for (let i = 0; i < 10; i++) {
             await new Promise(r => setImmediate(r));
@@ -1134,7 +1286,7 @@ Deno.test('a re-minted token without the seat earns one more'
             },
         };
         await postInvitationAcceptance(
-            recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            recording, await heldInvitee(sarah, inv.id),
         );
         assertStrictEquals(refreshBodies.length, 2);
         assertStrictEquals(session.getSessionToken(), fresh);
@@ -1181,13 +1333,100 @@ Deno.test('two re-minted tokens without the seat surface a'
             },
         };
         const err = await assertRejects(
-            () => postInvitationAcceptance(
-                recording, inv.id, 'BBjWJsjYIDkTRKIIPrzWRw',
+            async () => postInvitationAcceptance(
+                recording, await heldInvitee(sarah, inv.id),
             ),
         ) as Error;
         assertInstanceOf(err, SessionRemintFailedError);
         assertStrictEquals(refreshBodies.length, 2);
     } finally {
         session?.deleteRefreshChannel();
+    }
+}));
+
+// Another tab revoked the invitation this tab still holds.
+// The accept names that part, so the stale tag is 412 and
+// the revoked head stays the head.
+Deno.test('a stale held invitation answers 412'
+    + ' and stores nothing',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    const inv = await invitationOf(db, WAYNE, SARAH);
+    const sarah = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
+        , 'AjdvjuECVZEgZoFajaIEkg');
+    const pending = await heldInvitee(sarah, inv.id);
+    await postInvitationRevocation(
+        tony, await heldSent(tony, inv.id),
+    );
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        async () => postInvitationAcceptance(sarah, pending),
+    ) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    assertStrictEquals(
+        (await invitationOf(db, WAYNE, SARAH)).state,
+        'revoked',
+    );
+}));
+
+Deno.test('a membership write notifies both channels',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const { ctx } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    deleteBellSession();
+    let invitations = 0;
+    let humans = 0;
+    const stopInvitations = subscribeInvitationChanges(
+        () => {
+            invitations += 1;
+        },
+    );
+    const stopHumans = subscribeHumanMemberChanges(
+        () => {
+            humans += 1;
+        },
+    );
+    try {
+        const id = generateIdentifier();
+        await postHumanMemberCreation(ctx, id, {
+            name: 'New Member',
+            email: 'new-member@example.com',
+            title: 'Engineer',
+            department: 'Product',
+            strengths: [],
+            team_dimensions: {},
+            phone: '',
+            bio: '',
+        });
+        assertStrictEquals(invitations, 1);
+        assertStrictEquals(humans, 1);
+        invitations = 0;
+        humans = 0;
+        const { read } = await getHumanMemberProfile(
+            ctx, id,
+        );
+        await putHumanMember(ctx, id, {
+            held: read,
+            body: {
+                title: 'Lead',
+                department: 'Product',
+                strengths: [],
+                team_dimensions: {},
+            },
+        });
+        assertStrictEquals(invitations, 0);
+        assertStrictEquals(humans, 1);
+    } finally {
+        stopInvitations();
+        stopHumans();
+        deleteBellSession();
     }
 }));
