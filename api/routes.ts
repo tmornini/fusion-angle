@@ -36,6 +36,7 @@ import type {
     ProjectObjectiveActualScoreEntity,
     RecordEntity,
     RecordAttributeEntity,
+    MembershipEntity,
     SeatEntity,
     IdentityProviderEntity,
     WorkOrderFlowGraph,
@@ -279,7 +280,6 @@ import {
     type WorkOrderVersion,
 } from './work-order-version.ts';
 import {
-    deriveOrganizations,
     organizationEntityOf,
 } from './derive-organizations.ts';
 import {
@@ -327,6 +327,7 @@ import {
 import {
     MEMBERSHIPS_PATH,
     membershipOfHead,
+    membershipsOfIdentity,
 } from './memberships.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
@@ -698,65 +699,22 @@ export function route(
     };
 }
 
-// GATE 15 — THE PRODUCTION MEMBERSHIP PAIR PLANE (Phase 10 Task
-// 8 Session B): identity_pii and identity_credentials carry NO
-// organization_id of their own, so their read fence (viaMembership,
-// api/store-parent-scoped.ts) derives visibility from the
-// membership ledger instead. A GET handler here receives ONLY the
-// caller's already-org-SCOPED adapter (api.ts hands it `effective`)
-// — that adapter's OWN .memberships facet is filtered to the
-// caller's org already, so it cannot see a foreign-org row and
-// would misreport it as an orphan (visible), silently WIDENING the
-// fence rather than reproducing it. The scoped adapter's
-// .requests/.responses DO pass through globally (db-organization-
-// scoped.ts: "the message plane... passes through unwrapped"), so
-// this reads the SAME membership ledger every org's derivation
-// would, via the SAME documentCollectionGetHandler(MEMBERSHIPS_
-// WIRING) reduction GET /memberships itself rides — mirroring
-// tests/drift-identities.test.ts's own gate-15 proof
-// (pairPlaneMembershipsAcrossKnownOrganizations), generalized from
-// that test's hardcoded two-org set to deriveOrganizations(db)
-// (Phase 12 Task 5: the message-plane derivation, api/derive-
-// organizations.ts — itself reading only requests/responses, the
-// SAME global passthrough the prior db.organizations.getAll()
-// read rode) so this holds for however many organizations
-// actually exist, not only the ones a test happened to seed.
-async function membershipsAcrossAllOrganizations(
-    db: DbAdapter, _actor: Id,
-): Promise<SeatEntity[]> {
-    const organizations = await deriveOrganizations(db);
-    const perOrganization = await Promise.all(
-        organizations.map((organization) =>
-            deriveOrganizationMemberSeats(
-                db, organization.id,
-            ),
-        ),
-    );
-    return perOrganization.flat();
-}
-
-// viaMembership's OWN three-way algorithm (api/store-parent-
-// scoped.ts), re-derived here over the PAIR-PLANE union above
-// rather than the row-plane's identity_id index — the SAME
-// reduction tests/drift-identities.test.ts's
-// pairPlaneOwnerOrganization proves equal to the row-plane fence
-// on all three legs (co-member, FOREIGN-org, orphan): null
-// (orphan, visible), the bound org (co-member, visible), or a
-// DIFFERENT org (foreign, hidden).
+// Visibility from the target's accepted memberships.
+// None is an orphan, visible. A membership in the
+// bound organization is a co-member, visible. Any
+// other organization is foreign, hidden.
 function ownerOrganizationViaMembershipPairPlane(
-    memberships: readonly SeatEntity[],
-    identityId: Id,
+    memberships: readonly MembershipEntity[],
     boundOrganization: Id,
 ): Id | null {
-    const mine = memberships.filter(
-        (m) => m.identity_id === identityId,
+    if (memberships.length === 0) return null;
+    const inBound = memberships.some(
+        (membership) =>
+            membership.organization_id === boundOrganization,
     );
-    if (mine.length === 0) return null;
-    return mine.some(
-        (m) => m.organization_id === boundOrganization,
-    )
+    return inBound
         ? boundOrganization
-        : mine[0]!.organization_id;
+        : memberships[0]!.organization_id;
 }
 
 // The bundle a live POST /records forms (Phase 6 Task 4, the
@@ -3915,18 +3873,17 @@ export const routes: Route[] = [
     // foreign identity's absent or erased PII answers 403,
     // never a 404 or 410 that would describe it.
     route('identities/:id/pii', {
-        select: async (db, p, actor, organization) => {
+        select: async (db, p, _actor, organization) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
+            const memberships = await membershipsOfIdentity(
+                db, identityId,
+            );
             const owner =
                 ownerOrganizationViaMembershipPairPlane(
-                    memberships, identityId, organizationId,
+                    memberships, organizationId,
                 );
             if (owner !== null
                 && owner !== organizationId) {
@@ -3974,7 +3931,7 @@ export const routes: Route[] = [
     // root admin entries — NO MEMBER_VERBS entry. The secret
     // reaches no reader (credentialReader).
     route(CREDENTIALS_COLLECTION_PATTERN, {
-        select: async (db, p, actor, organization, roles) => {
+        select: async (db, p, _actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
@@ -3986,13 +3943,12 @@ export const routes: Route[] = [
             ).filter((head) =>
                 storedCredentialIdentityOf(head) === identityId);
             if (heads.length > 0) {
-                const memberships =
-                    await membershipsAcrossAllOrganizations(
-                        db, actor,
-                    );
+                const memberships = await membershipsOfIdentity(
+                    db, identityId,
+                );
                 const owner =
                     ownerOrganizationViaMembershipPairPlane(
-                        memberships, identityId, organizationId,
+                        memberships, organizationId,
                     );
                 if (owner !== null && owner !== organizationId) {
                     throw new ForeignOrganizationError(
@@ -4015,7 +3971,7 @@ export const routes: Route[] = [
     // A foreign identity's credential 403s; an absent one
     // 404s. The secret reaches no reader (credentialReader).
     route(CREDENTIAL_DETAIL_PATTERN, {
-        select: async (db, p, actor, organization, roles) => {
+        select: async (db, p, _actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
@@ -4031,13 +3987,13 @@ export const routes: Route[] = [
             }
             const identityOfHead =
                 storedCredentialIdentityOf(head);
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
-            const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships, identityOfHead, organizationId,
+            const memberships = await membershipsOfIdentity(
+                db, identityOfHead,
             );
+            const owner =
+                ownerOrganizationViaMembershipPairPlane(
+                    memberships, organizationId,
+                );
             if (owner !== null && owner !== organizationId) {
                 throw new ForeignOrganizationError(
                     'identity_credentials', cid,

@@ -31,6 +31,7 @@ import {
     postIdentityDocumentOp,
 } from '../api/routes.ts';
 import {
+    deriveOrganizationMemberSeat,
     deriveOrganizationMemberSeats,
 } from '../api/derive-memberships.ts';
 import {
@@ -47,6 +48,8 @@ import {
     buildUnaffiliatedIdentity,
 } from '../api/mock-data/members.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { landMembership } from './membership-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 import {
     seedIdentityCredential,
     seedIdentityPii,
@@ -455,6 +458,126 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
         ),
         true,
     );
+});
+
+// The route fence, not the local seat scan. A non-accepted
+// head in the caller's organization leaves the seat, and an
+// accepted membership elsewhere is the only one that counts.
+const FENCE_SUBJECT = 'XXZruirZyAOoRpNxaDnpSA';
+const SEAT_AT = '2026-06-04T00:00:00.000000Z';
+const REPLACED_AT = '2026-06-05T00:00:00.000000Z';
+const ELSEWHERE_AT = '2026-06-06T00:00:00.000000Z';
+
+async function callerPiiAfterNonAccepted(
+    state: 'pending' | 'declined' | 'revoked' | 'removed',
+): Promise<{ response: Response; identityId: Id }> {
+    const db = await seededDb();
+    const identityId = generateIdentifier();
+    const token = await organizationToken(
+        FENCE_SUBJECT, STARK_ORGANIZATION,
+    );
+    const created = await handleRequest(db, req(
+        'POST', '/identities/', token,
+        { id: identityId, kind: 'person' },
+    ));
+    await created.body?.cancel();
+    assertStrictEquals(created.status, 201);
+    const written = await handleRequest(db, req(
+        'PUT', '/identities/' + identityId + '/pii', token,
+        {
+            name: 'Fenced ' + state,
+            email: state + '-fence@x.com',
+            phone: '',
+            bio: '',
+        },
+    ));
+    await written.body?.cancel();
+    assertStrictEquals(written.status, 201);
+    await seedSeat(
+        db, STARK_ORGANIZATION, identityId, 'member',
+        SEAT_AT,
+    );
+    await landMembership(
+        db, STARK_ORGANIZATION, identityId, state,
+        'member', REPLACED_AT,
+    );
+    await landMembership(
+        db, ORGANIZATION_TWO, identityId, 'accepted',
+        'member', ELSEWHERE_AT,
+    );
+    const seat = await deriveOrganizationMemberSeat(
+        db, STARK_ORGANIZATION, identityId,
+    );
+    assertStrictEquals(seat.identity_id, identityId);
+    assertStrictEquals(
+        seat.organization_id, STARK_ORGANIZATION,
+    );
+    const response = await handleRequest(db, req(
+        'GET', '/identities/' + identityId + '/pii', token,
+    ));
+    return { response, identityId };
+}
+
+for (const state of [
+    'removed', 'pending', 'declined', 'revoked',
+] as const) {
+    Deno.test('a ' + state + ' membership in the caller'
+        + ' organization is not a co-member', async () => {
+        const { response, identityId } =
+            await callerPiiAfterNonAccepted(state);
+        assertStrictEquals(response.status, 403);
+        assertEquals(await response.json(), {
+            error: 'forbidden: identity_pii/' + identityId
+                + ' belongs to a different organization',
+        });
+    });
+}
+
+Deno.test('a membership with no seat counts as foreign',
+async () => {
+    const db = await seededDb();
+    const identityId = generateIdentifier();
+    const caller = await organizationToken(
+        FENCE_SUBJECT, STARK_ORGANIZATION,
+    );
+    const home = await organizationToken(
+        FENCE_SUBJECT, ORGANIZATION_TWO,
+    );
+    const created = await handleRequest(db, req(
+        'POST', '/identities/', caller,
+        { id: identityId, kind: 'person' },
+    ));
+    await created.body?.cancel();
+    assertStrictEquals(created.status, 201);
+    const written = await handleRequest(db, req(
+        'PUT', '/identities/' + identityId + '/pii', caller,
+        {
+            name: 'Seatless Fence',
+            email: 'seatless-fence@x.com',
+            phone: '',
+            bio: '',
+        },
+    ));
+    await written.body?.cancel();
+    assertStrictEquals(written.status, 201);
+    await landMembership(
+        db, ORGANIZATION_TWO, identityId, 'accepted',
+        'member', ELSEWHERE_AT,
+    );
+    const hidden = await handleRequest(db, req(
+        'GET', '/identities/' + identityId + '/pii', caller,
+    ));
+    assertStrictEquals(hidden.status, 403);
+    assertEquals(await hidden.json(), {
+        error: 'forbidden: identity_pii/' + identityId
+            + ' belongs to a different organization',
+    });
+    const visible = await handleRequest(db, req(
+        'GET', '/identities/' + identityId + '/pii', home,
+    ));
+    assertStrictEquals(visible.status, 200);
+    const body = await visible.json() as { name: string };
+    assertStrictEquals(body.name, 'Seatless Fence');
 });
 
 // -- 2b. the by-email login-shape leg (Phase 13 Task 8, concern -
