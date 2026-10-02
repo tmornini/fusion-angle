@@ -12,8 +12,14 @@ import {
 import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
+import { deriveOrganizationMemberSeat } from
+    '../api/derive-memberships.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 const T1 = '2026-01-01T00:00:00.000000Z';
 const T2 = '2026-02-01T00:00:00.000000Z';
@@ -141,19 +147,27 @@ Deno.test(
     'identityDefaultOrganization tie-breaks equal-at by lowest org id',
     async () => {
         const db = await freshDb();
+        // Identifier order is not code-point order: 'B'
+        // precedes '0', so a string sort inverts these.
+        const earlier = 'BAAAAAAAAAAAAAAAAAAAAA';
+        const later = '0AAAAAAAAAAAAAAAAAAAAA';
+        assertStrictEquals(
+            compareIdentifiers(earlier, later) < 0, true,
+        );
+        assertStrictEquals(earlier < later, false);
         await seedMembershipPair(
             db, generateIdentifier(),
-            'CaaaaaaaaaaaaaaaaaaAw', IDENTITY_ID, T1,
+            later, IDENTITY_ID, T1,
         );
         await seedMembershipPair(
             db, generateIdentifier(),
-            ORGANIZATION_TWO, IDENTITY_ID, T1,
+            earlier, IDENTITY_ID, T1,
         );
         assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
-            ORGANIZATION_TWO,
+            earlier,
         );
     },
 );
@@ -172,8 +186,8 @@ Deno.test(
 );
 
 Deno.test(
-    'identityDefaultOrganization skips a SET that is not a'
-    + ' live seat',
+    'a seat removed below the mirror leaves the'
+    + ' accepted membership, so the SET holds',
     async () => {
         const db = await freshDb();
         await seedMembershipPair(
@@ -221,7 +235,62 @@ Deno.test(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
+            ORGANIZATION_TWO,
+        );
+    },
+);
+
+Deno.test(
+    'identityDefaultOrganization falls to the primary'
+    + ' when the SET membership is removed',
+    async () => {
+        const db = await freshDb();
+        await seedMembershipPair(
+            db, generateIdentifier(),
+            STARK_ORGANIZATION, IDENTITY_ID, T1,
+        );
+        await seedMembershipPair(
+            db, generateIdentifier(),
+            ORGANIZATION_TWO, IDENTITY_ID, T2,
+        );
+        await seedDefaultOrganizationEvent(
+            db, IDENTITY_ID, ORGANIZATION_TWO, T2,
+        );
+        await landMembership(
+            db, ORGANIZATION_TWO, IDENTITY_ID, 'removed',
+            'member', '2026-03-01T00:00:00.000000Z',
+        );
+        const seat = await deriveOrganizationMemberSeat(
+            db, ORGANIZATION_TWO, IDENTITY_ID,
+        );
+        assertStrictEquals(seat.type, 'member');
+        assertStrictEquals(
+            seat.organization_id, ORGANIZATION_TWO,
+        );
+        assertStrictEquals(
+            await identityDefaultOrganization(
+                db, IDENTITY_ID,
+            ),
             STARK_ORGANIZATION,
+        );
+    },
+);
+
+Deno.test(
+    'identityDefaultOrganization takes a membership'
+    + ' with no seat as the primary',
+    async () => {
+        const db = await freshDb();
+        const organization = generateIdentifier();
+        await landMembership(
+            db, organization, IDENTITY_ID, 'accepted',
+            'member', T1,
+        );
+        assertStrictEquals(
+            await identityDefaultOrganization(
+                db, IDENTITY_ID,
+            ),
+            organization,
         );
     },
 );

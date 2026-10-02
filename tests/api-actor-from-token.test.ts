@@ -8,7 +8,14 @@ import { seedOrganizationMember } from
     './root-admin-fixture.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { identifierOfUuidText } from
+    '../shared/identifier.ts';
 
+// 6f0b9c1e-4a27-4d5b-8e31-7c9a2f10b6d4. A membership
+// read accepts this identifier. The short name is not one.
+const ALICE = identifierOfUuidText(
+    '6f0b9c1e-4a27-4d5b-8e31-7c9a2f10b6d4',
+);
 
 Deno.test(
     'a person identity write is authored by the token',
@@ -39,18 +46,18 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await seedHumanMember(db, 'alice', 'Alice');
-        await seedOrganizationMember(db, 'alice');
-        const token = await devToken('alice');
+        await seedHumanMember(db, ALICE, 'Alice');
+        await seedOrganizationMember(db, ALICE);
+        const token = await devToken(ALICE);
         const { principalFromToken } = await import(
             '../shared/access-token-decode.ts'
         );
         assertStrictEquals(
-            principalFromToken(token).id, 'alice',
+            principalFromToken(token).id, ALICE,
         );
         const seats = (await GETCollection<{ id: string }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
             operationIdHeader())).map((part) => part.body().toValue());
-        assert(seats.some(s => s.id === 'alice'));
+        assert(seats.some(s => s.id === ALICE));
     },
 );

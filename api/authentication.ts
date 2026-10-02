@@ -17,7 +17,6 @@ import {
 } from './access-token.ts';
 import {
     byAtThenIdAscending,
-    compareIdentifiers,
     generateIdentifier,
 } from '../shared/identifier.ts';
 import { generateSecret } from
@@ -86,10 +85,9 @@ import type {
     WriteAnswer,
 } from './message-pair.ts';
 import {
-    deriveMembershipsForIdentity,
-    membershipExistsFor,
-} from './derive-memberships.ts';
-import { membershipsOfIdentity } from './memberships.ts';
+    membershipOf,
+    membershipsOfIdentity,
+} from './memberships.ts';
 import {
     deriveCredentialsFor,
     deriveClientRegistration,
@@ -436,11 +434,11 @@ export async function subjectOrganizations(
 
 // The org a flat (un-exchanged) token resolves to, server-side:
 // the SET default-organization document if that organization
-// is a live seat, else PRIMARY (earliest remaining join `at`,
+// is an accepted membership, else PRIMARY (earliest remaining join `at`,
 // lex organization id on tie), else null. The gate denies a
 // null — there is no global default left to fall back on.
 // Revoke does not rewrite the SET document; this read skips
-// a SET that is no longer a live seat.
+// a SET that is no longer an accepted membership.
 export async function identityDefaultOrganization(
     adapter: DbAdapter,
     identityId: Id,
@@ -453,9 +451,9 @@ export async function identityDefaultOrganization(
     );
     if (
         chosen !== null
-        && await membershipExistsFor(
+        && await membershipOf(
             adapter, chosen, identityId,
-        )
+        ) !== null
     ) {
         return chosen;
     }
@@ -471,22 +469,17 @@ async function primaryMembershipOrganization(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
-    // The index already narrows to this identity's rows, so no
-    // per-row identity guard after (trust the gate).
-    const rows = await deriveMembershipsForIdentity(
-        adapter, identityId);
-    let best: { organization: Id; at: string } | null = null;
-    for (const row of rows) {
-        if (best === null
-            || row.at < best.at
-            || (row.at === best.at
-                && compareIdentifiers(
-                    row.organization_id,
-                    best.organization) < 0)) {
-            best = { organization: row.organization_id, at: row.at };
-        }
-    }
-    return best === null ? null : best.organization;
+    const rows = await membershipsOfIdentity(
+        adapter, identityId,
+    );
+    rows.sort((left, right) => byAtThenIdAscending(
+        { at: left.at, id: left.organization_id },
+        { at: right.at, id: right.organization_id },
+    ));
+    const earliest = rows[0];
+    return earliest === undefined
+        ? null
+        : earliest.organization_id;
 }
 
 // Mint an access + refresh JWT pair. The access token gets a
