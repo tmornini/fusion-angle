@@ -222,12 +222,7 @@ function attributeDocument(): Record<string, unknown> {
 function invitationTransition(
     state: string,
 ): Record<string, unknown> {
-    return {
-        state,
-        membershipId: 'id',
-        eventId: 'id',
-        at: AT,
-    };
+    return { state, at: AT };
 }
 
 const WRITE_EXAMPLES = new Map<string, unknown>([
@@ -249,7 +244,7 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     ),
     writeExample(
         'put',
-        '/identities/:id/invitations/:id',
+        '/identities/:id/invitations/:membership-id',
         invitationTransition('accepted'),
     ),
     writeExample('put', '/ai-agents/:id', {
@@ -495,16 +490,11 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     writeExample(
         'post',
         '/organizations/:id/invitations/',
-        {
-            email: 'email',
-            invitationId: 'id',
-            grantEventId: 'id',
-            grantAt: AT,
-        },
+        { email: 'email', grantAt: AT },
     ),
     writeExample(
         'put',
-        '/organizations/:id/invitations/:id',
+        '/organizations/:id/invitations/:membership-id',
         invitationTransition('revoked'),
     ),
     writeExample(
@@ -635,22 +625,64 @@ function isDeletableDocument(row: Route): boolean {
         && documentFamilyWiring(family)?.lifecycle === 'state';
 }
 
+// The segment before the document id, for a version route.
+function versionFamily(row: Route): string | undefined {
+    const at = row.segments.indexOf('versions');
+    if (at < 2) return undefined;
+    return row.segments[at - 2];
+}
+
+// A lifecycle-'state' family, or a document route that
+// offers DELETE, can hold a deleted head.
+function familyHoldsDeletedHead(family: string): boolean {
+    if (
+        documentFamilyWiring(family)?.lifecycle === 'state'
+    ) {
+        return true;
+    }
+    return routes.some((candidate) => {
+        const last = candidate.segments.at(-1);
+        const previous = candidate.segments.at(-2);
+        return last !== undefined
+            && last.startsWith(':')
+            && previous === family
+            && offeredVerbs(candidate).includes('delete');
+    });
+}
+
 function statusCodesFor(
     row: Route,
     verb: HttpVerb,
 ): string[] {
     const codes: number[] = [];
+    const uri = uriOf(row);
     const selects = verb === 'get' && row.select !== undefined;
     if (verb === 'delete') codes.push(204);
     else codes.push(200);
     // A collection that selects no head answers 204.
-    if (selects && uriOf(row).endsWith('/')) codes.push(204);
-    const body = exampleBodyFor(uriOf(row), verb);
+    // A versions/ list never does: a written document
+    // has a PUT.
+    if (
+        selects
+        && uri.endsWith('/')
+        && !uri.endsWith('/versions/')
+    ) {
+        codes.push(204);
+    }
+    const body = exampleBodyFor(uri, verb);
     if (body !== 'none') codes.push(400);
     codes.push(401);
     if (isOrganizationNested(row)) codes.push(403);
     if (!isAuthGrant(row)) codes.push(404);
-    if (selects && isDeletableDocument(row)) codes.push(410);
+    const family = versionFamily(row);
+    const deletedVersion = family !== undefined
+        && familyHoldsDeletedHead(family);
+    if (
+        (selects && isDeletableDocument(row))
+        || deletedVersion
+    ) {
+        codes.push(410);
+    }
     const conditional = conditionalFor(verb, uriOf(row));
     if (conditional !== undefined && conditional !== 'none') {
         codes.push(412);

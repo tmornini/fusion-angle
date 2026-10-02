@@ -107,6 +107,13 @@ import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import {
     isIdentifier,
 } from '../shared/identifier.ts';
+import { parsedMembershipName } from
+    '../shared/membership-name.ts';
+import {
+    memberViewRefusal,
+    membershipNameRefusal,
+    type ViewQuery,
+} from './membership-gate.ts';
 
 export {
     ApiError,
@@ -143,9 +150,11 @@ function invitationWriteOwnsNotification(
     return routePattern
             === 'organizations/:id/invitations/'
         || routePattern
-            === 'organizations/:id/invitations/:id'
+            === 'organizations/:id/invitations/'
+                + ':membership-id'
         || routePattern
-            === 'identities/:id/invitations/:id';
+            === 'identities/:id/invitations/'
+                + ':membership-id';
 }
 
 // Tenant-root document and its version reads. Path org
@@ -343,6 +352,19 @@ function rejectMalformedIdentifierParams(
         const name = seg.slice(1);
         if (NON_IDENTIFIER_PARAMS.has(name)) continue;
         const value = pathSegments[i]!;
+        if (name === 'membership-id') {
+            if (parsedMembershipName(value) === undefined) {
+                return Response.json(
+                    {
+                        error: 'membership-id must be two'
+                            + ' identifiers joined by one'
+                            + ' colon',
+                    },
+                    { status: HTTP_BAD_REQUEST },
+                );
+            }
+            continue;
+        }
         if (!isIdentifier(value)) {
             return Response.json(
                 {
@@ -353,6 +375,55 @@ function rejectMalformedIdentifierParams(
                 { status: HTTP_BAD_REQUEST },
             );
         }
+    }
+    return undefined;
+}
+
+// The name's halves, after policy and before any read.
+// Organization nest: a foreign organization half is 403.
+// Identity nest: an identity half that is not the path's
+// is 404. A route with no :membership-id is untouched.
+function membershipNameGate(
+    route: Route,
+    params: readonly string[],
+    pathname: string,
+): Response | undefined {
+    let captured = 0;
+    let membershipId: string | undefined;
+    for (const segment of route.segments) {
+        if (!segment.startsWith(':')) continue;
+        if (segment === ':membership-id') {
+            membershipId = params[captured];
+            break;
+        }
+        captured += 1;
+    }
+    if (membershipId === undefined) return undefined;
+    const parsed = parsedMembershipName(membershipId);
+    if (parsed === undefined) return undefined;
+    const nest = route.segments[0] === 'organizations'
+        ? 'organization'
+        : 'identity';
+    const pathId = params[0];
+    if (pathId === undefined) return undefined;
+    const refusal = membershipNameRefusal(
+        nest, pathId, parsed,
+    );
+    if (refusal === 'foreign') {
+        return Response.json(
+            {
+                error: foreignOrganizationMessage(
+                    'invitations', membershipId,
+                ),
+            },
+            { status: HTTP_FORBIDDEN },
+        );
+    }
+    if (refusal === 'absent') {
+        return Response.json(
+            { error: 'Not found: ' + pathname },
+            { status: HTTP_NOT_FOUND },
+        );
     }
     return undefined;
 }
@@ -522,14 +593,15 @@ async function dispatched(
                             + 'invitations/'
                     && fencePattern
                         !== 'identities/:id/'
-                            + 'invitations/:id'
+                            + 'invitations/:membership-id'
                     && fencePattern
                         !== 'identities/:id/'
-                            + 'invitations/:id/versions/'
+                            + 'invitations/:membership-id'
+                            + '/versions/'
                     && fencePattern
                         !== 'identities/:id/'
-                            + 'invitations/:id/versions/'
-                            + ':etag'
+                            + 'invitations/:membership-id'
+                            + '/versions/:etag'
                     && !(
                         method === 'PUT'
                         && fencePattern
@@ -653,6 +725,37 @@ async function dispatched(
     }
     const { route: matched, params } = match;
     const routePattern = matched.segments.join('/');
+
+    const named = membershipNameGate(
+        matched, params, pathname,
+    );
+    if (named !== undefined) return named;
+
+    let viewQuery: ViewQuery | undefined;
+    if (method === 'GET' && matched.query !== undefined) {
+        const judged = matched.query(ctx.search);
+        if (judged.kind === 'refused') {
+            return Response.json(
+                { error: judged.error },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
+        if (
+            routePattern
+                === 'organizations/:id/invitations/'
+        ) {
+            const memberRefusal = memberViewRefusal(
+                roles, judged,
+            );
+            if (memberRefusal !== undefined) {
+                return Response.json(
+                    { error: memberRefusal },
+                    { status: HTTP_FORBIDDEN },
+                );
+            }
+        }
+        viewQuery = judged;
+    }
 
     // Parse the request body when the method
     // has one. A malformed or non-object JSON
@@ -904,6 +1007,7 @@ async function dispatched(
                         await matched.select(
                             effective, params, actor,
                             organization, roles,
+                            viewQuery,
                         ),
                         {
                             date: httpDateOf(nowUtc()),

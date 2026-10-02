@@ -67,13 +67,14 @@ import { OBJECTIVE_SEEDS } from
 import {
     mockProjectFlows,
     SEED_INSTANCE_ID,
-    UNAFFILIATED_INVITATION_ID,
     WO01_ID,
 } from '../api/mock-data/seed-message-pairs.ts';
 import { buildUnaffiliatedIdentity } from
     '../api/mock-data/members.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import type { MessagePairEntity } from '../shared/types.ts';
 
 Deno.test(
@@ -928,23 +929,32 @@ Deno.test(
     async () => {
         const rows = await (await sharedMockDb())
             .messagePairs.getAll();
-        const at = rows.filter((row) =>
+        const riley = buildUnaffiliatedIdentity().id;
+        const name = membershipNameOf(
+            STARK_ORGANIZATION, riley,
+        );
+        const put = rows.find((row) =>
             row.path === '/invitations/'
-            && row.name === UNAFFILIATED_INVITATION_ID);
-        const post = at.find((row) => row.method === 'POST');
-        const put = at.find((row) => row.method === 'PUT');
-        assert(post !== undefined && put !== undefined);
+            && row.name === name
+            && row.method === 'PUT');
+        const operation = rows.find((row) =>
+            row.path === '/invitations/' + name + '/'
+            && row.name === 'pending');
+        assert(put !== undefined && operation !== undefined);
+        assertStrictEquals(operation.method, 'POST');
         const invitation = JSON.parse(
-            HttpMessage.fromWire(post.response).body().toText(),
+            HttpMessage.fromWire(put.response).body().toText(),
         ) as Record<string, unknown>;
         assertStrictEquals(
             invitation['organization_id'], STARK_ORGANIZATION,
         );
+        assertStrictEquals(invitation['identity_id'], riley);
         assertStrictEquals(
-            invitation['identity_id'],
-            buildUnaffiliatedIdentity().id,
+            invitation['id'], name,
         );
-        assertStrictEquals(post.operation_id, put.operation_id);
+        assertStrictEquals(
+            operation.operation_id, put.operation_id,
+        );
     },
 );
 

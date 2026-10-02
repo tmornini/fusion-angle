@@ -27,6 +27,7 @@ import {
 } from '../api/validators.ts';
 import {
     HTTP_CONFLICT,
+    HTTP_PRECONDITION_FAILED,
     RequestError,
     UnauthorizedError,
 } from '../shared/http-errors.ts';
@@ -44,6 +45,9 @@ import {
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
+import type { MembershipEntity } from '../shared/types.ts';
 import {
     postInvitationGrant,
     postInvitationAcceptance,
@@ -246,24 +250,30 @@ async function ctxFor(sub: string, organization: string) {
     return { db, ctx, daveId };
 }
 
-// The invitation's newest version as its organization's
-// admin reads it, with the author the server recorded.
+// The invitation's newest version is the last part. The
+// author is the pair the statement stored, not a body field.
 async function newestVersion(
+    db: DbAdapter,
     admin: RequestContext,
     organization: string,
     id: string,
 ): Promise<{ etag: string; at: string; member_id: string }> {
-    const versions = (await admin.GET<{
-        etag: string;
-        at: string;
-        member_id: string;
-    }[]>(
+    const parts = await admin.GETCollection<MembershipEntity>(
         'organizations/' + organization + '/invitations/'
             + id + '/versions/',
-    )).body().toValue();
-    const newest = versions[0];
+    );
+    const newest = parts[parts.length - 1];
     assert(newest !== undefined, 'the invitation has no version');
-    return newest;
+    const etag = newest.query('header.etag').toText();
+    const pair = await db.messagePairs.getById(
+        etag.slice(1, -1),
+    );
+    assert(pair !== null);
+    return {
+        etag,
+        at: newest.body().toValue().at,
+        member_id: pair.requester_identity_id,
+    };
 }
 
 // A context bound to an existing db (for two actors in one test).
@@ -403,9 +413,21 @@ Deno.test('grant by unknown email returns no-identity',
 
 Deno.test('grant for an existing member returns already-member',
 () => withLocalStorageAsync(freshStorage(), async () => {
-    // Tony invites Sarah to Stark, where she is already a member.
+    // An accepted membership is a member. A seat alone is not.
     const { ctx } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
+    const sarah = 'toccYYkLEABmlbpHJalgtQ';
+    const stark = 'AjdvjuECVZEgZoFajaIEkg';
+    await ctx.PUT(
+        'organizations/' + stark + '/invitations/'
+            + membershipNameOf(stark, sarah),
+        {
+            state: 'accepted',
+            type: 'member',
+            at: '2026-01-01T00:00:00.000000Z',
+        },
+        'creates',
+    );
     assertStrictEquals(
         await postInvitationGrant(ctx, 'sarah@x.com'),
         'already-member');
@@ -431,7 +453,10 @@ Deno.test('the invitee reads their own pending invitation',
         , 'AjdvjuECVZEgZoFajaIEkg');
     const mine = await getInvitations(toccYYkLEABmlbpHJalgtQ);
     assertStrictEquals(mine.length, 1);
-    assertStrictEquals(mine[0]!.organizationName, 'Wayne');
+    assertStrictEquals(
+        mine[0]!.organizationId, 'BBjWJsjYIDkTRKIIPrzWRw',
+    );
+    assert(!('organizationName' in mine[0]!));
     assertStrictEquals(mine[0]!.state, 'pending');
 }));
 
@@ -449,36 +474,6 @@ Deno.test('the view omits the inviter name when PII is erased',
     const mine = await getInvitations(toccYYkLEABmlbpHJalgtQ);
     assertStrictEquals(mine.length, 1);
     assert(!('invitedByName' in mine[0]!));
-}));
-
-Deno.test('the view omits the org name when the org is gone',
-() => withLocalStorageAsync(freshStorage(), async () => {
-    // Org '3': current is admin/member, but it carries no
-    // organizations document at all — a states 'deleted' event
-    // against an EXISTING org (the pre-flip version of this test)
-    // no longer omits the name, since the flipped join (Phase 12
-    // Task 5) derives from the ledger, which never consults
-    // states (a NAMED watch-point, api/derive-organizations.ts's
-    // own header — organizations carry no real delete lifecycle,
-    // so a genuinely-undocumented org is the honest "gone" case
-    // on BOTH planes).
-    const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
-        , 'BBjWJsjYIDkTRKIIPrzWRw');
-    const missingOrganization = generateIdentifier();
-    await seedMembershipPair(db, generateIdentifier(), {
-        organization_id: missingOrganization,
-        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        type: 'admin', at: AT,
-    });
-    const tony = await ctxOn(
-        db, 'XXZruirZyAOoRpNxaDnpSA', missingOrganization,
-    );
-    await postInvitationGrant(tony, 'sarah@x.com');
-    const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
-        , 'AjdvjuECVZEgZoFajaIEkg');
-    const mine = await getInvitations(toccYYkLEABmlbpHJalgtQ);
-    assertStrictEquals(mine.length, 1);
-    assert(!('organizationName' in mine[0]!));
 }));
 
 Deno.test('accept writes a membership in the invitation org',
@@ -652,12 +647,10 @@ Deno.test('granting the same email twice is idempotent',
     assertStrictEquals((await deriveInvitations(db)).length, 1);
 }));
 
-// The dedup treats only a PENDING invitation as outstanding — a
-// DECLINED one is spent. Contrast the idempotent-duplicate case
-// above (still pending): here the invitee has answered, so the
-// re-grant must mint a FRESH invitation, never echo the declined
-// row's id.
-Deno.test('re-inviting a declined invitee mints a fresh invitation',
+// A declined membership is the same document. A later grant
+// lands pending on it.
+Deno.test('re-inviting a declined invitee lands pending on the'
++ ' same membership',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -673,14 +666,12 @@ Deno.test('re-inviting a declined invitee mints a fresh invitation',
         await postInvitationGrant(tony, 'sarah@x.com'), 'sent');
 
     const invs = await deriveInvitations(db);
-    assertStrictEquals(invs.length, 2);
-    const fresh = invs.find(inv => inv.id !== first.id);
-    assert(fresh !== undefined);
-
+    assertStrictEquals(invs.length, 1);
+    assertStrictEquals(invs[0]!.id, first.id);
+    assertStrictEquals(invs[0]!.state, 'pending');
     const mine = await getInvitations(toccYYkLEABmlbpHJalgtQ);
-    const stateById = new Map(mine.map(v => [v.id, v.state]));
-    assertStrictEquals(stateById.get(first.id), 'declined');
-    assertStrictEquals(stateById.get(fresh!.id), 'pending');
+    assertStrictEquals(
+        mine.find(v => v.id === first.id)?.state, 'pending');
 }));
 
 Deno.test('sent invitations list the active org pending only',
@@ -692,7 +683,10 @@ Deno.test('sent invitations list the active org pending only',
     await postInvitationGrant(tonyWayne, 'sarah@x.com');
     const sent = await getSentInvitations(tonyWayne);
     assertStrictEquals(sent.length, 1);
-    assertStrictEquals(sent[0]!.inviteeEmail, 'sarah@x.com');
+    assertStrictEquals(
+        sent[0]!.identityId, 'toccYYkLEABmlbpHJalgtQ',
+    );
+    assert(!('inviteeEmail' in sent[0]!));
     // Switched to Stark, the Wayne invitation is out of scope.
     const tonyStark = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
@@ -734,7 +728,7 @@ Deno.test('grant: entity lands and event author is server-derived',
     assert(invs[0]!.id !== '');
     // The newest version exists and carries an at.
     const ev = await newestVersion(
-        tony, 'BBjWJsjYIDkTRKIIPrzWRw', invs[0]!.id,
+        db, tony, 'BBjWJsjYIDkTRKIIPrzWRw', invs[0]!.id,
     );
     assert(ev.at !== '');
     assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
@@ -756,7 +750,7 @@ Deno.test('accept: event author is server-derived, membership lands',
     );
     // The version landed with a non-empty etag + at.
     const ev = await newestVersion(
-        tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
+        db, tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
     assert(ev.etag !== '');
     assert(ev.at !== '');
@@ -780,7 +774,7 @@ Deno.test('decline: event author is server-derived',
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationDecline(dave, inv.id);
     const ev = await newestVersion(
-        tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
+        db, tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
     assert(ev.etag !== '');
     assert(ev.at !== '');
@@ -797,7 +791,7 @@ Deno.test('revoke: event author is server-derived',
     const inv = (await deriveInvitations(db))[0]!;
     await postInvitationRevocation(tony, inv.id);
     const ev = await newestVersion(
-        tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
+        db, tony, 'BBjWJsjYIDkTRKIIPrzWRw', inv.id,
     );
     assert(ev.etag !== '');
     assert(ev.at !== '');
@@ -829,15 +823,28 @@ Deno.test('a repeated accept posts no notification',
     const inv = (await deriveInvitations(db))[0]!;
     const toccYYkLEABmlbpHJalgtQ = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'AjdvjuECVZEgZoFajaIEkg');
+    const pending = await toccYYkLEABmlbpHJalgtQ.GET(
+        'identities/toccYYkLEABmlbpHJalgtQ/invitations/'
+            + inv.id,
+    );
     await postInvitationAcceptance(
         toccYYkLEABmlbpHJalgtQ, inv.id,
         'BBjWJsjYIDkTRKIIPrzWRw',
     );
     assertStrictEquals(posted.length, 2);   // grant, accept
-    await postInvitationAcceptance(
-        toccYYkLEABmlbpHJalgtQ, inv.id,
-        'BBjWJsjYIDkTRKIIPrzWRw',
-    );
+    const err = await assertRejects(
+        () => toccYYkLEABmlbpHJalgtQ.PUT(
+            'identities/toccYYkLEABmlbpHJalgtQ/invitations/'
+                + inv.id,
+            {
+                state: 'accepted',
+                at: '2026-01-01T00:00:02.000000Z',
+            },
+            [pending],
+        ),
+    ) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
     assertStrictEquals(posted.length, 2);
 }));
 
@@ -854,7 +861,11 @@ Deno.test('a repeated decline posts no notification',
     const dave = await ctxOn(db, daveId, 'AjdvjuECVZEgZoFajaIEkg');
     await postInvitationDecline(dave, inv.id);
     assertStrictEquals(posted.length, 2);   // grant, decline
-    await postInvitationDecline(dave, inv.id);
+    const err = await assertRejects(
+        () => postInvitationDecline(dave, inv.id),
+    ) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
     assertStrictEquals(posted.length, 2);
 }));
 
@@ -868,7 +879,11 @@ Deno.test('a repeated revoke posts no notification',
     const inv = (await deriveInvitations(db))[0]!;
     await postInvitationRevocation(tony, inv.id);
     assertStrictEquals(posted.length, 2);   // grant, revoke
-    await postInvitationRevocation(tony, inv.id);
+    const err = await assertRejects(
+        () => postInvitationRevocation(tony, inv.id),
+    ) as RequestError;
+    assertInstanceOf(err, RequestError);
+    assertStrictEquals(err.status, HTTP_CONFLICT);
     assertStrictEquals(posted.length, 2);
 }));
 

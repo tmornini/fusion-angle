@@ -17,6 +17,7 @@ export function offeredVerbs(
         (key) =>
             key !== 'segments'
             && key !== 'select'
+            && key !== 'query'
             && !(HTTP_VERBS as readonly string[])
                 .includes(key)
             && typeof (row as unknown as

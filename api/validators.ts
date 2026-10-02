@@ -33,6 +33,7 @@ import type {
     SeatEntity,
     MembershipType,
     InvitationEntity,
+    InvitationState,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
     RecordEntity,
@@ -1952,61 +1953,39 @@ export function validateInvitationEntity(
     };
 }
 
-export interface InvitationTransitionBody {
-    readonly state: 'accepted' | 'declined'
-        | 'revoked';
-    readonly membershipId?: string;
-    readonly eventId: string;
+export interface MembershipRequestBody {
+    readonly state: InvitationState;
+    readonly type?: MembershipType;
     readonly at: string;
 }
 
-const INVITATION_TRANSITION_KEYS:
-    readonly string[] = [
-    'state', 'eventId', 'at',
+const MEMBERSHIP_REQUEST_KEYS: readonly string[] = [
+    'state', 'at',
 ];
 
-export function validateInvitationTransitionBody(
+export function validateMembershipRequest(
     body: Record<string, unknown>,
-): InvitationTransitionBody {
+): MembershipRequestBody {
     assertOnlyKeys(
         body,
-        INVITATION_TRANSITION_KEYS,
-        'InvitationTransitionBody',
-        ['membershipId'],
+        MEMBERSHIP_REQUEST_KEYS,
+        'MembershipRequest',
+        ['type'],
     );
-    const state = pickString(body, 'state');
-    if (
-        state !== 'accepted'
-        && state !== 'declined'
-        && state !== 'revoked'
-    ) {
-        throw new ValidationError(
-            'InvitationTransitionBody.state must'
-            + ' be accepted, declined, or revoked',
-        );
-    }
-    const membershipId = 'membershipId' in body
-        ? pickIdentifier(body, 'membershipId')
+    const state = assertInvitationState(
+        pickString(body, 'state'), 'MembershipRequest',
+    );
+    const type = 'type' in body
+        ? validateEnumField(
+            body, 'type', MEMBERSHIP_TYPES,
+            'membership type', 'MembershipRequest',
+        )
         : undefined;
-    if (state === 'accepted') {
-        if (
-            membershipId === undefined
-            || membershipId === ''
-        ) {
-            throw new ValidationError(
-                'membershipId must be non-empty',
-            );
-        }
-    }
     return {
         state,
-        ...(membershipId !== undefined
-            ? { membershipId }
-            : {}),
-        eventId: pickIdentifier(body, 'eventId'),
+        ...(type !== undefined ? { type } : {}),
         at: validateTimestampField(
-            body, 'at',
-            'InvitationTransitionBody.at',
+            body, 'at', 'MembershipRequest',
         ),
     };
 }

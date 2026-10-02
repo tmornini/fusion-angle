@@ -207,7 +207,7 @@ Deno.test('a GET of a document that can be deleted'
         '/identities/:id',
         '/organizations/:id',
         '/organizations/:id/ideas/',
-        '/organizations/:id/invitations/:id',
+        '/organizations/:id/invitations/:membership-id',
     ]) {
         assert(
             !getStatusesOf(rooms, uri).includes('410'), uri,
@@ -220,13 +220,14 @@ Deno.test('a GET of a selected collection lists 204',
     const rooms = generateAll();
     for (const uri of [
         '/identities/',
+        '/identities/:id/invitations/',
         '/organizations/:id/ideas/',
+        '/organizations/:id/invitations/',
     ]) {
         assert(getStatusesOf(rooms, uri).includes('204'), uri);
     }
     for (const uri of [
         '/identities/:id',
-        '/organizations/:id/invitations/',
     ]) {
         assert(
             !getStatusesOf(rooms, uri).includes('204'), uri,

@@ -54,8 +54,8 @@ const NAMED_EXEMPT_ROUTE_PATTERNS:
         // would store a second nest document and turn
         // grant 200 into 201 via sendWriteResponse.
         'organizations/:id/invitations/',
-        'organizations/:id/invitations/:id',
-        'identities/:id/invitations/:id',
+        'organizations/:id/invitations/:membership-id',
+        'identities/:id/invitations/:membership-id',
     ]);
 
 Deno.test('every write-verb route is pair-wired or named exempt',

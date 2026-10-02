@@ -39,16 +39,11 @@ function buildInviteeRow(inv: InvitationView): SafeHtml {
         }" data-invitation-id="${inv.id}">
             <div class="flex-fill min-w-0">
                 <p class="font-medium truncate">
-                    ${inv.organizationName ?? DISPLAY_ABSENT}
+                    ${DISPLAY_ABSENT}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
-                }">${
-                    inv.invitedByName !== undefined
-                        ? html`Invited by ${
-                            inv.invitedByName} · `
-                        : ''
-                }${formatDate(inv.invitedAt)}</p>
+                }">${formatDate(inv.invitedAt)}</p>
             </div>
             ${stateBadge(inv.state)}
             ${
@@ -66,7 +61,7 @@ function buildSentRow(inv: SentInvitation): SafeHtml {
         }" data-invitation-id="${inv.id}">
             <div class="flex-fill min-w-0">
                 <p class="font-medium truncate">
-                    ${inv.inviteeEmail ?? DISPLAY_ABSENT}
+                    ${DISPLAY_ABSENT}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'

@@ -584,7 +584,6 @@ Deno.test('a concurrent facade refresh and remint present'
         name: 'Tony', email: 'demo@example.com',
         phone: '', bio: '',
     });
-    const invitationId = generateIdentifier();
     const granted = await handleRequest(db, apiRequest({
         method: 'POST',
         path: '/organizations/' + ORGANIZATION_B
@@ -597,12 +596,11 @@ Deno.test('a concurrent facade refresh and remint present'
         }),
         body: {
             email: 'demo@example.com',
-            invitationId,
-            grantEventId: generateIdentifier(),
             grantAt: '2026-06-04T00:00:01.000000Z',
         },
     }));
     assertStrictEquals(granted.status, 201);
+    const invitationId = (await granted.json() as { id: string }).id;
     const pair = await issuePair(db);
     client.putSessionCredentials({
         accessToken: pair.access_token,

@@ -23,36 +23,20 @@ import {
     apiRequest,
     invitationLatched,
     partBodiesOf,
+    partsOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
+import type { MembershipEntity } from '../shared/types.ts';
 
-const INV_SARAH = generateIdentifier();
-const EV_GRANT = generateIdentifier();
-const INV_X = generateIdentifier();
-const EV_X = generateIdentifier();
-const INV_REVOKE = generateIdentifier();
-const EV_REVOKE = generateIdentifier();
-const MS_SARAH = generateIdentifier();
-const EV_ACC = generateIdentifier();
-const MS_SARAH_2 = generateIdentifier();
-const EV_ACC_2 = generateIdentifier();
-const INV_IDEM = generateIdentifier();
-const EV_G_IDEM = generateIdentifier();
-const EV_GAI = generateIdentifier();
-const MS_IDEM = generateIdentifier();
-const EV_A_IDEM = generateIdentifier();
-const EV_GDI = generateIdentifier();
-const EV_D_IDEM = generateIdentifier();
-const EV_GRI = generateIdentifier();
-const EV_R_IDEM = generateIdentifier();
-const MS_X = generateIdentifier();
-const MS_SARAH_REMOVED = generateIdentifier();
-const EV_ACC_REMOVED = generateIdentifier();
-const MS_SARAH_AGAIN = generateIdentifier();
-const EV_ACC_AGAIN = generateIdentifier();
-
+const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const SARAH = 'toccYYkLEABmlbpHJalgtQ';
+const SARAH_WAYNE = membershipNameOf(WAYNE, SARAH);
+const SARAH_STARK = membershipNameOf(STARK, SARAH);
 // Phase Final Task 2: memberships on the message plane.
 async function allMemberships(db: MemoryDbAdapter) {
     const organizations = await deriveOrganizations(db);
@@ -127,12 +111,17 @@ function req(
 }
 
 // A Wayne invitation's versions as Tony, its admin, reads
-// them: newest first, each with its etag, arrival, and
-// author.
+// them: oldest first. The etag is the stored pair. `at` is
+// the body's moment, and the author is that pair's requester.
 async function versionsOf(
     db: MemoryDbAdapter,
     id: string,
-): Promise<{ etag: string; at: string; member_id: string }[]> {
+): Promise<{
+    etag: string;
+    at: string;
+    state: string;
+    member_id: string;
+}[]> {
     const res = await handleRequest(db, req(
         'GET', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
             + id + '/versions/',
@@ -140,7 +129,21 @@ async function versionsOf(
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
     ));
     assertStrictEquals(res.status, 200);
-    return await res.json();
+    const parts = await partsOf<MembershipEntity>(res);
+    const rows = [];
+    for (const part of parts) {
+        const etag = part.query('header.etag').toText()
+            .slice(1, -1);
+        const pair = await db.messagePairs.getById(etag);
+        const body = part.body().toValue();
+        rows.push({
+            etag,
+            at: body.at,
+            state: body.state,
+            member_id: pair!.requester_identity_id,
+        });
+    }
+    return rows;
 }
 
 // Stark 'AjdvjuECVZEgZoFajaIEkg' and Wayne 'BBjWJsjYIDkTRKIIPrzWRw'. Tony
@@ -201,8 +204,6 @@ async function grantSarahToWayne(
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
         {
             email: 'sarah@x.com',
-            invitationId: INV_SARAH,
-            grantEventId: EV_GRANT,
             grantAt: AT,
         }));
     assertStrictEquals(res.status, 201);
@@ -220,9 +221,9 @@ async () => {
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg')));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as { state: string }[];
+    const rows = await partsOf<MembershipEntity>(res);
     assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.state, 'pending');
+    assertStrictEquals(rows[0]!.body().toValue().state, 'pending');
 });
 
 Deno.test('a non-admin is forbidden from granting', async () => {
@@ -233,7 +234,6 @@ Deno.test('a non-admin is forbidden from granting', async () => {
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             email: 'demo@example.com',
-            invitationId: INV_X, grantEventId: EV_X,
             grantAt: AT,
         }));
     assertStrictEquals(res.status, 403);
@@ -250,16 +250,16 @@ Deno.test('a non-admin is forbidden from revoking', async () => {
     const res = await handleRequest(db, req(
         'PUT',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
-            + INV_REVOKE,
+            + SARAH_STARK,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
-        { state: 'revoked', eventId: EV_REVOKE, at: AT },
+        { state: 'revoked', at: AT },
     ));
     assertStrictEquals(res.status, 403);
     assertEquals(await res.json(), {
         error: 'forbidden: PUT'
             + ' /organizations/AjdvjuECVZEgZoFajaIEkg'
-            + '/invitations/' + INV_REVOKE
+            + '/invitations/' + SARAH_STARK
             + ' requires a role this principal lacks',
     });
 });
@@ -288,7 +288,6 @@ Deno.test('a pending invitee is absent from the roster', async () => {
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: MS_SARAH, eventId: EV_ACC,
             at: AT,
         })));
     assertStrictEquals(acc.status, 200);
@@ -317,8 +316,6 @@ Deno.test('accept makes the invitation org reachable', async () => {
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: MS_SARAH_2,
-            eventId: EV_ACC_2,
             at: AT,
         })));
     const sarahOrganizations = (await allMemberships(db))
@@ -352,9 +349,10 @@ async () => {
     );
 });
 
-// Caller-minted id + at: replay idempotency at the API level.
-// A fixed body posted twice must produce exactly one event — the
-// same guarantee as flows-PUT replay (one updated event).
+// A fixed body posted twice on a pending head stores one
+// event. A second accept or decline latched on the head it
+// moved answers 409. A revoke replay latched on the pending
+// head answers 412.
 
 // Far-future timestamps distinguish caller-supplied `at` from
 // any server-stamped nowUtc() so an accidental server mint is
@@ -369,411 +367,330 @@ async () => {
     const db = await seed();
     const body = {
         email: 'sarah@x.com',
-        invitationId: INV_IDEM,
-        grantEventId: EV_G_IDEM,
         grantAt: GRANT_AT,
     };
     const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     const operationId = generateIdentifier();
     const r1 = await handleRequest(
-        db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
+        db, req('POST', '/organizations/' + WAYNE + '/invitations/',
             tok, body, operationId));
     assertStrictEquals(r1.status, 201);
+    await r1.body?.cancel();
     const r2 = await handleRequest(
-        db, req('POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
+        db, req('POST', '/organizations/' + WAYNE + '/invitations/',
             tok, body, operationId));
-    assertStrictEquals(r2.status, 409);
+    assertStrictEquals(r2.status, 200);
+    await r2.body?.cancel();
     assertStrictEquals((await deriveInvitations(db)).length, 1);
-    const versions = await versionsOf(db, INV_IDEM);
+    const versions = await versionsOf(db, SARAH_WAYNE);
     assertStrictEquals(versions.length, 1);
-    // The pending version is the grant's own document PUT.
     const ev = versions[0]!;
     const [grantPut] = documentMessagePairsAt(
         await db.messagePairs.getDocumentHistory(
-            '/invitations/', INV_IDEM,
+            '/invitations/', SARAH_WAYNE,
         ),
         '/invitations/',
     );
     assertStrictEquals(ev.etag, grantPut!.id);
-    assertStrictEquals(ev.at, grantPut!.at);
-});
-
-Deno.test('accept: replay of fixed body is a no-op (two events total)',
-async () => {
-    // grant emits 1 event, accept emits 1 more; a second accept
-    // of the same body must not emit a third.
-    const db = await seed();
-    const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-        , 'BBjWJsjYIDkTRKIIPrzWRw');
-    await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/', tok, {
-        email: 'sarah@x.com',
-        invitationId: 'hasVDnGjEylAnJDTPjnZuQ',
-        grantEventId: EV_GAI,
-        grantAt: GRANT_AT,
-    }));
-    const accBody = {
-        state: 'accepted',
-        membershipId: MS_IDEM,
-        eventId: EV_A_IDEM,
-        at: ACCEPT_AT,
-    };
-    const sTok = await organizationToken('toccYYkLEABmlbpHJalgtQ'
-        , 'AjdvjuECVZEgZoFajaIEkg');
-    const operationId = generateIdentifier();
-    const UQTJZvCoKlFjEoDlDUwekw = await handleRequest(
-        db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hasVDnGjEylAnJDTPjnZuQ',
-        sTok, accBody, operationId)));
-    assertStrictEquals(UQTJZvCoKlFjEoDlDUwekw.status, 200);
-    const UZgNCkZlSJcSaAmAJuSkcw = await handleRequest(
-        db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hasVDnGjEylAnJDTPjnZuQ',
-        sTok, accBody, operationId)));
-    assertStrictEquals(UZgNCkZlSJcSaAmAJuSkcw.status, 200);
-    const versions = await versionsOf(db, 'hasVDnGjEylAnJDTPjnZuQ');
-    assertStrictEquals(versions.length, 2);
-    // The accepted version is the terminal PUT's own pair.
-    const ev = versions[0]!;
-    const terminalPut = documentMessagePairsAt(
-        await db.messagePairs.getDocumentHistory(
-            '/invitations/', 'hasVDnGjEylAnJDTPjnZuQ',
-        ),
-        '/invitations/',
-    ).at(-1)!;
-    assertStrictEquals(ev.etag, terminalPut.id);
-    assertStrictEquals(ev.at, terminalPut.at);
-    assertStrictEquals(ev.member_id, 'toccYYkLEABmlbpHJalgtQ');
-});
-
-Deno.test('decline: replay of fixed body is a no-op (two events total)',
-async () => {
-    // grant emits 1 event, decline emits 1 more; a second
-    // decline of the same body must not emit a third.
-    const db = await seed();
-    const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-        , 'BBjWJsjYIDkTRKIIPrzWRw');
-    await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/', tok, {
-        email: 'sarah@x.com',
-        invitationId: 'hlmIVMfGBbdTSoChNYsQkQ',
-        grantEventId: EV_GDI,
-        grantAt: GRANT_AT,
-    }));
-    const decBody = {
-        state: 'declined',
-        eventId: EV_D_IDEM,
-        at: DECLINE_AT,
-    };
-    const sTok = await organizationToken('toccYYkLEABmlbpHJalgtQ'
-        , 'AjdvjuECVZEgZoFajaIEkg');
-    const operationId = generateIdentifier();
-    const d1 = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hlmIVMfGBbdTSoChNYsQkQ',
-        sTok, decBody, operationId)));
-    assertStrictEquals(d1.status, 200);
-    const d2 = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hlmIVMfGBbdTSoChNYsQkQ',
-        sTok, decBody, operationId)));
-    assertStrictEquals(d2.status, 200);
-    const versions = await versionsOf(db, 'hlmIVMfGBbdTSoChNYsQkQ');
-    assertStrictEquals(versions.length, 2);
-    // The declined version is the terminal PUT's own pair.
-    const ev = versions[0]!;
-    const terminalPut = documentMessagePairsAt(
-        await db.messagePairs.getDocumentHistory(
-            '/invitations/', 'hlmIVMfGBbdTSoChNYsQkQ',
-        ),
-        '/invitations/',
-    ).at(-1)!;
-    assertStrictEquals(ev.etag, terminalPut.id);
-    assertStrictEquals(ev.at, terminalPut.at);
-});
-
-Deno.test('revoke: replay of fixed body is a no-op (two events total)',
-async () => {
-    // grant emits 1 event, revoke emits 1 more; a second revoke
-    // of the same body must not emit a third.
-    const db = await seed();
-    const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-        , 'BBjWJsjYIDkTRKIIPrzWRw');
-    await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/', tok, {
-        email: 'sarah@x.com',
-        invitationId: 'itekPiJIBiPQhcZveiqTKw',
-        grantEventId: EV_GRI,
-        grantAt: GRANT_AT,
-    }));
-    const revBody = {
-        state: 'revoked',
-        eventId: EV_R_IDEM,
-        at: REVOKE_AT,
-    };
-    const operationId = generateIdentifier();
-    const r1 = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
-            + 'itekPiJIBiPQhcZveiqTKw',
-        tok, revBody, operationId)));
-    assertStrictEquals(r1.status, 200);
-    const r2 = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
-            + 'itekPiJIBiPQhcZveiqTKw',
-        tok, revBody, operationId)));
-    assertStrictEquals(r2.status, 200);
-    const versions = await versionsOf(db, 'itekPiJIBiPQhcZveiqTKw');
-    assertStrictEquals(versions.length, 2);
-    // The revoked version is the terminal PUT's own pair.
-    const ev = versions[0]!;
-    const terminalPut = documentMessagePairsAt(
-        await db.messagePairs.getDocumentHistory(
-            '/invitations/', 'itekPiJIBiPQhcZveiqTKw',
-        ),
-        '/invitations/',
-    ).at(-1)!;
-    assertStrictEquals(ev.etag, terminalPut.id);
-    assertStrictEquals(ev.at, terminalPut.at);
+    assertStrictEquals(ev.at, GRANT_AT);
     assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-// Gap-1 gate: empty ids are rejected at the gate (400).
-
-Deno.test('grant: empty invitationId is rejected (400)', async () => {
-    const db = await seed();
-    const res = await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            email: 'sarah@x.com',
-            invitationId: '',
-            grantEventId: EV_X,
-            grantAt: AT,
-        }));
-    assertStrictEquals(res.status, 400);
-});
-
-Deno.test('grant: empty grantEventId is rejected (400)', async () => {
-    const db = await seed();
-    const res = await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            email: 'sarah@x.com',
-            invitationId: INV_X,
-            grantEventId: '',
-            grantAt: AT,
-        }));
-    assertStrictEquals(res.status, 400);
-});
-
-Deno.test('accept: empty membershipId is rejected (400)', async () => {
-    const db = await seed();
-    await grantSarahToWayne(db);
-    const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'accepted',
-            membershipId: '',
-            eventId: EV_X,
-            at: AT,
-        })));
-    assertStrictEquals(res.status, 400);
-});
-
-Deno.test('decline: empty declineEventId is rejected (400)',
+Deno.test('accept: a replay latched on the accepted head'
++ ' is 409 (two events total)',
 async () => {
     const db = await seed();
-    await grantSarahToWayne(db);
-    const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'declined',
-            eventId: '',
-            at: AT,
-        })));
-    assertStrictEquals(res.status, 400);
+    const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const granted = await handleRequest(db, req(
+        'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
+        email: 'sarah@x.com',
+        grantAt: GRANT_AT,
+    }));
+    assertStrictEquals(granted.status, 201);
+    await granted.body?.cancel();
+    const accBody = {
+        state: 'accepted',
+        at: ACCEPT_AT,
+    };
+    const sTok = await organizationToken(SARAH, STARK);
+    const operationId = generateIdentifier();
+    const first = await handleRequest(
+        db, await invitationLatched(db, req(
+        'PUT', '/identities/' + SARAH + '/invitations/'
+            + SARAH_WAYNE,
+        sTok, accBody, operationId)));
+    assertStrictEquals(first.status, 200);
+    await first.body?.cancel();
+    const second = await handleRequest(
+        db, await invitationLatched(db, req(
+        'PUT', '/identities/' + SARAH + '/invitations/'
+            + SARAH_WAYNE,
+        sTok, accBody, operationId)));
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
+    const versions = await versionsOf(db, SARAH_WAYNE);
+    assertStrictEquals(versions.length, 2);
+    const ev = versions.at(-1)!;
+    const terminalPut = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', SARAH_WAYNE,
+        ),
+        '/invitations/',
+    ).at(-1)!;
+    assertStrictEquals(ev.etag, terminalPut.id);
+    assertStrictEquals(ev.at, ACCEPT_AT);
+    assertStrictEquals(ev.member_id, SARAH);
 });
 
-Deno.test('revoke: empty revokeEventId is rejected (400)', async () => {
+Deno.test('decline: a replay latched on the declined head'
++ ' is 409 (two events total)',
+async () => {
     const db = await seed();
-    await grantSarahToWayne(db);
-    const id = (await deriveInvitations(db))[0]!.id;
-    const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/' + id,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            state: 'revoked',
-            eventId: '',
-            at: AT,
-        })));
-    assertStrictEquals(res.status, 400);
+    const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const granted = await handleRequest(db, req(
+        'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
+        email: 'sarah@x.com',
+        grantAt: GRANT_AT,
+    }));
+    assertStrictEquals(granted.status, 201);
+    await granted.body?.cancel();
+    const decBody = {
+        state: 'declined',
+        at: DECLINE_AT,
+    };
+    const sTok = await organizationToken(SARAH, STARK);
+    const operationId = generateIdentifier();
+    const d1 = await handleRequest(db, await invitationLatched(db, req(
+        'PUT', '/identities/' + SARAH + '/invitations/'
+            + SARAH_WAYNE,
+        sTok, decBody, operationId)));
+    assertStrictEquals(d1.status, 200);
+    await d1.body?.cancel();
+    const d2 = await handleRequest(db, await invitationLatched(db, req(
+        'PUT', '/identities/' + SARAH + '/invitations/'
+            + SARAH_WAYNE,
+        sTok, decBody, operationId)));
+    assertStrictEquals(d2.status, 409);
+    await d2.body?.cancel();
+    const versions = await versionsOf(db, SARAH_WAYNE);
+    assertStrictEquals(versions.length, 2);
+    const ev = versions.at(-1)!;
+    const terminalPut = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', SARAH_WAYNE,
+        ),
+        '/invitations/',
+    ).at(-1)!;
+    assertStrictEquals(ev.etag, terminalPut.id);
+    assertStrictEquals(ev.at, DECLINE_AT);
 });
 
-// Gap-2 gate: missing or non-string fields are rejected (400),
-// not uncaught (500). pickString and validateTimestampField both
-// throw ValidationError on these inputs; the domain functions
-// must catch and translate, not leak.
+Deno.test('revoke: a replay latched on the pending head is 412',
+async () => {
+    const db = await seed();
+    const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const granted = await handleRequest(db, req(
+        'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
+        email: 'sarah@x.com',
+        grantAt: GRANT_AT,
+    }));
+    assertStrictEquals(granted.status, 201);
+    await granted.body?.cancel();
+    const revBody = {
+        state: 'revoked',
+        at: REVOKE_AT,
+    };
+    const operationId = generateIdentifier();
+    const path = '/organizations/' + WAYNE + '/invitations/'
+        + SARAH_WAYNE;
+    const firstReq = await invitationLatched(db, req(
+        'PUT', path, tok, revBody, operationId));
+    const replayReq = await invitationLatched(db, req(
+        'PUT', path, tok, revBody, generateIdentifier()));
+    const r1 = await handleRequest(db, firstReq);
+    assertStrictEquals(r1.status, 200);
+    await r1.body?.cancel();
+    const r2 = await handleRequest(db, replayReq);
+    assertStrictEquals(r2.status, 412);
+    await r2.body?.cancel();
+    const versions = await versionsOf(db, SARAH_WAYNE);
+    assertStrictEquals(versions.length, 2);
+    const ev = versions.at(-1)!;
+    const terminalPut = documentMessagePairsAt(
+        await db.messagePairs.getDocumentHistory(
+            '/invitations/', SARAH_WAYNE,
+        ),
+        '/invitations/',
+    ).at(-1)!;
+    assertStrictEquals(ev.etag, terminalPut.id);
+    assertStrictEquals(ev.at, REVOKE_AT);
+    assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
+});
 
-Deno.test('grant: missing invitationId is rejected (400)', async () => {
+Deno.test('grant: empty email is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            email: 'sarah@x.com',
-            // invitationId intentionally absent
-            grantEventId: EV_X,
-            grantAt: AT,
-        }));
+        'POST', '/organizations/' + WAYNE + '/invitations/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
+        { email: '', grantAt: AT }));
     assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
+});
+
+Deno.test('grant: empty grantAt is rejected (400)', async () => {
+    const db = await seed();
+    const res = await handleRequest(db, req(
+        'POST', '/organizations/' + WAYNE + '/invitations/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
+        { email: 'sarah@x.com', grantAt: '' }));
+    assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
+});
+
+Deno.test('accept: empty state is rejected (400)', async () => {
+    const db = await seed();
+    await grantSarahToWayne(db);
+    const id = (await deriveInvitations(db))[0]!.id;
+    const res = await handleRequest(db, await invitationLatched(db, req(
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
+        { state: '', at: AT })));
+    assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
+});
+
+Deno.test('decline: empty state is rejected (400)', async () => {
+    const db = await seed();
+    await grantSarahToWayne(db);
+    const id = (await deriveInvitations(db))[0]!.id;
+    const res = await handleRequest(db, await invitationLatched(db, req(
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
+        { state: '', at: AT })));
+    assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
+});
+
+Deno.test('revoke: empty state is rejected (400)', async () => {
+    const db = await seed();
+    await grantSarahToWayne(db);
+    const id = (await deriveInvitations(db))[0]!.id;
+    const res = await handleRequest(db, await invitationLatched(db, req(
+        'PUT', '/organizations/' + WAYNE + '/invitations/' + id,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
+        { state: '', at: AT })));
+    assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
+});
+
+Deno.test('grant: missing email is rejected (400)', async () => {
+    const db = await seed();
+    const res = await handleRequest(db, req(
+        'POST', '/organizations/' + WAYNE + '/invitations/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
+        { grantAt: AT }));
+    assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
 });
 
 Deno.test('grant: non-string grantAt is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'),
+        'POST', '/organizations/' + WAYNE + '/invitations/',
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
         {
             email: 'sarah@x.com',
-            invitationId: INV_X,
-            grantEventId: EV_X,
-            grantAt: 42,   // non-string
+            grantAt: 42,
         }));
     assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
 });
 
-Deno.test('accept: missing eventId is rejected (400)',
-async () => {
+Deno.test('accept: missing state is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'accepted',
-            membershipId: MS_X,
-            // eventId intentionally absent
-            at: AT,
-        })));
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
+        { at: AT })));
     assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
 });
 
-Deno.test('accept: non-string at is rejected (400)',
-async () => {
+Deno.test('accept: non-string at is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'accepted',
-            membershipId: MS_X,
-            eventId: EV_X,
-            at: 42,   // non-string
-        })));
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
+        { state: 'accepted', at: 42 })));
     assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
 });
 
-Deno.test('decline: missing declineAt is rejected (400)', async () => {
+Deno.test('decline: missing at is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'declined',
-            eventId: EV_X,
-            // at intentionally absent
-        })));
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
+        { state: 'declined' })));
     assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
 });
 
-// KEEP-ATOMIC (Author gate 6e): a removed member cannot
-// re-admit themselves by merely replaying their old acceptance.
-// The accept path's 'accepted' branch short-circuits to
-// a no-op BEFORE the membership-existence check ever runs, so
-// the property holds today already — this pin proves it against
-// TODAY's code, before Phase 8 Task 6 adds the document-plane
-// synthesis around this same accept path.
-Deno.test('a removed member who re-accepts gets a no-op — not a'
-+ ' silent re-admission (KEEP-ATOMIC)', async () => {
-    // Distinct, strictly-increasing `at` stamps, kept from the
-    // states-log era. The accept path reads the invitation's
-    // head document (loadInvitation, then
-    // transitionInvitation), not a reduction over events.
+Deno.test('a removed member who re-accepts is 409 — not a'
++ ' silent re-admission', async () => {
     const db = await seed();
     const id = await grantSarahToWayne(db);
     const accept = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
         {
             state: 'accepted',
-            membershipId: MS_SARAH_REMOVED,
-            eventId: EV_ACC_REMOVED,
             at: '2026-01-01T00:00:01.000000Z',
         })));
     assertStrictEquals(accept.status, 200);
+    await accept.body?.cancel();
     const del = await handleRequest(db, req(
-        'DELETE', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/members/'
-            + 'toccYYkLEABmlbpHJalgtQ',
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw')));
+        'DELETE', '/organizations/' + WAYNE + '/members/' + SARAH,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE)));
     assertStrictEquals(del.status, 204);
+    await del.body?.cancel();
     const versionsBefore = (await versionsOf(db, id)).length;
     const reaccept = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
+        'PUT', '/identities/' + SARAH + '/invitations/' + id,
+        await organizationToken(SARAH, STARK),
         {
             state: 'accepted',
-            membershipId: MS_SARAH_AGAIN,
-            eventId: EV_ACC_AGAIN,
             at: '2026-01-01T00:00:02.000000Z',
         })));
-    assertStrictEquals(reaccept.status, 200);
+    assertStrictEquals(reaccept.status, 409);
+    await reaccept.body?.cancel();
     const sarahInWayne = (await allMemberships(db))
-        .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ'
-            && m.organization_id === 'BBjWJsjYIDkTRKIIPrzWRw');
+        .filter(m => m.identity_id === SARAH
+            && m.organization_id === WAYNE);
     assertEquals(sarahInWayne, []);
     assertStrictEquals(
         (await versionsOf(db, id)).length, versionsBefore,
     );
 });
 
-Deno.test('revoke: missing revokeAt is rejected (400)', async () => {
+Deno.test('revoke: missing at is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, await invitationLatched(db, req(
-        'PUT', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/' + id,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            state: 'revoked',
-            eventId: EV_X,
-            // at intentionally absent
-        })));
+        'PUT', '/organizations/' + WAYNE + '/invitations/' + id,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
+        { state: 'revoked' })));
     assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
 });

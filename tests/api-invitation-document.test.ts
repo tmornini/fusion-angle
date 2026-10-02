@@ -25,6 +25,8 @@ import {
     generateIdentifier,
     compareIdentifiers,
 } from '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 // Phase 8 Task 6: the invitation document plane — the grant's
 // PUT-shaped invitation document (the entity minus id, NO email
@@ -36,40 +38,15 @@ import {
 // are storage-only.
 
 const AT = '2026-01-01T00:00:00.000000Z';
-const INV_DOC_1 = generateIdentifier();
-const INV_DOC_2A = generateIdentifier();
-const INV_DOC_2B = generateIdentifier();
-const INV_DOC_FAIL = generateIdentifier();
-const INV_DOC_3 = generateIdentifier();
-const MS_DOC_3 = generateIdentifier();
-const EV_ACC_3 = generateIdentifier();
-const INV_DOC_4 = generateIdentifier();
-const MS_DOC_4 = generateIdentifier();
-const EV_ACC_4 = generateIdentifier();
-const MS_DOC_4B = generateIdentifier();
-const EV_ACC_4B = generateIdentifier();
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const SARAH = 'toccYYkLEABmlbpHJalgtQ';
+const SARAH_NAME = membershipNameOf(STARK, SARAH);
 const BRUCE = generateIdentifier();
 const CLARK = generateIdentifier();
 const DIANA = generateIdentifier();
-const INV_DERIVE_PENDING = generateIdentifier();
-const INV_DERIVE_DECLINE = generateIdentifier();
-const INV_DERIVE_REVOKE = generateIdentifier();
-const MS_DERIVE_BRUCE = generateIdentifier();
-const EV_DERIVE_ACC = generateIdentifier();
-const EV_DERIVE_DEC = generateIdentifier();
-const EV_DERIVE_REV = generateIdentifier();
-const INV_DERIVE_REPLAY = generateIdentifier();
-const INV_BALANCE_1 = generateIdentifier();
-const INV_BALANCE_3 = generateIdentifier();
-const MS_BALANCE_2 = generateIdentifier();
-const EV_BALANCE_ACC = generateIdentifier();
-const EV_BALANCE_DEC = generateIdentifier();
-const INV_DOC_5 = generateIdentifier();
-const MS_DOC_5 = generateIdentifier();
-const EV_ACC_5 = generateIdentifier();
-const INV_DOC_6 = generateIdentifier();
-const EV_REV_6 = generateIdentifier();
-const INV_SEAT_NO_OP = generateIdentifier();
+const BRUCE_NAME = membershipNameOf(STARK, BRUCE);
+const CLARK_NAME = membershipNameOf(STARK, CLARK);
+const DIANA_NAME = membershipNameOf(STARK, DIANA);
 
 function req(
     method: string,
@@ -142,18 +119,12 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 
 async function grant(
     db: MemoryDbAdapter,
-    invitationId: string,
     email = 'sarah@x.com',
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/',
+        'POST', '/organizations/' + STARK + '/invitations/',
         await organizationToken(),
-        {
-            email,
-            invitationId,
-            grantEventId: 'ev-grant-' + invitationId,
-            grantAt: AT,
-        },
+        { email, grantAt: AT },
     ));
 }
 
@@ -163,7 +134,7 @@ Deno.test('a fresh grant appends 2 pairs — the operation and the'
 + ' invitation document, email ABSENT by construction',
 async () => {
     const db = await freshDb();
-    const res = await grant(db, INV_DOC_1);
+    const res = await grant(db);
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
     // 8: the fixture's own membership pair (Phase 13 Task 1;
@@ -174,16 +145,22 @@ async () => {
     assertStrictEquals(requests.length, 9);
     const pairsAt = requests.filter(
         r => r.path === '/invitations/'
-            && r.name === INV_DOC_1,
+            && r.name === SARAH_NAME,
     );
-    assertStrictEquals(pairsAt.length, 2);
+    assertStrictEquals(pairsAt.length, 1);
+    const operation = requests.filter(
+        r => r.path === '/invitations/' + SARAH_NAME + '/'
+            && r.name === 'pending',
+    );
+    assertStrictEquals(operation.length, 1);
+    assertStrictEquals(operation[0]!.method, 'POST');
     // The document head: the ONE PUT/2xx pair at this document —
     // documentMessagePairsAt excludes the operation message pair's POST
     // method by construction (design decision 6), so a match
     // here IS the document.
     const documents = documentMessagePairsAt(
         requests, '/invitations/',
-    ).filter(messagePair => messagePair.name === INV_DOC_1);
+    ).filter(messagePair => messagePair.name === SARAH_NAME);
     assertStrictEquals(documents.length, 1);
     const wire = documents[0]!.body;
     // The stored request is the invitation's state, which
@@ -191,65 +168,65 @@ async () => {
     // bytes.
     assertEquals(
         Object.keys(withoutId(wire)).sort(),
-        ['at', 'identity_id', 'organization_id', 'state'],
+        ['at', 'identity_id', 'organization_id', 'state', 'type'],
     );
     assertStrictEquals(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     assertStrictEquals(wire.identity_id, 'toccYYkLEABmlbpHJalgtQ');
     assertStrictEquals(wire.at, AT);
     assertStrictEquals(wire.email, undefined);
     assertStrictEquals(wire.state, 'pending');
+    assertStrictEquals(wire.type, 'member');
 });
 
 Deno.test('a duplicate grant answers the pending invitation with'
-+ ' 200 and stores nothing — no phantom document at the'
-+ ' duplicate\'s submitted id',
++ ' 200 and stores nothing',
 async () => {
     const db = await freshDb();
-    const first = await grant(db, INV_DOC_2A);
+    const first = await grant(db);
     assertStrictEquals(first.status, 201);
     await first.body?.cancel();
     const before = (await db.messagePairs.getAll()).length;
-    const second = await grant(db, INV_DOC_2B);
+    const second = await grant(db);
     assertStrictEquals(second.status, 200);
     assertEquals(await second.json(), {
-        id: INV_DOC_2A,
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        id: SARAH_NAME,
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
         at: AT,
         state: 'pending',
     });
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(requests.length, before);
-    const atDuplicateId = requests.filter(
-        r => r.path === '/invitations/'
-            && r.name === INV_DOC_2B,
-    );
-    assertStrictEquals(atDuplicateId.length, 0);
     const atFreshId = requests.filter(
         r => r.path === '/invitations/'
-            && r.name === INV_DOC_2A,
+            && r.name === SARAH_NAME,
     );
-    assertStrictEquals(atFreshId.length, 2);
+    assertStrictEquals(atFreshId.length, 1);
 });
 
-Deno.test('a failed (member-conflict) grant appends nothing',
-async () => {
+Deno.test('a grant of an accepted membership is 409'
++ ' and appends nothing', async () => {
     const db = await freshDb();
-    await seedMembershipMessagePair(db, generateIdentifier(), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg'
-            , identity_id: 'toccYYkLEABmlbpHJalgtQ',
-        type: 'member', at: AT,
-    });
-    const res = await grant(db, INV_DOC_FAIL);
+    const seated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK
+            + '/invitations/' + SARAH_NAME,
+        token: await organizationToken(),
+        body: {
+            state: 'accepted', type: 'member', at: AT,
+        },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(seated.status, 201);
+    await seated.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await grant(db);
     assertStrictEquals(res.status, 409);
-    // 7: the fixture's own membership pair, two seeded people
-    // (an identities/:id document and its pii document each),
-    // the organizations/:id document (Stage B), plus
-    // toccYYkLEABmlbpHJalgtQ's own conflicting membership pair
-    // (Phase 13 Task 1) — the failed grant appends nothing
-    // further. Role-grant retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 8);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 8);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 // ── accept: the memberships document message pair
@@ -261,32 +238,22 @@ async () => {
 
 async function accept(
     db: MemoryDbAdapter,
-    invitationId: string,
-    membershipId: string,
-    eventId: string,
     acceptAt: string,
 ): Promise<Response> {
     return handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + invitationId,
-        await organizationToken('toccYYkLEABmlbpHJalgtQ'
-            , 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'accepted',
-            membershipId,
-            eventId,
-            at: acceptAt,
-        },
+        '/identities/' + SARAH + '/invitations/' + SARAH_NAME,
+        await organizationToken(SARAH, STARK),
+        { state: 'accepted', at: acceptAt },
     )));
 }
 
 Deno.test('a fresh accept appends its seat document at the'
 + ' invitation-org members document', async () => {
     const db = await freshDb();
-    await grant(db, INV_DOC_3);
+    await grant(db);
     const res = await accept(
-        db, INV_DOC_3, MS_DOC_3, EV_ACC_3,
-        '2026-01-01T00:00:01.000000Z',
+        db, '2026-01-01T00:00:01.000000Z',
     );
     assertStrictEquals(res.status, 200);
     const requests = await db.messagePairs.getAll();
@@ -333,10 +300,9 @@ Deno.test('a fresh accept appends its seat document at the'
 Deno.test('a route PUT of the accepted seat stores nothing'
 + ' and answers 200', async () => {
     const db = await freshDb();
-    await grant(db, INV_SEAT_NO_OP);
+    await grant(db);
     const accepted = await accept(
-        db, INV_SEAT_NO_OP, generateIdentifier(),
-        generateIdentifier(), '2026-01-01T00:00:01.000000Z',
+        db, '2026-01-01T00:00:01.000000Z',
     );
     assertStrictEquals(accepted.status, 200);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
@@ -361,17 +327,15 @@ Deno.test('a route PUT of the accepted seat stores nothing'
 Deno.test('a no-op re-accept appends no seat document',
 async () => {
     const db = await freshDb();
-    await grant(db, INV_DOC_4);
+    await grant(db);
     const first = await accept(
-        db, INV_DOC_4, MS_DOC_4, EV_ACC_4,
-        '2026-01-01T00:00:01.000000Z',
+        db, '2026-01-01T00:00:01.000000Z',
     );
     assertStrictEquals(first.status, 200);
     const second = await accept(
-        db, INV_DOC_4, MS_DOC_4B, EV_ACC_4B,
-        '2026-01-01T00:00:02.000000Z',
+        db, '2026-01-01T00:00:02.000000Z',
     );
-    assertStrictEquals(second.status, 200);
+    assertStrictEquals(second.status, 409);
     const documents = (await db.messagePairs.getAll()).filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/'
@@ -380,7 +344,7 @@ async () => {
     const invitationDocuments = documentMessagePairsAt(
         await db.messagePairs.getCollectionPairs('/invitations/'),
         '/invitations/',
-    ).filter(messagePair => messagePair.name === INV_DOC_4);
+    ).filter(messagePair => messagePair.name === SARAH_NAME);
     assertStrictEquals(invitationDocuments.length, 2);
     assertStrictEquals(documents.length, 1);
 });
@@ -389,29 +353,30 @@ Deno.test('a terminal answer appends a full PUT of the'
 + ' invitation document whose head carries the state',
 async () => {
     const db = await freshDb();
-    await grant(db, INV_DOC_5);
+    await grant(db);
     const res = await accept(
-        db, INV_DOC_5, MS_DOC_5, EV_ACC_5,
-        '2026-01-01T00:00:01.000000Z',
+        db, '2026-01-01T00:00:01.000000Z',
     );
     assertStrictEquals(res.status, 200);
     const documents = documentMessagePairsAt(
         await db.messagePairs.getCollectionPairs('/invitations/'),
         '/invitations/',
-    ).filter(messagePair => messagePair.name === INV_DOC_5);
+    ).filter(messagePair => messagePair.name === SARAH_NAME);
     assertStrictEquals(documents.length, 2);
     // Each stored request is the invitation's state, id
     // first, until the former stores no request bytes.
     assertEquals(withoutId(documents[0]!.body), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
         at: AT,
         state: 'pending',
     });
     assertEquals(withoutId(documents[1]!.body), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'toccYYkLEABmlbpHJalgtQ',
-        at: AT,
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
+        at: '2026-01-01T00:00:01.000000Z',
         state: 'accepted',
     });
     assertStrictEquals(
@@ -424,29 +389,31 @@ Deno.test('a revoke appends a full PUT of the invitation'
 + ' document whose head carries the revoked state',
 async () => {
     const db = await freshDb();
-    await grant(db, INV_DOC_6);
+    await grant(db);
     const res = await revokeFor(
-        db, INV_DOC_6, EV_REV_6,
+        db, SARAH_NAME,
         '2026-01-01T00:00:01.000000Z',
     );
     assertStrictEquals(res.status, 200);
     const documents = documentMessagePairsAt(
         await db.messagePairs.getCollectionPairs('/invitations/'),
         '/invitations/',
-    ).filter(messagePair => messagePair.name === INV_DOC_6);
+    ).filter(messagePair => messagePair.name === SARAH_NAME);
     assertStrictEquals(documents.length, 2);
     // Each stored request is the invitation's state, id
     // first, until the former stores no request bytes.
     assertEquals(withoutId(documents[0]!.body), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'toccYYkLEABmlbpHJalgtQ',
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
         at: AT,
         state: 'pending',
     });
     assertEquals(withoutId(documents[1]!.body), {
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'toccYYkLEABmlbpHJalgtQ',
-        at: AT,
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
+        at: '2026-01-01T00:00:01.000000Z',
         state: 'revoked',
     });
     assertStrictEquals(
@@ -459,39 +426,28 @@ async () => {
 
 async function declineFor(
     db: MemoryDbAdapter,
-    invitationId: string,
     invitee: string,
-    eventId: string,
+    name: string,
     declineAt: string,
 ): Promise<Response> {
     return handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/' + invitee
-            + '/invitations/' + invitationId,
-        await organizationToken(invitee, 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'declined',
-            eventId,
-            at: declineAt,
-        },
+        '/identities/' + invitee + '/invitations/' + name,
+        await organizationToken(invitee, STARK),
+        { state: 'declined', at: declineAt },
     )));
 }
 
 async function revokeFor(
     db: MemoryDbAdapter,
-    invitationId: string,
-    eventId: string,
+    name: string,
     revokeAt: string,
 ): Promise<Response> {
     return handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/' + invitationId,
+        '/organizations/' + STARK + '/invitations/' + name,
         await organizationToken(),
-        {
-            state: 'revoked',
-            eventId,
-            at: revokeAt,
-        },
+        { state: 'revoked', at: revokeAt },
     )));
 }
 
@@ -503,44 +459,42 @@ Deno.test('deriveInvitations round-trips every terminal state:'
     await person(db, CLARK, 'Clark', 'clark@x.com');
     await person(db, DIANA, 'Diana', 'diana@x.com');
 
-    await grant(db, INV_DERIVE_PENDING, 'sarah@x.com');
+    await grant(db, 'sarah@x.com');
 
-    await grant(db, 'hkbiAljVBMHiLoGwiWjaaw', 'bruce@x.com');
+    await grant(db, 'bruce@x.com');
     await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + BRUCE
-            + '/invitations/hkbiAljVBMHiLoGwiWjaaw',
-        await organizationToken(BRUCE, 'AjdvjuECVZEgZoFajaIEkg'),
+            + '/invitations/' + BRUCE_NAME,
+        await organizationToken(BRUCE, STARK),
         {
             state: 'accepted',
-            membershipId: MS_DERIVE_BRUCE,
-            eventId: EV_DERIVE_ACC,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
 
-    await grant(db, INV_DERIVE_DECLINE, 'clark@x.com');
+    await grant(db, 'clark@x.com');
     await declineFor(
-        db, INV_DERIVE_DECLINE, CLARK, EV_DERIVE_DEC,
+        db, CLARK, CLARK_NAME,
         '2026-01-01T00:00:01.000000Z',
     );
 
-    await grant(db, INV_DERIVE_REVOKE, 'diana@x.com');
+    await grant(db, 'diana@x.com');
     await revokeFor(
-        db, INV_DERIVE_REVOKE, EV_DERIVE_REV,
+        db, DIANA_NAME,
         '2026-01-01T00:00:01.000000Z',
     );
 
     const derived = await deriveInvitations(db);
     const byId = new Map(derived.map(row => [row.id, row]));
     assertStrictEquals(
-        byId.get(INV_DERIVE_PENDING)?.state, 'pending');
+        byId.get(SARAH_NAME)?.state, 'pending');
     assertStrictEquals(
-        byId.get('hkbiAljVBMHiLoGwiWjaaw')?.state, 'accepted');
+        byId.get(BRUCE_NAME)?.state, 'accepted');
     assertStrictEquals(
-        byId.get(INV_DERIVE_DECLINE)?.state, 'declined');
+        byId.get(CLARK_NAME)?.state, 'declined');
     assertStrictEquals(
-        byId.get(INV_DERIVE_REVOKE)?.state, 'revoked');
+        byId.get(DIANA_NAME)?.state, 'revoked');
     // Identifier order (byIdAscending — the derivation's
     // own order, never the backend's).
     const ids = derived.map(row => row.id);
@@ -553,9 +507,9 @@ Deno.test('deriveInvitations round-trips every terminal state:'
 Deno.test('a no-op replay changes nothing deriveInvitations reads',
 async () => {
     const db = await freshDb();
-    await grant(db, INV_DERIVE_REPLAY);
+    await grant(db);
     const before = await deriveInvitations(db);
-    await grant(db, INV_DERIVE_REPLAY);   // byte-identical resend
+    await grant(db);
     const after = await deriveInvitations(db);
     assertEquals(after, before);
 });
@@ -566,23 +520,21 @@ Deno.test('every stored invitation-family message verifies against'
     const db = await freshDb();
     await person(db, BRUCE, 'Bruce', 'bruce@x.com');
     await person(db, CLARK, 'Clark', 'clark@x.com');
-    await grant(db, INV_BALANCE_1, 'sarah@x.com');
-    await grant(db, 'hdlRpVJZrTkuMAnTASJNnA', 'bruce@x.com');
+    await grant(db, 'sarah@x.com');
+    await grant(db, 'bruce@x.com');
     await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + BRUCE
-            + '/invitations/hdlRpVJZrTkuMAnTASJNnA',
-        await organizationToken(BRUCE, 'AjdvjuECVZEgZoFajaIEkg'),
+            + '/invitations/' + BRUCE_NAME,
+        await organizationToken(BRUCE, STARK),
         {
             state: 'accepted',
-            membershipId: MS_BALANCE_2,
-            eventId: EV_BALANCE_ACC,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
-    await grant(db, INV_BALANCE_3, 'clark@x.com');
+    await grant(db, 'clark@x.com');
     await declineFor(
-        db, INV_BALANCE_3, CLARK, EV_BALANCE_DEC,
+        db, CLARK, CLARK_NAME,
         '2026-01-01T00:00:01.000000Z',
     );
     const messagePairs = await db.messagePairs.getAll();
@@ -605,30 +557,39 @@ Deno.test('every stored invitation-family message verifies against'
 Deno.test('POST invitations/ answers 201 with the document\'s'
 + ' state and its location', async () => {
     const db = await freshDb();
-    const id = generateIdentifier();
-    const res = await grant(db, id);
+    const res = await grant(db);
     assertStrictEquals(res.status, 201);
-    assertStrictEquals(res.headers.get('location'), id);
+    assertStrictEquals(
+        res.headers.get('location'),
+        '/organizations/' + STARK
+            + '/invitations/' + SARAH_NAME,
+    );
     assertEquals(
         await res.json(),
         JSON.parse(
-            await storedPutBodyText(db, '/invitations/', id),
+            await storedPutBodyText(
+                db, '/invitations/', SARAH_NAME,
+            ),
         ),
     );
 });
 
-Deno.test('a resent POST invitations/ is 409 and stores nothing',
-async () => {
+Deno.test('a resent POST of a pending email is 200'
++ ' and stores nothing', async () => {
     const db = await freshDb();
-    const id = generateIdentifier();
-    const first = await grant(db, id);
+    const first = await grant(db);
     assertStrictEquals(first.status, 201);
     await first.body?.cancel();
     const before = (await db.messagePairs.getAll()).length;
-    const second = await grant(db, id);
-    assertStrictEquals(second.status, 409);
+    const second = await grant(db);
+    assertStrictEquals(second.status, 200);
     assertEquals(await second.json(), {
-        error: 'Document already exists at /invitations/' + id,
+        id: SARAH_NAME,
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
+        at: AT,
+        state: 'pending',
     });
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
@@ -660,13 +621,12 @@ const ORGANIZATION_NEST =
 async function granted(
     db: MemoryDbAdapter,
 ): Promise<{ id: string, etag: string }> {
-    const id = generateIdentifier();
-    const res = await grant(db, id);
+    const res = await grant(db);
     assertStrictEquals(res.status, 201);
     await res.body?.cancel();
     const etag = res.headers.get('etag');
     assert(etag !== null);
-    return { id, etag };
+    return { id: SARAH_NAME, etag };
 }
 
 async function inviteeToken(): Promise<string> {
@@ -683,8 +643,6 @@ async () => {
     const accepted = await handleRequest(db, transitionRequest(
         INVITEE_NEST + id, await inviteeToken(), {
             state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: generateIdentifier(),
             at: '2026-01-01T00:00:01.000000Z',
         },
     ));
@@ -693,7 +651,6 @@ async () => {
     const declined = await handleRequest(db, transitionRequest(
         INVITEE_NEST + id, await inviteeToken(), {
             state: 'declined',
-            eventId: generateIdentifier(),
             at: '2026-01-01T00:00:01.000000Z',
         },
     ));
@@ -702,7 +659,6 @@ async () => {
     const revoked = await handleRequest(db, transitionRequest(
         ORGANIZATION_NEST + id, await organizationToken(), {
             state: 'revoked',
-            eventId: generateIdentifier(),
             at: '2026-01-01T00:00:01.000000Z',
         },
     ));
@@ -719,8 +675,6 @@ Deno.test('accept answers the invitation\'s state', async () => {
     const res = await handleRequest(db, transitionRequest(
         INVITEE_NEST + id, await inviteeToken(), {
             state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: generateIdentifier(),
             at: '2026-01-01T00:00:01.000000Z',
         }, etag,
     ));
@@ -731,9 +685,10 @@ Deno.test('accept answers the invitation\'s state', async () => {
     assertStrictEquals(res.headers.get('etag'), '"' + head?.id + '"');
     assertEquals(await res.json(), {
         id,
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: 'toccYYkLEABmlbpHJalgtQ',
-        at: AT,
+        organization_id: STARK,
+        identity_id: SARAH,
+        type: 'member',
+        at: '2026-01-01T00:00:01.000000Z',
         state: 'accepted',
     });
 });
@@ -744,7 +699,6 @@ Deno.test('a stale invitation tag is 412', async () => {
     const revoked = await handleRequest(db, transitionRequest(
         ORGANIZATION_NEST + id, await organizationToken(), {
             state: 'revoked',
-            eventId: generateIdentifier(),
             at: '2026-01-01T00:00:01.000000Z',
         }, etag,
     ));
@@ -754,8 +708,6 @@ Deno.test('a stale invitation tag is 412', async () => {
     const res = await handleRequest(db, transitionRequest(
         INVITEE_NEST + id, await inviteeToken(), {
             state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: generateIdentifier(),
             at: '2026-01-01T00:00:02.000000Z',
         }, etag,
     ));
@@ -766,13 +718,12 @@ Deno.test('a stale invitation tag is 412', async () => {
     );
 });
 
-Deno.test('a resent revoke answers the head and stores nothing',
-async () => {
+Deno.test('a resent revoke latched on the revoked head'
++ ' is 409 and stores nothing', async () => {
     const db = await freshDb();
     const { id, etag } = await granted(db);
     const body = {
         state: 'revoked',
-        eventId: generateIdentifier(),
         at: '2026-01-01T00:00:01.000000Z',
     };
     const first = await handleRequest(db, transitionRequest(
@@ -781,16 +732,18 @@ async () => {
     ));
     assertStrictEquals(first.status, 200);
     const head = first.headers.get('etag');
-    const state = await first.json();
+    await first.body?.cancel();
     assert(head !== null);
     const before = (await db.messagePairs.getAll()).length;
     const resent = await handleRequest(db, transitionRequest(
         ORGANIZATION_NEST + id, await organizationToken(), body,
         head,
     ));
-    assertStrictEquals(resent.status, 200);
-    assertStrictEquals(resent.headers.get('etag'), head);
-    assertEquals(await resent.json(), state);
+    assertStrictEquals(resent.status, 409);
+    assertEquals(await resent.json(), {
+        error: 'no transition from revoked to revoked'
+            + ' for the admin',
+    });
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );

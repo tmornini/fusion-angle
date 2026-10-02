@@ -38,23 +38,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
-const INV_ROSTER_SARAH = generateIdentifier();
-const EV_ROSTER_SARAH_GRANT = generateIdentifier();
-const INV_ROSTER_JESSICA = generateIdentifier();
-const EV_ROSTER_JESSICA_GRANT = generateIdentifier();
-const MS_ROSTER_JESSICA = generateIdentifier();
-const EV_ROSTER_JESSICA_ACCEPT = generateIdentifier();
-const INV_ROSTER_EMILY = generateIdentifier();
-const EV_ROSTER_EMILY_GRANT = generateIdentifier();
-const EV_ROSTER_EMILY_DECLINE = generateIdentifier();
-const INV_ROSTER_MARCUS = generateIdentifier();
-const EV_ROSTER_MARCUS_GRANT = generateIdentifier();
-const EV_ROSTER_MARCUS_REVOKE = generateIdentifier();
-const INV_ROSTER_SARAH_DUP = generateIdentifier();
-const EV_ROSTER_SARAH_DUP_GRANT = generateIdentifier();
-const MS_ROSTER_JESSICA_2 = generateIdentifier();
-const EV_ROSTER_JESSICA_REACCEPT = generateIdentifier();
 const AI_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 
@@ -557,105 +543,101 @@ async () => {
 
 Deno.test('invitations lifecycle: fresh grant → pending; accept →'
 + ' accepted + membership on message plane; decline; revoke;'
-+ ' duplicate grant → no phantom; no-op re-accept → stable',
++ ' duplicate grant stores nothing; a repeated accept is 409',
 async () => {
     const db = await seededDb();
     const organization = ORGANIZATION_TWO;
     const adminToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organization,
     );
+    const sarahId = 'MQFcPtrZPIGjMCRAXtZUnA';
+    const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
+    const emilyId = 'CJrglMsNBxOWWfbihHQSeg';
+    const marcusId = 'SsVAZghfSzMZRZmxNKIizw';
+    const sarahName = membershipNameOf(organization, sarahId);
+    const jessicaName = membershipNameOf(
+        organization, jessicaId,
+    );
+    const emilyName = membershipNameOf(organization, emilyId);
+    const marcusName = membershipNameOf(
+        organization, marcusId,
+    );
 
     async function grantTo(
-        invitationId: string, email: string,
-        grantEventId: string, grantAt: string,
+        email: string, grantAt: string,
     ): Promise<Response> {
         return handleRequest(db, req(
             'POST',
             '/organizations/' + organization
                 + '/invitations/',
             adminToken,
-            { email, invitationId, grantEventId, grantAt },
+            { email, grantAt },
         ));
     }
 
     async function acceptAs(
-        invitee: string, invitationId: string,
-        membershipId: string, acceptEventId: string,
-        acceptAt: string,
+        invitee: string, acceptAt: string,
     ): Promise<Response> {
+        const name = membershipNameOf(organization, invitee);
         return handleRequest(db, await invitationLatched(db, req(
             'PUT',
             '/identities/' + invitee
-                + '/invitations/' + invitationId,
+                + '/invitations/' + name,
             await organizationToken(invitee, STARK_ORGANIZATION),
-            {
-                state: 'accepted',
-                membershipId,
-                eventId: acceptEventId,
-                at: acceptAt,
-            },
+            { state: 'accepted', at: acceptAt },
         )));
     }
 
     async function declineAs(
-        invitee: string, invitationId: string,
-        declineEventId: string, declineAt: string,
+        invitee: string, declineAt: string,
     ): Promise<Response> {
+        const name = membershipNameOf(organization, invitee);
         return handleRequest(db, await invitationLatched(db, req(
             'PUT',
             '/identities/' + invitee
-                + '/invitations/' + invitationId,
+                + '/invitations/' + name,
             await organizationToken(invitee, STARK_ORGANIZATION),
-            {
-                state: 'declined',
-                eventId: declineEventId,
-                at: declineAt,
-            },
+            { state: 'declined', at: declineAt },
         )));
     }
 
     async function revoke(
-        invitationId: string, revokeEventId: string,
-        revokeAt: string,
+        identity: string, revokeAt: string,
     ): Promise<Response> {
+        const name = membershipNameOf(organization, identity);
         return handleRequest(db, await invitationLatched(db, req(
             'PUT',
             '/organizations/' + organization
-                + '/invitations/' + invitationId,
-            adminToken, {
-                state: 'revoked',
-                eventId: revokeEventId,
-                at: revokeAt,
-            },
+                + '/invitations/' + name,
+            adminToken,
+            { state: 'revoked', at: revokeAt },
         )));
     }
 
-    // A: fresh grant — pending.
+    // A: fresh grant — pending, named by the pair.
     const sarahGrant = await grantTo(
-        INV_ROSTER_SARAH, 'sarah.chen@company.com',
-        EV_ROSTER_SARAH_GRANT, '2026-06-01T00:00:00.000000Z',
+        'sarah.chen@company.com',
+        '2026-06-01T00:00:00.000000Z',
     );
     assertStrictEquals(sarahGrant.status, 201);
     const sarahRow = (await deriveInvitations(db)).find(
-        (row) => row.id === INV_ROSTER_SARAH,
+        (row) => row.id === sarahName,
     )!;
     assertStrictEquals(sarahRow.state, 'pending');
     // Phase Final Stage B: roster tables retired.
 
     // B: accept — accepted + the membership on the message plane.
-    const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
     const jessicaGrant = await grantTo(
-        INV_ROSTER_JESSICA, 'jessica.park@company.com',
-        EV_ROSTER_JESSICA_GRANT, '2026-06-01T00:00:01.000000Z',
+        'jessica.park@company.com',
+        '2026-06-01T00:00:01.000000Z',
     );
     assertStrictEquals(jessicaGrant.status, 201);
     const jessicaAccept = await acceptAs(
-        jessicaId, INV_ROSTER_JESSICA, MS_ROSTER_JESSICA,
-        EV_ROSTER_JESSICA_ACCEPT, '2026-06-01T00:00:02.000000Z',
+        jessicaId, '2026-06-01T00:00:02.000000Z',
     );
     assertStrictEquals(jessicaAccept.status, 200);
     const jessicaRow = (await deriveInvitations(db)).find(
-        (row) => row.id === INV_ROSTER_JESSICA,
+        (row) => row.id === jessicaName,
     )!;
     assertStrictEquals(jessicaRow.state, 'accepted');
     const derivedJessicaMembership =
@@ -671,42 +653,40 @@ async () => {
 
     // C: decline.
     const emilyGrant = await grantTo(
-        INV_ROSTER_EMILY, 'emily.rodriguez@company.com',
-        EV_ROSTER_EMILY_GRANT, '2026-06-01T00:00:03.000000Z',
+        'emily.rodriguez@company.com',
+        '2026-06-01T00:00:03.000000Z',
     );
     assertStrictEquals(emilyGrant.status, 201);
     const emilyDecline = await declineAs(
-        'CJrglMsNBxOWWfbihHQSeg', INV_ROSTER_EMILY,
-        EV_ROSTER_EMILY_DECLINE, '2026-06-01T00:00:04.000000Z',
+        emilyId, '2026-06-01T00:00:04.000000Z',
     );
     assertStrictEquals(emilyDecline.status, 200);
     const emilyRow = (await deriveInvitations(db)).find(
-        (row) => row.id === INV_ROSTER_EMILY,
+        (row) => row.id === emilyName,
     )!;
     assertStrictEquals(emilyRow.state, 'declined');
 
     // D: revoke.
     const marcusGrant = await grantTo(
-        INV_ROSTER_MARCUS, 'marcus@acmecorp.com',
-        EV_ROSTER_MARCUS_GRANT, '2026-06-01T00:00:05.000000Z',
+        'marcus@acmecorp.com',
+        '2026-06-01T00:00:05.000000Z',
     );
     assertStrictEquals(marcusGrant.status, 201);
     const marcusRevoke = await revoke(
-        INV_ROSTER_MARCUS, EV_ROSTER_MARCUS_REVOKE,
-        '2026-06-01T00:00:06.000000Z',
+        marcusId, '2026-06-01T00:00:06.000000Z',
     );
     assertStrictEquals(marcusRevoke.status, 200);
     const marcusRow = (await deriveInvitations(db)).find(
-        (row) => row.id === INV_ROSTER_MARCUS,
+        (row) => row.id === marcusName,
     )!;
     assertStrictEquals(marcusRow.state, 'revoked');
 
-    // E: duplicate grant for Sarah's SAME (org, identity) pair —
-    // NO phantom invitation document.
+    // E: a second grant of Sarah's pending membership stores
+    // nothing and does not open another document.
     const beforeDerived = (await deriveInvitations(db)).length;
     const sarahDuplicate = await grantTo(
-        INV_ROSTER_SARAH_DUP, 'sarah.chen@company.com',
-        EV_ROSTER_SARAH_DUP_GRANT, '2026-06-01T00:00:07.000000Z',
+        'sarah.chen@company.com',
+        '2026-06-01T00:00:07.000000Z',
     );
     assertStrictEquals(sarahDuplicate.status, 200);
     assertStrictEquals(
@@ -715,20 +695,24 @@ async () => {
     const derivedAfterDuplicate = await deriveInvitations(db);
     assertStrictEquals(
         derivedAfterDuplicate.filter(
-            (row) => row.identity_id === 'MQFcPtrZPIGjMCRAXtZUnA'
+            (row) => row.identity_id === sarahId
                 && row.organization_id === organization,
         ).length, 1,
     );
 
-    // F: no-op re-accept — state stable, no new state event.
+    // F: a repeated accept latched on the accepted head is 409.
     const statesBefore =
         0 /* states table retired */;
     const jessicaReaccept = await acceptAs(
-        jessicaId, INV_ROSTER_JESSICA, MS_ROSTER_JESSICA_2,
-        EV_ROSTER_JESSICA_REACCEPT,
-        '2026-06-01T00:00:08.000000Z',
+        jessicaId, '2026-06-01T00:00:08.000000Z',
     );
-    assertStrictEquals(jessicaReaccept.status, 200);
+    assertStrictEquals(jessicaReaccept.status, 409);
+    assertStrictEquals(
+        (await deriveInvitations(db)).find(
+            (row) => row.id === jessicaName,
+        )!.state,
+        'accepted',
+    );
     assertStrictEquals(
         0 /* states table retired */,
         statesBefore,

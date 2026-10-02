@@ -20,6 +20,7 @@ import {
 } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { partBodiesOf } from './http-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
     makeAssertionSigner,
@@ -1429,8 +1430,6 @@ async () => {
             },
             body: JSON.stringify({
                 email: UNSEATED_EMAIL,
-                invitationId: generateIdentifier(),
-                grantEventId: generateIdentifier(),
                 grantAt: nowUtc(),
             }),
         },
@@ -1447,9 +1446,9 @@ async () => {
         },
     ));
     assertStrictEquals(pending.status, 200);
-    const invitations = await pending.json() as {
+    const invitations = await partBodiesOf<{
         state: string;
-    }[];
+    }>(pending);
     assertStrictEquals(invitations.length, 1);
     assertStrictEquals(invitations[0]!.state, 'pending');
     const reachableClaims = decodeAccessToken(

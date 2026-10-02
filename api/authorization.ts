@@ -159,9 +159,11 @@ const MEMBER_VERBS: Readonly<
     '/identities/:id/default-organization':
         ['GET', 'PUT'],
     '/identities/:id/organizations': ['GET'],
-    // Invitee (or admin) may read and answer. Org
-    // nest stays admin-only via `/` — no row here.
+    // Invitee (or admin) may read and answer.
     '/identities/:id/invitations': ['GET', 'PUT'],
+    // A member reads accepted and removed only. The
+    // gate and the selectors enforce that rule.
+    '/organizations/:id/invitations': ['GET'],
 };
 
 const MEMBER_TIER: readonly PolicyEntry[] =

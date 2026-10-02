@@ -32,6 +32,8 @@ import {
     invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -76,8 +78,6 @@ Deno.test('accept writes the seat at the invitation'
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
-            invitationId: 'ixyIgeiKspwtanaBXyAGpg',
-            grantEventId: generateIdentifier(),
             grantAt: '2026-06-05T00:00:00.000000Z',
         },
     ));
@@ -86,14 +86,12 @@ Deno.test('accept writes the seat at the invitation'
     const operationId = generateIdentifier();
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/' + SARAH_ID
-            + '/invitations/ixyIgeiKspwtanaBXyAGpg',
+        '/identities/' + SARAH_ID + '/invitations/'
+            + membershipNameOf(ORGANIZATION_TWO, SARAH_ID),
         await organizationToken(
             SARAH_ID, ORGANIZATION_TWO),
         {
             state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: generateIdentifier(),
             at: '2026-06-05T00:00:01.000000Z',
         },
         operationId,

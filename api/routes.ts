@@ -321,6 +321,11 @@ import {
     getInvitationVersionsOnIdentityNest,
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
+import {
+    viewQueryOf,
+    type QueryRefusal,
+    type ViewQuery,
+} from './membership-gate.ts';
 import type {
     DerivedDocument, DocumentMessagePair,
 } from './derive-documents.ts';
@@ -567,12 +572,18 @@ export type GetHandler = (
 
 // A GET that serves stored responses (spec §2): the handler
 // fences and selects; the gate serves what it selected.
+// `query` is the route's parsed search, undefined when the
+// route declares no query slot. Fewer parameters still
+// type-check.
+export type RouteQuery = ViewQuery;
+
 export type SelectHandler = (
     adapter: DbAdapter,
     params: string[],
     actor: Id,
     organization: Id | undefined,
     roles: readonly string[],
+    query: RouteQuery | undefined,
 ) => Promise<HeadSelection>;
 
 // PutHandler, PatchHandler, PostHandler, and DeleteHandler
@@ -653,6 +664,9 @@ export interface Route {
     patch?: PatchHandler;
     delete?: DeleteHandler;
     post?: PostHandler;
+    query?: (
+        search: string,
+    ) => ViewQuery | QueryRefusal;
 }
 
 export function route(
@@ -664,6 +678,9 @@ export function route(
         patch?: PatchHandler;
         delete?: DeleteHandler;
         post?: PostHandler;
+        query?: (
+            search: string,
+        ) => ViewQuery | QueryRefusal;
     },
 ): Route {
     return {
@@ -3218,11 +3235,11 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/invitations/': {
         conditional: 'none',
     },
-    'identities/:id/invitations/:id': {
+    'identities/:id/invitations/:membership-id': {
         conditional: 'in-order',
     },
-    'organizations/:id/invitations/:id': {
-        conditional: 'in-order',
+    'organizations/:id/invitations/:membership-id': {
+        conditional: 'required',
     },
 };
 
@@ -3737,19 +3754,24 @@ export const routes: Route[] = [
     // /invitations/. Two HTTP nests are filters and
     // authorization, not two documents.
     route('identities/:id/invitations/', {
-        get: getIdentityInvitations,
+        query: viewQueryOf,
+        select: getIdentityInvitations,
     }),
-    route('identities/:id/invitations/:id', {
-        get: getInvitationOnIdentityNest,
+    route('identities/:id/invitations/:membership-id', {
+        select: getInvitationOnIdentityNest,
         put: putInvitationOnIdentityNest,
     }),
-    route('identities/:id/invitations/:id/versions/', {
-        get: getInvitationVersionsOnIdentityNest,
-    }),
     route(
-        'identities/:id/invitations/:id/versions/:etag',
+        'identities/:id/invitations/:membership-id/versions/',
         {
-            get: getInvitationVersionOnIdentityNest,
+            select: getInvitationVersionsOnIdentityNest,
+        },
+    ),
+    route(
+        'identities/:id/invitations/:membership-id'
+            + '/versions/:etag',
+        {
+            select: getInvitationVersionOnIdentityNest,
         },
     ),
     documentCollectionRoute(AI_AGENTS_WIRING),
@@ -5285,23 +5307,29 @@ export const routes: Route[] = [
     // Invitation send nest. POST grants pending. PUT
     // revokes. Storage prefix stays /invitations/.
     route('organizations/:id/invitations/', {
-        get: getOrganizationInvitations,
+        query: viewQueryOf,
+        select: getOrganizationInvitations,
         post: postOrganizationInvitationGrant,
     }),
-    route('organizations/:id/invitations/:id', {
-        get: getInvitationOnOrganizationNest,
-        put: putInvitationOnOrganizationNest,
-    }),
     route(
-        'organizations/:id/invitations/:id/versions/',
+        'organizations/:id/invitations/:membership-id',
         {
-            get: getInvitationVersionsOnOrganizationNest,
+            select: getInvitationOnOrganizationNest,
+            put: putInvitationOnOrganizationNest,
         },
     ),
     route(
-        'organizations/:id/invitations/:id/versions/:etag',
+        'organizations/:id/invitations/:membership-id'
+            + '/versions/',
         {
-            get: getInvitationVersionOnOrganizationNest,
+            select: getInvitationVersionsOnOrganizationNest,
+        },
+    ),
+    route(
+        'organizations/:id/invitations/:membership-id'
+            + '/versions/:etag',
+        {
+            select: getInvitationVersionOnOrganizationNest,
         },
     ),
     // The seats the ledger has DELETEd — the organization's

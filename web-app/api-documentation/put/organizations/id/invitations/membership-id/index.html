@@ -1,13 +1,11 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>PUT /api/identities/:id/invitations/:id</title>
-<h1>PUT /api/identities/:id/invitations/:id</h1>
+<title>PUT /api/organizations/:id/invitations/:membership-id</title>
+<h1>PUT /api/organizations/:id/invitations/:membership-id</h1>
 <h2>Request body</h2>
 <pre>
 {
-  "state": "accepted",
-  "membershipId": "id",
-  "eventId": "id",
+  "state": "revoked",
   "at": "2020-01-01T00:00:00.000Z"
 }
 </pre>
@@ -15,13 +13,14 @@
 <ul>
   <li>Authorization: Bearer …</li>
   <li>Operation-ID: on every request</li>
-  <li>If-Match: strong etag</li>
+  <li>If-Match or If-None-Match: *</li>
 </ul>
 <h2>Status</h2>
 <ul>
   <li><a href="../../../../../statuses/200/">200</a></li>
   <li><a href="../../../../../statuses/400/">400</a></li>
   <li><a href="../../../../../statuses/401/">401</a></li>
+  <li><a href="../../../../../statuses/403/">403</a></li>
   <li><a href="../../../../../statuses/404/">404</a></li>
   <li><a href="../../../../../statuses/412/">412</a></li>
   <li><a href="../../../../../statuses/428/">428</a></li>

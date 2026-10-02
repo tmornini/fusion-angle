@@ -323,8 +323,7 @@ async () => {
         await organizationToken(),
         {
             email: ERASED_EMAIL,
-            invitationId: generateIdentifier(),
-            grantEventId: generateIdentifier(), grantAt: AT,
+            grantAt: AT,
         },
     ));
     assertStrictEquals(grantRes.status, 201);
@@ -336,8 +335,7 @@ async () => {
         await organizationToken(id, 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: generateIdentifier(), at: AT,
+            at: AT,
         },
     )));
     assertStrictEquals(acceptRes.status, 200);

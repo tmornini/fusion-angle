@@ -1,6 +1,8 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -53,12 +55,6 @@ const DRIFT_STATES_WO_STANDALONE_RELEASE_1 = generateIdentifier();
 const DRIFT_STATES_WO_STANDALONE_RELEASE_FLOW = generateIdentifier();
 const DRIFT_STATES_FLOW_NODE_1 = generateIdentifier();
 const DRIFT_STATES_PROJ_1 = generateIdentifier();
-const DRIFT_STATES_INV_ACCEPT_GRANT = generateIdentifier();
-const DRIFT_STATES_INV_ACCEPT_MS = generateIdentifier();
-const DRIFT_STATES_INV_ACCEPT_ACCEPT = generateIdentifier();
-const DRIFT_STATES_INV_DECLINE_GRANT = generateIdentifier();
-const DRIFT_STATES_INV_DECLINE_DECLINE = generateIdentifier();
-const DRIFT_STATES_INV_REVOKE_REVOKE = generateIdentifier();
 const DRIFT_STATES_AI_CHAIN_1 = generateIdentifier();
 const WORKORDERID_FWO = generateIdentifier();
 const WORKORDERID_EV1 = generateIdentifier();
@@ -1104,12 +1100,16 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
 
+    const acceptInvitee = 'YeQnyZJddPctAdaMBVWEew';
+    const acceptName = membershipNameOf(
+        STARK_ORGANIZATION, acceptInvitee,
+    );
     await person(
-        db, 'YeQnyZJddPctAdaMBVWEew', 'Accept Invitee',
+        db, acceptInvitee, 'Accept Invitee',
         'drift-states-invitee-accept@x.com',
     );
     const acceptInviteeToken = await organizationToken(
-        'YeQnyZJddPctAdaMBVWEew', STARK_ORGANIZATION,
+        acceptInvitee, STARK_ORGANIZATION,
     );
     const acceptGrant = await handleRequest(db, req(
         'POST',
@@ -1117,38 +1117,38 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-accept@x.com',
-            invitationId: 'YUuiirIfYgZZdbyLqxAHmg',
-            grantEventId: DRIFT_STATES_INV_ACCEPT_GRANT,
             grantAt: '2026-03-01T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(acceptGrant.status, 201);
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/YeQnyZJddPctAdaMBVWEew'
-            + '/invitations/YUuiirIfYgZZdbyLqxAHmg',
+        '/identities/' + acceptInvitee
+            + '/invitations/' + acceptName,
         acceptInviteeToken, {
             state: 'accepted',
-            membershipId: DRIFT_STATES_INV_ACCEPT_MS,
-            eventId: DRIFT_STATES_INV_ACCEPT_ACCEPT,
             at: '2026-03-01T00:00:00.000001Z',
         },
     )));
     assertStrictEquals(accept.status, 200);
     const acceptDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'YUuiirIfYgZZdbyLqxAHmg',
+        db, STARK_ORGANIZATION, acceptName,
     );
     assertEquals(
         acceptDerived.map((row) => row.state),
         ['pending', 'accepted'],
     );
 
+    const declineInvitee = 'YfxZQrzQBOaPJmijEVzQOg';
+    const declineName = membershipNameOf(
+        STARK_ORGANIZATION, declineInvitee,
+    );
     await person(
-        db, 'YfxZQrzQBOaPJmijEVzQOg', 'Decline Invitee',
+        db, declineInvitee, 'Decline Invitee',
         'drift-states-invitee-decline@x.com',
     );
     const declineInviteeToken = await organizationToken(
-        'YfxZQrzQBOaPJmijEVzQOg', STARK_ORGANIZATION,
+        declineInvitee, STARK_ORGANIZATION,
     );
     const declineGrant = await handleRequest(db, req(
         'POST',
@@ -1156,25 +1156,22 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-decline@x.com',
-            invitationId: 'YXTFXcJwnALAOHAFRMiiPg',
-            grantEventId: DRIFT_STATES_INV_DECLINE_GRANT,
             grantAt: '2026-03-02T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(declineGrant.status, 201);
     const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/YfxZQrzQBOaPJmijEVzQOg'
-            + '/invitations/YXTFXcJwnALAOHAFRMiiPg',
+        '/identities/' + declineInvitee
+            + '/invitations/' + declineName,
         declineInviteeToken, {
             state: 'declined',
-            eventId: DRIFT_STATES_INV_DECLINE_DECLINE,
             at: '2026-03-02T00:00:00.000001Z',
         },
     )));
     assertStrictEquals(decline.status, 200);
     const declineDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'YXTFXcJwnALAOHAFRMiiPg',
+        db, STARK_ORGANIZATION, declineName,
     );
     assertEquals(
         declineDerived.map((row) => row.state),
@@ -1185,8 +1182,12 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
     // had NO old-plane parity evidence anywhere before this task
     // (the invitation's version list reads exactly this
     // history for its 'revoked' version).
+    const revokeInvitee = generateIdentifier();
+    const revokeName = membershipNameOf(
+        STARK_ORGANIZATION, revokeInvitee,
+    );
     await person(
-        db, 'drift-states-invitee-revoke', 'Revoke Invitee',
+        db, revokeInvitee, 'Revoke Invitee',
         'drift-states-invitee-revoke@x.com',
     );
     const revokeGrant = await handleRequest(db, req(
@@ -1195,8 +1196,6 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-revoke@x.com',
-            invitationId: 'YZtAiXGchFrNHaSixyjBsg',
-            grantEventId: 'drift-states-inv-revoke-grant',
             grantAt: '2026-03-03T00:00:00.000000Z',
         },
     ));
@@ -1204,16 +1203,15 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
     const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
-            + '/invitations/YZtAiXGchFrNHaSixyjBsg',
+            + '/invitations/' + revokeName,
         adminToken, {
             state: 'revoked',
-            eventId: DRIFT_STATES_INV_REVOKE_REVOKE,
             at: '2026-03-03T00:00:00.000001Z',
         },
     )));
     assertStrictEquals(revoke.status, 200);
     const revokeDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'YZtAiXGchFrNHaSixyjBsg',
+        db, STARK_ORGANIZATION, revokeName,
     );
     assertEquals(
         revokeDerived.map((row) => row.state),

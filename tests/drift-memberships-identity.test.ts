@@ -23,10 +23,9 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
-const EV_MS_DRIFT_IDENTITY_SARAH_GRANT = generateIdentifier();
-const MS_DRIFT_IDENTITY_SARAH = generateIdentifier();
-const EV_MS_DRIFT_IDENTITY_SARAH_ACCEPT = generateIdentifier();
 const NO_SUCH_IDENTITY = generateIdentifier();
 
 // Phase Final Task 2: memberships dual-write stripped. This
@@ -245,27 +244,22 @@ Deno.test('leg 6: LIVE accept — grant + accept an invitation through'
     const adminToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
+    const name = membershipNameOf(ORGANIZATION_TWO, sarahId);
     const grant = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', adminToken, {
             email: 'sarah.chen@company.com',
-            invitationId: 'iHfMDzumeGtJONHzPjOjWQ',
-            grantEventId: EV_MS_DRIFT_IDENTITY_SARAH_GRANT,
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grant.status, 201);
 
-    const membershipId = MS_DRIFT_IDENTITY_SARAH;
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/' + sarahId
-            + '/invitations/iHfMDzumeGtJONHzPjOjWQ',
+        '/identities/' + sarahId + '/invitations/' + name,
         await organizationToken(sarahId, STARK_ORGANIZATION),
         {
             state: 'accepted',
-            membershipId,
-            eventId: EV_MS_DRIFT_IDENTITY_SARAH_ACCEPT,
             at: '2026-06-01T00:00:01.000000Z',
         },
     )));

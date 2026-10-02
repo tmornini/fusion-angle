@@ -2,7 +2,6 @@ import {
     assert,
     assertEquals,
     assertInstanceOf,
-    assertNotEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
@@ -64,8 +63,6 @@ import {
 import { bodyOf } from '../api/derive-documents.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-
-const INV_A = generateIdentifier();
 
 // Phase Final Task 2: identity spine dual-write stripped.
 // This file no longer compares derive vs old-table oracles —
@@ -131,20 +128,6 @@ function sortById<T extends { id: string }>(
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
-}
-
-function humanCreateBody(id: string): Record<string, unknown> {
-    return {
-        id,
-        detail: {
-            title: 't', department: 'd',
-            strengths: [],
-            team_dimensions: {},
-        },
-        initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: nowUtc(),
-    };
 }
 
 // A served credential is its stored body less its secret
@@ -676,92 +659,6 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
 
 // -- 5. live-write chain, re-compared on BOTH planes at every ---
 // -- step -----------------------------------------------------------
-
-// -- 6. invitations enrichment JOIN parity (SATISFIED -----------
-// -- TRANSITIVELY — case 2 already proves the two row sets ------
-// -- equal; this pins the JOIN's key-omission shape alone) ------
-
-Deno.test('invitations enrichment parity: the personName/'
-+ ' inviteeEmail JOIN (invitationsForInvitee/sentInvitations,'
-+ ' api/invitations-domain.ts) built over deriveIdentityPiiRows'
-+ ' deep-equals the SAME JOIN over identityPii.getAll(),'
-+ ' including ABSENT-key omission for an erased identity —'
-+ ' SATISFIED TRANSITIVELY (case 2 already proves the two row'
-+ ' sets equal); no new export, no re-flip of'
-+ ' invitationsForInvitee/sentInvitations, no handleRequest'
-+ ' exception', async () => {
-    const db = await seededDb();
-    const adminToken = await organizationToken();
-    const eraseeId = generateIdentifier();
-    await handleRequest(db, req(
-        'POST', '/human-members', adminToken,
-        humanCreateBody(eraseeId),
-    ));
-    await handleRequest(db, req(
-        'PUT', '/identities/' + eraseeId + '/pii', adminToken,
-        {
-            name: 'Erasee Name', email: 'erasee@example.com',
-            phone: '', bio: '',
-        },
-    ));
-    await handleRequest(db, req(
-        'DELETE', '/identities/' + eraseeId + '/pii', adminToken,
-    ));
-
-    const invitations = [
-        { id: INV_A, identity_id: 'XXZruirZyAOoRpNxaDnpSA' },
-        { id: 'inv-b', identity_id: eraseeId },
-    ] as const;
-
-    // The SAME join shape both invitationsForInvitee
-    // (invited_by_name) and sentInvitations (invitee_email)
-    // build — a Map lookup + ABSENT-key spread, byte-for-byte.
-    function enrichedByName(
-        rows: readonly IdentityPiiEntity[],
-    ): { id: Id; invited_by_name?: string }[] {
-        const byId = new Map(rows.map((p) => [p.id, p.name]));
-        return invitations.map((inv) => {
-            const name = byId.get(inv.identity_id);
-            return {
-                id: inv.id,
-                ...(name !== undefined
-                    ? { invited_by_name: name } : {}),
-            };
-        });
-    }
-    function enrichedByEmail(
-        rows: readonly IdentityPiiEntity[],
-    ): { id: Id; invitee_email?: string }[] {
-        const byId = new Map(rows.map((p) => [p.id, p.email]));
-        return invitations.map((inv) => {
-            const email = byId.get(inv.identity_id);
-            return {
-                id: inv.id,
-                ...(email !== undefined
-                    ? { invitee_email: email } : {}),
-            };
-        });
-    }
-
-    const derivedRows = await deriveIdentityPiiRows(db);
-    // Phase Final Stage B: identity spine tables retired.
-
-    // ABSENT-key pinned: the erased identity carries NO
-    // invited_by_name/invitee_email key — never a '' sentinel.
-    assertEquals(
-        enrichedByName(derivedRows)[1], { id: 'inv-b' },
-    );
-    assertEquals(
-        enrichedByEmail(derivedRows)[1], { id: 'inv-b' },
-    );
-    // The present identity's key IS carried.
-    assertNotEquals(
-        enrichedByName(derivedRows)[0], { id: INV_A },
-    );
-    assertNotEquals(
-        enrichedByEmail(derivedRows)[0], { id: INV_A },
-    );
-});
 
 // -- 7. method-filter proof + genesis-wins-under-skew + the -----
 // -- E6 resend branches at drift altitude ------------------------

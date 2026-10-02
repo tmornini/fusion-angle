@@ -37,20 +37,18 @@ function record(): {
 const PENDING = {
     id: 'jEoYCFtPjXFEgZqZNtOcEA',
     organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
-    organizationName: 'Wayne Enterprises',
-    invitedByName: 'Tony Stark',
     invitedAt: '2026-01-01T00:00:00.000000Z',
     state: 'pending' as const,
 };
 
-Deno.test('a pending invitation shows the org, inviter, and'
-    + ' Accept / Decline', () => {
+Deno.test('a pending invitation shows the absence marker'
+    + ' and Accept / Decline', () => {
     const rec = record();
     new InvitationListPresenter([PENDING]).render(rec.container);
     const out = rec.html();
     assertMatch(out, /data-invitation-id="jEoYCFtPjXFEgZqZNtOcEA"/);
-    assertMatch(out, /Wayne Enterprises/);
-    assertMatch(out, /Tony Stark/);
+    assertMatch(out, /—/);
+    assertNotMatch(out, /Invited by/);
     assertMatch(out, /data-invitation-action="accept"/);
     assertMatch(out, /data-invitation-action="decline"/);
     assertMatch(out, /Pending/);
@@ -73,19 +71,17 @@ Deno.test('an absent inviter omits the Invited by line', () => {
     new InvitationListPresenter([{
         id: 'inv3',
         organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
-        organizationName: 'Wayne Enterprises',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
     }]).render(rec.container);
     assertNotMatch(rec.html(), /Invited by/);
 });
 
-Deno.test('an absent org name renders the absence glyph', () => {
+Deno.test('the org name renders the absence glyph', () => {
     const rec = record();
     new InvitationListPresenter([{
         id: 'inv4',
         organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
-        invitedByName: 'Tony Stark',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
     }]).render(rec.container);
@@ -98,22 +94,22 @@ Deno.test('an empty invitee list shows the empty state', () => {
     assertMatch(rec.html(), /No invitations/);
 });
 
-Deno.test('a sent invitation shows the invitee email and Revoke',
-() => {
+Deno.test('a sent invitation shows the absence marker'
+    + ' and Revoke', () => {
     const rec = record();
     new SentInvitationsPresenter([
         {
             id: 'inv2',
             organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
             identityId: 'toccYYkLEABmlbpHJalgtQ',
-            inviteeEmail: 'sarah@x.com',
             invitedAt: '2026-01-01T00:00:00.000000Z',
             state: 'pending' as const,
         },
     ]).render(rec.container);
     const out = rec.html();
     assertMatch(out, /data-invitation-id="inv2"/);
-    assertMatch(out, /sarah@x\.com/);
+    assertMatch(out, /—/);
+    assertNotMatch(out, /sarah@x\.com/);
     assertMatch(out, /data-invitation-action="revoke"/);
 });
 

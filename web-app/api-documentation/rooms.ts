@@ -395,14 +395,15 @@ export const API_DOC_ROOMS:
         statuses:
         [
             '200',
+            '204',
             '401',
             '404',
         ],
     },
     {
-        hash: 'get/identities/id/invitations/id',
+        hash: 'get/identities/id/invitations/membership-id',
         verb: 'GET',
-        uri: '/api/identities/:id/invitations/:id',
+        uri: '/api/identities/:id/invitations/:membership-id',
         body: 'none',
         headers:
         [
@@ -417,9 +418,9 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/identities/id/invitations/id/versions',
+        hash: 'get/identities/id/invitations/membership-id/versions',
         verb: 'GET',
-        uri: '/api/identities/:id/invitations/:id/versions/',
+        uri: '/api/identities/:id/invitations/:membership-id/versions/',
         body: 'none',
         headers:
         [
@@ -434,9 +435,9 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/identities/id/invitations/id/versions/etag',
+        hash: 'get/identities/id/invitations/membership-id/versions/etag',
         verb: 'GET',
-        uri: '/api/identities/:id/invitations/:id/versions/:etag',
+        uri: '/api/identities/:id/invitations/:membership-id/versions/:etag',
         body: 'none',
         headers:
         [
@@ -754,6 +755,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -772,6 +774,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -866,6 +869,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -884,6 +888,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -899,15 +904,16 @@ export const API_DOC_ROOMS:
         statuses:
         [
             '200',
+            '204',
             '401',
             '403',
             '404',
         ],
     },
     {
-        hash: 'get/organizations/id/invitations/id',
+        hash: 'get/organizations/id/invitations/membership-id',
         verb: 'GET',
-        uri: '/api/organizations/:id/invitations/:id',
+        uri: '/api/organizations/:id/invitations/:membership-id',
         body: 'none',
         headers:
         [
@@ -923,9 +929,9 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/organizations/id/invitations/id/versions',
+        hash: 'get/organizations/id/invitations/membership-id/versions',
         verb: 'GET',
-        uri: '/api/organizations/:id/invitations/:id/versions/',
+        uri: '/api/organizations/:id/invitations/:membership-id/versions/',
         body: 'none',
         headers:
         [
@@ -941,9 +947,11 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/organizations/id/invitations/id/versions/etag',
+        hash: 'get/organizations/id/invitations/membership-id/versions/etag',
         verb: 'GET',
-        uri: '/api/organizations/:id/invitations/:id/versions/:etag',
+        uri:
+            '/api/organizations/:id/invitations/:membership-id/versions/:eta'
+            + 'g',
         body: 'none',
         headers:
         [
@@ -1031,6 +1039,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1049,6 +1058,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1162,6 +1172,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1180,6 +1191,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1348,6 +1360,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1370,6 +1383,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1524,6 +1538,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1546,6 +1561,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1568,6 +1584,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1590,6 +1607,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
         ],
     },
     {
@@ -1788,8 +1806,8 @@ export const API_DOC_ROOMS:
         verb: 'POST',
         uri: '/api/organizations/:id/invitations/',
         body:
-            '{\n  "email": "email",\n  "invitationId": "id",\n  "grantEventI'
-            + 'd": "id",\n  "grantAt": "2020-01-01T00:00:00.000Z"\n}',
+            '{\n  "email": "email",\n  "grantAt": "2020-01-01T00:00:00.000Z"'
+            + '\n}',
         headers:
         [
             'Authorization: Bearer …',
@@ -1990,12 +2008,12 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'put/identities/id/invitations/id',
+        hash: 'put/identities/id/invitations/membership-id',
         verb: 'PUT',
-        uri: '/api/identities/:id/invitations/:id',
+        uri: '/api/identities/:id/invitations/:membership-id',
         body:
-            '{\n  "state": "accepted",\n  "membershipId": "id",\n  "eventId"'
-            + ': "id",\n  "at": "2020-01-01T00:00:00.000Z"\n}',
+            '{\n  "state": "accepted",\n  "at": "2020-01-01T00:00:00.000Z"\n'
+            + '}',
         headers:
         [
             'Authorization: Bearer …',
@@ -2295,17 +2313,16 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'put/organizations/id/invitations/id',
+        hash: 'put/organizations/id/invitations/membership-id',
         verb: 'PUT',
-        uri: '/api/organizations/:id/invitations/:id',
+        uri: '/api/organizations/:id/invitations/:membership-id',
         body:
-            '{\n  "state": "revoked",\n  "membershipId": "id",\n  "eventId":'
-            + ' "id",\n  "at": "2020-01-01T00:00:00.000Z"\n}',
+            '{\n  "state": "revoked",\n  "at": "2020-01-01T00:00:00.000Z"\n}',
         headers:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
-            'If-Match: strong etag',
+            'If-Match or If-None-Match: *',
         ],
         statuses:
         [

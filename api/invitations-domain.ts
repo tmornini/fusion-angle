@@ -1,58 +1,91 @@
 import type { DbAdapter } from './db.ts';
+import { EntityNotFoundError } from './db.ts';
+import {
+    ApiError,
+    HTTP_FORBIDDEN,
+    HTTP_CONFLICT,
+    HTTP_NOT_FOUND,
+} from '../shared/http-errors.ts';
 import {
     ValidationError,
+    nowUtc,
     type Id,
     type InvitationState,
+    type MembershipEntity,
     type MessagePairEntity,
 } from '../shared/types.ts';
 import {
-    ApiError,
-    HTTP_BAD_REQUEST,
-    HTTP_NOT_FOUND,
-    HTTP_FORBIDDEN,
-    HTTP_CONFLICT,
-    HTTP_PRECONDITION_FAILED,
-    HTTP_PRECONDITION_REQUIRED,
-} from '../shared/http-errors.ts';
-import {
-    pickString,
+    assertOnlyKeys,
+    validateMembershipRequest,
     validateTimestampField,
-    validateInvitationTransitionBody,
 } from './validators.ts';
 import {
-    attachEtag,
-    canonicalPath,
-    entityTagsOf,
     formWriteMessagePair,
-    latchesOf,
+    httpDateOf,
+    IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
+    parseEntityTags,
     runStateWrite,
 } from './message-pair.ts';
 import type {
-    MessagePair, ReceivedRequest, StateSibling,
+    MessagePair,
+    ReceivedRequest,
+    SiblingCondition,
+    StateAnswerKind,
+    StateSibling,
+    WriteAnswer,
 } from './message-pair.ts';
-import { messageStore } from './message-store.ts';
-import { headDocumentOf } from './derive-documents.ts';
-import {
-    deriveInvitations,
-    invitationRowOf,
-} from './derive-invitations.ts';
-import { deriveOrganizations } from './derive-organizations.ts';
+import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityPiiRows,
 } from './derive-identity-spine.ts';
+import { seatsPrefixFor } from './derive-memberships.ts';
+import { param } from './document-family.ts';
 import {
-    deriveInvitationStates,
-} from './derive-states.ts';
+    selectVersionAt,
+    selectVersionsAt,
+    wholeCollectionSelection,
+    wholeHeadSelection,
+    type HeadSelection,
+} from './head-reads.ts';
 import {
-    membershipExistsFor,
-    seatEntityOf,
-    seatsPrefixFor,
-} from './derive-memberships.ts';
+    memberSeesState,
+    type ViewQuery,
+} from './membership-gate.ts';
 import {
-    param,
-    storedRevisionDocument,
-    versionSnapshotsAt,
-} from './document-family.ts';
+    lastAdminRefusal,
+    membershipOfHead,
+    membershipTransition,
+    MEMBERSHIPS_PATH,
+    organizationMembershipHeads,
+    identityMembershipHeads,
+    type MembershipActor,
+    type MembershipRequest,
+} from './memberships.ts';
+import {
+    membershipNameOf,
+    parsedMembershipName,
+    type MembershipName,
+} from '../shared/membership-name.ts';
+import {
+    responseOfWire,
+    servedResponse,
+} from './served-response.ts';
+
+const ADMIN_WRITE =
+    'forbidden: an organization invitation write'
+    + ' requires an admin role';
+const INVITEE_READ =
+    'forbidden: only the invitee or an admin'
+    + ' may read this invitation';
+const LIST_READ =
+    'forbidden: invitation list is self or admin';
+
+const OPERATION_PATTERN =
+    'invitations/:membership-name/:state';
+const OPERATION_SEGMENTS = [
+    'invitations', ':membership-name', ':state',
+];
 
 function requireAdmin(
     roles: readonly string[],
@@ -86,483 +119,159 @@ function requireWriteStamp(
     }
 }
 
-type InvitationRow = {
-    id: Id;
-    organization_id: Id;
-    identity_id: Id;
-    at: string;
-    state: InvitationState;
-};
-
-async function identityViewJoins(
-    db: DbAdapter,
-): Promise<{
-    organizationName: Map<Id, string>;
-    personName: Map<Id, string>;
-    eventsFor: Map<Id, readonly { state: string; member_id: Id }[]>;
-}> {
-    const organizationName = new Map(
-        (await deriveOrganizations(db))
-            .map(o => [o.id, o.name]));
-    const personName = new Map(
-        (await deriveIdentityPiiRows(db))
-            .map(p => [p.id, p.name]));
-    const events = await deriveInvitationStates(db);
-    return {
-        organizationName,
-        personName,
-        eventsFor: Map.groupBy(events, ev => ev.entity_id),
-    };
+function requireInvitee(
+    actor: Id,
+    identityId: Id,
+    state: InvitationState,
+): void {
+    if (actor === identityId) return;
+    const verb = state === 'accepted'
+        ? 'accept'
+        : state === 'declined'
+            ? 'decline'
+            : 'answer';
+    throw new ApiError(
+        'forbidden: only the invitee may ' + verb,
+        HTTP_FORBIDDEN,
+    );
 }
 
-function invitationIdentityView(
-    inv: InvitationRow,
-    joins: Awaited<ReturnType<typeof identityViewJoins>>,
+function membershipName(params: string[]): string {
+    return param(params, 1);
+}
+
+function parsedName(name: string): MembershipName {
+    const parsed = parsedMembershipName(name);
+    if (parsed === undefined) {
+        throw new Error(
+            'membership-id reached a handler unparsed',
+        );
+    }
+    return parsed;
+}
+
+function askedQuery(query: ViewQuery | undefined): ViewQuery {
+    return query ?? { kind: 'every' };
+}
+
+function storedMembership(
+    membership: MembershipEntity,
 ): Record<string, unknown> {
-    const grant = (joins.eventsFor.get(inv.id) ?? [])
-        .find(ev => ev.state === 'pending');
-    const name = joins.organizationName.get(
-        inv.organization_id,
-    );
-    const inviter = grant === undefined
-        ? undefined
-        : joins.personName.get(grant.member_id);
     return {
-        id: inv.id,
-        organization_id: inv.organization_id,
-        ...(name !== undefined
-            ? { organization_name: name }
-            : {}),
-        identity_id: inv.identity_id,
-        ...(inviter !== undefined
-            ? { invited_by_name: inviter }
-            : {}),
-        at: inv.at,
-        state: inv.state,
+        id: membership.id,
+        organization_id: membership.organization_id,
+        identity_id: membership.identity_id,
+        type: membership.type,
+        state: membership.state,
+        at: membership.at,
     };
 }
 
-async function invitationOrganizationView(
-    db: DbAdapter,
-    inv: InvitationRow,
-): Promise<Record<string, unknown>> {
-    const email = new Map(
-        (await deriveIdentityPiiRows(db))
-            .map(p => [p.id, p.email]));
-    const inviteeEmail = email.get(inv.identity_id);
-    return {
-        id: inv.id,
-        organization_id: inv.organization_id,
-        identity_id: inv.identity_id,
-        ...(inviteeEmail !== undefined
-            ? { invitee_email: inviteeEmail }
-            : {}),
-        at: inv.at,
-        state: inv.state,
-    };
-}
-
-// GET /identities/:id/invitations/ — that identity's
-// invitations. Self or admin.
-export async function getIdentityInvitations(
-    db: DbAdapter,
-    params: string[],
-    actor: Id,
-    _organization: Id | undefined,
-    roles: readonly string[],
-): Promise<unknown> {
-    const identityId = param(params, 0);
-    requireSelfOrAdmin(
-        actor, identityId, roles,
-        'forbidden: invitation list is self or admin',
-    );
-    const mine = (await deriveInvitations(db))
-        .filter(inv => inv.identity_id === identityId);
-    if (mine.length === 0) return [];
-    const joins = await identityViewJoins(db);
-    return mine.map(inv => invitationIdentityView(inv, joins));
-}
-
-// GET /identities/:id/invitations/:id
-export async function getInvitationOnIdentityNest(
-    db: DbAdapter,
-    params: string[],
-    actor: Id,
-    _organization: Id | undefined,
-    roles: readonly string[],
-): Promise<unknown> {
-    const identityId = param(params, 0);
-    const id = param(params, 1);
-    requireSelfOrAdmin(
-        actor, identityId, roles,
-        'forbidden: only the invitee or an admin'
-        + ' may read this invitation',
-    );
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.identity_id !== identityId
-    ) {
-        throw new ApiError(
-            'Not found: /identities/' + identityId
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    const joins = await identityViewJoins(db);
-    return attachEtag(
-        Response.json(
-            invitationIdentityView(loaded.invitation, joins),
-        ),
-        loaded.head.id,
-    );
-}
-
-// GET /organizations/:id/invitations/ — pending invites
-// for that organization. Admin of the fenced org.
-export async function getOrganizationInvitations(
-    db: DbAdapter,
-    params: string[],
-    _actor: Id,
-    _organization: Id | undefined,
-    roles: readonly string[],
-): Promise<unknown> {
-    requireAdmin(
-        roles,
-        'forbidden: listing sent invitations requires'
-        + ' an admin role',
-    );
-    const organization = param(params, 0);
-    const rows = (await deriveInvitations(db))
-        .filter(inv => inv.organization_id === organization
-            && inv.state === 'pending');
-    if (rows.length === 0) return [];
-    const email = new Map(
-        (await deriveIdentityPiiRows(db))
-            .map(p => [p.id, p.email]));
-    return rows.map(inv => {
-        const inviteeEmail = email.get(inv.identity_id);
-        return {
-            id: inv.id,
-            organization_id: inv.organization_id,
-            identity_id: inv.identity_id,
-            ...(inviteeEmail !== undefined
-                ? { invitee_email: inviteeEmail }
-                : {}),
-            at: inv.at,
-            state: inv.state,
-        };
-    });
-}
-
-// GET /organizations/:id/invitations/:id
-export async function getInvitationOnOrganizationNest(
-    db: DbAdapter,
-    params: string[],
-    _actor: Id,
-    _organization: Id | undefined,
-    roles: readonly string[],
-): Promise<unknown> {
-    requireAdmin(
-        roles,
-        'forbidden: reading an organization invitation'
-        + ' requires an admin role',
-    );
-    const organization = param(params, 0);
-    const id = param(params, 1);
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.organization_id !== organization
-    ) {
-        throw new ApiError(
-            'Not found: /organizations/' + organization
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    return attachEtag(
-        Response.json(await invitationOrganizationView(
-            db, loaded.invitation,
-        )),
-        loaded.head.id,
-    );
-}
-
-// POST /organizations/:id/invitations/ — grant pending.
-// Path org is the invitation org. A fresh grant answers
-// 201 with the invitation; a pending duplicate answers 200
-// with the pending one. Pair formation stays inside the
-// handler.
-export async function postOrganizationInvitationGrant(
-    db: DbAdapter,
-    params: string[],
-    payload: Record<string, unknown>,
-    actor: Id,
-    _messagePair: MessagePair | undefined,
-    _organization: Id | undefined,
-    _roles: readonly string[],
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<unknown> {
-    requireWriteStamp(requestAt, operationId);
-    return grantInvitation(
-        db, param(params, 0), payload, actor,
-        requestAt, operationId, received,
-    );
-}
-
-// PUT /identities/:id/invitations/:id — accepted or
-// declined from pending.
-export async function putInvitationOnIdentityNest(
-    db: DbAdapter,
-    params: string[],
-    payload: Record<string, unknown>,
-    actor: Id,
-    _messagePair: MessagePair | undefined,
-    _organization: Id | undefined,
-    _roles: readonly string[],
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<unknown> {
-    requireWriteStamp(requestAt, operationId);
-    const identityId = param(params, 0);
-    const id = param(params, 1);
-    const transition = validateInvitationTransitionBody(
-        payload,
-    );
-    if (
-        transition.state !== 'accepted'
-        && transition.state !== 'declined'
-    ) {
-        throw new ApiError(
-            'forbidden: identity nest may set accepted'
-            + ' or declined',
-            HTTP_FORBIDDEN,
-        );
-    }
-    if (transition.state === 'accepted') {
-        return acceptInvitation(
-            db, id, identityId, transition, actor,
-            requestAt, operationId, received,
-        );
-    }
-    return declineInvitation(
-        db, id, identityId, transition, actor,
-        requestAt, operationId, received,
-    );
-}
-
-// PUT /organizations/:id/invitations/:id — revoked from
-// pending.
-export async function putInvitationOnOrganizationNest(
-    db: DbAdapter,
-    params: string[],
-    payload: Record<string, unknown>,
-    actor: Id,
-    _messagePair: MessagePair | undefined,
-    _organization: Id | undefined,
-    _roles: readonly string[],
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<unknown> {
-    requireWriteStamp(requestAt, operationId);
-    const organization = param(params, 0);
-    const id = param(params, 1);
-    const transition = validateInvitationTransitionBody(
-        payload,
-    );
-    if (transition.state !== 'revoked') {
-        throw new ApiError(
-            'forbidden: organization nest may set'
-            + ' revoked',
-            HTTP_FORBIDDEN,
-        );
-    }
-    return revokeInvitation(
-        db, id, organization, transition, actor,
-        requestAt, operationId, received,
-    );
-}
-
-// Grant: an admin invites an EXISTING identity by email.
-// The organization is the path organization. A pending
-// invitation for the (organization, identity) pair under
-// another id answers 200 and stores nothing; a resend
-// naming a taken invitation id answers 409.
-async function grantInvitation(
-    db: DbAdapter,
-    organization: Id,
-    body: Record<string, unknown>,
-    actor: Id,
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<unknown> {
-    const email = typeof body.email === 'string'
-        ? body.email : '';
-    if (email === '') {
-        throw new ApiError(
-            'an "email" is required', HTTP_BAD_REQUEST);
-    }
-    let invitationId: string;
-    let grantEventId: string;
-    let grantAt: string;
-    try {
-        invitationId = pickString(body, 'invitationId');
-        grantEventId = pickString(body, 'grantEventId');
-        grantAt = validateTimestampField(
-            body, 'grantAt', 'grant',
-        );
-    } catch (e) {
-        if (e instanceof ValidationError) {
-            throw new ApiError(e.message, HTTP_BAD_REQUEST);
-        }
-        throw e;
-    }
-    if (invitationId === '') {
-        throw new ApiError(
-            'invitationId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
-    }
-    if (grantEventId === '') {
-        throw new ApiError(
-            'grantEventId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
-    }
-    // DEMO-TIER POSTURE: a missing email 404s and an
-    // already-member 409s, so an org admin can tell whether
-    // an email maps to an existing identity.
-    const match = (await deriveIdentityPiiRows(db))
-        .find(p => p.email === email);
-    if (match === undefined) {
-        throw new ApiError(
-            'no identity with that email', HTTP_NOT_FOUND);
-    }
-    const identityId = match.id;
-    const outcome = await grantOutcomeFor(
-        db, organization, identityId);
-    if (outcome.kind === 'member') {
-        throw new ApiError(
-            'that identity is already a member of this'
-            + ' organization', HTTP_CONFLICT);
-    }
-    // A pending invitation under another id is the one this
-    // grant would repeat, so it answers and nothing lands. A
-    // resend names its own invitation, a taken name the
-    // statement refuses.
-    if (outcome.kind === 'existing' && outcome.id !== invitationId) {
-        return {
-            id: outcome.id, organization_id: organization,
-            identity_id: identityId, at: outcome.at,
-            state: 'pending',
-        };
-    }
-    if (received === undefined) {
-        throw new Error('requestId is required');
-    }
-    const invitation = {
-        id: invitationId, organization_id: organization,
-        identity_id: identityId,
-        at: grantAt, state: 'pending',
-    };
-    const messagePair = await formWriteMessagePair({
-        method: 'POST',
-        pathname: received.target,
-        routePattern: 'invitations',
-        routeSegments: ['invitations'],
-        pathSegments: ['invitations'],
-        headerFields: received.headerFields,
-        body,
-        bodyBytes: received.bodyBytes,
-        requesterIdentityId: actor,
-        requestAt,
-        organization: undefined,
-        responseBody: invitation,
-        operationId,
-        requestId: received.requestId,
-    });
-    const answer = await runStateWrite(db, {
-        kind: 'siblings',
-        received: messagePair,
-        siblings: [{
-            method: 'PUT',
-            path: canonicalPath(undefined, '/invitations/'),
-            name: invitationId,
-            state: invitation,
-            condition: { kind: 'genesis', declarer: 'handler' },
-        }],
-        reader: { sees: 'whole' },
-        answer: { kind: 'created', location: invitationId },
-    });
-    if (answer.outcome === 'land') {
-        db.postNotification({
-            kind: 'scoped',
-            organizationIds: [organization],
-            identityIds: [identityId],
-        });
-    }
-    return answer.response;
-}
-
-type GrantOutcome =
-    | { kind: 'member' }
-    | { kind: 'existing'; id: Id; at: string }
-    | { kind: 'fresh' };
-
-async function grantOutcomeFor(
-    adapter: DbAdapter,
-    organization: Id,
-    identityId: Id,
-): Promise<GrantOutcome> {
-    const member = await membershipExistsFor(
-        adapter, organization, identityId);
-    if (member) return { kind: 'member' };
-    const existing = await pendingInvitationFor(
-        adapter, organization, identityId);
-    return existing === null
-        ? { kind: 'fresh' }
-        : { kind: 'existing', id: existing.id, at: existing.at };
-}
-
-// The org's outstanding pending invitation for an identity,
-// or null. Exported for write-path parity pins.
-export async function pendingInvitationFor(
-    adapter: DbAdapter,
-    organization: Id,
-    identityId: Id,
-): Promise<{ id: Id; at: string } | null> {
-    const pending = (await deriveInvitations(adapter)).find(
-        inv => inv.organization_id === organization
-            && inv.identity_id === identityId
-            && inv.state === 'pending',
-    );
-    return pending === undefined
-        ? null
-        : { id: pending.id, at: pending.at };
-}
-
-async function formInvitationOperationMessagePair(
-    actor: Id,
-    requestAt: string,
-    operationId: string,
-    requestId: string,
-    body: Record<string, unknown>,
-    invitationId: Id,
-    op: string,
+function headerOf(
     received: ReceivedRequest,
+    name: string,
+): string | undefined {
+    return received.headerFields.find(
+        (field) => field.name === name,
+    )?.value;
+}
+
+function starCreate(received: ReceivedRequest): boolean {
+    const raw = headerOf(received, IF_NONE_MATCH_HEADER);
+    return raw !== undefined && raw.trim() === '*';
+}
+
+function matchTags(
+    received: ReceivedRequest,
+): readonly string[] | undefined {
+    const raw = headerOf(received, IF_MATCH_HEADER);
+    if (raw === undefined) return undefined;
+    const tags = parseEntityTags(raw);
+    if (tags === undefined) {
+        throw new Error(
+            'the gate admitted a malformed If-Match',
+        );
+    }
+    return tags;
+}
+
+// The latch names the head this handler read. Anything else
+// skips the table: the statement refuses it.
+function latchAgrees(
+    received: ReceivedRequest,
+    head: MessagePairEntity | null,
+): boolean {
+    if (starCreate(received)) return head === null;
+    const tags = matchTags(received);
+    if (tags === undefined) return false;
+    return head !== null
+        && tags.length === 1
+        && tags[0] === head.id;
+}
+
+function staleCondition(
+    received: ReceivedRequest,
+    head: MessagePairEntity | null,
+): SiblingCondition {
+    if (starCreate(received)) {
+        return { kind: 'never-written', declarer: 'client' };
+    }
+    const tags = matchTags(received) ?? [];
+    const other = tags.find(
+        (tag) => head === null || tag !== head.id,
+    );
+    const tag = other ?? tags[0];
+    if (tag === undefined) {
+        throw new Error('a stale latch named no tag');
+    }
+    return { kind: 'in-order', head: tag };
+}
+
+function servedHead(
+    head: MessagePairEntity,
+    requestId: string,
+): Response {
+    return responseOfWire(servedResponse(
+        head.response,
+        {
+            date: httpDateOf(nowUtc()),
+            requestId,
+        },
+        { sees: 'whole' },
+    ));
+}
+
+function notify(
+    db: DbAdapter,
+    organizationId: Id,
+    identityId: Id,
+): void {
+    db.postNotification({
+        kind: 'scoped',
+        organizationIds: [organizationId],
+        identityIds: [identityId],
+    });
+}
+
+// The column is the verb that was received. Succession
+// is unique only for PUT and DELETE, so a later POST
+// named pending does not conflict.
+async function operationPair(
+    method: string,
+    actor: Id,
+    requestAt: string,
+    operationId: string,
+    received: ReceivedRequest,
+    body: Record<string, unknown>,
+    name: string,
+    state: string,
 ): Promise<MessagePair> {
-    return formWriteMessagePair({
-        method: 'POST',
+    const formed = await formWriteMessagePair({
+        method,
         pathname: received.target,
-        routePattern: 'invitations/:id/' + op,
-        routeSegments: ['invitations', ':id', op],
-        pathSegments: ['invitations', invitationId, op],
+        routePattern: OPERATION_PATTERN,
+        routeSegments: OPERATION_SEGMENTS,
+        pathSegments: ['invitations', name, state],
         headerFields: received.headerFields,
         body,
         bodyBytes: received.bodyBytes,
@@ -571,482 +280,516 @@ async function formInvitationOperationMessagePair(
         organization: undefined,
         responseBody: undefined,
         operationId,
-        requestId,
+        requestId: received.requestId,
     });
+    return formed;
 }
 
-// Accept, decline, and revoke (§1 C): each is an operation on
-// the invitation, latched on the head the client read. The
-// invitation lands its terminal state in order on that tag,
-// beside `siblings` (accept's seat). A head already in the
-// terminal state is the answer, and nothing lands; any other
-// state but pending is 409. A tag naming another head was read
-// from a head this one replaced: the statement refuses it, so
-// no rule of this head is asked.
-async function transitionInvitation(
+async function landMembership(
     db: DbAdapter,
-    loaded: InvitationHead,
-    terminal: InvitationState,
-    messagePair: MessagePair,
-    // Deferred: accept's seat read runs only when this lands.
-    siblings: () => Promise<readonly StateSibling[]>,
-): Promise<Response> {
-    const inv = loaded.invitation;
-    const latches = latchesOf(
-        entityTagsOf(messagePair), [loaded.head.id],
+    method: string,
+    actor: Id,
+    requestAt: string,
+    operationId: string,
+    received: ReceivedRequest,
+    body: Record<string, unknown>,
+    name: string,
+    stateName: string,
+    parentState: Record<string, unknown>,
+    condition: SiblingCondition,
+    seat: StateSibling | undefined,
+    answer: StateAnswerKind,
+): Promise<WriteAnswer> {
+    const receivedPair = await operationPair(
+        method, actor, requestAt, operationId, received,
+        body, name, stateName,
     );
-    if (latches.kind === 'missing') {
-        throw new ApiError(
-            'If-Match is required for '
-                + INVITATIONS_STORAGE_PREFIX + inv.id,
-            HTTP_PRECONDITION_REQUIRED,
-        );
-    }
-    if (latches.kind === 'extra') {
-        throw new ApiError(
-            'If-Match names no document this operation'
-                + ' derives from',
-            HTTP_PRECONDITION_FAILED,
-        );
-    }
-    const latch = latches.heads[0]!;
-    const current = latch === loaded.head.id;
-    if (
-        current
-        && inv.state !== terminal
-        && inv.state !== 'pending'
-    ) {
-        throw new ApiError(
-            'invitation is not pending', HTTP_CONFLICT);
-    }
-    const lands = current && inv.state === 'pending';
     const parent = {
-        method: 'PUT',
-        path: INVITATIONS_STORAGE_PREFIX,
-        name: inv.id,
-        state: {
-            id: inv.id,
-            organization_id: inv.organization_id,
-            identity_id: inv.identity_id,
-            at: inv.at,
-            state: lands ? terminal : inv.state,
-        },
-    } as const;
-    const [first, ...rest] = lands ? await siblings() : [];
-    const answer = await runStateWrite(db, {
+        method: 'PUT' as const,
+        path: MEMBERSHIPS_PATH,
+        name,
+        state: parentState,
+        condition,
+    };
+    const siblings = seat === undefined
+        ? [parent] as const
+        : [parent, seat] as const;
+    return runStateWrite(db, {
         kind: 'siblings',
-        received: messagePair,
-        siblings: first === undefined
-            ? [{
-                ...parent,
-                condition: { kind: 'in-order', head: latch },
-            }]
-            : [
-                {
-                    ...parent,
-                    condition: {
-                        kind: 'in-order',
-                        head: latch,
-                        read: loaded.head,
-                    },
-                },
-                first,
-                ...rest,
-            ],
+        received: receivedPair,
+        siblings,
         reader: { sees: 'whole' },
-        answer: { kind: 'parent' },
+        answer,
     });
-    if (answer.outcome === 'land') {
-        db.postNotification({
-            kind: 'scoped',
-            organizationIds: [inv.organization_id],
-            identityIds: [inv.identity_id],
-        });
-    }
-    return answer.response;
 }
 
-async function acceptInvitation(
+// Interpretation E, rows 1–3. A DELETE head is current, so
+// a later accept restores the seat in order on it.
+export async function seatSiblingOf(
     db: DbAdapter,
-    id: Id,
-    pathIdentityId: Id,
-    transition: {
-        readonly membershipId?: string;
-        readonly eventId: string;
-        readonly at: string;
-    },
-    actor: Id,
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<Response> {
-    const loaded = await loadInvitation(db, id);
+    from: MembershipEntity | null,
+    next: MembershipEntity,
+): Promise<StateSibling | undefined> {
     if (
-        loaded === null
-        || loaded.invitation.identity_id !== pathIdentityId
+        next.state !== 'accepted'
+        && next.state !== 'removed'
     ) {
-        throw new ApiError(
-            'Not found: /identities/' + pathIdentityId
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
+        return undefined;
     }
-    if (received === undefined) {
-        throw new Error('requestId is required');
+    if (from === null && next.state === 'removed') {
+        return undefined;
     }
-    const inv = loaded.invitation;
-    if (inv.identity_id !== actor) {
-        throw new ApiError(
-            'forbidden: only the invitee may accept',
-            HTTP_FORBIDDEN);
-    }
-    const membershipId = transition.membershipId ?? '';
-    if (membershipId === '') {
-        throw new ApiError(
-            'membershipId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
-    }
-    if (transition.eventId === '') {
-        throw new ApiError(
-            'eventId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
-    }
-    const messagePair = await formInvitationOperationMessagePair(
-        actor, requestAt, operationId, received.requestId,
-        {
-            membershipId,
-            acceptEventId: transition.eventId,
-            acceptAt: transition.at,
-        },
-        id, 'acceptance', received);
-    // The seat is granted once: a live seat stays as it is.
-    return transitionInvitation(
-        db, loaded, 'accepted', messagePair,
-        async () => await membershipExistsFor(
-                db, inv.organization_id, actor,
-            )
-            ? []
-            : [{
-                method: 'PUT',
-                path: seatsPrefixFor(inv.organization_id),
-                name: actor,
-                state: {
-                    ...seatEntityOf({
-                        name: actor,
-                        messagePairId: actor,
-                        method: 'PUT',
-                        body: { type: 'member', at: transition.at },
-                    }, inv.organization_id),
-                },
-                condition: {
-                    kind: 'genesis', declarer: 'handler',
-                },
-            }],
+    const path = seatsPrefixFor(next.organization_id);
+    const head = await db.messagePairs.getHeadPair(
+        path, next.identity_id,
     );
-}
-
-async function declineInvitation(
-    db: DbAdapter,
-    id: Id,
-    pathIdentityId: Id,
-    transition: {
-        readonly eventId: string;
-        readonly at: string;
-    },
-    actor: Id,
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<Response> {
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.identity_id !== pathIdentityId
-    ) {
-        throw new ApiError(
-            'Not found: /identities/' + pathIdentityId
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    if (received === undefined) {
-        throw new Error('requestId is required');
-    }
-    if (loaded.invitation.identity_id !== actor) {
-        throw new ApiError(
-            'forbidden: only the invitee may decline',
-            HTTP_FORBIDDEN);
-    }
-    if (transition.eventId === '') {
-        throw new ApiError(
-            'eventId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
-    }
-    const messagePair = await formInvitationOperationMessagePair(
-        actor, requestAt, operationId, received.requestId,
-        {
-            declineEventId: transition.eventId,
-            declineAt: transition.at,
-        },
-        id, 'decline', received);
-    return transitionInvitation(
-        db, loaded, 'declined', messagePair,
-        () => Promise.resolve([]),
-    );
-}
-
-async function revokeInvitation(
-    db: DbAdapter,
-    id: Id,
-    pathOrganization: Id,
-    transition: {
-        readonly eventId: string;
-        readonly at: string;
-    },
-    actor: Id,
-    requestAt: string,
-    operationId: string,
-    received?: ReceivedRequest,
-): Promise<Response> {
-    const loaded = await loadInvitation(db, id);
-    if (received === undefined) {
-        throw new Error('requestId is required');
-    }
-    if (
-        loaded === null
-        || loaded.invitation.organization_id !== pathOrganization
-    ) {
-        throw new ApiError(
-            'Not found: /organizations/' + pathOrganization
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    if (transition.eventId === '') {
-        throw new ApiError(
-            'eventId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
-    }
-    const messagePair = await formInvitationOperationMessagePair(
-        actor, requestAt, operationId, received.requestId,
-        {
-            revokeEventId: transition.eventId,
-            revokeAt: transition.at,
-        },
-        id, 'revocation', received);
-    return transitionInvitation(
-        db, loaded, 'revoked', messagePair,
-        () => Promise.resolve([]),
-    );
-}
-
-// The invitation's head: its row, and the pair a client's
-// If-Match names.
-type InvitationHead = {
-    readonly invitation: InvitationRow;
-    readonly head: MessagePairEntity;
-};
-
-async function loadInvitation(
-    adapter: DbAdapter,
-    id: Id,
-): Promise<InvitationHead | null> {
-    const head = await messageStore(adapter).getDocumentHead(
-        INVITATIONS_STORAGE_PREFIX, id,
-    );
-    return head === null
-        ? null
-        : {
-            invitation: invitationRowOf(headDocumentOf(head)),
-            head,
+    if (next.state === 'removed') {
+        if (head === null) return undefined;
+        return {
+            method: 'DELETE',
+            path,
+            name: next.identity_id,
+            condition: { kind: 'in-order', head: head.id },
         };
-}
-
-const INVITATIONS_STORAGE_PREFIX =
-    '/invitations/';
-
-function invitationDocumentEntity(
-    document: { name: Id; body: Record<string, unknown> },
-): Record<string, unknown> {
+    }
+    // The seat route stores the path's ids on the wire.
+    // A later PUT of { type, at } matches this body.
+    const state = {
+        id: next.identity_id,
+        organization_id: next.organization_id,
+        identity_id: next.identity_id,
+        type: next.type,
+        at: next.at,
+    };
+    if (head === null) {
+        return {
+            method: 'PUT',
+            path,
+            name: next.identity_id,
+            state,
+            condition: {
+                kind: 'genesis', declarer: 'handler',
+            },
+        };
+    }
     return {
-        id: document.name,
-        // The spread body's `at` is the invitation's own
-        // grant time — validated at write time by
-        // grantInvitation's validateTimestampField(body,
-        // 'grantAt', …) and copied to the document body —
-        // not a ledger fact: GET
-        // .../invitations/:id/versions/ stamps a DIFFERENT
-        // `at` on top of this entity — the message pair's
-        // own arrival time (versionSnapshotsAt,
-        // document-family.ts). Same name, different fact —
-        // see InvitationEntity.at (api/types.ts) and the
-        // pin at tests/api-versions-etag.test.ts
-        // ('invitation versions at is the ledger arrival
-        // time, not the invitation grant time').
-        ...document.body,
+        method: 'PUT',
+        path,
+        name: next.identity_id,
+        state,
+        condition: { kind: 'in-order', head: head.id },
     };
 }
 
-async function invitationVersionSnapshots(
+function guardsLastAdmin(
+    next: MembershipEntity,
+): boolean {
+    return next.state === 'removed'
+        || (
+            next.state === 'accepted'
+            && next.type !== 'admin'
+        );
+}
+
+async function refuseLastAdmin(
     db: DbAdapter,
-    id: Id,
-): Promise<Record<string, unknown>[]> {
-    return versionSnapshotsAt(
-        db, INVITATIONS_STORAGE_PREFIX, id,
-        invitationDocumentEntity,
+    from: MembershipEntity,
+    next: MembershipEntity,
+): Promise<void> {
+    if (!guardsLastAdmin(next)) return;
+    const accepted = await db.readTransaction(
+        async (view) => {
+            const heads = await organizationMembershipHeads(
+                view,
+                from.organization_id,
+                { kind: 'state', state: 'accepted' },
+            );
+            return heads.map(membershipOfHead);
+        },
+    );
+    const refusal = lastAdminRefusal(accepted, from, next);
+    if (refusal !== undefined) {
+        throw new ApiError(refusal, HTTP_CONFLICT);
+    }
+}
+
+async function readHead(
+    db: DbAdapter,
+    name: string,
+): Promise<MessagePairEntity | null> {
+    return db.messagePairs.getHeadPair(
+        MEMBERSHIPS_PATH, name,
     );
 }
 
-async function invitationVersionSnapshot(
-    db: DbAdapter,
-    id: Id,
-    etag: string,
-): Promise<Record<string, unknown> | undefined> {
-    const document = await storedRevisionDocument(
-        db, INVITATIONS_STORAGE_PREFIX, id, etag,
-    );
-    if (document === undefined) return undefined;
-    return invitationDocumentEntity(document);
+function miss(name: string): never {
+    throw new EntityNotFoundError('invitations', name);
 }
 
-// GET /identities/:id/invitations/:id/versions/
+async function visibleHead(
+    db: DbAdapter,
+    name: string,
+    roles: readonly string[],
+    nest: 'organization' | 'identity',
+): Promise<MessagePairEntity> {
+    const head = await readHead(db, name);
+    if (head === null) miss(name);
+    if (nest === 'organization') {
+        const state = membershipOfHead(head).state;
+        if (!memberSeesState(roles, state)) miss(name);
+    }
+    return head;
+}
+
+// GET /identities/:id/invitations/
+export async function getIdentityInvitations(
+    db: DbAdapter,
+    params: string[],
+    actor: Id,
+    _organization: Id | undefined,
+    roles: readonly string[],
+    query?: ViewQuery,
+): Promise<HeadSelection> {
+    const identityId = param(params, 0);
+    requireSelfOrAdmin(actor, identityId, roles, LIST_READ);
+    return wholeCollectionSelection(
+        await identityMembershipHeads(
+            db, identityId, askedQuery(query),
+        ),
+        'stateless',
+    );
+}
+
+// GET /identities/:id/invitations/:membership-id
+export async function getInvitationOnIdentityNest(
+    db: DbAdapter,
+    params: string[],
+    actor: Id,
+    _organization: Id | undefined,
+    roles: readonly string[],
+): Promise<HeadSelection> {
+    const identityId = param(params, 0);
+    const name = membershipName(params);
+    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    const head = await visibleHead(
+        db, name, roles, 'identity',
+    );
+    return wholeHeadSelection(
+        head, 'stateless', 'invitations', name,
+    );
+}
+
+// GET /organizations/:id/invitations/
+export async function getOrganizationInvitations(
+    db: DbAdapter,
+    params: string[],
+    _actor: Id,
+    _organization: Id | undefined,
+    _roles: readonly string[],
+    query?: ViewQuery,
+): Promise<HeadSelection> {
+    return wholeCollectionSelection(
+        await organizationMembershipHeads(
+            db, param(params, 0), askedQuery(query),
+        ),
+        'stateless',
+    );
+}
+
+// GET /organizations/:id/invitations/:membership-id
+export async function getInvitationOnOrganizationNest(
+    db: DbAdapter,
+    params: string[],
+    _actor: Id,
+    _organization: Id | undefined,
+    roles: readonly string[],
+): Promise<HeadSelection> {
+    const name = membershipName(params);
+    const head = await visibleHead(
+        db, name, roles, 'organization',
+    );
+    return wholeHeadSelection(
+        head, 'stateless', 'invitations', name,
+    );
+}
+
+// GET .../versions/
 export async function getInvitationVersionsOnIdentityNest(
     db: DbAdapter,
     params: string[],
     actor: Id,
     _organization: Id | undefined,
     roles: readonly string[],
-): Promise<unknown> {
+): Promise<HeadSelection> {
     const identityId = param(params, 0);
-    const id = param(params, 1);
-    requireSelfOrAdmin(
-        actor, identityId, roles,
-        'forbidden: only the invitee or an admin'
-        + ' may read this invitation',
+    const name = membershipName(params);
+    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    await visibleHead(db, name, roles, 'identity');
+    return selectVersionsAt(
+        db, MEMBERSHIPS_PATH, name, 'stateless',
+        'invitations', { sees: 'whole' },
+        () => Promise.reject(
+            new EntityNotFoundError('invitations', name),
+        ),
     );
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.identity_id !== identityId
-    ) {
-        throw new ApiError(
-            'Not found: /identities/' + identityId
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    return invitationVersionSnapshots(db, id);
 }
 
-// GET /identities/:id/invitations/:id/versions/:etag
 export async function getInvitationVersionOnIdentityNest(
     db: DbAdapter,
     params: string[],
     actor: Id,
     _organization: Id | undefined,
     roles: readonly string[],
-): Promise<unknown> {
+): Promise<HeadSelection> {
     const identityId = param(params, 0);
-    const id = param(params, 1);
-    const etag = param(params, params.length - 1);
-    requireSelfOrAdmin(
-        actor, identityId, roles,
-        'forbidden: only the invitee or an admin'
-        + ' may read this invitation',
+    const name = membershipName(params);
+    const tag = param(params, params.length - 1);
+    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    await visibleHead(db, name, roles, 'identity');
+    return selectVersionAt(
+        db, MEMBERSHIPS_PATH, name, tag, 'stateless',
+        'invitations', { sees: 'whole' },
+        () => Promise.reject(
+            new EntityNotFoundError('invitations', name),
+        ),
     );
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.identity_id !== identityId
-    ) {
-        throw new ApiError(
-            'Not found: /identities/' + identityId
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    const snapshot = await invitationVersionSnapshot(
-        db, id, etag,
-    );
-    if (snapshot === undefined) {
-        throw new ApiError(
-            'Not found: /identities/' + identityId
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    return snapshot;
 }
 
-// GET /organizations/:id/invitations/:id/versions/
 export async function getInvitationVersionsOnOrganizationNest(
     db: DbAdapter,
     params: string[],
     _actor: Id,
     _organization: Id | undefined,
     roles: readonly string[],
-): Promise<unknown> {
-    requireAdmin(
-        roles,
-        'forbidden: reading an organization invitation'
-        + ' requires an admin role',
+): Promise<HeadSelection> {
+    const name = membershipName(params);
+    await visibleHead(db, name, roles, 'organization');
+    return selectVersionsAt(
+        db, MEMBERSHIPS_PATH, name, 'stateless',
+        'invitations', { sees: 'whole' },
+        () => Promise.reject(
+            new EntityNotFoundError('invitations', name),
+        ),
     );
-    const organization = param(params, 0);
-    const id = param(params, 1);
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.organization_id !== organization
-    ) {
-        throw new ApiError(
-            'Not found: /organizations/' + organization
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
-    }
-    return invitationVersionSnapshots(db, id);
 }
 
-// GET /organizations/:id/invitations/:id/versions/:etag
 export async function getInvitationVersionOnOrganizationNest(
     db: DbAdapter,
     params: string[],
     _actor: Id,
     _organization: Id | undefined,
     roles: readonly string[],
+): Promise<HeadSelection> {
+    const name = membershipName(params);
+    const tag = param(params, params.length - 1);
+    await visibleHead(db, name, roles, 'organization');
+    return selectVersionAt(
+        db, MEMBERSHIPS_PATH, name, tag, 'stateless',
+        'invitations', { sees: 'whole' },
+        () => Promise.reject(
+            new EntityNotFoundError('invitations', name),
+        ),
+    );
+}
+
+function grantFields(
+    body: Record<string, unknown>,
+): { email: string; grantAt: string } {
+    const email = body['email'];
+    if (typeof email !== 'string' || email === '') {
+        throw new ValidationError(
+            'an "email" is required',
+        );
+    }
+    assertOnlyKeys(
+        body, ['email', 'grantAt'], 'InvitationGrant',
+    );
+    return {
+        email,
+        grantAt: validateTimestampField(
+            body, 'grantAt', 'InvitationGrant',
+        ),
+    };
+}
+
+// POST /organizations/:id/invitations/ — grant pending.
+export async function postOrganizationInvitationGrant(
+    db: DbAdapter,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    _messagePair: MessagePair | undefined,
+    _organization: Id | undefined,
+    roles: readonly string[],
+    requestAt: string,
+    operationId: string,
+    received?: ReceivedRequest,
 ): Promise<unknown> {
-    requireAdmin(
-        roles,
-        'forbidden: reading an organization invitation'
-        + ' requires an admin role',
-    );
-    const organization = param(params, 0);
-    const id = param(params, 1);
-    const etag = param(params, params.length - 1);
-    const loaded = await loadInvitation(db, id);
-    if (
-        loaded === null
-        || loaded.invitation.organization_id !== organization
-    ) {
+    requireWriteStamp(requestAt, operationId);
+    requireAdmin(roles, ADMIN_WRITE);
+    if (received === undefined) {
+        throw new Error('requestId is required');
+    }
+    const organizationId = param(params, 0);
+    const { email, grantAt } = grantFields(payload);
+    const match = (await deriveIdentityPiiRows(db))
+        .find((person) => person.email === email);
+    if (match === undefined) {
         throw new ApiError(
-            'Not found: /organizations/' + organization
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
+            'no identity with that email', HTTP_NOT_FOUND,
         );
     }
-    const snapshot = await invitationVersionSnapshot(
-        db, id, etag,
+    const name = membershipNameOf(organizationId, match.id);
+    const parsed = parsedName(name);
+    const request: MembershipRequest = {
+        state: 'pending', type: 'member', at: grantAt,
+    };
+    const head = await readHead(db, name);
+    const from = head === null
+        ? null
+        : membershipOfHead(head);
+    const outcome = membershipTransition(
+        'admin', parsed, from, request,
     );
-    if (snapshot === undefined) {
-        throw new ApiError(
-            'Not found: /organizations/' + organization
-                + '/invitations/' + id,
-            HTTP_NOT_FOUND,
-        );
+    if (outcome.kind === 'unchanged') {
+        if (head === null) {
+            throw new Error('an unchanged grant has no head');
+        }
+        return servedHead(head, received.requestId);
     }
-    return snapshot;
+    if (outcome.kind === 'refused') {
+        throw new ApiError(outcome.error, HTTP_CONFLICT);
+    }
+    const condition: SiblingCondition = head === null
+        ? { kind: 'genesis', declarer: 'handler' }
+        : { kind: 'in-order', head: head.id };
+    const answer = await landMembership(
+        db, 'POST', actor, requestAt, operationId,
+        received, payload, name, 'pending',
+        storedMembership(outcome.next), condition, undefined,
+        {
+            kind: 'created',
+            location: '/organizations/' + organizationId
+                + '/invitations/' + name,
+        },
+    );
+    if (answer.outcome === 'land') {
+        notify(db, organizationId, match.id);
+    }
+    return answer.response;
+}
+
+async function putMembership(
+    db: DbAdapter,
+    actorKind: MembershipActor,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    roles: readonly string[],
+    requestAt: string,
+    operationId: string,
+    received: ReceivedRequest | undefined,
+): Promise<Response> {
+    requireWriteStamp(requestAt, operationId);
+    const request = validateMembershipRequest(payload);
+    const name = membershipName(params);
+    const parsed = parsedName(name);
+    if (received === undefined) {
+        throw new Error('requestId is required');
+    }
+    const head = await readHead(db, name);
+    // A tag that names another head stores nothing.
+    // The statement answers 412 before any actor rule.
+    if (!latchAgrees(received, head)) {
+        const stale = await landMembership(
+            db, 'PUT', actor, requestAt, operationId,
+            received, payload, name, request.state,
+            head === null
+                ? { id: name }
+                : bodyOf(head.response),
+            staleCondition(received, head),
+            undefined,
+            { kind: 'parent' },
+        );
+        return stale.response;
+    }
+    if (actorKind === 'invitee') {
+        requireInvitee(
+            actor, parsed.identityId, request.state,
+        );
+    } else {
+        requireAdmin(roles, ADMIN_WRITE);
+    }
+    const from = head === null
+        ? null
+        : membershipOfHead(head);
+    const outcome = membershipTransition(
+        actorKind, parsed, from, request,
+    );
+    if (outcome.kind === 'refused') {
+        throw new ApiError(outcome.error, HTTP_CONFLICT);
+    }
+    if (outcome.kind === 'unchanged') {
+        if (head === null) {
+            throw new Error(
+                'an unchanged transition has no head',
+            );
+        }
+        return servedHead(head, received.requestId);
+    }
+    if (from !== null) {
+        await refuseLastAdmin(db, from, outcome.next);
+    }
+    const seat = await seatSiblingOf(db, from, outcome.next);
+    const condition: SiblingCondition = head === null
+        ? { kind: 'never-written', declarer: 'client' }
+        : { kind: 'in-order', head: head.id };
+    const answer = await landMembership(
+        db, 'PUT', actor, requestAt, operationId,
+        received, payload, name, request.state,
+        storedMembership(outcome.next), condition, seat,
+        { kind: 'parent' },
+    );
+    if (answer.outcome === 'land') {
+        notify(db, parsed.organizationId, parsed.identityId);
+    }
+    return answer.response;
+}
+
+// PUT /identities/:id/invitations/:membership-id
+export async function putInvitationOnIdentityNest(
+    db: DbAdapter,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    _messagePair: MessagePair | undefined,
+    _organization: Id | undefined,
+    roles: readonly string[],
+    requestAt: string,
+    operationId: string,
+    received?: ReceivedRequest,
+): Promise<unknown> {
+    return putMembership(
+        db, 'invitee', params, payload, actor, roles,
+        requestAt, operationId, received,
+    );
+}
+
+// PUT /organizations/:id/invitations/:membership-id
+export async function putInvitationOnOrganizationNest(
+    db: DbAdapter,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    _messagePair: MessagePair | undefined,
+    _organization: Id | undefined,
+    roles: readonly string[],
+    requestAt: string,
+    operationId: string,
+    received?: ReceivedRequest,
+): Promise<unknown> {
+    return putMembership(
+        db, 'admin', params, payload, actor, roles,
+        requestAt, operationId, received,
+    );
 }

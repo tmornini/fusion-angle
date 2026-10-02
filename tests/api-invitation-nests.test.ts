@@ -25,9 +25,13 @@ import { deriveDocumentsAt } from
 import {
     apiRequest,
     invitationLatched,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
+import type { MembershipEntity } from '../shared/types.ts';
 
 function match(path: string) {
     return matchRoute(
@@ -69,14 +73,16 @@ Deno.test('organization nest offers GET POST on /'
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/',
     );
     assert(col);
-    assertStrictEquals(typeof col.route.get, 'function');
+    assertStrictEquals(typeof col.route.select, 'function');
+    assertStrictEquals(col.route.get, undefined);
     assertStrictEquals(typeof col.route.post, 'function');
     const item = match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw',
     );
     assert(item);
-    assertStrictEquals(typeof item.route.get, 'function');
+    assertStrictEquals(typeof item.route.select, 'function');
+    assertStrictEquals(item.route.get, undefined);
     assertStrictEquals(typeof item.route.put, 'function');
 });
 
@@ -86,33 +92,25 @@ Deno.test('identity nest offers GET on / and'
         '/identities/' + generateIdentifier() + '/invitations/',
     );
     assert(col);
-    assertStrictEquals(typeof col.route.get, 'function');
+    assertStrictEquals(typeof col.route.select, 'function');
+    assertStrictEquals(col.route.get, undefined);
     assertStrictEquals(col.route.post, undefined);
     const item = match(
         '/identities/' + generateIdentifier()
             + '/invitations/fndCYAsXazdzMUlEGMNIZw',
     );
     assert(item);
-    assertStrictEquals(typeof item.route.get, 'function');
+    assertStrictEquals(typeof item.route.select, 'function');
+    assertStrictEquals(item.route.get, undefined);
     assertStrictEquals(typeof item.route.put, 'function');
 });
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
+const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 const DAVE = generateIdentifier();
-const INV_GRANT = generateIdentifier();
-const MS_ACC = generateIdentifier();
-const EV_ACC = generateIdentifier();
-const EV_DEC = generateIdentifier();
-const EV_REV = generateIdentifier();
-const EV_BAD = generateIdentifier();
-const MS_ADM = generateIdentifier();
-const EV_ADM = generateIdentifier();
-const MS_409 = generateIdentifier();
-const EV_409 = generateIdentifier();
-const MS_409B = generateIdentifier();
-const EV_409B = generateIdentifier();
-const MS_HOLE = generateIdentifier();
-const EV_HOLE = generateIdentifier();
+const SARAH_WAYNE = membershipNameOf(WAYNE, SARAH);
+const DAVE_WAYNE = membershipNameOf(WAYNE, DAVE);
 
 async function seedPerson(
     db: DbAdapter,
@@ -165,19 +163,13 @@ function req(
 async function grantWayne(
     db: DbAdapter,
     email: string,
-    invitationId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
         'POST',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            email,
-            invitationId,
-            grantEventId: 'ev-' + invitationId,
-            grantAt: AT,
-        },
+        { email, grantAt: AT },
     ));
 }
 
@@ -211,9 +203,7 @@ async function membershipsFor(
 Deno.test('admin POST org nest grants pending',
 async () => {
     const db = await seedWorld();
-    const res = await grantWayne(
-        db, 'sarah@x.com', INV_GRANT,
-    );
+    const res = await grantWayne(db, 'sarah@x.com');
     assertStrictEquals(res.status, 201);
     const body = await res.json() as {
         id: string;
@@ -221,7 +211,7 @@ async () => {
         organization_id: string;
         identity_id: string;
     };
-    assertStrictEquals(body.id, INV_GRANT);
+    assertStrictEquals(body.id, SARAH_WAYNE);
     assertStrictEquals(body.state, 'pending');
     assertStrictEquals(body.organization_id, 'BBjWJsjYIDkTRKIIPrzWRw');
     assertStrictEquals(body.identity_id, 'toccYYkLEABmlbpHJalgtQ');
@@ -232,17 +222,15 @@ async () => {
 Deno.test('invitee PUT identity nest accepted writes'
     + ' the seat', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com', 'hZjjtxCNiLqiQahFZuykvA');
+    await grantWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hZjjtxCNiLqiQahFZuykvA',
+            + SARAH_WAYNE,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: MS_ACC,
-            eventId: EV_ACC,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
@@ -252,27 +240,26 @@ Deno.test('invitee PUT identity nest accepted writes'
         ['AjdvjuECVZEgZoFajaIEkg', 'BBjWJsjYIDkTRKIIPrzWRw'],
     );
     const row = (await deriveInvitations(db))
-        .find(inv => inv.id === 'hZjjtxCNiLqiQahFZuykvA')!;
+        .find(inv => inv.id === SARAH_WAYNE)!;
     assertStrictEquals(row.state, 'accepted');
 });
 
 Deno.test('invitee PUT declined', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'dave@x.com', 'hgFLbVZKltowuLSHmjQVKw');
+    await grantWayne(db, 'dave@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + DAVE
-            + '/invitations/hgFLbVZKltowuLSHmjQVKw',
+            + '/invitations/' + DAVE_WAYNE,
         await organizationToken(DAVE, 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'declined',
-            eventId: EV_DEC,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
     assertStrictEquals(res.status, 200);
     const row = (await deriveInvitations(db))
-        .find(inv => inv.id === 'hgFLbVZKltowuLSHmjQVKw')!;
+        .find(inv => inv.id === DAVE_WAYNE)!;
     assertStrictEquals(row.state, 'declined');
     assertEquals(
         await membershipsFor(db, DAVE),
@@ -282,100 +269,100 @@ Deno.test('invitee PUT declined', async () => {
 
 Deno.test('admin PUT org nest revoked', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com', 'isEimNpTpNyPKQzbcYxoiA');
+    await grantWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
-            + 'isEimNpTpNyPKQzbcYxoiA',
+            + SARAH_WAYNE,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
         {
             state: 'revoked',
-            eventId: EV_REV,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
     assertStrictEquals(res.status, 200);
     const row = (await deriveInvitations(db))
-        .find(inv => inv.id === 'isEimNpTpNyPKQzbcYxoiA')!;
+        .find(inv => inv.id === SARAH_WAYNE)!;
     assertStrictEquals(row.state, 'revoked');
 });
 
-Deno.test('invitee PUT revoked is 403', async () => {
+Deno.test('invitee PUT revoked is 409', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com', 'hcTwUMjMVqkOKDsPOhKxiA');
+    await grantWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hcTwUMjMVqkOKDsPOhKxiA',
+            + SARAH_WAYNE,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'revoked',
-            eventId: EV_BAD,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
-    assertStrictEquals(res.status, 403);
+    assertStrictEquals(res.status, 409);
+    assertEquals(await res.json(), {
+        error: 'no transition from pending to revoked'
+            + ' for the invitee',
+    });
 });
 
-Deno.test('admin PUT accepted is 403', async () => {
+Deno.test('admin PUT accepted on a pending head is 409',
+async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com', 'hadMASAdKHbHSgRNcCrndw');
+    await grantWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
-            + 'hadMASAdKHbHSgRNcCrndw',
+            + SARAH_WAYNE,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
         {
             state: 'accepted',
-            membershipId: MS_ADM,
-            eventId: EV_ADM,
+            type: 'member',
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
-    assertStrictEquals(res.status, 403);
+    assertStrictEquals(res.status, 409);
+    assertEquals(await res.json(), {
+        error: 'no transition from pending to accepted'
+            + ' for the admin',
+    });
 });
 
-Deno.test('PUT from accepted answers the head and stores nothing',
+Deno.test('a second accept latched on the accepted head'
++ ' is 409 and stores nothing',
 async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com', 'hXEuekgeiwIxOSyjdOQYQg');
+    await grantWayne(db, 'sarah@x.com');
     const first = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hXEuekgeiwIxOSyjdOQYQg',
+            + SARAH_WAYNE,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: MS_409,
-            eventId: EV_409,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
     assertStrictEquals(first.status, 200);
-    const accepted = await first.json();
+    await first.body?.cancel();
     const before = (await db.messagePairs.getAll()).length;
     const second = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
-            + 'hXEuekgeiwIxOSyjdOQYQg',
+            + SARAH_WAYNE,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             state: 'accepted',
-            membershipId: MS_409B,
-            eventId: EV_409B,
             at: '2026-01-01T00:00:02.000000Z',
         },
     )));
-    assertStrictEquals(second.status, 200);
-    assertStrictEquals(
-        second.headers.get('etag'), first.headers.get('etag'),
-    );
-    assertEquals(await second.json(), accepted);
+    assertStrictEquals(second.status, 409);
+    await second.body?.cancel();
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );
@@ -384,7 +371,7 @@ async () => {
 Deno.test('org-less invitee reaches identity nest',
 async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'dave@x.com', 'hvIFfMMXNtqRPYXnChCzug');
+    await grantWayne(db, 'dave@x.com');
     const token = await reachableToken(DAVE, []);
     const list = await handleRequest(db, req(
         'GET',
@@ -392,21 +379,16 @@ async () => {
         token,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as {
-        id: string;
-        state: string;
-    }[];
+    const rows = await partsOf<MembershipEntity>(list);
     assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.state, 'pending');
+    assertStrictEquals(rows[0]!.body().toValue().state, 'pending');
     const acc = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + DAVE
-            + '/invitations/hvIFfMMXNtqRPYXnChCzug',
+            + '/invitations/' + DAVE_WAYNE,
         token,
         {
             state: 'accepted',
-            membershipId: MS_HOLE,
-            eventId: EV_HOLE,
             at: '2026-01-01T00:00:01.000000Z',
         },
     )));
@@ -420,17 +402,17 @@ async () => {
 Deno.test('the invitation item GETs carry their head\'s ETag',
 async () => {
     const db = await seedWorld();
-    const id = generateIdentifier();
-    const granted = await grantWayne(db, 'sarah@x.com', id);
+    const granted = await grantWayne(db, 'sarah@x.com');
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
     const head = await db.messagePairs.getHeadPair(
-        '/invitations/', id,
+        '/invitations/', SARAH_WAYNE,
     );
     assert(head !== null);
     const invitee = await handleRequest(db, req(
         'GET',
-        '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
+        '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
+            + SARAH_WAYNE,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
             , 'AjdvjuECVZEgZoFajaIEkg'),
     ));
@@ -441,7 +423,8 @@ async () => {
     );
     const admin = await handleRequest(db, req(
         'GET',
-        '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/' + id,
+        '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
+            + SARAH_WAYNE,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
     ));

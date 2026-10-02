@@ -485,15 +485,6 @@ export const SEED_RECORD_TYPE_ID =
     customerProfileRecordId;
 export const WO01_ID = 'xqcXYHXBJJXcLkRYkRngKA';
 
-// The unaffiliated identity's pending Stark invitation —
-// exported so pass 2 (mock-data.ts) grants it through the
-// live postOrganizationInvitationGrant. Preimages
-// registered in seed-hash-preimage.ts.
-export const UNAFFILIATED_INVITATION_ID =
-    seedIdentifier('seed-invitation-riley-stark');
-const UNAFFILIATED_INVITATION_GRANT_EVENT_ID =
-    seedIdentifier('seed-invitation-riley-stark-grant');
-
 export const mockStateFieldValues: StateFieldValueEntity[] = [
     {
         id: 'CCiZyMeJtKzkjmIqUpDgmA',
@@ -2229,8 +2220,6 @@ export function formInvitationGrantSeedInput(
         + '/invitations/';
     const body = {
         email: buildUnaffiliatedIdentity().email,
-        invitationId: UNAFFILIATED_INVITATION_ID,
-        grantEventId: UNAFFILIATED_INVITATION_GRANT_EVENT_ID,
         grantAt: MOCK_SEED_TIMESTAMP,
     };
     const model = buildRequestModel({

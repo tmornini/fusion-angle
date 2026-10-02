@@ -27,9 +27,16 @@ import { seatsPrefixFor } from
     '../api/derive-memberships.ts';
 import {
     apiRequest,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
+import { httpDateOf } from '../api/message-pair.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import type { MembershipEntity } from '../shared/types.ts';
 
 const ORGANIZATION_A = generateIdentifier();
 const ORGANIZATION_B = generateIdentifier();
@@ -225,23 +232,19 @@ async function seedInviteeWorld(): Promise<DbAdapter> {
     return db;
 }
 
-async function grantDave(
-    db: DbAdapter,
-    invitationId: string,
-): Promise<void> {
+async function grantDave(db: DbAdapter): Promise<string> {
     const res = await handleRequest(db, req(
         'POST',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        {
-            email: 'dave@x.com',
-            invitationId,
-            grantEventId: generateIdentifier(),
-            grantAt: AT,
-        },
+        { email: 'dave@x.com', grantAt: AT },
     ));
     assertStrictEquals(res.status, 201);
+    await res.body?.cancel();
+    return membershipNameOf(
+        'BBjWJsjYIDkTRKIIPrzWRw', DAVE,
+    );
 }
 
 async function seedMemberOrganizations(): Promise<DbAdapter> {
@@ -261,33 +264,32 @@ async function seedMemberOrganizations(): Promise<DbAdapter> {
 Deno.test('org-less invitee GET identity-nest versions is 200',
 async () => {
     const db = await seedInviteeWorld();
-    await grantDave(db, 'hvIFfMMXNtqRPYXnChCzug');
+    const name = await grantDave(db);
     const token = await reachableToken(DAVE, []);
     const item = await handleRequest(db, req(
         'GET',
-        '/identities/' + DAVE
-            + '/invitations/hvIFfMMXNtqRPYXnChCzug',
+        '/identities/' + DAVE + '/invitations/' + name,
         token,
     ));
     assertStrictEquals(item.status, 200);
+    await item.body?.cancel();
     const list = await handleRequest(db, req(
         'GET',
-        '/identities/' + DAVE
-            + '/invitations/hvIFfMMXNtqRPYXnChCzug'
+        '/identities/' + DAVE + '/invitations/' + name
             + '/versions/',
         token,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as unknown[];
+    const rows = await partsOf<MembershipEntity>(list);
     assert(rows.length >= 1);
     const snapshot = await handleRequest(db, req(
         'GET',
-        '/identities/' + DAVE
-            + '/invitations/hvIFfMMXNtqRPYXnChCzug'
+        '/identities/' + DAVE + '/invitations/' + name
             + '/versions/nmPWmjhGfSUcdaEGaCyMZg',
         token,
     ));
     assertStrictEquals(snapshot.status, 404);
+    await snapshot.body?.cancel();
 });
 
 Deno.test('member of B GET B versions while fenced to A',
@@ -374,7 +376,7 @@ Deno.test('absent org versions is 404 not 403', async () => {
 Deno.test('identities, members, and identity-nest lists are 200',
 async () => {
     const db = await seedInviteeWorld();
-    await grantDave(db, 'iBSjaSPKkHorkvpwZBBNFg');
+    const name = await grantDave(db);
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const paths = [
@@ -382,8 +384,6 @@ async () => {
         '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/XXZruirZyAOoRpNxaDnpSA/'
             + 'versions/',
-        '/identities/' + DAVE
-            + '/invitations/iBSjaSPKkHorkvpwZBBNFg/versions/',
     ];
     for (const path of paths) {
         const res = await handleRequest(
@@ -393,6 +393,15 @@ async () => {
         const rows = await res.json() as unknown[];
         assert(rows.length >= 1, path);
     }
+    const invitations = await handleRequest(db, req(
+        'GET',
+        '/identities/' + DAVE + '/invitations/' + name
+            + '/versions/',
+        token,
+    ));
+    assertStrictEquals(invitations.status, 200);
+    const parts = await partsOf<MembershipEntity>(invitations);
+    assert(parts.length >= 1);
 });
 
 // Task 4 fix round 1, Finding 3: the member entity's OWN
@@ -429,37 +438,36 @@ Deno.test(
     },
 );
 
-// Sibling to the member pin above: invitationDocumentEntity
-// spreads document.body (carrying the invitation's OWN `at`,
-// validated at write time by grantInvitation's
-// validateTimestampField(body, 'grantAt', …)) before
-// versionSnapshotsAt overwrites it with the ledger arrival
-// time. This pins the versions wire to the ledger fact and
-// proves it is NOT the invitation's own grant time.
+// The body's at is the grant time the client sent.
+// The stored date line is the statement's splice of
+// response_at. The two clocks are different facts.
 Deno.test(
-    'invitation versions at is the ledger arrival time,'
-    + ' not the invitation grant time',
+    'the stored invitation date line is the statement'
+    + ' splice, and body at is the grant time',
     async () => {
         const db = await seedInviteeWorld();
-        const invitationId = generateIdentifier();
-        await grantDave(db, invitationId);
+        const name = await grantDave(db);
         const token = await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         );
         const list = await handleRequest(db, req(
             'GET',
             '/identities/' + DAVE + '/invitations/'
-                + invitationId + '/versions/',
+                + name + '/versions/',
             token,
         ));
         assertStrictEquals(list.status, 200);
-        const rows = await list.json() as { at: string }[];
-        assertStrictEquals(rows.length, 1);
+        const parts = await partsOf<MembershipEntity>(list);
+        assertStrictEquals(parts.length, 1);
+        assertStrictEquals(parts[0]!.body().toValue().at, AT);
         const stored = await messageStore(db).getDocumentHead(
-            '/invitations/', invitationId,
+            '/invitations/', name,
         );
         assert(stored);
-        assertStrictEquals(rows[0]!.at, stored.response_at);
-        assertNotStrictEquals(rows[0]!.at, AT);
+        assertNotStrictEquals(AT, stored.response_at);
+        const date = HttpMessage.fromWire<unknown>(
+            stored.response,
+        ).query('header.date').toText();
+        assertStrictEquals(date, httpDateOf(stored.response_at));
     },
 );

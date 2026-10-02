@@ -9,6 +9,7 @@ import {
 import {
     deriveInvitations,
 } from '../api/derive-invitations.ts';
+import { bodyOf } from '../api/derive-documents.ts';
 import {
     getIdentityInvitations,
     getInvitationOnIdentityNest,
@@ -66,26 +67,23 @@ Deno.test('the unaffiliated identity holds exactly one'
     const read = await getInvitationOnIdentityNest(
         db, [unaffiliated.id, invitation.id], unaffiliated.id,
         undefined, [],
-    ) as Response;
-    assertStrictEquals(
-        (await read.json() as { state: string }).state,
-        'pending',
     );
+    assert(read.kind === 'document');
+    assertStrictEquals(bodyOf(read.head.response)['state'], 'pending');
 });
 
-Deno.test('the invitee view carries the org name and the'
-+ ' inviting admin (TEST-PLAN B27 card)', async () => {
+Deno.test('the invitee view omits the org name and the'
++ ' inviting admin', async () => {
     const db = await sharedMockDb();
     const unaffiliated = buildUnaffiliatedIdentity();
     const views = await getIdentityInvitations(
         db, [unaffiliated.id], unaffiliated.id,
         undefined, [],
-    ) as Record<string, unknown>[];
-    assertStrictEquals(views.length, 1);
-    const view = views[0]!;
-    assertStrictEquals(
-        view['organization_name'], 'Stark Industries',
     );
-    assertStrictEquals(view['invited_by_name'], 'Tony Stark');
+    assert(views.kind === 'collection');
+    assertStrictEquals(views.heads.length, 1);
+    const view = bodyOf(views.heads[0]!.response);
+    assertStrictEquals(view['organization_name'], undefined);
+    assertStrictEquals(view['invited_by_name'], undefined);
     assertStrictEquals(view['state'], 'pending');
 });

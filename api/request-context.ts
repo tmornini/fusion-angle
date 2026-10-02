@@ -31,6 +31,9 @@ export interface IncomingContext {
     readonly requestId: string;
     readonly method: string;
     readonly pathname: string;
+    // The raw query, including the leading '?'. Empty when
+    // the request names none. A route's query slot reads it.
+    readonly search: string;
     // The unfenced tier. Phase Final Task 5 retired the
     // org-scoped decorator shell; handlers receive this base
     // adapter. Pair-plane tenancy rides path, not a
@@ -82,10 +85,12 @@ export async function incomingContext(
     const bodyBytes = new Uint8Array(
         await request.arrayBuffer(),
     );
+    const url = new URL(request.url);
     return {
         requestId: generateIdentifier(),
         method: request.method,
-        pathname: new URL(request.url).pathname,
+        pathname: url.pathname,
+        search: url.search,
         base,
         requestAt: nowUtc(),
         arrivalMs: performance.now(),

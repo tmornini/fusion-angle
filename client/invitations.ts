@@ -1,10 +1,11 @@
-import type { Id, InvitationState } from '../shared/types.ts';
+import type {
+    Id,
+    InvitationState,
+    MembershipEntity,
+} from '../shared/types.ts';
 import {
     nowUtc,
 } from '../shared/types.ts';
-import {
-    generateIdentifier,
-} from '../shared/identifier.ts';
 import {
     activeOrganization,
     type RequestContext,
@@ -34,112 +35,81 @@ export function subscribeInvitationChanges(
     return invitationChanges.subscribe(fn);
 }
 
-// One invitation as the invitee sees it: the inviting org, who
-// invited them, when, and the current lifecycle state. An
-// absent related row (erased inviter PII, vanished org) is an
-// absent key — never a '' sentinel.
+// One membership as the invitee sees it. The id is the
+// membership name. Names of the organization and the
+// inviter are not on this wire.
 export interface InvitationView {
     readonly id: Id;
     readonly organizationId: Id;
-    readonly organizationName?: string;
-    readonly invitedByName?: string;
     readonly invitedAt: string;
     readonly state: InvitationState;
 }
 
-// One outstanding invitation as the inviting admin sees it: the
-// invitee email they sent it to, and when. Erased invitee PII
-// is an absent key.
+// One outstanding membership as the inviting admin sees
+// it. The invitee's email is not on this wire.
 export interface SentInvitation {
     readonly id: Id;
     readonly organizationId: Id;
     readonly identityId: Id;
-    readonly inviteeEmail?: string;
     readonly invitedAt: string;
     readonly state: InvitationState;
 }
 
-interface InviteeRow {
-    id: Id;
-    organization_id: Id;
-    organization_name?: string;
-    identity_id: Id;
-    invited_by_name?: string;
-    at: string;
-    state: InvitationState;
-}
-
-interface SentRow {
-    id: Id;
-    organization_id: Id;
-    identity_id: Id;
-    invitee_email?: string;
-    at: string;
-    state: InvitationState;
-}
-
-// The caller's own invitations across every org — the org fence
-// cannot serve this, so the server fences by the verified
-// identity. Callers filter to `pending` for the actionable set.
-export async function getInvitations(
-    ctx: RequestContext,
-): Promise<InvitationView[]> {
-    const rows = (await ctx.GET<InviteeRow[]>(
-        'identities/' + ctx.identity.id
-            + '/invitations/',
-    )).body().toValue();
-    return rows.map(inviteeViewOf);
-}
-
-function inviteeViewOf(row: InviteeRow): InvitationView {
+function inviteeViewOf(row: MembershipEntity): InvitationView {
     return {
         id: row.id,
         organizationId: row.organization_id,
-        ...(row.organization_name !== undefined
-            ? { organizationName: row.organization_name }
-            : {}),
-        ...(row.invited_by_name !== undefined
-            ? { invitedByName: row.invited_by_name }
-            : {}),
         invitedAt: row.at,
         state: row.state,
     };
+}
+
+function sentViewOf(row: MembershipEntity): SentInvitation {
+    return {
+        id: row.id,
+        organizationId: row.organization_id,
+        identityId: row.identity_id,
+        invitedAt: row.at,
+        state: row.state,
+    };
+}
+
+// The caller's own memberships across every organization.
+// The server fences by the verified identity. Callers
+// filter to `pending` for the actionable set.
+export async function getInvitations(
+    ctx: RequestContext,
+): Promise<InvitationView[]> {
+    const parts = await ctx.GETCollection<MembershipEntity>(
+        'identities/' + ctx.identity.id + '/invitations/',
+    );
+    return parts.map((part) =>
+        inviteeViewOf(part.body().toValue()));
 }
 
 function invitationPath(ctx: RequestContext, id: Id): string {
     return 'identities/' + ctx.identity.id + '/invitations/' + id;
 }
 
-// The active org's outstanding invitations, for an admin — the
-// inviter-side counterpart of getInvitations.
+// The active organization's pending memberships. The box
+// has no selector of its own yet, so the view is asked
+// for pending.
 export async function getSentInvitations(
     ctx: RequestContext,
 ): Promise<SentInvitation[]> {
-    const rows = (await ctx.GET<SentRow[]>(
+    const parts = await ctx.GETCollection<MembershipEntity>(
         'organizations/'
             + activeOrganization(ctx)
-            + '/invitations/',
-    )).body().toValue();
-    return rows.map(row => ({
-        id: row.id,
-        organizationId: row.organization_id,
-        identityId: row.identity_id,
-        ...(row.invitee_email !== undefined
-            ? { inviteeEmail: row.invitee_email }
-            : {}),
-        invitedAt: row.at,
-        state: row.state,
-    }));
+            + '/invitations/?state=pending',
+    );
+    return parts.map((part) =>
+        sentViewOf(part.body().toValue()));
 }
 
-// Invite an EXISTING identity, by email, to the admin's active
-// org. The server resolves the email to an identity (the PII
-// fence forbids a client-side identity picker) and appends a
-// pending invitation. The outcome is returned in the domain's
-// own words so the page need not read HTTP status: 'sent' covers
-// a fresh grant AND a re-grant of an outstanding one (both 200);
-// the server's expected 404 / 409 become 'no-identity' /
-// 'already-member'. An unexpected fault still throws.
+// Invite an EXISTING identity, by email, to the admin's
+// active organization. The server resolves the email.
+// 'sent' covers a fresh grant and a repeated pending one.
+// 404 and 409 become 'no-identity' and 'already-member'.
 export type InvitationGrantOutcome =
     | 'sent'
     | 'no-identity'
@@ -149,17 +119,12 @@ export async function postInvitationGrant(
     ctx: RequestContext,
     email: string,
 ): Promise<InvitationGrantOutcome> {
-    const invitationId = generateIdentifier();
-    const grantEventId = generateIdentifier();
-    const grantAt = nowUtc();
     try {
         await ctx.POST(
             'organizations/'
                 + activeOrganization(ctx)
                 + '/invitations/',
-            {
-                email, invitationId, grantEventId, grantAt,
-            },
+            { email, grantAt: nowUtc() },
         );
     } catch (err) {
         if (
@@ -201,17 +166,12 @@ export async function postInvitationAcceptance(
     id: Id,
     organizationId: Id,
 ): Promise<void> {
-    const read = await ctx.GET<InviteeRow>(
+    const read = await ctx.GET<MembershipEntity>(
         invitationPath(ctx, id),
     );
     await ctx.PUT(
         invitationPath(ctx, id),
-        {
-            state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: generateIdentifier(),
-            at: nowUtc(),
-        },
+        { state: 'accepted', at: nowUtc() },
         [read],
     );
     try {
@@ -309,16 +269,12 @@ export async function postInvitationDecline(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    const read = await ctx.GET<InviteeRow>(
+    const read = await ctx.GET<MembershipEntity>(
         invitationPath(ctx, id),
     );
     await ctx.PUT(
         invitationPath(ctx, id),
-        {
-            state: 'declined',
-            eventId: generateIdentifier(),
-            at: nowUtc(),
-        },
+        { state: 'declined', at: nowUtc() },
         [read],
     );
     invitationChanges.notify();
@@ -335,14 +291,10 @@ export async function postInvitationRevocation(
     const path = 'organizations/'
         + activeOrganization(ctx)
         + '/invitations/' + id;
-    const read = await ctx.GET<SentRow>(path);
+    const read = await ctx.GET<MembershipEntity>(path);
     await ctx.PUT(
         path,
-        {
-            state: 'revoked',
-            eventId: generateIdentifier(),
-            at: nowUtc(),
-        },
+        { state: 'revoked', at: nowUtc() },
         [read],
     );
     invitationChanges.notify();

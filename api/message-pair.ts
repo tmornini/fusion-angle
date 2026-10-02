@@ -1036,10 +1036,11 @@ export async function formStateWrite(
     const received = write.answer.kind === 'received'
         ? write.received
         : await completedPair(write.received, {
-            status: write.siblings[0].condition.kind
-                    === 'in-order'
-                ? HTTP_OK
-                : HTTP_CREATED,
+            status: write.answer.kind === 'created'
+                || write.siblings[0].condition.kind
+                    !== 'in-order'
+                ? HTTP_CREATED
+                : HTTP_OK,
             etag: receivedEtag(write.siblings[0], pairs[0]!.id),
             fields: write.answer.kind === 'created'
                 ? [{
@@ -1659,26 +1660,14 @@ export function eventForMessagePair(
 }
 
 // The create-document override table: which body field names
-// the created entity for create-shaped collection POSTs. Grown
-// family by family in Tasks 2-5. A registered family (family-
-// registry.ts) answers ONLY from its own createBodyIdField —
-// its entry here is deleted, never kept as a parallel truth.
-// Identities' own entry retired here (Phase 10 Task 4): the
-// twelfth registered family now answers ONLY from its own
-// family-registry.ts createBodyIdField. 'invitations' is the
-// ONE entry this table keeps PERMANENTLY — the invitations side
-// channel is never a family-registry.ts registrant (it has no
-// organization-nesting tier, no document of its own to
-// register), so this literal table stays
-// its one consult forever, not a waypoint to registration.
+// the created entity for create-shaped collection POSTs. A
+// registered family answers ONLY from its own
+// createBodyIdField — its entry here is deleted. The
+// invitations side channel retired its invitationId entry
+// when the membership name replaced a client-minted id.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
-    // Not gate-dispatched (the invitations side channel forms
-    // its own pair directly in invitations-domain.ts) but reuses
-    // this SAME override table so createdEntityName serves both
-    // callers with one voice.
-    'invitations': 'invitationId',
-    // Nested composed POST (Task 9): pattern is not a bare
-    // family name, so the registry consult never fires — body
+    // Nested composed POST: pattern is not a bare family
+    // name, so the registry consult never fires — body
     // `id` collapses the operation message pair onto the
     // type's name (same supersession collapse the retired
     // flat POST /records used).

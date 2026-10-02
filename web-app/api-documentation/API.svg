@@ -137,32 +137,32 @@
   <rect class="empty" x="149" y="341" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="341" width="10" height="10" fill="none"/>
   <text class="uri" x="224" y="349">/api/identities/:id/invitations/</text>
-  <a href="#get/identities/id/invitations/id">
+  <a href="#get/identities/id/invitations/membership-id">
     <circle class="filled" cx="34" cy="364" r="5"/>
   </a>
-  <a href="#put/identities/id/invitations/id">
+  <a href="#put/identities/id/invitations/membership-id">
     <circle class="filled" cx="74" cy="364" r="5"/>
   </a>
   <rect class="empty" x="109" y="359" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="359" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="359" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="367">/api/identities/:id/invitations/:id</text>
-  <a href="#get/identities/id/invitations/id/versions">
+  <text class="uri" x="224" y="367">/api/identities/:id/invitations/:membership-id</text>
+  <a href="#get/identities/id/invitations/membership-id/versions">
     <circle class="filled" cx="34" cy="382" r="5"/>
   </a>
   <rect class="empty" x="69" y="377" width="10" height="10" fill="none"/>
   <rect class="empty" x="109" y="377" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="377" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="377" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="385">/api/identities/:id/invitations/:id/versions/</text>
-  <a href="#get/identities/id/invitations/id/versions/etag">
+  <text class="uri" x="224" y="385">/api/identities/:id/invitations/:membership-id/versions/</text>
+  <a href="#get/identities/id/invitations/membership-id/versions/etag">
     <circle class="filled" cx="34" cy="400" r="5"/>
   </a>
   <rect class="empty" x="69" y="395" width="10" height="10" fill="none"/>
   <rect class="empty" x="109" y="395" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="395" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="395" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="403">/api/identities/:id/invitations/:id/versions/:etag</text>
+  <text class="uri" x="224" y="403">/api/identities/:id/invitations/:membership-id/versions/:etag</text>
   <a href="#get/identities/id/organizations">
     <circle class="filled" cx="34" cy="418" r="5"/>
   </a>
@@ -444,32 +444,32 @@
   <rect class="empty" x="149" y="983" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="983" width="10" height="10" fill="none"/>
   <text class="uri" x="224" y="991">/api/organizations/:id/invitations/</text>
-  <a href="#get/organizations/id/invitations/id">
+  <a href="#get/organizations/id/invitations/membership-id">
     <circle class="filled" cx="34" cy="1006" r="5"/>
   </a>
-  <a href="#put/organizations/id/invitations/id">
+  <a href="#put/organizations/id/invitations/membership-id">
     <circle class="filled" cx="74" cy="1006" r="5"/>
   </a>
   <rect class="empty" x="109" y="1001" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="1001" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1001" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="1009">/api/organizations/:id/invitations/:id</text>
-  <a href="#get/organizations/id/invitations/id/versions">
+  <text class="uri" x="224" y="1009">/api/organizations/:id/invitations/:membership-id</text>
+  <a href="#get/organizations/id/invitations/membership-id/versions">
     <circle class="filled" cx="34" cy="1024" r="5"/>
   </a>
   <rect class="empty" x="69" y="1019" width="10" height="10" fill="none"/>
   <rect class="empty" x="109" y="1019" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="1019" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1019" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="1027">/api/organizations/:id/invitations/:id/versions/</text>
-  <a href="#get/organizations/id/invitations/id/versions/etag">
+  <text class="uri" x="224" y="1027">/api/organizations/:id/invitations/:membership-id/versions/</text>
+  <a href="#get/organizations/id/invitations/membership-id/versions/etag">
     <circle class="filled" cx="34" cy="1042" r="5"/>
   </a>
   <rect class="empty" x="69" y="1037" width="10" height="10" fill="none"/>
   <rect class="empty" x="109" y="1037" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="1037" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1037" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="1045">/api/organizations/:id/invitations/:id/versions/:etag</text>
+  <text class="uri" x="224" y="1045">/api/organizations/:id/invitations/:membership-id/versions/:etag</text>
   <a href="#get/organizations/id/objectives">
     <circle class="filled" cx="34" cy="1060" r="5"/>
   </a>
