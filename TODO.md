@@ -3257,6 +3257,24 @@ Off the critical path; each with its oracle.
   walks the ids the suite stores and fails when
   `isIdentifier` rejects one, with named exceptions
   for display names and search text.
+- The removed default-organization pin says the seat
+  remains and does not assert it
+  (`tests/api-identity-default-organization.test.ts:156`).
+  `seedSeat` mirrors an accepted membership and
+  `landMembership` writes only the membership, so the
+  seat is still there. A later edit that drops the
+  seat would still read 400. Assert
+  `deriveOrganizationMemberSeat` before the PUT, as
+  `tests/api-authentication-token.test.ts:833` does.
+  Left on `7bfb1702`. Oracle: that pin fails when the
+  seat is absent.
+- The default-organization client still says the PUT
+  must name a live seat
+  (`client/identity-default-organization.ts:9`).
+  Say an accepted membership. A seated removed head
+  is 400, and an accepted membership with no seat is
+  201. Left on `7bfb1702`. Oracle: that comment does
+  not say "live seat".
 
 ## Sequencing
 
