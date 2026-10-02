@@ -38,6 +38,10 @@ import {
     invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
+import { deriveOrganizationMemberSeat } from
+    '../api/derive-memberships.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
@@ -53,6 +57,7 @@ import { membershipNameOf } from
 // history routes.
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const LATER = '2026-01-02T00:00:00.000000Z';
 
 // Non-current admins need explicit claim roles — organizationToken
 // only bakes admin for sub === 'XXZruirZyAOoRpNxaDnpSA'.
@@ -565,7 +570,7 @@ async () => {
     );
 });
 
-Deno.test('deriveMembers is seats ∩ identities: leftover'
+Deno.test('deriveMembers is memberships ∩ identities: leftover'
 + ' /members/ and /memberships/ do not join',
 async () => {
     const db = memoryDbAdapter();
@@ -598,6 +603,118 @@ async () => {
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === ghost),
         true,
+    );
+});
+
+const PERSON = {
+    name: 'Person', email: 'p@x.com',
+    phone: '', bio: '',
+};
+
+Deno.test('deriveMembers holds an accepted membership'
++ ' of either type with no seat', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const member = generateIdentifier();
+    const admin = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedPersonIdentity(db, member, {
+        ...PERSON, email: 'member@x.com',
+    });
+    await seedPersonIdentity(db, admin, {
+        ...PERSON, email: 'admin@x.com',
+    });
+    await landMembership(
+        db, organizationA, member, 'accepted', 'member', AT,
+    );
+    await landMembership(
+        db, organizationA, admin, 'accepted', 'admin', AT,
+    );
+    const rows = await deriveMembers(db, organizationA);
+    assertEquals(
+        rows.find((row) => row.id === member),
+        { id: member, type: 'human' },
+    );
+    assertEquals(
+        rows.find((row) => row.id === admin),
+        { id: admin, type: 'human' },
+    );
+    assertStrictEquals(rows.length, 2);
+});
+
+Deno.test('deriveMembers holds nothing for a removed'
++ ' membership head whose seat remains', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const identity = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedPersonIdentity(db, identity, PERSON);
+    await seedSeat(
+        db, organizationA, identity, 'member', AT,
+    );
+    await landMembership(
+        db, organizationA, identity, 'removed', 'member', AT,
+    );
+    const seat = await deriveOrganizationMemberSeat(
+        db, organizationA, identity,
+    );
+    assertStrictEquals(seat.identity_id, identity);
+    assertStrictEquals(
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === identity),
+        false,
+    );
+});
+
+Deno.test('deriveMembers holds nothing for a non-accepted'
++ ' membership', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    const states = [
+        'pending', 'declined', 'revoked', 'removed',
+    ] as const;
+    for (const state of states) {
+        const identity = generateIdentifier();
+        await seedPersonIdentity(db, identity, {
+            ...PERSON, email: state + '@x.com',
+        });
+        await landMembership(
+            db, organizationA, identity, state, 'member',
+            AT,
+        );
+        assertStrictEquals(
+            (await deriveMembers(db, organizationA))
+                .some((row) => row.id === identity),
+            false,
+            state,
+        );
+    }
+});
+
+Deno.test('deriveMembers holds nothing for an accepted'
++ ' version under a removed head', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const identity = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedPersonIdentity(db, identity, PERSON);
+    await landMembership(
+        db, organizationA, identity, 'accepted', 'member',
+        AT,
+    );
+    await landMembership(
+        db, organizationA, identity, 'removed', 'member',
+        LATER,
+    );
+    assertStrictEquals(
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === identity),
+        false,
     );
 });
 
