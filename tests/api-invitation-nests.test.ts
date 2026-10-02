@@ -215,8 +215,32 @@ async () => {
     assertStrictEquals(body.state, 'pending');
     assertStrictEquals(body.organization_id, 'BBjWJsjYIDkTRKIIPrzWRw');
     assertStrictEquals(body.identity_id, 'toccYYkLEABmlbpHJalgtQ');
-    const row = (await deriveInvitations(db))[0]!;
-    assertStrictEquals(row.state, 'pending');
+    const invitations = await deriveInvitations(db);
+    assertStrictEquals(invitations.length, 4);
+    const grant = invitations.find(
+        (row) => row.id === SARAH_WAYNE,
+    );
+    assert(grant !== undefined);
+    assertStrictEquals(grant.state, 'pending');
+    const mirrored = [
+        membershipNameOf(
+            'AjdvjuECVZEgZoFajaIEkg',
+            'XXZruirZyAOoRpNxaDnpSA',
+        ),
+        membershipNameOf(
+            WAYNE, 'XXZruirZyAOoRpNxaDnpSA',
+        ),
+        membershipNameOf(
+            'AjdvjuECVZEgZoFajaIEkg', SARAH,
+        ),
+    ];
+    for (const id of mirrored) {
+        const row = invitations.find(
+            (item) => item.id === id,
+        );
+        assert(row !== undefined);
+        assertStrictEquals(row.state, 'accepted');
+    }
 });
 
 Deno.test('invitee PUT identity nest accepted writes'

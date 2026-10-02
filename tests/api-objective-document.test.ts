@@ -269,8 +269,8 @@ Deno.test('a byte-identical PUT resend to'
             , body, DEV_TOKEN,
         operationIdHeader())).body().toValue();
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 
 // -- 4. below-route via the generic handlers, against the REAL

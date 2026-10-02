@@ -96,6 +96,7 @@ import {
 import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
+    formStateWrite,
     runWrite,
     runStateWrite,
     sameAsHead,
@@ -105,12 +106,14 @@ import {
     documentHeadAt,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
+    responseRecordOf,
     PII_DOCUMENT_NAME,
 } from './message-pair.ts';
 import type {
     MessagePair,
     ParentSibling,
     ReceivedRequest,
+    SiblingCondition,
     StateSibling,
 } from './message-pair.ts';
 import type { Reader } from './served-response.ts';
@@ -321,6 +324,12 @@ import {
     getInvitationVersionsOnIdentityNest,
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
+import {
+    MEMBERSHIPS_PATH,
+    membershipOfHead,
+} from './memberships.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import {
     viewQueryOf,
     type QueryRefusal,
@@ -2526,13 +2535,111 @@ export async function postActualScoreDocumentOp(
     return entity;
 }
 
+// A seat's stored path. Any other path is not a seat, so
+// the write grows no membership sibling.
+function organizationOfSeatPath(
+    path: string,
+): Id | undefined {
+    const head = '/organizations/';
+    const tail = '/members/';
+    if (!path.startsWith(head) || !path.endsWith(tail)) {
+        return undefined;
+    }
+    const organization = path.slice(
+        head.length, path.length - tail.length,
+    );
+    if (
+        organization === ''
+        || organization.includes('/')
+    ) {
+        return undefined;
+    }
+    return organization;
+}
+
+// While both shapes exist, a seat write lands the
+// membership that says the same thing, in the seat's own
+// statement. Task 26 deletes this with the seats.
+export async function membershipSiblingOf(
+    db: DbAdapter,
+    organization: Id,
+    identity: Id,
+    seat: MessagePair,
+): Promise<MessagePair | undefined> {
+    const name = membershipNameOf(organization, identity);
+    const head = await db.messagePairs.getHeadPair(
+        MEMBERSHIPS_PATH, name,
+    );
+    let state: Record<string, unknown>;
+    let condition: SiblingCondition;
+    if (seat.method === 'DELETE') {
+        if (head === null) return undefined;
+        state = {
+            id: name,
+            organization_id: organization,
+            identity_id: identity,
+            type: membershipOfHead(head).type,
+            state: 'removed',
+            at: seat.requestAt,
+        };
+        condition = { kind: 'in-order', head: head.id };
+    } else {
+        const record = responseRecordOf(
+            seat.responseMessage,
+        );
+        if (record === undefined) {
+            throw new Error('a seat PUT stored no body');
+        }
+        const fact = validateSeatDocumentBody({
+            type: record['type'],
+            at: record['at'],
+        });
+        state = {
+            id: name,
+            organization_id: organization,
+            identity_id: identity,
+            type: fact.type,
+            state: 'accepted',
+            at: fact.at,
+        };
+        condition = head === null
+            ? { kind: 'genesis', declarer: 'handler' }
+            : { kind: 'in-order', head: head.id };
+    }
+    const formed = await formStateWrite({
+        kind: 'events',
+        context: {
+            operationId: seat.operationId,
+            requestId: seat.requestId,
+            requesterIdentityId: seat.requesterIdentityId,
+            requestAt: seat.requestAt,
+        },
+        siblings: [{
+            method: 'PUT',
+            path: MEMBERSHIPS_PATH,
+            name,
+            state,
+            condition,
+        }],
+    });
+    const row = formed.rows[0];
+    if (row === undefined || !('requestMessage' in row)) {
+        throw new Error(
+            'membership sibling was not formed',
+        );
+    }
+    return row;
+}
+
 // Membership document write — Phase Final Task 2: the
-// memberships ROW half is stripped — pure message-plane write
-// (postFlowTagDocumentOp shape). No states interaction
-// (memberships never post events). `messagePair` is optional so a
-// below-facade caller keeps compiling; the live route always
-// supplies one. WRITE_RESPONSE_SPECS successBody forms the
-// wire bytes; the reconstructed return is for type parity.
+// memberships ROW half is stripped — pure message-plane
+// write (postFlowTagDocumentOp shape). A seat write also
+// lands the membership sibling in the same statement, so
+// the two shapes agree. `messagePair` is optional so a
+// below-facade caller keeps compiling; the live route
+// always supplies one. WRITE_RESPONSE_SPECS successBody
+// forms the wire bytes; the reconstructed return is for
+// type parity.
 export async function postMembershipDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -2542,13 +2649,19 @@ export async function postMembershipDocumentOp(
 ): Promise<Omit<SeatEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<SeatEntity, 'id'>;
-    // Phase Final Task 2: memberships ROW half stripped.
     if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
+        const organization = organizationOfSeatPath(
+            messagePair.path,
         );
+        const sibling = organization === undefined
+            ? undefined
+            : await membershipSiblingOf(
+                db, organization, _id, messagePair,
+            );
+        const rows = sibling === undefined
+            ? [messagePair]
+            : [messagePair, sibling];
+        await runWrite(db, attemptFor(rows), rows);
     }
     return entity;
 }
@@ -5390,11 +5503,13 @@ export const routes: Route[] = [
                 );
             }
             if (messagePair !== undefined) {
-                await runWrite(
-                    db,
-                    attemptFor([messagePair]),
-                    [messagePair],
+                const sibling = await membershipSiblingOf(
+                    db, fenced, identityId, messagePair,
                 );
+                const rows = sibling === undefined
+                    ? [messagePair]
+                    : [messagePair, sibling];
+                await runWrite(db, attemptFor(rows), rows);
             }
         },
     }),

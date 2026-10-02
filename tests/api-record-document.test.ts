@@ -279,6 +279,6 @@ async () => {
             token, body, operationId,
         ),
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });

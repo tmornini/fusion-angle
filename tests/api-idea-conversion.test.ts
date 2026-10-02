@@ -270,11 +270,11 @@ Deno.test(
         // project document message pair, the synthesized
         // idea document message pair, and TWO synthesized
         // baseline pairs — Phase 7 Task 4's 3+N widening,
-        // N=2 here) + three schema/bootstrap pairs = 11.
+        // N=2 here) + four schema/bootstrap pairs = 12.
         const allRequests = await db.messagePairs.getAll();
         const allResponses = await db.messagePairs.getAll();
-        assertStrictEquals(allRequests.length, 11);
-        assertStrictEquals(allResponses.length, 11);
+        assertStrictEquals(allRequests.length, 12);
+        assertStrictEquals(allResponses.length, 12);
         assertStrictEquals(allRequests.length, allResponses.length);
 
         const atProject = allRequests.filter(

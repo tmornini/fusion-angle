@@ -157,8 +157,8 @@ function messagePairJsonOf(message: string): {
 // invitation pairs (the seeded pending Stark
 // invitation's operation + document, granted by
 // postOrganizationInvitationGrant). Measure after
-// seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 2317;
+// seed — do not invent. Bootstrap absolute is 10.
+const EXPECTED_MESSAGE_PAIR_COUNT = 2329;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -974,7 +974,7 @@ Deno.test('seed pairs verify against their hashes', async () => {
     }
 });
 
-Deno.test('a bootstrap seed populates exactly eight balanced,'
+Deno.test('a bootstrap seed populates exactly ten balanced,'
 + ' hash-verified pairs for the current identity and the'
 + ' system identity', async () => {
     const db = memoryDbAdapter();
@@ -982,7 +982,7 @@ Deno.test('a bootstrap seed populates exactly eight balanced,'
         hashPassword: testHashPassword,
     });
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 10);
     const atIdentity = requests.filter(
         r => r.path === '/identities/'
             && r.name === 'XXZruirZyAOoRpNxaDnpSA',

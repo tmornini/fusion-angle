@@ -142,7 +142,7 @@ async () => {
     // document and its pii document each), the
     // organizations/:id document (Stage B), and the grant's own
     // 2 pairs.
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 10);
     const pairsAt = requests.filter(
         r => r.path === '/invitations/'
             && r.name === SARAH_NAME,
@@ -545,7 +545,7 @@ Deno.test('every stored invitation-family message verifies against'
     // membership pair, four seeded people (an identities/:id
     // document and its pii document each), and the
     // organizations/:id document = 21.
-    assertStrictEquals(messagePairs.length, 22);
+    assertStrictEquals(messagePairs.length, 23);
     for (const row of messagePairs) {
         assertStrictEquals(
             await requestHashOfStored(row),

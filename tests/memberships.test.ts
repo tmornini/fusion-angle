@@ -533,7 +533,15 @@ Deno.test('an organization id that is not an'
 Deno.test('membershipOf holds an accepted head and its'
     + ' type, and nothing else', async () => {
     const db = await freshDb();
-    assertStrictEquals(await membershipOf(db, O, I), null);
+    // seedRootAdmin seats Tony at seedSeat's default at.
+    assertEquals(await membershipOf(db, O, I), {
+        id: O + ':' + I,
+        organization_id: O,
+        identity_id: I,
+        type: 'admin',
+        state: 'accepted',
+        at: '2020-01-01T00:00:00.000000Z',
+    });
     for (const state of [
         'pending', 'declined', 'revoked', 'removed',
     ] as const) {
@@ -655,6 +663,15 @@ Deno.test('each membership view keeps its own nest',
 Deno.test('a view returns every state, one state,'
     + ' or the heads in order', async () => {
     const db = await freshDb();
+    const seeded = await organizationMembershipHeads(
+        db, O, { kind: 'every' },
+    );
+    assertStrictEquals(seeded.length, 1);
+    const adminHead = seeded[0];
+    if (adminHead === undefined) {
+        throw new Error('seeded admin head is missing');
+    }
+    const adminHeadId = adminHead.id;
     const planted: {
         state: InvitationState,
         identityId: string,
@@ -678,6 +695,7 @@ Deno.test('a view returns every state, one state,'
         LATER,
     );
     const expected = [
+        adminHeadId,
         ...planted.slice(1).map((row) => row.headId),
         revised.id,
     ];
@@ -691,13 +709,16 @@ Deno.test('a view returns every state, one state,'
         const selected = await organizationMembershipHeads(
             db, O, { kind: 'state', state: row.state },
         );
-        assertEquals(
-            selected.map((head) => head.id),
-            [
+        const expectedIds = row.state === 'accepted'
+            ? [adminHeadId, row.headId]
+            : [
                 row.state === first.state
                     ? revised.id
                     : row.headId,
-            ],
+            ];
+        assertEquals(
+            selected.map((head) => head.id),
+            expectedIds,
         );
     }
     assertEquals(

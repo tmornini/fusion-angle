@@ -119,8 +119,8 @@ async () => {
         'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assertEquals(written, body);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -139,10 +139,11 @@ Deno.test('a byte-identical PUT resend to a seat converges'
             + 'toccYYkLEABmlbpHJalgtQ', body, DEV_TOKEN,
         operationIdHeader())).body().toValue();
     assertEquals(first, second);
-    // seedAdminSchema: org + current seat; one unique
-    // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    // seedAdminSchema: nil root, organization, admin seat
+    // and its membership sibling, plus the new seat and
+    // its membership sibling. The resend stores nothing.
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
 });
 
 Deno.test('a seat PUT chain derives the latest body',

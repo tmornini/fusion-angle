@@ -131,10 +131,16 @@ Deno.test('PUT identity-tokens/:id appends its pair at the entity'
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 4);
-    assertStrictEquals(requests[3]!.path
-        , '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/');
-    assertStrictEquals(requests[3]!.name, 'vNIIMoezHOyoUeTsbqSzCA');
+    assertStrictEquals(requests.length, 5);
+    const token = requests.find(
+        (row) => row.name === 'vNIIMoezHOyoUeTsbqSzCA',
+    );
+    assert(token);
+    assertStrictEquals(
+        token.path,
+        '/identities/XXZruirZyAOoRpNxaDnpSA/tokens/',
+    );
+    assertStrictEquals(token.name, 'vNIIMoezHOyoUeTsbqSzCA');
     const domainRow = await deriveIdentityToken(
         db, 'XXZruirZyAOoRpNxaDnpSA', 'vNIIMoezHOyoUeTsbqSzCA',
     );
@@ -205,12 +211,18 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 4);
+    assertStrictEquals(requests.length, 5);
+    const revocation = requests.find(
+        (row) => row.name === 'sVWUntTCtQYFCpONjkzAKg',
+    );
+    assert(revocation);
     assertStrictEquals(
-        requests[3]!.path,
+        revocation.path,
         '/identities/XXZruirZyAOoRpNxaDnpSA/token-revocations/',
     );
-    assertStrictEquals(requests[3]!.name, 'sVWUntTCtQYFCpONjkzAKg');
+    assertStrictEquals(
+        revocation.name, 'sVWUntTCtQYFCpONjkzAKg',
+    );
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the message plane.
     const domainRow = await deriveTokenRevocation(
@@ -298,11 +310,11 @@ async () => {
         DEV_TOKEN, {},
     ));
     assertStrictEquals(res.status, 409);
-    // 3 bootstrap + seededDb's own pair-forming PUT (Phase 13
-    // Task 6's seeding re-point) = 4; the 409 itself appends
-    // nothing further.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    // 3 bootstrap + the admin membership sibling
+    // + seededDb's own pair-forming PUT = 5; the 409
+    // itself appends nothing further.
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 
 // ── identity-tokens/:jti/revocation — operation path ──
@@ -602,9 +614,10 @@ async () => {
     );
     assert(operationMessagePair);
     assertStrictEquals(operationMessagePair!.name, '');
-    // 3 bootstrap + seeded authorize + code document
-    // + its DELETE + the issued event + the grant pair.
-    assertStrictEquals(requests.length, 8);
+    // 3 bootstrap + the admin membership sibling
+    // + seeded authorize + code document + its DELETE
+    // + the issued event + the grant pair.
+    assertStrictEquals(requests.length, 9);
 });
 
 Deno.test('a token-exchange grant (a real /authentication/token'

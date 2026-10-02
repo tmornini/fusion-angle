@@ -704,7 +704,7 @@ async () => {
     assertStrictEquals(created.status, 201);
 
     const messagePairs = await db.messagePairs.getAll();
-    assertStrictEquals(messagePairs.length, 6);
+    assertStrictEquals(messagePairs.length, 7);
 
     const flowPairs = messagePairs.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
