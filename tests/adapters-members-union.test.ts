@@ -48,7 +48,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    deleteHumanMemberSeat,
+    postMembershipRemoval,
     getHumanMember,
 } from '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
@@ -423,9 +423,9 @@ Deno.test(
             memberName(await getMemberMap(ctx), leaverId),
             'Lisa Leaver',
         );
-        await deleteHumanMemberSeat(
-            ctx, await getHumanMember(ctx, leaverId),
-        );
+        const leaver = await getHumanMember(ctx, leaverId);
+        assert(leaver !== null);
+        await postMembershipRemoval(ctx, leaver);
         const map = await getMemberMap(ctx);
         const former = map.get(leaverId);
         assert(former !== undefined, 'former member mapped');

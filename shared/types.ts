@@ -716,9 +716,9 @@ export type HumanProfile =
 
 export class HumanMember {
     readonly kind = 'human' as const;
-    // The seat this member was read through: its removal
-    // names the head it replaces.
-    readonly membership: HttpMessage<SeatEntity>;
+    // The membership this member was read through: its
+    // removal names the head it replaces.
+    readonly membership: HttpMessage<MembershipEntity>;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
     readonly #profile: HumanProfile;
@@ -727,7 +727,7 @@ export class HumanMember {
         parent: MemberEntity,
         profile: HumanProfile,
         pii: MemberPii,
-        membership: HttpMessage<SeatEntity>,
+        membership: HttpMessage<MembershipEntity>,
     ) {
         this.membership = membership;
         this.#id = parent.id;
@@ -893,19 +893,19 @@ export class SystemMember {
 
 export const FORMER_MEMBER_NAME = 'Former member';
 
-// A former member: an identity whose seat in the active
-// organization the ledger has DELETEd. What it authored
-// while seated — submissions, transitions, scores — still
-// names it, so the name resolver must know it and paint it
-// as what it is. Identity only: no seat, no profile, and no
+// A former member: an identity whose membership in the
+// active organization is removed. What it authored while
+// a member — submissions, transitions, scores — still
+// names it, so the name resolver must know it and paint
+// it as what it is. Identity only: no profile, and no
 // PII read (a removed identity's PII is not the
 // organization's to paint). Never a roster row.
 export class FormerMember {
     readonly kind = 'former' as const;
     readonly #id: MemberId;
 
-    constructor(seat: FormerSeatEntity) {
-        this.#id = seat.identity_id;
+    constructor(membership: MembershipEntity) {
+        this.#id = membership.identity_id;
     }
 
     idForLink(): string {

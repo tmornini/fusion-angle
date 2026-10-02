@@ -38,7 +38,8 @@ function collectionGets(
 }
 
 Deno.test(
-    'organization init GETs members/ and objectives/ once',
+    'organization init GETs accepted memberships'
+    + ' and objectives once',
     () => withLocalStorageAsync(
         (() => {
             const storage = new Map<string, string>();
@@ -157,7 +158,9 @@ Deno.test(
                 1,
             );
             assertEquals(
-                collectionGets(paths, 'members'),
+                paths.filter(p => p.endsWith(
+                    '/invitations/?state=accepted',
+                )).length,
                 1,
             );
         } finally {

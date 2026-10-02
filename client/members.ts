@@ -6,7 +6,7 @@ import type {
     HumanProfile,
     IdentityPiiEntity,
     MemberPii,
-    SeatEntity,
+    MembershipEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -16,10 +16,17 @@ import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { byAtThenIdAscending } from '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { getMemberPii } from './identities.ts';
 import {
     createSubscriptionChannel,
 } from './channels.ts';
+import {
+    RequestError,
+    HTTP_NOT_FOUND,
+    HTTP_PRECONDITION_FAILED,
+} from '../shared/http-errors.ts';
 
 const humanMemberChanges =
     createSubscriptionChannel();
@@ -46,14 +53,41 @@ function sessionOrganization(
         ?? ctx.identity.organizations?.[0];
 }
 
-function seatsCollection(ctx: RequestContext): string {
+function requireOrganization(ctx: RequestContext): string {
     const organization = sessionOrganization(ctx);
     if (organization === undefined) {
         throw new Error(
-            'no organization on the session for seats',
+            'no organization on the session for memberships',
         );
     }
-    return 'organizations/' + organization + '/members/';
+    return organization;
+}
+
+function acceptedMemberships(ctx: RequestContext): string {
+    return 'organizations/' + requireOrganization(ctx)
+        + '/invitations/?state=accepted';
+}
+
+function membershipItem(
+    ctx: RequestContext,
+    identityId: string,
+): string {
+    const organization = requireOrganization(ctx);
+    return 'organizations/' + organization
+        + '/invitations/'
+        + membershipNameOf(organization, identityId);
+}
+
+function byGrantThenIdentity(
+    a: HttpMessage<MembershipEntity>,
+    b: HttpMessage<MembershipEntity>,
+): number {
+    const left = a.body().toValue();
+    const right = b.body().toValue();
+    return byAtThenIdAscending(
+        { at: left.at, id: left.identity_id },
+        { at: right.at, id: right.identity_id },
+    );
 }
 
 function profileOf(
@@ -78,23 +112,23 @@ function seatedHumanParent(
 }
 
 // The roster serves in write order; the members page and
-// the palette's featured six read the seats in grant order.
+// the palette's featured six read memberships in grant
+// order: at, then identity.
 export function buildHumanMemberMap(
-    seats: readonly HttpMessage<SeatEntity>[],
+    memberships: readonly HttpMessage<MembershipEntity>[],
 ): Map<MemberId, HumanMember> {
     const map = new Map<MemberId, HumanMember>();
-    const granted = seats.toSorted((a, b) => byAtThenIdAscending(
-        a.body().toValue(), b.body().toValue(),
-    ));
-    for (const seat of granted) {
-        const identityId = seat.body().toValue().identity_id;
+    const granted = memberships.toSorted(byGrantThenIdentity);
+    for (const membership of granted) {
+        const identityId = membership.body()
+            .toValue().identity_id;
         map.set(
             identityId,
             new HumanMember(
                 seatedHumanParent(identityId),
                 { present: false },
                 { erased: true },
-                seat,
+                membership,
             ),
         );
     }
@@ -105,8 +139,8 @@ export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
     const map = buildHumanMemberMap(
-        await ctx.GETCollection<SeatEntity>(
-            seatsCollection(ctx),
+        await ctx.GETCollection<MembershipEntity>(
+            acceptedMemberships(ctx),
         ),
     );
     const filled = await Promise.all(
@@ -152,22 +186,34 @@ export function featuredHumanMembers(
 export async function getHumanMember(
     ctx: RequestContext,
     id: string,
-): Promise<HumanMember> {
-    const [seat, identity, pii] =
-        await Promise.all([
-            ctx.GET<SeatEntity>(
-                seatsCollection(ctx) + id,
-            ),
-            ctx.GET<IdentityEntity>(
-                `identities/${id}`,
-            ).then(read => read.body().toValue()),
-            getMemberPii(ctx, id),
-        ]);
+): Promise<HumanMember | null> {
+    let membership: HttpMessage<MembershipEntity>;
+    try {
+        membership = await ctx.GET<MembershipEntity>(
+            membershipItem(ctx, id),
+        );
+    } catch (err) {
+        if (
+            err instanceof RequestError
+            && err.status === HTTP_NOT_FOUND
+        ) {
+            return null;
+        }
+        throw err;
+    }
+    const body = membership.body().toValue();
+    if (body.state !== 'accepted') return null;
+    const [identity, pii] = await Promise.all([
+        ctx.GET<IdentityEntity>(
+            `identities/${id}`,
+        ).then(read => read.body().toValue()),
+        getMemberPii(ctx, id),
+    ]);
     return new HumanMember(
         seatedHumanParent(id),
         profileOf(identity),
         pii,
-        seat,
+        membership,
     );
 }
 
@@ -253,24 +299,45 @@ export async function postHumanMemberCreation(
     } catch (err) {
         throw new HumanMemberPiiIntakeFailedError(id, err);
     }
-    await ctx.PUT(
-        seatsCollection(ctx) + id,
-        { type: 'member', at: nowUtc() },
-    );
+    const item = membershipItem(ctx, id);
+    const body = {
+        state: 'accepted',
+        type: 'member',
+        at: nowUtc(),
+    };
+    try {
+        await ctx.PUT(item, body, 'creates');
+    } catch (err) {
+        // If-None-Match meets a head as 412. Accepted
+        // means the seat already landed. Any other state
+        // is put once, latched on the head just read. A
+        // 412 from that put propagates.
+        if (
+            !(err instanceof RequestError)
+            || err.status !== HTTP_PRECONDITION_FAILED
+        ) {
+            throw err;
+        }
+        const held = await ctx.GET<MembershipEntity>(item);
+        if (held.body().toValue().state !== 'accepted') {
+            await ctx.PUT(item, body, [held]);
+        }
+    }
     humanMemberChanges.notify();
 }
 
-// The seat's own DELETE — the identity survives; only its
-// place in this organization goes. The API refuses the last
-// admin seat (409); the page mirrors that guard through
-// getAdminSeatIds below rather than discovering it here.
-// The removal names the seat the member was read through.
-export async function deleteHumanMemberSeat(
+// The membership PUT that ends the place — the identity
+// survives. The API refuses the last admin (409); the page
+// mirrors that guard through getAdminSeatIds rather than
+// discovering it here. The removal names the membership
+// the member was read through.
+export async function postMembershipRemoval(
     ctx: RequestContext,
     member: HumanMember,
 ): Promise<void> {
-    await ctx.DELETE(
-        seatsCollection(ctx) + member.idForLink(),
+    await ctx.PUT(
+        membershipItem(ctx, member.idForLink()),
+        { state: 'removed', at: nowUtc() },
         [member.membership],
     );
     humanMemberChanges.notify();
@@ -279,10 +346,12 @@ export async function deleteHumanMemberSeat(
 export async function getAdminSeatIds(
     ctx: RequestContext,
 ): Promise<MemberId[]> {
-    const seats = (await ctx.GETCollection<SeatEntity>(
-        seatsCollection(ctx),
-    )).map((m) => m.body().toValue());
-    return seats
-        .filter(seat => seat.type === 'admin')
-        .map(seat => seat.identity_id);
+    const memberships = (
+        await ctx.GETCollection<MembershipEntity>(
+            acceptedMemberships(ctx),
+        )
+    ).map((m) => m.body().toValue());
+    return memberships
+        .filter(membership => membership.type === 'admin')
+        .map(membership => membership.identity_id);
 }

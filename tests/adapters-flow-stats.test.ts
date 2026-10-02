@@ -188,7 +188,9 @@ Deno.test(
                 if (path.endsWith('/history')) {
                     return responseMessage([]);
                 }
-                if (path.endsWith('/former-members/')) {
+                if (path.endsWith(
+                    '/invitations/?state=removed',
+                )) {
                     return responseMessage([]);
                 }
                 return responseMessage({
@@ -227,8 +229,12 @@ Deno.test(
                 }
                 if (
                     path.endsWith('/history')
-                    || path.endsWith('/members/')
-                    || path.endsWith('/former-members/')
+                    || path.endsWith(
+                        '/invitations/?state=accepted',
+                    )
+                    || path.endsWith(
+                        '/invitations/?state=removed',
+                    )
                     || path === 'ai-agents/'
                 ) {
                     return [];

@@ -6,7 +6,7 @@ import {
     nowUtc,
     type Id,
     type IdentityPiiEntity,
-    type SeatEntity,
+    type MembershipEntity,
 } from '../shared/types.ts';
 import {
     getModelsByProvider,
@@ -25,6 +25,8 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
 // The catalog's first model — the fixture default.
@@ -83,11 +85,14 @@ export function makeHumanMember(
                 id, ...pii,
             }),
         },
-        responseMessage<SeatEntity>({
-            id,
+        responseMessage<MembershipEntity>({
+            id: membershipNameOf(
+                MEMBER_ORGANIZATION, id,
+            ),
             organization_id: MEMBER_ORGANIZATION,
             identity_id: id,
             type: 'member',
+            state: 'accepted',
             at: '2026-01-01T00:00:00.000000Z',
         }),
     );

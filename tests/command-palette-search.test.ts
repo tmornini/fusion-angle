@@ -12,7 +12,7 @@ import {
     Idea, Project, HumanMember,
     type IdeaState,
     type IdentityPiiEntity,
-    type SeatEntity,
+    type MembershipEntity,
 } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
@@ -85,11 +85,12 @@ function buildHumanMember(
                 id, ...pii,
             }),
         },
-        responseMessage<SeatEntity>({
+        responseMessage<MembershipEntity>({
             id,
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: id,
             type: 'member',
+            state: 'accepted',
             at: '2026-01-01T00:00:00.000000Z',
         }),
     );

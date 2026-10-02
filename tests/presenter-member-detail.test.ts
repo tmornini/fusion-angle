@@ -7,7 +7,7 @@ import {
     HumanMember,
     AIMember,
     type IdentityPiiEntity,
-    type SeatEntity,
+    type MembershipEntity,
 } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import { firstProviderModel } from './member-fixtures.ts';
@@ -116,11 +116,12 @@ function makeHumanMember() {
                 bio: 'Builds things.',
             }),
         },
-        responseMessage<SeatEntity>({
+        responseMessage<MembershipEntity>({
             id: 'hw_1',
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: 'hw_1',
             type: 'member',
+            state: 'accepted',
             at: '2026-01-01T00:00:00.000000Z',
         }),
     );

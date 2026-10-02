@@ -1,4 +1,8 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -38,7 +42,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    deleteHumanMemberSeat,
+    postMembershipRemoval,
     getHumanMember,
 } from '../client/members.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -296,9 +300,9 @@ Deno.test(
         await seedIdea(
             ctx, generateIdentifier(), 'active', leaverId,
         );
-        await deleteHumanMemberSeat(
-            ctx, await getHumanMember(ctx, leaverId),
-        );
+        const leaver = await getHumanMember(ctx, leaverId);
+        assert(leaver !== null);
+        await postMembershipRemoval(ctx, leaver);
         const stats = await getOrganizationStats(ctx);
         assertStrictEquals(stats.ideasCurrent, 1);
         assertStrictEquals(stats.activePeopleCount, 1);
