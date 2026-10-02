@@ -1,9 +1,15 @@
-import { assertStrictEquals } from '@std/assert';
+import {
+    assertNotStrictEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import { EntityNotFoundError } from '../api/db.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
+import { membershipOf } from '../api/memberships.ts';
 import {
     runWrite,
     attemptFor,
@@ -33,12 +39,9 @@ async function freshDb() {
     return db;
 }
 
-// Below-facade pair formation (the seedDefaultOrganizationEvent
-// precedent just above, applied to memberships): the primary-
-// membership fallback this file's own tests exercise derives
-// from the message plane once memberships flips, so a raw row here
-// would go derivation-invisible. PLUMBING ONLY: the assertions
-// this helper feeds stay byte-identical.
+// seedSeat mirrors an accepted membership, which is
+// what this file reads. seedSeat's mirror still wants
+// the organization document.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
     _id: string,
@@ -46,12 +49,6 @@ async function seedMembershipPair(
     identityId: string,
     at: string,
 ): Promise<void> {
-    // A real organizations/:id document (Phase 13 Task 3's
-    // fixture prerequisite; seedOrganizationDocument is idempotent
-    // — a no-op on a repeat organization id) — a membership pair
-    // with no document for its own org stays derivation-invisible
-    // to deriveMembershipsForIdentity's own enumerate-then-probe
-    // (via deriveOrganizations).
     await seedOrganizationDocument(
         db, organizationId, organizationId,
     );
@@ -226,10 +223,23 @@ Deno.test(
             operationId: generateIdentifier(),
             requestId: generateIdentifier(),
         });
-        await runWrite(
+        const answer = await runWrite(
             db,
             attemptFor([tombstone]),
             [tombstone],
+        );
+        assertStrictEquals(answer.outcome, 'land');
+        await assertRejects(
+            () => deriveOrganizationMemberSeat(
+                db, ORGANIZATION_TWO, IDENTITY_ID,
+            ),
+            EntityNotFoundError,
+        );
+        assertNotStrictEquals(
+            await membershipOf(
+                db, ORGANIZATION_TWO, IDENTITY_ID,
+            ),
+            null,
         );
         assertStrictEquals(
             await identityDefaultOrganization(
@@ -291,6 +301,51 @@ Deno.test(
                 db, IDENTITY_ID,
             ),
             organization,
+        );
+    },
+);
+
+Deno.test(
+    'pending, declined, revoked, and a removed head'
+    + ' hold nothing as the default',
+    async () => {
+        const db = await freshDb();
+        const organization = 'IAAAAAAAAAAAAAAAAAAAAA';
+        await seedDefaultOrganizationEvent(
+            db, IDENTITY_ID, organization,
+            '2026-04-01T00:00:00.000000Z',
+        );
+        const nonAccepted = [
+            ['pending', '2026-04-02T00:00:00.000000Z'],
+            ['declined', '2026-04-03T00:00:00.000000Z'],
+            ['revoked', '2026-04-04T00:00:00.000000Z'],
+        ] as const;
+        for (const [state, at] of nonAccepted) {
+            await landMembership(
+                db, organization, IDENTITY_ID, state,
+                'member', at,
+            );
+            assertStrictEquals(
+                await identityDefaultOrganization(
+                    db, IDENTITY_ID,
+                ),
+                null,
+                state,
+            );
+        }
+        await landMembership(
+            db, organization, IDENTITY_ID, 'accepted',
+            'member', '2026-04-05T00:00:00.000000Z',
+        );
+        await landMembership(
+            db, organization, IDENTITY_ID, 'removed',
+            'member', '2026-04-06T00:00:00.000000Z',
+        );
+        assertStrictEquals(
+            await identityDefaultOrganization(
+                db, IDENTITY_ID,
+            ),
+            null,
         );
     },
 );
