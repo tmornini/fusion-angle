@@ -1383,6 +1383,18 @@ export interface SeatEntity {
     at: string;
 }
 
+// The membership body (spec §1): the name fixes the two
+// ids; `at` is when the current state was entered.
+export interface MembershipEntity {
+    // `<organization-id>:<identity-id>`
+    id: string;
+    organization_id: Id;
+    identity_id: Id;
+    type: MembershipType;
+    state: InvitationState;
+    at: string;
+}
+
 // A seat the ledger has DELETEd: the identity once held a
 // place in this organization and holds none now. `at` is
 // the removal pair's own arrival time — the moment the
