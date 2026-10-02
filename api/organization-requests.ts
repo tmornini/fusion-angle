@@ -23,8 +23,8 @@ import {
 } from './derive-default-organization.ts';
 import {
     deriveMembershipsForIdentity,
-    membershipExistsFor,
 } from './derive-memberships.ts';
+import { membershipOf } from './memberships.ts';
 import {
     validateDefaultOrganizationBody,
 } from './validators.ts';
@@ -70,7 +70,7 @@ export async function selectIdentityOrganizations(
 
 // PUT/GET /identities/:id/default-organization — a simple
 // document. Authorized by tree ownership (caller === :id).
-// PUT { organization_id } must name a live seat, else 400
+// PUT { organization_id } must name an accepted membership, else 400
 // and nothing is stored. GET serves that document's head
 // or 404s if never SET. No public DELETE. Revoke does not
 // rewrite this document. Self-only stays here:
@@ -118,12 +118,12 @@ export async function putIdentityDefaultOrganization(
     const { organization_id: organization } =
         validateDefaultOrganizationBody(payload);
     if (
-        !await membershipExistsFor(
+        await membershipOf(
             db, organization, identityId,
-        )
+        ) === null
     ) {
         throw new ApiError(
-            'organization_id is not a live seat',
+            'organization_id is not an accepted membership',
             HTTP_BAD_REQUEST,
         );
     }
