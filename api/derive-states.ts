@@ -24,6 +24,10 @@ import {
 } from './derive-documents.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
+    membershipOf,
+    membershipsOfIdentity,
+} from './memberships.ts';
+import {
     historyOf,
     type WorkOrderVersion,
 } from './work-order-version.ts';
@@ -185,10 +189,9 @@ async function resolveFlowGraphOwner(
 }
 
 // The org-less member/identity fallback (an ai-member/human-member
-// id, i.e. an identity id): seats are organization-nested, so
-// there is no single document to scan — THE GATE-15 PRECEDENT
-// unions the same per-org derivation across every known
-// organization instead.
+// id, i.e. an identity id). An accepted membership owns. The
+// bound organization is membershipOf; any other is the first
+// other row from membershipsOfIdentity.
 //
 // ASKER-RELATIVE BY NECESSITY: an identity can hold memberships in
 // MULTIPLE organizations at once. api/store-parent-scoped.ts's own
@@ -207,14 +210,10 @@ async function organizationHasMemberMessagePair(
     organization: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const seatPrefix = '/organizations/' + organization
-        + '/members/';
-    const seatMessagePairs = await db.messagePairs.getDocumentHistory(
-        seatPrefix, identityId,
+    const membership = await membershipOf(
+        db, organization, identityId,
     );
-    return deriveDocumentsAt(
-        seatMessagePairs, seatPrefix,
-    ).has(identityId);
+    return membership !== null;
 }
 
 async function resolveViaMembershipPairPlane(
@@ -229,15 +228,16 @@ async function resolveViaMembershipPairPlane(
     ) {
         return boundOrganization;
     }
-    for (const organization of await organizationIds(db)) {
-        if (organization === boundOrganization) continue;
+    const memberships = await membershipsOfIdentity(
+        db, entityId,
+    );
+    for (const membership of memberships) {
         if (
-            await organizationHasMemberMessagePair(
-                db, organization, entityId,
-            )
+            membership.organization_id === boundOrganization
         ) {
-            return organization;
+            continue;
         }
+        return membership.organization_id;
     }
     return null;
 }

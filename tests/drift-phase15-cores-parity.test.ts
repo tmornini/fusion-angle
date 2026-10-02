@@ -4,7 +4,10 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -39,7 +42,12 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
+import { deriveOrganizationMemberSeat } from
+    '../api/derive-memberships.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import type { DbAdapter } from '../api/db.ts';
 import {
@@ -430,6 +438,143 @@ async () => {
             db, ownedId, ORGANIZATION_TWO,
         ),
         STARK_ORGANIZATION,
+    );
+});
+
+const AT = '2026-06-04T00:00:00.000000Z';
+const LATER = '2026-06-05T00:00:00.000000Z';
+
+Deno.test('resolveOwningOrganization holds an accepted'
++ ' membership with no seat', async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const organization = generateIdentifier();
+    const identity = generateIdentifier();
+    await landMembership(
+        db, organization, identity, 'accepted', 'member',
+        AT,
+    );
+    assertStrictEquals(
+        await resolveOwningOrganization(
+            db, identity, organization,
+        ),
+        organization,
+    );
+});
+
+Deno.test('resolveOwningOrganization holds nothing when'
++ ' a removed membership leaves its seat',
+async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const organization = generateIdentifier();
+    const identity = generateIdentifier();
+    await seedSeat(
+        db, organization, identity, 'member', AT,
+    );
+    await landMembership(
+        db, organization, identity, 'removed', 'member',
+        LATER,
+    );
+    const seat = await deriveOrganizationMemberSeat(
+        db, organization, identity,
+    );
+    assertStrictEquals(seat.identity_id, identity);
+    assertStrictEquals(
+        seat.organization_id, organization,
+    );
+    assertStrictEquals(
+        await resolveOwningOrganization(
+            db, identity, organization,
+        ),
+        null,
+    );
+});
+
+Deno.test('resolveOwningOrganization holds nothing for a'
++ ' non-accepted membership', async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const organization = generateIdentifier();
+    const states = [
+        'pending', 'declined', 'revoked', 'removed',
+    ] as const;
+    for (const state of states) {
+        const identity = generateIdentifier();
+        await landMembership(
+            db, organization, identity, state, 'member',
+            AT,
+        );
+        assertStrictEquals(
+            await resolveOwningOrganization(
+                db, identity, organization,
+            ),
+            null,
+            state,
+        );
+    }
+});
+
+Deno.test('resolveOwningOrganization holds nothing for an'
++ ' accepted version under a removed head',
+async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const organization = generateIdentifier();
+    const identity = generateIdentifier();
+    await landMembership(
+        db, organization, identity, 'accepted', 'member',
+        AT,
+    );
+    await landMembership(
+        db, organization, identity, 'removed', 'member',
+        LATER,
+    );
+    assertStrictEquals(
+        await resolveOwningOrganization(
+            db, identity, organization,
+        ),
+        null,
+    );
+});
+
+Deno.test('resolveOwningOrganization prefers the bound'
++ ' accepted membership', async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const bound = generateIdentifier();
+    const other = generateIdentifier();
+    const identity = generateIdentifier();
+    await landMembership(
+        db, other, identity, 'accepted', 'member', AT,
+    );
+    await landMembership(
+        db, bound, identity, 'accepted', 'member', LATER,
+    );
+    assertStrictEquals(
+        await resolveOwningOrganization(
+            db, identity, bound,
+        ),
+        bound,
+    );
+});
+
+Deno.test('resolveOwningOrganization returns another'
++ ' accepted membership when the bound one misses',
+async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    const bound = generateIdentifier();
+    const other = generateIdentifier();
+    const identity = generateIdentifier();
+    await landMembership(
+        db, other, identity, 'accepted', 'member', AT,
+    );
+    assertStrictEquals(
+        await resolveOwningOrganization(
+            db, identity, bound,
+        ),
+        other,
     );
 });
 
