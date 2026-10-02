@@ -16,6 +16,7 @@ import {
     revokedThroughSeconds,
 } from './access-token.ts';
 import {
+    byAtThenIdAscending,
     compareIdentifiers,
     generateIdentifier,
 } from '../shared/identifier.ts';
@@ -88,6 +89,7 @@ import {
     deriveMembershipsForIdentity,
     membershipExistsFor,
 } from './derive-memberships.ts';
+import { membershipsOfIdentity } from './memberships.ts';
 import {
     deriveCredentialsFor,
     deriveClientRegistration,
@@ -390,10 +392,9 @@ async function nameFor(
 }
 
 // The subject's reachable orgs and mint-time claim roles —
-// one `{type}:{organization_id}` per live seat — from a
-// single membership derivation. Source of the token's
-// `orgs` claim and the exchange's member-check. Mint-time
-// only — the gate reads claims.
+// one `{type}:{organization_id}` per accepted membership.
+// Source of the token's `orgs` claim and the exchange's
+// member-check. Mint-time only — the gate reads claims.
 export async function subjectClaims(
     adapter: DbAdapter,
     identityId: Id,
@@ -401,9 +402,16 @@ export async function subjectClaims(
     readonly organizations: Id[];
     readonly roles: string[];
 }> {
-    const rows = await deriveMembershipsForIdentity(
+    const rows = await membershipsOfIdentity(
         adapter, identityId,
     );
+    // The name is `<organization>:<identity>`. Equal `at`
+    // ties on the organization, which is the chronology
+    // already minted from seats.
+    rows.sort((left, right) => byAtThenIdAscending(
+        { at: left.at, id: left.organization_id },
+        { at: right.at, id: right.organization_id },
+    ));
     return {
         organizations: rows.map(
             m => m.organization_id,
