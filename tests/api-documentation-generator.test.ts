@@ -254,3 +254,146 @@ Deno.test('a GET room names Operation-ID on every request',
     assertMatch(html, /Operation-ID: on every request/);
     assertNotMatch(html, /Operation-ID: on writes/);
 });
+
+function roomHtmlOf(
+    rooms: ReadonlyMap<string, string>,
+    verb: string,
+    uri: string,
+): string | undefined {
+    const row = routes.find(
+        (candidate) => uriOf(candidate) === uri,
+    );
+    assert(row, uri);
+    return rooms.get(roomPathOf(verb, row.segments));
+}
+
+function statusesOf(
+    rooms: ReadonlyMap<string, string>,
+    verb: string,
+    uri: string,
+): string[] {
+    const html = roomHtmlOf(rooms, verb, uri);
+    assert(html, verb + ' ' + uri);
+    return [...html.matchAll(/statuses\/(\d+)\//g)]
+        .map((match) => match[1]!);
+}
+
+const MEMBERSHIP_ITEMS = [
+    '/organizations/:id/invitations/:membership-id',
+    '/identities/:id/invitations/:membership-id',
+];
+
+const PAIR_LINES = [
+    'last-modified: on 2xx',
+    'requester-identity-id: on 2xx',
+    'response-at: on 2xx',
+];
+
+function responseHeaderBlock(html: string): string {
+    const at = html.indexOf('<h2>Response headers</h2>');
+    if (at < 0) return '';
+    const status = html.indexOf('<h2>Status</h2>', at);
+    return html.slice(
+        at, status < 0 ? html.length : status,
+    );
+}
+
+Deno.test('invitation views list 400, and the identity'
+    + ' view lists the fence 403', () => {
+    const rooms = generateAll();
+    for (const uri of [
+        '/identities/:id/invitations/',
+        '/organizations/:id/invitations/',
+    ]) {
+        const codes = statusesOf(rooms, 'get', uri);
+        assert(codes.includes('400'), uri);
+        assert(codes.includes('403'), uri);
+    }
+});
+
+Deno.test('a membership item lists 405 and no DELETE'
+    + ' room, and its writes list 409', () => {
+    const rooms = generateAll();
+    for (const uri of MEMBERSHIP_ITEMS) {
+        const row = routes.find(
+            (candidate) => uriOf(candidate) === uri,
+        );
+        assert(row, uri);
+        assertStrictEquals(
+            rooms.get(
+                roomPathOf('delete', row.segments),
+            ),
+            undefined,
+            uri,
+        );
+        const got = statusesOf(rooms, 'get', uri);
+        assert(got.includes('405'), uri);
+        assert(!got.includes('410'), uri);
+        assert(!got.includes('409'), uri);
+        const put = statusesOf(rooms, 'put', uri);
+        assert(put.includes('405'), uri);
+        assert(put.includes('409'), uri);
+    }
+    const grant = statusesOf(
+        rooms, 'post',
+        '/organizations/:id/invitations/',
+    );
+    assert(grant.includes('409'));
+    assert(!grant.includes('405'));
+});
+
+Deno.test('a stored pair\'s 2xx names the three lines'
+    + ' as response headers', () => {
+    const rooms = generateAll();
+    const carries = [
+        ['get', '/identities/:id'],
+        ['get', '/organizations/:id/ideas/:id'
+            + '/versions/:etag'],
+        ['put', '/identities/:id'],
+        ['get', '/organizations/:id/invitations'
+            + '/:membership-id'],
+        ['put', '/identities/:id/invitations'
+            + '/:membership-id'],
+        ['post', '/organizations/:id/invitations/'],
+        ['post', '/authentication/token'],
+        ['post', '/authentication/authorize'],
+        ['delete', '/identities/:id/pii'],
+    ] as const;
+    for (const [verb, uri] of carries) {
+        const html = roomHtmlOf(rooms, verb, uri);
+        assert(html, verb + ' ' + uri);
+        const block = responseHeaderBlock(html);
+        assert(block !== '', verb + ' ' + uri);
+        let at = 0;
+        for (const line of PAIR_LINES) {
+            const next = block.indexOf(line);
+            assert(next >= at, verb + ' ' + line);
+            at = next + line.length;
+        }
+        const request = html.slice(0, html.indexOf(block));
+        assert(
+            !request.includes('last-modified'),
+            verb + ' ' + uri,
+        );
+    }
+    const omits = [
+        ['get', '/identities/'],
+        ['get', '/identities/:id/invitations/'],
+        ['get', '/organizations/:id/ideas/'],
+        ['get', '/organizations/:id/ideas/:id/versions/'],
+        ['get', '/organizations/:id/work-orders/:id'
+            + '/history'],
+    ] as const;
+    for (const [verb, uri] of omits) {
+        const html = roomHtmlOf(rooms, verb, uri);
+        assert(html, verb + ' ' + uri);
+        assert(
+            !html.includes('last-modified'),
+            verb + ' ' + uri,
+        );
+        assert(
+            !html.includes('Response headers'),
+            verb + ' ' + uri,
+        );
+    }
+});

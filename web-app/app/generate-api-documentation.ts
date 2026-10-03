@@ -664,10 +664,29 @@ function statusCodesFor(
         codes.push(204);
     }
     const body = exampleBodyFor(uri, verb);
+    // A view's ?state= is judged before any body. A bad
+    // query is 400. A write body is 400 on its own.
     if (body !== 'none') codes.push(400);
+    else if (verb === 'get' && row.query !== undefined) {
+        codes.push(400);
+    }
     codes.push(401);
-    if (isOrganizationNested(row)) codes.push(403);
+    // The organization view's 403 is the member rule,
+    // already listed because the nest is fenced. The
+    // identity view's 403 is that route's own fence.
+    if (
+        isOrganizationNested(row)
+        || uri === '/identities/:id/invitations/'
+    ) {
+        codes.push(403);
+    }
     if (!isAuthGrant(row)) codes.push(404);
+    // DELETE is not offered, so the catalog has no
+    // DELETE room. The item still answers 405.
+    if (isMembershipItem(uri)) codes.push(405);
+    // A transition outside the table, the last accepted
+    // admin, and a repeated accept, decline, or revoke.
+    if (isMembershipConflict(verb, uri)) codes.push(409);
     const family = versionFamily(row);
     // State families, and any family whose document route
     // offers DELETE, already list 410. A select version
@@ -723,32 +742,90 @@ function isGrantUri(uri: string): boolean {
         || uri === '/authentication/authorize';
 }
 
+function isMembershipItem(uri: string): boolean {
+    return uri
+            === '/identities/:id/invitations/:membership-id'
+        || uri
+            === '/organizations/:id/invitations'
+                + '/:membership-id';
+}
+
+function isMembershipConflict(
+    verb: HttpVerb,
+    uri: string,
+): boolean {
+    if (verb === 'put' && isMembershipItem(uri)) {
+        return true;
+    }
+    return verb === 'post'
+        && uri === '/organizations/:id/invitations/';
+}
+
+// The three lines of one stored pair, on a 2xx. A
+// collection or a versions list answers an envelope:
+// the lines ride each part, not the response. History
+// answers JSON. A grant's wire is the pair it stored,
+// so it carries the same three.
+const PAIR_RESPONSE_HEADERS = [
+    'last-modified: on 2xx',
+    'requester-identity-id: on 2xx',
+    'response-at: on 2xx',
+] as const;
+
+function carriesStoredPairLines(
+    verb: string,
+    uri: string,
+): boolean {
+    const lower = verb.toLowerCase();
+    if (
+        lower === 'put' || lower === 'post'
+        || lower === 'patch' || lower === 'delete'
+    ) {
+        return true;
+    }
+    if (lower !== 'get' || uri.endsWith('/')) return false;
+    const row = routes.find(
+        (candidate) => uriOf(candidate) === uri,
+    );
+    return row !== undefined && row.select !== undefined;
+}
+
+interface DocumentedHeaders {
+    readonly request: readonly string[];
+    readonly response: readonly string[];
+}
+
 function headersFor(
     verb: string,
     uri: string,
-): readonly string[] {
+): DocumentedHeaders {
     const lower = verb.toLowerCase();
-    const headers: string[] = [];
+    const request: string[] = [];
     if (!isGrantUri(uri)) {
-        headers.push('Authorization: Bearer …');
+        request.push('Authorization: Bearer …');
     }
-    headers.push('Operation-ID: on every request');
+    request.push('Operation-ID: on every request');
     const conditional = conditionalFor(lower, uri);
     if (conditional === 'in-order') {
-        headers.push('If-Match: strong etag');
+        request.push('If-Match: strong etag');
     }
     if (conditional === 'required') {
-        headers.push('If-Match or If-None-Match: *');
+        request.push('If-Match or If-None-Match: *');
     }
     // If-None-Match: * never lands a DELETE: a name never
     // written is 404, a gone one 204 with nothing stored,
     // and a live head refuses it with 412.
     if (conditional === 'optional' && lower === 'delete') {
-        headers.push('If-Match (optional)');
+        request.push('If-Match (optional)');
     } else if (conditional === 'optional') {
-        headers.push('If-Match or If-None-Match: * (optional)');
+        request.push(
+            'If-Match or If-None-Match: * (optional)',
+        );
     }
-    return headers;
+    const response = carriesStoredPairLines(verb, uri)
+        ? PAIR_RESPONSE_HEADERS
+        : [];
+    return { request, response };
 }
 
 export function verbRoomHtml(
@@ -783,13 +860,24 @@ export function verbRoomHtml(
             '</pre>',
         );
     }
+    const documented = headersFor(verb, uri);
     lines.push('<h2>Headers</h2>', '<ul>');
-    for (const header of headersFor(verb, uri)) {
+    for (const header of documented.request) {
         lines.push(
             '  <li>' + escapeHtml(header) + '</li>',
         );
     }
-    lines.push('</ul>', '<h2>Status</h2>', '<ul>');
+    lines.push('</ul>');
+    if (documented.response.length > 0) {
+        lines.push('<h2>Response headers</h2>', '<ul>');
+        for (const header of documented.response) {
+            lines.push(
+                '  <li>' + escapeHtml(header) + '</li>',
+            );
+        }
+        lines.push('</ul>');
+    }
+    lines.push('<h2>Status</h2>', '<ul>');
     for (const code of statusCodes) {
         const href = statusHref(depth, code);
         lines.push(
@@ -995,6 +1083,7 @@ interface CatalogRoom {
     readonly uri: string;
     readonly body: string;
     readonly headers: readonly string[];
+    readonly responseHeaders: readonly string[];
     readonly statuses: readonly string[];
 }
 
@@ -1009,12 +1098,14 @@ function catalogRoomsOf(): CatalogRoom[] {
     for (const row of routes) {
         const uri = uriOf(row);
         for (const verb of offeredVerbs(row)) {
+            const documented = headersFor(verb, uri);
             rooms.push({
                 hash: roomHashOf(verb, row.segments),
                 verb: verb.toUpperCase(),
                 uri: wireUriOf(uri),
                 body: exampleBodyFor(uri, verb),
-                headers: headersFor(verb, uri),
+                headers: documented.request,
+                responseHeaders: documented.response,
                 statuses: statusCodesFor(row, verb),
             });
         }
@@ -1136,6 +1227,8 @@ function emitRoomLiteral(
         ...emitField('body', room.body, i2),
         i2 + 'headers:',
         ...emitStringArray(room.headers, i2),
+        i2 + 'responseHeaders:',
+        ...emitStringArray(room.responseHeaders, i2),
         i2 + 'statuses:',
         ...emitStringArray(room.statuses, i2),
         i + '},',
@@ -1163,6 +1256,7 @@ const ROOMS_HEADER = [
     '    readonly uri: string;',
     '    readonly body: string;',
     '    readonly headers: readonly string[];',
+    '    readonly responseHeaders: readonly string[];',
     '    readonly statuses: readonly string[];',
     '}',
     '',

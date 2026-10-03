@@ -4,6 +4,7 @@ export interface ApiDocRoom {
     readonly uri: string;
     readonly body: string;
     readonly headers: readonly string[];
+    readonly responseHeaders: readonly string[];
     readonly statuses: readonly string[];
 }
 
@@ -26,6 +27,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '204',
@@ -45,6 +52,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '204',
@@ -63,6 +76,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -84,6 +103,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '204',
@@ -104,6 +129,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '204',
@@ -123,6 +154,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match: strong etag',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -149,6 +186,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '204',
@@ -172,6 +215,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -197,6 +246,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '204',
@@ -216,6 +271,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -234,6 +291,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -251,6 +314,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -268,6 +333,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -287,6 +358,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -305,6 +378,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -322,6 +401,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -340,6 +421,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -356,6 +443,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -374,11 +467,15 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
             '204',
+            '400',
             '401',
+            '403',
             '404',
         ],
     },
@@ -392,11 +489,18 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
             '401',
             '404',
+            '405',
         ],
     },
     {
@@ -409,6 +513,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -425,6 +531,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -443,6 +555,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -460,6 +574,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -479,6 +599,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -497,6 +619,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -513,6 +641,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -532,6 +666,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -549,6 +689,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -567,6 +709,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -584,6 +732,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -601,6 +751,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -620,6 +776,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -638,6 +800,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -656,6 +820,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -676,6 +846,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -694,6 +866,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -714,6 +892,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -733,6 +917,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -751,6 +937,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -771,6 +963,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -790,6 +984,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -808,6 +1004,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -828,6 +1030,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -847,6 +1051,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -865,6 +1071,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -885,10 +1097,13 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
             '204',
+            '400',
             '401',
             '403',
             '404',
@@ -904,12 +1119,19 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
             '401',
             '403',
             '404',
+            '405',
         ],
     },
     {
@@ -922,6 +1144,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -942,6 +1166,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -960,6 +1190,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -978,6 +1210,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -998,6 +1236,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1017,6 +1257,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1035,6 +1277,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1055,6 +1303,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1073,6 +1323,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1093,6 +1349,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1112,6 +1370,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1131,6 +1391,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1150,6 +1412,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1168,6 +1432,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1188,6 +1458,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1205,6 +1477,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1224,6 +1502,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1243,6 +1523,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1261,6 +1547,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1279,6 +1567,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1299,6 +1589,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1323,6 +1619,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1345,6 +1643,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1369,6 +1673,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1391,6 +1697,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1415,6 +1727,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1437,6 +1751,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1461,6 +1781,8 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [],
         statuses:
         [
             '200',
@@ -1483,6 +1805,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1510,6 +1838,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1533,6 +1867,12 @@ export const API_DOC_ROOMS:
         [
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1551,6 +1891,12 @@ export const API_DOC_ROOMS:
         [
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1567,6 +1913,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1586,6 +1938,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1602,6 +1960,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1626,6 +1990,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1645,6 +2015,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match: strong etag',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1673,6 +2049,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1696,6 +2078,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1703,6 +2091,7 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '409',
         ],
     },
     {
@@ -1716,6 +2105,12 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1742,6 +2137,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1764,6 +2165,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match: strong etag',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1791,6 +2198,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1815,6 +2228,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1837,6 +2256,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1861,6 +2286,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1880,6 +2311,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1903,12 +2340,20 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
             '400',
             '401',
             '404',
+            '405',
+            '409',
             '412',
             '428',
         ],
@@ -1925,6 +2370,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -1949,6 +2400,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1972,6 +2429,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -1993,6 +2456,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2017,6 +2486,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2039,6 +2514,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2068,6 +2549,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2092,6 +2579,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2112,6 +2605,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2135,6 +2634,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2162,6 +2667,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2185,6 +2696,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2207,6 +2724,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2214,6 +2737,8 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '405',
+            '409',
             '412',
             '428',
         ],
@@ -2228,6 +2753,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2252,6 +2783,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2278,6 +2815,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2300,6 +2843,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2326,6 +2875,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2354,6 +2909,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2378,6 +2939,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match or If-None-Match: *',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2399,6 +2966,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match: strong etag',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2425,6 +2998,12 @@ export const API_DOC_ROOMS:
             'Operation-ID: on every request',
             'If-Match: strong etag',
         ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
         statuses:
         [
             '200',
@@ -2450,6 +3029,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
@@ -2478,6 +3063,12 @@ export const API_DOC_ROOMS:
             'Authorization: Bearer …',
             'Operation-ID: on every request',
             'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
         ],
         statuses:
         [
