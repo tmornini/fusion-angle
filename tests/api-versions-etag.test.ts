@@ -23,6 +23,8 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { firstProviderModel } from
+    './member-fixtures.ts';
 import { messageStore } from '../api/message-store.ts';
 import {
     attemptFor,
@@ -507,6 +509,136 @@ Deno.test(
         });
         assertEquals(versions[1]!.body().toValue(), {
             id, kind: 'service',
+        });
+        for (const part of versions) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(db, req(
+                'GET', path + '/versions/' + tag, token,
+            ));
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+// The AI agent document route offers no DELETE. A
+// DELETE head is still Gone on both version routes:
+// the ladder answers 410 before it looks at the tag.
+function aiAgentDocument(name: string) {
+    return {
+        name,
+        description: 'helper',
+        skill_focus: 'ops',
+        model: firstProviderModel().id,
+    };
+}
+
+async function deleteAiAgentDocument(
+    db: DbAdapter,
+    id: string,
+): Promise<void> {
+    const messagePair = await formWriteMessagePair({
+        method: 'DELETE',
+        pathname: '/ai-agents/' + id,
+        routePattern: 'ai-agents/:id',
+        routeSegments: ['ai-agents', ':id'],
+        pathSegments: ['ai-agents', id],
+        headerFields: [],
+        body: {},
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: '2026-08-01T00:00:00.000000Z',
+        organization: undefined,
+        responseBody: undefined,
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
+    );
+}
+
+Deno.test(
+    'a deleted AI agent answers 410 on both version'
+        + ' routes',
+    async () => {
+        const db = await seedInviteeWorld();
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const created = await handleRequest(db, req(
+            'PUT', '/ai-agents/' + id, token,
+            aiAgentDocument('First'),
+        ));
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        await created.body?.cancel();
+        await deleteAiAgentDocument(db, id);
+        const listPath = '/ai-agents/' + id + '/versions/';
+        const list = await handleRequest(
+            db, req('GET', listPath, token),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: ai-agents/' + id,
+        });
+        const item = await handleRequest(db, req(
+            'GET', listPath + tag, token,
+        ));
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: ai-agents/' + id,
+        });
+    },
+);
+
+Deno.test(
+    'two AI agent PUTs list oldest first,'
+        + ' each part the item its tag serves',
+    async () => {
+        const db = await seedInviteeWorld();
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const path = '/ai-agents/' + id;
+        const firstBody = aiAgentDocument('First');
+        const secondBody = aiAgentDocument('Second');
+        const first = await handleRequest(db, req(
+            'PUT', path, token, firstBody,
+        ));
+        assertStrictEquals(first.status, 201);
+        await first.body?.cancel();
+        const second = await handleRequest(db, req(
+            'PUT', path, token, secondBody,
+        ));
+        assertStrictEquals(second.status, 200);
+        await second.body?.cancel();
+        const list = await handleRequest(db, req(
+            'GET', path + '/versions/', token,
+        ));
+        assertStrictEquals(list.status, 200);
+        const versions = await partsOf<{
+            id: string;
+            name: string;
+            description: string;
+            skill_focus: string;
+            model: string;
+        }>(list);
+        assertStrictEquals(versions.length, 2);
+        assertEquals(versions[0]!.body().toValue(), {
+            id, ...firstBody,
+        });
+        assertEquals(versions[1]!.body().toValue(), {
+            id, ...secondBody,
         });
         for (const part of versions) {
             const tag = part.query('header.etag').toText()

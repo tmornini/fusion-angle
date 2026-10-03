@@ -3685,8 +3685,8 @@ export const routes: Route[] = [
     }),
     documentVersionsSelectRoute(IDENTITIES_WIRING),
     documentVersionSelectRoute(IDENTITIES_WIRING),
-    documentVersionListRoute(AI_AGENTS_WIRING),
-    documentVersionRoute(AI_AGENTS_WIRING),
+    documentVersionsSelectRoute(AI_AGENTS_WIRING),
+    documentVersionSelectRoute(AI_AGENTS_WIRING),
     // PII is a facet of the identity's own subtree: GET is
     // self-or-admin, PUT/DELETE self-or-admin (enforced in
     // the request gate, mirroring

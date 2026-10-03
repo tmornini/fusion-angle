@@ -10,8 +10,6 @@ import { routePatternOf } from '../api/route-surface.ts';
 // `## A response is one unit` to ARCHITECTURE.md (spec §12,
 // `## For the next brainstorms`).
 const PARTED = [
-    'ai-agents/:id/versions/',
-    'ai-agents/:id/versions/:etag',
     'organizations/:id/flows/:id/versions/',
     'organizations/:id/flows/:id/versions/:etag',
     'organizations/:id/ideas/:id/versions/',
