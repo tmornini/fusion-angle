@@ -1841,14 +1841,14 @@ export function validateMembershipEntity(
     at: string;
 } {
     assertOnlyKeys(
-        body, MEMBERSHIP_BODY_KEYS, 'SeatEntity',
+        body, MEMBERSHIP_BODY_KEYS, 'MembershipEntity',
     );
     const type = validateEnumField(
         body, 'type', MEMBERSHIP_TYPES,
-        'membership type', 'SeatEntity',
+        'membership type', 'MembershipEntity',
     );
     const at = validateTimestampField(
-        body, 'at', 'SeatEntity',
+        body, 'at', 'MembershipEntity',
     );
     return {
         organization_id: pickIdentifier(body, 'organization_id'),
@@ -1875,30 +1875,27 @@ export interface MembershipDocumentBody {
 // family, and the FOURTH 'stateless' one. Membership carries
 // a privilege attribute (`type`: admin | member) baked into
 // access-token claims at mint — not a pure join. THE LABEL
-// MANDATE (a NAMED byte-parity-over-convention choice, the
-// Phase 7 Objective precedent): the assertOnlyKeys label is
-// 'SeatEntity', matching validateMembershipEntity
-// byte-for-byte, NOT the 'MembershipDocumentBody' naming
-// convention every other *DocumentBody validator uses — the
-// label appears in the wire 400 body ("unexpected key ... for
-// SeatEntity"), and the convention's label would change
-// those bytes. Every key here is REQUIRED. position/state
-// rules do not apply; the fields are the SAME pickString/
-// enum/timestamp calls validateMembershipEntity already
-// makes, so the missing-key 400 stays byte-identical on both
-// paths too.
+// MANDATE: the two gates share the label MembershipEntity.
+// validateMembershipDocumentBody matches
+// validateMembershipEntity, not the MembershipDocumentBody
+// name every other *DocumentBody validator uses. Splitting
+// the labels would make the 400 texts differ. Every key
+// here is REQUIRED. position/state rules do not apply; the
+// fields are the SAME pickString/enum/timestamp calls
+// validateMembershipEntity already makes, so the missing-key
+// 400 stays byte-identical on both paths too.
 export function validateMembershipDocumentBody(
     body: Record<string, unknown>,
 ): MembershipDocumentBody {
     assertOnlyKeys(
-        body, MEMBERSHIP_DOCUMENT_BODY_KEYS, 'SeatEntity',
+        body, MEMBERSHIP_DOCUMENT_BODY_KEYS, 'MembershipEntity',
     );
     const type = validateEnumField(
         body, 'type', MEMBERSHIP_TYPES,
-        'membership type', 'SeatEntity',
+        'membership type', 'MembershipEntity',
     );
     const at = validateTimestampField(
-        body, 'at', 'SeatEntity',
+        body, 'at', 'MembershipEntity',
     );
     return {
         entity: {
