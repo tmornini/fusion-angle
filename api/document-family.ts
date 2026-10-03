@@ -28,6 +28,8 @@ import { liveHeadId, messageStore } from
 import { flowStoredEntityOf } from './derive-flows.ts';
 import {
     selectHeadsAtPath,
+    selectVersionAt,
+    selectVersionsAt,
     wholeHeadSelection,
     type Lifecycle,
 } from './head-reads.ts';
@@ -567,6 +569,77 @@ export function documentVersionRoute(
             'versions', ':etag',
         ],
         get: documentVersionGetHandler(wiring),
+    };
+}
+
+// Versions ride the head's ladder. The whole reader is
+// the family's: only a credential or an instance
+// projects. The miss is the family's own, so a foreign
+// id stays 403 and a name never written stays 404.
+export function documentVersionsSelectRoute(
+    wiring: DocumentFamilyWiring,
+): Route {
+    return {
+        segments: [
+            ...entitySegments(wiring),
+            'versions', '',
+        ],
+        select: async (
+            db, params, _actor, organization,
+        ) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const id = entityIdParam(wiring, params);
+            return selectVersionsAt(
+                db,
+                canonicalPath(
+                    organizationId,
+                    '/' + wiring.family + '/',
+                ),
+                id,
+                wiring.lifecycle,
+                wiring.notFoundTable,
+                { sees: 'whole' },
+                () => throwDocumentMiss(
+                    wiring, db, organizationId, id,
+                ),
+            );
+        },
+    };
+}
+
+export function documentVersionSelectRoute(
+    wiring: DocumentFamilyWiring,
+): Route {
+    return {
+        segments: [
+            ...entitySegments(wiring),
+            'versions', ':etag',
+        ],
+        select: async (
+            db, params, _actor, organization,
+        ) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const id = entityIdParam(wiring, params);
+            return selectVersionAt(
+                db,
+                canonicalPath(
+                    organizationId,
+                    '/' + wiring.family + '/',
+                ),
+                id,
+                param(params, params.length - 1),
+                wiring.lifecycle,
+                wiring.notFoundTable,
+                { sees: 'whole' },
+                () => throwDocumentMiss(
+                    wiring, db, organizationId, id,
+                ),
+            );
+        },
     };
 }
 

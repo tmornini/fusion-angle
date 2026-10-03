@@ -587,6 +587,7 @@ export const API_DOC_ROOMS:
             '200',
             '401',
             '404',
+            '410',
         ],
     },
     {
@@ -604,6 +605,7 @@ export const API_DOC_ROOMS:
             '200',
             '401',
             '404',
+            '410',
         ],
     },
     {

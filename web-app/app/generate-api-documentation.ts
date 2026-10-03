@@ -669,8 +669,18 @@ function statusCodesFor(
     if (isOrganizationNested(row)) codes.push(403);
     if (!isAuthGrant(row)) codes.push(404);
     const family = versionFamily(row);
+    // State families, and any family whose document route
+    // offers DELETE, already list 410. A select version
+    // route lists it too: the ladder answers Gone for a
+    // DELETE head of every lifecycle.
     const deletedVersion = family !== undefined
-        && familyHoldsDeletedHead(family);
+        && (
+            familyHoldsDeletedHead(family)
+            || (
+                selects
+                && documentFamilyWiring(family) !== undefined
+            )
+        );
     if (
         (selects && isDeletableDocument(row))
         || deletedVersion

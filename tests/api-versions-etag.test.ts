@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertNotStrictEquals,
     assertStrictEquals,
 } from '@std/assert';
@@ -24,7 +25,14 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { messageStore } from '../api/message-store.ts';
 import {
+    attemptFor,
+    formWriteMessagePair,
+    runWrite,
+} from '../api/message-pair.ts';
+import {
     apiRequest,
+    messageOfResponse,
+    pairIdOf,
     partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -377,8 +385,8 @@ async () => {
         db, req('GET', identityVersions, token),
     );
     assertStrictEquals(identityList.status, 200, identityVersions);
-    const rows = await identityList.json() as unknown[];
-    assert(rows.length >= 1, identityVersions);
+    const identityParts = await partsOf(identityList);
+    assert(identityParts.length >= 1, identityVersions);
     const membershipName = membershipNameOf(
         'AjdvjuECVZEgZoFajaIEkg', 'XXZruirZyAOoRpNxaDnpSA',
     );
@@ -403,6 +411,122 @@ async () => {
     const parts = await partsOf<MembershipEntity>(invitations);
     assert(parts.length >= 1);
 });
+
+// The identity document route offers no DELETE. A
+// DELETE head is still Gone on both version routes:
+// the ladder answers 410 before it looks at the tag.
+async function deleteIdentityDocument(
+    db: DbAdapter,
+    id: string,
+): Promise<void> {
+    const messagePair = await formWriteMessagePair({
+        method: 'DELETE',
+        pathname: '/identities/' + id,
+        routePattern: 'identities/:id',
+        routeSegments: ['identities', ':id'],
+        pathSegments: ['identities', id],
+        headerFields: [],
+        body: {},
+        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+        requestAt: '2026-08-01T00:00:00.000000Z',
+        organization: undefined,
+        responseBody: undefined,
+        operationId: generateIdentifier(),
+        requestId: generateIdentifier(),
+    });
+    await runWrite(
+        db,
+        attemptFor([messagePair]),
+        [messagePair],
+    );
+}
+
+Deno.test(
+    'a deleted identity answers 410 on both version'
+        + ' routes',
+    async () => {
+        const db = await seedInviteeWorld();
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const created = await handleRequest(db, req(
+            'PUT', '/identities/' + id, token,
+            { kind: 'person' },
+        ));
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        await created.body?.cancel();
+        await deleteIdentityDocument(db, id);
+        const listPath = '/identities/' + id + '/versions/';
+        const list = await handleRequest(
+            db, req('GET', listPath, token),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: identities/' + id,
+        });
+        const item = await handleRequest(db, req(
+            'GET', listPath + tag, token,
+        ));
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: identities/' + id,
+        });
+    },
+);
+
+Deno.test(
+    'two identity PUTs list oldest first,'
+        + ' each part the item its tag serves',
+    async () => {
+        const db = await seedInviteeWorld();
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const path = '/identities/' + id;
+        const first = await handleRequest(db, req(
+            'PUT', path, token, { kind: 'person' },
+        ));
+        assertStrictEquals(first.status, 201);
+        await first.body?.cancel();
+        const second = await handleRequest(db, req(
+            'PUT', path, token, { kind: 'service' },
+        ));
+        assertStrictEquals(second.status, 200);
+        await second.body?.cancel();
+        const list = await handleRequest(db, req(
+            'GET', path + '/versions/', token,
+        ));
+        assertStrictEquals(list.status, 200);
+        const versions = await partsOf<{
+            id: string;
+            kind: string;
+        }>(list);
+        assertStrictEquals(versions.length, 2);
+        assertEquals(versions[0]!.body().toValue(), {
+            id, kind: 'person',
+        });
+        assertEquals(versions[1]!.body().toValue(), {
+            id, kind: 'service',
+        });
+        for (const part of versions) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(db, req(
+                'GET', path + '/versions/' + tag, token,
+            ));
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
 
 // The body's at is the grant time the client sent.
 // The stored date line is the statement's splice of
