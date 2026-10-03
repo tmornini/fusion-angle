@@ -1871,6 +1871,23 @@ Off the critical path; each with its oracle.
   fetch window; a pending flag would close it but
   reintroduces the shared state the design avoids —
   `web-app/app/channels.ts:138-154`
+- A `fusion-angle:data` bell during `./test` re-enters
+  the ideas list `init` on a document that has no
+  `#ideas-list`. `subscribeOnce`
+  (`web-app/app/channels.ts:149`) calls `init`
+  (`web-app/ideas/index.ts:43`), `$required` throws,
+  and `handlePageLoadError` logs `page failed to init`
+  with `Required element not found: #ideas-list`
+  (`web-app/app/page-loader.ts:49`). Witnessed
+  2026-10-03 on `a6af68a6` as post-test output between
+  `identity-tokens-reduce` and `drift-states`; the
+  suite still reported 0 failed, so the gate stays
+  green. `BroadcastChannel` is process-global.
+  Oracle: `./test` prints neither `page failed to
+  init` nor `Required element not found: #ideas-list`;
+  `tests/ideas-empty-subscribe.test.ts` stays green;
+  a bell after the ideas document is gone does not
+  log and does not paint the error state
 - The records list's steady-state subscribe is still
   fire-and-forget. `subscribeRecordChanges(async () => {
   … await getRecords … })` (`web-app/records/index.ts:
