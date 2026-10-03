@@ -114,16 +114,16 @@ Deno.test('GET objective versions/ is collection'
     const db = await seededMockDb();
     const objective = OBJECTIVE_SEEDS[0]!;
     const token = await organizationToken();
-    const rows = (await GET<
-        Record<string, unknown>[]
+    const parts = await GETCollection<
+        Record<string, unknown>
     >(
         db,
         nest('objectives', objective.id)
             + '/versions/',
         token,
-        operationIdHeader())).body().toValue();
-    assert(rows.length >= 1);
-    const first = rows[0]!;
+        operationIdHeader());
+    assert(parts.length >= 1);
+    const first = parts[0]!.body().toValue();
     assertStrictEquals('state_at' in first, false);
     assertStrictEquals(typeof first.position, 'number');
     assertStrictEquals(typeof first.state, 'string');

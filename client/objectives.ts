@@ -69,33 +69,23 @@ export async function getArchivedObjectiveIds(
     );
 }
 
-// A versions index row: the entity snapshot plus the
-// pair facts the list stamps on every row (etag is the
-// message-pair id).
-export interface ObjectiveVersionRow
-    extends ObjectiveEntity {
-    etag: string;
-    at: string;
-    member_id: Id;
-}
-
 // Parallel GET objectives/:id/versions/ for each live
-// objective. Rows are entity snapshots stamped with pair
-// facts. Source for the lifecycle stream.
+// objective. Each part is a stored response. Source for
+// the lifecycle stream.
 export async function getObjectiveVersions(
     ctx: RequestContext,
-): Promise<Map<Id, ObjectiveVersionRow[]>> {
-    const rows = (await ctx.GETCollection<{ id: Id }>(
+): Promise<Map<Id, HttpMessage<ObjectiveEntity>[]>> {
+    const rows = (await ctx.GETCollection<ObjectiveEntity>(
         organizationCollection(ctx, 'objectives'),
     )).map((m) => m.body().toValue());
     const pairs = await Promise.all(
         rows.map(async (row) => {
-            const versions = (await ctx.GET<
-                ObjectiveVersionRow[]
+            const versions = await ctx.GETCollection<
+                ObjectiveEntity
             >(
                 organizationItem(ctx, 'objectives', row.id)
                     + '/versions/',
-            )).body().toValue();
+            );
             return [row.id, versions] as const;
         }),
     );
@@ -119,30 +109,35 @@ export interface ObjectiveLifecycleEvent {
 export async function getObjectiveLifecycleEvents(
     ctx: RequestContext,
 ): Promise<ObjectiveLifecycleEvent[]> {
-    const histories =
+    const versionsByObjective =
         await getObjectiveVersions(ctx);
     const events: ObjectiveLifecycleEvent[] = [];
     for (
-        const [objectiveId, versions] of histories
+        const [objectiveId, versions] of versionsByObjective
     ) {
         let previous: string | undefined;
-        for (const row of versions.toReversed()) {
+        for (const part of versions) {
+            const state = part.body().toValue().state;
             const transition =
-                row.state === 'archived'
+                state === 'archived'
                     ? previous !== 'archived'
                     : previous === 'archived';
             if (transition) {
                 events.push({
                     objectiveId,
                     kind:
-                        row.state === 'archived'
+                        state === 'archived'
                             ? 'archival'
                             : 'reactivation',
-                    memberId: row.member_id,
-                    at: row.at,
+                    memberId: part.query(
+                        'header.requester-identity-id',
+                    ).toText(),
+                    at: part.query(
+                        'header.response-at',
+                    ).toText(),
                 });
             }
-            previous = row.state;
+            previous = state;
         }
     }
     return events;

@@ -375,9 +375,9 @@ async () => {
                 ),
             );
             assertStrictEquals(versions.status, 200);
-            const rows = await versions.json() as {
+            const rows = await partBodiesOf<{
                 id: string;
-            }[];
+            }>(versions);
             objSeen += rows.length;
         }
     }

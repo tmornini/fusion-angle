@@ -16,8 +16,16 @@ import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
-import { parseIfMatch } from '../api/message-pair.ts';
+import {
+    DEFAULT_LOCK_TIMEOUT,
+    nowUtc,
+} from '../shared/types.ts';
+import {
+    attemptFor,
+    formWriteMessagePair,
+    parseIfMatch,
+    runWrite,
+} from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {
     apiRequest,
@@ -1060,7 +1068,8 @@ async function seedObjectiveLifecycle(
 }
 
 Deno.test(
-    'GET organizations/:id/objectives/:id/versions: 200 DESC current-first',
+    'GET organizations/:id/objectives/:id/versions/'
+    + ' 200 oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -1069,36 +1078,172 @@ Deno.test(
             db,
             req(
                 'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-                    + '/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/',
                 DEV_TOKEN,
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-            etag: string;
-            at: string;
-            member_id: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'archived');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
-        assertStrictEquals(typeof rows[0]!.etag, 'string');
-        assertNotStrictEquals(rows[0]!.etag, '');
-        assertNotStrictEquals(
-            rows[0]!.etag, rows[1]!.etag,
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'archived');
+        assertStrictEquals('state_at' in current, false);
+        const oldestTag = parts[0]!.query('header.etag')
+            .toText().slice(1, -1);
+        const currentTag = parts[1]!.query('header.etag')
+            .toText().slice(1, -1);
+        assertStrictEquals(typeof currentTag, 'string');
+        assertNotStrictEquals(currentTag, '');
+        assertNotStrictEquals(currentTag, oldestTag);
+        const oldestAt = parts[0]!.query(
+            'header.response-at',
+        ).toText();
+        const currentAt = parts[1]!.query(
+            'header.response-at',
+        ).toText();
+        assert(currentAt > oldestAt);
+        const oldestMember = parts[0]!.query(
+            'header.requester-identity-id',
+        ).toText();
+        const currentMember = parts[1]!.query(
+            'header.requester-identity-id',
+        ).toText();
+        assertStrictEquals(typeof currentMember, 'string');
+        assertNotStrictEquals(currentMember, '');
+        assertStrictEquals(currentMember, oldestMember);
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/objectives/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedObjectiveLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
         );
-        assert(rows[0]!.at > rows[1]!.at);
-        assertStrictEquals(typeof rows[0]!.member_id, 'string');
-        assertNotStrictEquals(rows[0]!.member_id, '');
-        assertStrictEquals(
-            rows[0]!.member_id, rows[1]!.member_id,
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                        + '/objectives/' + id + '/versions/'
+                        + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/objectives/:id/versions/ of'
+    + ' a state-deleted objective is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id,
+                DEV_TOKEN,
+                objectiveBody('active'),
+            ),
         );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        // The objective alphabet admits no deleted, so the
+        // state-deleted head is formed below the facade.
+        const deletedBody = {
+            position: 1,
+            state: 'deleted',
+        };
+        const messagePair = await formWriteMessagePair({
+            method: 'PUT',
+            pathname:
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id,
+            routePattern: 'organizations/:id/objectives/:id',
+            routeSegments: [
+                'organizations', ':id', 'objectives', ':id',
+            ],
+            pathSegments: [
+                'organizations', 'AjdvjuECVZEgZoFajaIEkg',
+                'objectives', id,
+            ],
+            headerFields: [],
+            body: deletedBody,
+            requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+            requestAt: nowUtc(),
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            responseBody: { id, ...deletedBody },
+            operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
+        });
+        await runWrite(
+            db, attemptFor([messagePair]), [messagePair],
+        );
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: objectives/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: objectives/' + id,
+        });
     },
 );
 
