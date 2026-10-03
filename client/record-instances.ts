@@ -168,7 +168,7 @@ export async function deleteRecordInstance(
     );
 }
 
-export async function getRecordInstanceHistory(
+export async function getRecordInstanceVersions(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,

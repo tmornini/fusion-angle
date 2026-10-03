@@ -28,7 +28,7 @@ import {
     putRecordInstance,
     patchRecordInstance,
     deleteRecordInstance,
-    getRecordInstanceHistory,
+    getRecordInstanceVersions,
 } from '../client/record-instances.ts';
 import {
     RequestError,
@@ -197,7 +197,7 @@ Deno.test(
         );
 
         // history DESC: head first
-        const history = await getRecordInstanceHistory(
+        const history = await getRecordInstanceVersions(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
         assert(history.length >= 3);
