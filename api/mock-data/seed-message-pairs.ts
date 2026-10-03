@@ -52,10 +52,10 @@
 // member. Bootstrap's lone 'XXZruirZyAOoRpNxaDnpSA' human-member create forms
 // this SAME identity path via formBootstrapMessagePair. Memberships
 // closed the LAST whole-slice seed deferral (Phase 8 Task 5):
-// each seeded membership row (16 — 11 human-member-organization
-// rows, `current` counted twice for its two-organization
-// membership, + 4 ai-member rows) now folds in its OWN document
-// message pair, closed through postMembershipDocumentOp.
+// each seeded membership row (twelve — 11 humans, the
+// current identity counted twice for its two-organization
+// membership) folds in its OWN document message pair,
+// a membership PUT. AI agents are not memberships.
 // Leftover members/:id parent documents are gone from the
 // seed.
 // Bootstrap's membership forms this SAME pair via
@@ -140,6 +140,7 @@ import {
 import {
     formWriteMessagePair,
     IF_MATCH_HEADER,
+    IF_NONE_MATCH_HEADER,
     strongEtagOf,
 } from '../message-pair.ts';
 import { OPERATION_ID_HEADER } from '../../shared/message-id-fields.ts';
@@ -169,10 +170,11 @@ import {
     validateObjectiveCreateBody,
 } from '../validators.ts';
 import { asStoredGraph } from '../../shared/flow-graph-body.ts';
+import { membershipNameOf } from
+    '../../shared/membership-name.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../family-registry.ts';
@@ -1033,25 +1035,30 @@ export function aiMemberSeedBody(
     };
 }
 
-// The wire body a live PUT memberships/:id would carry for this
-// SAME write: {organization_id, identity_id, type, at} — the
-// membershipDocumentEntityOf precedent (api/routes.ts), the ONE
-// shape every seeded membership row (human, AI, bootstrap)
-// shares. Hoisted so pass 1 (this file) and pass 2
-// (mock-data.ts) share the SAME construction — the
-// aiMemberSeedBody precedent, generalized
-// to the roster membership entity. `type` is required: writers
-// pass it explicitly (no schema default).
+// The stored membership document a live organization-nest
+// PUT lands for a direct accept: the six keys
+// validateMembershipBody requires, state accepted. The
+// request the handler validates is state, at, and type;
+// organization and identity ride the name. This builder
+// is the stored document, shared by pass 1 and pass 2,
+// so the pair and the write cannot drift. `at` defaults
+// to the mock seed instant; bootstrap passes its own.
+export const MEMBERSHIP_ITEM_ROUTE =
+    'organizations/:id/invitations/:membership-id';
+
 export function membershipSeedBody(
     organizationId: Id,
     identityId: Id,
     type: 'admin' | 'member',
+    at: string = MOCK_SEED_TIMESTAMP,
 ): Record<string, unknown> {
     return {
+        id: membershipNameOf(organizationId, identityId),
         organization_id: organizationId,
         identity_id: identityId,
         type,
-        at: MOCK_SEED_TIMESTAMP,
+        state: 'accepted',
+        at,
     };
 }
 
@@ -1397,11 +1404,11 @@ export function buildMockDataInvocations():
         // other human is single-org via assignOrganization — the
         // SAME per-member partition postMockDataLoadIn's own
         // membership loop uses (mock-data.ts). Each row folds in
-        // its OWN document message pair, closed through
-        // postMembershipDocumentOp, ordered before the
-        // human-member triple below — the SAME write order
-        // postMockDataLoadIn uses (memberships land before the
-        // member they join is created).
+        // its OWN document message pair, a membership PUT
+        // on the organization-nest item route, ordered
+        // before the human-member triple below — the SAME
+        // write order postMockDataLoadIn uses (memberships
+        // land before the member they join is created).
         const organizations = member.id === 'XXZruirZyAOoRpNxaDnpSA'
             ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
             : [assignOrganization(index)];
@@ -1409,19 +1416,25 @@ export function buildMockDataInvocations():
             const type = member.id === 'XXZruirZyAOoRpNxaDnpSA'
                 ? 'admin' as const
                 : 'member' as const;
-            const seatKey = seedMessagePairKey(
-                ORGANIZATION_MEMBER_DETAIL_PATTERN,
+            const membershipKey = seedMessagePairKey(
+                MEMBERSHIP_ITEM_ROUTE,
                 member.id + '-' + n,
             );
             invocations.push({
-                key: seatKey,
-                routePattern:
-                    ORGANIZATION_MEMBER_DETAIL_PATTERN,
-                idParams: [organization, member.id],
+                key: membershipKey,
+                routePattern: MEMBERSHIP_ITEM_ROUTE,
+                idParams: [
+                    organization,
+                    membershipNameOf(
+                        organization, member.id,
+                    ),
+                ],
                 organization,
                 requesterIdentityId: SYSTEM_MEMBER_ID,
-                body: seatSeedBody(type),
-                operation: seatKey,
+                body: membershipSeedBody(
+                    organization, member.id, type,
+                ),
+                operation: membershipKey,
             });
         });
         const identityKey = seedMessagePairKey(
@@ -2063,10 +2076,63 @@ export function buildMockDataInvocations():
 // The seed's request id is its operation's id. Pass 1 mints
 // no request id, and the landing drops the line (Decision
 // 3).
+// The organization-nest item route stores at
+// /invitations/ under the composite name. Pair wiring
+// would store a second document at the nest path, so
+// this former names the route and stores the membership
+// prefix. If-None-Match: * rides the request.
+// genesis: 'client' is the nil latch; the header alone
+// does not set it.
+async function formMembershipItemSeedPair(
+    inv: MockDataInvocation,
+    requestAt: string,
+    operationId: string,
+): Promise<MessagePair> {
+    const organization = inv.idParams?.[0];
+    const name = inv.idParams?.[1];
+    if (organization === undefined || name === undefined) {
+        throw new Error(
+            'membership seed pair needs organization'
+            + ' and name',
+        );
+    }
+    return formWriteMessagePair({
+        method: 'PUT',
+        pathname: '/organizations/' + organization
+            + '/invitations/' + name,
+        routePattern: MEMBERSHIP_ITEM_ROUTE,
+        routeSegments: ['invitations', ':membership-id'],
+        pathSegments: ['invitations', name],
+        headerFields: [
+            {
+                name: OPERATION_ID_HEADER,
+                value: operationId,
+            },
+            {
+                name: IF_NONE_MATCH_HEADER,
+                value: '*',
+            },
+        ],
+        body: inv.body,
+        requesterIdentityId: inv.requesterIdentityId,
+        requestAt,
+        organization: inv.organization,
+        responseBody: inv.body,
+        operationId,
+        requestId: operationId,
+        genesis: 'client',
+    });
+}
+
 export async function formSeedMessagePair(
     inv: MockDataInvocation, requestAt: string,
     operationId: string,
 ): Promise<MessagePair> {
+    if (inv.routePattern === MEMBERSHIP_ITEM_ROUTE) {
+        return formMembershipItemSeedPair(
+            inv, requestAt, operationId,
+        );
+    }
     const idParams = inv.idParams;
     const routeSegments = inv.routePattern.split('/');
     let paramIndex = 0;
@@ -2528,7 +2594,7 @@ export async function formBootstrapMessagePair(
     requestAt: string,
 ): Promise<{
     readonly identityMessagePair: MessagePair;
-    readonly seatMessagePair: MessagePair;
+    readonly membershipMessagePair: MessagePair;
     readonly piiMessagePair: MessagePair;
     readonly systemIdentityMessagePair: MessagePair;
     readonly defaultOrganizationMessagePair: MessagePair;
@@ -2551,20 +2617,29 @@ export async function formBootstrapMessagePair(
         requestAt,
         generateIdentifier(),
     );
-    const seatKey = seedMessagePairKey(
-        ORGANIZATION_MEMBER_DETAIL_PATTERN,
-        'current-0',
+    const membershipKey = seedMessagePairKey(
+        MEMBERSHIP_ITEM_ROUTE, 'current-0',
     );
-    const seatMessagePair = await formSeedMessagePair(
+    const membershipMessagePair = await formSeedMessagePair(
         {
-            key: seatKey,
-            routePattern:
-                ORGANIZATION_MEMBER_DETAIL_PATTERN,
-            idParams: [STARK_ORGANIZATION, 'XXZruirZyAOoRpNxaDnpSA'],
+            key: membershipKey,
+            routePattern: MEMBERSHIP_ITEM_ROUTE,
+            idParams: [
+                STARK_ORGANIZATION,
+                membershipNameOf(
+                    STARK_ORGANIZATION,
+                    'XXZruirZyAOoRpNxaDnpSA',
+                ),
+            ],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: seatSeedBody('admin', requestAt),
-            operation: seatKey,
+            body: membershipSeedBody(
+                STARK_ORGANIZATION,
+                'XXZruirZyAOoRpNxaDnpSA',
+                'admin',
+                requestAt,
+            ),
+            operation: membershipKey,
         },
         requestAt,
         generateIdentifier(),
@@ -2625,7 +2700,7 @@ export async function formBootstrapMessagePair(
     );
     return {
         identityMessagePair,
-        seatMessagePair,
+        membershipMessagePair,
         piiMessagePair,
         systemIdentityMessagePair,
         defaultOrganizationMessagePair,

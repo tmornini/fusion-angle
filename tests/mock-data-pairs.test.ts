@@ -43,6 +43,8 @@ import {
     MOCK_SEED_TIMESTAMP,
 } from '../api/mock-data/seed-constants.ts';
 import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { deriveOrganization } from
     '../api/derive-organizations.ts';
 import { HttpMessage } from
@@ -74,11 +76,10 @@ function messagePairJsonOf(message: string): {
 // an operation/member-document/detail-document triple — the
 // objectives-family 1+1+1 precedent generalized to the roster —
 // 15 ops + 15 member documents + 15 detail documents) +
-// 16 membership-family pairs (Phase 8 Task 5: 16 membership
-// documents — 11 human-member-organization rows (`current`
-// counted twice for its two-organization membership) + 4
-// ai-member rows, closed through postMembershipDocumentOp,
-// the LAST whole-slice seed deferral) +
+// 12 membership documents (eleven humans; the current
+// identity is a member of both organizations), each a
+// membership PUT that also lands its seat sibling — AI
+// agents are not memberships +
 // 11 ideas +
 // 2 organizations documents (Phase 12 Task 3: the tenant root's
 // own family onboards — Stark Industries + Wayne Enterprises,
@@ -339,6 +340,30 @@ Deno.test('a seeded seat document message pair sits at its org-nested'
     assertEquals(
         Object.keys(embedded.body).sort(),
         ['at', 'id', 'identity_id', 'organization_id', 'type'],
+    );
+    const membershipName = membershipNameOf(
+        STARK_ORGANIZATION, firstMember.id,
+    );
+    const membership = requests.find(
+        (row) => row.path === '/invitations/'
+            && row.name === membershipName,
+    );
+    assert(
+        membership,
+        'no membership row for the seeded member',
+    );
+    const membershipBody = messagePairJsonOf(
+        membership.response,
+    );
+    assertEquals(
+        Object.keys(membershipBody.body).sort(),
+        [
+            'at', 'id', 'identity_id', 'organization_id',
+            'state', 'type',
+        ],
+    );
+    assertStrictEquals(
+        membershipBody.body['state'], 'accepted',
     );
 });
 

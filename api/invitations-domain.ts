@@ -20,12 +20,15 @@ import {
     validateTimestampField,
 } from './validators.ts';
 import {
+    attemptFor,
+    formStateWrite,
     formWriteMessagePair,
     httpDateOf,
     IF_MATCH_HEADER,
     IF_NONE_MATCH_HEADER,
     parseEntityTags,
     runStateWrite,
+    runWrite,
 } from './message-pair.ts';
 import type {
     MessagePair,
@@ -57,6 +60,7 @@ import {
     membershipOfHead,
     membershipTransition,
     MEMBERSHIPS_PATH,
+    validateMembershipBody,
     organizationMembershipHeads,
     identityMembershipHeads,
     type MembershipActor,
@@ -787,19 +791,81 @@ export async function putInvitationOnIdentityNest(
     );
 }
 
+// A seed supplies the membership document it formed. The
+// live route does not: it is exempt from pair wiring and
+// forms the operation, the document, and the seat itself.
+// The supplied document plus the seat sibling is two rows,
+// the same count a seat write plus its membership sibling
+// was. The live path is unchanged.
+async function writeSuppliedMembership(
+    db: DbAdapter,
+    messagePair: MessagePair,
+): Promise<void> {
+    if (
+        messagePair.path !== MEMBERSHIPS_PATH
+        || messagePair.method !== 'PUT'
+    ) {
+        throw new Error(
+            'a supplied membership is a PUT at '
+            + MEMBERSHIPS_PATH,
+        );
+    }
+    const next = validateMembershipBody(
+        bodyOf(messagePair.responseMessage),
+    );
+    if (next.id !== messagePair.name) {
+        throw new Error(
+            'a supplied membership name disagrees'
+            + ' with its body',
+        );
+    }
+    const head = await readHead(db, next.id);
+    const from = head === null
+        ? null
+        : membershipOfHead(head);
+    const seat = await seatSiblingOf(db, from, next);
+    if (seat === undefined) {
+        await runWrite(
+            db, attemptFor([messagePair]), [messagePair],
+        );
+        return;
+    }
+    const formed = await formStateWrite({
+        kind: 'events',
+        context: {
+            operationId: messagePair.operationId,
+            requestId: messagePair.requestId,
+            requesterIdentityId:
+                messagePair.requesterIdentityId,
+            requestAt: messagePair.requestAt,
+        },
+        siblings: [seat],
+    });
+    const row = formed.rows[0];
+    if (row === undefined || !('requestMessage' in row)) {
+        throw new Error('seat sibling was not formed');
+    }
+    const rows = [messagePair, row];
+    await runWrite(db, attemptFor(rows), rows);
+}
+
 // PUT /organizations/:id/invitations/:membership-id
 export async function putInvitationOnOrganizationNest(
     db: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    _messagePair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     _organization: Id | undefined,
     roles: readonly string[],
     requestAt: string,
     operationId: string,
     received?: ReceivedRequest,
 ): Promise<unknown> {
+    if (messagePair !== undefined) {
+        await writeSuppliedMembership(db, messagePair);
+        return;
+    }
     return putMembership(
         db, 'admin', params, payload, actor, roles,
         requestAt, operationId, received,

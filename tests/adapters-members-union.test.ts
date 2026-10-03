@@ -34,7 +34,10 @@ import {
 import type {
     MemberId,
     Member,
+    MembershipEntity,
 } from '../shared/types.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import {
     SYSTEM_MEMBER_NAME,
     SYSTEM_MEMBER_ID,
@@ -60,7 +63,6 @@ import {
     getHumanMember,
 } from '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
-import { seedSeat } from './root-admin-fixture.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,
@@ -447,9 +449,19 @@ Deno.test(
             ),
             'a former member is not a roster row',
         );
-        await seedSeat(
-            db, 'AjdvjuECVZEgZoFajaIEkg', leaverId, 'member',
-        );
+        // seedSeat is a genesis. It does not land over
+        // the removed head. Re-seat through the live
+        // transition, latched on that head.
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const item = 'organizations/' + organization
+            + '/invitations/'
+            + membershipNameOf(organization, leaverId);
+        const held = await ctx.GET<MembershipEntity>(item);
+        await ctx.PUT(item, {
+            state: 'accepted',
+            type: 'member',
+            at: nowUtc(),
+        }, [held]);
         assertStrictEquals(
             memberName(await getMemberMap(ctx), leaverId),
             'Lisa Leaver',

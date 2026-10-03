@@ -3,10 +3,16 @@ import {
     nowUtc, SYSTEM_MEMBER_ID, type Id,
     type OrganizationEntity,
 } from '../shared/types.ts';
+import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
+import { putInvitationOnOrganizationNest } from
+    '../api/invitations-domain.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
+    formSeedMessagePair,
+    MEMBERSHIP_ITEM_ROUTE,
+    membershipSeedBody,
+} from '../api/mock-data/seed-message-pairs.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     '../api/family-registry.ts';
 import {
@@ -151,20 +157,42 @@ export async function seedSeat(
     at: string = '2020-01-01T00:00:00.000000Z',
 ): Promise<void> {
     const requestAt = nowUtc();
-    const body = { type, at };
-    await postMembershipDocumentOp(
-        db, identityId, body, SYSTEM_MEMBER_ID,
-        await seatDocumentMessagePair(
-            organization, identityId, body, requestAt,
-        ),
+    const name = membershipNameOf(organization, identityId);
+    const body = membershipSeedBody(
+        organization, identityId, type, at,
+    );
+    const operationId = generateIdentifier();
+    const messagePair = await formSeedMessagePair(
+        {
+            key: operationId,
+            routePattern: MEMBERSHIP_ITEM_ROUTE,
+            idParams: [organization, name],
+            organization,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            body,
+            operation: operationId,
+        },
+        requestAt,
+        operationId,
+    );
+    await putInvitationOnOrganizationNest(
+        db,
+        [organization, name],
+        body,
+        SYSTEM_MEMBER_ID,
+        messagePair,
+        organization,
+        ['admin'],
+        requestAt,
+        operationId,
     );
 }
 
-// Seed the demo `current` identity as a root admin directly at
-// the storage layer (below the gate): seat with
-// type:"admin" in org 'AjdvjuECVZEgZoFajaIEkg'. Tokens bake claim roles from
-// that
-// type at mint (tests/token-fixtures.ts).
+// Seed the demo `current` identity as a root admin directly
+// below the gate: an accepted membership in organization
+// 'AjdvjuECVZEgZoFajaIEkg', which lands the seat sibling.
+// Tokens bake claim roles from that type at mint
+// (tests/token-fixtures.ts).
 export async function seedRootAdmin(
     db: DbAdapter,
 ): Promise<void> {
