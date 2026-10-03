@@ -28,6 +28,8 @@ import {
 } from '../shared/types.ts';
 import {
     apiRequest,
+    messageOfResponse,
+    partsOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
@@ -38,9 +40,9 @@ import {
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
 
-// Instance GET history — full-state revision chain (Task 19).
-// Wire DESC; each entry full state projected by CURRENT read
-// ACL; miss → missedReadError (R2).
+// Instance versions — every stored PUT, oldest first, each
+// part the instance projected by the CURRENT read ACL.
+// Never written → 404; an owned tombstone → 410.
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
@@ -58,7 +60,7 @@ const TYPE_DETAIL =
 const ATTRS = TYPE_DETAIL + '/attributes/';
 const INSTANCES = TYPE_DETAIL + '/instances/';
 const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
-const INSTANCE_HISTORY = INSTANCE_DETAIL + '/versions';
+const INSTANCE_HISTORY = INSTANCE_DETAIL + '/versions/';
 
 function req(
     method: string,
@@ -232,14 +234,28 @@ async function appendInstancePair(
     return messagePair.id;
 }
 
-interface HistoryEntry {
-    at: string;
-    etag: string;
+interface InstanceBody {
+    id: string;
+    organization_id: string;
+    record_type_id: string;
     values: { attribute_id: string; value: string }[];
 }
 
-Deno.test('history genesis + 2 PATCHes → 200, three entries, '
-+ '(at,id) DESC; index 0 == current head',
+function etagLine(part: {
+    query(path: string): { toText(): string };
+}): string {
+    return part.query('header.etag').toText();
+}
+
+function bareEtag(part: {
+    query(path: string): { toText(): string };
+}): string {
+    return etagLine(part).slice(1, -1);
+}
+
+Deno.test(
+    'versions genesis + 2 PATCHes → 200, three parts,'
+    + ' oldest first; the last part is the head',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -296,65 +312,74 @@ async () => {
         'GET', INSTANCE_HISTORY, memberToken,
     ));
     assertStrictEquals(history.status, 200);
-    const entries = await history.json() as HistoryEntry[];
-    assertStrictEquals(entries.length, 3);
+    const parts = await partsOf<InstanceBody>(history);
+    assertStrictEquals(parts.length, 3);
+    const oldest = parts[0]!;
+    const middle = parts[1]!;
+    const current = parts[2]!;
 
-    // DESC: index 0 is current head (etag sans quotes).
-    assertStrictEquals(
-        entries[0]!.etag,
-        etag2.replaceAll('"', ''),
-    );
-    assertStrictEquals(
-        strongEtagOf(entries[0]!.etag),
-        etag2,
-    );
-    assertEquals(entries[0]!.values, [
+    assertStrictEquals(etagLine(current), etag2);
+    assertStrictEquals(etagLine(middle), etag1);
+    assertStrictEquals(etagLine(oldest), etag0);
+    assertEquals(current.body().toValue().values, [
         { attribute_id: ATTR_PUBLIC, value: 'v2' },
     ]);
-    assertEquals(entries[1]!.values, [
-        { attribute_id: ATTR_PUBLIC, value: 'xDyDkxEPwtcNmJVknUHDsg' },
+    assertEquals(middle.body().toValue().values, [
+        {
+            attribute_id: ATTR_PUBLIC,
+            value: 'xDyDkxEPwtcNmJVknUHDsg',
+        },
     ]);
-    assertEquals(entries[2]!.values, [
+    assertEquals(oldest.body().toValue().values, [
         { attribute_id: ATTR_PUBLIC, value: 'v0' },
     ]);
-    assertStrictEquals(
-        entries[1]!.etag,
-        etag1.replaceAll('"', ''),
-    );
-    assertStrictEquals(
-        entries[2]!.etag,
-        etag0.replaceAll('"', ''),
-    );
 
-    // Wire (at, id) DESC — timestamps non-increasing.
-    assert(entries[0]!.at >= entries[1]!.at);
-    assert(entries[1]!.at >= entries[2]!.at);
+    // Oldest first: response-at is non-decreasing.
+    const at0 = oldest.query('header.response-at').toText();
+    const at1 = middle.query('header.response-at').toText();
+    const at2 = current.query('header.response-at')
+        .toText();
+    assert(at0 <= at1);
+    assert(at1 <= at2);
 
-    // Each entry is FULL state (not a delta).
-    for (const entry of entries) {
-        assert(Array.isArray(entry.values));
+    // Each part is the stored instance, not a delta.
+    for (const part of parts) {
+        const body = part.body().toValue();
+        assert(Array.isArray(body.values));
+        assertStrictEquals(body.id, INSTANCE_ID);
         assertStrictEquals(
-            typeof entry.etag === 'string'
-            && isIdentifier(entry.etag)
-            && !entry.etag.includes('"'),
+            body.organization_id, ORGANIZATION,
+        );
+        assertStrictEquals(body.record_type_id, TYPE_ID);
+        const bare = bareEtag(part);
+        assertStrictEquals(
+            isIdentifier(bare) && !bare.includes('"'),
             true,
-            'etag is an identifier, no quotes in JSON',
+            'etag line quotes an identifier',
         );
         assertStrictEquals(
-            'version' in entry,
+            'version' in body,
             false,
-            'history entries carry no version field',
+            'a version part carries no version field',
         );
-        assertStrictEquals(typeof entry.at, 'string');
+        assertStrictEquals(
+            typeof part.query('header.response-at')
+                .toText(),
+            'string',
+        );
     }
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert(head !== undefined);
-    assertStrictEquals(entries[0]!.etag, head.messagePairId);
+    assertStrictEquals(
+        bareEtag(current), head.messagePairId,
+    );
 });
 
-Deno.test('history etag[0] is the head pair id for both roles',
+Deno.test(
+    'versions last part etag is the head pair id'
+    + ' for both roles',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -383,16 +408,16 @@ async () => {
     ));
     assertStrictEquals(memberHist.status, 200);
     assertStrictEquals(adminHist.status, 200);
-    const memberEntries =
-        await memberHist.json() as HistoryEntry[];
-    const adminEntries =
-        await adminHist.json() as HistoryEntry[];
+    const memberParts =
+        await partsOf<InstanceBody>(memberHist);
+    const adminParts =
+        await partsOf<InstanceBody>(adminHist);
     assertStrictEquals(
-        memberEntries[0]!.etag,
+        bareEtag(memberParts[memberParts.length - 1]!),
         head.messagePairId,
     );
     assertStrictEquals(
-        adminEntries[0]!.etag,
+        bareEtag(adminParts[adminParts.length - 1]!),
         head.messagePairId,
     );
 });
@@ -414,12 +439,15 @@ async () => {
         },
     ]);
     assertStrictEquals(put.status, 201);
+    const etag = put.headers.get('ETag')!;
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert(head !== undefined);
-    const leafPath =
-        INSTANCE_HISTORY + '/' + head.messagePairId;
+    assertStrictEquals(
+        etag, strongEtagOf(head.messagePairId),
+    );
+    const leafPath = INSTANCE_HISTORY + etag.slice(1, -1);
     const memberLeaf = await handleRequest(db, req(
         'GET', leafPath, memberToken,
     ));
@@ -429,12 +457,10 @@ async () => {
     assertStrictEquals(memberLeaf.status, 200);
     assertStrictEquals(adminLeaf.status, 200);
     assertStrictEquals(
-        memberLeaf.headers.get('ETag'),
-        strongEtagOf(head.messagePairId),
+        memberLeaf.headers.get('ETag'), etag,
     );
     assertStrictEquals(
-        adminLeaf.headers.get('ETag'),
-        strongEtagOf(head.messagePairId),
+        adminLeaf.headers.get('ETag'), etag,
     );
     await seedOrganizationDocument(
         db, ORGANIZATION_B, 'Beta',
@@ -453,13 +479,13 @@ async () => {
     );
     const foreign = await handleRequest(db, req(
         'GET',
-        INSTANCE_HISTORY + '/' + foreignPairId,
+        INSTANCE_HISTORY + foreignPairId,
         memberToken,
     ));
     assertStrictEquals(foreign.status, 404);
     assertEquals(await foreign.json(), {
         error:
-            'Not found: record_instances/' + INSTANCE_ID,
+            'Not found: record_instances/' + foreignPairId,
     });
 });
 
@@ -504,51 +530,60 @@ async () => {
         'GET', INSTANCE_HISTORY, memberToken,
     ));
     assertStrictEquals(memberHist.status, 200);
-    const memberEntries =
-        await memberHist.json() as HistoryEntry[];
-    assertStrictEquals(memberEntries.length, 2);
-    for (const entry of memberEntries) {
-        assertStrictEquals(entry.values.length, 1);
+    const memberParts =
+        await partsOf<InstanceBody>(memberHist);
+    assertStrictEquals(memberParts.length, 2);
+    for (const part of memberParts) {
+        const values = part.body().toValue().values;
+        assertStrictEquals(values.length, 1);
         assertStrictEquals(
-            entry.values[0]!.attribute_id,
+            values[0]!.attribute_id,
             ATTR_PUBLIC,
         );
         assert(
-            !entry.values.some(
-                (v) => v.attribute_id === ATTR_SECRET,
+            !values.some(
+                (entry) =>
+                    entry.attribute_id === ATTR_SECRET,
             ),
             'member never sees secret in any revision',
         );
     }
     assertStrictEquals(
-        memberEntries[0]!.values[0]!.value,
-        'public-1',
+        memberParts[0]!.body().toValue()
+            .values[0]!.value,
+        'public-0',
     );
     assertStrictEquals(
-        memberEntries[1]!.values[0]!.value,
-        'public-0',
+        memberParts[1]!.body().toValue()
+            .values[0]!.value,
+        'public-1',
     );
 
     const adminHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, adminToken,
     ));
     assertStrictEquals(adminHist.status, 200);
-    const adminEntries =
-        await adminHist.json() as HistoryEntry[];
-    assertStrictEquals(adminEntries.length, 2);
-    for (const entry of adminEntries) {
-        assertStrictEquals(entry.values.length, 2);
+    const adminParts =
+        await partsOf<InstanceBody>(adminHist);
+    assertStrictEquals(adminParts.length, 2);
+    for (const part of adminParts) {
+        const values = part.body().toValue().values;
+        assertStrictEquals(values.length, 2);
         const byId = new Map(
-            entry.values.map(
-                (v) => [v.attribute_id, v.value],
+            values.map(
+                (entry) =>
+                    [entry.attribute_id, entry.value],
             ),
         );
         assert(byId.has(ATTR_PUBLIC));
         assert(byId.has(ATTR_SECRET));
     }
-    const head = adminEntries[0]!;
+    const headValues = adminParts[1]!.body().toValue()
+        .values;
     const byId = new Map(
-        head.values.map((v) => [v.attribute_id, v.value]),
+        headValues.map(
+            (entry) => [entry.attribute_id, entry.value],
+        ),
     );
     assertStrictEquals(byId.get(ATTR_PUBLIC), 'public-1');
     assertStrictEquals(byId.get(ATTR_SECRET), 'secret-1');
@@ -562,7 +597,7 @@ async () => {
     const missing = generateIdentifier();
     const res = await handleRequest(db, req(
         'GET',
-        INSTANCES + missing + '/versions',
+        INSTANCES + missing + '/versions/',
         memberToken,
     ));
     assertStrictEquals(res.status, 404);
@@ -572,7 +607,8 @@ async () => {
     });
 });
 
-Deno.test('history tombstoned → 404 via missedReadError (R2)',
+Deno.test(
+    'history tombstoned → 410 on both version routes',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -590,19 +626,28 @@ async () => {
         { attribute_id: ATTR_PUBLIC, value: 'live' },
     ]);
     assertStrictEquals(put.status, 201);
+    const etag = put.headers.get('ETag')!;
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
     assertStrictEquals(del.status, 204);
+    await del.body?.cancel();
 
+    const gone = {
+        error: 'Gone: record_instances/' + INSTANCE_ID,
+    };
     const res = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assertStrictEquals(res.status, 404);
-    assertEquals(await res.json(), {
-        error:
-            'Not found: record_instances/' + INSTANCE_ID,
-    });
+    assertStrictEquals(res.status, 410);
+    assertEquals(await res.json(), gone);
+    const item = await handleRequest(db, req(
+        'GET',
+        INSTANCE_HISTORY + etag.slice(1, -1),
+        memberToken,
+    ));
+    assertStrictEquals(item.status, 410);
+    assertEquals(await item.json(), gone);
 });
 
 Deno.test('history foreign instance id → 404 via '
@@ -641,7 +686,7 @@ async () => {
         'GET',
         '/organizations/' + ORGANIZATION
             + '/record-types/oZjfWriXLxoqurdbwfBnpA/instances/'
-            + INSTANCE_ID + '/versions',
+            + INSTANCE_ID + '/versions/',
         memberToken,
     ));
     assertStrictEquals(res.status, 404);
@@ -701,25 +746,88 @@ async () => {
             'GET', INSTANCE_HISTORY, token,
         ));
         assertStrictEquals(history.status, 200);
-        const entries =
-            await history.json() as HistoryEntry[];
-        assertStrictEquals(entries.length, 2);
-        for (const entry of entries) {
-            assertEquals(entry.values, [
-                { attribute_id: ATTR_PUBLIC, value: 'kept' },
-            ]);
+        const parts = await partsOf<InstanceBody>(history);
+        assertStrictEquals(parts.length, 2);
+        const kept = [
+            { attribute_id: ATTR_PUBLIC, value: 'kept' },
+        ];
+        for (const part of parts) {
+            assertEquals(part.body().toValue().values, kept);
         }
+        // The older part was entries[1] when the list
+        // was newest first. Its tag is the etag line.
         const older = await handleRequest(db, req(
             'GET',
-            INSTANCE_HISTORY + '/' + entries[1]!.etag,
+            INSTANCE_HISTORY + bareEtag(parts[0]!),
             token,
         ));
         assertStrictEquals(older.status, 200);
-        const body = await older.json() as {
-            values: HistoryEntry['values'];
-        };
-        assertEquals(body.values, [
-            { attribute_id: ATTR_PUBLIC, value: 'kept' },
-        ]);
+        const served = await messageOfResponse(older);
+        assertEquals(
+            served.body().toValue() as InstanceBody,
+            parts[0]!.body().toValue(),
+        );
+        assertEquals(
+            (served.body().toValue() as InstanceBody)
+                .values,
+            kept,
+        );
+    }
+});
+
+Deno.test(
+    'instance versions each part equals the item'
+    + ' its etag serves',
+async () => {
+    const { db, adminToken, memberToken } =
+        await adminDb();
+    await putLiveType(db, adminToken);
+    await putAttribute(db, adminToken, ATTR_PUBLIC, {
+        name: 'Title',
+        attribute_type: 'text',
+        sort_order: 0,
+        options: [],
+        constraints: [],
+        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
+    });
+    const put = await putInstance(db, memberToken, [
+        { attribute_id: ATTR_PUBLIC, value: 'v0' },
+    ]);
+    assertStrictEquals(put.status, 201);
+    const patched = await patchInstance(
+        db, memberToken, put.headers.get('ETag')!, {
+            set: [
+                {
+                    attribute_id: ATTR_PUBLIC,
+                    value: 'v1',
+                },
+            ],
+        },
+    );
+    assertStrictEquals(patched.status, 200);
+    await patched.body?.cancel();
+    const index = await handleRequest(db, req(
+        'GET', INSTANCE_HISTORY, memberToken,
+    ));
+    assertStrictEquals(index.status, 200);
+    const parts = await partsOf<InstanceBody>(index);
+    assertStrictEquals(parts.length, 2);
+    for (const part of parts) {
+        const item = await handleRequest(db, req(
+            'GET',
+            INSTANCE_HISTORY + bareEtag(part),
+            memberToken,
+        ));
+        assertStrictEquals(item.status, 200);
+        const served = await messageOfResponse(item);
+        assertStrictEquals(
+            served.withFieldDeleted('date')
+                .withFieldDeleted('request-id')
+                .toWire(),
+            part.withFieldDeleted('date')
+                .withFieldDeleted('request-id')
+                .toWire(),
+        );
     }
 });

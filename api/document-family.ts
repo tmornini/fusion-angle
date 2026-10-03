@@ -1,8 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type {
-    Id, MessagePairEntity,
-} from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalPath } from './message-pair.ts';
 import { familyRegistration } from './family-registry.ts';
@@ -339,23 +337,6 @@ export function documentEntityRoute(
 }
 
 const PUT_METHOD = 'PUT';
-
-// Find the pair at this document whose id is the advertised
-// ETag. A foreign or absent pair is simply not in the
-// collection — the caller's missedReadError ladder answers.
-export async function lookupStoredRevision(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-    etag: string,
-): Promise<MessagePairEntity | undefined> {
-    const messagePairs = await messageStore(db).getDocumentHistory(
-        prefix, id,
-    );
-    return messagePairs.find(
-        (row) => row.id === etag,
-    );
-}
 
 // Versions ride the head's ladder. The whole reader is
 // the family's: only a credential or an instance

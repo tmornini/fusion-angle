@@ -14,12 +14,6 @@ export interface RecordInstance {
     readonly message: HttpMessage<InstanceDetailWire>;
 }
 
-export interface RecordInstanceHistoryEntry {
-    readonly at: string;
-    readonly etag: string;
-    readonly values: ReadonlyMap<string, string>;
-}
-
 export interface InstanceValueSet {
     readonly attributeId: string;
     readonly value: string;
@@ -34,12 +28,6 @@ interface InstanceDetailWire {
     readonly id: string;
     readonly organization_id: string;
     readonly record_type_id: string;
-    readonly values: readonly InstanceValueWire[];
-}
-
-interface InstanceHistoryWire {
-    readonly at: string;
-    readonly etag: string;
     readonly values: readonly InstanceValueWire[];
 }
 
@@ -168,18 +156,15 @@ export async function deleteRecordInstance(
     );
 }
 
+// The instance's stored PUT parts, oldest first. Each
+// body is the instance, projected by the reader's
+// current attribute schema.
 export async function getRecordInstanceVersions(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
-): Promise<RecordInstanceHistoryEntry[]> {
-    const rows = (await ctx.GET<InstanceHistoryWire[]>(
-        instancePath(ctx, recordTypeId, id)
-        + '/versions',
-    )).body().toValue();
-    return rows.map(row => ({
-        at: row.at,
-        etag: row.etag,
-        values: valuesMap(row.values),
-    }));
+): Promise<HttpMessage<InstanceDetailWire>[]> {
+    return await ctx.GETCollection<InstanceDetailWire>(
+        instancePath(ctx, recordTypeId, id) + '/versions/',
+    );
 }

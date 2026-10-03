@@ -745,7 +745,7 @@
   <rect class="empty" x="109" y="1595" width="10" height="10" fill="none"/>
   <rect class="empty" x="149" y="1595" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1595" width="10" height="10" fill="none"/>
-  <text class="uri" x="224" y="1603">/api/organizations/:organization-id/record-types/:record-type-id/instances/:instance-id/versions</text>
+  <text class="uri" x="224" y="1603">/api/organizations/:organization-id/record-types/:record-type-id/instances/:instance-id/versions/</text>
   <a href="#get/organizations/organization-id/record-types/record-type-id/instances/instance-id/versions/etag">
     <circle class="filled" cx="34" cy="1618" r="5"/>
   </a>

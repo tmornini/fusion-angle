@@ -194,14 +194,12 @@ import {
 import {
     instancesUriPrefix,
     deriveInstanceHead,
-    deriveInstanceRevisions,
     mergeInstanceValues,
     revisionValuesOf,
     type InstanceValue,
 } from './derive-record-instances.ts';
 import {
     assertWritableAttributeIds,
-    projectReadableValues,
 } from './attribute-acl.ts';
 import {
     validateInstanceValues,
@@ -286,7 +284,6 @@ import {
     documentSelect,
     documentVersionSelectRoute,
     documentVersionsSelectRoute,
-    lookupStoredRevision,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
     liveGlobalDocumentIds,
@@ -4860,87 +4857,102 @@ export const routes: Route[] = [
             };
         },
     }),
-    // Nested instance value-revision versions (Task 19).
-    // NOT a document-versions clone: each entry is full state
-    // from a revision (or genesis) PUT pair (R5 — no fold),
-    // projected by the caller's CURRENT read ACL. Wire
-    // (at, id) DESC so index 0 is the live head. Empty →
-    // missedReadError('record_instances') (R2: foreign 403
-    // / absent-or-tombstoned 404). Parent type miss first.
-    // etag is the revision pair id.
+    // Nested instance versions. Each stored PUT is served
+    // as the detail GET serves the head, projected by the
+    // reader's current attribute schema, oldest first.
+    // Parent type miss first. A tombstone is Gone only
+    // after the owner probe, so a foreign retired
+    // instance stays 403.
     route(INSTANCE_VERSIONS_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
-            await requireRecordTypeExists(db, org, typeId);
-            const revisions = await deriveInstanceRevisions(
-                db, org, typeId, instanceId,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            if (revisions.length === 0) {
-                throw await missedReadError(
-                    db, instanceId, org,
-                    'record_instances',
+            const selection = await selectVersionsAt(
+                db,
+                instancesUriPrefix(organizationId, typeId),
+                instanceId,
+                'stateless',
+                'record_instances',
+                instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
+                ),
+                async () => {
+                    throw await missedReadError(
+                        db, instanceId, organizationId,
+                        'record_instances',
+                    );
+                },
+            );
+            // The gate's own 410 would skip the owner
+            // probe, and a foreign retired instance must
+            // answer 403.
+            if (
+                selection.kind !== 'collection'
+                && selection.head.method === 'DELETE'
+            ) {
+                throw await retiredInstanceError(
+                    db, instanceId, organizationId,
                 );
             }
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
-                );
-            const entries = [];
-            for (const rev of revisions.toReversed()) {
-                const values = projectReadableValues(
-                    rev.values, attributesById, roles,
-                );
-                entries.push({
-                    at: rev.at,
-                    etag: rev.messagePairId,
-                    values,
-                });
-            }
-            return entries;
+            return selection;
         },
     }),
     route(INSTANCE_VERSION_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
             const etag = param(p, 3);
-            await requireRecordTypeExists(db, org, typeId);
-            const found = await lookupStoredRevision(
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
+            );
+            const selection = await selectVersionAt(
                 db,
-                instancesUriPrefix(org, typeId),
+                instancesUriPrefix(organizationId, typeId),
                 instanceId,
                 etag,
+                'stateless',
+                'record_instances',
+                instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
+                ),
+                async () => {
+                    throw await missedReadError(
+                        db, instanceId, organizationId,
+                        'record_instances',
+                    );
+                },
             );
+            // The gate's own 410 would skip the owner
+            // probe, and a foreign retired instance must
+            // answer 403.
             if (
-                found === undefined
-                || found.method !== 'PUT'
+                selection.kind !== 'collection'
+                && selection.head.method === 'DELETE'
             ) {
-                throw await missedReadError(
-                    db, instanceId, org,
-                    'record_instances',
+                throw await retiredInstanceError(
+                    db, instanceId, organizationId,
                 );
             }
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
-                );
-            const values = projectReadableValues(
-                revisionValuesOf(
-                    bodyOf(found.response),
-                ),
-                attributesById,
-                roles,
-            );
-            return instanceStateOf(
-                org, typeId, instanceId, values,
-            );
+            return selection;
         },
     }),
     // Nested instance detail (Task 20): public PUT is

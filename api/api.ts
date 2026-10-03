@@ -1038,20 +1038,6 @@ async function dispatched(
                 if (result instanceof Response) {
                     return result;
                 }
-                // Document /versions/:etag: ETag is the
-                // path token.
-                if (
-                    routePattern.endsWith(
-                        '/versions/:etag',
-                    )
-                ) {
-                    return attachEtag(
-                        Response.json(result),
-                        param(
-                            params, params.length - 1,
-                        ),
-                    );
-                }
                 return Response.json(result);
             }
             case 'PUT': {

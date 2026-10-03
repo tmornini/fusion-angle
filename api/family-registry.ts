@@ -123,9 +123,9 @@ export const INSTANCES_COLLECTION_PATTERN =
 export const INSTANCE_DETAIL_PATTERN =
     INSTANCES_COLLECTION_PATTERN + ':instance-id';
 export const INSTANCE_VERSIONS_PATTERN =
-    INSTANCE_DETAIL_PATTERN + '/versions';
+    INSTANCE_DETAIL_PATTERN + '/versions/';
 export const INSTANCE_VERSION_PATTERN =
-    INSTANCE_VERSIONS_PATTERN + '/:etag';
+    INSTANCE_VERSIONS_PATTERN + ':etag';
 // A credential nests under its identity. Its `secret` is
 // read by no role, admin included: the key's read roles
 // are empty (spec §3). Item 2 removes the declaration

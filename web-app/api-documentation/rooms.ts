@@ -1408,7 +1408,7 @@ export const API_DOC_ROOMS:
         verb: 'GET',
         uri:
             '/api/organizations/:organization-id/record-types/:record-type-i'
-            + 'd/instances/:instance-id/versions',
+            + 'd/instances/:instance-id/versions/',
         body: 'none',
         headers:
         [

@@ -196,17 +196,20 @@ Deno.test(
             retriedEtag,
         );
 
-        // history DESC: head first
+        // versions, oldest first; the last part is the head
         const history = await getRecordInstanceVersions(
             ctx(), TYPE_ID, INSTANCE_ID,
         );
         assert(history.length >= 3);
+        const head = history[history.length - 1]!;
         assertStrictEquals(
-            '"' + history[0]!.etag + '"', retriedEtag,
+            head.query('header.etag').toText(),
+            retriedEtag,
         );
-        assertStrictEquals(
-            history[0]!.values.get(ATTR_ID), 'v2',
-        );
+        const current = head.body().toValue().values
+            .find((entry) =>
+                entry.attribute_id === ATTR_ID);
+        assertStrictEquals(current?.value, 'v2');
 
         // delete → list empty; a retired instance's detail
         // answers 410
@@ -249,14 +252,14 @@ Deno.test(
 );
 
 Deno.test(
-    'InstanceHistoryWire has no version; etag is'
+    'InstanceDetailWire has no version; etag is'
     + ' not 64-hex',
     () => {
         const src = Deno.readTextFileSync(
             'client/record-instances.ts',
         );
         const start = src.indexOf(
-            'interface InstanceHistoryWire',
+            'interface InstanceDetailWire',
         );
         assert(start >= 0);
         const wire = src.slice(

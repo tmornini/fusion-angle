@@ -11,11 +11,6 @@ import { routePatternOf } from '../api/route-surface.ts';
 // `## For the next brainstorms`).
 const PARTED = [
     'organizations/:id/work-orders/:id/history',
-    'organizations/:organization-id/record-types/'
-        + ':record-type-id/instances/:instance-id/versions',
-    'organizations/:organization-id/record-types/'
-        + ':record-type-id/instances/:instance-id/versions/'
-        + ':etag',
 ];
 
 Deno.test('the parted GET routes are exactly the census',
