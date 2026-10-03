@@ -82,7 +82,7 @@ export interface ObjectiveVersionRow
 // Parallel GET objectives/:id/versions/ for each live
 // objective. Rows are entity snapshots stamped with pair
 // facts. Source for the lifecycle stream.
-export async function getObjectiveHistories(
+export async function getObjectiveVersions(
     ctx: RequestContext,
 ): Promise<Map<Id, ObjectiveVersionRow[]>> {
     const rows = (await ctx.GETCollection<{ id: Id }>(
@@ -120,7 +120,7 @@ export async function getObjectiveLifecycleEvents(
     ctx: RequestContext,
 ): Promise<ObjectiveLifecycleEvent[]> {
     const histories =
-        await getObjectiveHistories(ctx);
+        await getObjectiveVersions(ctx);
     const events: ObjectiveLifecycleEvent[] = [];
     for (
         const [objectiveId, versions] of histories
