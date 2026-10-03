@@ -385,7 +385,7 @@ async () => {
 Deno.test('tokenHeadFor: the later event is the head, identical'
 + ' pre-tx (the plain adapter) vs in-tx (an open db.transaction view'
 + ' sharing rotateRefreshJti/revokeTokenChain\'s own table'
-+ ' list) — the membershipExistsFor precedent', async () => {
++ ' list)', async () => {
     const db = await freshDb();
     await PUT(db, 'identities/XXZruirZyAOoRpNxaDnpSA/tokens/'
         + JTI_TX, {
