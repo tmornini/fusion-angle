@@ -20,6 +20,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -85,9 +86,13 @@ async function versionsOf(
         token,
     ));
     assertStrictEquals(res.status, 200);
-    return await res.json() as {
-        state: string; member_id: string;
-    }[];
+    const parts = await partsOf<{ state: string }>(res);
+    return parts.map((part) => ({
+        state: part.body().toValue().state,
+        member_id: part.query(
+            'header.requester-identity-id',
+        ).toText(),
+    }));
 }
 
 // -- 1. validateRecordDocumentBody --------------------------
@@ -240,7 +245,7 @@ Deno.test('postRecordDocumentOp with a new state writes a'
     );
     assertEquals(
         versions.map(v => v.state),
-        ['archived', 'active'],
+        ['active', 'archived'],
     );
     assert(
         versions.every(

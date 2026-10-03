@@ -116,6 +116,8 @@ import type { Reader } from './served-response.ts';
 import {
     selectHeadAtPath,
     selectHeadsAtPath,
+    selectVersionAt,
+    selectVersionsAt,
     wholeCollectionSelection,
     wholeHeadSelection,
     type HeadSelection,
@@ -4691,49 +4693,48 @@ export const routes: Route[] = [
         },
     }),
     route(RECORD_TYPE_VERSIONS_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
-            const id = param(p, 1);
-            const snapshots = await versionSnapshotsAt(
-                db, recordTypesUriPrefix(org), id,
-                (document) =>
-                    recordTypeEntityOf(document, org),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
             );
-            if (snapshots.length === 0) {
-                throw await missedReadError(
-                    db, id, org, 'record_types',
-                );
-            }
-            return snapshots;
+            const id = param(p, 1);
+            return selectVersionsAt(
+                db,
+                recordTypesUriPrefix(organizationId),
+                id,
+                'stateless',
+                'record_types',
+                { sees: 'whole' },
+                async () => {
+                    throw await missedReadError(
+                        db, id, organizationId,
+                        'record_types',
+                    );
+                },
+            );
         },
     }),
     route(RECORD_TYPE_VERSION_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
             const id = param(p, 1);
             const etag = param(p, 2);
-            const found = await lookupStoredRevision(
-                db, recordTypesUriPrefix(org), id, etag,
-            );
-            if (
-                found === undefined
-                || found.method !== 'PUT'
-            ) {
-                throw await missedReadError(
-                    db, id, org, 'record_types',
-                );
-            }
-            const body = bodyOf(
-                found.response,
-            );
-            return recordTypeEntityOf(
-                {
-                    name: id,
-                    messagePairId: found.id,
-                    method: found.method,
-                    body,
+            return selectVersionAt(
+                db,
+                recordTypesUriPrefix(organizationId),
+                id,
+                etag,
+                'stateless',
+                'record_types',
+                { sees: 'whole' },
+                async () => {
+                    throw await missedReadError(
+                        db, id, organizationId,
+                        'record_types',
+                    );
                 },
-                org,
             );
         },
     }),

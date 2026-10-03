@@ -21,6 +21,7 @@ import {
 import {
     apiRequest,
     partBodiesOf,
+    partsOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
@@ -248,8 +249,8 @@ async () => {
     });
 });
 
-Deno.test('GET .../record-types/:id/versions → 200 DESC, '
-+ 'index 0 current',
+Deno.test('GET .../record-types/:id/versions → 200'
++ ' oldest first',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -272,13 +273,18 @@ async () => {
         token,
     ));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as RecordTypeWireRow[];
-    assertStrictEquals(rows.length, 2);
-    assertStrictEquals(rows[0]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
-    assertStrictEquals(rows[0]!.state, 'archived');
-    assertStrictEquals(rows[1]!.id, 'sjWcXwYGlgxxJOHxzMoUow');
-    assertStrictEquals(rows[1]!.state, 'active');
-    assertStrictEquals('state_at' in rows[0]!, false);
+    const parts = await partsOf<RecordTypeWireRow>(res);
+    assertStrictEquals(parts.length, 2);
+    const oldest = parts[0]!.body().toValue();
+    const current = parts[parts.length - 1]!
+        .body().toValue();
+    assertStrictEquals(oldest.id, 'sjWcXwYGlgxxJOHxzMoUow');
+    assertStrictEquals(oldest.state, 'active');
+    assertStrictEquals(
+        current.id, 'sjWcXwYGlgxxJOHxzMoUow',
+    );
+    assertStrictEquals(current.state, 'archived');
+    assertStrictEquals('state_at' in current, false);
 });
 
 Deno.test('GET path org ≠ token org → 403 (member of A '

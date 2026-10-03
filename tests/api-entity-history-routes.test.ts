@@ -646,7 +646,8 @@ async function seedRecordLifecycle(
 }
 
 Deno.test(
-    'GET nested record-types/:id/versions: 200 DESC current-first',
+    'GET nested record-types/:id/versions: 200 oldest'
+    + ' first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -655,22 +656,130 @@ Deno.test(
             db,
             req(
                 'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id
-                    + '/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
                 DEV_TOKEN,
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'archived');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[parts.length - 1]!
+            .body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'archived');
+        assertStrictEquals('state_at' in current, false);
+    },
+);
+
+Deno.test(
+    'GET nested record-types/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedRecordLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                        + '/record-types/' + id
+                        + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET nested record-types/:id/versions/ of a'
+    + ' deleted record type is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+                recordBody('Gone Record', 'active'),
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const removed = await handleRequest(
+            db,
+            req(
+                'DELETE',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(removed.status, 204);
+        await removed.body?.cancel();
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: record_types/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: record_types/' + id,
+        });
     },
 );
 

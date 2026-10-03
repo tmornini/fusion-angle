@@ -20,10 +20,6 @@ const PARTED = [
     'organizations/:organization-id/record-types/'
         + ':record-type-id/instances/:instance-id/versions/'
         + ':etag',
-    'organizations/:organization-id/record-types/'
-        + ':record-type-id/versions/',
-    'organizations/:organization-id/record-types/'
-        + ':record-type-id/versions/:etag',
 ];
 
 Deno.test('the parted GET routes are exactly the census',
