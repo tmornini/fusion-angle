@@ -40,9 +40,13 @@ import type { HttpMessage } from
 import type { ClientSession } from '../client/client-session.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import {
+    IN_PROCESS_ORIGIN,
     inPageContext,
+    inProcessFetch,
     recordedContext,
 } from './in-page-facade.ts';
+import { createHttpFacade } from '../client/http-facade.ts';
+import { createAppClient } from '../web-app/app/client.ts';
 import {
     organizationToken,
     reachableToken,
@@ -828,6 +832,36 @@ Deno.test('re-inviting a declined invitee lands pending on the'
         mine.find(v => v.id === first.id)?.state, 'pending');
 }));
 
+Deno.test('getSentInvitations reads ?state=declined',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const { db } = await seed();
+    const urls: string[] = [];
+    const inner = inProcessFetch(db);
+    const recording: typeof fetch = async (input, init) => {
+        const request = new Request(input, init);
+        urls.push(request.url);
+        return inner(request);
+    };
+    const ctx = createAppClient(createHttpFacade(
+        IN_PROCESS_ORIGIN, recording,
+    )).requestContext(await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA',
+        'BBjWJsjYIDkTRKIIPrzWRw',
+    ));
+    await getSentInvitations(ctx, 'declined');
+    assertStrictEquals(urls.length, 1);
+    const url = new URL(urls[0]!);
+    assertStrictEquals(
+        url.pathname,
+        '/api/organizations/BBjWJsjYIDkTRKIIPrzWRw'
+            + '/invitations/',
+    );
+    assertStrictEquals(url.search, '?state=declined');
+    assertStrictEquals(
+        url.search.match(/state=/g)?.length, 1,
+    );
+}));
+
 Deno.test('sent invitations list the active org pending only',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
@@ -835,7 +869,9 @@ Deno.test('sent invitations list the active org pending only',
     const tonyWayne = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitationGrant(tonyWayne, 'sarah@x.com');
-    const sent = await getSentInvitations(tonyWayne);
+    const sent = await getSentInvitations(
+        tonyWayne, 'pending',
+    );
     assertStrictEquals(sent.length, 1);
     assertStrictEquals(
         sent[0]!.identityId, 'toccYYkLEABmlbpHJalgtQ',
@@ -844,7 +880,11 @@ Deno.test('sent invitations list the active org pending only',
     // Switched to Stark, the Wayne invitation is out of scope.
     const tonyStark = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    assertStrictEquals((await getSentInvitations(tonyStark)).length, 0);
+    assertStrictEquals(
+        (await getSentInvitations(tonyStark, 'pending'))
+            .length,
+        0,
+    );
 }));
 
 Deno.test('the sent view omits the email when PII is erased',
@@ -856,7 +896,7 @@ Deno.test('the sent view omits the email when PII is erased',
     await postInvitationGrant(tony, 'sarah@x.com');
     await eraseIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw', 'toccYYkLEABmlbpHJalgtQ');
-    const sent = await getSentInvitations(tony);
+    const sent = await getSentInvitations(tony, 'pending');
     assertStrictEquals(sent.length, 1);
     assert(!('inviteeEmail' in sent[0]!));
 }));

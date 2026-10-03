@@ -88,9 +88,17 @@ type PageState =
         draft: GeneralInfoDraft;
     };
 
+type SentInvitationState =
+    'pending' | 'declined' | 'revoked';
+
 let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
 let sentInvitations: readonly SentInvitation[] = [];
+let sentInvitationState: SentInvitationState = 'pending';
+// List on screen. A failed click restores the button
+// here when no different state was pressed since.
+let paintedSentInvitationState: SentInvitationState =
+    'pending';
 
 const FIELDS: ReadonlySet<GeneralInfoFieldKey> =
     new Set(['name', 'domain']);
@@ -331,7 +339,7 @@ export async function init(): Promise<void> {
     ] = await Promise.allSettled([
         organizationAndStats(ctx),
         fetchObjectivesData(ctx),
-        fetchSentInvitations(ctx),
+        fetchSentInvitations(ctx, sentInvitationState),
     ]);
     markEnd(fetchName);
 
@@ -397,7 +405,9 @@ export async function init(): Promise<void> {
         );
     }
     if (sentResult.status === 'fulfilled') {
-        paintSentInvitations(sentResult.value);
+        paintSentInvitations(
+            sentResult.value, sentInvitationState,
+        );
     } else {
         log.error(
             'organization invitations load failed',
@@ -412,6 +422,7 @@ export async function init(): Promise<void> {
             e => void onSentInvitationClick(e),
             { signal },
         );
+    bindSentInvitationState();
 
     // Add-Objective dialog wiring
     $(
@@ -474,35 +485,42 @@ export async function init(): Promise<void> {
     }, { signal });
 }
 
-// The org's outstanding (pending) invitations, with a Revoke
-// per row. Admin-only — the org page already requires admin,
-// so a failure here is unexpected and surfaces loudly: the
-// boot path renders the page error state, refresh paths toast
-// through the global spine.
+// The organization's invitations in the selected state.
+// Revoke is on a pending row. Admin-only — the page
+// already requires admin, so a failure here is unexpected
+// and surfaces loudly: the boot path renders the page
+// error state, refresh paths toast through the global spine.
 async function fetchSentInvitations(
     ctx: ReturnType<typeof sessionContext>,
+    selected: SentInvitationState,
 ) {
-    return getSentInvitations(ctx);
+    return getSentInvitations(ctx, selected);
 }
 
 function paintSentInvitations(
     sent: Awaited<
         ReturnType<typeof getSentInvitations>
     >,
+    selected: SentInvitationState,
 ): void {
     const box = $('#sent-invitations-box', document);
     const list = $('#sent-invitations-list', document);
     sentInvitations = sent;
     if (!box || !list) return;
-    new SentInvitationsPresenter(sent).render(list);
+    new SentInvitationsPresenter(
+        sent, selected,
+    ).render(list);
     box.classList.remove('hidden');
+    paintedSentInvitationState = selected;
 }
 
 async function renderSentInvitations(): Promise<void> {
+    const selected = sentInvitationState;
     const sent = await fetchSentInvitations(
-        sessionContext(),
+        sessionContext(), selected,
     );
-    paintSentInvitations(sent);
+    if (selected !== sentInvitationState) return;
+    paintSentInvitations(sent, selected);
 }
 
 async function onSentInvitationClick(
@@ -536,7 +554,74 @@ async function onSentInvitationClick(
         );
         return;
     }
-    await renderSentInvitations();
+}
+
+const SENT_INVITATION_STATES: readonly SentInvitationState[] = [
+    'pending', 'declined', 'revoked',
+];
+
+function sentStateButton(
+    selected: SentInvitationState,
+): HTMLElement | null {
+    return $(
+        '[data-invitation-state="' + selected + '"]',
+        document,
+    );
+}
+
+function bindSentInvitationState(): void {
+    for (const selected of SENT_INVITATION_STATES) {
+        sentStateButton(selected)?.addEventListener(
+            'click',
+            e => void onSentInvitationStateClick(e),
+            { signal },
+        );
+    }
+}
+
+function pressSentInvitationState(
+    selected: SentInvitationState,
+): void {
+    for (const candidate of SENT_INVITATION_STATES) {
+        sentStateButton(candidate)?.setAttribute(
+            'aria-pressed',
+            candidate === selected ? 'true' : 'false',
+        );
+    }
+}
+
+async function onSentInvitationStateClick(
+    e: Event,
+): Promise<void> {
+    const target = e.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    const selected = target.getAttribute(
+        'data-invitation-state',
+    );
+    if (
+        selected !== 'pending'
+        && selected !== 'declined'
+        && selected !== 'revoked'
+    ) return;
+    sentInvitationState = selected;
+    pressSentInvitationState(selected);
+    try {
+        await renderSentInvitations();
+    } catch (err) {
+        log.error(
+            'getSentInvitations failed',
+            'organization', err,
+        );
+        if (sentInvitationState !== selected) return;
+        sentInvitationState = paintedSentInvitationState;
+        pressSentInvitationState(
+            paintedSentInvitationState,
+        );
+        showToast(
+            'Failed to load invitations: '
+            + extractErrorMessage(err), 'error',
+        );
+    }
 }
 
 function bindStableListeners(

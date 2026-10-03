@@ -127,7 +127,7 @@ Deno.test('a sent invitation shows the absence marker'
             state: 'pending' as const,
             message: heldMessage('inv2'),
         },
-    ]).render(rec.container);
+    ], 'pending').render(rec.container);
     const out = rec.html();
     assertMatch(out, /data-invitation-id="inv2"/);
     assertMatch(out, /—/);
@@ -145,12 +145,63 @@ Deno.test('an absent invitee email renders the absence glyph',
         invitedAt: '2026-01-01T00:00:00.000000Z',
         state: 'pending' as const,
         message: heldMessage('inv5'),
-    }]).render(rec.container);
+    }], 'pending').render(rec.container);
     assertMatch(rec.html(), /—/);
+});
+
+Deno.test('a declined sent invitation shows its badge'
+    + ' and no Revoke', () => {
+    const rec = record();
+    new SentInvitationsPresenter([{
+        id: 'inv-declined',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
+        identityId: 'toccYYkLEABmlbpHJalgtQ',
+        invitedAt: '2026-01-01T00:00:00.000000Z',
+        state: 'declined' as const,
+        message: heldMessage('inv-declined'),
+    }], 'declined').render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /data-invitation-id="inv-declined"/);
+    assertMatch(out, /—/);
+    assertMatch(out, /Declined/);
+    assertNotMatch(out, /<button/);
+});
+
+Deno.test('a revoked sent invitation shows its badge'
+    + ' and no Revoke', () => {
+    const rec = record();
+    new SentInvitationsPresenter([{
+        id: 'inv-revoked',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
+        identityId: 'toccYYkLEABmlbpHJalgtQ',
+        invitedAt: '2026-01-01T00:00:00.000000Z',
+        state: 'revoked' as const,
+        message: heldMessage('inv-revoked'),
+    }], 'revoked').render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /data-invitation-id="inv-revoked"/);
+    assertMatch(out, /—/);
+    assertMatch(out, /Revoked/);
+    assertNotMatch(out, /<button/);
 });
 
 Deno.test('an empty sent list shows the empty state', () => {
     const rec = record();
-    new SentInvitationsPresenter([]).render(rec.container);
-    assertMatch(rec.html(), /No outstanding invitations/);
+    new SentInvitationsPresenter([], 'pending')
+        .render(rec.container);
+    assertMatch(rec.html(), /No pending invitations\./);
+});
+
+Deno.test('an empty declined sent list names declined', () => {
+    const rec = record();
+    new SentInvitationsPresenter([], 'declined')
+        .render(rec.container);
+    assertMatch(rec.html(), /No declined invitations\./);
+});
+
+Deno.test('an empty revoked sent list names revoked', () => {
+    const rec = record();
+    new SentInvitationsPresenter([], 'revoked')
+        .render(rec.container);
+    assertMatch(rec.html(), /No revoked invitations\./);
 });

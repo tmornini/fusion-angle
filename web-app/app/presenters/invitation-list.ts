@@ -54,6 +54,14 @@ function buildInviteeRow(inv: InvitationView): SafeHtml {
         </div>`;
 }
 
+function revokeAction(): SafeHtml {
+    return html`
+        <button type="button"
+            class="btn btn-ghost btn-sm"
+            data-invitation-action="revoke"
+        >Revoke</button>`;
+}
+
 function buildSentRow(inv: SentInvitation): SafeHtml {
     return html`
         <div class="${
@@ -68,11 +76,25 @@ function buildSentRow(inv: SentInvitation): SafeHtml {
                 }">Invited ${formatDate(inv.invitedAt)}</p>
             </div>
             ${stateBadge(inv.state)}
-            <button type="button"
-                class="btn btn-ghost btn-sm"
-                data-invitation-action="revoke"
-            >Revoke</button>
+            ${
+                inv.state === 'pending'
+                    ? revokeAction()
+                    : html``
+            }
         </div>`;
+}
+
+type SentListState = 'pending' | 'declined' | 'revoked';
+
+function emptySentMessage(state: SentListState): string {
+    switch (state) {
+        case 'pending':
+            return 'No pending invitations.';
+        case 'declined':
+            return 'No declined invitations.';
+        case 'revoked':
+            return 'No revoked invitations.';
+    }
 }
 
 function emptyState(message: string): SafeHtml {
@@ -99,19 +121,25 @@ export class InvitationListPresenter {
     }
 }
 
-// The inviting org's outstanding invitations, each with a Revoke
-// (admin only). Empty → "No outstanding invitations."
+// The inviting organization's invitations in one state.
+// Revoke is on a pending row only. An empty list names
+// the state, which the rows cannot.
 export class SentInvitationsPresenter {
     readonly #rows: readonly SentInvitation[];
+    readonly #state: SentListState;
 
-    constructor(rows: readonly SentInvitation[]) {
+    constructor(
+        rows: readonly SentInvitation[],
+        state: SentListState,
+    ) {
         this.#rows = rows;
+        this.#state = state;
     }
 
     render(container: HTMLElement): void {
         setHtml(container, html`${
             this.#rows.length === 0
-                ? emptyState('No outstanding invitations.')
+                ? emptyState(emptySentMessage(this.#state))
                 : html`${this.#rows.map(buildSentRow)}`
         }`);
     }

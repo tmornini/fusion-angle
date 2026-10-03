@@ -100,16 +100,16 @@ function invitationPath(ctx: RequestContext, id: Id): string {
     return 'identities/' + ctx.identity.id + '/invitations/' + id;
 }
 
-// The active organization's pending memberships. The box
-// has no selector of its own yet, so the view is asked
-// for pending.
+// The active organization's invitations in one state.
+// The organization box passes the selector's state.
 export async function getSentInvitations(
     ctx: RequestContext,
+    state: InvitationState,
 ): Promise<SentInvitation[]> {
     const parts = await ctx.GETCollection<MembershipEntity>(
         'organizations/'
             + activeOrganization(ctx)
-            + '/invitations/?state=pending',
+            + '/invitations/?state=' + state,
     );
     return parts.map(sentViewOf);
 }
