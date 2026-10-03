@@ -79,16 +79,16 @@ Deno.test('GET project versions/ is collection item'
     const db = await seededMockDb();
     const project = buildProjects()[0]!;
     const token = await organizationToken();
-    const rows = (await GET<
-        Record<string, unknown>[]
+    const parts = await GETCollection<
+        Record<string, unknown>
     >(
         db,
         nest('projects', project.id)
             + '/versions/',
         token,
-        operationIdHeader())).body().toValue();
-    assert(rows.length >= 1);
-    const first = rows[0]!;
+        operationIdHeader());
+    assert(parts.length >= 1);
+    const first = parts[0]!.body().toValue();
     assertStrictEquals('state_at' in first, false);
     assertStrictEquals(typeof first.title, 'string');
     assertStrictEquals(typeof first.state, 'string');

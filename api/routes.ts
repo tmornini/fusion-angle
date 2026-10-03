@@ -5248,11 +5248,8 @@ export const routes: Route[] = [
     // the shared rationale; the Decision-7/MEMBER_ID-CAVEAT
     // prose moved to the PROJECTS_WIRING block above.
     documentEntityRoute(PROJECTS_WIRING),
-    // GET projects/:id/versions/: entityOf snapshots
-    // DESC, each stamped with the pair facts (etag, at,
-    // member_id); empty → missedReadError('projects').
-    documentVersionListRoute(PROJECTS_WIRING),
-    documentVersionRoute(PROJECTS_WIRING),
+    documentVersionsSelectRoute(PROJECTS_WIRING),
+    documentVersionSelectRoute(PROJECTS_WIRING),
     // GET serves the stored heads through the generic
     // collectionSelect. POST stays this hand-written
     // create — objectives' own create lands the document PLUS

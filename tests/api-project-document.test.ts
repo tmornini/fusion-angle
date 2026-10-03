@@ -11,6 +11,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { HttpMessage } from
@@ -69,9 +70,13 @@ async function versionsOf(
         token,
     ));
     assertStrictEquals(res.status, 200);
-    return await res.json() as {
-        state: string; member_id: string;
-    }[];
+    const parts = await partsOf<{ state: string }>(res);
+    return parts.map((part) => ({
+        state: part.body().toValue().state,
+        member_id: part.query(
+            'header.requester-identity-id',
+        ).toText(),
+    }));
 }
 
 async function getWire(

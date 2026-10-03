@@ -404,7 +404,8 @@ async function seedProjectLifecycle(
 }
 
 Deno.test(
-    'GET organizations/:id/projects/:id/versions: 200 DESC current-first',
+    'GET organizations/:id/projects/:id/versions/ 200'
+    + ' oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -419,16 +420,122 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'under_review');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'submitted');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'submitted');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'under_review');
+        assertStrictEquals('state_at' in oldest, false);
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/projects/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedProjectLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                        + id + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/projects/:id/versions/ of a'
+    + ' state-deleted project is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id,
+                DEV_TOKEN,
+                projectBody('Gone Project', 'submitted'),
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const tombstone = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id,
+                DEV_TOKEN,
+                projectBody('Gone Project', 'deleted'),
+            ),
+        );
+        assertStrictEquals(tombstone.status, 200);
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: projects/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: projects/' + id,
+        });
     },
 );
 

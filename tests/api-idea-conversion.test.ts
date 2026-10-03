@@ -199,15 +199,17 @@ Deno.test(
 
         // The new project entered at its initial state, also
         // authored by the actor.
-        const projectVersions = (await GET<{
+        const projectVersions = await GETCollection<{
             state: string;
-            member_id: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader());
         assertStrictEquals(projectVersions.length, 1);
         assertStrictEquals(
-            projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+            projectVersions[0]!.query(
+                'header.requester-identity-id',
+            ).toText(),
+            'XXZruirZyAOoRpNxaDnpSA',
         );
 
         const mine = (await GETCollection<
