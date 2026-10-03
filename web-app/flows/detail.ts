@@ -46,7 +46,6 @@ import type {
     RecordAttributeId,
     RecordEntity,
     RecordId,
-    StateEntity,
 } from '../../shared/types.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
@@ -1901,7 +1900,9 @@ async function refreshFlowFromServer(
     let graph: Awaited<
         ReturnType<typeof getRenderableFlowGraph>
     >;
-    let versions: StateEntity[];
+    let versions: Awaited<
+        ReturnType<typeof getFlowVersions>
+    >;
     try {
         [graph, versions] = await Promise.all([
             getRenderableFlowGraph(ctx, flowId),

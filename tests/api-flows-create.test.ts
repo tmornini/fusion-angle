@@ -177,13 +177,19 @@ Deno.test(
         }, DEV_TOKEN,
             operationIdHeader());
 
-        const events = (await GET<StateEntity[]>(
+        const parts = await GETCollection<{
+            state_at: string;
+        }>(
             db,
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
             DEV_TOKEN,
-            operationIdHeader())).body().toValue();
-        assertStrictEquals(events.length, 1);
-        assertStrictEquals(events[0]!.at, AT);
+            operationIdHeader(),
+        );
+        assertStrictEquals(parts.length, 1);
+        assertStrictEquals(
+            parts[0]!.body().toValue().state_at,
+            AT,
+        );
     },
 );

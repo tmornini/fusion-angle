@@ -407,8 +407,8 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
     },
 ];
 
-Deno.test('case 2: GET <family>/:id/history parity — one entity'
-+ ' per family (flow, work-order) + the (at, id) DESC order',
+Deno.test('case 2: flow parts match deriveFlowStateHistory;'
++ ' work-order history stays (at, id) DESC',
 async () => {
     const db = await seededDb();
     for (const { family, routeFamily, id }
@@ -417,10 +417,10 @@ async () => {
         const derived = await entityHistory(
             db, STARK_ORGANIZATION, id,
         );
-        // Family routes emit DESC (current first). Work-order
-        // wire widens StateEntity with field_values — parity
-        // is the lifecycle core (id/state/at/member_id), not
-        // full JSON equality with the bare derive.
+        // Work-order history is newest first. Its wire
+        // widens StateEntity with field_values — parity
+        // is the lifecycle core (id/state/at/member_id),
+        // not full JSON equality with the bare derive.
         const expected = derived.toReversed();
         const token = await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -434,6 +434,34 @@ async () => {
             token,
         ));
         assertStrictEquals(res.status, 200, family);
+        if (family === 'flow') {
+            const parts = await partsOf<{
+                state_event_id: string;
+                state: string;
+                state_at: string;
+            }>(res);
+            const history = await deriveFlowStateHistory(
+                db, STARK_ORGANIZATION, id,
+            );
+            assertEquals(
+                parts.map((part) => {
+                    const body = part.body().toValue();
+                    return {
+                        state_event_id:
+                            body.state_event_id,
+                        state: body.state,
+                        state_at: body.state_at,
+                    };
+                }),
+                history.map((row) => ({
+                    state_event_id: row.id,
+                    state: row.state,
+                    state_at: row.at,
+                })),
+                family,
+            );
+            continue;
+        }
         const wire = await res.json() as {
             id: string;
             entity_id?: string;

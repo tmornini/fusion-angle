@@ -6,6 +6,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
     apiRequest,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -74,8 +75,8 @@ async () => {
             + 'cyLfilTEOVYoZqXJMakKAQ/versions/', token),
     );
     assertStrictEquals(index.status, 200);
-    const rows = await index.json() as { id: string }[];
-    assert(rows.length >= 1);
+    const parts = await partsOf(index);
+    assert(parts.length >= 1);
 
     const retired = await handleRequest(
         db,

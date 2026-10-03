@@ -424,8 +424,9 @@ export interface StateEntity {
     state: string;
     member_id: Id;
     at: string;
-    // Present on /versions index rows; value is that
-    // revision's pair id.
+    // Work-order history rows, the only reader still
+    // shaped like a /versions index, may carry it.
+    // Value is that revision's pair id.
     etag?: string;
 }
 

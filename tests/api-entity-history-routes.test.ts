@@ -47,15 +47,6 @@ import {
 // derive*StateHistory (ASC) with DESC + missedReadError.
 // Product versions live under organizations/:id/.
 
-interface HistoryEvent {
-    id: string;
-    entity_id: string;
-    state: string;
-    member_id: string;
-    at: string;
-    etag?: string;
-}
-
 function req(
     method: string,
     path: string,
@@ -76,20 +67,6 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
-}
-
-function assertDesc(rows: HistoryEvent[]): void {
-    for (let i = 1; i < rows.length; i++) {
-        const prev = rows[i - 1]!;
-        const cur = rows[i]!;
-        const ordered =
-            prev.at > cur.at
-            || (prev.at === cur.at && prev.id > cur.id);
-        assert(
-            ordered,
-            'history must be (at, id) DESC',
-        );
-    }
 }
 
 // -- Ideas --------------------------------------------------
@@ -921,8 +898,15 @@ async function seedFlowLifecycle(
     return { ev1, ev2 };
 }
 
+function flowEtagOf(
+    part: { query(path: string): { toText(): string } },
+): string {
+    return part.query('header.etag').toText().slice(1, -1);
+}
+
 Deno.test(
-    'GET organizations/:id/flows/:id/versions: 200 DESC current-first',
+    'GET organizations/:id/flows/:id/versions/'
+    + ' 200 oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -933,19 +917,23 @@ Deno.test(
             db,
             req(
                 'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id
-                    + '/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + id + '/versions/',
                 DEV_TOKEN,
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, ev2);
-        assertStrictEquals(rows[0]!.state, 'updated');
-        assertStrictEquals(rows[1]!.id, ev1);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertDesc(rows);
+        const parts = await partsOf<{
+            state: string;
+            state_event_id: string;
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.state_event_id, ev1);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.state_event_id, ev2);
+        assertStrictEquals(current.state, 'updated');
     },
 );
 
@@ -985,14 +973,19 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-        assertStrictEquals(rows.length, 1);
-        assertStrictEquals(rows[0]!.etag, pairId);
+        const parts = await partsOf<{
+            state: string;
+            state_event_id: string;
+        }>(res);
+        assertStrictEquals(parts.length, 1);
+        const body = parts[0]!.body().toValue();
+        assertStrictEquals(flowEtagOf(parts[0]!), pairId);
         assertStrictEquals(
-            isIdentifier(rows[0]!.etag ?? ''),
+            isIdentifier(flowEtagOf(parts[0]!)),
             true,
         );
-        assertStrictEquals('version' in rows[0]!, false);
+        assertStrictEquals('version' in body, false);
+        assertStrictEquals(body.state, 'active');
     },
 );
 
@@ -1068,15 +1061,130 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-        assertStrictEquals(rows.length, 3);
-        const etags = rows.map((row) => row.etag);
-        assertEquals(etags, [etagA2, etagB, etagA]);
+        const parts = await partsOf(res);
+        assertStrictEquals(parts.length, 3);
+        const etags = parts.map((part) => flowEtagOf(part));
+        assertEquals(etags, [etagA, etagB, etagA2]);
         assertStrictEquals(new Set(etags).size, 3);
         for (const etag of etags) {
-            assertStrictEquals(isIdentifier(etag ?? ''), true);
+            assertStrictEquals(isIdentifier(etag), true);
         }
-        assertStrictEquals('version' in rows[0]!, false);
+        const body = parts[0]!.body().toValue() as
+            Record<string, unknown>;
+        assertStrictEquals('version' in body, false);
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/flows/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedFlowLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = flowEtagOf(part);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                        + id + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/flows/:id/versions/ of a'
+    + ' state-deleted flow is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const path =
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + id;
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Gone Flow',
+                    'active',
+                    '2026-03-01T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+                { 'if-none-match': '*' },
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const removed = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Gone Flow',
+                    'deleted',
+                    '2026-03-02T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+                {
+                    'if-match': created.headers.get('ETag')!,
+                },
+            ),
+        );
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+        const list = await handleRequest(
+            db,
+            req('GET', path + '/versions/', DEV_TOKEN),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: flows/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                path + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: flows/' + id,
+        });
     },
 );
 

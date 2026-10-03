@@ -284,8 +284,6 @@ import {
     documentEntityRoute,
     documentPutHandler,
     documentSelect,
-    documentVersionListRoute,
-    documentVersionRoute,
     documentVersionSelectRoute,
     documentVersionsSelectRoute,
     lookupStoredRevision,
@@ -4329,12 +4327,8 @@ export const routes: Route[] = [
         select: documentSelect(FLOWS_WIRING),
         put: documentPutHandler(FLOWS_WIRING),
     },
-    // GET flows/:id/versions/: pair-chain index. Old
-    // table-backed /versions/:vid stays a miss (404).
-    // List is StateEntity[] DESC; snapshot is the stored
-    // flow document. Do not change the flow payload.
-    documentVersionListRoute(FLOWS_WIRING),
-    documentVersionRoute(FLOWS_WIRING),
+    documentVersionsSelectRoute(FLOWS_WIRING),
+    documentVersionSelectRoute(FLOWS_WIRING),
     // Undo-as-replay (Phase 14 Task 8): the restored state,
     // graphDelta/revivals server-computed into it
     // (SIDECAR-KEEP → deriveFlowGraphStates), lands through

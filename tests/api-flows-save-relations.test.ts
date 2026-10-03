@@ -20,7 +20,6 @@ import type {
     FlowWithGraph,
     GraphNode,
     GraphEdge,
-    StateEntity,
     StoredGraph,
 } from '../shared/types.ts';
 import {
@@ -527,14 +526,18 @@ Deno.test(
         await putFlow(ctx, flowId, save(
             working.nodes, working.edges,
         ));
-        const events = (await ctx.GET<StateEntity[]>(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
-                + '/versions/',
-        )).body().toValue();
-        // Family history is DESC — current first.
+        const parts = await ctx.GETCollection<{
+            state: string;
+        }>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId + '/versions/',
+        );
+        // Oldest first — the last part is current.
         assertEquals(
-            events.map(e => e.state),
-            ['updated', 'updated', 'active'],
+            parts.map(
+                (part) => part.body().toValue().state,
+            ),
+            ['active', 'updated', 'updated'],
         );
     },
 );

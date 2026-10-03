@@ -3,9 +3,9 @@ import type {
     Id,
     ProjectEntity,
     ProjectFlowEntity,
+    FlowEntity,
     GraphNode,
     GraphEdge,
-    StateEntity,
     StoredGraph,
 } from '../shared/types.ts';
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
@@ -231,15 +231,13 @@ export async function getFlowGraph(
     return flowGraphOf(await getFlowWithGraph(ctx, flowId));
 }
 
-// The flow's lifecycle rows, one per distinct state
-// event (api/derive-documents.ts documentLifecycleEvents).
-// More than one row is something to undo (spec §10). The
-// route answers JSON until the fourth spec.
+// The flow's stored PUT parts, oldest first. More than
+// one part is something to undo (spec §10).
 export async function getFlowVersions(
     ctx: RequestContext,
     flowId: Id,
-): Promise<StateEntity[]> {
-    return (await ctx.GET<StateEntity[]>(
+): Promise<HttpMessage<FlowEntity>[]> {
+    return await ctx.GETCollection<FlowEntity>(
         organizationItem(ctx, 'flows', flowId) + '/versions/',
-    )).body().toValue();
+    );
 }

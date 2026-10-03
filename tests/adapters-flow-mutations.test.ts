@@ -31,7 +31,6 @@ import type {
     FlowWithGraph,
     GraphNode,
     GraphEdge,
-    StateEntity,
     StoredGraph,
 } from '../shared/types.ts';
 import {
@@ -154,14 +153,16 @@ Deno.test(
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'aEsGMmBEFaVdWihhHXwCbw');
-        const events =
-            (await ctx.GET<StateEntity[]>(
-                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-                    + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-            )).body().toValue();
-        assertStrictEquals(events.length, 1);
-        const ev = events[0]!;
-        assertStrictEquals(ev.entity_id, 'aEsGMmBEFaVdWihhHXwCbw');
+        const parts = await ctx.GETCollection<{
+            id: string;
+            state: string;
+        }>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
+        );
+        assertStrictEquals(parts.length, 1);
+        const ev = parts[0]!.body().toValue();
+        assertStrictEquals(ev.id, 'aEsGMmBEFaVdWihhHXwCbw');
         assertStrictEquals(ev.state, 'active');
     },
 );
@@ -180,16 +181,19 @@ Deno.test(
             nodes: [],
             edges: [],
         });
-        const events =
-            (await ctx.GET<StateEntity[]>(
-                'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-                    + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-            )).body().toValue();
-        assertStrictEquals(events.length, 2);
-        // Family history is DESC — current first.
-        const states = events.map(e => e.state);
+        const parts = await ctx.GETCollection<{
+            state: string;
+        }>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
+        );
+        assertStrictEquals(parts.length, 2);
+        // Oldest first — the last part is current.
+        const states = parts.map(
+            (part) => part.body().toValue().state,
+        );
         assertEquals(
-            states, ['updated', 'active'],
+            states, ['active', 'updated'],
         );
     },
 );
@@ -424,11 +428,11 @@ Deno.test(
         // second row. The first echo is stale.
         const fresh = await ctx.GET<FlowWithGraph>(path);
         await resend.PUT(path, body, [fresh]);
-        const events = (await ctx.GET<StateEntity[]>(
+        const parts = await ctx.GETCollection(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-        )).body().toValue();
-        assertStrictEquals(events.length, 2);
+        );
+        assertStrictEquals(parts.length, 2);
     },
 );
 
@@ -470,13 +474,18 @@ Deno.test(
             },
             [undoHead],
         );
-        const events = (await ctx.GET<StateEntity[]>(
+        const parts = await ctx.GETCollection<{
+            state_at: string;
+        }>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-        )).body().toValue();
-        // Family history is DESC — index 0 is current.
+        );
+        // Oldest first — the last part is current.
+        // The caller-chosen at is the body's state_at.
+        const current = parts[parts.length - 1]!
+            .body().toValue();
         assertStrictEquals(
-            events[0]!.at,
+            current.state_at,
             '2099-01-02T00:00:00.000000Z',
         );
     },
@@ -516,13 +525,18 @@ Deno.test(
             },
             [read],
         );
-        const events = (await ctx.GET<StateEntity[]>(
+        const parts = await ctx.GETCollection<{
+            state_at: string;
+        }>(
             'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                 + 'aEsGMmBEFaVdWihhHXwCbw/versions/',
-        )).body().toValue();
-        // Family history is DESC — index 0 is current.
+        );
+        // Oldest first — the last part is current.
+        // The caller-chosen at is the body's state_at.
+        const current = parts[parts.length - 1]!
+            .body().toValue();
         assertStrictEquals(
-            events[0]!.at,
+            current.state_at,
             '2099-01-03T00:00:00.000000Z',
         );
     },
