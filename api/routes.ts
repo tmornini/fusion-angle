@@ -4691,7 +4691,7 @@ export const routes: Route[] = [
                 db,
                 recordTypesUriPrefix(organizationId),
                 id,
-                'stateless',
+                'state',
                 'record_types',
                 { sees: 'whole' },
                 async () => {
@@ -4715,7 +4715,7 @@ export const routes: Route[] = [
                 recordTypesUriPrefix(organizationId),
                 id,
                 etag,
-                'stateless',
+                'state',
                 'record_types',
                 { sees: 'whole' },
                 async () => {

@@ -761,6 +761,65 @@ Deno.test(
 );
 
 Deno.test(
+    'GET nested record-types/:id/versions/ of a'
+    + ' state-deleted record type is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+                recordBody('Gone Record', 'active'),
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const tombstone = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+                recordBody('Gone Record', 'deleted'),
+            ),
+        );
+        assertStrictEquals(tombstone.status, 200);
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: record_types/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: record_types/' + id,
+        });
+    },
+);
+
+Deno.test(
     'GET nested record-types/:id/versions foreign → 404',
     async () => {
         const db = await sharedMockDb();
