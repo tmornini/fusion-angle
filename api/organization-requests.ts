@@ -22,15 +22,15 @@ import {
     defaultOrganizationPrefix,
 } from './derive-default-organization.ts';
 import {
-    deriveMembershipsForIdentity,
-    membershipExistsFor,
-} from './derive-memberships.ts';
+    membershipOf,
+    membershipsOfIdentity,
+} from './memberships.ts';
 import {
     validateDefaultOrganizationBody,
 } from './validators.ts';
 
 // GET /identities/:id/organizations/ — the organization
-// heads the path identity holds a live seat in. Self or
+// heads the path identity holds an accepted membership in. Self or
 // admin. Caller claims must not shape another identity's
 // list.
 export async function selectIdentityOrganizations(
@@ -56,13 +56,13 @@ export async function selectIdentityOrganizations(
             await view.messagePairs.getCollectionHeadPairs(
                 canonicalPath(undefined, '/organizations/'),
             );
-        const seats = new Set(
-            (await deriveMembershipsForIdentity(
+        const accepted = new Set(
+            (await membershipsOfIdentity(
                 view, identityId,
             )).map((membership) => membership.organization_id),
         );
         return wholeCollectionSelection(
-            heads.filter((head) => seats.has(head.name)),
+            heads.filter((head) => accepted.has(head.name)),
             'stateless',
         );
     });
@@ -70,7 +70,7 @@ export async function selectIdentityOrganizations(
 
 // PUT/GET /identities/:id/default-organization — a simple
 // document. Authorized by tree ownership (caller === :id).
-// PUT { organization_id } must name a live seat, else 400
+// PUT { organization_id } must name an accepted membership, else 400
 // and nothing is stored. GET serves that document's head
 // or 404s if never SET. No public DELETE. Revoke does not
 // rewrite this document. Self-only stays here:
@@ -118,12 +118,12 @@ export async function putIdentityDefaultOrganization(
     const { organization_id: organization } =
         validateDefaultOrganizationBody(payload);
     if (
-        !await membershipExistsFor(
+        await membershipOf(
             db, organization, identityId,
-        )
+        ) === null
     ) {
         throw new ApiError(
-            'organization_id is not a live seat',
+            'organization_id is not an accepted membership',
             HTTP_BAD_REQUEST,
         );
     }

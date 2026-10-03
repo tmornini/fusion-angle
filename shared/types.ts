@@ -139,19 +139,15 @@ export const OBJECTIVE_STATES = [
 export type ObjectiveState =
     typeof OBJECTIVE_STATES[number];
 
-// The invitation lifecycle, derived from the invitation
-// document's own PUT history (never a states log —
-// deriveInvitationStates, derive-states.ts). Grant (admin)
-// PUTs 'pending'; the invitee PUTs 'accepted' (which writes
-// the membership) or 'declined'; the admin PUTs 'revoked' to
-// cancel a pending invite. Current status = the head's
-// state — derive, never mutate. No 'deleted': an invitation
-// persists as audit.
+// pending: an offer. accepted: holds a seat. declined: the
+// invitee said no. revoked: an offer withdrawn before
+// acceptance. removed: a seat taken away. None is deleted.
 export const INVITATION_STATES = [
     'pending',
     'accepted',
     'declined',
     'revoked',
+    'removed',
 ] as const;
 
 export type InvitationState =
@@ -428,8 +424,9 @@ export interface StateEntity {
     state: string;
     member_id: Id;
     at: string;
-    // Present on /versions index rows; value is that
-    // revision's pair id.
+    // Work-order history rows, the only reader still
+    // shaped like a /versions index, may carry it.
+    // Value is that revision's pair id.
     etag?: string;
 }
 
@@ -720,9 +717,9 @@ export type HumanProfile =
 
 export class HumanMember {
     readonly kind = 'human' as const;
-    // The seat this member was read through: its removal
-    // names the head it replaces.
-    readonly seat: HttpMessage<MembershipEntity>;
+    // The membership this member was read through: its
+    // removal names the head it replaces.
+    readonly membership: HttpMessage<MembershipEntity>;
     readonly #id: MemberId;
     readonly #pii: MemberPii;
     readonly #profile: HumanProfile;
@@ -731,9 +728,9 @@ export class HumanMember {
         parent: MemberEntity,
         profile: HumanProfile,
         pii: MemberPii,
-        seat: HttpMessage<MembershipEntity>,
+        membership: HttpMessage<MembershipEntity>,
     ) {
-        this.seat = seat;
+        this.membership = membership;
         this.#id = parent.id;
         this.#pii = pii;
         this.#profile = profile;
@@ -897,19 +894,23 @@ export class SystemMember {
 
 export const FORMER_MEMBER_NAME = 'Former member';
 
-// A former member: an identity whose seat in the active
-// organization the ledger has DELETEd. What it authored
-// while seated — submissions, transitions, scores — still
-// names it, so the name resolver must know it and paint it
-// as what it is. Identity only: no seat, no profile, and no
+// A former member: an identity whose membership in the
+// active organization is removed. What it authored while
+// a member — submissions, transitions, scores — still
+// names it, so the name resolver must know it and paint
+// it as what it is. Identity only: no profile, and no
 // PII read (a removed identity's PII is not the
-// organization's to paint). Never a roster row.
+// organization's to paint). The members roster lists it
+// when Former members is selected: this name and the
+// removal instant, never an edit.
 export class FormerMember {
     readonly kind = 'former' as const;
     readonly #id: MemberId;
+    readonly #at: string;
 
-    constructor(seat: FormerSeatEntity) {
-        this.#id = seat.identity_id;
+    constructor(membership: MembershipEntity) {
+        this.#id = membership.identity_id;
+        this.#at = membership.at;
     }
 
     idForLink(): string {
@@ -918,6 +919,10 @@ export class FormerMember {
 
     name(): string {
         return FORMER_MEMBER_NAME;
+    }
+
+    at(): string {
+        return this.#at;
     }
 
     matchesSearch(_term: string): boolean {
@@ -1365,36 +1370,15 @@ export interface OrganizationEntity {
 // no separate role-grants family.
 export type MembershipType = 'admin' | 'member';
 
-// The covenant binding an identity to an organization, with
-// the moment of union and the privilege of that join. Source
-// of "which orgs can this identity reach" and mint-time role
-// baking. A person in N orgs has N membership rows;
-// member.id === identity.id stays global (one profile, many
-// memberships). Not a pure join: `type` is a privilege
-// attribute of the relationship.
+// The membership body (spec §1): the name fixes the two
+// ids; `at` is when the current state was entered.
 export interface MembershipEntity {
-    id: Id;
+    // `<organization-id>:<identity-id>`
+    id: string;
     organization_id: Id;
     identity_id: Id;
     type: MembershipType;
-    // The seat's own grant time
-    // (validateSeatDocumentBody), a domain fact — NOT a
-    // ledger fact. GET .../members/:id/versions/ stamps a
-    // DIFFERENT `at` on each row: the message pair's own
-    // arrival time (versionSnapshotsAt, document-family.ts,
-    // seatEntityOf in derive-memberships.ts). Same name on
-    // this entity and on that versions row, different facts.
-    at: string;
-}
-
-// A seat the ledger has DELETEd: the identity once held a
-// place in this organization and holds none now. `at` is
-// the removal pair's own arrival time — the moment the
-// seat ended — never the seat's grant time.
-export interface FormerSeatEntity {
-    id: Id;
-    organization_id: Id;
-    identity_id: Id;
+    state: InvitationState;
     at: string;
 }
 

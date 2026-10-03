@@ -13,23 +13,39 @@ import {
     isRawJson,
     parsePreservingNumbers,
 } from '../shared/http-message/json-numbers.ts';
-import { sortJsonKeys } from
+import { compareAscii, sortJsonKeys } from
     '../shared/http-message/canonical.ts';
+import { imfFixdate } from '../shared/pair-root.ts';
 import { HTTP_OK } from '../shared/http-errors.ts';
+import type { MessagePairEntity } from '../shared/types.ts';
 import { rolesCanRead } from './attribute-acl.ts';
 
-// A read serves what was stored (spec §2): the status line
-// 200, this transmission's `date` and `request-id`, every
-// other stored line as stored, and the body untouched but
-// for the reader's projection. It is built from the
-// `response` column alone: hoisted credential lines are
-// never spliced back. The caller hands it everything; it
-// reads no clock and no row.
+// A read serves what was stored (spec §6): status 200,
+// this transmission's date and request-id, the pair's
+// three lines, every other stored line as stored, and
+// the body untouched but for the reader's projection.
+// Hoisted credential lines are never spliced back. The
+// caller hands it everything; it reads no clock and no row.
 
 export type Transmission = {
     readonly date: string,
     readonly requestId: string,
 };
+
+// What the pair's row says about the write (§6).
+export type Envelope = {
+    readonly responseAt: string, // six-digit zulu
+    readonly requesterIdentityId: string,
+};
+
+export function envelopeOf(
+    pair: MessagePairEntity,
+): Envelope {
+    return {
+        responseAt: pair.response_at,
+        requesterIdentityId: pair.requester_identity_id,
+    };
+}
 
 // A top-level key a reader sees only while holding one of
 // its roles. Empty roles admit no reader; no bypass.
@@ -55,13 +71,10 @@ export type Reader =
         readonly roles: readonly string[],
     };
 
-const TRANSMISSION_LINES: ReadonlySet<string> = new Set([
-    'date', 'request-id', 'content-length',
-]);
-
 export function servedResponse(
     stored: string,
     transmission: Transmission,
+    envelope: Envelope,
     reader: Reader,
 ): string {
     const model = parseWire(stored);
@@ -70,18 +83,36 @@ export function servedResponse(
             'stored response message has no status line',
         );
     }
-    const body = model.body === undefined
+    const original = model.body === undefined
         ? undefined
-        : projectedBody(model.body.toLatin1(), reader);
-    const fields: FieldLine[] = [
-        ...model.fields.filter(
-            (field) => !TRANSMISSION_LINES.has(field.name),
-        ),
+        : model.body.toLatin1();
+    const body = original === undefined
+        ? undefined
+        : projectedBody(original, reader);
+    const lengthLine = body !== undefined
+        && body !== original
+        ? [contentLengthOfLatin1(body)]
+        : [];
+    // Already in name order, so no sort runs.
+    const placed: FieldLine[] = [
+        ...lengthLine,
         { name: 'date', value: transmission.date },
-        { name: 'request-id', value: transmission.requestId },
-        ...(body === undefined
-            ? []
-            : [contentLengthOfLatin1(body)]),
+        {
+            name: 'last-modified',
+            value: imfFixdate(envelope.responseAt),
+        },
+        {
+            name: 'request-id',
+            value: transmission.requestId,
+        },
+        {
+            name: 'requester-identity-id',
+            value: envelope.requesterIdentityId,
+        },
+        {
+            name: 'response-at',
+            value: envelope.responseAt,
+        },
     ];
     return serializeWire({
         startLine: {
@@ -90,12 +121,56 @@ export function servedResponse(
             status: HTTP_OK,
             reason: '',
         },
-        fields,
+        fields: placedLines(model.fields, placed),
         body: body === undefined
             ? undefined
             : Octets.fromLatin1(body),
         trailer: undefined,
     });
+}
+
+// One ordered pass over a canonical head block. A placed
+// line takes its value where that name stands, or is
+// inserted in order when absent; a stored copy of a
+// placed name is dropped. Every other line passes
+// through. Nothing compares the result afterward.
+export function placedLines(
+    stored: readonly FieldLine[],
+    placed: readonly FieldLine[],
+): FieldLine[] {
+    const out: FieldLine[] = [];
+    let storedAt = 0;
+    let placedAt = 0;
+    while (
+        storedAt < stored.length
+        && placedAt < placed.length
+    ) {
+        const storedLine = stored[storedAt]!;
+        const placedLine = placed[placedAt]!;
+        const order = compareAscii(
+            placedLine.name, storedLine.name,
+        );
+        if (order < 0) {
+            out.push(placedLine);
+            placedAt += 1;
+        } else if (order === 0) {
+            out.push(placedLine);
+            placedAt += 1;
+            storedAt += 1;
+        } else {
+            out.push(storedLine);
+            storedAt += 1;
+        }
+    }
+    while (storedAt < stored.length) {
+        out.push(stored[storedAt]!);
+        storedAt += 1;
+    }
+    while (placedAt < placed.length) {
+        out.push(placed[placedAt]!);
+        placedAt += 1;
+    }
+    return out;
 }
 
 // The only place a body is transformed (§3). It drops what

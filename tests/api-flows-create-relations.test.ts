@@ -13,7 +13,6 @@ import {
 } from
 '../client/flow-mutations.ts';
 import type {
-    StateEntity,
     FlowWithGraph,
     StoredGraph,
 } from '../shared/types.ts';
@@ -153,18 +152,25 @@ Deno.test(
             projectId: generateIdentifier(),
             name: 'State Event Test Flow',
         });
-        const events = (await ctx.GET<StateEntity[]>(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
-                + '/versions/',
-        )).body().toValue();
-        assertStrictEquals(events.length, 1);
-        const ev = events[0]!;
-        assertStrictEquals(ev.entity_id, flowId);
+        const parts = await ctx.GETCollection<{
+            id: string;
+            state: string;
+        }>(
+            'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                + flowId + '/versions/',
+        );
+        assertStrictEquals(parts.length, 1);
+        const part = parts[0]!;
+        const ev = part.body().toValue();
+        assertStrictEquals(ev.id, flowId);
         assertStrictEquals(ev.state, 'active');
         // author is server-derived, not client body
         assertStrictEquals(
-            ev.member_id, 'XXZruirZyAOoRpNxaDnpSA',
-            'state event must be authored by the verified actor',
+            part.query('header.requester-identity-id')
+                .toText(),
+            'XXZruirZyAOoRpNxaDnpSA',
+            'state event must be authored by the'
+                + ' verified actor',
         );
     },
 );

@@ -1,13 +1,29 @@
 <div id="organization-content">
 </div>
 
-<!-- Sent invitations: outstanding (pending) invitations this
-     org has sent, with a Revoke per row. Admin-only; hidden
-     until the admin read succeeds. -->
+<!-- Sent invitations in the selected state. Revoke is on
+     a pending row. Admin-only; hidden until the admin
+     read succeeds. -->
 <div id="sent-invitations-box" class="mt-6 hidden">
     <h2 class="text-lg font-semibold mb-3">
         Sent invitations
     </h2>
+    <div class="flex items-center gap-2 mb-3"
+        role="group"
+        aria-label="Filter invitations by state">
+        <button class="btn btn-secondary btn-sm"
+            data-invitation-state="pending"
+            aria-pressed="true"
+        >Pending</button>
+        <button class="btn btn-secondary btn-sm"
+            data-invitation-state="declined"
+            aria-pressed="false"
+        >Declined</button>
+        <button class="btn btn-secondary btn-sm"
+            data-invitation-state="revoked"
+            aria-pressed="false"
+        >Revoked</button>
+    </div>
     <div id="sent-invitations-list"
         class="flex flex-col gap-3"></div>
 </div>

@@ -9,7 +9,10 @@ import {
     type TxMode,
 } from './db.ts';
 import type { SqlClient } from './postgres-client.ts';
-import { POSTGRES_SCHEMA } from './schema-postgres.ts';
+import {
+    BODY_INDEXED_PATH,
+    POSTGRES_SCHEMA,
+} from './schema-postgres.ts';
 import { serializeRecord } from './storage-serialize.ts';
 import { mapPostgresError } from './errors-postgres.ts';
 import { Octets } from '../shared/http-message/octets.ts';
@@ -264,6 +267,26 @@ function postgresTx(
         >(path: string): Promise<T[]> {
             const rows = await selectCollectionHeadPairs(
                 sql, path,
+            );
+            return rows.map((row) => entityOf<T>(row));
+        },
+        async getCollectionHeadPairsContaining<
+            T extends { id: string },
+        >(
+            path: string,
+            contains: Readonly<Record<string, string>>,
+        ): Promise<T[]> {
+            if (path !== BODY_INDEXED_PATH) {
+                throw new Error('no body index at ' + path);
+            }
+            // npm:postgres describes $2::jsonb, then
+            // JSON.stringifies the value. A string is
+            // encoded twice and matches nothing.
+            const rows = await sql.unsafe<
+                Record<string, unknown>
+            >(
+                COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
+                [path, contains],
             );
             return rows.map((row) => entityOf<T>(row));
         },
@@ -598,6 +621,53 @@ async function selectCollectionHeadPairs(
     `;
 }
 
+// '/invitations/' is the partial index's predicate,
+// written in the statement. A bound path alone cannot
+// prove it, so a generic plan would not use the index.
+// $1 is the caller's path, bound. $2 is the containment
+// object, bound. Neither value is written into the SQL.
+if (BODY_INDEXED_PATH !== '/invitations/') {
+    throw new Error(
+        'BODY_INDEXED_PATH and its index predicate differ',
+    );
+}
+
+export const COLLECTION_HEAD_PAIRS_CONTAINING_SQL = [
+    'SELECT heads.id, heads.operation_id, heads.path,',
+    '    heads.name, heads.supersedes,',
+    '    heads.requester_identity_id, heads.method,',
+    "    to_char(response_at AT TIME ZONE 'UTC',",
+    `        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+    '        AS response_at,',
+    '    heads.request, heads.request_salt,',
+    '    heads.request_hash,',
+    '    heads.request_secrets, heads.request_secrets_hash,',
+    '    heads.response, heads.response_salt,',
+    '    heads.response_hash,',
+    '    heads.response_secrets,',
+    '    heads.response_secrets_hash,',
+    '    heads.pair_hash',
+    'FROM (',
+    '    SELECT DISTINCT ON (head.name) head.*',
+    '    FROM fa_message_pairs head',
+    "    WHERE head.path = '/invitations/'",
+    '      AND head.path = $1',
+    "      AND head.method IN ('PUT', 'DELETE')",
+    '      AND head.name IN (',
+    '          SELECT version.name',
+    '          FROM fa_message_pairs version',
+    "          WHERE version.path = '/invitations/'",
+    '            AND version.path = $1',
+    '            AND fa_message_body_json(version.response)',
+    '                @> $2::jsonb',
+    '      )',
+    '    ORDER BY head.name, head.response_at DESC,',
+    '        head.id DESC',
+    ') heads',
+    "WHERE heads.method = 'PUT'",
+    'ORDER BY heads.response_at, heads.id',
+].join('\n');
+
 async function insertPair(
     sql: SqlClient,
     row: Record<string, unknown>,
@@ -689,6 +759,9 @@ type StatementResult = {
     head_id: string | null,
     head_response: unknown,
     head_method: string | null,
+    requester_identity_id: string,
+    head_response_at: string | null,
+    head_requester_identity_id: string | null,
     supersedes: string,
     request_hash: string,
     request_secrets_hash: string,
@@ -787,6 +860,10 @@ async function queryStatement(
                 ? null
                 : bytesOfBytea(row.head_response),
             headMethod,
+            requesterIdentityId: row.requester_identity_id,
+            headResponseAt: row.head_response_at,
+            headRequesterIdentityId:
+                row.head_requester_identity_id,
             inserted: isInserted(outcome, rawOutcome),
             supersedes: identifierOfUuidText(
                 row.supersedes,

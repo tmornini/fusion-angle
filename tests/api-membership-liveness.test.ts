@@ -8,7 +8,12 @@ import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedRootAdmin, seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { framedRequest } from './http-fixtures.ts';
+import {
+    framedRequest,
+    invitationLatched,
+} from './http-fixtures.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 const BASE = 'http://localhost';
 
@@ -18,25 +23,36 @@ function req(path: string, token: string): Request {
     });
 }
 
-// De-membership rides the real wire DELETE. Under the claim-
-// based fence, a still-valid token keeps its claim orgs/roles
-// until mint/refresh/exchange or access-token expiry — the
-// NAMED ≤15-min staleness covenant. Live membership is NOT
-// re-read on every request.
-async function deleteMembership(
+// De-membership is the membership write to removed. Under
+// the claim-based fence, a still-valid token keeps its
+// claim orgs/roles until mint/refresh/exchange or
+// access-token expiry. Live membership is not re-read on
+// every request.
+async function removeMembership(
     db: MemoryDbAdapter, id: string,
 ): Promise<void> {
+    const organization = 'AjdvjuECVZEgZoFajaIEkg';
+    const name = membershipNameOf(organization, id);
     const res = await handleRequest(
-        db, framedRequest(
-            `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg/members/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': 'Bearer '
-                    + await organizationToken(),
-                'operation-id': generateIdentifier(),
+        db, await invitationLatched(db, framedRequest(
+            `${BASE}/organizations/${organization}`
+                + `/invitations/${name}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer '
+                        + await organizationToken(),
+                    'operation-id': generateIdentifier(),
+                },
+                body: JSON.stringify({
+                    state: 'removed',
+                    at: '2026-06-01T00:00:00.000000Z',
+                }),
             },
-        }));
-    assertStrictEquals(res.status, 204);
+        )),
+    );
+    assertStrictEquals(res.status, 200);
+    await res.body?.cancel();
 }
 
 function putDefaultOrganization(
@@ -77,9 +93,10 @@ Deno.test('a live member passes the membership fence',
 async () => {
     const db = await adminDb();
     const res = await handleRequest(
-        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/'
             , await organizationToken()));
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 204);
 });
 
 Deno.test('a revoked membership does not stop access mid-token',
@@ -87,15 +104,17 @@ async () => {
     const db = await adminDb();
     const token = await organizationToken();
     const before = await handleRequest(
-        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
-    assertStrictEquals(before.status, 200);
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/', token));
+    assertStrictEquals(before.status, 204);
     // Claim-based fence: de-membership lands on the message plane
     // but the existing token's organizations claim still holds
     // until mint/refresh/exchange or exp.
-    await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
+    await removeMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
     const after = await handleRequest(
-        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
-    assertStrictEquals(after.status, 200);
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/', token));
+    assertStrictEquals(after.status, 204);
 });
 
 Deno.test('a flat token denies when SET is not a live seat'
@@ -109,9 +128,10 @@ async () => {
         await devToken(), 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
     ));
     assertStrictEquals(pin.status, 201);
-    await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
+    await removeMembership(db, 'XXZruirZyAOoRpNxaDnpSA');
     const res = await handleRequest(
-        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        db, req('/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/'
             , await devToken()));
     assertStrictEquals(res.status, 403);
 });

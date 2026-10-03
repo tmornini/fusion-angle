@@ -3,8 +3,8 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     postBootstrap,
 } from '../api/mock-data.ts';
-import { deriveMembershipsForIdentity } from
-    '../api/derive-memberships.ts';
+import { membershipsOfIdentity } from
+    '../api/memberships.ts';
 import { seededMockDb } from './mock-seed.ts';
 
 // Privilege is membership type:"admin" — claim roles bake
@@ -13,7 +13,7 @@ import { seededMockDb } from './mock-seed.ts';
 Deno.test('bootstrap seeds current as admin', async () => {
     const db = memoryDbAdapter();
     await postBootstrap(db);
-    const rows = await deriveMembershipsForIdentity(
+    const rows = await membershipsOfIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert(
@@ -26,7 +26,7 @@ Deno.test('bootstrap seeds current as admin', async () => {
 
 Deno.test('mock data seeds current as admin', async () => {
     const db = await seededMockDb();
-    const rows = await deriveMembershipsForIdentity(
+    const rows = await membershipsOfIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     assert(

@@ -61,6 +61,13 @@ export type StatementAnswer = {
     responseHashHex: string,
     responseSecretsHashHex: string,
     pairHashHex: string,
+    // the row's own requester, as inserted (or as it
+    // would have been)
+    requesterIdentityId: string,
+    // the head this row read: its response_at (six-digit
+    // zulu) and its requester; null with no head
+    headResponseAt: string | null,
+    headRequesterIdentityId: string | null,
 };
 
 export type Head = {
@@ -70,6 +77,7 @@ export type Head = {
     responseAt: string,
     response: Uint8Array,
     method: string,
+    requesterIdentityId: string,
 };
 
 export type ClassifiedRow = {
@@ -82,6 +90,8 @@ export type ClassifiedRow = {
     headId: string | null,
     headResponse: Uint8Array | null,
     headMethod: string | null,
+    headResponseAt: string | null,
+    headRequesterIdentityId: string | null,
     requestHashHex: string,
     requestSecretsHashHex: string,
     responseHashHex: string,
@@ -354,6 +364,12 @@ async function hashedRow(
         headMethod: item.head === null
             ? null
             : item.head.method,
+        headResponseAt: item.head === null
+            ? null
+            : item.head.responseAt,
+        headRequesterIdentityId: item.head === null
+            ? null
+            : item.head.requesterIdentityId,
         requestHashHex,
         requestSecretsHashHex,
         responseHashHex,

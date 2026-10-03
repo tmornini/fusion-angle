@@ -59,7 +59,10 @@ import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
-import { nowUtc } from '../shared/types.ts';
+import {
+    nowUtc,
+    type MembershipEntity,
+} from '../shared/types.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
@@ -332,7 +335,7 @@ Deno.test('a recover context silently refreshes a dead access token',
         deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
     const members = (await ctx.GETCollection(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/invitations/?state=accepted',
     )).map(part => part.body().toValue());
     assertStrictEquals(members.length, 1);
 }));
@@ -354,7 +357,8 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     // both reads 401 in parallel; a second refresh would be
     // branded reuse and revoke the fresh chain
     const [members, organizations] = await Promise.all([
-        ctx.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
+        ctx.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/invitations/?state=accepted')
             .then(parts => parts.map(part => part.body().toValue())),
         ctx.GETCollection(
             'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
@@ -392,7 +396,7 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
         seed);
     // recovery re-installs the live token, re-scopes, and retries
     const members = (await ctx.GETCollection(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/invitations/?state=accepted',
     )).map(part => part.body().toValue());
     assertStrictEquals(members.length, 1);
     // the live session is preserved (not scrubbed) and now scoped
@@ -416,7 +420,8 @@ Deno.test('recovery with both tokens dead scrubs and bounces',
         dead);
     // the 401 is unrecoverable: the original error propagates
     await assertRejects(
-        () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
+        () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/')
             , UnauthorizedError);
     // the dead credential was scrubbed...
     assertStrictEquals(client.getSessionCredentials(), null);
@@ -444,8 +449,10 @@ Deno.test('recovery with a corrupt credential scrubs, bounces,'
             const ctx = client.recoveringRequestContext(
                 dead);
             await assertRejects(
-                () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                    + ''), UnauthorizedError);
+                () => ctx.GET(
+                    'organizations/AjdvjuECVZEgZoFajaIEkg'
+                        + '/ideas/',
+                ), UnauthorizedError);
         },
     );
     assertStrictEquals(
@@ -584,7 +591,6 @@ Deno.test('a concurrent facade refresh and remint present'
         name: 'Tony', email: 'demo@example.com',
         phone: '', bio: '',
     });
-    const invitationId = generateIdentifier();
     const granted = await handleRequest(db, apiRequest({
         method: 'POST',
         path: '/organizations/' + ORGANIZATION_B
@@ -597,12 +603,11 @@ Deno.test('a concurrent facade refresh and remint present'
         }),
         body: {
             email: 'demo@example.com',
-            invitationId,
-            grantEventId: generateIdentifier(),
             grantAt: '2026-06-04T00:00:01.000000Z',
         },
     }));
     assertStrictEquals(granted.status, 201);
+    const invitationId = (await granted.json() as { id: string }).id;
     const pair = await issuePair(db);
     client.putSessionCredentials({
         accessToken: pair.access_token,
@@ -616,13 +621,22 @@ Deno.test('a concurrent facade refresh and remint present'
             'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
         ),
     );
+    const held = await acceptor.GET<MembershipEntity>(
+        'identities/XXZruirZyAOoRpNxaDnpSA/invitations/'
+            + invitationId,
+    );
+    const row = held.body().toValue();
     await Promise.all([
         reader.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/').then(parts =>
+            + 'ideas/').then(parts =>
             parts.map(part => part.body().toValue())),
-        postInvitationAcceptance(
-            acceptor, invitationId, ORGANIZATION_B,
-        ),
+        postInvitationAcceptance(acceptor, {
+            id: row.id,
+            organizationId: row.organization_id,
+            invitedAt: row.at,
+            state: row.state,
+            message: held,
+        }),
     ]);
     // Assert on `revoked`, not `rotated`: the loser was a
     // replay, so the rotation count was already one.

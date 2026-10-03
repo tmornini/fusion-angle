@@ -2,6 +2,9 @@ import { assert, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../../api/api.ts';
 import { STARK_ORGANIZATION } from
     '../../api/mock-data/seed-constants.ts';
+import { nowUtc } from '../../shared/types.ts';
+import { membershipNameOf } from
+    '../../shared/membership-name.ts';
 import { apiRequest } from '../http-fixtures.ts';
 import {
     adminToken, useBrowser, withAdminPage, type Origin,
@@ -21,13 +24,22 @@ const ERROR_CARD =
 // two-jars test writes its idea: the page under test is
 // the one that reads, not the one that removes.
 async function removeLisaWang(origin: Origin): Promise<void> {
+    const name = membershipNameOf(
+        STARK_ORGANIZATION, LISA_WANG,
+    );
+    const head = await origin.db.messagePairs.getHeadPair(
+        '/invitations/', name,
+    );
+    assert(head !== null);
     const res = await handleRequest(origin.db, apiRequest({
-        method: 'DELETE',
+        method: 'PUT',
         path: '/organizations/' + STARK_ORGANIZATION
-            + '/members/' + LISA_WANG,
+            + '/invitations/' + name,
         token: await adminToken(),
+        body: { state: 'removed', at: nowUtc() },
+        headers: { 'If-Match': '"' + head.id + '"' },
     }));
-    assertStrictEquals(res.status, 204);
+    assertStrictEquals(res.status, 200);
 }
 
 function countAtLeast(selector: string, min: number): string {

@@ -185,27 +185,31 @@ Deno.test(
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
-        const ideaHistory = (await GET<{
+        const ideaHistory = await GETCollection<{
             id: string;
             state: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
-        const ideaCurrent = ideaHistory[0]!;
+                operationIdHeader());
+        const ideaCurrent = ideaHistory[
+            ideaHistory.length - 1
+        ]!.body().toValue();
         assertStrictEquals(ideaCurrent.id, 'gVvtDIaqhnkXZQcxZeSuiw');
         assertStrictEquals(ideaCurrent.state, 'promoted');
 
         // The new project entered at its initial state, also
         // authored by the actor.
-        const projectVersions = (await GET<{
+        const projectVersions = await GETCollection<{
             state: string;
-            member_id: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/versions/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader());
         assertStrictEquals(projectVersions.length, 1);
         assertStrictEquals(
-            projectVersions[0]!.member_id, 'XXZruirZyAOoRpNxaDnpSA',
+            projectVersions[0]!.query(
+                'header.requester-identity-id',
+            ).toText(),
+            'XXZruirZyAOoRpNxaDnpSA',
         );
 
         const mine = (await GETCollection<
@@ -437,12 +441,16 @@ Deno.test(
                 + 'pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
                 operationIdHeader())).body().toValue();
         assertStrictEquals(project.id, 'pnXmXrxOWayANgDLdCjuBw');
-        const ideaHistory = (await GET<{ state: string }[]>(
+        const ideaHistory = await GETCollection<{
+            state: string;
+        }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 + 'gVvtDIaqhnkXZQcxZeSuiw/versions/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
-        // Family history is DESC — index 0 is current.
-        const ideaCurrent = ideaHistory[0]!;
+                operationIdHeader());
+        // Oldest first — the last part is current.
+        const ideaCurrent = ideaHistory[
+            ideaHistory.length - 1
+        ]!.body().toValue();
         assertStrictEquals(ideaCurrent.state, 'promoted');
     },
 );

@@ -18,7 +18,8 @@ and execution.
   provider links, and access tokens
 - **Account** — organization settings, members, and billing;
   members join by email invitation (accept writes the
-  seat; an admin may revoke a pending invite)
+  membership; it does not write a seat; an admin may
+  revoke a pending invite)
 
 The demo is multi-organization: loading mock data seeds two
 orgs (Stark Industries and Wayne Enterprises) with a sidebar

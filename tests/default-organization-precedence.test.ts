@@ -1,19 +1,25 @@
-import { assertStrictEquals } from '@std/assert';
+import {
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
+import { membershipOf } from '../api/memberships.ts';
 import {
     runWrite,
     attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 
 const T1 = '2026-01-01T00:00:00.000000Z';
 const T2 = '2026-02-01T00:00:00.000000Z';
@@ -27,12 +33,9 @@ async function freshDb() {
     return db;
 }
 
-// Below-facade pair formation (the seedDefaultOrganizationEvent
-// precedent just above, applied to memberships): the primary-
-// membership fallback this file's own tests exercise derives
-// from the message plane once memberships flips, so a raw row here
-// would go derivation-invisible. PLUMBING ONLY: the assertions
-// this helper feeds stay byte-identical.
+// seedSeat mirrors an accepted membership, which is
+// what this file reads. seedSeat's mirror still wants
+// the organization document.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
     _id: string,
@@ -40,12 +43,6 @@ async function seedMembershipPair(
     identityId: string,
     at: string,
 ): Promise<void> {
-    // A real organizations/:id document (Phase 13 Task 3's
-    // fixture prerequisite; seedOrganizationDocument is idempotent
-    // — a no-op on a repeat organization id) — a membership pair
-    // with no document for its own org stays derivation-invisible
-    // to deriveMembershipsForIdentity's own enumerate-then-probe
-    // (via deriveOrganizations).
     await seedOrganizationDocument(
         db, organizationId, organizationId,
     );
@@ -141,19 +138,27 @@ Deno.test(
     'identityDefaultOrganization tie-breaks equal-at by lowest org id',
     async () => {
         const db = await freshDb();
+        // Identifier order is not code-point order: 'B'
+        // precedes '0', so a string sort inverts these.
+        const earlier = 'BAAAAAAAAAAAAAAAAAAAAA';
+        const later = '0AAAAAAAAAAAAAAAAAAAAA';
+        assertStrictEquals(
+            compareIdentifiers(earlier, later) < 0, true,
+        );
+        assertStrictEquals(earlier < later, false);
         await seedMembershipPair(
             db, generateIdentifier(),
-            'CaaaaaaaaaaaaaaaaaaAw', IDENTITY_ID, T1,
+            later, IDENTITY_ID, T1,
         );
         await seedMembershipPair(
             db, generateIdentifier(),
-            ORGANIZATION_TWO, IDENTITY_ID, T1,
+            earlier, IDENTITY_ID, T1,
         );
         assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
-            ORGANIZATION_TWO,
+            earlier,
         );
     },
 );
@@ -172,8 +177,8 @@ Deno.test(
 );
 
 Deno.test(
-    'identityDefaultOrganization skips a SET that is not a'
-    + ' live seat',
+    'identityDefaultOrganization falls to the primary'
+    + ' when the SET membership is removed',
     async () => {
         const db = await freshDb();
         await seedMembershipPair(
@@ -187,41 +192,85 @@ Deno.test(
         await seedDefaultOrganizationEvent(
             db, IDENTITY_ID, ORGANIZATION_TWO, T2,
         );
-        const tombstone = await formWriteMessagePair({
-            method: 'DELETE',
-            pathname: '/organizations/'
-                + ORGANIZATION_TWO
-                + '/members/' + IDENTITY_ID,
-            routePattern:
-                'organizations/:organization-id/members'
-                + '/:identity-id',
-            routeSegments: [
-                'organizations', ':organization-id',
-                'members', ':identity-id',
-            ],
-            pathSegments: [
-                'organizations', ORGANIZATION_TWO,
-                'members', IDENTITY_ID,
-            ],
-            headerFields: [],
-            body: {},
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            requestAt: T2,
-            organization: ORGANIZATION_TWO,
-            responseBody: undefined,
-            operationId: generateIdentifier(),
-            requestId: generateIdentifier(),
-        });
-        await runWrite(
-            db,
-            attemptFor([tombstone]),
-            [tombstone],
+        await landMembership(
+            db, ORGANIZATION_TWO, IDENTITY_ID, 'removed',
+            'member', '2026-03-01T00:00:00.000000Z',
+        );
+        assertStrictEquals(
+            await membershipOf(
+                db, ORGANIZATION_TWO, IDENTITY_ID,
+            ),
+            null,
         );
         assertStrictEquals(
             await identityDefaultOrganization(
                 db, IDENTITY_ID,
             ),
             STARK_ORGANIZATION,
+        );
+    },
+);
+
+Deno.test(
+    'identityDefaultOrganization takes a membership'
+    + ' with no seat as the primary',
+    async () => {
+        const db = await freshDb();
+        const organization = generateIdentifier();
+        await landMembership(
+            db, organization, IDENTITY_ID, 'accepted',
+            'member', T1,
+        );
+        assertStrictEquals(
+            await identityDefaultOrganization(
+                db, IDENTITY_ID,
+            ),
+            organization,
+        );
+    },
+);
+
+Deno.test(
+    'pending, declined, revoked, and a removed head'
+    + ' hold nothing as the default',
+    async () => {
+        const db = await freshDb();
+        const organization = 'IAAAAAAAAAAAAAAAAAAAAA';
+        await seedDefaultOrganizationEvent(
+            db, IDENTITY_ID, organization,
+            '2026-04-01T00:00:00.000000Z',
+        );
+        const nonAccepted = [
+            ['pending', '2026-04-02T00:00:00.000000Z'],
+            ['declined', '2026-04-03T00:00:00.000000Z'],
+            ['revoked', '2026-04-04T00:00:00.000000Z'],
+        ] as const;
+        for (const [state, at] of nonAccepted) {
+            await landMembership(
+                db, organization, IDENTITY_ID, state,
+                'member', at,
+            );
+            assertStrictEquals(
+                await identityDefaultOrganization(
+                    db, IDENTITY_ID,
+                ),
+                null,
+                state,
+            );
+        }
+        await landMembership(
+            db, organization, IDENTITY_ID, 'accepted',
+            'member', '2026-04-05T00:00:00.000000Z',
+        );
+        await landMembership(
+            db, organization, IDENTITY_ID, 'removed',
+            'member', '2026-04-06T00:00:00.000000Z',
+        );
+        assertStrictEquals(
+            await identityDefaultOrganization(
+                db, IDENTITY_ID,
+            ),
+            null,
         );
     },
 );

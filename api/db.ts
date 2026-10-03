@@ -118,6 +118,15 @@ export interface EntityStore<
     getHeadPair(path: string, name: string): Promise<T | null>;
     // The live PUT heads of a collection, (response_at, id).
     getCollectionHeadPairs(path: string): Promise<T[]>;
+    // The heads of the documents at path any of whose
+    // pairs' JSON bodies contain every field of contains,
+    // live PUT heads only, in (response_at, id) order. Only
+    // BODY_INDEXED_PATH has a body index; any other path is
+    // refused.
+    getCollectionHeadPairsContaining(
+        path: string,
+        contains: Readonly<Record<string, string>>,
+    ): Promise<T[]>;
     getById(id: string): Promise<T>;
     // Writes the row if its id is absent and reports whether
     // it did. A later append of the same id changes nothing.
@@ -172,6 +181,15 @@ export interface Tx {
     ): Promise<T | null>;
     getCollectionHeadPairs<T extends { id: string }>(
         path: string,
+    ): Promise<T[]>;
+    // Same contract as EntityStore: live PUT heads whose
+    // document has a matching version. Any path but
+    // BODY_INDEXED_PATH is refused.
+    getCollectionHeadPairsContaining<
+        T extends { id: string },
+    >(
+        path: string,
+        contains: Readonly<Record<string, string>>,
     ): Promise<T[]>;
     // In-transaction notify. A read handle omits it.
     // The statement is the api's bell; this stays for a

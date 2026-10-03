@@ -28,10 +28,11 @@ same rows in an in-process Map keyed by table name.
 
 ## What the DDL buys you
 
-1. **`fa_message_body_bytes`** — the body search
-   left with the code document. The function remains
-   because the statement's sameness test reads it
-   (`api/ledger-statement-sql.ts`).
+1. **`fa_message_body_bytes`** — the body octets
+   after the header block. The statement's sameness
+   test reads it (`api/ledger-statement-sql.ts`).
+   The body search is `fa_message_body_json`
+   (item 13), not this function.
 2. **One stamp, `response_at`** — `timestamptz NOT
    NULL`. `request_at` is gone. The type is the
    storage-edge validator (a month-13 stamp is rejected
@@ -41,7 +42,10 @@ same rows in an in-process Map keyed by table name.
    'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
    (`api/backend-postgres.ts`), so the native
    `(response_at, id)` order and the seam's lexical
-   order agree.
+   order agree. `response-at` is that formatted
+   column. `last-modified` is the same column as an
+   IMF-fixdate, which stops at the second
+   (`imfFixdate`, `shared/pair-root.ts`).
 3. **`fa_message_pairs_document`** — head and history
    for free (`path`, `name`, `response_at`, `id`). The
    seam promises `(response_at, id)` order on every
@@ -64,9 +68,15 @@ same rows in an in-process Map keyed by table name.
    The seed's one transaction writes it last, after the DDL,
    the root, and every pair, so a failed seed leaves no
    table (`./bin/postgres-seed`).
-8. **Tenancy rides `path`** — unchanged. The store is
-   global; the fence and the write authorizer
-   (`api/write-authorizer.ts`) enforce organization.
+8. **Tenancy rides `path`, and a membership's name.**
+   The store is global. The fence and the write
+   authorizer (`api/write-authorizer.ts`) enforce
+   organization. A membership's name is
+   `<organization-id>:<identity-id>`. On the organization nest,
+   `membershipNameRefusal` compares only the organization half
+   to the path id, and a mismatch is 403. On the identity nest
+   it compares only the identity half to the path id, and a
+   mismatch is 404. The other half is not checked there.
 9. **`operation_id` groups one client operation** —
    the client mints operation-id once per operation,
    on every request, and the server never mints one
@@ -88,6 +98,19 @@ same rows in an in-process Map keyed by table name.
     stores one. The root does not. The index is on
     `fa_request_id_of(response)`. Nothing in the
     product reads the index yet.
+13. **`fa_message_body_json` and
+    `fa_message_pairs_body`** — the function returns
+    the body as `jsonb` when the stored header block
+    says `content-type: application/json`, and NULL
+    without raising otherwise
+    (`api/schema-postgres.ts`). The partial GIN index
+    is on that expression with `jsonb_path_ops`,
+    `WHERE path = '/invitations/'`. It reaches
+    membership bodies only. A database built before
+    the function and the index gains them only by
+    wipe and reseed: the seed refuses a database
+    whose `fa_message_pairs` exists, and nothing
+    alters one in place.
 
 ## Document bodies
 
@@ -106,7 +129,10 @@ six fraction digits; the validation gate rejects any other
 width. Postgres holds `response_at`, the one envelope
 stamp, as `timestamptz` and formats it back on every
 read (`tests/timestamps.test.ts` pins the mint; the
-Postgres acceptance suite pins the round trip). Render
+Postgres acceptance suite pins the round trip).
+`response-at` is that six-digit form.
+`last-modified` reads the same column as an
+IMF-fixdate, seconds only. Render
 to local time for display only.
 
 ## Secrets

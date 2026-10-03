@@ -3,7 +3,6 @@ import type {
     Member,
     MembershipEntity,
     AIAgentEntity,
-    FormerSeatEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -44,19 +43,19 @@ export async function getMembers(
 ): Promise<Member[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
-    const [seats, agents] = await Promise.all([
+    const [memberships, agents] = await Promise.all([
         organization === undefined
             ? Promise.resolve(
                 [] as HttpMessage<MembershipEntity>[],
             )
             : ctx.GETCollection<MembershipEntity>(
                 'organizations/' + organization
-                    + '/members/',
+                    + '/invitations/?state=accepted',
             ),
         ctx.GETCollection<AIAgentEntity>('ai-agents/')
             .then(parts => parts.map((m) => m.body().toValue())),
     ]);
-    const humans = buildHumanMemberMap(seats);
+    const humans = buildHumanMemberMap(memberships);
     const ais = buildAIAgentMap(agents);
     return fillHumanMemberPii(ctx, [
         ...humans.values(),
@@ -85,7 +84,7 @@ export async function fillHumanMemberPii(
             },
             member.profile(),
             pii,
-            member.seat,
+            member.membership,
         );
     }));
 }
@@ -111,7 +110,7 @@ export async function fillHumanMemberProfile(
                 { id, type: 'human' },
                 profile,
                 member.pii(),
-                member.seat,
+                member.membership,
             );
         } catch (error) {
             if (error instanceof RequestError
@@ -125,21 +124,24 @@ export async function fillHumanMemberProfile(
     }));
 }
 
-// The seats the ledger has DELETEd for this organization —
-// resolved beside the live roster so an author who has
-// left still names. A flat session with no organization
-// has no former seats to read.
-async function getFormerMembers(
+// Removed memberships for this organization, resolved
+// beside the live roster so an author who has left still
+// names. A flat session with no organization has none.
+export async function getFormerMembers(
     ctx: RequestContext,
 ): Promise<FormerMember[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
     if (organization === undefined) return [];
-    const seats = (await ctx.GET<FormerSeatEntity[]>(
+    const removed = await ctx.GETCollection<
+        MembershipEntity
+    >(
         'organizations/' + organization
-            + '/former-members/',
-    )).body().toValue();
-    return seats.map(seat => new FormerMember(seat));
+            + '/invitations/?state=removed',
+    );
+    return removed.map(
+        part => new FormerMember(part.body().toValue()),
+    );
 }
 
 export async function getMemberMap(

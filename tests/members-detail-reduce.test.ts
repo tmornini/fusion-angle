@@ -14,7 +14,6 @@ import {
 import {
     RequestError,
     HTTP_NOT_FOUND,
-    HTTP_GONE,
     HTTP_FORBIDDEN,
 } from '../shared/http-errors.ts';
 import {
@@ -305,6 +304,7 @@ Deno.test(
                 organization_id: 'AjdvjuECVZEgZoFajaIEkg',
                 identity_id: 'hw_1',
                 type: 'member',
+                state: 'accepted',
                 at: '2026-01-01T00:00:00.000000Z',
             }),
         );
@@ -346,16 +346,9 @@ Deno.test(
 );
 
 Deno.test(
-    'a removed seat is absent, as a missing member is',
+    'a removed membership is absent, as a missing member is',
     () => {
-        assertStrictEquals(
-            isAbsentMember(new RequestError(
-                'Gone',
-                HTTP_GONE,
-                responseMessage({ error: 'Gone' }, {}, HTTP_GONE),
-            )),
-            true,
-        );
+        assertStrictEquals(isAbsentMember(null), true);
     },
 );
 

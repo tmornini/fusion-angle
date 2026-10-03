@@ -21,9 +21,11 @@ import type { DbAdapter } from '../api/db.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
 import {
+    envelopeOf,
     servedResponse,
     type Reader,
 } from '../api/served-response.ts';
+import { imfFixdate } from '../shared/pair-root.ts';
 
 const BASE = 'http://localhost';
 
@@ -313,8 +315,10 @@ export async function partBodiesOf<T>(
 }
 
 // Each part is its head's stored response served with
-// this transmission's two lines (spec §2), the parts in
-// the heads' (response_at, id) order (§4).
+// this transmission's date and request-id and the
+// head's three lines (spec §6), in (response_at, id)
+// order (§4). The three are asserted by value, not
+// only by calling the server again.
 export async function assertPartsAreHeads(
     db: DbAdapter,
     parts: readonly HttpMessage[],
@@ -328,12 +332,25 @@ export async function assertPartsAreHeads(
         const head = await db.messagePairs.getById(id);
         heads.push(head);
         assertStrictEquals(
+            part.query('header.last-modified').toText(),
+            imfFixdate(head.response_at),
+        );
+        assertStrictEquals(
+            part.query('header.response-at').toText(),
+            head.response_at,
+        );
+        assertStrictEquals(
+            part.query('header.requester-identity-id')
+                .toText(),
+            head.requester_identity_id,
+        );
+        assertStrictEquals(
             part.toWire(),
             servedResponse(head.response, {
                 date: part.query('header.date').toText(),
                 requestId: part.query('header.request-id')
                     .toText(),
-            }, reader),
+            }, envelopeOf(head), reader),
         );
     }
     const order = [...heads].sort((a, b) =>

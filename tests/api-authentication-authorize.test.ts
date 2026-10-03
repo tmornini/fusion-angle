@@ -149,9 +149,10 @@ async () => {
     assertStrictEquals(tok.status, 200);
     const body = await presentedFields(tok) as { access_token: string };
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         body.access_token, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 // authorization_code TTL: a code older than

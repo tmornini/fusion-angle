@@ -121,6 +121,7 @@ function makeHumanMember() {
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: 'hw_1',
             type: 'member',
+            state: 'accepted',
             at: '2026-01-01T00:00:00.000000Z',
         }),
     );

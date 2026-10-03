@@ -1,7 +1,9 @@
 import {
-    assert, assertEquals, assertStrictEquals,
+    assert, assertEquals, assertRejects, assertStrictEquals,
 } from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
+import { BODY_INDEXED_PATH } from
+    '../api/schema-postgres.ts';
 import { handleRequest } from '../api/api.ts';
 import { messageStore } from '../api/message-store.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -11,8 +13,17 @@ import {
     pairIdOf,
 } from './http-fixtures.ts';
 import {
-    compareIdentifiers, generateIdentifier,
+    NIL_IDENTIFIER,
+    compareIdentifiers,
+    generateIdentifier,
 } from '../shared/identifier.ts';
+import { DATE_PLACEHOLDER } from
+    '../api/ledger-root.ts';
+import { notifyPayload } from '../api/advisory-lock.ts';
+import { eventForMessagePair } from
+    '../api/message-pair.ts';
+import type { StatementBind } from
+    '../shared/ledger-statement.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import type { MessagePairEntity } from '../shared/types.ts';
 import { ledgerFields } from './ledger-row.ts';
@@ -191,8 +202,80 @@ function pairRow(
     });
 }
 
+function bodyPairRow(
+    id: string,
+    name: string,
+    method: string,
+    responseAt: string,
+    n: number,
+    body: string,
+    contentType: string,
+): Promise<Omit<MessagePairEntity, 'id'>> {
+    return ledgerFields({
+        id,
+        path: BODY_INDEXED_PATH,
+        name,
+        requester_identity_id: ORDER_REQUESTER,
+        method,
+        response_at: responseAt,
+        request: method + ' ' + BODY_INDEXED_PATH + name
+            + ' HTTP/1.1\r\n'
+            + 'x-n: ' + String(n) + '\r\n\r\n',
+        response: 'HTTP/1.1 200 OK\r\n'
+            + 'content-type: ' + contentType + '\r\n\r\n'
+            + body,
+        operation_id: ORDER_OPERATION,
+        supersedes: id,
+    });
+}
+
 function stamp(k: number): string {
     return '2026-01-01T00:00:00.00000' + String(k) + 'Z';
+}
+
+const ENVELOPE_PATH = '/envelope-pin/';
+const ENVELOPE_NAME = 'doc';
+
+// Same date split bindOf uses: the statement splices
+// the stamp into the value and matches on the body.
+function envelopeBind(fields: {
+    id: string,
+    operationId: string,
+    requesterIdentityId: string,
+    body: string,
+    ifMatch: string | null,
+}): StatementBind {
+    const wire = 'HTTP/1.1 201 \r\n'
+        + 'date: ' + DATE_PLACEHOLDER + '\r\n'
+        + '\r\n'
+        + fields.body;
+    const mark = '\r\ndate: ';
+    const valueAt = wire.indexOf(mark) + mark.length;
+    const bytes = new TextEncoder().encode(wire);
+    const salt = new Uint8Array(16);
+    return {
+        id: fields.id,
+        operationId: fields.operationId,
+        path: ENVELOPE_PATH,
+        name: ENVELOPE_NAME,
+        requesterIdentityId: fields.requesterIdentityId,
+        method: 'PUT',
+        request: new TextEncoder().encode('req'),
+        requestSalt: salt,
+        requestSecrets: new Uint8Array(0),
+        responsePrefix: bytes.slice(0, valueAt),
+        responseSuffix: bytes.slice(
+            valueAt + DATE_PLACEHOLDER.length,
+        ),
+        responseSalt: salt.slice(),
+        responseSecrets: new Uint8Array(0),
+        ifMatch: fields.ifMatch,
+        notify: notifyPayload(eventForMessagePair({
+            path: ENVELOPE_PATH,
+            requesterIdentityId:
+                fields.requesterIdentityId,
+        })),
+    };
 }
 
 export function defineStoreAcceptance(
@@ -231,28 +314,22 @@ export function defineStoreAcceptance(
 
     Deno.test(name + ': DELETE head is gone', async () => {
         const { db, token } = await ready();
+        const tag = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/flows/yNqCXXgKLCqDESGScIzYrQ/tags/'
+            + 'tOGidMXUNrBnbXkIQWSpag';
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                + 'tOGidMXUNrBnbXkIQWSpag', token,
-            { type: 'member', at: '2026-01-01T00:00:00.000000Z' },
+            'PUT', tag, token,
+            {
+                flow_response_id: 'yNqCXXgKLCqDESGScIzYrQ',
+            },
         ));
         assertStrictEquals(put.status, 201);
         const del = await handleRequest(
-            db, req(
-                'DELETE',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                    + 'tOGidMXUNrBnbXkIQWSpag',
-                token,
-            ),
+            db, req('DELETE', tag, token),
         );
         assertStrictEquals(del.status, 204);
         const got = await handleRequest(
-            db, req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                    + 'tOGidMXUNrBnbXkIQWSpag',
-                token,
-            ),
+            db, req('GET', tag, token),
         );
         assertStrictEquals(got.status, 410);
     });
@@ -487,6 +564,83 @@ export function defineStoreAcceptance(
         assert(heads.every((row) => row.method === 'PUT'));
     });
 
+    Deno.test(name + ': containing heads are the live PUT'
+    + ' heads of documents with a matching version',
+    async () => {
+        const { db } = await ready();
+        const json = 'application/json';
+        const id = (): string => generateIdentifier();
+        const [a1, a2, b1, c1, c2, d1, e1, f1] =
+            [id(), id(), id(), id(), id(), id(), id(), id()];
+        const rows: [
+            string, string, string, string, string,
+        ][] = [
+            // An older version matches; the head does not.
+            // The document is selected and its head served.
+            [a1, 'a', 'PUT', '{"k":"v","s":"old"}', json],
+            [a2, 'a', 'PUT', '{"k":"w","s":"new"}', json],
+            // Never matches.
+            [b1, 'b', 'PUT', '{"k":"x"}', json],
+            // Matches, then a DELETE head: not live.
+            [c1, 'c', 'PUT', '{"k":"v"}', json],
+            [c2, 'c', 'DELETE', '', json],
+            // A POST matches; there is no PUT head.
+            [d1, 'd', 'POST', '{"k":"v"}', json],
+            // Not JSON: it inserts and never matches.
+            [e1, 'e', 'PUT', 'k=v', 'text/plain'],
+            // Content type says JSON; the body does not.
+            [f1, 'f', 'PUT', '{"k":"v"', json],
+        ];
+        let k = 1;
+        for (
+            const [rowId, docName, method, body, type] of rows
+        ) {
+            await db.messagePairs.append(
+                rowId,
+                // Each row supersedes itself, as pairRow's
+                // do: one PUT or DELETE per
+                // (path, name, supersedes).
+                await bodyPairRow(
+                    rowId, docName, method, stamp(k), k,
+                    body, type,
+                ),
+            );
+            k += 1;
+        }
+        const heads = await db.messagePairs
+            .getCollectionHeadPairsContaining(
+                BODY_INDEXED_PATH, { k: 'v' },
+            );
+        assertEquals(heads.map((row) => row.id), [a2]);
+        assertEquals(
+            (await db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    BODY_INDEXED_PATH, { k: 'w', s: 'new' },
+                )).map((row) => row.id),
+            [a2],
+        );
+        assertEquals(
+            await db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    BODY_INDEXED_PATH, { k: 'w', s: 'old' },
+                ),
+            [],
+        );
+    });
+
+    Deno.test(name + ': containing heads refuse a path with'
+    + ' no body index', async () => {
+        const { db } = await ready();
+        await assertRejects(
+            () => db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    HEAD_PATH, { k: 'v' },
+                ),
+            Error,
+            'no body index at ' + HEAD_PATH,
+        );
+    });
+
     Deno.test(name + ': head pair is the latest PUT or'
     + ' DELETE; POST and PATCH never displace it', async () => {
         const { db } = await ready();
@@ -597,6 +751,105 @@ export function defineStoreAcceptance(
         assertStrictEquals(
             stored.response_at,
             '2026-03-04T05:06:07.100000Z',
+        );
+    });
+
+    Deno.test(name + ': a statement answers each row\'s'
+        + ' envelope and its head\'s', async () => {
+        const { db } = await ready();
+        const requesterA = generateIdentifier();
+        const requesterB = generateIdentifier();
+        const requesterC = generateIdentifier();
+        const firstId = generateIdentifier();
+        const secondId = generateIdentifier();
+        const thirdId = generateIdentifier();
+        const now = '2026-10-01T00:00:00.000000Z';
+        const genesis = await db.executeLedger(
+            'in-order',
+            [envelopeBind({
+                id: firstId,
+                operationId: generateIdentifier(),
+                requesterIdentityId: requesterA,
+                body: 'alpha',
+                ifMatch: NIL_IDENTIFIER,
+            })],
+            now,
+        );
+        const opened = genesis[0]!;
+        assertStrictEquals(opened.outcome, 'land');
+        assertStrictEquals(opened.inserted, true);
+        assertStrictEquals(
+            opened.requesterIdentityId, requesterA,
+        );
+        assertStrictEquals(opened.headResponseAt, null);
+        assertStrictEquals(
+            opened.headRequesterIdentityId, null,
+        );
+
+        const first = await db.messagePairs.getHeadPair(
+            ENVELOPE_PATH, ENVELOPE_NAME,
+        );
+        assert(first !== null);
+        const followed = await db.executeLedger(
+            'in-order',
+            [envelopeBind({
+                id: secondId,
+                operationId: generateIdentifier(),
+                requesterIdentityId: requesterB,
+                body: 'beta',
+                ifMatch: firstId,
+            })],
+            now,
+        );
+        const wrote = followed[0]!;
+        assertStrictEquals(wrote.outcome, 'land');
+        assertStrictEquals(wrote.inserted, true);
+        assertStrictEquals(
+            wrote.requesterIdentityId, requesterB,
+        );
+        assertStrictEquals(
+            wrote.headResponseAt, first.response_at,
+        );
+        assertStrictEquals(
+            wrote.headRequesterIdentityId, requesterA,
+        );
+
+        const second = await db.messagePairs.getHeadPair(
+            ENVELOPE_PATH, ENVELOPE_NAME,
+        );
+        assert(second !== null);
+        assertStrictEquals(second.id, secondId);
+        const before = await messagePairsAt(
+            db, ENVELOPE_PATH, ENVELOPE_NAME,
+        );
+        const matched = await db.executeLedger(
+            'in-order',
+            [envelopeBind({
+                id: thirdId,
+                operationId: generateIdentifier(),
+                requesterIdentityId: requesterC,
+                body: 'beta',
+                ifMatch: secondId,
+            })],
+            now,
+        );
+        const skipped = matched[0]!;
+        assertStrictEquals(skipped.outcome, 'matched');
+        assertStrictEquals(skipped.inserted, false);
+        assertStrictEquals(
+            skipped.requesterIdentityId, requesterC,
+        );
+        assertStrictEquals(
+            skipped.headResponseAt, second.response_at,
+        );
+        assertStrictEquals(
+            skipped.headRequesterIdentityId, requesterB,
+        );
+        assertStrictEquals(
+            await messagePairsAt(
+                db, ENVELOPE_PATH, ENVELOPE_NAME,
+            ),
+            before,
         );
     });
 }

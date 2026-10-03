@@ -17,6 +17,8 @@ import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import {
     incomingContext,
 } from '../api/request-context.ts';
@@ -47,6 +49,14 @@ function pathOf(
     const segs = route.segments.map((seg, i) => {
         if (!seg.startsWith(':')) return seg;
         if (i === badIndex) return badValue;
+        // A later param is reached only when this
+        // sibling already passes its own rule.
+        if (seg === ':membership-id') {
+            return membershipNameOf(
+                generateIdentifier(),
+                generateIdentifier(),
+            );
+        }
         return generateIdentifier();
     });
     return '/' + segs.join('/');
@@ -66,8 +76,11 @@ async () => {
             const path = pathOf(
                 route, i, 'not-an-identifier',
             );
-            const expected = name
-                + ' must be a 22-character identifier';
+            const expected = name === 'membership-id'
+                ? 'membership-id must be two identifiers'
+                    + ' joined by one colon'
+                : name
+                    + ' must be a 22-character identifier';
             for (const method of verbsOn(route)) {
                 const write = method !== 'GET';
                 const res = await handleRequest(

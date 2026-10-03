@@ -6,6 +6,8 @@ import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { framedRequest } from './http-fixtures.ts';
 import { operationIdHeader } from './operation-id-header.ts';
 
@@ -35,9 +37,10 @@ Deno.test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         await devToken(), operationIdHeader(),
-    )).query('status').toNumber(), 200);   // 200, not 403
+    )).query('status').toNumber(), 204);   // 204, not 403
 });
 
 Deno.test('role-grants routes are retired (404)', async () => {
@@ -65,17 +68,20 @@ Deno.test('role-grants routes are retired (404)', async () => {
 Deno.test('admin may write a membership type', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
+    const organization = 'AjdvjuECVZEgZoFajaIEkg';
+    const identity = 'prBESZPjJDiuXCeZLmbiVw';
     const res = await handleRequest(db, framedRequest(
-        `${BASE}/organizations/`
-            + 'AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'prBESZPjJDiuXCeZLmbiVw', {
+        `${BASE}/organizations/${organization}/invitations/`
+            + membershipNameOf(organization, identity), {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + await devToken(),
+                'If-None-Match': '*',
                 'operation-id': generateIdentifier(),
             },
             body: JSON.stringify({
+                state: 'accepted',
                 type: 'member',
                 at: '2026-06-03T00:00:00.000000Z',
             }),

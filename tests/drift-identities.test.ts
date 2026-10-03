@@ -2,7 +2,6 @@ import {
     assert,
     assertEquals,
     assertInstanceOf,
-    assertNotEquals,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
@@ -32,8 +31,10 @@ import {
     postIdentityDocumentOp,
 } from '../api/routes.ts';
 import {
-    deriveOrganizationMemberSeats,
-} from '../api/derive-memberships.ts';
+    membershipOf,
+    membershipOfHead,
+    organizationMembershipHeads,
+} from '../api/memberships.ts';
 import {
     deriveIdentityPiiRows,
     deriveIdentityPii,
@@ -48,6 +49,8 @@ import {
     buildUnaffiliatedIdentity,
 } from '../api/mock-data/members.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { landMembership } from './membership-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 import {
     seedIdentityCredential,
     seedIdentityPii,
@@ -64,8 +67,6 @@ import {
 import { bodyOf } from '../api/derive-documents.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-
-const INV_A = generateIdentifier();
 
 // Phase Final Task 2: identity spine dual-write stripped.
 // This file no longer compares derive vs old-table oracles —
@@ -131,20 +132,6 @@ function sortById<T extends { id: string }>(
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
-}
-
-function humanCreateBody(id: string): Record<string, unknown> {
-    return {
-        id,
-        detail: {
-            title: 't', department: 'd',
-            strengths: [],
-            team_dimensions: {},
-        },
-        initialState: 'active',
-        initialStateEventId: generateIdentifier(),
-        initialStateAt: nowUtc(),
-    };
 }
 
 // A served credential is its stored body less its secret
@@ -232,12 +219,18 @@ async function derivedIdentity(
 async function pairPlaneMembershipsAcrossKnownOrganizations(
     db: DbAdapter,
 ): Promise<MembershipEntity[]> {
+    const accepted = {
+        kind: 'state' as const,
+        state: 'accepted' as const,
+    };
     const perOrganization = await Promise.all(
         [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
-            (organization) =>
-                deriveOrganizationMemberSeats(
-                    db, organization,
-                ),
+            async (organization) => {
+                const heads = await organizationMembershipHeads(
+                    db, organization, accepted,
+                );
+                return heads.map(membershipOfHead);
+            },
         ),
     );
     return perOrganization.flat();
@@ -432,13 +425,9 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
             phone: '', bio: '',
         },
     ));
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/members/' + foreignId,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
-        { type: 'member', at: nowUtc() },
-    ));
+    await seedSeat(
+        db, ORGANIZATION_TWO, foreignId, 'member', nowUtc(),
+    );
     assertStrictEquals(
         await assertPiiFenceLeg(
             db, STARK_ORGANIZATION, foreignId,
@@ -472,6 +461,133 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
         ),
         true,
     );
+});
+
+// The route fence, not the local seat scan. A non-accepted
+// head in the caller's organization leaves the seat, and an
+// accepted membership elsewhere is the only one that counts.
+const FENCE_SUBJECT = 'XXZruirZyAOoRpNxaDnpSA';
+const SEAT_AT = '2026-06-04T00:00:00.000000Z';
+const REPLACED_AT = '2026-06-05T00:00:00.000000Z';
+const ELSEWHERE_AT = '2026-06-06T00:00:00.000000Z';
+
+async function callerPiiAfterNonAccepted(
+    state: 'pending' | 'declined' | 'revoked' | 'removed',
+): Promise<{ response: Response; identityId: Id }> {
+    const db = await seededDb();
+    const identityId = generateIdentifier();
+    const token = await organizationToken(
+        FENCE_SUBJECT, STARK_ORGANIZATION,
+    );
+    const created = await handleRequest(db, req(
+        'POST', '/identities/', token,
+        { id: identityId, kind: 'person' },
+    ));
+    await created.body?.cancel();
+    assertStrictEquals(created.status, 201);
+    const written = await handleRequest(db, req(
+        'PUT', '/identities/' + identityId + '/pii', token,
+        {
+            name: 'Fenced ' + state,
+            email: state + '-fence@x.com',
+            phone: '',
+            bio: '',
+        },
+    ));
+    await written.body?.cancel();
+    assertStrictEquals(written.status, 201);
+    await seedSeat(
+        db, STARK_ORGANIZATION, identityId, 'member',
+        SEAT_AT,
+    );
+    await landMembership(
+        db, STARK_ORGANIZATION, identityId, state,
+        'member', REPLACED_AT,
+    );
+    await landMembership(
+        db, ORGANIZATION_TWO, identityId, 'accepted',
+        'member', ELSEWHERE_AT,
+    );
+    assertStrictEquals(
+        await membershipOf(
+            db, STARK_ORGANIZATION, identityId,
+        ),
+        null,
+    );
+    const elsewhere = await membershipOf(
+        db, ORGANIZATION_TWO, identityId,
+    );
+    assert(elsewhere !== null);
+    assertStrictEquals(elsewhere.identity_id, identityId);
+    assertStrictEquals(
+        elsewhere.organization_id, ORGANIZATION_TWO,
+    );
+    const response = await handleRequest(db, req(
+        'GET', '/identities/' + identityId + '/pii', token,
+    ));
+    return { response, identityId };
+}
+
+for (const state of [
+    'removed', 'pending', 'declined', 'revoked',
+] as const) {
+    Deno.test('a ' + state + ' membership in the caller'
+        + ' organization is not a co-member', async () => {
+        const { response, identityId } =
+            await callerPiiAfterNonAccepted(state);
+        assertStrictEquals(response.status, 403);
+        assertEquals(await response.json(), {
+            error: 'forbidden: identity_pii/' + identityId
+                + ' belongs to a different organization',
+        });
+    });
+}
+
+Deno.test('a membership with no seat counts as foreign',
+async () => {
+    const db = await seededDb();
+    const identityId = generateIdentifier();
+    const caller = await organizationToken(
+        FENCE_SUBJECT, STARK_ORGANIZATION,
+    );
+    const home = await organizationToken(
+        FENCE_SUBJECT, ORGANIZATION_TWO,
+    );
+    const created = await handleRequest(db, req(
+        'POST', '/identities/', caller,
+        { id: identityId, kind: 'person' },
+    ));
+    await created.body?.cancel();
+    assertStrictEquals(created.status, 201);
+    const written = await handleRequest(db, req(
+        'PUT', '/identities/' + identityId + '/pii', caller,
+        {
+            name: 'Seatless Fence',
+            email: 'seatless-fence@x.com',
+            phone: '',
+            bio: '',
+        },
+    ));
+    await written.body?.cancel();
+    assertStrictEquals(written.status, 201);
+    await landMembership(
+        db, ORGANIZATION_TWO, identityId, 'accepted',
+        'member', ELSEWHERE_AT,
+    );
+    const hidden = await handleRequest(db, req(
+        'GET', '/identities/' + identityId + '/pii', caller,
+    ));
+    assertStrictEquals(hidden.status, 403);
+    assertEquals(await hidden.json(), {
+        error: 'forbidden: identity_pii/' + identityId
+            + ' belongs to a different organization',
+    });
+    const visible = await handleRequest(db, req(
+        'GET', '/identities/' + identityId + '/pii', home,
+    ));
+    assertStrictEquals(visible.status, 200);
+    const body = await visible.json() as { name: string };
+    assertStrictEquals(body.name, 'Seatless Fence');
 });
 
 // -- 2b. the by-email login-shape leg (Phase 13 Task 8, concern -
@@ -589,20 +705,12 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
     // Different org memberships (the adjudicated scenario): A in
     // STARK, B in ORGANIZATION_TWO only — so the fence's answer
     // depends entirely on WHICH identity it keys on.
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + STARK_ORGANIZATION
-            + '/members/' + identityA,
-        adminToken,
-        { type: 'member', at: nowUtc() },
-    ));
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/members/' + identityB,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
-        { type: 'member', at: nowUtc() },
-    ));
+    await seedSeat(
+        db, STARK_ORGANIZATION, identityA, 'member', nowUtc(),
+    );
+    await seedSeat(
+        db, ORGANIZATION_TWO, identityB, 'member', nowUtc(),
+    );
 
     // The mismatched write itself — document under A, body names
     // B — producible only below-facade (no validator ties the
@@ -676,92 +784,6 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
 
 // -- 5. live-write chain, re-compared on BOTH planes at every ---
 // -- step -----------------------------------------------------------
-
-// -- 6. invitations enrichment JOIN parity (SATISFIED -----------
-// -- TRANSITIVELY — case 2 already proves the two row sets ------
-// -- equal; this pins the JOIN's key-omission shape alone) ------
-
-Deno.test('invitations enrichment parity: the personName/'
-+ ' inviteeEmail JOIN (invitationsForInvitee/sentInvitations,'
-+ ' api/invitations-domain.ts) built over deriveIdentityPiiRows'
-+ ' deep-equals the SAME JOIN over identityPii.getAll(),'
-+ ' including ABSENT-key omission for an erased identity —'
-+ ' SATISFIED TRANSITIVELY (case 2 already proves the two row'
-+ ' sets equal); no new export, no re-flip of'
-+ ' invitationsForInvitee/sentInvitations, no handleRequest'
-+ ' exception', async () => {
-    const db = await seededDb();
-    const adminToken = await organizationToken();
-    const eraseeId = generateIdentifier();
-    await handleRequest(db, req(
-        'POST', '/human-members', adminToken,
-        humanCreateBody(eraseeId),
-    ));
-    await handleRequest(db, req(
-        'PUT', '/identities/' + eraseeId + '/pii', adminToken,
-        {
-            name: 'Erasee Name', email: 'erasee@example.com',
-            phone: '', bio: '',
-        },
-    ));
-    await handleRequest(db, req(
-        'DELETE', '/identities/' + eraseeId + '/pii', adminToken,
-    ));
-
-    const invitations = [
-        { id: INV_A, identity_id: 'XXZruirZyAOoRpNxaDnpSA' },
-        { id: 'inv-b', identity_id: eraseeId },
-    ] as const;
-
-    // The SAME join shape both invitationsForInvitee
-    // (invited_by_name) and sentInvitations (invitee_email)
-    // build — a Map lookup + ABSENT-key spread, byte-for-byte.
-    function enrichedByName(
-        rows: readonly IdentityPiiEntity[],
-    ): { id: Id; invited_by_name?: string }[] {
-        const byId = new Map(rows.map((p) => [p.id, p.name]));
-        return invitations.map((inv) => {
-            const name = byId.get(inv.identity_id);
-            return {
-                id: inv.id,
-                ...(name !== undefined
-                    ? { invited_by_name: name } : {}),
-            };
-        });
-    }
-    function enrichedByEmail(
-        rows: readonly IdentityPiiEntity[],
-    ): { id: Id; invitee_email?: string }[] {
-        const byId = new Map(rows.map((p) => [p.id, p.email]));
-        return invitations.map((inv) => {
-            const email = byId.get(inv.identity_id);
-            return {
-                id: inv.id,
-                ...(email !== undefined
-                    ? { invitee_email: email } : {}),
-            };
-        });
-    }
-
-    const derivedRows = await deriveIdentityPiiRows(db);
-    // Phase Final Stage B: identity spine tables retired.
-
-    // ABSENT-key pinned: the erased identity carries NO
-    // invited_by_name/invitee_email key — never a '' sentinel.
-    assertEquals(
-        enrichedByName(derivedRows)[1], { id: 'inv-b' },
-    );
-    assertEquals(
-        enrichedByEmail(derivedRows)[1], { id: 'inv-b' },
-    );
-    // The present identity's key IS carried.
-    assertNotEquals(
-        enrichedByName(derivedRows)[0], { id: INV_A },
-    );
-    assertNotEquals(
-        enrichedByEmail(derivedRows)[0], { id: INV_A },
-    );
-});
 
 // -- 7. method-filter proof + genesis-wins-under-skew + the -----
 // -- E6 resend branches at drift altitude ------------------------

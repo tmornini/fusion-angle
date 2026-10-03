@@ -157,9 +157,10 @@ async () => {
         await postSessionRefresh(ctx, pair.refresh_token);
     assertNotStrictEquals(creds.refreshToken, pair.refresh_token);
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         creds.accessToken, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('a garbage refresh token throws UnauthorizedError',

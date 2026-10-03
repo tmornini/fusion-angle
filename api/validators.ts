@@ -30,9 +30,9 @@ import type {
     FlowWorkOrderEntity,
     StateFieldValueEntity,
     OrganizationEntity,
-    MembershipEntity,
     MembershipType,
     InvitationEntity,
+    InvitationState,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
     RecordEntity,
@@ -1834,7 +1834,12 @@ const MEMBERSHIP_TYPES = [
 
 export function validateMembershipEntity(
     body: Record<string, unknown>,
-): Omit<MembershipEntity, 'id'> {
+): {
+    organization_id: Id;
+    identity_id: Id;
+    type: MembershipType;
+    at: string;
+} {
     assertOnlyKeys(
         body, MEMBERSHIP_BODY_KEYS, 'MembershipEntity',
     );
@@ -1858,25 +1863,27 @@ const MEMBERSHIP_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface MembershipDocumentBody {
-    readonly entity: Omit<MembershipEntity, 'id'>;
+    readonly entity: {
+        organization_id: Id;
+        identity_id: Id;
+        type: MembershipType;
+        at: string;
+    };
 }
 
 // The HTTP-body gate for PUT /memberships/:id: the eighth
 // family, and the FOURTH 'stateless' one. Membership carries
 // a privilege attribute (`type`: admin | member) baked into
 // access-token claims at mint — not a pure join. THE LABEL
-// MANDATE (a NAMED byte-parity-over-convention choice, the
-// Phase 7 Objective precedent): the assertOnlyKeys label is
-// 'MembershipEntity', matching validateMembershipEntity
-// byte-for-byte, NOT the 'MembershipDocumentBody' naming
-// convention every other *DocumentBody validator uses — the
-// label appears in the wire 400 body ("unexpected key ... for
-// MembershipEntity"), and the convention's label would change
-// those bytes. Every key here is REQUIRED. position/state
-// rules do not apply; the fields are the SAME pickString/
-// enum/timestamp calls validateMembershipEntity already
-// makes, so the missing-key 400 stays byte-identical on both
-// paths too.
+// MANDATE: the two gates share the label MembershipEntity.
+// validateMembershipDocumentBody matches
+// validateMembershipEntity, not the MembershipDocumentBody
+// name every other *DocumentBody validator uses. Splitting
+// the labels would make the 400 texts differ. Every key
+// here is REQUIRED. position/state rules do not apply; the
+// fields are the SAME pickString/enum/timestamp calls
+// validateMembershipEntity already makes, so the missing-key
+// 400 stays byte-identical on both paths too.
 export function validateMembershipDocumentBody(
     body: Record<string, unknown>,
 ): MembershipDocumentBody {
@@ -1897,35 +1904,6 @@ export function validateMembershipDocumentBody(
             type,
             at,
         },
-    };
-}
-
-const SEAT_DOCUMENT_BODY_KEYS: readonly string[] = [
-    'type', 'at',
-];
-
-export interface SeatDocumentBody {
-    readonly type: MembershipType;
-    readonly at: string;
-}
-
-// PUT organizations/:organization-id/members/:identity-id.
-// Organization and identity ride the path. Privilege type
-// and the moment of union ride the body.
-export function validateSeatDocumentBody(
-    body: Record<string, unknown>,
-): SeatDocumentBody {
-    assertOnlyKeys(
-        body, SEAT_DOCUMENT_BODY_KEYS, 'SeatDocumentBody',
-    );
-    return {
-        type: validateEnumField(
-            body, 'type', MEMBERSHIP_TYPES,
-            'membership type', 'SeatDocumentBody',
-        ),
-        at: validateTimestampField(
-            body, 'at', 'SeatDocumentBody',
-        ),
     };
 }
 
@@ -1952,61 +1930,39 @@ export function validateInvitationEntity(
     };
 }
 
-export interface InvitationTransitionBody {
-    readonly state: 'accepted' | 'declined'
-        | 'revoked';
-    readonly membershipId?: string;
-    readonly eventId: string;
+export interface MembershipRequestBody {
+    readonly state: InvitationState;
+    readonly type?: MembershipType;
     readonly at: string;
 }
 
-const INVITATION_TRANSITION_KEYS:
-    readonly string[] = [
-    'state', 'eventId', 'at',
+const MEMBERSHIP_REQUEST_KEYS: readonly string[] = [
+    'state', 'at',
 ];
 
-export function validateInvitationTransitionBody(
+export function validateMembershipRequest(
     body: Record<string, unknown>,
-): InvitationTransitionBody {
+): MembershipRequestBody {
     assertOnlyKeys(
         body,
-        INVITATION_TRANSITION_KEYS,
-        'InvitationTransitionBody',
-        ['membershipId'],
+        MEMBERSHIP_REQUEST_KEYS,
+        'MembershipRequest',
+        ['type'],
     );
-    const state = pickString(body, 'state');
-    if (
-        state !== 'accepted'
-        && state !== 'declined'
-        && state !== 'revoked'
-    ) {
-        throw new ValidationError(
-            'InvitationTransitionBody.state must'
-            + ' be accepted, declined, or revoked',
-        );
-    }
-    const membershipId = 'membershipId' in body
-        ? pickIdentifier(body, 'membershipId')
+    const state = assertInvitationState(
+        pickString(body, 'state'), 'MembershipRequest',
+    );
+    const type = 'type' in body
+        ? validateEnumField(
+            body, 'type', MEMBERSHIP_TYPES,
+            'membership type', 'MembershipRequest',
+        )
         : undefined;
-    if (state === 'accepted') {
-        if (
-            membershipId === undefined
-            || membershipId === ''
-        ) {
-            throw new ValidationError(
-                'membershipId must be non-empty',
-            );
-        }
-    }
     return {
         state,
-        ...(membershipId !== undefined
-            ? { membershipId }
-            : {}),
-        eventId: pickIdentifier(body, 'eventId'),
+        ...(type !== undefined ? { type } : {}),
         at: validateTimestampField(
-            body, 'at',
-            'InvitationTransitionBody.at',
+            body, 'at', 'MembershipRequest',
         ),
     };
 }

@@ -8,6 +8,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -39,7 +40,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 }
 
 Deno.test('GET organizations/:id/objectives/:id/versions carries the'
-+ ' objective rows (DESC current-first)', async () => {
++ ' objective rows, oldest first', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const id = generateIdentifier();
@@ -60,13 +61,17 @@ Deno.test('GET organizations/:id/objectives/:id/versions carries the'
             + '/versions/', token,
     ));
     assertStrictEquals(res.status, 200);
-    const rows = JSON.parse(await res.text()) as {
-        id: string; state: string;
-    }[];
-    assertStrictEquals(rows.length, 2);
-    assertStrictEquals(rows[0]!.id, id);
-    assertStrictEquals(rows[0]!.state, 'archived');
-    assertStrictEquals(rows[1]!.id, id);
-    assertStrictEquals(rows[1]!.state, 'active');
-    assertStrictEquals('state_at' in rows[0]!, false);
+    const parts = await partsOf<{
+        id: string;
+        state: string;
+    }>(res);
+    assertStrictEquals(parts.length, 2);
+    const oldest = parts[0]!.body().toValue();
+    const current = parts[parts.length - 1]!
+        .body().toValue();
+    assertStrictEquals(current.id, id);
+    assertStrictEquals(current.state, 'archived');
+    assertStrictEquals(oldest.id, id);
+    assertStrictEquals(oldest.state, 'active');
+    assertStrictEquals('state_at' in current, false);
 });

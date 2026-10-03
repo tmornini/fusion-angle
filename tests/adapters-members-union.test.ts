@@ -9,11 +9,19 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    IN_PROCESS_ORIGIN,
+    inPageContext,
+    inProcessFetch,
+} from './in-page-facade.ts';
+import { createHttpFacade } from '../client/http-facade.ts';
+import { createAppClient } from
+    '../web-app/app/client.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getMembers,
+    getFormerMembers,
     getMemberMap,
     memberName,
     MEMBER_WITHOUT_PII_NAME,
@@ -26,7 +34,10 @@ import {
 import type {
     MemberId,
     Member,
+    MembershipEntity,
 } from '../shared/types.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import {
     SYSTEM_MEMBER_NAME,
     SYSTEM_MEMBER_ID,
@@ -48,11 +59,10 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    deleteHumanMemberSeat,
+    postMembershipRemoval,
     getHumanMember,
 } from '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
-import { seedSeat } from './root-admin-fixture.ts';
 
 const NULL_STORAGE: Partial<Storage> = {
     getItem: () => null,
@@ -423,9 +433,9 @@ Deno.test(
             memberName(await getMemberMap(ctx), leaverId),
             'Lisa Leaver',
         );
-        await deleteHumanMemberSeat(
-            ctx, await getHumanMember(ctx, leaverId),
-        );
+        const leaver = await getHumanMember(ctx, leaverId);
+        assert(leaver !== null);
+        await postMembershipRemoval(ctx, leaver);
         const map = await getMemberMap(ctx);
         const former = map.get(leaverId);
         assert(former !== undefined, 'former member mapped');
@@ -439,12 +449,55 @@ Deno.test(
             ),
             'a former member is not a roster row',
         );
-        await seedSeat(
-            db, 'AjdvjuECVZEgZoFajaIEkg', leaverId, 'member',
-        );
+        // seedSeat is a genesis. It does not land over
+        // the removed head. Re-seat through the live
+        // transition, latched on that head.
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const item = 'organizations/' + organization
+            + '/invitations/'
+            + membershipNameOf(organization, leaverId);
+        const held = await ctx.GET<MembershipEntity>(item);
+        await ctx.PUT(item, {
+            state: 'accepted',
+            type: 'member',
+            at: nowUtc(),
+        }, [held]);
         assertStrictEquals(
             memberName(await getMemberMap(ctx), leaverId),
             'Lisa Leaver',
+        );
+    }),
+);
+
+Deno.test(
+    'getFormerMembers reads ?state=removed once',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const urls: string[] = [];
+        const inner = inProcessFetch(db);
+        const recording: typeof fetch = async (
+            input, init,
+        ) => {
+            const request = new Request(input, init);
+            urls.push(request.url);
+            return inner(request);
+        };
+        const ctx = createAppClient(createHttpFacade(
+            IN_PROCESS_ORIGIN, recording,
+        )).requestContext(await organizationToken());
+        const former = await getFormerMembers(ctx);
+        assertStrictEquals(former.length, 0);
+        assertStrictEquals(urls.length, 1);
+        const url = new URL(urls[0]!);
+        assertStrictEquals(
+            url.pathname,
+            '/api/organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/invitations/',
+        );
+        assertStrictEquals(url.search, '?state=removed');
+        assertStrictEquals(
+            url.search.match(/state=/g)?.length, 1,
         );
     }),
 );

@@ -1,6 +1,8 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -37,6 +39,7 @@ import {
     apiRequest,
     pairIdOf,
     partBodiesOf,
+    partsOf,
     invitationLatched,
 } from './http-fixtures.ts';
 
@@ -53,12 +56,6 @@ const DRIFT_STATES_WO_STANDALONE_RELEASE_1 = generateIdentifier();
 const DRIFT_STATES_WO_STANDALONE_RELEASE_FLOW = generateIdentifier();
 const DRIFT_STATES_FLOW_NODE_1 = generateIdentifier();
 const DRIFT_STATES_PROJ_1 = generateIdentifier();
-const DRIFT_STATES_INV_ACCEPT_GRANT = generateIdentifier();
-const DRIFT_STATES_INV_ACCEPT_MS = generateIdentifier();
-const DRIFT_STATES_INV_ACCEPT_ACCEPT = generateIdentifier();
-const DRIFT_STATES_INV_DECLINE_GRANT = generateIdentifier();
-const DRIFT_STATES_INV_DECLINE_DECLINE = generateIdentifier();
-const DRIFT_STATES_INV_REVOKE_REVOKE = generateIdentifier();
 const DRIFT_STATES_AI_CHAIN_1 = generateIdentifier();
 const WORKORDERID_FWO = generateIdentifier();
 const WORKORDERID_EV1 = generateIdentifier();
@@ -378,9 +375,9 @@ async () => {
                 ),
             );
             assertStrictEquals(versions.status, 200);
-            const rows = await versions.json() as {
+            const rows = await partBodiesOf<{
                 id: string;
-            }[];
+            }>(versions);
             objSeen += rows.length;
         }
     }
@@ -410,8 +407,8 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
     },
 ];
 
-Deno.test('case 2: GET <family>/:id/history parity — one entity'
-+ ' per family (flow, work-order) + the (at, id) DESC order',
+Deno.test('case 2: flow parts match deriveFlowStateHistory;'
++ ' work-order history stays (at, id) DESC',
 async () => {
     const db = await seededDb();
     for (const { family, routeFamily, id }
@@ -420,10 +417,10 @@ async () => {
         const derived = await entityHistory(
             db, STARK_ORGANIZATION, id,
         );
-        // Family routes emit DESC (current first). Work-order
-        // wire widens StateEntity with field_values — parity
-        // is the lifecycle core (id/state/at/member_id), not
-        // full JSON equality with the bare derive.
+        // Work-order history is newest first. Its wire
+        // widens StateEntity with field_values — parity
+        // is the lifecycle core (id/state/at/member_id),
+        // not full JSON equality with the bare derive.
         const expected = derived.toReversed();
         const token = await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -437,6 +434,34 @@ async () => {
             token,
         ));
         assertStrictEquals(res.status, 200, family);
+        if (family === 'flow') {
+            const parts = await partsOf<{
+                state_event_id: string;
+                state: string;
+                state_at: string;
+            }>(res);
+            const history = await deriveFlowStateHistory(
+                db, STARK_ORGANIZATION, id,
+            );
+            assertEquals(
+                parts.map((part) => {
+                    const body = part.body().toValue();
+                    return {
+                        state_event_id:
+                            body.state_event_id,
+                        state: body.state,
+                        state_at: body.state_at,
+                    };
+                }),
+                history.map((row) => ({
+                    state_event_id: row.id,
+                    state: row.state,
+                    state_at: row.at,
+                })),
+                family,
+            );
+            continue;
+        }
         const wire = await res.json() as {
             id: string;
             entity_id?: string;
@@ -503,8 +528,9 @@ async () => {
 // retired with the document — the own/foreign/deleted legs
 // ride documents.
 Deno.test('case 3: the fence\'s legs — own-org history visible,'
-+ ' foreign history 404 (miss at this document), and a'
-+ ' DELETED foreign entity still names its owner',
++ ' foreign history 404 (miss at this document), a'
++ ' state-deleted idea\'s versions are Gone, and it'
++ ' still names its owner',
 async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
@@ -530,6 +556,8 @@ async () => {
         ideaDocument('Foreign'),
     ));
     assertStrictEquals(foreignCreated.status, 201);
+    const foreignTag = pairIdOf(foreignCreated);
+    assert(foreignTag !== null);
 
     // The DELETED-entity leg: org 2 tombstones its OWN idea —
     // message plane is IMMUNE to deleted filter, so owner still
@@ -549,9 +577,10 @@ async () => {
             '/versions/', tokenStark,
     ));
     assertStrictEquals(ownRes.status, 200);
-    const ownWire = await ownRes.json() as { id: string }[];
+    const ownParts = await partsOf<{ id: string }>(ownRes);
     assert(
-        ownWire.some((r) => r.id === ownIdeaId),
+        ownParts.some((part) =>
+            part.body().toValue().id === ownIdeaId),
     );
 
     // Foreign history from STARK → 404; owner still org 2
@@ -570,25 +599,29 @@ async () => {
         ORGANIZATION_TWO,
     );
 
-    // Org 2 still sees its own genesis + delete on history.
+    // A state-deleted idea is Gone on both version
+    // routes. The list and the item name the document.
     const org2Res = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_TWO
             + '/ideas/' + foreignIdeaId + '/versions/',
         tokenOrg2,
     ));
-    assertStrictEquals(org2Res.status, 200);
-    const org2Wire = await org2Res.json() as {
-        id: string;
-        state: string;
-    }[];
-    assertStrictEquals(org2Wire.length, 2);
-    assert(
-        org2Wire.every((r) => r.id === foreignIdeaId),
-    );
-    assert(
-        org2Wire.some((r) => r.state === 'deleted'),
-    );
+    assertStrictEquals(org2Res.status, 410);
+    assertEquals(await org2Res.json(), {
+        error: 'Gone: ideas/' + foreignIdeaId,
+    });
+    const org2Item = await handleRequest(db, req(
+        'GET',
+        '/organizations/' + ORGANIZATION_TWO
+            + '/ideas/' + foreignIdeaId + '/versions/'
+            + foreignTag,
+        tokenOrg2,
+    ));
+    assertStrictEquals(org2Item.status, 410);
+    assertEquals(await org2Item.json(), {
+        error: 'Gone: ideas/' + foreignIdeaId,
+    });
 
     // STARK idea absent from org 2 history read (404).
     const ownFromOrg2 = await handleRequest(db, req(
@@ -1104,12 +1137,16 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
 
+    const acceptInvitee = 'YeQnyZJddPctAdaMBVWEew';
+    const acceptName = membershipNameOf(
+        STARK_ORGANIZATION, acceptInvitee,
+    );
     await person(
-        db, 'YeQnyZJddPctAdaMBVWEew', 'Accept Invitee',
+        db, acceptInvitee, 'Accept Invitee',
         'drift-states-invitee-accept@x.com',
     );
     const acceptInviteeToken = await organizationToken(
-        'YeQnyZJddPctAdaMBVWEew', STARK_ORGANIZATION,
+        acceptInvitee, STARK_ORGANIZATION,
     );
     const acceptGrant = await handleRequest(db, req(
         'POST',
@@ -1117,38 +1154,38 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-accept@x.com',
-            invitationId: 'YUuiirIfYgZZdbyLqxAHmg',
-            grantEventId: DRIFT_STATES_INV_ACCEPT_GRANT,
             grantAt: '2026-03-01T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(acceptGrant.status, 201);
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/YeQnyZJddPctAdaMBVWEew'
-            + '/invitations/YUuiirIfYgZZdbyLqxAHmg',
+        '/identities/' + acceptInvitee
+            + '/invitations/' + acceptName,
         acceptInviteeToken, {
             state: 'accepted',
-            membershipId: DRIFT_STATES_INV_ACCEPT_MS,
-            eventId: DRIFT_STATES_INV_ACCEPT_ACCEPT,
             at: '2026-03-01T00:00:00.000001Z',
         },
     )));
     assertStrictEquals(accept.status, 200);
     const acceptDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'YUuiirIfYgZZdbyLqxAHmg',
+        db, STARK_ORGANIZATION, acceptName,
     );
     assertEquals(
         acceptDerived.map((row) => row.state),
         ['pending', 'accepted'],
     );
 
+    const declineInvitee = 'YfxZQrzQBOaPJmijEVzQOg';
+    const declineName = membershipNameOf(
+        STARK_ORGANIZATION, declineInvitee,
+    );
     await person(
-        db, 'YfxZQrzQBOaPJmijEVzQOg', 'Decline Invitee',
+        db, declineInvitee, 'Decline Invitee',
         'drift-states-invitee-decline@x.com',
     );
     const declineInviteeToken = await organizationToken(
-        'YfxZQrzQBOaPJmijEVzQOg', STARK_ORGANIZATION,
+        declineInvitee, STARK_ORGANIZATION,
     );
     const declineGrant = await handleRequest(db, req(
         'POST',
@@ -1156,25 +1193,22 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-decline@x.com',
-            invitationId: 'YXTFXcJwnALAOHAFRMiiPg',
-            grantEventId: DRIFT_STATES_INV_DECLINE_GRANT,
             grantAt: '2026-03-02T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(declineGrant.status, 201);
     const decline = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
-        '/identities/YfxZQrzQBOaPJmijEVzQOg'
-            + '/invitations/YXTFXcJwnALAOHAFRMiiPg',
+        '/identities/' + declineInvitee
+            + '/invitations/' + declineName,
         declineInviteeToken, {
             state: 'declined',
-            eventId: DRIFT_STATES_INV_DECLINE_DECLINE,
             at: '2026-03-02T00:00:00.000001Z',
         },
     )));
     assertStrictEquals(decline.status, 200);
     const declineDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'YXTFXcJwnALAOHAFRMiiPg',
+        db, STARK_ORGANIZATION, declineName,
     );
     assertEquals(
         declineDerived.map((row) => row.state),
@@ -1185,8 +1219,12 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
     // had NO old-plane parity evidence anywhere before this task
     // (the invitation's version list reads exactly this
     // history for its 'revoked' version).
+    const revokeInvitee = generateIdentifier();
+    const revokeName = membershipNameOf(
+        STARK_ORGANIZATION, revokeInvitee,
+    );
     await person(
-        db, 'drift-states-invitee-revoke', 'Revoke Invitee',
+        db, revokeInvitee, 'Revoke Invitee',
         'drift-states-invitee-revoke@x.com',
     );
     const revokeGrant = await handleRequest(db, req(
@@ -1195,8 +1233,6 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-revoke@x.com',
-            invitationId: 'YZtAiXGchFrNHaSixyjBsg',
-            grantEventId: 'drift-states-inv-revoke-grant',
             grantAt: '2026-03-03T00:00:00.000000Z',
         },
     ));
@@ -1204,16 +1240,15 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
     const revoke = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
-            + '/invitations/YZtAiXGchFrNHaSixyjBsg',
+            + '/invitations/' + revokeName,
         adminToken, {
             state: 'revoked',
-            eventId: DRIFT_STATES_INV_REVOKE_REVOKE,
             at: '2026-03-03T00:00:00.000001Z',
         },
     )));
     assertStrictEquals(revoke.status, 200);
     const revokeDerived = await assertHistoryParity(
-        db, STARK_ORGANIZATION, 'YZtAiXGchFrNHaSixyjBsg',
+        db, STARK_ORGANIZATION, revokeName,
     );
     assertEquals(
         revokeDerived.map((row) => row.state),

@@ -67,13 +67,15 @@ Deno.test(
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
-        const history = (await GET<{
+        const history = await GETCollection<{
             state: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rbfHGatkwQzGZJVXKJEeyw/versions/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader());
         assertStrictEquals(history.length, 1);
-        assertStrictEquals(history[0]!.state, 'active');
+        assertStrictEquals(
+            history[0]!.body().toValue().state, 'active',
+        );
         const attrs = (await GETCollection<unknown>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
                 + 'rbfHGatkwQzGZJVXKJEeyw/attributes/', DEV_TOKEN,
@@ -109,17 +111,24 @@ Deno.test(
         assertStrictEquals(record.name, 'Empty');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7).
-        const history = (await GET<{
+        const history = await GETCollection<{
             state: string;
-            member_id: string;
-        }[]>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+        }>(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rcaSzEaORBkezCxyhLhecA/versions/', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
+                operationIdHeader());
         assertStrictEquals(history.length, 1);
-        assertStrictEquals(history[0]!.state, 'active');
-        assertStrictEquals(typeof history[0]!.member_id, 'string');
-        assertNotStrictEquals(history[0]!.member_id, '');
-        assertStrictEquals('state_at' in history[0]!, false);
+        const current = history[0]!;
+        assertStrictEquals(
+            current.body().toValue().state, 'active',
+        );
+        const memberId = current.query(
+            'header.requester-identity-id',
+        ).toText();
+        assertStrictEquals(typeof memberId, 'string');
+        assertNotStrictEquals(memberId, '');
+        assertStrictEquals(
+            'state_at' in current.body().toValue(), false,
+        );
     },
 );
 

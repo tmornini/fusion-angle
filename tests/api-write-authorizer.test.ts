@@ -201,45 +201,6 @@ async () => {
     assertStrictEquals(row.name, 'A record');
 });
 
-Deno.test('foreign-id DELETE seat is a miss in the caller org',
-async () => {
-    const { db, organizationB } = await twoOrganizationDb();
-    const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-        , ORGANIZATION_A);
-    const tokenB = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-        , organizationB);
-    const created = await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_A
-            + '/members/uTGrEpVpODbNhDhDVdWeqQ',
-        tokenA,
-        {
-            type: 'member',
-            at: '2026-01-01T00:00:00.000000Z',
-        },
-    ));
-    assertStrictEquals(created.status, 201);
-
-    const foreign = await handleRequest(db, req(
-        'DELETE',
-        '/organizations/' + organizationB
-            + '/members/uTGrEpVpODbNhDhDVdWeqQ',
-        tokenB,
-    ));
-    assertStrictEquals(foreign.status, 404);
-    const stillThere = await handleRequest(db, req(
-        'GET',
-        '/organizations/' + ORGANIZATION_A
-            + '/members/uTGrEpVpODbNhDhDVdWeqQ',
-        tokenA,
-    ));
-    assertStrictEquals(stillThere.status, 200);
-    const row = await stillThere.json() as {
-        organization_id: string;
-    };
-    assertStrictEquals(row.organization_id, ORGANIZATION_A);
-});
-
 Deno.test('foreign-id PUT organizations/:id/projects/:id geneses at'
 + ' this document', async () => {
     const { db, organizationB } = await twoOrganizationDb();

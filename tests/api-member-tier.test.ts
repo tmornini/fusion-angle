@@ -10,6 +10,8 @@ import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -50,7 +52,8 @@ async () => {
             , token));
     assertStrictEquals(list.status, 200);
     const roster = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/invitations/?state=accepted'
             , token));
     assertStrictEquals(roster.status, 200);
 });
@@ -201,14 +204,23 @@ Deno.test('PUT /identity-token-revocations/:rid is retired'
 // beside the live roster — the member tier must offer
 // the GET, or a non-admin 403s on every page that names
 // an author.
-Deno.test('a member reads the former-members list',
+Deno.test('a member reads ?state=removed',
 async () => {
     const db = await memberDb();
+    await landMembership(
+        db,
+        'AjdvjuECVZEgZoFajaIEkg',
+        generateIdentifier(),
+        'removed',
+        'member',
+        '2026-01-01T00:00:00.000000Z',
+    );
     const token = await devToken(MEMBER);
     const former = await handleRequest(
         db, req(
             'GET',
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/former-members/',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
+                + '?state=removed',
             token,
         ),
     );

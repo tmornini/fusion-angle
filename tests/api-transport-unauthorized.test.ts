@@ -25,7 +25,8 @@ Deno.test('a 401 through a verb is an UnauthorizedError', async () => {
     const db = await freshDb();
     const tok = await expiredToken();
     const err = await assertRejects(
-        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok,
+        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/', tok,
             operationIdHeader()),
     ) as UnauthorizedError;
     assertInstanceOf(err, UnauthorizedError);
@@ -43,7 +44,8 @@ async () => {
     const db = await freshDb();   // no role granted
     const tok = await devToken();
     const err = await assertRejects(
-        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tok,
+        () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/', tok,
             operationIdHeader()),
     ) as RequestError;
     assertInstanceOf(err, RequestError);

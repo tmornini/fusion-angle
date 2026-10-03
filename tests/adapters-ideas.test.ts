@@ -37,7 +37,7 @@ import { seededMockDb } from './mock-seed.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    deleteHumanMemberSeat,
+    postMembershipRemoval,
     getHumanMember,
 } from '../client/members.ts';
 import { FORMER_MEMBER_NAME } from '../shared/types.ts';
@@ -536,9 +536,9 @@ async () => {
         ctx, generateIdentifier(), ideaId, leaverId,
         '2026-04-01T00:00:00.000000Z',
     );
-    await deleteHumanMemberSeat(
-        ctx, await getHumanMember(ctx, leaverId),
-    );
+    const leaver = await getHumanMember(ctx, leaverId);
+    assert(leaver !== null);
+    await postMembershipRemoval(ctx, leaver);
     const rows = await getIdeas(ctx);
     assertStrictEquals(rows.length, 1);
     assertStrictEquals(rows[0]!.idea.idForLink(), ideaId);
@@ -560,10 +560,11 @@ Deno.test(
                 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
             ),
         );
-        await deleteHumanMemberSeat(
-            ctx,
-            await getHumanMember(ctx, 'RPzLGrWcstxLaHoBcViPLQ'),
+        const leaver = await getHumanMember(
+            ctx, 'RPzLGrWcstxLaHoBcViPLQ',
         );
+        assert(leaver !== null);
+        await postMembershipRemoval(ctx, leaver);
         const rows = await getIdeas(ctx);
         assertStrictEquals(rows.length, 6);
         assertStrictEquals(

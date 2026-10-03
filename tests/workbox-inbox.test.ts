@@ -1,4 +1,5 @@
 import {
+    assert,
     assertEquals,
     assertNotStrictEquals,
     assertStrictEquals,
@@ -59,7 +60,7 @@ import {
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
-    deleteHumanMemberSeat,
+    postMembershipRemoval,
     getHumanMember,
 } from '../client/members.ts';
 
@@ -605,9 +606,11 @@ Deno.test(
         const admin = inPageContext(
             db, await organizationToken(),
         );
-        await deleteHumanMemberSeat(
-            admin, await getHumanMember(admin, leaverId),
+        const leaver = await getHumanMember(
+            admin, leaverId,
         );
+        assert(leaver !== null);
+        await postMembershipRemoval(admin, leaver);
         const {
             workOrders, transitionsByWo,
             activeClaimsByWo, memberMap,

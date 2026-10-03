@@ -143,6 +143,43 @@ compose shape, on host port 55433, named by
   reaches the handler de-chunked with its
   `transfer-encoding` line and no `content-length`.
 
+## membership-gin/ (2026-10-01)
+
+Postgres 18.6, image `postgres:18.6`. The server
+reports `PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2)`.
+Container `fa-gin-probe`, database `probe`, tmpfs on
+`/var/lib/postgresql`, not compose. From the worktree:
+
+    sh measurements/probes/membership-gin/setup.sh
+    sh measurements/probes/membership-gin/time.sh
+
+`time.sh` starts the container when it is not already
+running, and removes `fa-gin-probe` when it finishes.
+
+- `setup.sh` — starts `fa-gin-probe` and waits until
+  `pg_isready`. A running container of that name is
+  refused. A stopped leftover of that name is removed.
+- `seed.sql` — printed `POSTGRES_SCHEMA`, then 10,000
+  membership PUT pairs at `/invitations/` across 100
+  organizations, 100 identities each. Names are
+  `organizationId:identityId`. Each response is an
+  HTTP message: a status line, content-type
+  application/json, and a JSON object with
+  `organization_id`, `identity_id`, and state
+  `accepted`.
+- `time.sh` — median of seven warm `EXPLAIN ANALYZE`
+  runs (eight executions, drop the first), with
+  `fa_message_pairs_body` and without it. The index
+  is dropped between the legs and recreated after.
+
+Indexed insert 102.436 ms; unindexed insert 81.943 ms.
+After `ANALYZE` on the indexed load, the table is
+6832128 bytes and the index is 622592 bytes. The
+organization view is 1.355 ms with the index (a bitmap
+index scan of `fa_message_pairs_body`) and 12.434 ms
+as a sequential scan (`enable_bitmapscan` off and
+`enable_indexscan` off).
+
 ## Figures whose script did not survive
 
 Stated in TODO.md as measured; re-measure when the statement

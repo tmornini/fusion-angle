@@ -16,13 +16,23 @@ import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
-import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
-import { parseIfMatch } from '../api/message-pair.ts';
+import {
+    DEFAULT_LOCK_TIMEOUT,
+    nowUtc,
+} from '../shared/types.ts';
+import {
+    attemptFor,
+    formWriteMessagePair,
+    parseIfMatch,
+    runWrite,
+} from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    messageOfResponse,
     pairIdOf,
     partBodiesOf,
+    partsOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -36,15 +46,6 @@ import {
 // absent → 404. Shared handler builder wraps
 // derive*StateHistory (ASC) with DESC + missedReadError.
 // Product versions live under organizations/:id/.
-
-interface HistoryEvent {
-    id: string;
-    entity_id: string;
-    state: string;
-    member_id: string;
-    at: string;
-    etag?: string;
-}
 
 function req(
     method: string,
@@ -66,20 +67,6 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
-}
-
-function assertDesc(rows: HistoryEvent[]): void {
-    for (let i = 1; i < rows.length; i++) {
-        const prev = rows[i - 1]!;
-        const cur = rows[i]!;
-        const ordered =
-            prev.at > cur.at
-            || (prev.at === cur.at && prev.id > cur.id);
-        assert(
-            ordered,
-            'history must be (at, id) DESC',
-        );
-    }
 }
 
 // -- Ideas --------------------------------------------------
@@ -131,8 +118,9 @@ function versionOf(res: Response): string {
 }
 
 Deno.test(
-    'GET organizations/:id/ideas/:id/versions/ 200 DESC; /history 404; '
-    + '/versions/:etag serves that revision',
+    'GET organizations/:id/ideas/:id/versions/ 200 oldest'
+    + ' first; /history 404; /versions/:etag serves that'
+    + ' revision',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -166,19 +154,31 @@ Deno.test(
                 '/versions/', DEV_TOKEN),
         );
         assertStrictEquals(index.status, 200);
-        const rows = await index.json() as {
+        const parts = await partsOf<{
             id: string;
             title: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.title, 'Hist Idea Revised');
-        assertStrictEquals(rows[0]!.state, 'in_review');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.title, 'Hist Idea');
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(index);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.title, 'Hist Idea');
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.title, 'Hist Idea Revised');
+        assertStrictEquals(current.state, 'in_review');
+        assertStrictEquals('state_at' in oldest, false);
+        assertStrictEquals(
+            parts[0]!.query('header.etag').toText()
+                .slice(1, -1),
+            xDyDkxEPwtcNmJVknUHDsg,
+        );
+        assertStrictEquals(
+            parts[1]!.query('header.etag').toText()
+                .slice(1, -1),
+            v2,
+        );
 
         const retired = await handleRequest(
             db,
@@ -187,49 +187,51 @@ Deno.test(
         );
         assertStrictEquals(retired.status, 404);
 
-        const first = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id
-                    + '/versions/' + xDyDkxEPwtcNmJVknUHDsg,
-                DEV_TOKEN,
-            ),
-        );
-        assertStrictEquals(first.status, 200);
-        const firstBody = await first.json() as {
-            id: string;
-            title: string;
-            state: string;
-        };
-        assertStrictEquals(firstBody.id, id);
-        assertStrictEquals(firstBody.title, 'Hist Idea');
-        assertStrictEquals(firstBody.state, 'active');
-        assertStrictEquals(versionOf(first), xDyDkxEPwtcNmJVknUHDsg);
-
-        const second = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id
-                    + '/versions/' + v2,
-                DEV_TOKEN,
-            ),
-        );
-        assertStrictEquals(second.status, 200);
-        const secondBody = await second.json() as {
-            id: string;
-            title: string;
-            state: string;
-        };
-        assertStrictEquals(secondBody.title, 'Hist Idea Revised');
-        assertStrictEquals(secondBody.state, 'in_review');
-        assertStrictEquals(versionOf(second), v2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                        + id + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            assertStrictEquals(versionOf(item), tag);
+            const served = await messageOfResponse(item);
+            const body = served.body().toValue() as {
+                id: string;
+                title: string;
+                state: string;
+            };
+            if (tag === xDyDkxEPwtcNmJVknUHDsg) {
+                assertStrictEquals(body.id, id);
+                assertStrictEquals(body.title, 'Hist Idea');
+                assertStrictEquals(body.state, 'active');
+            } else {
+                assertStrictEquals(
+                    body.title, 'Hist Idea Revised',
+                );
+                assertStrictEquals(body.state, 'in_review');
+            }
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
     },
 );
 
 Deno.test(
-    'GET organizations/:id/ideas/:id/versions/: 200 DESC current-first',
+    'GET organizations/:id/ideas/:id/versions/ 200'
+    + ' oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -240,16 +242,18 @@ Deno.test(
                 '/versions/', DEV_TOKEN),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'in_review');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'in_review');
+        assertStrictEquals('state_at' in oldest, false);
     },
 );
 
@@ -329,13 +333,15 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'in_review');
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const current = parts[parts.length - 1]!
+            .body().toValue();
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'in_review');
     },
 );
 
@@ -383,7 +389,8 @@ async function seedProjectLifecycle(
 }
 
 Deno.test(
-    'GET organizations/:id/projects/:id/versions: 200 DESC current-first',
+    'GET organizations/:id/projects/:id/versions/ 200'
+    + ' oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -398,16 +405,122 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'under_review');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'submitted');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'submitted');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'under_review');
+        assertStrictEquals('state_at' in oldest, false);
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/projects/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedProjectLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                        + id + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/projects/:id/versions/ of a'
+    + ' state-deleted project is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id,
+                DEV_TOKEN,
+                projectBody('Gone Project', 'submitted'),
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const tombstone = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id,
+                DEV_TOKEN,
+                projectBody('Gone Project', 'deleted'),
+            ),
+        );
+        assertStrictEquals(tombstone.status, 200);
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: projects/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: projects/' + id,
+        });
     },
 );
 
@@ -510,7 +623,8 @@ async function seedRecordLifecycle(
 }
 
 Deno.test(
-    'GET nested record-types/:id/versions: 200 DESC current-first',
+    'GET nested record-types/:id/versions: 200 oldest'
+    + ' first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -519,22 +633,189 @@ Deno.test(
             db,
             req(
                 'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/' + id
-                    + '/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
                 DEV_TOKEN,
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'archived');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[parts.length - 1]!
+            .body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'archived');
+        assertStrictEquals('state_at' in current, false);
+    },
+);
+
+Deno.test(
+    'GET nested record-types/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedRecordLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                        + '/record-types/' + id
+                        + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET nested record-types/:id/versions/ of a'
+    + ' deleted record type is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+                recordBody('Gone Record', 'active'),
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const removed = await handleRequest(
+            db,
+            req(
+                'DELETE',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(removed.status, 204);
+        await removed.body?.cancel();
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: record_types/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: record_types/' + id,
+        });
+    },
+);
+
+Deno.test(
+    'GET nested record-types/:id/versions/ of a'
+    + ' state-deleted record type is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+                recordBody('Gone Record', 'active'),
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const tombstone = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id,
+                DEV_TOKEN,
+                recordBody('Gone Record', 'deleted'),
+            ),
+        );
+        assertStrictEquals(tombstone.status, 200);
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: record_types/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: record_types/' + id,
+        });
     },
 );
 
@@ -676,8 +957,15 @@ async function seedFlowLifecycle(
     return { ev1, ev2 };
 }
 
+function flowEtagOf(
+    part: { query(path: string): { toText(): string } },
+): string {
+    return part.query('header.etag').toText().slice(1, -1);
+}
+
 Deno.test(
-    'GET organizations/:id/flows/:id/versions: 200 DESC current-first',
+    'GET organizations/:id/flows/:id/versions/'
+    + ' 200 oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -688,19 +976,23 @@ Deno.test(
             db,
             req(
                 'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + id
-                    + '/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + id + '/versions/',
                 DEV_TOKEN,
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, ev2);
-        assertStrictEquals(rows[0]!.state, 'updated');
-        assertStrictEquals(rows[1]!.id, ev1);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertDesc(rows);
+        const parts = await partsOf<{
+            state: string;
+            state_event_id: string;
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.state_event_id, ev1);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.state_event_id, ev2);
+        assertStrictEquals(current.state, 'updated');
     },
 );
 
@@ -740,14 +1032,19 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-        assertStrictEquals(rows.length, 1);
-        assertStrictEquals(rows[0]!.etag, pairId);
+        const parts = await partsOf<{
+            state: string;
+            state_event_id: string;
+        }>(res);
+        assertStrictEquals(parts.length, 1);
+        const body = parts[0]!.body().toValue();
+        assertStrictEquals(flowEtagOf(parts[0]!), pairId);
         assertStrictEquals(
-            isIdentifier(rows[0]!.etag ?? ''),
+            isIdentifier(flowEtagOf(parts[0]!)),
             true,
         );
-        assertStrictEquals('version' in rows[0]!, false);
+        assertStrictEquals('version' in body, false);
+        assertStrictEquals(body.state, 'active');
     },
 );
 
@@ -823,15 +1120,130 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-        assertStrictEquals(rows.length, 3);
-        const etags = rows.map((row) => row.etag);
-        assertEquals(etags, [etagA2, etagB, etagA]);
+        const parts = await partsOf(res);
+        assertStrictEquals(parts.length, 3);
+        const etags = parts.map((part) => flowEtagOf(part));
+        assertEquals(etags, [etagA, etagB, etagA2]);
         assertStrictEquals(new Set(etags).size, 3);
         for (const etag of etags) {
-            assertStrictEquals(isIdentifier(etag ?? ''), true);
+            assertStrictEquals(isIdentifier(etag), true);
         }
-        assertStrictEquals('version' in rows[0]!, false);
+        const body = parts[0]!.body().toValue() as
+            Record<string, unknown>;
+        assertStrictEquals('version' in body, false);
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/flows/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedFlowLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = flowEtagOf(part);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+                        + id + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/flows/:id/versions/ of a'
+    + ' state-deleted flow is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const path =
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + id;
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Gone Flow',
+                    'active',
+                    '2026-03-01T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+                { 'if-none-match': '*' },
+            ),
+        );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        const removed = await handleRequest(
+            db,
+            req(
+                'PUT',
+                path,
+                DEV_TOKEN,
+                flowDocBody(
+                    'Gone Flow',
+                    'deleted',
+                    '2026-03-02T00:00:00.000000Z',
+                    generateIdentifier(),
+                ),
+                {
+                    'if-match': created.headers.get('ETag')!,
+                },
+            ),
+        );
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+        const list = await handleRequest(
+            db,
+            req('GET', path + '/versions/', DEV_TOKEN),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: flows/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                path + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: flows/' + id,
+        });
     },
 );
 
@@ -932,7 +1344,8 @@ async function seedObjectiveLifecycle(
 }
 
 Deno.test(
-    'GET organizations/:id/objectives/:id/versions: 200 DESC current-first',
+    'GET organizations/:id/objectives/:id/versions/'
+    + ' 200 oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -941,36 +1354,172 @@ Deno.test(
             db,
             req(
                 'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id
-                    + '/versions/',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/',
                 DEV_TOKEN,
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-            etag: string;
-            at: string;
-            member_id: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'archived');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
-        assertStrictEquals(typeof rows[0]!.etag, 'string');
-        assertNotStrictEquals(rows[0]!.etag, '');
-        assertNotStrictEquals(
-            rows[0]!.etag, rows[1]!.etag,
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'archived');
+        assertStrictEquals('state_at' in current, false);
+        const oldestTag = parts[0]!.query('header.etag')
+            .toText().slice(1, -1);
+        const currentTag = parts[1]!.query('header.etag')
+            .toText().slice(1, -1);
+        assertStrictEquals(typeof currentTag, 'string');
+        assertNotStrictEquals(currentTag, '');
+        assertNotStrictEquals(currentTag, oldestTag);
+        const oldestAt = parts[0]!.query(
+            'header.response-at',
+        ).toText();
+        const currentAt = parts[1]!.query(
+            'header.response-at',
+        ).toText();
+        assert(currentAt > oldestAt);
+        const oldestMember = parts[0]!.query(
+            'header.requester-identity-id',
+        ).toText();
+        const currentMember = parts[1]!.query(
+            'header.requester-identity-id',
+        ).toText();
+        assertStrictEquals(typeof currentMember, 'string');
+        assertNotStrictEquals(currentMember, '');
+        assertStrictEquals(currentMember, oldestMember);
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/objectives/:id/versions/ each'
+    + ' part equals the item its etag serves',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        await seedObjectiveLifecycle(db, id, DEV_TOKEN);
+        const index = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
         );
-        assert(rows[0]!.at > rows[1]!.at);
-        assertStrictEquals(typeof rows[0]!.member_id, 'string');
-        assertNotStrictEquals(rows[0]!.member_id, '');
-        assertStrictEquals(
-            rows[0]!.member_id, rows[1]!.member_id,
+        assertStrictEquals(index.status, 200);
+        const parts = await partsOf(index);
+        assertStrictEquals(parts.length, 2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg'
+                        + '/objectives/' + id + '/versions/'
+                        + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
+
+Deno.test(
+    'GET organizations/:id/objectives/:id/versions/ of'
+    + ' a state-deleted objective is Gone',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const created = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id,
+                DEV_TOKEN,
+                objectiveBody('active'),
+            ),
         );
+        assertStrictEquals(created.status, 201);
+        const tag = pairIdOf(created);
+        assert(tag !== null);
+        // The objective alphabet admits no deleted, so the
+        // state-deleted head is formed below the facade.
+        const deletedBody = {
+            position: 1,
+            state: 'deleted',
+        };
+        const messagePair = await formWriteMessagePair({
+            method: 'PUT',
+            pathname:
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id,
+            routePattern: 'organizations/:id/objectives/:id',
+            routeSegments: [
+                'organizations', ':id', 'objectives', ':id',
+            ],
+            pathSegments: [
+                'organizations', 'AjdvjuECVZEgZoFajaIEkg',
+                'objectives', id,
+            ],
+            headerFields: [],
+            body: deletedBody,
+            requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+            requestAt: nowUtc(),
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            responseBody: { id, ...deletedBody },
+            operationId: generateIdentifier(),
+            requestId: generateIdentifier(),
+        });
+        await runWrite(
+            db, attemptFor([messagePair]), [messagePair],
+        );
+        const list = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/',
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(list.status, 410);
+        assertEquals(await list.json(), {
+            error: 'Gone: objectives/' + id,
+        });
+        const item = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
+                    + id + '/versions/' + tag,
+                DEV_TOKEN,
+            ),
+        );
+        assertStrictEquals(item.status, 410);
+        assertEquals(await item.json(), {
+            error: 'Gone: objectives/' + id,
+        });
     },
 );
 

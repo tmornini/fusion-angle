@@ -268,7 +268,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // seedRootAdmin: org + membership (2)
+    // seedRootAdmin: organization and membership (2)
     // + identity + pii + credential (3)
     // + rehash + authorize + code document
     // + code DELETE + issued event + token = 12.
@@ -323,7 +323,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     assertStrictEquals(codeDelete.supersedes, codePut.id);
     // The code DELETE is the one successor. Every other
     // row in this slice is a genesis.
-    for (const row of responses.slice(6)) {
+    for (const row of responses.slice(5)) {
         if (row.id === codeDelete.id) continue;
         assertStrictEquals(row.supersedes, NIL_IDENTIFIER);
         assertStrictEquals('follows' in row, false);

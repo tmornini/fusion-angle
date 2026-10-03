@@ -78,7 +78,7 @@ Deno.test('admin is permitted on every verb at root', () => {
             true);
         assertStrictEquals(
             isPermitted(
-                verb, '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
+                verb, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas'
                     , ['admin'],
             ), true);
     }
@@ -87,11 +87,11 @@ Deno.test('admin is permitted on every verb at root', () => {
 Deno.test('deny-by-default: no held role is forbidden', () => {
     assertStrictEquals(
         isPermitted(
-            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members', [],
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas', [],
         ), false);
     assertStrictEquals(
         isPermitted(
-            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas'
                 , ['viewer'],
         ), false);
 });
@@ -157,7 +157,7 @@ Deno.test('prefixes match on segment boundaries only', () => {
     // surface that merely shares the leading characters.
     assertStrictEquals(
         isPermitted(
-            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members'
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas'
                 , ['member'],
         ), true);
     assertStrictEquals(

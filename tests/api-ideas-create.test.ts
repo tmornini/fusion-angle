@@ -5,6 +5,7 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest,
     pairIdOf,
+    partsOf,
 } from './http-fixtures.ts';
 import {
     seedAdminSchema,
@@ -96,13 +97,13 @@ Deno.test(
                 + 'gVvtDIaqhnkXZQcxZeSuiw/versions/',
             DEV_TOKEN,
         ));
-        const history = await stateRes.json() as {
+        const history = await partsOf<{
             id: string;
             title: string;
             state: string;
-        }[];
+        }>(stateRes);
         assertStrictEquals(history.length, 1);
-        const current = history[0]!;
+        const current = history[0]!.body().toValue();
         assertStrictEquals(current.id, 'gVvtDIaqhnkXZQcxZeSuiw');
         assertStrictEquals(current.title, 'Fresh Idea');
         assertStrictEquals(current.state, 'active');
@@ -181,7 +182,8 @@ Deno.test(
             ideaGenesisBody('Should Not Create'),
         ));
         assertStrictEquals(res.status, 405);
-        // seedRootAdmin only (org + membership); no write pair.
+        // nil root, organization, and the membership;
+        // no write pair.
         assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     },
 );

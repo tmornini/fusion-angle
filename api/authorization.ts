@@ -142,10 +142,6 @@ const MEMBER_VERBS: Readonly<
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
     '/ai-agents': ['GET'],
-    '/organizations/:id/members': ['GET'],
-    // The same roster's DELETEd seats — every member's
-    // name resolver reads it beside the live roster.
-    '/organizations/:id/former-members': ['GET'],
     // :id only — the root collection is retired.
     // The old '/organizations' prefix also matched
     // GET /organizations/:id; keep that document.
@@ -159,9 +155,11 @@ const MEMBER_VERBS: Readonly<
     '/identities/:id/default-organization':
         ['GET', 'PUT'],
     '/identities/:id/organizations': ['GET'],
-    // Invitee (or admin) may read and answer. Org
-    // nest stays admin-only via `/` — no row here.
+    // Invitee (or admin) may read and answer.
     '/identities/:id/invitations': ['GET', 'PUT'],
+    // A member reads accepted and removed only. The
+    // gate and the selectors enforce that rule.
+    '/organizations/:id/invitations': ['GET'],
 };
 
 const MEMBER_TIER: readonly PolicyEntry[] =

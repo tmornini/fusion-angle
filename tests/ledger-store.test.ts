@@ -230,6 +230,7 @@ Deno.test(
             name: NAME,
             id: identifierAt(1),
             responseAt: HEAD_STAMP,
+            requesterIdentityId: 'fa_owner',
             response: message(imfFixdate(HEAD_STAMP), 'old'),
             method: 'PUT',
         };
@@ -287,6 +288,7 @@ Deno.test(
             name: NAME,
             id: headId,
             responseAt: HEAD_STAMP,
+            requesterIdentityId: 'fa_owner',
             response: headResponse,
             method: 'PUT',
         };
@@ -326,6 +328,7 @@ Deno.test(
                 name: NAME,
                 id: headId,
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: bareHead,
                 method: 'PUT',
             }],
@@ -345,6 +348,7 @@ Deno.test(
             name: NAME,
             id: identifierAt(1),
             responseAt: HEAD_STAMP,
+            requesterIdentityId: 'fa_owner',
             response: message(
                 imfFixdate(HEAD_STAMP),
                 'kept',
@@ -422,6 +426,7 @@ Deno.test(
                 name: NAME,
                 id: identifierAt(1),
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: message(
                     imfFixdate(HEAD_STAMP), 'hello',
                 ),
@@ -452,6 +457,7 @@ Deno.test(
                 name: NAME,
                 id: identifierAt(1),
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: textBytes(
                     'HTTP/1.1 204 \r\ndate: '
                         + imfFixdate(HEAD_STAMP)
@@ -518,6 +524,7 @@ Deno.test(
                 name: NAME,
                 id: identifierAt(1),
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: message(
                     imfFixdate(HEAD_STAMP), 'hello',
                 ),
@@ -549,6 +556,7 @@ Deno.test(
                 name: NAME,
                 id: identifierAt(1),
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: textBytes(
                     'HTTP/1.1 204 \r\ndate: '
                         + imfFixdate(HEAD_STAMP)
@@ -597,6 +605,7 @@ Deno.test(
                 name: NAME,
                 id: identifierAt(1),
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: message(
                     imfFixdate(HEAD_STAMP), 'old',
                 ),
@@ -753,6 +762,7 @@ Deno.test(
             name: NAME,
             id: headId,
             responseAt: HEAD_STAMP,
+            requesterIdentityId: 'fa_owner',
             response: message(imfFixdate(HEAD_STAMP), 'old'),
             method: 'PUT',
         };
@@ -761,6 +771,7 @@ Deno.test(
             name: '0000-root',
             id: identifierAt(2),
             responseAt: HEAD_STAMP,
+            requesterIdentityId: 'fa_owner',
             response: message(imfFixdate(HEAD_STAMP), 'old'),
             method: 'PUT',
         };
@@ -810,6 +821,7 @@ Deno.test(
             name: NAME,
             id: identifierAt(1),
             responseAt: HEAD_STAMP,
+            requesterIdentityId: 'fa_owner',
             response: message(
                 imfFixdate(HEAD_STAMP),
                 'kept',
@@ -865,6 +877,7 @@ Deno.test(
                 name: NAME,
                 id: headId,
                 responseAt: HEAD_STAMP,
+                requesterIdentityId: 'fa_owner',
                 response: message(
                     imfFixdate(HEAD_STAMP), 'kept',
                 ),

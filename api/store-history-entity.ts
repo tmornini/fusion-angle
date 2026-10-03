@@ -82,6 +82,18 @@ export class HistoryEntityStore<
         );
     }
 
+    async getCollectionHeadPairsContaining(
+        path: string,
+        contains: Readonly<Record<string, string>>,
+    ): Promise<T[]> {
+        return this.#run(
+            'readonly',
+            (tx) => tx.getCollectionHeadPairsContaining<T>(
+                path, contains,
+            ),
+        );
+    }
+
     async getById(id: string): Promise<T> {
         return this.#run(
             'readonly',

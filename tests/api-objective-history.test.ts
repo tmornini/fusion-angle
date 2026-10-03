@@ -9,6 +9,7 @@ import { DEV_TOKEN } from
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -140,12 +141,15 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as VersionRow[];
-        assertStrictEquals(rows.length, 4);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'archived');
-        const archived = rows.filter(
-            (row) => row.state === 'archived',
+        const parts = await partsOf<VersionRow>(res);
+        assertStrictEquals(parts.length, 4);
+        const current = parts[parts.length - 1]!
+            .body().toValue();
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'archived');
+        const archived = parts.filter(
+            (part) => part.body().toValue().state
+                === 'archived',
         );
         assertStrictEquals(archived.length, 2);
     },

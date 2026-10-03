@@ -24,9 +24,10 @@ import {
 import {
     formWriteMessagePair,
     canonicalPath,
+    runWrite,
+    attemptFor,
 } from '../api/message-pair.ts';
 import {
-    postMembershipDocumentOp,
     postMemberDocumentOp,
 } from '../api/routes.ts';
 import { deriveMembers } from '../api/derive-members.ts';
@@ -38,8 +39,13 @@ import {
     invitationLatched,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
+import { membershipOf } from '../api/memberships.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 // Per-family history derives (states-URI elimination C2/C3).
 // A hand-built multi-family fixture drives ONE representative
@@ -51,6 +57,7 @@ import { generateIdentifier } from
 // history routes.
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const LATER = '2026-01-02T00:00:00.000000Z';
 
 // Non-current admins need explicit claim roles — organizationToken
 // only bakes admin for sub === 'XXZruirZyAOoRpNxaDnpSA'.
@@ -111,8 +118,8 @@ async function leftoverMembershipMessagePair(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, messagePair,
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
     );
 }
 
@@ -391,32 +398,29 @@ async function createWorkOrder(
 async function grantAndAccept(
     db: MemoryDbAdapter, adminToken: string,
     inviteeToken: string, inviteeId: string,
-    inviteeEmail: string,
-    invitationId: string, grantEventId: string, grantAt: string,
-    membershipId: string, acceptEventId: string, acceptAt: string,
-    organization: string,
-): Promise<void> {
+    inviteeEmail: string, grantAt: string,
+    acceptAt: string, organization: string,
+): Promise<string> {
+    const name = membershipNameOf(organization, inviteeId);
     const grantRes = await handleRequest(db, req(
         'POST',
         '/organizations/' + organization + '/invitations/',
         adminToken,
-        { email: inviteeEmail, invitationId, grantEventId, grantAt },
+        { email: inviteeEmail, grantAt },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
-    const acceptRes = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + inviteeId
-            + '/invitations/' + invitationId,
-        inviteeToken,
-        {
-            state: 'accepted',
-            membershipId,
-            eventId: acceptEventId,
-            at: acceptAt,
-        },
-    )));
+    const acceptRes = await handleRequest(
+        db, await invitationLatched(db, req(
+            'PUT',
+            '/identities/' + inviteeId
+                + '/invitations/' + name,
+            inviteeToken,
+            { state: 'accepted', at: acceptAt },
+        )),
+    );
     assertStrictEquals(acceptRes.status, 200, 'accept failed');
+    return name;
 }
 
 interface UnionFixture {
@@ -434,8 +438,6 @@ interface UnionFixture {
     readonly deletedEventId: string;
     readonly restoredEventId: string;
     readonly invitationId: string;
-    readonly grantEventId: string;
-    readonly acceptEventId: string;
     readonly foreignIdeaId: string;
 }
 
@@ -529,15 +531,10 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const inviteeToken = await organizationToken(
         inviteeId, organizationA,
     );
-    const invitationId = generateIdentifier();
-    const grantEventId = generateIdentifier();
-    const acceptEventId = generateIdentifier();
-    await grantAndAccept(
+    const invitationId = await grantAndAccept(
         db, tokenA, inviteeToken, inviteeId,
         'invitee-union@x.com',
-        invitationId, grantEventId,
         '2026-01-05T00:00:00.000000Z',
-        generateIdentifier(), acceptEventId,
         '2026-01-05T00:00:00.000001Z',
         organizationA,
     );
@@ -548,7 +545,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
         workOrderEventIds: wo.stateEventIds,
         deletedNodeId, restoredNodeId,
         deletedEventId, restoredEventId,
-        invitationId, grantEventId, acceptEventId,
+        invitationId,
         foreignIdeaId,
     };
 }
@@ -573,7 +570,7 @@ async () => {
     );
 });
 
-Deno.test('deriveMembers is seats ∩ identities: leftover'
+Deno.test('deriveMembers is memberships ∩ identities: leftover'
 + ' /members/ and /memberships/ do not join',
 async () => {
     const db = memoryDbAdapter();
@@ -606,6 +603,118 @@ async () => {
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === ghost),
         true,
+    );
+});
+
+const PERSON = {
+    name: 'Person', email: 'p@x.com',
+    phone: '', bio: '',
+};
+
+Deno.test('deriveMembers holds an accepted membership'
++ ' of either type with no seat', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const member = generateIdentifier();
+    const admin = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedPersonIdentity(db, member, {
+        ...PERSON, email: 'member@x.com',
+    });
+    await seedPersonIdentity(db, admin, {
+        ...PERSON, email: 'admin@x.com',
+    });
+    await landMembership(
+        db, organizationA, member, 'accepted', 'member', AT,
+    );
+    await landMembership(
+        db, organizationA, admin, 'accepted', 'admin', AT,
+    );
+    const rows = await deriveMembers(db, organizationA);
+    assertEquals(
+        rows.find((row) => row.id === member),
+        { id: member, type: 'human' },
+    );
+    assertEquals(
+        rows.find((row) => row.id === admin),
+        { id: admin, type: 'human' },
+    );
+    assertStrictEquals(rows.length, 2);
+});
+
+Deno.test('deriveMembers holds nothing for a removed'
++ ' membership head whose seat remains', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const identity = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedPersonIdentity(db, identity, PERSON);
+    await seedSeat(
+        db, organizationA, identity, 'member', AT,
+    );
+    await landMembership(
+        db, organizationA, identity, 'removed', 'member', AT,
+    );
+    assertStrictEquals(
+        await membershipOf(db, organizationA, identity),
+        null,
+    );
+    assertStrictEquals(
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === identity),
+        false,
+    );
+});
+
+Deno.test('deriveMembers holds nothing for a non-accepted'
++ ' membership', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    const states = [
+        'pending', 'declined', 'revoked', 'removed',
+    ] as const;
+    for (const state of states) {
+        const identity = generateIdentifier();
+        await seedPersonIdentity(db, identity, {
+            ...PERSON, email: state + '@x.com',
+        });
+        await landMembership(
+            db, organizationA, identity, state, 'member',
+            AT,
+        );
+        assertStrictEquals(
+            (await deriveMembers(db, organizationA))
+                .some((row) => row.id === identity),
+            false,
+            state,
+        );
+    }
+});
+
+Deno.test('deriveMembers holds nothing for an accepted'
++ ' version under a removed head', async () => {
+    const db = memoryDbAdapter();
+    const organizationA = generateIdentifier();
+    const identity = generateIdentifier();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, organizationA, 'Acme');
+    await seedPersonIdentity(db, identity, PERSON);
+    await landMembership(
+        db, organizationA, identity, 'accepted', 'member',
+        AT,
+    );
+    await landMembership(
+        db, organizationA, identity, 'removed', 'member',
+        LATER,
+    );
+    assertStrictEquals(
+        (await deriveMembers(db, organizationA))
+            .some((row) => row.id === identity),
+        false,
     );
 });
 
@@ -725,95 +834,19 @@ async () => {
     );
 });
 
-// ---- 3. invitation phantom-pair regressions (gate 5f) -----------
+// ---- 3. a repeated answer stores no second row -----------------
 
-// deriveInvitationStates folds the invitation document's own
-// PUT history: every PUT at /invitations/<id> is one row. A
-// duplicate grant on an already-pending (organization,
-// identity) pair writes no document at its own submitted id
-// (grantInvitation's own header, api/invitations-domain.ts),
-// so there is structurally nothing to read there. An
-// idempotent resend (re-accept/re-decline/re-revoke) appends
-// no second PUT once the invitation has reached that
-// terminal state, so only the first answering write's PUT
-// ever exists. Both are hand-trace-verified in
-// invitationLifecycleRowsOf's own header comment
-// (api/derive-states.ts) but had no regression coverage
-// before this section — these three tests drive each phantom
-// shape through handleRequest and assert row counts, not
-// just presence.
+// The duplicate-grant pin named two invitation ids for one
+// pair. That behavior is gone: the document name is the
+// membership name. A repeated accept or decline, latched on
+// the head it already moved, is 409 and appends no PUT.
 
-Deno.test('deriveInvitationStates: a duplicate grant on the same'
-+ ' pending (organization, invitee) pair derives exactly ONE'
-+ ' \'pending\' row, and posts no event on the old plane for'
-+ ' the duplicate\'s own id', async () => {
-    const { db, organizationA, adminA } = await seed();
-    const tokenA = await adminToken(adminA, organizationA);
-    const inviteeId = generateIdentifier();
-    const invA = generateIdentifier();
-    const invB = generateIdentifier();
-    const grantA = generateIdentifier();
-    await person(
-        db, inviteeId, 'Dup Invitee', 'invitee-dup@x.com',
-    );
-
-    const first = await handleRequest(db, req(
-        'POST', '/organizations/' + organizationA + '/invitations/',
-        tokenA,
-        {
-            email: 'invitee-dup@x.com',
-            invitationId: invA,
-            grantEventId: grantA,
-            grantAt: '2026-04-01T00:00:00.000000Z',
-        },
-    ));
-    assertStrictEquals(first.status, 201, 'first grant failed');
-
-    const second = await handleRequest(db, req(
-        'POST', '/organizations/' + organizationA + '/invitations/',
-        tokenA,
-        {
-            email: 'invitee-dup@x.com',
-            invitationId: invB,
-            grantEventId: generateIdentifier(),
-            grantAt: '2026-04-01T00:00:00.000001Z',
-        },
-    ));
-    assertStrictEquals(second.status, 200, 'duplicate grant failed');
-    const secondBody = await second.json() as { id: string };
-    // The duplicate echoes the ORIGINAL invitation id, never its
-    // own submitted one.
-    assertStrictEquals(secondBody.id, invA);
-
-    // The old plane: no event was ever posted for the
-    // duplicate's own submitted id — a REAL second pending row
-    // here would be a live parity bug, not a test gap.
-    assertEquals(
-        [], [], // states table retired
-    );
-
-    const rows = await deriveInvitationStates(db);
-    const pendingForOriginal = rows.filter(
-        (row) => row.entity_id === invA
-            && row.state === 'pending',
-    );
-    assertStrictEquals(pendingForOriginal.length, 1);
-
-    // No phantom row was derived for the duplicate's own id.
-    assertStrictEquals(
-        rows.some((row) => row.entity_id === invB), false,
-    );
-});
-
-Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
-+ ' derives exactly ONE \'accepted\' row, appended by the'
-+ ' first accept only', async () => {
+Deno.test('deriveInvitationStates: a repeated accept is 409'
++ ' and derives exactly one accepted row', async () => {
     const { db, organizationA, adminA } = await seed();
     const tokenA = await adminToken(adminA, organizationA);
     const inviteeId = 'jLMftvmIlvkHfyyIXYElhQ';
-    const invitationId = 'ientwuGyocqieLhpxdHZNA';
-    const accept1 = generateIdentifier();
-    const accept2 = generateIdentifier();
+    const name = membershipNameOf(organizationA, inviteeId);
     await person(
         db, inviteeId, 'Reaccept Invitee',
         'invitee-reaccept@x.com',
@@ -823,12 +856,11 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
     );
 
     const grantRes = await handleRequest(db, req(
-        'POST', '/organizations/' + organizationA + '/invitations/',
+        'POST', '/organizations/' + organizationA
+            + '/invitations/',
         tokenA,
         {
             email: 'invitee-reaccept@x.com',
-            invitationId,
-            grantEventId: generateIdentifier(),
             grantAt: '2026-04-02T00:00:00.000000Z',
         },
     ));
@@ -836,58 +868,55 @@ Deno.test('deriveInvitationStates: a re-accept (idempotent resend)'
 
     const firstAccept = await handleRequest(
         db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + inviteeId + '/invitations/'
-            + invitationId,
-        inviteeToken,
-        {
-            state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: accept1,
-            at: '2026-04-02T00:00:00.000001Z',
-        },
-    )));
-    assertStrictEquals(firstAccept.status, 200, 'first accept failed');
+            'PUT',
+            '/identities/' + inviteeId + '/invitations/'
+                + name,
+            inviteeToken,
+            {
+                state: 'accepted',
+                at: '2026-04-02T00:00:00.000001Z',
+            },
+        )),
+    );
+    assertStrictEquals(
+        firstAccept.status, 200, 'first accept failed',
+    );
 
     const secondAccept = await handleRequest(
         db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + inviteeId + '/invitations/'
-            + invitationId,
-        inviteeToken,
-        {
-            state: 'accepted',
-            membershipId: generateIdentifier(),
-            eventId: accept2,
-            at: '2026-04-02T00:00:00.000002Z',
-        },
-    )));
+            'PUT',
+            '/identities/' + inviteeId + '/invitations/'
+                + name,
+            inviteeToken,
+            {
+                state: 'accepted',
+                at: '2026-04-02T00:00:00.000002Z',
+            },
+        )),
+    );
     assertStrictEquals(
-        secondAccept.status, 200, 're-accept is a no-op',
+        secondAccept.status, 409,
+        'a repeated accept is refused',
     );
 
     const rows = await deriveInvitationStates(db);
     assertStrictEquals(
-        rows.filter((row) => row.entity_id === invitationId)
-            .length,
+        rows.filter((row) => row.entity_id === name).length,
         2,
     );
     assertStrictEquals(
-        rows.filter((row) => row.entity_id === invitationId
+        rows.filter((row) => row.entity_id === name
             && row.state === 'accepted').length,
         1,
     );
 });
 
-Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
-+ ' derives exactly ONE \'declined\' row, appended by the'
-+ ' first decline only', async () => {
+Deno.test('deriveInvitationStates: a repeated decline is 409'
++ ' and derives exactly one declined row', async () => {
     const { db, organizationA, adminA } = await seed();
     const tokenA = await adminToken(adminA, organizationA);
     const inviteeId = 'jLwvLbZCGaiaFioqVNEetA';
-    const invitationId = generateIdentifier();
-    const decline1 = generateIdentifier();
-    const decline2 = generateIdentifier();
+    const name = membershipNameOf(organizationA, inviteeId);
     await person(
         db, inviteeId, 'Redecline Invitee',
         'invitee-redecline@x.com',
@@ -897,12 +926,11 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
     );
 
     const grantRes = await handleRequest(db, req(
-        'POST', '/organizations/' + organizationA + '/invitations/',
+        'POST', '/organizations/' + organizationA
+            + '/invitations/',
         tokenA,
         {
             email: 'invitee-redecline@x.com',
-            invitationId,
-            grantEventId: generateIdentifier(),
             grantAt: '2026-04-03T00:00:00.000000Z',
         },
     ));
@@ -910,43 +938,44 @@ Deno.test('deriveInvitationStates: a re-decline (idempotent resend)'
 
     const firstDecline = await handleRequest(
         db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + inviteeId + '/invitations/'
-            + invitationId,
-        inviteeToken,
-        {
-            state: 'declined',
-            eventId: decline1,
-            at: '2026-04-03T00:00:00.000001Z',
-        },
-    )));
-    assertStrictEquals(firstDecline.status, 200, 'first decline failed');
+            'PUT',
+            '/identities/' + inviteeId + '/invitations/'
+                + name,
+            inviteeToken,
+            {
+                state: 'declined',
+                at: '2026-04-03T00:00:00.000001Z',
+            },
+        )),
+    );
+    assertStrictEquals(
+        firstDecline.status, 200, 'first decline failed',
+    );
 
     const secondDecline = await handleRequest(
         db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + inviteeId + '/invitations/'
-            + invitationId,
-        inviteeToken,
-        {
-            state: 'declined',
-            eventId: decline2,
-            at: '2026-04-03T00:00:00.000002Z',
-        },
-    )));
+            'PUT',
+            '/identities/' + inviteeId + '/invitations/'
+                + name,
+            inviteeToken,
+            {
+                state: 'declined',
+                at: '2026-04-03T00:00:00.000002Z',
+            },
+        )),
+    );
     assertStrictEquals(
-        secondDecline.status, 200,
-        're-decline is a no-op',
+        secondDecline.status, 409,
+        'a repeated decline is refused',
     );
 
     const rows = await deriveInvitationStates(db);
     assertStrictEquals(
-        rows.filter((row) => row.entity_id === invitationId)
-            .length,
+        rows.filter((row) => row.entity_id === name).length,
         2,
     );
     assertStrictEquals(
-        rows.filter((row) => row.entity_id === invitationId
+        rows.filter((row) => row.entity_id === name
             && row.state === 'declined').length,
         1,
     );

@@ -5,8 +5,12 @@ import {
 } from '@std/assert';
 import { connectPostgres } from
     '../api/postgres-client.ts';
-import { PostgresBackend } from
-    '../api/backend-postgres.ts';
+import {
+    COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
+    PostgresBackend,
+} from '../api/backend-postgres.ts';
+import { BODY_INDEXED_PATH } from
+    '../api/schema-postgres.ts';
 import type { Tx } from '../api/db.ts';
 import { serializeWire } from
     '../shared/http-message/wire-codec.ts';
@@ -41,6 +45,11 @@ const REQUESTER = 'WOTMsfERBVJEuTRTgrQptQ';
 const OPERATION = 'WvNiHVgksjrlfhPfdgfcyQ';
 const EXPLAIN_INSERT_N = 9000;
 const AUTH_CONTAINMENT = { code: 'abc' };
+const MEMBERSHIP_COUNT = 10000;
+const MEMBERSHIP_ORGANIZATIONS = 100;
+const MEMBERSHIP_ID_START = 10000;
+const ORGANIZATION_ID_START = 50000;
+const IDENTITY_ID_START = 80000;
 
 function schemaName(): string {
     const base = Deno.env.get('SCHEMA_NAME')
@@ -179,6 +188,39 @@ async function putAuthorize(
     ));
 }
 
+function organizationIdFor(n: number): string {
+    return id22(ORGANIZATION_ID_START + n);
+}
+
+function identityIdFor(n: number): string {
+    return id22(IDENTITY_ID_START + n);
+}
+
+// Enough rows, spread across organizations, that the
+// containment plan is the body index rather than a walk
+// of the table. One organization is the probe.
+async function seedMembershipRows(tx: Tx): Promise<void> {
+    for (let i = 0; i < MEMBERSHIP_COUNT; i++) {
+        const organizationId = organizationIdFor(
+            i % MEMBERSHIP_ORGANIZATIONS,
+        );
+        const identityId = identityIdFor(i);
+        const name = organizationId + ':' + identityId;
+        await tx.append(await storedRow(
+            MEMBERSHIP_ID_START + i,
+            BODY_INDEXED_PATH,
+            name,
+            putWire(BODY_INDEXED_PATH + name, ''),
+            jsonWire({
+                organization_id: organizationId,
+                identity_id: identityId,
+                state: 'accepted',
+            }),
+            'PUT',
+        ));
+    }
+}
+
 async function seedRows(
     backend: PostgresBackend,
 ): Promise<void> {
@@ -247,6 +289,7 @@ async function seedRows(
                     'PUT',
                 );
             }
+            await seedMembershipRows(tx);
         },
     );
 }
@@ -470,6 +513,61 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assertNoSortBeneath(text, 'Recursive Union');
         assertNotMatch(text, /Seq Scan/);
     });
+
+    Deno.test(
+        'containing heads use the body index',
+        async () => {
+            const plans = await sql.unsafe<
+                Record<string, unknown>
+            >(
+                'EXPLAIN\n'
+                    + COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
+                [
+                    BODY_INDEXED_PATH,
+                    {
+                        organization_id:
+                            organizationIdFor(0),
+                    },
+                ],
+            );
+            const text = explainText(plans);
+            assertMatch(
+                text,
+                /Bitmap Index Scan on fa_message_pairs_body/,
+            );
+            assertIndexPlan(text, [
+                'fa_message_pairs_body',
+            ]);
+        },
+    );
+
+    Deno.test(
+        'containing heads keep the body index'
+            + ' under a generic plan',
+        async () => {
+            const plans = await sql.unsafe<
+                Record<string, unknown>
+            >(
+                'EXPLAIN (GENERIC_PLAN)\n'
+                    + COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
+                [
+                    BODY_INDEXED_PATH,
+                    {
+                        organization_id:
+                            organizationIdFor(0),
+                    },
+                ],
+            );
+            const text = explainText(plans);
+            assertMatch(
+                text,
+                /Bitmap Index Scan on fa_message_pairs_body/,
+            );
+            assertIndexPlan(text, [
+                'fa_message_pairs_body',
+            ]);
+        },
+    );
 
     Deno.test('head pair is one backward walk under a Limit',
     async () => {

@@ -5,6 +5,21 @@ import type {
     ApiDocStatus,
 } from './rooms.ts';
 
+function responseHeaderHtml(
+    headers: readonly string[],
+): SafeHtml | string {
+    if (headers.length === 0) return '';
+    return html`
+        <h2 class="mt-4 text-sm font-semibold">
+            Response headers</h2>
+        <ul class="api-doc-list">
+            ${headers.map((header) => html`
+                <li>${header}</li>
+            `)}
+        </ul>
+    `;
+}
+
 export function roomHtml(room: ApiDocRoom): SafeHtml {
     return html`
         <h1 class="font-mono text-xl">${
@@ -20,6 +35,7 @@ export function roomHtml(room: ApiDocRoom): SafeHtml {
                 <li>${header}</li>
             `)}
         </ul>
+        ${responseHeaderHtml(room.responseHeaders)}
         <h2 class="mt-4 text-sm font-semibold">
             Status</h2>
         <ul class="api-doc-list">

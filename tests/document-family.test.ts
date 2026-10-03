@@ -244,7 +244,7 @@ Deno.test('documentEntityRoute (simple arm) PUTs through the'
     const selection = await route.select!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg']
             , 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
-        [],
+        [], undefined,
     );
     const served = servedSelection(selection, {
         date: 'Wed, 30 Sep 2026 12:00:00 GMT',
@@ -965,7 +965,7 @@ Deno.test('stateless lifecycle: a DELETE head is Gone carrying'
     await deleteStatelessDocumentMessagePair(db, SL_3);
     const selection = await documentSelect(statelessWiring)(
         db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
-            , 'AjdvjuECVZEgZoFajaIEkg', [],
+            , 'AjdvjuECVZEgZoFajaIEkg', [], undefined,
     );
     assert(selection.kind === 'document');
     assertStrictEquals(selection.head.method, 'DELETE');

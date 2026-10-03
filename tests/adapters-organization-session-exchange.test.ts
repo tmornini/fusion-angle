@@ -13,8 +13,13 @@ import {
 } from '../client/organization-session.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { RequestError } from '../shared/http-errors.ts';
 
 const AT = '2026-06-04T00:00:00.000000Z';
+// A membership body requires a 22-character
+// organization id. The exchange fence reads it.
+const SEATED = 'AjdvjuECVZEgZoFajaIEkg';
+const OTHER = 'BBjWJsjYIDkTRKIIPrzWRw';
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
 // postOrganizationSessionExchange's membership-fence check derives
@@ -64,22 +69,31 @@ async function memberOf(organizations: string[]) {
 
 Deno.test('exchanges a member token for an org-scoped token',
 async () => {
-    const db = await memberOf(['A']);
+    const db = await memberOf([SEATED]);
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const ctx = inPageContext(db, token);
     const scoped = await postOrganizationSessionExchange(
-        ctx, token, 'A');
+        ctx, token, SEATED);
     const principal = principalFromToken(scoped);
-    assertStrictEquals(principal.organization, 'A');
+    assertStrictEquals(principal.organization, SEATED);
     assertStrictEquals(principal.id, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
 Deno.test('a non-member org exchange is rejected', async () => {
-    const db = await memberOf(['A']);
+    const db = await memberOf([SEATED]);
     const token = await devToken('XXZruirZyAOoRpNxaDnpSA');
     const ctx = inPageContext(db, token);
-    await assertRejects(
-        () => postOrganizationSessionExchange(ctx, token, 'B'));
+    const error = await assertRejects(
+        () => postOrganizationSessionExchange(
+            ctx, token, OTHER,
+        ),
+        RequestError,
+    );
+    assertStrictEquals(error.status, 403);
+    assertStrictEquals(
+        error.message,
+        'subject is not a member of the organization ()',
+    );
 });
 
 Deno.test('shouldShowOrganizationSwitcher only at two or more orgs', () => {

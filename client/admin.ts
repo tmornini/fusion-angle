@@ -36,16 +36,21 @@ export async function getOrganizationSeats(
     if (organization === undefined) {
         return [];
     }
-    // The roster serves in write order; the seats read in
-    // grant order, the one order a seat list has (see
-    // buildHumanMemberMap), though today's readers only
-    // count them.
+    // The roster serves in write order; memberships read
+    // in grant order (at, then identity), the one order a
+    // member list has (see buildHumanMemberMap), though
+    // today's readers only count them.
     return (await ctx.GETCollection<MembershipEntity>(
         'organizations/' + organization
-            + '/members/',
-    )).toSorted((a, b) => byAtThenIdAscending(
-        a.body().toValue(), b.body().toValue(),
-    ));
+            + '/invitations/?state=accepted',
+    )).toSorted((a, b) => {
+        const left = a.body().toValue();
+        const right = b.body().toValue();
+        return byAtThenIdAscending(
+            { at: left.at, id: left.identity_id },
+            { at: right.at, id: right.identity_id },
+        );
+    });
 }
 
 export interface OrganizationStats {
@@ -62,7 +67,9 @@ export interface OrganizationStats {
 // reader and the entities it counts.
 export async function getOrganizationStats(
     ctx: RequestContext,
-    seatsP?: Promise<readonly HttpMessage<MembershipEntity>[]>,
+    seatsP?: Promise<
+        readonly HttpMessage<MembershipEntity>[]
+    >,
 ): Promise<OrganizationStats> {
     const [projects, ideaMessages, activePeopleCount] =
         await Promise.all([

@@ -5,8 +5,8 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import { deriveMembershipsForIdentity } from
-    '../api/derive-memberships.ts';
+import { membershipsOfIdentity } from
+    '../api/memberships.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
 import {
@@ -581,7 +581,7 @@ Deno.test(
         const organizationsByMember =
             new Map<string, Set<string>>();
         for (const identityId of authorIds) {
-            const rows = await deriveMembershipsForIdentity(
+            const rows = await membershipsOfIdentity(
                 db, identityId,
             );
             organizationsByMember.set(

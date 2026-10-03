@@ -191,6 +191,43 @@ RETURN (
     ) AS located
 );`;
 
+export const BODY_INDEXED_PATH = '/invitations/';
+
+// The body as jsonb when the stored header block says
+// application/json, NULL otherwise. It runs inside an
+// index expression, so it must never raise: a body that
+// is not UTF-8 or not JSON inserts unindexed.
+export const POSTGRES_FA_MESSAGE_BODY_JSON_FUNCTION =
+    String.raw`CREATE OR REPLACE FUNCTION fa_message_body_json(
+    response bytea
+)
+RETURNS jsonb
+IMMUTABLE STRICT PARALLEL SAFE LANGUAGE plpgsql
+AS $$
+DECLARE
+    split_at integer := position(
+        E'\r\n\r\n'::bytea IN response
+    );
+BEGIN
+    IF split_at = 0 THEN
+        RETURN NULL;
+    END IF;
+    IF position(
+        E'\r\ncontent-type: application/json\r\n'::bytea
+        IN E'\r\n'::bytea
+            || substring(response FROM 1 FOR split_at - 1)
+            || E'\r\n'::bytea
+    ) = 0 THEN
+        RETURN NULL;
+    END IF;
+    RETURN convert_from(
+        substring(response FROM split_at + 4), 'UTF8'
+    )::jsonb;
+EXCEPTION WHEN others THEN
+    RETURN NULL;
+END;
+$$;`;
+
 // The header block is the bytes before CRLF CRLF,
 // or the whole value when that separator is absent.
 // The captured group is the line value, not the
@@ -230,7 +267,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS fa_message_pairs_succession
     ON fa_message_pairs (path, name, supersedes)
     WHERE method IN ('PUT', 'DELETE');
 CREATE INDEX IF NOT EXISTS fa_message_pairs_request_id
-    ON fa_message_pairs (fa_request_id_of(response));`;
+    ON fa_message_pairs (fa_request_id_of(response));
+CREATE INDEX IF NOT EXISTS fa_message_pairs_body
+    ON fa_message_pairs
+    USING gin (fa_message_body_json(response)
+        jsonb_path_ops)
+    WHERE path = '${BODY_INDEXED_PATH}';`;
 
 export const POSTGRES_SCHEMA_STATEMENTS = [
     POSTGRES_MESSAGE_PAIRS_TABLE,
@@ -238,6 +280,7 @@ export const POSTGRES_SCHEMA_STATEMENTS = [
     POSTGRES_FA_IMF_FIXDATE_FUNCTION,
     POSTGRES_FA_PAIR_ROOT_FUNCTION,
     POSTGRES_FA_MESSAGE_BODY_BYTES_FUNCTION,
+    POSTGRES_FA_MESSAGE_BODY_JSON_FUNCTION,
     POSTGRES_FA_REQUEST_ID_OF_FUNCTION,
     POSTGRES_INDEXES,
 ] as const;
@@ -252,6 +295,8 @@ export const POSTGRES_SCHEMA =
     + POSTGRES_FA_PAIR_ROOT_FUNCTION
     + '\n\n'
     + POSTGRES_FA_MESSAGE_BODY_BYTES_FUNCTION
+    + '\n\n'
+    + POSTGRES_FA_MESSAGE_BODY_JSON_FUNCTION
     + '\n\n'
     + POSTGRES_FA_REQUEST_ID_OF_FUNCTION
     + '\n\n'

@@ -1,16 +1,20 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { initials } from '../format.ts';
+import {
+    formatDate, initials,
+} from '../format.ts';
 import {
     ICON_SIZE,
     iconBrain,
 } from '../icons.ts';
 import { MEMBER_WITHOUT_PII_NAME } from '../../../client/index.ts';
 import {
+    FormerMember,
     HumanMember,
     AIMember,
     type Member,
+    isFormerMember,
     isHumanMember,
     isAIMember,
 } from '../../../shared/types.ts';
@@ -193,11 +197,32 @@ export class AIMemberRowPresenter {
     }
 }
 
+export class FormerMemberRowPresenter {
+    readonly #member: FormerMember;
+
+    constructor(member: FormerMember) {
+        this.#member = member;
+    }
+
+    buildRow(): SafeHtml {
+        return html`
+        <div class="member-row-former">
+            <p class="font-medium truncate">
+                ${this.#member.name()}
+            </p>
+            <p class="text-xs truncate">
+                ${formatDate(this.#member.at())}
+            </p>
+        </div>`;
+    }
+}
+
 export type ManagedMembersState = {
     members: Member[];
     currentMemberId: string;
     search: string;
     kind: MemberKindFilter;
+    membership: 'accepted' | 'removed';
 };
 
 export function buildInitialManagedMembersState(
@@ -209,6 +234,7 @@ export function buildInitialManagedMembersState(
         currentMemberId,
         search: '',
         kind: 'all',
+        membership: 'accepted',
     };
 }
 
@@ -232,9 +258,11 @@ export function applyManagedMembersKind(
 export class ManagedMembersPresenter {
     readonly #humans: HumanMemberRowPresenter[];
     readonly #ais: AIMemberRowPresenter[];
+    readonly #formers: FormerMemberRowPresenter[];
     readonly #currentMemberId: string;
     readonly #search: string;
     readonly #kind: MemberKindFilter;
+    readonly #membership: ManagedMembersState['membership'];
 
     constructor(state: ManagedMembersState) {
         this.#humans = state.members
@@ -247,10 +275,17 @@ export class ManagedMembersPresenter {
             .map(
                 w => new AIMemberRowPresenter(w),
             );
+        this.#formers = state.members
+            .filter(isFormerMember)
+            .map(
+                member =>
+                    new FormerMemberRowPresenter(member),
+            );
         this.#currentMemberId =
             state.currentMemberId;
         this.#search = state.search;
         this.#kind = state.kind;
+        this.#membership = state.membership;
     }
 
     humanCount(): number {
@@ -264,6 +299,14 @@ export class ManagedMembersPresenter {
     renderList(
         container: HTMLElement,
     ): void {
+        if (this.#membership === 'removed') {
+            setHtml(container, html`${
+                this.#formers.map(
+                    row => row.buildRow(),
+                )
+            }`);
+            return;
+        }
         setHtml(container, html`${
             this.#buildSelfSection()
         }${

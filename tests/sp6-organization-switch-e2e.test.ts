@@ -58,11 +58,13 @@ async () => {
 
     const membersA = idsOf(
         (await GETCollection<{ id: string }>(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', tokA,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/invitations/?state=accepted', tokA,
                 operationIdHeader())).map((m) => m.body().toValue()));
     const membersB = idsOf(
         (await GETCollection<{ id: string }>(
-            db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw/members/', tokB,
+            db, 'organizations/BBjWJsjYIDkTRKIIPrzWRw'
+                + '/invitations/?state=accepted', tokB,
                 operationIdHeader())).map((m) => m.body().toValue()));
     const ideasA = idsOf(
         (await GETCollection<{ id: string }>(db

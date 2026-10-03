@@ -193,6 +193,11 @@ export class MemoryStorageBackend
                 responseSecretsHashHex:
                     item.responseSecretsHashHex,
                 pairHashHex: item.pairHashHex,
+                requesterIdentityId:
+                    row.requesterIdentityId,
+                headResponseAt: item.headResponseAt,
+                headRequesterIdentityId:
+                    item.headRequesterIdentityId,
             });
         }
         const inserting = rows.filter(
@@ -344,6 +349,9 @@ function headsOf(
             name: String(rec['name']),
             id: String(rec['id']),
             responseAt: String(rec['response_at']),
+            requesterIdentityId: String(
+                rec['requester_identity_id'],
+            ),
             response: typeof response === 'string'
                 ? Octets.fromLatin1(response).asBytes()
                 : new Uint8Array(0),

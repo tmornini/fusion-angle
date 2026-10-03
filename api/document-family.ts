@@ -1,17 +1,11 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type {
-    Id, MessagePairEntity, StateEntity,
-} from '../shared/types.ts';
+import type { Id } from '../shared/types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalPath } from './message-pair.ts';
 import { familyRegistration } from './family-registry.ts';
 import { missedReadError } from './derive-states.ts';
 import {
-    documentMessagePairsAt,
-    documentLifecycleEvents,
-    stateHistoryFrom,
-    bodyOf,
     headDocumentOf,
     documentIsTombstone,
     type DerivedDocument,
@@ -28,6 +22,8 @@ import { liveHeadId, messageStore } from
 import { flowStoredEntityOf } from './derive-flows.ts';
 import {
     selectHeadsAtPath,
+    selectVersionAt,
+    selectVersionsAt,
     wholeHeadSelection,
     type Lifecycle,
 } from './head-reads.ts';
@@ -340,213 +336,13 @@ export function documentEntityRoute(
     };
 }
 
-// GET <family>/:id/versions/: wrap a family derive*StateHistory
-// (ASC StateEntity[]) with (at, id) DESC so index 0 is
-// current, and empty → missedReadError (403 foreign / 404
-// absent) using the family's table name for an honest body.
-// Does NOT change the derive's own ASC for other callers.
-// Task 9 replaces the StateEntity[] list with entityOf
-// snapshots. Stateless families already return entityOf.
-export type DocumentStateHistoryDerive = (
-    db: DbAdapter,
-    organization: Id,
-    entityId: Id,
-) => Promise<StateEntity[]>;
-
-export function documentStateHistoryHandler(
-    wiring: DocumentFamilyWiring,
-    deriveFn: DocumentStateHistoryDerive,
-    tableName: string,
-): GetHandler {
-    return async (db, params, _actor, organization) => {
-        const org = requireOrganization(organization);
-        const id = entityIdParam(wiring, params);
-        const history = await deriveFn(db, org, id);
-        if (history.length === 0) {
-            throw await missedReadError(
-                db, id, org, tableName,
-            );
-        }
-        return history.toReversed();
-    };
-}
-
 const PUT_METHOD = 'PUT';
 
-// Find the pair at this document whose id is the advertised
-// ETag. A foreign or absent pair is simply not in the
-// collection — the caller's missedReadError ladder answers.
-export async function lookupStoredRevision(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-    etag: string,
-): Promise<MessagePairEntity | undefined> {
-    const messagePairs = await messageStore(db).getDocumentHistory(
-        prefix, id,
-    );
-    return messagePairs.find(
-        (row) => row.id === etag,
-    );
-}
-
-export async function storedRevisionDocument(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-    etag: string,
-): Promise<DerivedDocument | undefined> {
-    const found = await lookupStoredRevision(
-        db, prefix, id, etag,
-    );
-    if (
-        found === undefined
-        || found.method !== PUT_METHOD
-    ) {
-        return undefined;
-    }
-    return {
-        name: id,
-        messagePairId: found.id,
-        method: found.method,
-        body: bodyOf(found.response),
-    };
-}
-
-export async function versionSnapshotsAt(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-    toEntity: (document: DerivedDocument) => object,
-): Promise<Record<string, unknown>[]> {
-    const stored = await messageStore(db).getDocumentHistory(
-        prefix, id,
-    );
-    const messagePairs = documentMessagePairsAt(
-        stored, prefix,
-    ).filter((messagePair) => messagePair.name === id);
-    const snapshots: Record<string, unknown>[] = [];
-    for (const messagePair of messagePairs.toReversed()) {
-        if (messagePair.method !== PUT_METHOD) continue;
-        snapshots.push({
-            ...toEntity({
-                name: id,
-                messagePairId: messagePair.id,
-                method: messagePair.method,
-                body: messagePair.body,
-            }),
-            etag: messagePair.id,
-            at: messagePair.at,
-            member_id: messagePair.requesterIdentityId,
-        });
-    }
-    return snapshots;
-}
-
-async function documentStateHistoryAt(
-    wiring: DocumentFamilyWiring,
-    db: DbAdapter,
-    organization: Id,
-    id: Id,
-): Promise<StateEntity[]> {
-    const prefix = canonicalPath(
-        organization, '/' + wiring.family + '/',
-    );
-    const stored = await messageStore(db).getDocumentHistory(
-        prefix, id,
-    );
-    return stateHistoryFrom(
-        documentLifecycleEvents(
-            documentMessagePairsAt(
-                stored, prefix,
-            ).filter((messagePair) => messagePair.name === id),
-        ),
-        id,
-    );
-}
-
-async function serveDocumentRevision(
-    wiring: DocumentFamilyWiring,
-    db: DbAdapter,
-    organization: Id,
-    id: Id,
-    etag: string,
-): Promise<unknown> {
-    const prefix = canonicalPath(
-        organization, '/' + wiring.family + '/',
-    );
-    const found = await lookupStoredRevision(
-        db, prefix, id, etag,
-    );
-    if (
-        found === undefined
-        || found.method !== PUT_METHOD
-    ) {
-        throw await throwDocumentMiss(
-            wiring, db, organization, id,
-        );
-    }
-    const body = bodyOf(found.response);
-    const document: DerivedDocument = {
-        name: id,
-        messagePairId: found.id,
-        method: found.method,
-        body,
-    };
-    return wiring.entityOf(document, organization);
-}
-
-export function documentVersionGetHandler(
-    wiring: DocumentFamilyWiring,
-): GetHandler {
-    return (db, params, _actor, organization) =>
-        serveDocumentRevision(
-            wiring,
-            db,
-            requireOrganization(organization),
-            entityIdParam(wiring, params),
-            param(params, params.length - 1),
-        );
-}
-
-export function documentVersionListHandler(
-    wiring: DocumentFamilyWiring,
-): GetHandler {
-    // Flow keeps StateEntity[] (deferred). The other
-    // five wirings (identities, ai-agents, ideas,
-    // projects, objectives) return entityOf snapshots
-    // stamped with the pair facts (etag, at, member_id) —
-    // beyond, not identical to, GET collection / GET :id.
-    if (wiring.family === 'flows') {
-        return documentStateHistoryHandler(
-            wiring,
-            (db, organization, id) =>
-                documentStateHistoryAt(
-                    wiring, db, organization, id,
-                ),
-            wiring.notFoundTable,
-        );
-    }
-    return async (db, params, _actor, organization) => {
-        const org = requireOrganization(organization);
-        const id = entityIdParam(wiring, params);
-        const prefix = canonicalPath(
-            org, '/' + wiring.family + '/',
-        );
-        const snapshots = await versionSnapshotsAt(
-            db, prefix, id,
-            (document) => wiring.entityOf(document, org),
-        );
-        if (snapshots.length === 0) {
-            throw await throwDocumentMiss(
-                wiring, db, org, id,
-            );
-        }
-        return snapshots;
-    };
-}
-
-export function documentVersionListRoute(
+// Versions ride the head's ladder. The whole reader is
+// the family's: only a credential or an instance
+// projects. The miss is the family's own, so a foreign
+// id stays 403 and a name never written stays 404.
+export function documentVersionsSelectRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
@@ -554,11 +350,32 @@ export function documentVersionListRoute(
             ...entitySegments(wiring),
             'versions', '',
         ],
-        get: documentVersionListHandler(wiring),
+        select: async (
+            db, params, _actor, organization,
+        ) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const id = entityIdParam(wiring, params);
+            return selectVersionsAt(
+                db,
+                canonicalPath(
+                    organizationId,
+                    '/' + wiring.family + '/',
+                ),
+                id,
+                wiring.lifecycle,
+                wiring.notFoundTable,
+                { sees: 'whole' },
+                () => throwDocumentMiss(
+                    wiring, db, organizationId, id,
+                ),
+            );
+        },
     };
 }
 
-export function documentVersionRoute(
+export function documentVersionSelectRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
@@ -566,7 +383,29 @@ export function documentVersionRoute(
             ...entitySegments(wiring),
             'versions', ':etag',
         ],
-        get: documentVersionGetHandler(wiring),
+        select: async (
+            db, params, _actor, organization,
+        ) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const id = entityIdParam(wiring, params);
+            return selectVersionAt(
+                db,
+                canonicalPath(
+                    organizationId,
+                    '/' + wiring.family + '/',
+                ),
+                id,
+                param(params, params.length - 1),
+                wiring.lifecycle,
+                wiring.notFoundTable,
+                { sees: 'whole' },
+                () => throwDocumentMiss(
+                    wiring, db, organizationId, id,
+                ),
+            );
+        },
     };
 }
 

@@ -9,8 +9,8 @@ import {
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import { deriveDefaultOrganization } from
     '../api/derive-default-organization.ts';
-import { deriveMembershipsForIdentity } from
-    '../api/derive-memberships.ts';
+import { membershipsOfIdentity } from
+    '../api/memberships.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
 import { seededMockDb } from './mock-seed.ts';
 
@@ -29,7 +29,7 @@ async () => {
     const persons = buildMembers().map(m => m.id);
     for (const id of persons) {
         const memberships =
-            await deriveMembershipsForIdentity(db, id);
+            await membershipsOfIdentity(db, id);
         if (memberships.length === 0) continue;
         const defaults = await deriveDefaultOrganization(
             db, id,

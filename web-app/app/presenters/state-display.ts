@@ -121,4 +121,8 @@ export const INVITATION_STATE_CONFIG: Record<
         label: 'Revoked',
         className: 'badge-error',
     },
+    removed: {
+        label: 'Removed',
+        className: 'badge-default',
+    },
 };

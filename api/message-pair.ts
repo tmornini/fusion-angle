@@ -35,7 +35,6 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
@@ -62,10 +61,13 @@ import { DATE_PLACEHOLDER } from './ledger-root.ts';
 import { notifyPayload } from './advisory-lock.ts';
 import { sortJsonKeys } from
     '../shared/http-message/canonical.ts';
+import { imfFixdate } from '../shared/pair-root.ts';
 import {
+    placedLines,
     projectedBody,
     responseOfWire,
     servedResponse,
+    type Envelope,
     type Reader,
     type Transmission,
 } from './served-response.ts';
@@ -639,13 +641,6 @@ export function requestHeaderFields(
     return fields;
 }
 
-// The stored bytes, parsed and returned unchanged.
-export function responseFromStored(
-    stored: MessagePairEntity,
-): Response {
-    return responseFromLatin1(stored.response);
-}
-
 export function responseFromLatin1(
     wire: string,
 ): Response {
@@ -1036,10 +1031,11 @@ export async function formStateWrite(
     const received = write.answer.kind === 'received'
         ? write.received
         : await completedPair(write.received, {
-            status: write.siblings[0].condition.kind
-                    === 'in-order'
-                ? HTTP_OK
-                : HTTP_CREATED,
+            status: write.answer.kind === 'created'
+                || write.siblings[0].condition.kind
+                    !== 'in-order'
+                ? HTTP_CREATED
+                : HTTP_OK,
             etag: receivedEtag(write.siblings[0], pairs[0]!.id),
             fields: write.answer.kind === 'created'
                 ? [{
@@ -1200,12 +1196,17 @@ async function siblingsAnswer(
     }
     // A received answer is the received pair's own body, not
     // the parent's state, so no reader projects it.
-    const stored = latin1(stated[0]!.response);
+    const received = stated[0]!;
+    const stored = latin1(received.response);
     return {
         response: responseFromLatin1(mergeSecret(
-            write.answer.kind === 'received'
-                ? stored
-                : landedWire(stored, write.reader),
+            landedWire(
+                stored,
+                landedEnvelope(received),
+                write.answer.kind === 'received'
+                    ? { sees: 'whole' }
+                    : write.reader,
+            ),
             rows[0]!.responseSecrets,
         )),
         outcome,
@@ -1227,6 +1228,7 @@ function parentHeadAnswer(
         response: responseOfWire(servedResponse(
             latin1(parent.headResponse),
             transmissionOf(write.received.requestId),
+            headEnvelope(parent),
             write.reader,
         )),
         answeredId: parent.headId,
@@ -1357,23 +1359,68 @@ function transmissionOf(requestId: string): Transmission {
 }
 
 // A landed write answers the response it formed: its
-// status and its lines are its own, and only its body
-// passes through the reader's projection (§2).
-function landedWire(stored: string, reader: Reader): string {
-    if (reader.sees === 'whole') return stored;
+// status, date, and request-id stay, and the three
+// lines from the row are placed before any return.
+// Only its body passes through the reader's projection.
+function landedWire(
+    stored: string,
+    envelope: Envelope,
+    reader: Reader,
+): string {
     const model = parseWire(stored);
-    if (model.body === undefined) return stored;
+    const fields = placedLines(model.fields, [
+        {
+            name: 'last-modified',
+            value: imfFixdate(envelope.responseAt),
+        },
+        {
+            name: 'requester-identity-id',
+            value: envelope.requesterIdentityId,
+        },
+        {
+            name: 'response-at',
+            value: envelope.responseAt,
+        },
+    ]);
+    if (reader.sees === 'whole' || model.body === undefined) {
+        return serializeWire({ ...model, fields });
+    }
     const text = model.body.toLatin1();
     const body = projectedBody(text, reader);
-    if (body === text) return stored;
+    if (body === text) {
+        return serializeWire({ ...model, fields });
+    }
     return serializeWire({
         ...model,
-        fields: model.fields.map((field) =>
-            field.name === 'content-length'
-                ? contentLengthOfLatin1(body)
-                : field),
+        fields: placedLines(fields, [
+            contentLengthOfLatin1(body),
+        ]),
         body: Octets.fromLatin1(body),
     });
+}
+
+function landedEnvelope(row: StatementAnswer): Envelope {
+    return {
+        responseAt: row.stamp,
+        requesterIdentityId: row.requesterIdentityId,
+    };
+}
+
+// A matched answer's envelope is its head's. Null here
+// means the statement named a head and omitted it.
+function headEnvelope(row: StatementAnswer): Envelope {
+    if (
+        row.headResponseAt === null
+        || row.headRequesterIdentityId === null
+    ) {
+        throw new Error(
+            'a matched answer has no head envelope',
+        );
+    }
+    return {
+        responseAt: row.headResponseAt,
+        requesterIdentityId: row.headRequesterIdentityId,
+    };
 }
 
 function wireForPair(
@@ -1386,7 +1433,11 @@ function wireForPair(
     const row = stated.find((item) => item.id === pair.id);
     if (row === undefined) return answer.response;
     return responseFromLatin1(mergeSecret(
-        landedWire(latin1(row.response), reader),
+        landedWire(
+            latin1(row.response),
+            landedEnvelope(row),
+            reader,
+        ),
         pair.responseSecrets,
     ));
 }
@@ -1481,6 +1532,7 @@ function answerOf(
                 transmissionOf(
                     currentRequestId(rows[index]!, row.response),
                 ),
+                headEnvelope(row),
                 reader,
             )),
             outcome,
@@ -1491,7 +1543,11 @@ function answerOf(
     }
     return {
         response: responseFromLatin1(mergeSecret(
-            landedWire(latin1(row.response), reader),
+            landedWire(
+                latin1(row.response),
+                landedEnvelope(row),
+                reader,
+            ),
             rows[index]!.responseSecrets,
         )),
         outcome,
@@ -1659,26 +1715,14 @@ export function eventForMessagePair(
 }
 
 // The create-document override table: which body field names
-// the created entity for create-shaped collection POSTs. Grown
-// family by family in Tasks 2-5. A registered family (family-
-// registry.ts) answers ONLY from its own createBodyIdField —
-// its entry here is deleted, never kept as a parallel truth.
-// Identities' own entry retired here (Phase 10 Task 4): the
-// twelfth registered family now answers ONLY from its own
-// family-registry.ts createBodyIdField. 'invitations' is the
-// ONE entry this table keeps PERMANENTLY — the invitations side
-// channel is never a family-registry.ts registrant (it has no
-// organization-nesting tier, no document of its own to
-// register), so this literal table stays
-// its one consult forever, not a waypoint to registration.
+// the created entity for create-shaped collection POSTs. A
+// registered family answers ONLY from its own
+// createBodyIdField — its entry here is deleted. The
+// invitations side channel retired its invitationId entry
+// when the membership name replaced a client-minted id.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
-    // Not gate-dispatched (the invitations side channel forms
-    // its own pair directly in invitations-domain.ts) but reuses
-    // this SAME override table so createdEntityName serves both
-    // callers with one voice.
-    'invitations': 'invitationId',
-    // Nested composed POST (Task 9): pattern is not a bare
-    // family name, so the registry consult never fires — body
+    // Nested composed POST: pattern is not a bare family
+    // name, so the registry consult never fires — body
     // `id` collapses the operation message pair onto the
     // type's name (same supersession collapse the retired
     // flat POST /records used).
@@ -1791,7 +1835,6 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     // Nested instances detail: PATCH create/update +
     // DELETE. Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
     // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.

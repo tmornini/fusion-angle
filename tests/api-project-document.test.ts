@@ -1,4 +1,6 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert, assertEquals, assertStrictEquals,
+} from '@std/assert';
 import { projectEntityOf } from '../api/derive-projects.ts';
 import {
     memoryDbAdapter,
@@ -9,6 +11,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
+    partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { HttpMessage } from
@@ -67,9 +70,13 @@ async function versionsOf(
         token,
     ));
     assertStrictEquals(res.status, 200);
-    return await res.json() as {
-        state: string; member_id: string;
-    }[];
+    const parts = await partsOf<{ state: string }>(res);
+    return parts.map((part) => ({
+        state: part.body().toValue().state,
+        member_id: part.query(
+            'header.requester-identity-id',
+        ).toText(),
+    }));
 }
 
 async function getWire(
@@ -208,9 +215,13 @@ Deno.test('the pair request body carries domain state;'
     assertStrictEquals(wire.state, 'under_review');
     assertStrictEquals('state_at' in wire, false);
     const requests = await db.messagePairs.getAll();
-    // seedRootAdmin 2 + project PUT 1
+    // nil root + seedRootAdmin 2 + project PUT 1
     assertStrictEquals(requests.length, 4);
-    const parsed = messagePairJsonOf(requests[3]!.request) as {
+    const project = requests.find(
+        (row) => row.name === 'YKtyCizelcaUAaHGwetojA',
+    );
+    assert(project);
+    const parsed = messagePairJsonOf(project.request) as {
         body: { state: string };
     };
     assertStrictEquals(parsed.body.state, 'under_review');

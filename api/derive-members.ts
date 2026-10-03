@@ -7,12 +7,14 @@ import {
     byIdAscending,
 } from './derive-documents.ts';
 import {
-    deriveOrganizationMemberSeats,
-} from './derive-memberships.ts';
+    membershipOfHead,
+    organizationMembershipHeads,
+} from './memberships.ts';
 
-// Roster is seats ∩ identities. Leftover /members/ parent
-// documents do not join. A person identity with a live seat
-// is a human roster row; absence of either is not a member.
+// Roster is memberships ∩ identities. Leftover /members/
+// parent documents do not join. A person identity with an
+// accepted membership is a human roster row; absence of
+// either is not a member.
 
 const IDENTITIES_PREFIX = canonicalPath(
     undefined, '/identities/',
@@ -27,14 +29,18 @@ function seatedHumanOf(
     };
 }
 
-// Roster is seats ∩ person identities. Leftover /members/
-// parent documents do not join. System is not a seat.
+// Roster is memberships ∩ person identities. Leftover
+// /members/ parent documents do not join. System is not
+// a membership.
 export async function deriveMembers(
     db: DbAdapter,
     organization: Id,
 ): Promise<MemberEntity[]> {
-    const [seats, identityMessagePairs] = await Promise.all([
-        deriveOrganizationMemberSeats(db, organization),
+    const [heads, identityMessagePairs] = await Promise.all([
+        organizationMembershipHeads(db, organization, {
+            kind: 'state',
+            state: 'accepted',
+        }),
         db.messagePairs.getCollectionPairs(IDENTITIES_PREFIX,
         ),
     ]);
@@ -42,13 +48,14 @@ export async function deriveMembers(
         identityMessagePairs, IDENTITIES_PREFIX,
     );
     const rows: MemberEntity[] = [];
-    for (const seat of seats) {
-        const identity = identities.get(seat.identity_id);
+    for (const head of heads) {
+        const membership = membershipOfHead(head);
+        const identity = identities.get(membership.identity_id);
         if (identity === undefined) continue;
         if (pickString(identity.body, 'kind') !== 'person') {
             continue;
         }
-        rows.push(seatedHumanOf(seat.identity_id));
+        rows.push(seatedHumanOf(membership.identity_id));
     }
     return rows.sort(byIdAscending);
 }

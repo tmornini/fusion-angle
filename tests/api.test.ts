@@ -121,18 +121,22 @@ Deno.test('GET organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
 });
 
 Deno.test(
-    'GET seats returns the persisted humans',
+    'GET accepted memberships returns the persisted humans',
     async () => {
         const db = await freshDb();
         const humanId = generateIdentifier();
         await seedHumanMember(db, humanId, 'Sarah Chen');
         const members =
-            (await GETCollection<{ id: string }>(
-                db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
-                await organizationToken(), operationIdHeader()))
+            (await GETCollection<{
+                identity_id: string;
+            }>(
+                db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                    + '/invitations/?state=accepted',
+                await organizationToken(),
+                operationIdHeader()))
                     .map((part) => part.body().toValue());
         assert(
-            members.some(row => row.id === humanId),
+            members.some(row => row.identity_id === humanId),
         );
     },
 );

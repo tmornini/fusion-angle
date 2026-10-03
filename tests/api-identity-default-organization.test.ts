@@ -13,13 +13,25 @@ import { pathSegmentsOf } from
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { framedRequest } from './http-fixtures.ts';
+import {
+    apiRequest,
+    framedRequest,
+    invitationLatched,
+} from './http-fixtures.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { responseRecordOf } from '../api/message-pair.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
+const LATER = '2026-06-05T00:00:00.000000Z';
+const MEMBER = 'XXZruirZyAOoRpNxaDnpSA';
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const OTHER = 'BBjWJsjYIDkTRKIIPrzWRw';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -28,8 +40,8 @@ async function freshDb() {
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
-// PUT identities/:id/default-organization requires a live
-// seat, so a raw row here would go derivation-invisible.
+// PUT identities/:id/default-organization requires an
+// accepted membership, and seedSeat mirrors one.
 async function seedMembership(
     db: MemoryDbAdapter,
     identityId: string,
@@ -95,16 +107,82 @@ async () => {
     assertStrictEquals(body.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 });
 
-Deno.test('PUT a non-seat organization is 400', async () => {
+Deno.test(
+    'PUT an organization without an accepted membership'
+        + ' is 400',
+    async () => {
+        const db = await freshDb();
+        await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
+            , 'AjdvjuECVZEgZoFajaIEkg');
+        const token = await devToken();
+        const res = await handleRequest(
+            db, putDefaultOrganization(
+                token, 'XXZruirZyAOoRpNxaDnpSA',
+                'BBjWJsjYIDkTRKIIPrzWRw',
+            ));
+        assertStrictEquals(res.status, 400);
+    },
+);
+
+const REFUSED = {
+    error: 'organization_id is not an accepted membership',
+};
+
+async function putAfterSeatedHead(
+    state: 'pending' | 'declined' | 'revoked' | 'removed',
+) {
     const db = await freshDb();
-    await seedMembership(db, 'XXZruirZyAOoRpNxaDnpSA'
-        , 'AjdvjuECVZEgZoFajaIEkg');
-    const token = await devToken();
-    const res = await handleRequest(
-        db, putDefaultOrganization(token, 'XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw'));
+    await seedMembership(db, MEMBER, STARK);
+    await landMembership(
+        db, STARK, MEMBER, state, 'member', LATER,
+    );
+    return handleRequest(db, putDefaultOrganization(
+        await devToken(), MEMBER, STARK,
+    ));
+}
+
+Deno.test('PUT a pending membership is 400', async () => {
+    const res = await putAfterSeatedHead('pending');
     assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), REFUSED);
 });
+
+Deno.test('PUT a declined membership is 400', async () => {
+    const res = await putAfterSeatedHead('declined');
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), REFUSED);
+});
+
+Deno.test('PUT a revoked membership is 400', async () => {
+    const res = await putAfterSeatedHead('revoked');
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), REFUSED);
+});
+
+// seedSeat mirrored accepted. The removed head is an
+// accepted version under a removed head, and the seat
+// remains.
+Deno.test('PUT a removed membership is 400', async () => {
+    const res = await putAfterSeatedHead('removed');
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), REFUSED);
+});
+
+Deno.test(
+    'PUT an accepted membership with no seat is admitted',
+    async () => {
+        const db = await freshDb();
+        await landMembership(
+            db, STARK, MEMBER, 'accepted', 'member', AT,
+        );
+        const res = await handleRequest(
+            db, putDefaultOrganization(
+                await devToken(), MEMBER, STARK,
+            ),
+        );
+        assertStrictEquals(res.status, 201);
+    },
+);
 
 Deno.test('PUT to another identity tree is forbidden', async () => {
     const db = await freshDb();
@@ -203,24 +281,23 @@ async () => {
         ),
     );
     assertStrictEquals(put.status, 201);
-    const revoked = await handleRequest(
-        db, framedRequest(
-            `${BASE}/organizations/`
-                + 'BBjWJsjYIDkTRKIIPrzWRw/members/'
-                + 'XXZruirZyAOoRpNxaDnpSA', {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': 'Bearer '
-                        + await organizationToken(
-                            'XXZruirZyAOoRpNxaDnpSA'
-                                , 'BBjWJsjYIDkTRKIIPrzWRw',
-                        ),
-                    'operation-id': generateIdentifier(),
-                },
+    const removed = await handleRequest(
+        db, await invitationLatched(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + OTHER
+                + '/invitations/'
+                + membershipNameOf(OTHER, MEMBER),
+            token: await organizationToken(
+                MEMBER, OTHER,
+            ),
+            body: {
+                state: 'removed',
+                at: LATER,
             },
-        ),
+        })),
     );
-    assertStrictEquals(revoked.status, 204);
+    assertStrictEquals(removed.status, 200);
+    await removed.body?.cancel();
     const got = await handleRequest(
         db, framedRequest(
             `${BASE}/identities/XXZruirZyAOoRpNxaDnpSA/default-organization`
@@ -251,10 +328,6 @@ Deno.test('GET identities/:id/default-organization'
     assertStrictEquals(typeof match.route.select, 'function');
     assertStrictEquals(typeof match.route.put, 'function');
 });
-
-const MEMBER = 'XXZruirZyAOoRpNxaDnpSA';
-const STARK = 'AjdvjuECVZEgZoFajaIEkg';
-const OTHER = 'BBjWJsjYIDkTRKIIPrzWRw';
 
 Deno.test(
     'a default organization naming another one lands',

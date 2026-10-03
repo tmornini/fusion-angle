@@ -7,8 +7,10 @@ import {
     type Tx,
     type TxMode,
 } from './db.ts';
+import { BODY_INDEXED_PATH } from './schema-postgres.ts';
 import { compareIdentifiers } from
     '../shared/identifier.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
 function compareResponseAtThenId(
@@ -61,6 +63,55 @@ function headOf(
         rows.map(keyedByResponseAt), () => 'head',
     ).get('head');
     return head === undefined ? null : head.row;
+}
+
+const JSON_CONTENT_TYPE =
+    '\r\ncontent-type: application/json\r\n';
+
+// A match is every contains field held as that string.
+// No content-type, or a body that is not JSON, is no
+// match. Only a SyntaxError is that miss: any other
+// throw is a store bug and still surfaces. The header
+// test is the index function's, including its case.
+function bodyContains(
+    row: { id: string },
+    contains: Readonly<Record<string, string>>,
+): boolean {
+    const response = (
+        row as Record<string, unknown>
+    )['response'];
+    if (typeof response !== 'string') {
+        throw new Error('response is not a wire');
+    }
+    const splitAt = response.indexOf('\r\n\r\n');
+    if (splitAt < 0) return false;
+    const header = response.slice(0, splitAt);
+    const wrapped = '\r\n' + header + '\r\n';
+    if (!wrapped.includes(JSON_CONTENT_TYPE)) return false;
+    const bytes = Octets.fromLatin1(
+        response.slice(splitAt + 4),
+    ).asBytes();
+    const text = new TextDecoder('utf-8', { fatal: true })
+        .decode(bytes);
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch (error) {
+        if (error instanceof SyntaxError) return false;
+        throw error;
+    }
+    if (
+        parsed === null
+        || typeof parsed !== 'object'
+        || Array.isArray(parsed)
+    ) {
+        return false;
+    }
+    const record = parsed as Record<string, unknown>;
+    for (const [key, value] of Object.entries(contains)) {
+        if (record[key] !== value) return false;
+    }
+    return true;
 }
 
 function documentRows(
@@ -168,6 +219,42 @@ export function bufferTx(
             const documents = buffer.filter((row) => {
                 const rec = row as Record<string, unknown>;
                 return rec['path'] === path
+                    && isDocumentMethod(rec['method']);
+            });
+            const heads = latestByKey(
+                documents.map(keyedByResponseAt),
+                (keyed) => String(keyed.row['name']),
+            );
+            const live: { id: string }[] = [];
+            for (const head of heads.values()) {
+                if (head.row['method'] === PUT_METHOD) {
+                    live.push(head.row);
+                }
+            }
+            return live
+                .sort(byResponseAtThenId)
+                .map((row) => ({ ...row })) as T[];
+        },
+        async getCollectionHeadPairsContaining<
+            T extends { id: string },
+        >(
+            path: string,
+            contains: Readonly<Record<string, string>>,
+        ): Promise<T[]> {
+            if (path !== BODY_INDEXED_PATH) {
+                throw new Error('no body index at ' + path);
+            }
+            const names = new Set<string>();
+            for (const row of buffer) {
+                const rec = row as Record<string, unknown>;
+                if (rec['path'] !== path) continue;
+                if (!bodyContains(row, contains)) continue;
+                names.add(String(rec['name']));
+            }
+            const documents = buffer.filter((row) => {
+                const rec = row as Record<string, unknown>;
+                return rec['path'] === path
+                    && names.has(String(rec['name']))
                     && isDocumentMethod(rec['method']);
             });
             const heads = latestByKey(

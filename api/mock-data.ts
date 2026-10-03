@@ -28,7 +28,6 @@ import {
     postIdentityPiiDocumentOp,
     postBaselineScoreDocumentOp,
     postActualScoreDocumentOp,
-    postMembershipDocumentOp,
     postIdentityDocumentOp,
     postIdentityCredentialDocumentOp,
     postAiAgentDocumentOp,
@@ -37,8 +36,10 @@ import {
 } from './routes.ts';
 import { putIdentityDefaultOrganization } from
     './organization-requests.ts';
-import { postOrganizationInvitationGrant } from
-    './invitations-domain.ts';
+import {
+    postOrganizationInvitationGrant,
+    putInvitationOnOrganizationNest,
+} from './invitations-domain.ts';
 import type {
     FlowCreationMessagePairs,
     RecordWriteMessagePairs,
@@ -56,6 +57,8 @@ import {
 import { generateSecret } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import type { MessagePair } from './message-pair.ts';
 import {
     humanMemberPoolsByOrganization,
@@ -125,7 +128,8 @@ import {
     formSeedCredentialMessagePairs,
     seedMessagePairKey,
     ORGANIZATION_TWO_OBJECTIVE,
-    seatSeedBody,
+    MEMBERSHIP_ITEM_ROUTE,
+    membershipSeedBody,
     identityPersonSeedBody,
     bootstrapCurrentIdentityBody,
     humanMemberPiiSeedBody,
@@ -156,7 +160,6 @@ import { byAtThenIdAscending } from
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from './family-registry.ts';
@@ -607,24 +610,35 @@ async function postMockDataLoadIn(
                 ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
                 : [assignOrganization(index)];
             return [
-                ...organizations.map((_organization, n) =>
-                    postMembershipDocumentOp(
+                ...organizations.map((organization, n) => {
+                    const type = member.id
+                        === 'XXZruirZyAOoRpNxaDnpSA'
+                        ? 'admin' as const
+                        : 'member' as const;
+                    const name = membershipNameOf(
+                        organization, member.id,
+                    );
+                    const messagePair = requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
+                            MEMBERSHIP_ITEM_ROUTE,
+                            member.id + '-' + n,
+                        ),
+                    );
+                    return putInvitationOnOrganizationNest(
                         adapter,
-                        member.id,
-                        seatSeedBody(
-                            member.id === 'XXZruirZyAOoRpNxaDnpSA'
-                                ? 'admin'
-                                : 'member',
+                        [organization, name],
+                        membershipSeedBody(
+                            organization, member.id, type,
                         ),
                         SYSTEM_MEMBER_ID,
-                        requireMessagePair(
-                            messagePairs,
-                            seedMessagePairKey(
-                                ORGANIZATION_MEMBER_DETAIL_PATTERN,
-                                member.id + '-' + n,
-                            ),
-                        ),
-                    )),
+                        messagePair,
+                        organization,
+                        ['admin'],
+                        messagePair.requestAt,
+                        messagePair.operationId,
+                    );
+                }),
                 postIdentityDocumentOp(
                     adapter,
                     member.id,
@@ -1275,7 +1289,7 @@ export async function rehearseBootstrap(
             await postBootstrapIn(
                 db,
                 bootstrap.identityMessagePair,
-                bootstrap.seatMessagePair,
+                bootstrap.membershipMessagePair,
                 bootstrap.piiMessagePair,
                 bootstrap.systemIdentityMessagePair,
                 bootstrap.defaultOrganizationMessagePair,
@@ -1304,7 +1318,7 @@ export async function postBootstrap(
 export async function postBootstrapIn(
     adapter: DbAdapter,
     identityMessagePair: MessagePair,
-    seatMessagePair: MessagePair,
+    membershipMessagePair: MessagePair,
     piiMessagePair: MessagePair,
     systemIdentityMessagePair: MessagePair,
     defaultOrganizationMessagePair: MessagePair,
@@ -1325,12 +1339,27 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             identityMessagePair,
         ),
-        postMembershipDocumentOp(
+        putInvitationOnOrganizationNest(
             adapter,
-            'XXZruirZyAOoRpNxaDnpSA',
-            seatSeedBody('admin', seatMessagePair.requestAt),
+            [
+                STARK_ORGANIZATION,
+                membershipNameOf(
+                    STARK_ORGANIZATION,
+                    'XXZruirZyAOoRpNxaDnpSA',
+                ),
+            ],
+            membershipSeedBody(
+                STARK_ORGANIZATION,
+                'XXZruirZyAOoRpNxaDnpSA',
+                'admin',
+                membershipMessagePair.requestAt,
+            ),
             SYSTEM_MEMBER_ID,
-            seatMessagePair,
+            membershipMessagePair,
+            STARK_ORGANIZATION,
+            ['admin'],
+            membershipMessagePair.requestAt,
+            membershipMessagePair.operationId,
         ),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'

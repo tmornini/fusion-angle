@@ -38,7 +38,8 @@ async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, framedRequest(
-            `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg/members/`));
+            `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg`
+                + '/ideas/'));
     assertStrictEquals(res.status, 401);
     const body = await res.json() as { error: string };
     assertStrictEquals(body.error, 'invalid_token');
@@ -47,15 +48,17 @@ async () => {
 Deno.test('protected route accepts a valid token', async () => {
     const db = await freshDb();
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         await devToken(), operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('rejects an expired token', async () => {
     const db = await freshDb();
     await assertRejects(
-        async () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        async () => GET(db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/'
             , await expiredToken(), operationIdHeader()),
         Error,
         'invalid_token',
@@ -66,7 +69,8 @@ Deno.test('rejects a not-yet-valid token', async () => {
     const db = await freshDb();
     await assertRejects(
         async () => GET(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/ideas/',
             await notYetValidToken(),
             operationIdHeader()),
         Error,
@@ -85,7 +89,8 @@ async () => {
     });
     await assertRejects(
         () => GET(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', anon,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/ideas/', anon,
             operationIdHeader()),
         Error,
         'invalid_token',
@@ -124,11 +129,13 @@ async () => {
     // Still admitted — revocation bites at next mint/exchange.
     assertEquals(
         (await GETCollection(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', live,
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/ideas/', live,
             operationIdHeader(),
         )).map((part) => part.body().toValue()),
         (await GETCollection(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/ideas/',
             await devToken(), operationIdHeader(),
         )).map((part) => part.body().toValue()),
     );
@@ -155,9 +162,10 @@ Deno.test('a token minted within a revocation second still'
         await devToken(),
         operationIdHeader());
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         sameSecond, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('a jti revoked in the ledger still admits the access'
@@ -186,7 +194,8 @@ Deno.test('a jti revoked in the ledger still admits the access'
         await devToken(),
         operationIdHeader());
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         await devToken(), operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });

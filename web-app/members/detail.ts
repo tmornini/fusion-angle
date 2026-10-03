@@ -47,7 +47,7 @@ import {
     putAIMember,
     subscribeAIMemberChanges,
     getAdminSeatIds,
-    deleteHumanMemberSeat,
+    postMembershipRemoval,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import {
@@ -133,14 +133,15 @@ function rerender(): void {
         .renderUpdate(pageContainer);
 }
 
-// Try human, then AI. A 404 or a 410 on either kind is
-// expected absence for that kind: a removed seat is not a
-// human member, as a never-seated one is not. Only absence
-// on both kinds is genuine not-found (return null → caller
-// redirects). Any other status is a real fault and must
-// surface — never collapse into the silent redirect that
-// absence uses.
+// Try human, then AI. A null human read, a 404, or a 410
+// on either kind is expected absence for that kind: a
+// removed membership is not a human member, as a
+// never-seated one is not. Only absence on both kinds is
+// genuine not-found (return null → caller redirects). Any
+// other status is a real fault and must surface — never
+// collapse into the silent redirect that absence uses.
 export function isAbsentMember(err: unknown): boolean {
+    if (err === null) return true;
     return err instanceof RequestError
         && (err.status === HTTP_NOT_FOUND
             || err.status === HTTP_GONE);
@@ -151,23 +152,24 @@ async function loadMemberByEitherKind(
 ): Promise<HumanMember | AIMember | null> {
     const ctx = sessionContext();
     try {
-        return await getHumanMember(
+        const human = await getHumanMember(
             ctx, memberId,
         );
+        if (!isAbsentMember(human)) return human;
     } catch (errHuman) {
         if (!isAbsentMember(errHuman)) {
             throw errHuman;
         }
-        try {
-            return await getAIMember(
-                ctx, memberId,
-            );
-        } catch (errAi) {
-            if (isAbsentMember(errAi)) {
-                return null;
-            }
-            throw errAi;
+    }
+    try {
+        return await getAIMember(
+            ctx, memberId,
+        );
+    } catch (errAi) {
+        if (isAbsentMember(errAi)) {
+            return null;
         }
+        throw errAi;
     }
 }
 
@@ -469,7 +471,7 @@ async function performRemove(): Promise<void> {
     if (!state || state.variant !== 'human') return;
     const ctx = sessionContext();
     try {
-        await deleteHumanMemberSeat(ctx, state.member);
+        await postMembershipRemoval(ctx, state.member);
     } catch (err) {
         reportFault(ctx, 'Failed to remove member', err);
         return;
@@ -562,6 +564,13 @@ async function saveHumanMember(
     } catch (err) {
         reportFault(
             ctx, 'Failed to reload member', err,
+        );
+        return;
+    }
+    if (fresh === null) {
+        reportFault(
+            ctx, 'Failed to reload member',
+            new Error('the member read returned nothing'),
         );
         return;
     }

@@ -18,8 +18,11 @@ import {
 import {
     seededMockDb, testHashPassword,
 } from './mock-seed.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    compareIdentifiers,
+    generateIdentifier,
+} from '../shared/identifier.ts';
+import { partBodiesOf } from './http-fixtures.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
     makeAssertionSigner,
@@ -37,7 +40,11 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     basicAuthorization,
     deriveAuthorizationCodeId,
+    subjectClaims,
 } from '../api/authentication.ts';
+import { membershipOf } from '../api/memberships.ts';
+import { landMembership } from
+    './membership-fixtures.ts';
 import {
     deriveIdentityTokensFor,
 } from '../api/derive-identity-tokens.ts';
@@ -444,9 +451,10 @@ async () => {
     );
     // the minted access token passes the SP-3 gate
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         body.access_token, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('replaying a consumed code is a 401 no-op', async () => {
@@ -652,9 +660,10 @@ async () => {
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         body['access_token'] as string, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test(
@@ -714,9 +723,10 @@ Deno.test('refresh rotates to a new pair', async () => {
     assertNotStrictEquals(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         pair2.access_token, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('replaying a rotated refresh token revokes the chain',
@@ -780,6 +790,131 @@ Deno.test(
         assertEquals(
             claims.organizations, before.organizations,
         );
+    },
+);
+
+Deno.test(
+    'a membership with no seat mints its organization'
+        + ' and type role',
+    async () => {
+        const db = await freshDb();
+        const organization = generateIdentifier();
+        const identity = generateIdentifier();
+        await landMembership(
+            db, organization, identity, 'accepted',
+            'member', '2026-10-01T12:00:00.000000Z',
+        );
+        assertEquals(await subjectClaims(db, identity), {
+            organizations: [organization],
+            roles: ['member:' + organization],
+        });
+    },
+);
+
+Deno.test(
+    'a removed membership head mints neither claim',
+    async () => {
+        const db = await freshDb();
+        const organization = 'BAAAAAAAAAAAAAAAAAAAAA';
+        const identity = 'CAAAAAAAAAAAAAAAAAAAAA';
+        await seedOrganizationDocument(
+            db, organization, 'Removed',
+        );
+        await seedSeat(
+            db, organization, identity, 'admin',
+            '2026-10-01T12:00:00.000000Z',
+        );
+        await landMembership(
+            db, organization, identity, 'removed',
+            'admin', '2026-10-02T12:00:00.000000Z',
+        );
+        assertEquals(await subjectClaims(db, identity), {
+            organizations: [],
+            roles: [],
+        });
+        assertStrictEquals(
+            await membershipOf(db, organization, identity),
+            null,
+        );
+    },
+);
+
+Deno.test(
+    'equal at memberships mint in organization id order',
+    async () => {
+        const db = await freshDb();
+        // Identifier order is not code-point order: 'B'
+        // precedes '0', so a string sort inverts these.
+        const earlier = 'BAAAAAAAAAAAAAAAAAAAAA';
+        const later = '0AAAAAAAAAAAAAAAAAAAAA';
+        const identity = 'DAAAAAAAAAAAAAAAAAAAAA';
+        const at = '2026-10-01T12:00:00.000000Z';
+        assertStrictEquals(
+            compareIdentifiers(earlier, later) < 0, true,
+        );
+        assertStrictEquals(earlier < later, false);
+        await seedOrganizationDocument(
+            db, later, 'Later',
+        );
+        await seedOrganizationDocument(
+            db, earlier, 'Earlier',
+        );
+        await seedSeat(db, later, identity, 'member', at);
+        await seedSeat(db, earlier, identity, 'admin', at);
+        assertEquals(await subjectClaims(db, identity), {
+            organizations: [earlier, later],
+            roles: [
+                'admin:' + earlier,
+                'member:' + later,
+            ],
+        });
+    },
+);
+
+Deno.test(
+    'pending, declined, and revoked mint nothing',
+    async () => {
+        const db = await freshDb();
+        const organization = 'EAAAAAAAAAAAAAAAAAAAAA';
+        const identity = 'FAAAAAAAAAAAAAAAAAAAAA';
+        const at = '2026-10-01T12:00:00.000000Z';
+        for (const state of [
+            'pending', 'declined', 'revoked',
+        ] as const) {
+            await landMembership(
+                db, organization, identity, state,
+                'admin', at,
+            );
+            assertEquals(
+                await subjectClaims(db, identity), {
+                    organizations: [],
+                    roles: [],
+                },
+                state,
+            );
+        }
+    },
+);
+
+Deno.test(
+    'an accepted version under a removed head'
+        + ' mints nothing',
+    async () => {
+        const db = await freshDb();
+        const organization = 'GAAAAAAAAAAAAAAAAAAAAA';
+        const identity = 'HAAAAAAAAAAAAAAAAAAAAA';
+        await landMembership(
+            db, organization, identity, 'accepted',
+            'member', '2026-10-01T12:00:00.000000Z',
+        );
+        await landMembership(
+            db, organization, identity, 'removed',
+            'member', '2026-10-02T12:00:00.000000Z',
+        );
+        assertEquals(await subjectClaims(db, identity), {
+            organizations: [],
+            roles: [],
+        });
     },
 );
 
@@ -852,9 +987,10 @@ async () => {
     assertStrictEquals(claims.act?.sub, 'XXZruirZyAOoRpNxaDnpSA');
     // the delegated token passes the gate (current = admin)
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         body.access_token, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('token-exchange 201 has no refresh Set-Cookie',
@@ -1042,9 +1178,10 @@ Deno.test('client_credentials issues a gate-valid token', async () => {
     assertStrictEquals(res.status, 200);
     const body = await presentedFields(res) as { access_token: string };
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         body.access_token, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
     assertNotStrictEquals(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );
@@ -1429,8 +1566,6 @@ async () => {
             },
             body: JSON.stringify({
                 email: UNSEATED_EMAIL,
-                invitationId: generateIdentifier(),
-                grantEventId: generateIdentifier(),
                 grantAt: nowUtc(),
             }),
         },
@@ -1447,9 +1582,9 @@ async () => {
         },
     ));
     assertStrictEquals(pending.status, 200);
-    const invitations = await pending.json() as {
+    const invitations = await partBodiesOf<{
         state: string;
-    }[];
+    }>(pending);
     assertStrictEquals(invitations.length, 1);
     assertStrictEquals(invitations[0]!.state, 'pending');
     const reachableClaims = decodeAccessToken(

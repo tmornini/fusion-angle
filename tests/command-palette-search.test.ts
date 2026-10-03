@@ -90,6 +90,7 @@ function buildHumanMember(
             organization_id: 'AjdvjuECVZEgZoFajaIEkg',
             identity_id: id,
             type: 'member',
+            state: 'accepted',
             at: '2026-01-01T00:00:00.000000Z',
         }),
     );

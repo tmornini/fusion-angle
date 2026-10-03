@@ -63,7 +63,6 @@ import {
     validateIdentityCreateBody,
     validateIdentityDocumentBody,
     validateIdentityCredentialEntity,
-    validateSeatDocumentBody,
     validateObjectiveCreateBody,
     validateObjectiveDocumentBody,
     validateObjectiveRevisionEntity,
@@ -117,6 +116,8 @@ import type { Reader } from './served-response.ts';
 import {
     selectHeadAtPath,
     selectHeadsAtPath,
+    selectVersionAt,
+    selectVersionsAt,
     wholeCollectionSelection,
     wholeHeadSelection,
     type HeadSelection,
@@ -180,9 +181,6 @@ import {
     INSTANCE_DETAIL_PATTERN,
     INSTANCE_VERSIONS_PATTERN,
     INSTANCE_VERSION_PATTERN,
-    ORGANIZATION_MEMBERS_COLLECTION_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
-    ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN,
     CREDENTIALS_COLLECTION_PATTERN,
     CREDENTIAL_DETAIL_PATTERN,
     CREDENTIAL_KEY_READ_ROLES,
@@ -196,14 +194,12 @@ import {
 import {
     instancesUriPrefix,
     deriveInstanceHead,
-    deriveInstanceRevisions,
     mergeInstanceValues,
     revisionValuesOf,
     type InstanceValue,
 } from './derive-record-instances.ts';
 import {
     assertWritableAttributeIds,
-    projectReadableValues,
 } from './attribute-acl.ts';
 import {
     validateInstanceValues,
@@ -245,12 +241,6 @@ import {
     scoresUriPrefix,
 } from './derive-project-scores.ts';
 import {
-    deriveOrganizationMemberSeats,
-    deriveOrganizationFormerSeats,
-    seatsPrefixFor,
-    seatEntityOf,
-} from './derive-memberships.ts';
-import {
     credentialsPrefixFor,
     deriveIdentityKind,
     providersPrefixFor,
@@ -276,7 +266,6 @@ import {
     type WorkOrderVersion,
 } from './work-order-version.ts';
 import {
-    deriveOrganizations,
     organizationEntityOf,
 } from './derive-organizations.ts';
 import {
@@ -293,11 +282,8 @@ import {
     documentEntityRoute,
     documentPutHandler,
     documentSelect,
-    documentVersionListRoute,
-    documentVersionRoute,
-    storedRevisionDocument,
-    versionSnapshotsAt,
-    lookupStoredRevision,
+    documentVersionSelectRoute,
+    documentVersionsSelectRoute,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
     liveGlobalDocumentIds,
@@ -321,6 +307,14 @@ import {
     getInvitationVersionsOnIdentityNest,
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
+import {
+    membershipsOfIdentity,
+} from './memberships.ts';
+import {
+    viewQueryOf,
+    type QueryRefusal,
+    type ViewQuery,
+} from './membership-gate.ts';
 import type {
     DerivedDocument, DocumentMessagePair,
 } from './derive-documents.ts';
@@ -567,12 +561,18 @@ export type GetHandler = (
 
 // A GET that serves stored responses (spec §2): the handler
 // fences and selects; the gate serves what it selected.
+// `query` is the route's parsed search, undefined when the
+// route declares no query slot. Fewer parameters still
+// type-check.
+export type RouteQuery = ViewQuery;
+
 export type SelectHandler = (
     adapter: DbAdapter,
     params: string[],
     actor: Id,
     organization: Id | undefined,
     roles: readonly string[],
+    query: RouteQuery | undefined,
 ) => Promise<HeadSelection>;
 
 // PutHandler, PatchHandler, PostHandler, and DeleteHandler
@@ -653,6 +653,9 @@ export interface Route {
     patch?: PatchHandler;
     delete?: DeleteHandler;
     post?: PostHandler;
+    query?: (
+        search: string,
+    ) => ViewQuery | QueryRefusal;
 }
 
 export function route(
@@ -664,6 +667,9 @@ export function route(
         patch?: PatchHandler;
         delete?: DeleteHandler;
         post?: PostHandler;
+        query?: (
+            search: string,
+        ) => ViewQuery | QueryRefusal;
     },
 ): Route {
     return {
@@ -672,65 +678,22 @@ export function route(
     };
 }
 
-// GATE 15 — THE PRODUCTION MEMBERSHIP PAIR PLANE (Phase 10 Task
-// 8 Session B): identity_pii and identity_credentials carry NO
-// organization_id of their own, so their read fence (viaMembership,
-// api/store-parent-scoped.ts) derives visibility from the
-// membership ledger instead. A GET handler here receives ONLY the
-// caller's already-org-SCOPED adapter (api.ts hands it `effective`)
-// — that adapter's OWN .memberships facet is filtered to the
-// caller's org already, so it cannot see a foreign-org row and
-// would misreport it as an orphan (visible), silently WIDENING the
-// fence rather than reproducing it. The scoped adapter's
-// .requests/.responses DO pass through globally (db-organization-
-// scoped.ts: "the message plane... passes through unwrapped"), so
-// this reads the SAME membership ledger every org's derivation
-// would, via the SAME documentCollectionGetHandler(MEMBERSHIPS_
-// WIRING) reduction GET /memberships itself rides — mirroring
-// tests/drift-identities.test.ts's own gate-15 proof
-// (pairPlaneMembershipsAcrossKnownOrganizations), generalized from
-// that test's hardcoded two-org set to deriveOrganizations(db)
-// (Phase 12 Task 5: the message-plane derivation, api/derive-
-// organizations.ts — itself reading only requests/responses, the
-// SAME global passthrough the prior db.organizations.getAll()
-// read rode) so this holds for however many organizations
-// actually exist, not only the ones a test happened to seed.
-async function membershipsAcrossAllOrganizations(
-    db: DbAdapter, _actor: Id,
-): Promise<MembershipEntity[]> {
-    const organizations = await deriveOrganizations(db);
-    const perOrganization = await Promise.all(
-        organizations.map((organization) =>
-            deriveOrganizationMemberSeats(
-                db, organization.id,
-            ),
-        ),
-    );
-    return perOrganization.flat();
-}
-
-// viaMembership's OWN three-way algorithm (api/store-parent-
-// scoped.ts), re-derived here over the PAIR-PLANE union above
-// rather than the row-plane's identity_id index — the SAME
-// reduction tests/drift-identities.test.ts's
-// pairPlaneOwnerOrganization proves equal to the row-plane fence
-// on all three legs (co-member, FOREIGN-org, orphan): null
-// (orphan, visible), the bound org (co-member, visible), or a
-// DIFFERENT org (foreign, hidden).
+// Visibility from the target's accepted memberships.
+// None is an orphan, visible. A membership in the
+// bound organization is a co-member, visible. Any
+// other organization is foreign, hidden.
 function ownerOrganizationViaMembershipPairPlane(
     memberships: readonly MembershipEntity[],
-    identityId: Id,
     boundOrganization: Id,
 ): Id | null {
-    const mine = memberships.filter(
-        (m) => m.identity_id === identityId,
+    if (memberships.length === 0) return null;
+    const inBound = memberships.some(
+        (membership) =>
+            membership.organization_id === boundOrganization,
     );
-    if (mine.length === 0) return null;
-    return mine.some(
-        (m) => m.organization_id === boundOrganization,
-    )
+    return inBound
         ? boundOrganization
-        : mine[0]!.organization_id;
+        : memberships[0]!.organization_id;
 }
 
 // The bundle a live POST /records forms (Phase 6 Task 4, the
@@ -2509,33 +2472,6 @@ export async function postActualScoreDocumentOp(
     return entity;
 }
 
-// Membership document write — Phase Final Task 2: the
-// memberships ROW half is stripped — pure message-plane write
-// (postFlowTagDocumentOp shape). No states interaction
-// (memberships never post events). `messagePair` is optional so a
-// below-facade caller keeps compiling; the live route always
-// supplies one. WRITE_RESPONSE_SPECS successBody forms the
-// wire bytes; the reconstructed return is for type parity.
-export async function postMembershipDocumentOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<MembershipEntity, 'id'>> {
-    const entity = withoutId(body) as unknown as
-        Omit<MembershipEntity, 'id'>;
-    // Phase Final Task 2: memberships ROW half stripped.
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return entity;
-}
-
 // Member document write — Phase Final Task 2: the members
 // ROW half is stripped — pure message-plane write. No states
 // interaction (genesis/archive ride the membership SEAT via
@@ -2827,8 +2763,8 @@ export type WriteMethod = 'PUT' | 'POST' | 'PATCH' | 'DELETE';
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
-// the message plane's stored response (WRITE_RESPONSE_SPECS +
-// responseFromStored). A spec with no successBody forms no
+// the message plane's stored response
+// (WRITE_RESPONSE_SPECS). A spec with no successBody forms no
 // response body. Keyed by route pattern, not verb: a DELETE
 // never consults its successBody (the gate forms no body for
 // any DELETE — see api/api.ts), so a pattern that carries both
@@ -3127,26 +3063,6 @@ export const WRITE_RESPONSE_SPECS:
             ...validateDefaultOrganizationBody(body ?? {}),
         }),
     },
-    // Seat document: path is the relationship. Body is
-    // type + at. organization_id / identity_id are
-    // reconstructed from the path for the wire entity.
-    [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
-        conditional: 'optional',
-        successBody: (params, body) => {
-            const organization = param(params, 0);
-            const identityId = param(params, 1);
-            const seat = validateSeatDocumentBody(
-                withoutId(body ?? {}),
-            );
-            return {
-                id: identityId,
-                organization_id: organization,
-                identity_id: identityId,
-                type: seat.type,
-                at: seat.at,
-            };
-        },
-    },
     // G4: GET wins. identityTokenEntityOf is id-first;
     // identity_id is stamped from the path so stored PUT
     // = GET (omit-PUT cannot poison GET).
@@ -3218,11 +3134,11 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/invitations/': {
         conditional: 'none',
     },
-    'identities/:id/invitations/:id': {
+    'identities/:id/invitations/:membership-id': {
         conditional: 'in-order',
     },
-    'organizations/:id/invitations/:id': {
-        conditional: 'in-order',
+    'organizations/:id/invitations/:membership-id': {
+        conditional: 'required',
     },
 };
 
@@ -3737,19 +3653,24 @@ export const routes: Route[] = [
     // /invitations/. Two HTTP nests are filters and
     // authorization, not two documents.
     route('identities/:id/invitations/', {
-        get: getIdentityInvitations,
+        query: viewQueryOf,
+        select: getIdentityInvitations,
     }),
-    route('identities/:id/invitations/:id', {
-        get: getInvitationOnIdentityNest,
+    route('identities/:id/invitations/:membership-id', {
+        select: getInvitationOnIdentityNest,
         put: putInvitationOnIdentityNest,
     }),
-    route('identities/:id/invitations/:id/versions/', {
-        get: getInvitationVersionsOnIdentityNest,
-    }),
     route(
-        'identities/:id/invitations/:id/versions/:etag',
+        'identities/:id/invitations/:membership-id/versions/',
         {
-            get: getInvitationVersionOnIdentityNest,
+            select: getInvitationVersionsOnIdentityNest,
+        },
+    ),
+    route(
+        'identities/:id/invitations/:membership-id'
+            + '/versions/:etag',
+        {
+            select: getInvitationVersionOnIdentityNest,
         },
     ),
     documentCollectionRoute(AI_AGENTS_WIRING),
@@ -3757,10 +3678,10 @@ export const routes: Route[] = [
         select: documentSelect(AI_AGENTS_WIRING),
         put: documentPutHandler(AI_AGENTS_WIRING),
     }),
-    documentVersionListRoute(IDENTITIES_WIRING),
-    documentVersionRoute(IDENTITIES_WIRING),
-    documentVersionListRoute(AI_AGENTS_WIRING),
-    documentVersionRoute(AI_AGENTS_WIRING),
+    documentVersionsSelectRoute(IDENTITIES_WIRING),
+    documentVersionSelectRoute(IDENTITIES_WIRING),
+    documentVersionsSelectRoute(AI_AGENTS_WIRING),
+    documentVersionSelectRoute(AI_AGENTS_WIRING),
     // PII is a facet of the identity's own subtree: GET is
     // self-or-admin, PUT/DELETE self-or-admin (enforced in
     // the request gate, mirroring
@@ -3780,18 +3701,17 @@ export const routes: Route[] = [
     // foreign identity's absent or erased PII answers 403,
     // never a 404 or 410 that would describe it.
     route('identities/:id/pii', {
-        select: async (db, p, actor, organization) => {
+        select: async (db, p, _actor, organization) => {
             const organizationId = requireOrganization(
                 organization,
             );
             const identityId = param(p, 0);
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
+            const memberships = await membershipsOfIdentity(
+                db, identityId,
+            );
             const owner =
                 ownerOrganizationViaMembershipPairPlane(
-                    memberships, identityId, organizationId,
+                    memberships, organizationId,
                 );
             if (owner !== null
                 && owner !== organizationId) {
@@ -3839,7 +3759,7 @@ export const routes: Route[] = [
     // root admin entries — NO MEMBER_VERBS entry. The secret
     // reaches no reader (credentialReader).
     route(CREDENTIALS_COLLECTION_PATTERN, {
-        select: async (db, p, actor, organization, roles) => {
+        select: async (db, p, _actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
@@ -3851,13 +3771,12 @@ export const routes: Route[] = [
             ).filter((head) =>
                 storedCredentialIdentityOf(head) === identityId);
             if (heads.length > 0) {
-                const memberships =
-                    await membershipsAcrossAllOrganizations(
-                        db, actor,
-                    );
+                const memberships = await membershipsOfIdentity(
+                    db, identityId,
+                );
                 const owner =
                     ownerOrganizationViaMembershipPairPlane(
-                        memberships, identityId, organizationId,
+                        memberships, organizationId,
                     );
                 if (owner !== null && owner !== organizationId) {
                     throw new ForeignOrganizationError(
@@ -3880,7 +3799,7 @@ export const routes: Route[] = [
     // A foreign identity's credential 403s; an absent one
     // 404s. The secret reaches no reader (credentialReader).
     route(CREDENTIAL_DETAIL_PATTERN, {
-        select: async (db, p, actor, organization, roles) => {
+        select: async (db, p, _actor, organization, roles) => {
             const organizationId = requireOrganization(
                 organization,
             );
@@ -3896,13 +3815,13 @@ export const routes: Route[] = [
             }
             const identityOfHead =
                 storedCredentialIdentityOf(head);
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
-            const owner = ownerOrganizationViaMembershipPairPlane(
-                memberships, identityOfHead, organizationId,
+            const memberships = await membershipsOfIdentity(
+                db, identityOfHead,
             );
+            const owner =
+                ownerOrganizationViaMembershipPairPlane(
+                    memberships, organizationId,
+                );
             if (owner !== null && owner !== organizationId) {
                 throw new ForeignOrganizationError(
                     'identity_credentials', cid,
@@ -4405,12 +4324,8 @@ export const routes: Route[] = [
         select: documentSelect(FLOWS_WIRING),
         put: documentPutHandler(FLOWS_WIRING),
     },
-    // GET flows/:id/versions/: pair-chain index. Old
-    // table-backed /versions/:vid stays a miss (404).
-    // List is StateEntity[] DESC; snapshot is the stored
-    // flow document. Do not change the flow payload.
-    documentVersionListRoute(FLOWS_WIRING),
-    documentVersionRoute(FLOWS_WIRING),
+    documentVersionsSelectRoute(FLOWS_WIRING),
+    documentVersionSelectRoute(FLOWS_WIRING),
     // Undo-as-replay (Phase 14 Task 8): the restored state,
     // graphDelta/revivals server-computed into it
     // (SIDECAR-KEEP → deriveFlowGraphStates), lands through
@@ -4767,49 +4682,48 @@ export const routes: Route[] = [
         },
     }),
     route(RECORD_TYPE_VERSIONS_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
-            const id = param(p, 1);
-            const snapshots = await versionSnapshotsAt(
-                db, recordTypesUriPrefix(org), id,
-                (document) =>
-                    recordTypeEntityOf(document, org),
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
             );
-            if (snapshots.length === 0) {
-                throw await missedReadError(
-                    db, id, org, 'record_types',
-                );
-            }
-            return snapshots;
+            const id = param(p, 1);
+            return selectVersionsAt(
+                db,
+                recordTypesUriPrefix(organizationId),
+                id,
+                'state',
+                'record_types',
+                { sees: 'whole' },
+                async () => {
+                    throw await missedReadError(
+                        db, id, organizationId,
+                        'record_types',
+                    );
+                },
+            );
         },
     }),
     route(RECORD_TYPE_VERSION_PATTERN, {
-        get: async (db, p, _actor, organization) => {
-            const org = requireOrganization(organization);
+        select: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
             const id = param(p, 1);
             const etag = param(p, 2);
-            const found = await lookupStoredRevision(
-                db, recordTypesUriPrefix(org), id, etag,
-            );
-            if (
-                found === undefined
-                || found.method !== 'PUT'
-            ) {
-                throw await missedReadError(
-                    db, id, org, 'record_types',
-                );
-            }
-            const body = bodyOf(
-                found.response,
-            );
-            return recordTypeEntityOf(
-                {
-                    name: id,
-                    messagePairId: found.id,
-                    method: found.method,
-                    body,
+            return selectVersionAt(
+                db,
+                recordTypesUriPrefix(organizationId),
+                id,
+                etag,
+                'state',
+                'record_types',
+                { sees: 'whole' },
+                async () => {
+                    throw await missedReadError(
+                        db, id, organizationId,
+                        'record_types',
+                    );
                 },
-                org,
             );
         },
     }),
@@ -4943,87 +4857,102 @@ export const routes: Route[] = [
             };
         },
     }),
-    // Nested instance value-revision versions (Task 19).
-    // NOT a document-versions clone: each entry is full state
-    // from a revision (or genesis) PUT pair (R5 — no fold),
-    // projected by the caller's CURRENT read ACL. Wire
-    // (at, id) DESC so index 0 is the live head. Empty →
-    // missedReadError('record_instances') (R2: foreign 403
-    // / absent-or-tombstoned 404). Parent type miss first.
-    // etag is the revision pair id.
+    // Nested instance versions. Each stored PUT is served
+    // as the detail GET serves the head, projected by the
+    // reader's current attribute schema, oldest first.
+    // Parent type miss first. A tombstone is Gone only
+    // after the owner probe, so a foreign retired
+    // instance stays 403.
     route(INSTANCE_VERSIONS_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
-            await requireRecordTypeExists(db, org, typeId);
-            const revisions = await deriveInstanceRevisions(
-                db, org, typeId, instanceId,
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
             );
-            if (revisions.length === 0) {
-                throw await missedReadError(
-                    db, instanceId, org,
-                    'record_instances',
+            const selection = await selectVersionsAt(
+                db,
+                instancesUriPrefix(organizationId, typeId),
+                instanceId,
+                'stateless',
+                'record_instances',
+                instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
+                ),
+                async () => {
+                    throw await missedReadError(
+                        db, instanceId, organizationId,
+                        'record_instances',
+                    );
+                },
+            );
+            // The gate's own 410 would skip the owner
+            // probe, and a foreign retired instance must
+            // answer 403.
+            if (
+                selection.kind !== 'collection'
+                && selection.head.method === 'DELETE'
+            ) {
+                throw await retiredInstanceError(
+                    db, instanceId, organizationId,
                 );
             }
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
-                );
-            const entries = [];
-            for (const rev of revisions.toReversed()) {
-                const values = projectReadableValues(
-                    rev.values, attributesById, roles,
-                );
-                entries.push({
-                    at: rev.at,
-                    etag: rev.messagePairId,
-                    values,
-                });
-            }
-            return entries;
+            return selection;
         },
     }),
     route(INSTANCE_VERSION_PATTERN, {
-        get: async (
+        select: async (
             db, p, _actor, organization, roles,
         ) => {
-            const org = requireOrganization(organization);
+            const organizationId = requireOrganization(
+                organization,
+            );
             const typeId = param(p, 1);
             const instanceId = param(p, 2);
             const etag = param(p, 3);
-            await requireRecordTypeExists(db, org, typeId);
-            const found = await lookupStoredRevision(
+            await requireRecordTypeExists(
+                db, organizationId, typeId,
+            );
+            const selection = await selectVersionAt(
                 db,
-                instancesUriPrefix(org, typeId),
+                instancesUriPrefix(organizationId, typeId),
                 instanceId,
                 etag,
+                'stateless',
+                'record_instances',
+                instanceReader(
+                    await loadAttributeSchemaById(
+                        db, organizationId, typeId,
+                    ),
+                    roles,
+                ),
+                async () => {
+                    throw await missedReadError(
+                        db, instanceId, organizationId,
+                        'record_instances',
+                    );
+                },
             );
+            // The gate's own 410 would skip the owner
+            // probe, and a foreign retired instance must
+            // answer 403.
             if (
-                found === undefined
-                || found.method !== 'PUT'
+                selection.kind !== 'collection'
+                && selection.head.method === 'DELETE'
             ) {
-                throw await missedReadError(
-                    db, instanceId, org,
-                    'record_instances',
+                throw await retiredInstanceError(
+                    db, instanceId, organizationId,
                 );
             }
-            const attributesById =
-                await loadAttributeSchemaById(
-                    db, org, typeId,
-                );
-            const values = projectReadableValues(
-                revisionValuesOf(
-                    bodyOf(found.response),
-                ),
-                attributesById,
-                roles,
-            );
-            return instanceStateOf(
-                org, typeId, instanceId, values,
-            );
+            return selection;
         },
     }),
     // Nested instance detail (Task 20): public PUT is
@@ -5240,40 +5169,39 @@ export const routes: Route[] = [
         put: postOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
-        get: async (db, p) => {
+        select: (db, p) => {
             const id = param(p, 0);
             const prefix = canonicalPath(
                 undefined, '/organizations/',
             );
-            const rows = await versionSnapshotsAt(
-                db, prefix, id, organizationEntityOf,
+            return selectVersionsAt(
+                db, prefix, id, 'stateless',
+                'organizations', { sees: 'whole' },
+                async () => {
+                    throw new EntityNotFoundError(
+                        'organizations', id,
+                    );
+                },
             );
-            if (rows.length === 0) {
-                throw new EntityNotFoundError(
-                    'organizations', id,
-                );
-            }
-            return rows;
         },
     }),
     route('organizations/:id/versions/:etag', {
-        get: async (db, p) => {
+        select: (db, p) => {
             const id = param(p, 0);
             const etag = param(p, p.length - 1);
-            const document = await storedRevisionDocument(
+            return selectVersionAt(
                 db,
                 canonicalPath(
                     undefined, '/organizations/',
                 ),
-                id,
-                etag,
+                id, etag, 'stateless', 'organizations',
+                { sees: 'whole' },
+                async () => {
+                    throw new EntityNotFoundError(
+                        'organizations', id,
+                    );
+                },
             );
-            if (document === undefined) {
-                throw new EntityNotFoundError(
-                    'organizations', id,
-                );
-            }
-            return organizationEntityOf(document);
         },
     }),
     // GET is FLIPPED (Task 8): derived via
@@ -5285,136 +5213,29 @@ export const routes: Route[] = [
     // Invitation send nest. POST grants pending. PUT
     // revokes. Storage prefix stays /invitations/.
     route('organizations/:id/invitations/', {
-        get: getOrganizationInvitations,
+        query: viewQueryOf,
+        select: getOrganizationInvitations,
         post: postOrganizationInvitationGrant,
     }),
-    route('organizations/:id/invitations/:id', {
-        get: getInvitationOnOrganizationNest,
-        put: putInvitationOnOrganizationNest,
-    }),
     route(
-        'organizations/:id/invitations/:id/versions/',
+        'organizations/:id/invitations/:membership-id',
         {
-            get: getInvitationVersionsOnOrganizationNest,
+            select: getInvitationOnOrganizationNest,
+            put: putInvitationOnOrganizationNest,
         },
     ),
     route(
-        'organizations/:id/invitations/:id/versions/:etag',
-        {
-            get: getInvitationVersionOnOrganizationNest,
-        },
-    ),
-    // The seats the ledger has DELETEd — the organization's
-    // former members. The name resolver reads it beside the
-    // live roster to tell "left" from "never existed".
-    // Same prefix as the roster, opposite head method;
-    // fenced by the path organization like every
-    // organizations/ route.
-    route(ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN, {
-        get: (db, _p, _actor, organization) =>
-            deriveOrganizationFormerSeats(
-                db, requireOrganization(organization),
-            ),
-    }),
-    // The roster serves in write order; a reader that wants
-    // grant order sorts the seat bodies by `at`.
-    route(ORGANIZATION_MEMBERS_COLLECTION_PATTERN, {
-        select: (db, _p, _actor, organization) => selectHeadsAtPath(
-            db, seatsPrefixFor(requireOrganization(organization)),
-            'stateless',
-        ),
-    }),
-    route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-        select: (db, p, _actor, organization) => selectHeadAtPath(
-            db, seatsPrefixFor(requireOrganization(organization)),
-            param(p, 1), 'organization_members',
-        ),
-        put: (db, p, body, actor, messagePair) =>
-            postMembershipDocumentOp(
-                db, param(p, 1), body, actor, messagePair,
-            ),
-        // The last admin seat cannot be removed: the actor
-        // is authorized, the organization's state forbids.
-        // The admin seats are derived INSIDE the transaction
-        // — a row op. The refusal is thrown after it, the
-        // invitations-domain shape.
-        delete: async (
-            db, p, _actor, messagePair, organization,
-        ) => {
-            const fenced = requireOrganization(organization);
-            const identityId = param(p, 1);
-            const lastAdmin = await db.readTransaction(
-                async (view) => {
-                    const admins = (
-                        await deriveOrganizationMemberSeats(
-                            view, fenced,
-                        )
-                    ).filter(seat => seat.type === 'admin');
-                    return admins.length === 1
-                        && admins[0]!.identity_id
-                            === identityId;
-                },
-            );
-            if (lastAdmin) {
-                throw new ApiError(
-                    'the last admin seat cannot be removed',
-                    HTTP_CONFLICT,
-                );
-            }
-            if (messagePair !== undefined) {
-                await runWrite(
-                    db,
-                    attemptFor([messagePair]),
-                    [messagePair],
-                );
-            }
-        },
-    }),
-    route(
-        ORGANIZATION_MEMBER_DETAIL_PATTERN
+        'organizations/:id/invitations/:membership-id'
             + '/versions/',
         {
-            get: async (db, p, _actor, organization) => {
-                const org = requireOrganization(
-                    organization,
-                );
-                const id = param(p, 1);
-                const rows = await versionSnapshotsAt(
-                    db, seatsPrefixFor(org), id,
-                    (document) => seatEntityOf(
-                        document, org,
-                    ),
-                );
-                if (rows.length === 0) {
-                    throw new EntityNotFoundError(
-                        'organization_members', id,
-                    );
-                }
-                return rows;
-            },
+            select: getInvitationVersionsOnOrganizationNest,
         },
     ),
     route(
-        ORGANIZATION_MEMBER_DETAIL_PATTERN
+        'organizations/:id/invitations/:membership-id'
             + '/versions/:etag',
         {
-            get: async (db, p, _actor, organization) => {
-                const org = requireOrganization(
-                    organization,
-                );
-                const id = param(p, 1);
-                const etag = param(p, p.length - 1);
-                const document =
-                    await storedRevisionDocument(
-                        db, seatsPrefixFor(org), id, etag,
-                    );
-                if (document === undefined) {
-                    throw new EntityNotFoundError(
-                        'organization_members', id,
-                    );
-                }
-                return seatEntityOf(document, org);
-            },
+            select: getInvitationVersionOnOrganizationNest,
         },
     ),
     // Absorbed (Phase 4 Task 2) into the generic
@@ -5424,21 +5245,15 @@ export const routes: Route[] = [
     // MEMBER_ID-CAVEAT prose that lived here moved to the
     // IDEAS_WIRING block above.
     documentEntityRoute(IDEAS_WIRING),
-    // GET ideas/:id/versions/: entityOf snapshots
-    // DESC, each stamped with the pair facts (etag, at,
-    // member_id); empty → missedReadError('ideas').
-    documentVersionListRoute(IDEAS_WIRING),
-    documentVersionRoute(IDEAS_WIRING),
+    documentVersionsSelectRoute(IDEAS_WIRING),
+    documentVersionSelectRoute(IDEAS_WIRING),
     // Absorbed (Phase 4 Task 2) into the generic
     // documentEntityRoute — see the ideas/:id entry above for
     // the shared rationale; the Decision-7/MEMBER_ID-CAVEAT
     // prose moved to the PROJECTS_WIRING block above.
     documentEntityRoute(PROJECTS_WIRING),
-    // GET projects/:id/versions/: entityOf snapshots
-    // DESC, each stamped with the pair facts (etag, at,
-    // member_id); empty → missedReadError('projects').
-    documentVersionListRoute(PROJECTS_WIRING),
-    documentVersionRoute(PROJECTS_WIRING),
+    documentVersionsSelectRoute(PROJECTS_WIRING),
+    documentVersionSelectRoute(PROJECTS_WIRING),
     // GET serves the stored heads through the generic
     // collectionSelect. POST stays this hand-written
     // create — objectives' own create lands the document PLUS
@@ -5516,11 +5331,8 @@ export const routes: Route[] = [
     // precedent that already rides this same
     // documentEntityRoute shape.
     documentEntityRoute(OBJECTIVES_WIRING),
-    // GET objectives/:id/versions/: entityOf snapshots
-    // DESC, each stamped with the pair facts (etag, at,
-    // member_id); empty → missedReadError('objectives').
-    documentVersionListRoute(OBJECTIVES_WIRING),
-    documentVersionRoute(OBJECTIVES_WIRING),
+    documentVersionsSelectRoute(OBJECTIVES_WIRING),
+    documentVersionSelectRoute(OBJECTIVES_WIRING),
     // Objective revisions nest under their parent objective:
     // param 0 is the path org, param 1 is the objective, so
     // the SERVER filters the collection to that objective

@@ -1,4 +1,5 @@
 import {
+    assert,
     assertEquals,
     assertStrictEquals,
 } from '@std/assert';
@@ -459,33 +460,47 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
 
     Deno.test(
-        'body indexes are absent and'
-            + ' fa_message_body_bytes remains',
+        'the body index is partial, jsonb_path_ops,'
+            + ' over fa_message_body_json',
         async () => {
             const catalog = await sql.query<{
+                indexdef: string,
                 body_absent: boolean,
-                pairs_absent: boolean,
                 bytes_present: boolean,
             }>`
-                SELECT to_regprocedure(
+                SELECT indexdef,
+                    to_regprocedure(
                         'fa_message_body(bytea)'
                     ) IS NULL AS body_absent,
-                    to_regclass(
-                        'fa_message_pairs_body'
-                    ) IS NULL AS pairs_absent,
                     to_regprocedure(
                         'fa_message_body_bytes(bytea)'
                     ) IS NOT NULL AS bytes_present
+                FROM pg_indexes
+                WHERE schemaname = current_schema()
+                  AND indexname = 'fa_message_pairs_body'
             `;
             assertStrictEquals(catalog.length, 1);
             const row = catalog[0]!;
+            const indexdef = row.indexdef;
+            assert(indexdef.includes('gin'), indexdef);
+            assert(
+                indexdef.includes(
+                    'fa_message_body_json(response)',
+                ),
+                indexdef,
+            );
+            assert(
+                indexdef.includes('jsonb_path_ops'),
+                indexdef,
+            );
+            assert(
+                indexdef.includes(
+                    "WHERE (path = '/invitations/'",
+                ),
+                indexdef,
+            );
             assertStrictEquals(row.body_absent, true);
-            assertStrictEquals(
-                row.pairs_absent, true,
-            );
-            assertStrictEquals(
-                row.bytes_present, true,
-            );
+            assertStrictEquals(row.bytes_present, true);
         },
     );
 }
