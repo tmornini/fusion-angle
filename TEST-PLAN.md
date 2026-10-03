@@ -578,14 +578,17 @@ the second organization.
   "Jordan Rivera" (`jordan.rivera@company.com`, Title:
   QA Lead, Department: Quality), and click Create.
   PASS: toast confirms creation; the person writes as
-  `PUT /identities/:id` plus PII and a seat at Stark
-  Industries (`PUT
-  organizations/:id/members/:identity-id`) and appears
-  in the seat-derived roster alongside Sarah Chen.
+  `PUT /identities/:id` plus PII and an accepted
+  membership at Stark Industries (`PUT
+  organizations/:id/invitations/:membership-id`,
+  If-None-Match: *). It does not write a seat. The
+  person appears in the accepted-membership roster
+  alongside Sarah Chen.
   Pin: tests/adapters-members.test.ts
        'postHumanMemberCreation persists identity PII
-       and a seat' (decides the identity + PII + seat
-       write this Create triggers);
+       and an accepted membership' (decides the
+       identity + PII + membership write this Create
+       triggers);
        tests/browser/member-create.test.ts
        'adding a human member toasts success and
        stays (AA5)' (the live toast, no-reload, and
@@ -595,17 +598,18 @@ the second organization.
   David Martinez, Emily Rodriguez, Alex Kim, Marcus
   Johnson, David Kim, Lisa Wang, James Miller. Do not
   Create any of them. PASS: Stark Members shows the six
-  seated there (Sarah Chen, Jessica Park, Emily
-  Rodriguez, Marcus Johnson, Lisa Wang, plus Tony Stark
+  with an accepted membership there (Sarah Chen,
+  Jessica Park, Emily Rodriguez, Marcus Johnson, Lisa
+  Wang, plus Tony Stark
   from AA3) alongside Jordan Rivera from AA5; the other
   five sit on the second organization, out of view — do
   not switch there to check them.
-  Pin: exploratory — the live seat-derived roster
-       membership (no test pins the 10-human /
+  Pin: exploratory — the live accepted-membership
+       roster (no test pins the 10-human /
        6-on-Stark split as a single assertion)
 - [ ] **AA7** Reload the Members page. PASS: the roster
-  is seat-derived — the seeded humans and Jordan Rivera
-  (AA5) all re-render with their seats.
+  is the accepted view — the seeded humans and Jordan
+  Rivera (AA5) all re-render.
   Pin: exploratory — the live post-reload re-render
 - [ ] **AA7a** Click "+ Add Member", switch the Kind
   toggle to AI. PASS: the Human form hides and the AI
@@ -1526,7 +1530,7 @@ the second organization.
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Member detail's Remove strips any seat but the last admin's live, so a zero-membership identity can also be MADE: remove a seeded single-seat member's seat, then sign in as them. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (G43, V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Member detail's Remove, `postMembershipRemoval`, puts an accepted membership to `removed` but not the last accepted admin, so a zero-membership identity can also be MADE: remove a seeded member's accepted membership, then sign in as them. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (G43, V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
 
 - [ ] **B25** From the zero-membership state, click "Sign out", then sign in again with that member's credentials. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`) — sign-out is not org-fenced; a zero-membership identity must still revoke. Lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher. Navigating Back after sign-out does not boot into the account.
   Pin: tests/api-identity-token-revocations-self.test.ts
@@ -1550,22 +1554,23 @@ the second organization.
        bounce-to-invitations branch); exploratory —
        the live reload and the absence of an error
        card or retry loop
-- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — Stark Industries, an "Invited by Tony Stark · {date}" sub-line, a Pending state badge, and Accept / Decline buttons. Click neither — B29 still needs the zero-membership state.
+- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — the absence marker (`—`) where an organization name and an inviter name are not on the read, a date sub-line, a Pending state badge, and Accept / Decline buttons. No "Invited by" line. Click neither — B29 still needs the zero-membership state.
   Pin: tests/boot-organization-gate.test.ts
        'invitations page keeps an empty organization
        list' (its `resolveOrganizationGate([],
        'invitations')` assertion returns the empty
        list itself, not `null` — the self-guard);
        tests/mock-data-unaffiliated-identity.test.ts
-       'the invitee view carries the org name and the
-       inviting admin (TEST-PLAN B27 card)' (decides
-       the seeded pending row this card renders);
+       'the invitee view omits the org name and the
+       inviting admin' (decides the seeded pending
+       row carries neither name);
        tests/presenter-invitation-list.test.ts 'a
-       pending invitation shows the org, inviter, and
-       Accept / Decline' (decides the card's shape);
+       pending invitation shows the absence marker
+       and Accept / Decline' (decides the card's
+       shape);
        exploratory — the live stay and the rendered
        seeded card
-- [ ] **B28** As the demo admin, open a seeded single-seat member's detail page (one no later case names), click Remove, confirm in the alertdialog (its copy says access ends at the next token refresh). PASS: a "Member removed" toast, the roster no longer lists them. Sign in as that member. PASS: lands on `invitations/index.html` — the gate fires for a made orphan exactly as for the seeded one. Then sign in as an untouched seeded member (e.g. the demo admin) and load a gated page. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected). Also confirm the demo admin's own detail page shows no Remove — it is Stark's only admin seat. After PASS, sign back in as Riley for B29.
+- [ ] **B28** As the demo admin, open a seeded member's detail page (one accepted membership, one no later case names), click Remove, confirm in the alertdialog (its copy says access ends at the next token refresh). PASS: a "Member removed" toast, the roster no longer lists them. The write is `postMembershipRemoval`: the held membership, `accepted` → `removed`. Sign in as that member. PASS: lands on `invitations/index.html` — the gate fires for a made orphan exactly as for the seeded one. Then sign in as an untouched seeded member (e.g. the demo admin) and load a gated page. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected). Also confirm the demo admin's own detail page shows no Remove — it is Stark's only accepted admin. After PASS, sign back in as Riley for B29.
   Pin: tests/api-organization-member-seat.test.ts
        'the last admin seat refuses removal' (decides
        the guard) and 'an admin seat beside another
@@ -1575,13 +1580,14 @@ the second organization.
        confirm dialog' and 'the last admin seat offers
        no Remove' (decide the affordance);
        tests/adapters-members.test.ts
-       'deleteHumanMemberSeat removes the seat'
-       (decides the wire DELETE); exploratory — the
-       live removal, the made orphan's landing, and
-       the untouched member's landing on the target;
-       no test exercises `resolveOrganizationGate`
-       with a non-empty organization list against a
-       page other than `invitations`
+       'postMembershipRemoval removes the membership'
+       (decides the latched PUT to `removed`);
+       exploratory — the live removal, the made
+       orphan's landing, and the untouched member's
+       landing on the target; no test exercises
+       `resolveOrganizationGate` with a non-empty
+       organization list against a page other than
+       `invitations`
 - [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19). After PASS, sign back in as the demo admin before section C.
   Pin: tests/page-registry.test.ts 'public pages are
        auth-exempt only' (`design-system` carries
@@ -3217,9 +3223,9 @@ that the canvas re-renders after each step.)
   PASS: the Redo button renders disabled. (Undo
   may stay enabled at exhaustion — the designer
   marks undo history when `…/flows/:id/versions/`
-  answers more than one row
-  (`client/flow-queries.ts`) — and the click is a
-  graceful server no-op.)
+  answers more than one part
+  (`client/flow-queries.ts`) — and the click answers
+  200 with the head and stores nothing.)
   Pin: tests/presenter-misc.test.ts 'buildToolbar disables
        undo, redo, and delete buttons when their actions
        are unavailable' (decides the `disabled` attribute
@@ -3227,11 +3233,11 @@ that the canvas re-renders after each step.)
        `data-action="redo"`); tests/flow-history.test.ts
        'canRedoFlowEdits is true iff redo stack is
        non-empty' (decides redo's enablement rule);
-       tests/flow-undo-cursor.test.ts 'undo cursor: undo at
-       exhaustion (nothing before genesis) is a graceful
-       no-op — 204, no document pair, no graph change'
-       (decides the exhausted click leaves the graph
-       untouched); exploratory — the live button states
+       tests/flow-undo-cursor.test.ts 'an undo at
+       exhaustion stores nothing and answers the head'
+       (decides the exhausted click answers 200 with
+       the head and stores nothing); exploratory — the
+       live button states
 - [ ] **F37** Perform an action, undo, then perform
   a new action; let the new action's
   `PUT /api/organizations/:id/flows/:id` land —
@@ -3543,15 +3549,15 @@ that the canvas re-renders after each step.)
   the last keystroke) before selecting the next
   node. Then click Undo 11 times. After each Undo
   click, wait for the **canvas name/graph to
-  change**, not merely HTTP 201 (exhaustion 201
+  change**, not merely HTTP 200 (exhaustion 200
   with no canvas change is F36). PASS: every one
   of the 11 renames reverts in order — undo walks
   the flow's own full document-message-pair
   history (`FLOW_VERSION_CAP` and `flow_versions`
   are retired; there is no 10-edit bound). A
-  further Undo that answers 201 with no canvas
+  further Undo that answers 200 with no canvas
   change, Undo still enabled, is F36 exhaustion
-  (graceful server no-op), not a missed step.
+  (the head, and nothing stored), not a missed step.
   Pin: tests/flow-undo-cursor.test.ts 'undo cursor: eleven
        saves walk eleven undos — N10 back to genesis, no
        cap' (decides eleven saves are reachable by eleven
@@ -4864,9 +4870,11 @@ FSM, unlike `flows/detail`).
 > nested `GET identities/:id/pii` (self or admin). A
 > non-admin Ideas list must paint without
 > `GET /identities` or `GET /identity-pii`
-> (`getMemberMap` is seats + `/ai-agents`; a missing
+> (`getMemberMap` is the accepted view, the removed
+> view, `/ai-agents`, and the system member; a missing
 > name may read `MEMBER_WITHOUT_PII_NAME`). Invite
-> **grant** stays admin-gated in `grantInvitation`.
+> **grant** stays admin-gated: `postInvitationGrant`
+> posts the organization nest, and a non-admin is 403.
 
 - [ ] **G11** Navigate to `members/index.html` (reachable
   via the "Members" sidebar entry). PASS: page header reads
@@ -4875,8 +4883,11 @@ FSM, unlike `flows/detail`).
   static, populated counts live in the sidebar header and
   the table grouping). A `+ Add Member` button
   on the right opens the kind-picker dialog. Below the
-  header sit a search input and three filter chips (All /
-  Humans / AIs, with All pressed by default). The list
+  header sit a search input, three kind chips (All /
+  Humans / AIs, with All pressed by default), and a
+  members state selector (Members / Former members,
+  Members pressed). Both are segmented controls: one
+  `aria-pressed` in each group. The list
   table groups members under YOU (the signed-in human),
   then HUMANS, then AIs, each group showing avatar/name,
   title (humans) or the model name (AIs), and department
@@ -4897,8 +4908,8 @@ FSM, unlike `flows/detail`).
        'fillHumanMemberProfile copies identity title
        and department onto list rows' (decides the
        list row's title badge and department come
-       from GET identities/:id, not the empty seat
-       profile); exploratory — the live page header
+       from GET identities/:id); exploratory — the live
+       page header
        text, the Add Member button, the search input,
        and the filter chips
 - [ ] **G12** Click the sidebar member chip (lower-left:
@@ -5003,14 +5014,18 @@ FSM, unlike `flows/detail`).
   form appears
   with a Model pulldown and a Skill Focus textarea; no
   Auth Token field or security warning. Create Human
-  writes `PUT /identities/:id` plus PII and `PUT`s a
-  seat at the active organization so the person appears
-  in the seat-derived roster. "Invite member" (V1) still
-  grants a pending invitation for an EXISTING identity.
+  writes `PUT /identities/:id` plus PII and an accepted
+  membership at the active organization
+  (`organizations/:id/invitations/:membership-id`,
+  If-None-Match: *). It does not write a seat. The
+  person appears in the accepted-membership roster.
+  "Invite member" (V1) still grants a pending
+  membership for an EXISTING identity.
   Pin: tests/adapters-members.test.ts
        'postHumanMemberCreation persists identity PII and
-       a seat' (decides the identity + PII + seat write
-       Create Human triggers); exploratory — the live
+       an accepted membership' (decides the identity +
+       PII + membership write Create Human triggers);
+       exploratory — the live
        dialog Kind-toggle default and the AI-form
        hide/show (`bindAddMemberDialog` in
        web-app/members/index.ts carries no CLI or
@@ -5031,21 +5046,25 @@ FSM, unlike `flows/detail`).
 
 ### Membership invitations (V) — Members "Invite member"
 
-> "Add Member" seats a new person at the active
-> organization (AA5/G14). Invite is the path that seats
-> an EXISTING identity in this org. An admin invites by
-> email → a pending invitation; the invitee reads it on
-> `invitations/` (reached via the top-bar bell) and Accepts
-> (writes a seat in the invitation's org) or
-> Declines; an admin can Revoke an outstanding one from the
+> "Add Member" writes an accepted membership at the
+> active organization (AA5/G14). Invite grants a
+> pending membership for an EXISTING identity. The
+> invitee reads it on `invitations/` (reached via the
+> top-bar bell) and Accepts (the membership becomes
+> `accepted`; it does not write a seat) or Declines;
+> an admin can Revoke an outstanding one from the
 > Organization page. DEFERRED: email delivery (see
 > `TODO.md`).
 > Sources:
 > `web-app/members/index.ts` (`handleInviteSubmit`),
-> `web-app/app/adapters/invitations.ts`,
-> `api/invitations-domain.ts` (`grantInvitation` /
-> `acceptInvitation` / `declineInvitation`
-> / `revokeInvitation`), `web-app/invitations/`,
+> `client/invitations.ts` (`postInvitationGrant`,
+> `postInvitationAcceptance`, `postInvitationDecline`,
+> `postInvitationRevocation`),
+> `api/invitations-domain.ts`
+> (`postOrganizationInvitationGrant`,
+> `putInvitationOnIdentityNest`,
+> `putInvitationOnOrganizationNest`),
+> `web-app/invitations/`,
 > `web-app/app/invitations-indicator.ts`.
 
 - [ ] **V1 — Invite by email grants a pending
@@ -5064,7 +5083,8 @@ FSM, unlike `flows/detail`).
   grant is idempotent — sending the same email again
   while still pending returns the same pending invitation
   (no duplicate, no error). Source: `handleInviteSubmit`,
-  `postInvitationGrant`, `grantInvitation`.
+  `postInvitationGrant`,
+  `postOrganizationInvitationGrant`.
   Pin: tests/adapters-invitations.test.ts 'grant by email
        appends a pending invitation';
        tests/adapters-invitations.test.ts 'grant stamps the
@@ -5090,7 +5110,7 @@ FSM, unlike `flows/detail`).
   pending invitation is created. Leftover: does not
   consume invitation A (V1). Source:
   `setInviteEmailError` in `web-app/members/index.ts`;
-  `grantInvitation` guards in `api/invitations-domain.ts`.
+  `postOrganizationInvitationGrant`.
   Pin: tests/adapters-invitations.test.ts 'grant by unknown
        email returns no-identity';
        tests/adapters-invitations.test.ts 'grant for an
@@ -5102,15 +5122,15 @@ FSM, unlike `flows/detail`).
   until accepted** While the V1 invitation is still
   PENDING (before V4), confirm the org fence holds: the
   invitee is NOT in the inviting org's Members roster
-  (the roster derives from seats, and no seat exists
-  yet), and the inviting org is NOT reachable by the
-  invitee — it does not appear in their sidebar org
+  (the roster is the accepted view, and this
+  membership is still `pending`), and the inviting
+  organization is NOT reachable by the invitee — it
+  does not appear in their sidebar organization
   `<select>` and boot will not scope a token to it (a
-  pending invitation grants no seat). Do not Accept — V4
-  owns the accepted half. PASS: pending ⇒ not in roster,
-  not reachable. Source: the org fence
-  (`resolveOwningOrganization` via `writeAuthorizerFor`),
-  `acceptInvitation`.
+  pending membership grants no role). Do not Accept —
+  V4 owns the accepted half. PASS: pending means not
+  in the roster, and not reachable. Source:
+  `putInvitationOnIdentityNest`.
   Pin: tests/api-invitations-fence.test.ts 'a pending
        invite writes no membership';
        tests/api-invitations-fence.test.ts 'a pending
@@ -5143,45 +5163,50 @@ FSM, unlike `flows/detail`).
        count rendering, and the click navigation
        (`web-app/app/invitations-indicator.ts` carries
        no CLI or browser test)
-- [ ] **V4 — Accept writes a seat; invitee becomes
-  multi-org** On `invitations/index.html` (page header
+- [ ] **V4 — Accept writes the membership accepted;
+  invitee becomes multi-organization** On
+  `invitations/index.html` (page header
   "Invitations", subtitle "Organizations inviting you to
   join"), confirm `#invitations-list` shows one card per
-  PENDING invitation — org name, an "Invited by {name} ·
-  {date}" sub-line, a state badge, and Accept / Decline
-  buttons. Click Accept on the V1 invitation. PASS: an
-  "Invitation accepted" toast fires and the row leaves
-  the pending list. A REAL seat is now written in the
-  INVITATION's org (Stark), so David Martinez becomes
-  multi-org: reload any sidebar-layout page and the
-  sidebar footer now shows the org `<select>` (G36)
-  listing both Wayne and Stark. Accept is idempotent — a
-  re-accept is a 200 no-op, no duplicate seat. Source:
-  `postInvitationAcceptance`, `acceptInvitation` (atomic
-  seat document message pair + invitations/:id/
-  acceptance operation message pair via
-  `appendMessagePairOnce`).
+  PENDING invitation — the absence marker (`—`) where
+  an organization name and an inviter name are not on
+  the read, a date sub-line, a state badge, and Accept
+  / Decline buttons. No "Invited by" line. Click Accept
+  on the V1 invitation. PASS: an "Invitation accepted"
+  toast fires and the row leaves the pending list. The
+  membership is now `accepted` in the invitation's
+  organization (Stark). It does not write a seat.
+  David Martinez becomes multi-organization: reload
+  any sidebar-layout page and the sidebar footer now
+  shows the organization `<select>` (G36) listing both
+  Wayne and Stark. A second accept latched on the
+  accepted head is 409 and stores nothing. Source:
+  `postInvitationAcceptance`,
+  `putInvitationOnIdentityNest`.
   Pin: tests/presenter-invitation-list.test.ts 'a pending
-       invitation shows the org, inviter, and Accept /
-       Decline' (decides the pending card's org name,
-       inviter name, Pending state badge, and Accept/
-       Decline buttons); tests/adapters-invitations.test.ts
-       'accept writes
-       a membership in the invitation org' (decides the
-       seat lands in the invitation's org, making the
-       invitee multi-org);
-       tests/api-invitation-nests.test.ts 'PUT from
-       accepted answers the head and stores nothing'
-       (decides re-accept is a 200 no-op with no
-       duplicate);
+       invitation shows the absence marker and Accept /
+       Decline' (decides the absence marker, no
+       "Invited by" line, the Pending badge, and
+       Accept / Decline);
+       tests/mock-data-unaffiliated-identity.test.ts
+       'the invitee view omits the org name and the
+       inviting admin';
+       tests/adapters-invitations.test.ts
+       'accept writes a membership in the invitation org'
+       (decides the accepted membership lands in the
+       invitation's organization);
+       tests/api-invitation-nests.test.ts 'a second
+       accept latched on the accepted head is 409 and
+       stores nothing';
        tests/adapters-organization-session-exchange.test.ts
        'shouldShowOrganizationSwitcher only at two or
        more orgs' (decides the sidebar `<select>`
-       mechanism a second seat triggers); exploratory —
+       at a second organization); exploratory —
        the live "Invitation accepted" toast, the row
        leaving the pending list, and the reload showing
        the `<select>`
-- [ ] **V5 — Decline appends declined, writes no seat**
+- [ ] **V5 — Decline records declined and accepts no
+  membership**
   Grant invitation B first (V4 consumed A). On
   `members/index.html` as Tony Stark, Invite member with
   a fresh EXISTING identity who is not a member of
@@ -5189,24 +5214,25 @@ FSM, unlike `flows/detail`).
   "Invitation sent" toast. Sign in as Alex Kim. On
   `invitations/` click Decline. PASS: an "Invitation
   declined" toast fires, the row leaves the pending
-  list, and NO seat is written (Stark does NOT appear in
-  the sidebar switcher and stays unreachable). With no
-  pending invitations remaining, the list shows the
-  empty state "No invitations." and the top-bar bell
-  disappears (V3). Decline is idempotent (re-decline →
-  204). Source: `postInvitationDecline`,
-  `declineInvitation`.
+  list, and no membership is accepted (Stark does
+  NOT appear in the sidebar switcher and stays
+  unreachable). With no pending invitations remaining,
+  the list shows the empty state "No invitations." and
+  the top-bar bell disappears (V3). A second decline
+  latched on the declined head is 409 and stores
+  nothing. Source: `postInvitationDecline`,
+  `putInvitationOnIdentityNest`.
   Pin: tests/adapters-invitations.test.ts 'decline records
        declined and writes no membership';
-       tests/api-invitations-fence.test.ts 'decline: replay
-       of fixed body is a no-op (two events total)'
-       (decides re-decline is idempotent, 204, no extra
-       event); tests/presenter-invitation-list.test.ts 'an
+       tests/api-invitations-fence.test.ts 'decline: a
+       replay latched on the declined head is 409 (two
+       events total)';
+       tests/presenter-invitation-list.test.ts 'an
        empty invitee list shows the empty state' (decides
        the "No invitations." copy); exploratory — the live
        "Invitation sent"/"Invitation declined" toasts and
-       the sidebar switcher staying absent for the declined
-       org
+       the sidebar switcher staying absent for the
+       declined organization
 - [ ] **V8 — Organization "Sent invitations" section +
   Revoke (admin)** Grant invitation C (V4 consumed A; V5
   declined B). On
@@ -5215,11 +5241,15 @@ FSM, unlike `flows/detail`).
   "Invitation sent" toast. Then on
   `organization/index.html` confirm a "Sent
   invitations" section (`#sent-invitations-box`, h2
-  "Sent invitations") appears below the cards, listing
-  one row per PENDING org invitation (`#sent-
-  invitations-list`) — each row shows the invitee EMAIL,
-  an "Invited {date}" sub-line, a state badge, and a
-  Revoke button.
+  "Sent invitations") appears below the cards. A
+  segmented control (`data-invitation-state`) offers
+  Pending, Declined, and Revoked, one `aria-pressed`.
+  Pending is pressed on load. The list (`#sent-
+  invitations-list`) shows one row per invitation in
+  that state — the absence marker (`—`) where the
+  invitee email is not on the read, an "Invited
+  {date}" sub-line, a state badge, and, on a pending
+  row, a Revoke button.
   TWO rows are pending here: invitation C and the SEEDED
   pending invitation to `riley.okafor@example.net`
   (present from boot — B25–B29's fixture; do NOT revoke
@@ -5236,19 +5266,22 @@ FSM, unlike `flows/detail`).
   tests/presenter-invitation-list.test.ts 'an empty sent
   list shows the empty state' alone decides the "No
   outstanding invitations." copy.
-  Revoke is idempotent (re-revoke → 200).
+  A second revoke latched on the revoked head is
+  409 and stores nothing.
   Source: `web-app/organization/index.ts`
   (`renderSentInvitations` / `onSentInvitationClick`),
-  `SentInvitationsPresenter`, `revokeInvitation`.
+  `SentInvitationsPresenter`,
+  `putInvitationOnOrganizationNest`.
   Pin: tests/adapters-invitations.test.ts 'sent invitations
        list the active org pending only';
        tests/adapters-invitations.test.ts 'revoke records
        revoked (admin only)';
-       tests/api-invitations-fence.test.ts 'revoke: replay
-       of fixed body is a no-op (two events total)'
-       (decides re-revoke is idempotent, 200, no extra
-       event); tests/presenter-invitation-list.test.ts 'a
-       sent invitation shows the invitee email and Revoke';
+       tests/api-invitation-document.test.ts 'a resent
+       revoke latched on the revoked head is 409 and
+       stores nothing';
+       tests/presenter-invitation-list.test.ts 'a
+       sent invitation shows the absence marker and
+       Revoke';
        tests/presenter-invitation-list.test.ts 'an empty
        sent list shows the empty state' (decides the "No
        outstanding invitations." copy); exploratory — the
@@ -5299,15 +5332,19 @@ FSM, unlike `flows/detail`).
        live grant-dialog submission as a non-admin and the
        Organization page's hidden Sent-invitations section
 - [ ] **V9 — Sent-invitations section is admin-only**
-  Sign in as a non-admin Stark member (e.g. Sarah Chen)
-  and open `organization/index.html`. PASS: the admin
-  Sent-invitations read fails (403 "forbidden: listing
-  sent invitations requires an admin role") and the
-  section stays HIDDEN — the read rejects before the
-  reveal line, so the box never un-hides, and no Revoke
-  affordance is offered to a non-admin. (Pairs with V7's
-  grant/revoke 403s.) Source: `sentInvitations` admin
-  guard in `api/invitations-domain.ts`.
+  Sign in as a non-admin Stark member (e.g. Sarah Chen) and open
+  `organization/index.html`. PASS: `GET /organizations/:id` is on
+  the member tier (`api/authorization.ts`), so `getOrganization`
+  succeeds. The sent box starts `hidden`
+  (`web-app/organization/index.html`). The default sent state is
+  `pending`. A member's read of `pending` is 403,
+  `forbidden: members read accepted or removed memberships`
+  (`memberViewRefusal`). The rejection is logged and
+  `paintSentInvitations` does not run, so the box stays hidden
+  and no Revoke is offered. "Admin access required" paints only
+  when the organization pair itself rejects 403
+  (`web-app/organization/index.ts`), which this member's
+  organization GET does not. (Pairs with V7's grant/revoke 403s.)
   Pin: exploratory — the admin-only Sent-invitations
        read and the section staying hidden (no CLI or
        browser test drives `getOrganizationInvitations`

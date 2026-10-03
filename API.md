@@ -3,7 +3,7 @@
 This file is composition and wire law, not a catalog.
 Families, verbs, and rooms live in `routes[]`
 (`api/routes.ts`); browse them at `/api-documentation/`
-(141 rooms, derived from the table). On disagreement,
+(134 rooms, derived from the table). On disagreement,
 the table wins. Dispatch is `handleRequest`
 (`api/api.ts`). Pair formation is `api/message-pair.ts`.
 Each write route's conditional is its entry in
@@ -34,9 +34,10 @@ every request (`incomingContext`), then `dispatched`:
    a request. An operation-id groups the pairs of
    one operation (an instance PATCH and its
    revision). It is not a request-hash replay. A
-   resent write whose state equals the head matches:
-   it stores nothing and answers 200. No request hash
-   is replayed.
+   resent document write whose body equals the head
+   matches, stores nothing, and answers 200. A
+   membership PUT whose transition is not in the
+   table is 409. No request hash is replayed.
 4. **Match, then the gate.** `matchRoute`, then
    `authenticateRequest` unless the matched pattern
    is in `AUTHENTICATION_ROUTES`.
@@ -73,8 +74,9 @@ every request (`incomingContext`), then `dispatched`:
    `api/head-reads.ts`) and the gate serves them
    through `servedResponse`
    (`api/served-response.ts`), or answers handler JSON
-   (`get`: the thirty routes
-   `tests/parted-reads.test.ts` names). A selector
+   (`get`: the one route
+   `tests/parted-reads.test.ts` names,
+   `organizations/:id/work-orders/:id/history`). A selector
    runs after the fence and throws a document's miss
    (403 for a foreign owner, 404 otherwise); the gate
    then answers a deleted head 410 and serves a live
@@ -106,7 +108,11 @@ authentication doors keep OAuth's response and store
 which stores 200 with the work order's state. A
 landed message carries Date,
 ETag (quoted message-pair identifier), Operation-ID,
-and Request-ID. A document PUT's ETag is its pair id,
+Request-ID, and three lines from the inserted row:
+`last-modified` (that row's `response_at` as an
+IMF-fixdate), `response-at` (the same column, RFC-3339
+zulu, six fraction digits), and
+`requester-identity-id`. A document PUT's ETag is its pair id,
 the same value a later GET advertises. A write through
 the former answers with its received pair's response:
 the parent document's state, projected for the
@@ -114,8 +120,13 @@ requester, and an ETag naming the parent's new pair. A
 no-op stores nothing, not even the received pair, and
 answers 200 through the served response: this
 request's date and request-id, the head's etag and
-operation-id, and the head's body projected for the
-requester. If-Match is one
+operation-id, the three lines from the head's
+envelope, and the head's body projected for the
+requester. A pending grant sent again is `POST
+organizations/:id/invitations/`. It answers 200
+and stores nothing. A membership item PUT whose
+`state` is `pending` is 409. `putMembership`
+rejects `pending` before `membershipTransition`. If-Match is one
 strong validator (`"<identifier>"`); an `in-order`
 route also takes a comma-separated list of them, one
 per document. `*`, weak, unquoted, or 64-hex yield
@@ -125,20 +136,36 @@ alone.
 A read serves what was stored. A document GET answers
 its head's stored response with three substitutions,
 the lines that describe this transmission: the status
-line (200), `date`, and `request-id`. `etag`,
-`operation-id`, and `content-type` stay as stored, and
-`content-length` counts the body served. A hoisted
-credential line is never spliced back. The body is the
-stored octets but for one projection, the only body
-change (`projectedBody`): a credential's `secret`
-reaches no reader, admins included, and an instance
-keeps the values whose attributes the reader may read.
-A collection GET is `multipart/mixed` of
+line (200), `date`, and `request-id`. It adds three
+lines from the pair's envelope, the lines that
+describe the write: `last-modified` and `response-at`
+from `response_at` (`last-modified` is an IMF-fixdate,
+which stops at the second; `response-at` is RFC-3339
+zulu with six fraction digits), and
+`requester-identity-id` from `requester_identity_id`.
+`etag`, `operation-id`, and `content-type` stay as
+stored, and `content-length` counts the body served.
+A hoisted credential line is never spliced back. The
+body is the stored octets but for one projection, the
+only body change (`projectedBody`): a credential's
+`secret` reaches no reader, admins included, and an
+instance keeps the values whose attributes the reader
+may read. A collection GET is `multipart/mixed` of
 `application/http; msgtype=response` parts, ordered
 `response_at, id`, each the response a document GET of
-that head serves. It carries no `etag`, since it names
-no one state. A deleted head is no part of it, and a
-collection that selects none answers 204.
+that head serves, three lines included. The envelope
+carries `date` and `request-id` and no `etag`, since
+it names no one state. A deleted head is no part of
+it, and a collection that selects none answers 204.
+The two membership views are that collection:
+`identities/:id/invitations/` by `identity_id` and
+`organizations/:id/invitations/` by
+`organization_id`, each with an optional `?state=`.
+`versions/:etag` serves the stored PUT the tag names,
+through the same function. `versions/` is
+`multipart/mixed` of every PUT pair, oldest first.
+A DELETE pair is not a version. A written document's
+version list is never 204.
 
 Status ladder:
 
@@ -148,35 +175,50 @@ Status ladder:
   a collection GET that selects a head. Also a no-op,
   through the served response: this request's date
   and request-id, the head's etag and operation-id,
-  the head's body projected, and nothing stored
+  the three lines from the head, the head's body
+  projected, and nothing stored. Also a version of a
+  live document, and a view or version list that
+  selects at least one
 - **201** — a genesis: a landed PUT with no live
   head, including a PUT after a DELETE; a POST
   create, with `Location`; an instance create
 - **204** — DELETE success (landed, or already-gone);
-  a collection GET that selects none
+  a collection GET that selects none, including a
+  membership view. A version list is not this rung
 - **400** — bad JSON / Request-ID / Operation-ID /
   validators; a malformed If-Match or If-None-Match;
   If-None-Match on an `in-order` route; any
-  conditional on a `none` route
+  conditional on a `none` route; a malformed
+  `:membership-id` (not two identifiers joined by one
+  colon); a bad `?state=` or any other query
+  parameter on a view
 - **404** — authenticated unmatched; DELETE
   never-written; genuine absence, as a GET of a name
-  never written
-- **405** — no handler; public instance PUT; GET
+  never written; a tag that names no PUT pair at the
+  document; a membership name whose identity is not
+  the path's
+- **405** — no handler, including DELETE on a
+  membership; public instance PUT; GET
   `…/work-orders/:id/claim`
 - **409** — domain conflict (a rebind, a live claim by
-  another member, an invitation not pending, a
+  another member, a membership transition that is not
+  in the table, the last accepted admin, a
   RESTRICT); a handler's genesis over a live document
   (`Document already exists at <path><name>`); a
   never-written latch refused twice with no stated
   head, the same body; a blind PUT that loses three
   times (`Document remained contended at <path><name>`)
 - **410** — a GET of a deleted document, answered
-  after the fence (`Gone: <table>/<id>`): a DELETE
+  after the fence (`Gone: <table>/<id>`), and the
+  same answer on both of its version routes: a DELETE
   head, or a state-`deleted` head in a lifecycle
   family (ideas, projects, objectives, flows, record
-  types). Beside it, a retired record instance's
-  PATCH and a create over its tombstone (the create's
-  body: `Document is gone at <path><name>`)
+  types). Record-type version routes pass lifecycle
+  `state`, so a state-deleted record type is 410
+  there, the same as a DELETE head. Beside it, a
+  retired record instance's PATCH and a create over
+  its tombstone (the create's body: `Document is gone
+  at <path><name>`)
 - **411** — A request body requires Content-Length.
   The same sentence answers a Transfer-Encoding
 - **412** — a stale If-Match
@@ -210,9 +252,9 @@ through E are the write shapes the spec audits
 | Conditional | Takes | Routes |
 |---|---|---|
 | `optional` | If-Match, If-None-Match: *, or neither; a DELETE's useful one is If-Match (If-None-Match: * passes the gate, but a live head refuses it 412) | class A document PUTs; every DELETE but the release |
-| `required` | If-Match or If-None-Match: * | class B: the flow and work-order PUTs; the instance PATCH |
-| `in-order` | If-Match, one tag per document the operation derives from | class C operations: conversion, undo, claim and release, transition, binding, invitation accept, decline, and revoke |
-| `none` | no conditional | class D POST creates; class E operations: the grants, token rotation and revocation |
+| `required` | If-Match or If-None-Match: * | class B: the flow and work-order PUTs; the instance PATCH; the organization-nest membership item `organizations/:id/invitations/:membership-id` |
+| `in-order` | If-Match, one tag per document the operation derives from | class C operations: conversion, undo, claim and release, transition, binding, and the identity-nest membership PUTs (accept and decline) |
+| `none` | no conditional | class D POST creates; class E operations: the grants, including the membership grant, token rotation and revocation |
 
 The instance PATCH does two writes: If-None-Match: *
 declares a create of the id the client minted, and
@@ -300,14 +342,26 @@ parent carries none. When the parent equals that head
 while a later sibling lands, the parent is skipped:
 the answer is 200 with the parent's head, and the
 received pair's ETag names that head. The work-order transition, the
-record-type edit, conversion, and invitation accept
-read so.
+record-type edit, and conversion read so.
 
 **POST creates** (class D). Flows, work orders,
-objectives, identities, record types, and invitations.
+objectives, identities, and record types.
 The handler declares each created document's genesis,
 so a resent create answers 409 and stores nothing. The
-201 answers the created document's state.
+201 answers the created document's state. The
+membership grant is not this shape.
+
+**Membership grant.**
+`POST organizations/:id/invitations/` →
+`postOrganizationInvitationGrant`
+(`api/invitations-domain.ts`). Conditional `none`.
+The body is `{ email, grantAt }`. A name never
+written, or a declined, revoked, or removed head,
+lands `pending` as the handler's genesis or in order
+on the head. A pending grant sent again stores
+nothing and answers that head. An accepted membership
+answers 409. One email under one organization names
+one document, `<organization-id>:<identity-id>`.
 
 **Idea conversion.**
 `POST organizations/:id/ideas/:id/conversion` in
@@ -337,13 +391,36 @@ member and a rebind to another instance are 409 from
 the head. A resent claim, a release with no live claim,
 and the same binding again are no-ops.
 
-**Invitation accept.**
-`PUT identities/:id/invitations/:id` →
-`acceptInvitation` (`api/invitations-domain.ts`). The
-invitation lands `accepted` in order on the client's
-tag; a new seat lands beside it as the handler's
-genesis, stamped with the invitation's org. Decline and
-revoke land the invitation alone.
+**Memberships.** One document at `/invitations/`,
+named `<organization-id>:<identity-id>`. Five states:
+`pending`, `accepted`, `declined`, `revoked`,
+`removed`. There is no seat document. Two views, each
+a collection GET: `identities/:id/invitations/` and
+`organizations/:id/invitations/`. `?state=` selects
+one state; no query selects every state an admin may
+read. A member reads `accepted` and `removed` on the
+organization view. Any other `?state=`, or no query,
+is 403 for that member. A bad query is 400. A view
+that selects none is 204.
+
+The identity-nest item is `in-order`. Accept
+(`pending` → `accepted`) and decline
+(`pending` → `declined`) are the invitee's PUTs.
+Accept writes that membership `accepted`. It does not
+write a seat. The organization-nest item is
+`required`: If-Match, or If-None-Match: * for a name
+never written. Revoke, removal (`accepted` →
+`removed`), a type change, and a direct `accepted`
+write are the admin's PUTs there. A transition that
+is not in the table is 409, and so is removing or
+demoting the last accepted admin. A stale latch is
+412. DELETE on a membership is 405. A membership is
+never `deleted`, so its GET is never 410.
+
+`…/versions/:etag` serves the PUT pair that tag
+names. `…/versions/` serves every PUT pair,
+`multipart/mixed`, oldest first. A tag that names no
+PUT pair is 404.
 
 **Token grant dispatch.**
 `POST authentication/token` → `postToken`
@@ -405,7 +482,7 @@ HTTP nest. Validators, crypto, hash, and
 ## Seed pair formation
 
 Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 2317`, root
-included; bootstrap exactly 8 pairs and the root. Pinned by
+included; bootstrap nine, root included. Pinned by
 `tests/mock-data-pairs.test.ts`. A pair's request holds
 what was received, or nothing. A seeded row was never
 received, so every seeded row stores an empty request,

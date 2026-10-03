@@ -465,8 +465,9 @@ skew tests, which went with item 8's trio.
    nothing. Flows keep their event walk until item 11.
    Head reads landed
    (`docs/superpowers/specs/2026-09-30-head-reads-design.md`):
-   43 GET routes serve stored responses; thirty stay
-   parted under `tests/parted-reads.test.ts`. `./test`
+   43 GET routes served stored responses, and thirty
+   stayed parted under `tests/parted-reads.test.ts`,
+   at that landing. `./test`
    76.0 s → 104.1 s (medians; the base one parallel
    invocation, the tip three: parallel pass, serial
    lane, and tz); readyMs per list page, base → tip
@@ -475,20 +476,20 @@ skew tests, which went with item 8's trio.
    58.4, projects 57.5 → 62.3, records 50.6 → 54.9,
    flows 46.0 → 56.4, workbox 122.7 → 142.0, members
    53.8 → 54.1, identities 55.0 → 56.4, organization
-   51.2 → 54.1. Two specs
-   follow: version and history reads, the four
-   invitation reads, and `former-members/` (the fourth,
-   which leaves `…/work-orders/:id/history` in the
-   census); work-order events (the fifth, which builds
+   51.2 → 54.1. The fourth spec landed
+   (`docs/superpowers/specs/2026-10-01-membership-and-versions-design.md`).
+   The census is one pattern,
+   `organizations/:id/work-orders/:id/history`
+   (`tests/parted-reads.test.ts`). Its `./test` seconds
+   and readyMs are the next measure, not this record.
+   The fifth follows: work-order events, which builds
    that read once, as a heads read of the work order's
-   event documents). The covenant lands with the fifth,
-   in the commit that empties the census (spec §12,
-   `## For the next brainstorms`).
-   ARCHITECTURE.md gains a NAMED COVENANT,
-   `## A response is one unit`, in the commit that makes
-   it true and not before — that file states only what is,
-   and today thirty GET routes still answer handler JSON
-   (`tests/parted-reads.test.ts`). Its
+   event documents. The covenant, and
+   `## A response is one unit`, still land with the
+   fifth, in the commit that empties the census
+   (spec §12, `## For the next brainstorms`). That
+   heading is not in ARCHITECTURE.md yet. Today one
+   GET route answers handler JSON. Its
    approved wording: "The API, the client, and the
    application treat a response — status line, headers,
    and body — as one unit. A stored response is a
@@ -628,7 +629,12 @@ skew tests, which went with item 8's trio.
    the
    same pairs in TypeScript. Item 7's profile can be
    removed on its own only as its own document: keys on
-   the seat body would hide the seat's whole history. The
+   the membership body would hide that membership's
+   whole history. The membership read omits
+   `organization_name`, `invited_by_name`, and
+   `invitee_email`. Restoring the three names is a
+   read scoped to the relationship. That read does
+   not exist. The
    reduction takes back what Postgres grants every role.
    `fa_owner` revokes CONNECT and TEMPORARY on the
    database and every right on the schema from PUBLIC and
@@ -967,22 +973,23 @@ skew tests, which went with item 8's trio.
    (`tests/http-throttle.test.ts`); the `ipAllowList`
    bullet.
 7. The membership profile — an organization-side profile
-   per SEAT, so the identity "Tony Stark, CEO" holding a
-   contractor seat elsewhere appears there as
-   "contractor": the document shape (keys on the seat
-   body, or a nested facet under the seat mirroring
-   `identities/:id/pii` — the brainstorm decides, under
-   item 2's rule that a profile removable on its own is
-   its own document, since keys on the seat body would
-   hide the seat's whole history), its
-   validator, derive, seed, the roster and detail reads,
-   and the Members page's edit. Replaces the
-   one-profile-per-identity covenant at
-   `api/types.ts:1342-1343`; the seed already carries
-   the contradiction (the admin holds two seats with one
-   title). Lands before items 11 and 12, whose designer
-   roster and AI seats read it, and replaces the
-   roster's absent profile with the read. Authored on
+   per membership, so the identity "Tony Stark, CEO"
+   holding a contractor membership elsewhere appears
+   there as "contractor": the document shape (keys on
+   the membership body, or a nested facet under the
+   membership mirroring `identities/:id/pii` — the
+   brainstorm decides, under item 2's rule that a
+   profile removable on its own is its own document,
+   since keys on the membership body would hide that
+   membership's whole history), its validator, derive,
+   seed, the roster and detail reads, and the Members
+   page's edit. One profile still rides the identity
+   (`HumanProfile`, `shared/types.ts:707`). The seed
+   already carries the contradiction (the admin holds
+   two memberships with one title). Lands before
+   items 11 and 12, whose designer roster and AI
+   memberships read it, and replaces the roster's
+   absent profile with the read. Authored on
    the `2026-09-04-critical-functionality-path` branch;
    this is its master copy.
 8. Lifecycle out of the document body — closed the other
@@ -1060,16 +1067,18 @@ skew tests, which went with item 8's trio.
     `viewBox` mutation at four method sites
     (`web-app/app/presenters/flow-designer.ts:537-538,
     556-559, 1036-1039, 1066-1067`); `hasUndoHistory` as
-    the designer's own `versions.length > 1`
-    (`web-app/app/flow-operations.ts:841`, over the
-    `…/flows/:id/versions/` read, `client/flow-queries.ts:
-    238` — the server no longer computes it; the undo
-    route resolves its target itself
-    (`resolveFlowUndoTarget`, `api/derive-flows.ts:291`)
-    and with no target writes the current body unchanged
-    (`api/routes.ts:1433-1435`), which TEST-PLAN F36/F45
-    call PASS — the brainstorm decides whether that
-    stays); rotation only on the
+    the designer's own `versions.length > 1`, counting
+    parts of `…/flows/:id/versions/`
+    (`web-app/app/flow-operations.ts:841`,
+    `client/flow-queries.ts:234` — more than one part
+    is something to undo). The server no longer
+    computes it. The undo route resolves its target
+    itself (`resolveFlowUndoTarget`,
+    `api/derive-flows.ts:291`) and at exhaustion
+    answers the head and stores nothing
+    (`api/routes.ts:1367-1370`), which TEST-PLAN
+    F36/F45 call PASS — the brainstorm decides whether
+    that stays); rotation only on the
     toggle path (`web-app/app/flow-layout.ts:1032-1037`);
     the mirror trigger; and the canvas entries of the
     genericity bullet in `## Later work` (two zoom
@@ -1503,20 +1512,23 @@ Off the critical path; each with its oracle.
   `SELF_ONLY_TOKEN_ROUTES`: the token revocation
   document's PUT and the rotation and revocation POSTs)
   lets a member name only its own identity but lets an
-  admin name any identity, whether or not it holds a seat
-  in the admin's organization: `callerIsAdmin` is the
-  organization-scoped `admin` role from the verified
-  claim, and nothing compares the path identity's seats
-  to that organization. An organization's admin can so
-  rotate or revoke the token chain of an identity outside
-  it. Scope the admin arm to identities seated in the
-  claim's organization, keeping the root operator's reach
-  only where its own role says so, and sweep every other
-  admin-reachable `identities/:id/…` write for the same
-  reach. Oracle: on each guarded route, an organization
-  admin naming an identity with no seat in its
-  organization is 403 before any read; naming a seated
-  one is unchanged; the root operator's cross-organization
+  admin name any identity, whether or not it holds an
+  accepted membership in the admin's organization:
+  `callerIsAdmin` is the organization-scoped `admin`
+  role from the verified claim, and nothing compares
+  the path identity's memberships to that
+  organization. An organization's admin can so
+  rotate or revoke the token chain of an identity
+  outside it. Scope the admin arm to identities with
+  an accepted membership in the claim's organization,
+  keeping the root operator's reach only where its
+  own role says so, and sweep every other
+  admin-reachable `identities/:id/…` write for the
+  same reach. Oracle: on each guarded route, an
+  organization admin naming an identity with no
+  accepted membership in its organization is 403
+  before any read; naming one that holds one is
+  unchanged; the root operator's cross-organization
   reach, where kept, is pinned by name.
 - Instances and bound work orders name the record-type
   version they were written against. An instance's state
@@ -1616,13 +1628,16 @@ Off the critical path; each with its oracle.
   per-route figures to `measurements/`; `--visualize` draws
   the three charts; `--check` gates per-route p90 against
   `measurements/budgets.json`.
-- The work-order history list ends in a slash:
-  `organizations/:id/work-orders/:id/history` becomes
-  `…/history/`, as every other list route does
-  (`identities/:id/invitations/:id/versions/`). A wire
-  change: the route (`api/routes.ts:5232`), its two client
-  reads (`client/work-orders-queries.ts:175`, `:292`), and
-  the generated API documentation. Oracle: no route in
+- The work-order history list still lacks a slash:
+  `organizations/:id/work-orders/:id/history`
+  (`api/routes.ts:4494`). Its two client reads append
+  `/history` (`client/work-orders-queries.ts:181`,
+  `:294`). Version lists end in a slash, including
+  `identities/:id/invitations/:membership-id/versions/`
+  (`api/routes.ts:3664`) and instance versions
+  (`INSTANCE_VERSIONS_PATTERN`,
+  `api/family-registry.ts:125`). The fifth spec
+  inherits the history route. Oracle: no route in
   `api/routes.ts` that returns a list lacks the slash.
 - The refresh lock `fusion-refresh`, the peer channel
   `fusion-angle:refresh`
@@ -1666,12 +1681,30 @@ Off the critical path; each with its oracle.
   derives do not dual-read those old shapes; a live
   ledger that predates the landing still holds them
   until `./bin/postgres-wipe` then `./bin/postgres-seed`,
-  or the Render equivalents through `./deploy`. Decision
+  or the Render equivalents through `./deploy`. This
+  landing's membership documents, `fa_message_body_json`,
+  and the partial index `fa_message_pairs_body`
+  (`WHERE path = '/invitations/'`) arrive the same
+  way: the seed refuses a database whose
+  `fa_message_pairs` exists, and nothing alters one
+  in place. Decision
   9's measure witness landed at `3aaee31`
   (`measurements/history.jsonl`, `boot:auth-gate`
   recovered vs `c50e849`) and is closed. Oracle: every
   live database has been wiped and reseeded after
   `66457197`
+- Filtering other collections by a body field. The
+  partial index `fa_message_pairs_body` reaches
+  `path = '/invitations/'` only
+  (`BODY_INDEXED_PATH`, `api/schema-postgres.ts:194`).
+  Objectives record a transition in the body
+  (`lifecycle: 'state'`, `OBJECTIVES_WIRING`,
+  `api/routes.ts:459-467`) and serve versions per
+  objective (`documentVersionsSelectRoute`,
+  `api/routes.ts:5334`). They have no collection-wide
+  versions view. Oracle: a body field on another
+  collection selects through an index the statement
+  names, or the read says it scans
 - XSS can use the refresh cookie from the page. The
   cookie is HttpOnly, SameSite=Strict, Path=
   `/api/authentication`, Secure
@@ -2709,10 +2742,14 @@ Off the critical path; each with its oracle.
   every request, a method never served included
   (`api/api.ts:403-417`). Add
   `HEAD` to the API: now that a document GET serves the
-  stored response with three substitutions
-  (`servedResponse`, `api/served-response.ts:62`; thirty
-  routes stay parted, `tests/parted-reads.test.ts`),
-  `HEAD` is that function without the body. Conditional
+  stored response with three substitutions and three
+  additions (`servedResponse`,
+  `api/served-response.ts:74`; one route stays parted,
+  `organizations/:id/work-orders/:id/history`,
+  `tests/parted-reads.test.ts`),
+  `HEAD` is that function without the body.
+  `last-modified` makes `If-Modified-Since` possible.
+  No handler reads it. Conditional
   requests (`If-None-Match` / `304`) stay open. Start:
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
@@ -3028,7 +3065,7 @@ Off the critical path; each with its oracle.
   for a collection's parts. The five named values
   (`Idea`, `Project`, `RecordModel`, `WorkOrder`,
   `RecordInstance`) and the values a write latches
-  through (`HumanMember` by its `seat`, `MemberPii`
+  through (`HumanMember` by its membership, `MemberPii`
   present, `ClientRegistration` registered, the app's
   `Organization`, and `FlowGraph`) keep the message
   they were built from. The aggregates and the
@@ -3042,7 +3079,7 @@ Off the critical path; each with its oracle.
   from. `putHumanMember` (`client/members.ts`) answers
   void: its two heads, the identity's and the PII's,
   have no holder — the members page re-reads after a
-  save (`web-app/members/detail.ts:561`) — and the one
+  save (`web-app/members/detail.ts:563`) — and the one
   head a write verb owes is a composite shape for this
   bullet to name. Oracle: every client read verb returns a
   message, an array of messages, or a value whose
@@ -3108,8 +3145,8 @@ Off the critical path; each with its oracle.
   "appendMessagePairOnce's nowUtc()"; three in `tests/`
   (`tests/api-shadow-ledger-auth.test.ts:297`,
   `tests/derive-documents.test.ts:19`,
-  `tests/document-family.test.ts:273`); and TEST-PLAN
-  V4's source line (`TEST-PLAN.md:5140`). The state by
+  `tests/document-family.test.ts:273`). TEST-PLAN V4
+  no longer names `appendMessagePairOnce`. The state by
   PUT spec found more: `sendWriteResponse`
   (`tests/pair-write-coverage.test.ts:55`);
   `MEMBERS_WIRING` (`api/routes.ts:495`,
@@ -3132,8 +3169,9 @@ Off the critical path; each with its oracle.
   names code that runs
 - DELETE cascade. No one policy says what a delete does
   to the documents that name the deleted one. Four
-  references refuse the delete today (the last admin
-  seat, the record-type and attribute RESTRICTs, and the
+  references refuse the delete today (the last
+  accepted admin membership, the record-type and
+  attribute RESTRICTs, and the
   instance placement RESTRICT under a work-order
   binding), each checked in a read that closes before
   the write; no audit lists the rest. Consider one
@@ -3148,25 +3186,29 @@ Off the critical path; each with its oracle.
   racing delete under one statement; no reference is
   unlisted.
 - The four counting checks close before their
-  statement: the last admin seat
-  (`api/routes.ts:5315-5326`), the record-type RESTRICT
-  (`:4755-4766`), the attribute RESTRICT
-  (`:1039-1051`), and the instance placement RESTRICT
-  (`:3323-3349`) each verify in a read transaction that
-  closes before the write. Two probes verify and then
-  write with no transaction at all (spec Found 5): the
-  default-organization seat probe
-  (`api/organization-requests.ts:116-125`), and the
-  invitation grant's membership and pending probe
-  (`api/invitations-domain.ts:449-466`), so two grants
-  of one email under different ids both land. Oracle:
-  two writers race the last admin seat, a record-type
-  DELETE against an instance create, an attribute
-  DELETE against a flow PUT, an instance DELETE against
-  a binding, a default-organization PUT against the
-  seat's removal, and two grants of one email, each
-  under one write transaction and the organization's
-  advisory lock; each race refuses one writer.
+  statement: the last accepted admin
+  (`refuseLastAdmin`, `api/invitations-domain.ts:335-354`),
+  the record-type RESTRICT (`api/routes.ts:4663-4673`),
+  the attribute RESTRICT (`api/routes.ts:981-995`),
+  and the instance placement RESTRICT
+  (`api/routes.ts:3221-3247`) each verify in a read
+  transaction that closes before the write. The
+  default-organization write reads an accepted
+  membership (`membershipOf`,
+  `api/organization-requests.ts:120-128`) and then
+  writes. A grant reads the membership head
+  (`postOrganizationInvitationGrant`,
+  `api/invitations-domain.ts:588`) and then lands
+  (`:607`). Two grants of one email name one
+  document, `<organization-id>:<identity-id>`.
+  Oracle: two writers race the last accepted admin,
+  a record-type DELETE against an instance create, an
+  attribute DELETE against a flow PUT, an instance
+  DELETE against a binding, a default-organization
+  PUT against that membership's removal, and two
+  grants of one email, each under one write
+  transaction and the organization's advisory lock;
+  each race refuses one writer.
 - An RFC 7009 revocation endpoint for OAuth clients.
   Revocation today is
   `identities/:id/tokens/:jti/revocation`: the identity

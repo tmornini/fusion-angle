@@ -59,7 +59,25 @@ across every dialog. Submit/confirm stay page-specific (a
 **Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel',
 'active')` from `dialog.ts` — the third arg is the
 active-state class. Tab buttons use `data-tab="{name}"`
-attribute, panels use `id="tab-{name}"`.
+attribute, panels use `id="tab-{name}"`. `.tab` and
+`.tab.active` live in `components-tabs.css`. That is
+not this control.
+
+**Segmented control.** A `role="group"` of
+`btn btn-secondary btn-sm` buttons. Each carries
+`aria-pressed`; one is `true`. No inline style. The
+button classes are `.btn`, `.btn-secondary`, and
+`.btn-sm` in `components-buttons.css`. The group
+itself is utility layout (`flex items-center gap-2`);
+`pages-members.css` and `pages-organization.css` add
+no class for it. Two pages use it, under the
+three-page line, so it stays off `components-*.css`.
+Its users: the members kind filter
+(`data-kind-chip`: All, Humans, AIs), the members
+state selector (`data-membership-state`: Members,
+Former members), and the organization invitations
+selector (`data-invitation-state`: Pending, Declined,
+Revoked).
 
 When groups exist, use native `<optgroup label>` —
 introducing case: AI-member model picker

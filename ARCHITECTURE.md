@@ -138,12 +138,13 @@ A flat (un-exchanged) token has none and resolves via
 `identityDefaultOrganization`: the identity's SET default
 organization (message-plane
 `/identities/:id/default-organization` document) if that
-organization is a live seat, else PRIMARY (earliest
-remaining join `at`, identifier order on tie), else 403 —
-there is no global default.
+organization is an accepted membership, else PRIMARY
+(earliest remaining join `at`, organization id on tie),
+else 403 — there is no global default.
 
-Roles are claims (`admin:O` / `member:O` baked from seat
-`type` at mint). The gate projects them for the fenced org
+Roles are claims (`admin:O` / `member:O` baked from the
+accepted membership's `type` at mint). The gate projects
+them for the fenced org
 via `projectClaimRolesForOrganization`. NAMED COVENANT:
 de-membership, demotion, and logout-everywhere bite at the
 next mint/refresh/exchange or access-token expiry
@@ -154,36 +155,42 @@ not on the very next request.
 foreign-id PUT/DELETE/PATCH before genesis in the caller's
 namespace. Read isolation: foreign 403, absent 404. Path
 `:organization-id` on an org-nested route must equal the
-claim org else 403.
+claim org else 403. A membership name's organization
+half must equal the path's (403). Its identity half
+must equal the path's (404).
 
-## Identity, seats, invitations
+## Identity and memberships
 
-`organizations` is the tenant root. A seat at
-`organizations/:id/members/:identity-id` is the
-identity↔org relationship, carrying `type` `"admin"` |
-`"member"`. The members roster is seats plus `/ai-agents`
-(not members, not identities). Member detail removes a
-seat by its DELETE; the last admin seat refuses (409), and
-a removed member's access ends at the next mint, refresh,
-or expiry per the named covenant. The system member is the
-constant `SYSTEM_MEMBER_ID` (`api/types.ts`), not a seat.
-A removed seat stays in the ledger as a DELETE head at
-the same prefix; `organizations/:id/former-members/`
-lists those heads, and the name resolver paints them as
-"Former member" — an author who left is not an unknown
-id.
+`organizations` is the tenant root. A membership is
+the document: one row at `/invitations/`, named
+`<organization-id>:<identity-id>`, `type` `admin` or
+`member`. Five states: `pending`, `accepted`,
+`declined`, `revoked`, `removed`. There is no seat
+document and no `former-members/` route. `accepted`
+grants the role. The members roster is accepted
+memberships plus `/ai-agents` (not a members
+collection, not identities). Two views over that
+prefix, and `?state=` selects. A member reads
+`accepted` and `removed`; a member's other
+organization view is 403. Removal is a PUT to
+`removed`. The last accepted admin refuses (409), and
+a removed member's access ends at the next mint,
+refresh, or expiry per the named covenant. The system
+member is the constant `SYSTEM_MEMBER_ID`
+(`shared/types.ts`), not a membership. A removed
+membership stays a PUT head in state `removed`, and
+the name resolver paints it "Former member" — an
+author who left is not an unknown id.
 
-Invitation alphabet: pending, accepted, declined, revoked.
-Invitations are not org-fenced: the invitee must read an
-invitation to an org it is not yet in. Grant (admin)
-appends pending. Accept (invitee) appends accepted and
-writes the seat in the same transaction, stamped with the
-invitation's org — not the caller's active org. Decline
-and revoke append their terminal states.
+Grant (admin) lands `pending`. Accept (invitee) lands
+`accepted` on that same document. It does not write a
+seat. Decline and revoke land their states on it.
+The invitee reads a membership of an organization it
+is not yet in, on the identity view.
 
-Two HTTP nests over one prefix: receive at
-`/identities/:id/invitations/` and send at
-`/organizations/:id/invitations/`.
+Receive at `identities/:id/invitations/` and send at
+`organizations/:id/invitations/` are the two views,
+not two documents.
 
 ## Derivation
 
@@ -204,8 +211,18 @@ only body transform. A collection joins those responses
 as `multipart/mixed`, and on Postgres its heads come from
 a skip walk of the document index
 (`selectCollectionHeadPairs`,
-`api/backend-postgres.ts`). Thirty GET routes still
-answer handler JSON (`tests/parted-reads.test.ts`).
+`api/backend-postgres.ts`). A version is a stored PUT
+pair. `versions/:etag` serves that pair through
+`servedResponse`. `versions/` joins every PUT as
+`multipart/mixed`, oldest first
+(`selectVersionAt`, `selectVersionsAt`,
+`api/head-reads.ts`). A DELETE pair is not a version.
+A deleted document — a DELETE head, or a body state
+`deleted` in a lifecycle family — is 410 on its GET
+and on both version routes. One GET route still
+answers handler JSON:
+`organizations/:id/work-orders/:id/history`
+(`tests/parted-reads.test.ts`).
 Nothing
 derives from the `request` column;
 `tests/request-readers.test.ts` pins that. The
@@ -424,8 +441,10 @@ KNOWN.
 - bulk history routes —
   `tests/api-objective-history.test.ts`,
   `tests/api-entity-history-routes.test.ts`,
-  `tests/api-members-history.test.ts`,
   `tests/api-work-order-history.test.ts`
+- flat `GET /members/:id/versions` —
+  `tests/api-members-history.test.ts` (404; membership
+  versions are the invitation document's PUT pairs)
 - redo — `tests/api-flows-verb-gaps.test.ts`
 
 ## How we got here
