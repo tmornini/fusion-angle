@@ -5,6 +5,7 @@ import {
     assertThrows,
 } from '@std/assert';
 import {
+    placedLines,
     projectedBody,
     responseOfWire,
     servedResponse,
@@ -20,6 +21,10 @@ import { formWriteMessagePair } from
     '../api/message-pair.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import { sortFields } from
+    '../shared/http-message/canonical.ts';
+import type { FieldLine } from
+    '../shared/http-message/types.ts';
 import type { AttributeSchemaRow } from
     '../shared/record-constraints.ts';
 
@@ -28,8 +33,15 @@ const TRANSMISSION = {
     requestId: 'ReqReqReqReqReqReqReqQ',
 };
 const WHOLE: Reader = { sees: 'whole' };
+const ENVELOPE = {
+    responseAt: '2026-09-29T08:00:00.123456Z',
+    requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
+};
 
-function stored(body: unknown): string {
+function stored(
+    body: unknown,
+    more: readonly { name: string, value: string }[] = [],
+): string {
     return storedWire(buildResponseModel({
         status: 201,
         fields: [
@@ -40,6 +52,7 @@ function stored(body: unknown): string {
                 value: 'OpOpOpOpOpOpOpOpOpOpOQ' },
             { name: 'request-id',
                 value: 'OldOldOldOldOldOldOldQ' },
+            ...more,
         ],
         body,
     }));
@@ -55,10 +68,10 @@ function bodyOf(wire: string): string {
     return wire.slice(wire.indexOf('\r\n\r\n') + 4);
 }
 
-Deno.test('a read serves the status 200 and this'
-    + ' transmission\'s two lines', () => {
+Deno.test('a read serves the status 200 and its lines',
+() => {
     const served = servedResponse(
-        stored({ id: 'a' }), TRANSMISSION, WHOLE,
+        stored({ id: 'a' }), TRANSMISSION, ENVELOPE, WHOLE,
     );
     assert(served.startsWith('HTTP/1.1 200 \r\n'));
     const fields = lines(served);
@@ -68,10 +81,123 @@ Deno.test('a read serves the status 200 and this'
     );
 });
 
+Deno.test('a read adds the write\'s three lines from'
+    + ' the envelope', () => {
+    const fields = lines(servedResponse(
+        stored({ id: 'a' }), TRANSMISSION, ENVELOPE, WHOLE,
+    ));
+    assertStrictEquals(
+        fields.get('last-modified'),
+        'Tue, 29 Sep 2026 08:00:00 GMT',
+    );
+    assertStrictEquals(
+        fields.get('response-at'), ENVELOPE.responseAt,
+    );
+    assertStrictEquals(
+        fields.get('requester-identity-id'),
+        ENVELOPE.requesterIdentityId,
+    );
+});
+
+Deno.test('a read\'s lines are in canonical order by'
+    + ' construction', () => {
+    const served = servedResponse(
+        stored({ id: 'a' }, [
+            { name: 'location', value: '/x' },
+        ]),
+        TRANSMISSION, ENVELOPE, WHOLE,
+    );
+    assertEquals(
+        parseWire(served).fields.map((field) => field.name),
+        [
+            'content-length', 'content-type', 'date', 'etag',
+            'last-modified', 'location', 'operation-id',
+            'request-id', 'requester-identity-id',
+            'response-at',
+        ],
+    );
+});
+
+Deno.test('a stored copy of an added line is dropped,'
+    + ' never joined', () => {
+    const fields = parseWire(servedResponse(
+        stored({ id: 'a' }, [
+            { name: 'response-at', value: 'stale' },
+            { name: 'last-modified', value: 'stale' },
+        ]),
+        TRANSMISSION, ENVELOPE, WHOLE,
+    )).fields;
+    assertEquals(
+        fields.filter((f) => f.name === 'response-at')
+            .map((f) => f.value),
+        [ENVELOPE.responseAt],
+    );
+    assertEquals(
+        fields.filter((f) => f.name === 'last-modified')
+            .length,
+        1,
+    );
+});
+
+Deno.test('the served lines already equal their own'
+    + ' sort', () => {
+    const fields = parseWire(servedResponse(
+        stored({ id: 'a' }), TRANSMISSION, ENVELOPE, WHOLE,
+    )).fields;
+    assertEquals(fields, sortFields(fields));
+});
+
+// The seeded head (api/ledger-seed.ts) stores no
+// request-id. The line is inserted where the name sorts,
+// and date is replaced where it already stands.
+Deno.test('a stored block missing request-id gains it'
+    + ' in place', () => {
+    const block: FieldLine[] = [
+        { name: 'content-length', value: '11' },
+        { name: 'content-type', value: 'application/json' },
+        { name: 'date', value:
+            'Tue, 29 Sep 2026 08:00:00 GMT' },
+        { name: 'etag', value: '"HeadHeadHeadHeadHeadHQ"' },
+        { name: 'operation-id',
+            value: 'OpOpOpOpOpOpOpOpOpOpOQ' },
+    ];
+    const placed = placedLines(block, [
+        { name: 'date', value: TRANSMISSION.date },
+        {
+            name: 'request-id',
+            value: TRANSMISSION.requestId,
+        },
+    ]);
+    assertEquals(placed.map((field) => field.name), [
+        'content-length', 'content-type', 'date', 'etag',
+        'operation-id', 'request-id',
+    ]);
+    assertStrictEquals(placed[2]!.value, TRANSMISSION.date);
+    assertStrictEquals(
+        placed[5]!.value, TRANSMISSION.requestId,
+    );
+});
+
+Deno.test('a projected body\'s content-length replaces'
+    + ' the stored one where it stands', () => {
+    const block: FieldLine[] = [
+        { name: 'content-length', value: '99' },
+        { name: 'content-type', value: 'application/json' },
+        { name: 'etag', value: '"HeadHeadHeadHeadHeadHQ"' },
+    ];
+    const placed = placedLines(block, [
+        { name: 'content-length', value: '4' },
+    ]);
+    assertEquals(placed.map((field) => field.name), [
+        'content-length', 'content-type', 'etag',
+    ]);
+    assertStrictEquals(placed[0]!.value, '4');
+});
+
 Deno.test('a read keeps etag, operation-id, and'
     + ' content-type as stored', () => {
     const fields = lines(servedResponse(
-        stored({ id: 'a' }), TRANSMISSION, WHOLE,
+        stored({ id: 'a' }), TRANSMISSION, ENVELOPE, WHOLE,
     ));
     assertStrictEquals(
         fields.get('etag'), '"HeadHeadHeadHeadHeadHQ"',
@@ -89,7 +215,7 @@ Deno.test('an unprojected body is the stored octets', () => {
         name: 'Zoë', big: 12345678901234567890,
     });
     assertStrictEquals(
-        bodyOf(servedResponse(response, TRANSMISSION, WHOLE)),
+        bodyOf(servedResponse(response, TRANSMISSION, ENVELOPE, WHOLE)),
         bodyOf(response),
     );
 });
@@ -100,7 +226,7 @@ Deno.test('a stored response with no request-id line'
         'request-id: OldOldOldOldOldOldOldQ\r\n', '',
     );
     assertStrictEquals(
-        lines(servedResponse(seeded, TRANSMISSION, WHOLE))
+        lines(servedResponse(seeded, TRANSMISSION, ENVELOPE, WHOLE))
             .get('request-id'),
         TRANSMISSION.requestId,
     );
@@ -136,7 +262,7 @@ Deno.test('a read serves no credential line', async () => {
     });
     assertEquals(
         [...lines(servedResponse(
-            pair.responseMessage, TRANSMISSION, WHOLE,
+            pair.responseMessage, TRANSMISSION, ENVELOPE, WHOLE,
         )).keys()].filter((name) => name === 'set-cookie'),
         [],
     );
@@ -150,11 +276,13 @@ Deno.test('a credential\'s secret reaches no reader,'
         secret: '$scrypt$ln=17,r=8,p=1$x$y',
         status: 'active',
     });
-    const served = servedResponse(response, TRANSMISSION, {
-        sees: 'keys',
-        readRoles: CREDENTIAL_KEY_READ_ROLES,
-        roles: ['admin'],
-    });
+    const served = servedResponse(
+        response, TRANSMISSION, ENVELOPE, {
+            sees: 'keys',
+            readRoles: CREDENTIAL_KEY_READ_ROLES,
+            roles: ['admin'],
+        },
+    );
     const body = bodyOf(served);
     assertStrictEquals(body.includes('secret'), false);
     assertStrictEquals(
@@ -281,7 +409,7 @@ Deno.test('a values reader refuses an object with no values'
 Deno.test('responseOfWire builds the response from octets',
 async () => {
     const wire = servedResponse(
-        stored({ name: 'Zoë' }), TRANSMISSION, WHOLE,
+        stored({ name: 'Zoë' }), TRANSMISSION, ENVELOPE, WHOLE,
     );
     const response = responseOfWire(wire);
     assertStrictEquals(response.status, 200);

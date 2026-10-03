@@ -2766,8 +2766,8 @@ export type WriteMethod = 'PUT' | 'POST' | 'PATCH' | 'DELETE';
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
-// the message plane's stored response (WRITE_RESPONSE_SPECS +
-// responseFromStored). A spec with no successBody forms no
+// the message plane's stored response
+// (WRITE_RESPONSE_SPECS). A spec with no successBody forms no
 // response body. Keyed by route pattern, not verb: a DELETE
 // never consults its successBody (the gate forms no body for
 // any DELETE — see api/api.ts), so a pattern that carries both

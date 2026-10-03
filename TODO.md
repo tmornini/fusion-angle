@@ -496,10 +496,14 @@ skew tests, which went with item 8's trio.
    handed to the wire; for a sibling PUT, which received
    nothing and sent nothing, the message a read of it
    serves before the substitutions below. A read serves
-   those stored
-   bytes with exactly three substitutions — the status
-   line, `date`, and `request-id`, the lines that describe
-   this transmission — made by ONE function on the head;
+   those stored bytes with exactly three substitutions —
+   the status line, `date`, and `request-id`, the lines
+   that describe this transmission — and three additions
+   from the pair's envelope — `last-modified` and
+   `response-at` from `response_at`, and
+   `requester-identity-id` from `requester_identity_id`,
+   the lines that describe the write — made by ONE
+   function on the pair it serves;
    `etag` and `operation-id` stay, naming the state and
    the write that made it; the body
    bytes are never touched, except that a document

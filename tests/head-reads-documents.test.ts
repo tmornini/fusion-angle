@@ -27,6 +27,9 @@ import {
 import { withoutId } from '../api/document-family.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import { imfFixdate } from '../shared/pair-root.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
@@ -106,6 +109,155 @@ Deno.test('a document GET serves the stored lines and'
         await got.text(),
         await storedPutBodyText(db, IDEAS, id),
     );
+});
+
+Deno.test('a landed PUT\'s answer carries its own three'
+    + ' lines', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const response = await handleRequest(db, apiRequest({
+        method: 'PUT', path: IDEAS + id, token,
+        body: idea('active'),
+    }));
+    assertStrictEquals(response.status, 201);
+    const head = await messageStore(db).getDocumentHead(
+        IDEAS, id,
+    );
+    assert(head);
+    assertStrictEquals(head.requester_identity_id, ME);
+    assertStrictEquals(
+        response.headers.get('last-modified'),
+        response.headers.get('date'),
+    );
+    assertStrictEquals(
+        response.headers.get('response-at'),
+        head.response_at,
+    );
+    assertStrictEquals(
+        response.headers.get('requester-identity-id'),
+        ME,
+    );
+    await response.body?.cancel();
+});
+
+Deno.test('a no-op PUT\'s answer carries the head\'s three'
+    + ' lines', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    const body = idea('active');
+    const first = await handleRequest(db, apiRequest({
+        method: 'PUT', path: IDEAS + id, token, body,
+    }));
+    assertStrictEquals(first.status, 201);
+    await first.body?.cancel();
+    const head = await messageStore(db).getDocumentHead(
+        IDEAS, id,
+    );
+    assert(head);
+    const again = await handleRequest(db, apiRequest({
+        method: 'PUT', path: IDEAS + id, token, body,
+    }));
+    assertStrictEquals(again.status, 200);
+    assertStrictEquals(
+        again.headers.get('response-at'),
+        head.response_at,
+    );
+    assertStrictEquals(
+        again.headers.get('requester-identity-id'),
+        head.requester_identity_id,
+    );
+    assertStrictEquals(
+        again.headers.get('last-modified'),
+        imfFixdate(head.response_at),
+    );
+    await again.body?.cancel();
+});
+
+Deno.test('a document GET and its collection part carry'
+    + ' the same three lines', async () => {
+    const db = await seededMockDb();
+    const token = await organizationToken();
+    const id = generateIdentifier();
+    assertStrictEquals(
+        (await put(db, IDEAS + id, idea('active'), token))
+            .status,
+        201,
+    );
+    const head = await db.messagePairs.getHeadPair(IDEAS, id);
+    assert(head);
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET', path: IDEAS + id, token,
+    }));
+    assertStrictEquals(got.status, 200);
+    const parts = await partsOf(await handleRequest(
+        db, apiRequest({ method: 'GET', path: IDEAS, token }),
+    ));
+    const part = parts.find((item) =>
+        item.query('header.etag').toText()
+            === '"' + head.id + '"');
+    assert(part);
+    for (const name of [
+        'last-modified', 'response-at', 'requester-identity-id',
+    ]) {
+        assertStrictEquals(
+            part.query('header.' + name).toText(),
+            got.headers.get(name),
+        );
+    }
+    assertStrictEquals(
+        got.headers.get('last-modified'),
+        imfFixdate(head.response_at),
+    );
+    assertStrictEquals(
+        got.headers.get('response-at'), head.response_at,
+    );
+    assertStrictEquals(
+        got.headers.get('requester-identity-id'),
+        head.requester_identity_id,
+    );
+    await got.body?.cancel();
+});
+
+Deno.test('a grant\'s 201 carries its own pair\'s three'
+    + ' lines', async () => {
+    const db = await seededMockDb();
+    const invitee = 'MQFcPtrZPIGjMCRAXtZUnA';
+    const name = membershipNameOf(ORGANIZATION_TWO, invitee);
+    const token = await organizationToken(
+        ME, ORGANIZATION_TWO,
+    );
+    const grant = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/',
+        token,
+        body: {
+            email: 'sarah.chen@company.com',
+            grantAt: '2026-06-04T00:00:00.000000Z',
+        },
+    }));
+    assertStrictEquals(grant.status, 201);
+    const operation = (await db.messagePairs.getAll()).find(
+        (row) => row.method === 'POST'
+            && row.path === '/invitations/' + name + '/'
+            && row.name === 'pending',
+    );
+    assert(operation);
+    assertStrictEquals(operation.requester_identity_id, ME);
+    assertStrictEquals(
+        grant.headers.get('last-modified'),
+        grant.headers.get('date'),
+    );
+    assertStrictEquals(
+        grant.headers.get('response-at'),
+        operation.response_at,
+    );
+    assertStrictEquals(
+        grant.headers.get('requester-identity-id'), ME,
+    );
+    await grant.body?.cancel();
 });
 
 Deno.test('a state-deleted idea answers 410 after the fence',

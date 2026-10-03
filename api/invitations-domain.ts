@@ -69,6 +69,7 @@ import {
     type MembershipName,
 } from '../shared/membership-name.ts';
 import {
+    envelopeOf,
     responseOfWire,
     servedResponse,
 } from './served-response.ts';
@@ -238,6 +239,7 @@ function servedHead(
             date: httpDateOf(nowUtc()),
             requestId,
         },
+        envelopeOf(head),
         { sees: 'whole' },
     ));
 }

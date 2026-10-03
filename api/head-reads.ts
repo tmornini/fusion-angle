@@ -3,6 +3,7 @@ import type { Id, MessagePairEntity } from
 import { EntityNotFoundError, RetiredEntityError } from './db.ts';
 import type { DbAdapter } from './db.ts';
 import {
+    envelopeOf,
     responseOfWire,
     servedResponse,
     type Reader,
@@ -257,6 +258,7 @@ export function servedSelection(
         return responseOfWire(servedResponse(
             selection.pair.response,
             transmission,
+            envelopeOf(selection.pair),
             selection.reader,
         ));
     }
@@ -266,6 +268,7 @@ export function servedSelection(
     return responseOfWire(servedResponse(
         selection.head.response,
         transmission,
+        envelopeOf(selection.head),
         selection.reader,
     ));
 }
@@ -283,7 +286,10 @@ function servedCollection(
         .filter((head) =>
             !isDeletedHead(head, selection.lifecycle))
         .map((head) => servedResponse(
-            head.response, transmission, selection.reader,
+            head.response,
+            transmission,
+            envelopeOf(head),
+            selection.reader,
         ));
     const lines = [
         { name: 'date', value: transmission.date },
@@ -323,7 +329,10 @@ function servedVersions(
 ): Response {
     const parts = selection.pairs.map((pair) =>
         servedResponse(
-            pair.response, transmission, selection.reader,
+            pair.response,
+            transmission,
+            envelopeOf(pair),
+            selection.reader,
         ));
     const boundary = crypto.randomUUID();
     const body = joinParts(parts, boundary);

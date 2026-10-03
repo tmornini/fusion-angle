@@ -21,7 +21,7 @@ import {
     attemptFor,
     formAuthMessagePair,
     formWriteMessagePair,
-    responseFromStored,
+    responseFromLatin1,
 } from '../api/message-pair.ts';
 import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import {
@@ -257,7 +257,9 @@ Deno.test('a rotation appends its pair at an operation path:'
     assertStrictEquals(row!.name, '');
 
     const stored = await db.messagePairs.getById(row!.id);
-    const storedBody = await responseFromStored(stored).json();
+    const storedBody = await responseFromLatin1(
+        stored.response,
+    ).json();
     assertEquals(storedBody, wireBody);
     const rows = await deriveIdentityTokensFor(db, CURRENT_ID);
     const successor = rows.find((r) => r.action === 'issued');
@@ -497,7 +499,7 @@ async function assertRootEventMessagePair(
         eventRequest!.id,
     );
     const eventBody =
-        await responseFromStored(eventResponse).json();
+        await responseFromLatin1(eventResponse.response).json();
     assertEquals(eventBody, root satisfies IdentityTokenEntity);
 }
 
@@ -690,7 +692,7 @@ async function assertEventMessagePairForRow(
         eventRequest!.id,
     );
     const eventBody =
-        await responseFromStored(eventResponse).json();
+        await responseFromLatin1(eventResponse.response).json();
     assertEquals(eventBody, row satisfies IdentityTokenEntity);
 }
 

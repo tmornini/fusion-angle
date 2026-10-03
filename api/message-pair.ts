@@ -61,10 +61,13 @@ import { DATE_PLACEHOLDER } from './ledger-root.ts';
 import { notifyPayload } from './advisory-lock.ts';
 import { sortJsonKeys } from
     '../shared/http-message/canonical.ts';
+import { imfFixdate } from '../shared/pair-root.ts';
 import {
+    placedLines,
     projectedBody,
     responseOfWire,
     servedResponse,
+    type Envelope,
     type Reader,
     type Transmission,
 } from './served-response.ts';
@@ -638,13 +641,6 @@ export function requestHeaderFields(
     return fields;
 }
 
-// The stored bytes, parsed and returned unchanged.
-export function responseFromStored(
-    stored: MessagePairEntity,
-): Response {
-    return responseFromLatin1(stored.response);
-}
-
 export function responseFromLatin1(
     wire: string,
 ): Response {
@@ -1200,12 +1196,17 @@ async function siblingsAnswer(
     }
     // A received answer is the received pair's own body, not
     // the parent's state, so no reader projects it.
-    const stored = latin1(stated[0]!.response);
+    const received = stated[0]!;
+    const stored = latin1(received.response);
     return {
         response: responseFromLatin1(mergeSecret(
-            write.answer.kind === 'received'
-                ? stored
-                : landedWire(stored, write.reader),
+            landedWire(
+                stored,
+                landedEnvelope(received),
+                write.answer.kind === 'received'
+                    ? { sees: 'whole' }
+                    : write.reader,
+            ),
             rows[0]!.responseSecrets,
         )),
         outcome,
@@ -1227,6 +1228,7 @@ function parentHeadAnswer(
         response: responseOfWire(servedResponse(
             latin1(parent.headResponse),
             transmissionOf(write.received.requestId),
+            headEnvelope(parent),
             write.reader,
         )),
         answeredId: parent.headId,
@@ -1357,23 +1359,68 @@ function transmissionOf(requestId: string): Transmission {
 }
 
 // A landed write answers the response it formed: its
-// status and its lines are its own, and only its body
-// passes through the reader's projection (§2).
-function landedWire(stored: string, reader: Reader): string {
-    if (reader.sees === 'whole') return stored;
+// status, date, and request-id stay, and the three
+// lines from the row are placed before any return.
+// Only its body passes through the reader's projection.
+function landedWire(
+    stored: string,
+    envelope: Envelope,
+    reader: Reader,
+): string {
     const model = parseWire(stored);
-    if (model.body === undefined) return stored;
+    const fields = placedLines(model.fields, [
+        {
+            name: 'last-modified',
+            value: imfFixdate(envelope.responseAt),
+        },
+        {
+            name: 'requester-identity-id',
+            value: envelope.requesterIdentityId,
+        },
+        {
+            name: 'response-at',
+            value: envelope.responseAt,
+        },
+    ]);
+    if (reader.sees === 'whole' || model.body === undefined) {
+        return serializeWire({ ...model, fields });
+    }
     const text = model.body.toLatin1();
     const body = projectedBody(text, reader);
-    if (body === text) return stored;
+    if (body === text) {
+        return serializeWire({ ...model, fields });
+    }
     return serializeWire({
         ...model,
-        fields: model.fields.map((field) =>
-            field.name === 'content-length'
-                ? contentLengthOfLatin1(body)
-                : field),
+        fields: placedLines(fields, [
+            contentLengthOfLatin1(body),
+        ]),
         body: Octets.fromLatin1(body),
     });
+}
+
+function landedEnvelope(row: StatementAnswer): Envelope {
+    return {
+        responseAt: row.stamp,
+        requesterIdentityId: row.requesterIdentityId,
+    };
+}
+
+// A matched answer's envelope is its head's. Null here
+// means the statement named a head and omitted it.
+function headEnvelope(row: StatementAnswer): Envelope {
+    if (
+        row.headResponseAt === null
+        || row.headRequesterIdentityId === null
+    ) {
+        throw new Error(
+            'a matched answer has no head envelope',
+        );
+    }
+    return {
+        responseAt: row.headResponseAt,
+        requesterIdentityId: row.headRequesterIdentityId,
+    };
 }
 
 function wireForPair(
@@ -1386,7 +1433,11 @@ function wireForPair(
     const row = stated.find((item) => item.id === pair.id);
     if (row === undefined) return answer.response;
     return responseFromLatin1(mergeSecret(
-        landedWire(latin1(row.response), reader),
+        landedWire(
+            latin1(row.response),
+            landedEnvelope(row),
+            reader,
+        ),
         pair.responseSecrets,
     ));
 }
@@ -1481,6 +1532,7 @@ function answerOf(
                 transmissionOf(
                     currentRequestId(rows[index]!, row.response),
                 ),
+                headEnvelope(row),
                 reader,
             )),
             outcome,
@@ -1491,7 +1543,11 @@ function answerOf(
     }
     return {
         response: responseFromLatin1(mergeSecret(
-            landedWire(latin1(row.response), reader),
+            landedWire(
+                latin1(row.response),
+                landedEnvelope(row),
+                reader,
+            ),
             rows[index]!.responseSecrets,
         )),
         outcome,

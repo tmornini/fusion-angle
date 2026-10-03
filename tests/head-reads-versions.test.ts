@@ -21,6 +21,7 @@ import {
     type Lifecycle,
 } from '../api/head-reads.ts';
 import {
+    envelopeOf,
     servedResponse,
     type Reader,
 } from '../api/served-response.ts';
@@ -30,6 +31,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
+import type { MessagePairEntity } from '../shared/types.ts';
 
 const PREFIX = '/version-pin/';
 const TABLE = 'documents';
@@ -128,9 +130,11 @@ function assertHeadLines(wire: string): void {
 
 async function assertServedPair(
     response: Response,
-    stored: string,
+    stored: MessagePairEntity,
 ): Promise<void> {
-    const served = servedResponse(stored, TX, READER);
+    const served = servedResponse(
+        stored.response, TX, envelopeOf(stored), READER,
+    );
     const fields = lines(served);
     assertStrictEquals(response.status, 200);
     assertHeadLines(served);
@@ -205,7 +209,10 @@ async () => {
         const wire = part.toWire();
         assertStrictEquals(
             wire,
-            servedResponse(stored.response, TX, READER),
+            servedResponse(
+                stored.response, TX,
+                envelopeOf(stored), READER,
+            ),
         );
         assertHeadLines(wire);
         assertStrictEquals(
@@ -256,7 +263,7 @@ async () => {
     assertStrictEquals(body, '{"n":2}');
     await assertServedPair(
         servedSelection(selection, TX),
-        stored.response,
+        stored,
     );
 });
 
