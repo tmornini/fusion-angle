@@ -392,29 +392,6 @@ export async function lookupStoredRevision(
     );
 }
 
-export async function storedRevisionDocument(
-    db: DbAdapter,
-    prefix: string,
-    id: Id,
-    etag: string,
-): Promise<DerivedDocument | undefined> {
-    const found = await lookupStoredRevision(
-        db, prefix, id, etag,
-    );
-    if (
-        found === undefined
-        || found.method !== PUT_METHOD
-    ) {
-        return undefined;
-    }
-    return {
-        name: id,
-        messagePairId: found.id,
-        method: found.method,
-        body: bodyOf(found.response),
-    };
-}
-
 export async function versionSnapshotsAt(
     db: DbAdapter,
     prefix: string,

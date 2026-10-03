@@ -17,8 +17,10 @@ import {
     organizationToken,
     reachableToken,
 } from './token-fixtures.ts';
-import { seedOrganizationDocument } from
-    './test-fixtures.ts';
+import {
+    organizationRow,
+    seedOrganizationDocument,
+} from './test-fixtures.ts';
 import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
@@ -44,7 +46,10 @@ import { membershipNameOf } from
 import { httpDateOf } from '../api/message-pair.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import type { MembershipEntity } from '../shared/types.ts';
+import type {
+    MembershipEntity,
+    OrganizationEntity,
+} from '../shared/types.ts';
 
 const ORGANIZATION_A = generateIdentifier();
 const ORGANIZATION_B = generateIdentifier();
@@ -306,24 +311,24 @@ async () => {
         'GET', '/organizations/' + ORGANIZATION_B, token,
     ));
     assertStrictEquals(document.status, 200);
+    const tag = pairIdOf(document);
+    assert(tag !== null);
+    await document.body?.cancel();
     const list = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B + '/versions/',
         token,
     ));
     assertStrictEquals(list.status, 200);
-    const rows = await list.json() as unknown[];
+    const rows = await partsOf(list);
     assert(rows.length >= 1);
-    const stored = await messageStore(db).getDocumentHead(
-        '/organizations/', ORGANIZATION_B,
-    );
-    assert(stored);
     const snapshot = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_B + '/versions/'
-            + stored.id,
+            + tag,
         token,
     ));
     assertStrictEquals(snapshot.status, 200);
+    await snapshot.body?.cancel();
     const ideas = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_B + '/ideas/',
         token,
@@ -374,6 +379,64 @@ Deno.test('absent org versions is 404 not 403', async () => {
     ));
     assertStrictEquals(snapshot.status, 404);
 });
+
+Deno.test(
+    'two organization PUTs list oldest first,'
+        + ' each part the item its tag serves',
+    async () => {
+        const db = await seedMemberOrganizations();
+        const id = generateIdentifier();
+        const token = await claimToken({
+            organization: id,
+            organizations: [id],
+            roles: ['admin:' + id],
+        });
+        const path = '/organizations/' + id;
+        const firstBody = organizationRow('First');
+        const secondBody = organizationRow('Second');
+        const first = await handleRequest(db, req(
+            'PUT', path, token, firstBody,
+        ));
+        assertStrictEquals(first.status, 201);
+        await first.body?.cancel();
+        const second = await handleRequest(db, req(
+            'PUT', path, token, secondBody,
+        ));
+        assertStrictEquals(second.status, 200);
+        await second.body?.cancel();
+        const list = await handleRequest(db, req(
+            'GET', path + '/versions/', token,
+        ));
+        assertStrictEquals(list.status, 200);
+        const versions = await partsOf<OrganizationEntity>(
+            list,
+        );
+        assertStrictEquals(versions.length, 2);
+        assertEquals(versions[0]!.body().toValue(), {
+            id, ...firstBody,
+        });
+        assertEquals(versions[1]!.body().toValue(), {
+            id, ...secondBody,
+        });
+        for (const part of versions) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(db, req(
+                'GET', path + '/versions/' + tag, token,
+            ));
+            assertStrictEquals(item.status, 200);
+            const served = await messageOfResponse(item);
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
+    },
+);
 
 Deno.test('identities, members, and identity-nest lists are 200',
 async () => {

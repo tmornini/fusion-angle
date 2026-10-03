@@ -288,8 +288,6 @@ import {
     documentVersionRoute,
     documentVersionSelectRoute,
     documentVersionsSelectRoute,
-    storedRevisionDocument,
-    versionSnapshotsAt,
     lookupStoredRevision,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
@@ -5165,40 +5163,39 @@ export const routes: Route[] = [
         put: postOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
-        get: async (db, p) => {
+        select: (db, p) => {
             const id = param(p, 0);
             const prefix = canonicalPath(
                 undefined, '/organizations/',
             );
-            const rows = await versionSnapshotsAt(
-                db, prefix, id, organizationEntityOf,
+            return selectVersionsAt(
+                db, prefix, id, 'stateless',
+                'organizations', { sees: 'whole' },
+                async () => {
+                    throw new EntityNotFoundError(
+                        'organizations', id,
+                    );
+                },
             );
-            if (rows.length === 0) {
-                throw new EntityNotFoundError(
-                    'organizations', id,
-                );
-            }
-            return rows;
         },
     }),
     route('organizations/:id/versions/:etag', {
-        get: async (db, p) => {
+        select: (db, p) => {
             const id = param(p, 0);
             const etag = param(p, p.length - 1);
-            const document = await storedRevisionDocument(
+            return selectVersionAt(
                 db,
                 canonicalPath(
                     undefined, '/organizations/',
                 ),
-                id,
-                etag,
+                id, etag, 'stateless', 'organizations',
+                { sees: 'whole' },
+                async () => {
+                    throw new EntityNotFoundError(
+                        'organizations', id,
+                    );
+                },
             );
-            if (document === undefined) {
-                throw new EntityNotFoundError(
-                    'organizations', id,
-                );
-            }
-            return organizationEntityOf(document);
         },
     }),
     // GET is FLIPPED (Task 8): derived via
