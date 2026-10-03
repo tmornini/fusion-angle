@@ -759,6 +759,9 @@ type StatementResult = {
     head_id: string | null,
     head_response: unknown,
     head_method: string | null,
+    requester_identity_id: string,
+    head_response_at: string | null,
+    head_requester_identity_id: string | null,
     supersedes: string,
     request_hash: string,
     request_secrets_hash: string,
@@ -857,6 +860,10 @@ async function queryStatement(
                 ? null
                 : bytesOfBytea(row.head_response),
             headMethod,
+            requesterIdentityId: row.requester_identity_id,
+            headResponseAt: row.head_response_at,
+            headRequesterIdentityId:
+                row.head_requester_identity_id,
             inserted: isInserted(outcome, rawOutcome),
             supersedes: identifierOfUuidText(
                 row.supersedes,

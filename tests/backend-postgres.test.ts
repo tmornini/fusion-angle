@@ -102,6 +102,9 @@ function fakeClient(): {
                     head_id: null,
                     head_response: null,
                     head_method: null,
+                    requester_identity_id: 'fa_owner',
+                    head_response_at: null,
+                    head_requester_identity_id: null,
                     supersedes: '00000000-0000-0000-0000-'
                         + '000000000000',
                     request_hash: '00'.repeat(32),
