@@ -4,11 +4,9 @@ import { routePatternOf } from '../api/route-surface.ts';
 
 // The GET routes that still answer handler JSON instead of
 // the stored response (spec §12). A conversion deletes its
-// patterns here in the commit that converts them. The fourth
-// spec leaves `…/work-orders/:id/history`; the fifth builds
-// it once, and its commit that empties the list adds
-// `## A response is one unit` to ARCHITECTURE.md (spec §12,
-// `## For the next brainstorms`).
+// patterns here in the commit that converts them. The fifth
+// spec builds the one route left, and the commit that
+// empties the list lands the covenant.
 const PARTED = [
     'organizations/:id/work-orders/:id/history',
 ];

@@ -1496,8 +1496,8 @@ Off the critical path; each with its oracle.
   create, DELETE, then a declared create answers 410, as
   a GET already does; a never-written id answers 404; a
   foreign organization's retired document answers what
-  its live one does; history and past versions still
-  answer 200.
+  its live one does; history and past versions answer
+  410 with the document.
 - Admins act within their organization. The gate's
   self-or-admin guard (`api/api.ts` Region B,
   `SELF_ONLY_TOKEN_ROUTES`: the token revocation
