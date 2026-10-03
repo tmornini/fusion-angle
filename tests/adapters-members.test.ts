@@ -23,7 +23,6 @@ import {
 import {
     type HumanMember,
     type MembershipEntity,
-    type SeatEntity,
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -81,16 +80,10 @@ Deno.test(
         assertStrictEquals(row.title, 'Engineer');
         const pii = await deriveIdentityPii(db, ALICE);
         assertStrictEquals(pii.name, 'Alice');
-        const seat = (await ctx.GET<{
-            identity_id: string; type: string;
-        }>(
-            'organizations/' + STARK + '/members/' + ALICE,
-        )).body().toValue();
-        assertStrictEquals(seat.identity_id, ALICE);
-        assertStrictEquals(seat.type, 'member');
         const membership = (await ctx.GET<MembershipEntity>(
             membershipResource(ALICE),
         )).body().toValue();
+        assertStrictEquals(membership.identity_id, ALICE);
         assertStrictEquals(membership.state, 'accepted');
         assertStrictEquals(membership.type, 'member');
         const wrote = sent.filter((request) =>
@@ -403,10 +396,9 @@ Deno.test(
         const { db, ctx } = await adminContext();
         const id = generateIdentifier();
         await seedHumanMember(db, id, 'Leaving Member');
-        const seatPath = 'organizations/'
-            + 'AjdvjuECVZEgZoFajaIEkg/members/' + id;
-        const seat = await ctx.GET<SeatEntity>(seatPath);
-        await ctx.DELETE(seatPath, [seat]);
+        const member = await getHumanMember(ctx, id);
+        assert(member !== null);
+        await postMembershipRemoval(ctx, member);
         assertStrictEquals(
             await getHumanMember(ctx, id), null,
         );

@@ -27,8 +27,8 @@ import {
 import { buildMembers } from '../api/mock-data/members.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { organizationRow } from './test-fixtures.ts';
-import { deriveMembershipsForIdentity } from
-    '../api/derive-memberships.ts';
+import { membershipsOfIdentity } from
+    '../api/memberships.ts';
 import { mintAccessToken, TOKEN_AUDIENCE } from
     '../api/access-token.ts';
 import { seededMockDb } from './mock-seed.ts';
@@ -98,7 +98,7 @@ const SINGLE_ORGANIZATION_IDENTITY_ID: Id =
 async function membershipClaimToken(
     db: DbAdapter, identityId: Id,
 ): Promise<string> {
-    const memberships = await deriveMembershipsForIdentity(
+    const memberships = await membershipsOfIdentity(
         db, identityId,
     );
     const organizations = memberships.map(
@@ -122,7 +122,7 @@ async function membershipClaimToken(
 async function derivedReachableOrganizations(
     db: DbAdapter, identityId: Id,
 ): Promise<OrganizationEntity[]> {
-    const memberships = await deriveMembershipsForIdentity(
+    const memberships = await membershipsOfIdentity(
         db, identityId,
     );
     const mine = new Set(

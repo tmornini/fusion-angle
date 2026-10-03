@@ -23,8 +23,6 @@ import {
 } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { messageStore } from '../api/message-store.ts';
-import { seatsPrefixFor } from
-    '../api/derive-memberships.ts';
 import {
     apiRequest,
     partsOf,
@@ -141,9 +139,6 @@ Deno.test('registered families offer versions/ and :etag',
     const lists = [
         '/identities/abc/versions/',
         '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/mFNSxZqywTSMXhgUTdTqtA/'
-            + 'versions/',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw/versions/',
         '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/',
@@ -162,9 +157,6 @@ Deno.test('registered families offer versions/ and :etag',
     const snapshots = [
         '/identities/abc/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/YiJPbufDpkyrZcZCYbUJpg',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/mFNSxZqywTSMXhgUTdTqtA/'
-            + 'versions/YiJPbufDpkyrZcZCYbUJpg',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/'
@@ -379,20 +371,28 @@ async () => {
     const name = await grantDave(db);
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
-    const paths = [
-        '/identities/XXZruirZyAOoRpNxaDnpSA/versions/',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/XXZruirZyAOoRpNxaDnpSA/'
-            + 'versions/',
-    ];
-    for (const path of paths) {
-        const res = await handleRequest(
-            db, req('GET', path, token),
-        );
-        assertStrictEquals(res.status, 200, path);
-        const rows = await res.json() as unknown[];
-        assert(rows.length >= 1, path);
-    }
+    const identityVersions =
+        '/identities/XXZruirZyAOoRpNxaDnpSA/versions/';
+    const identityList = await handleRequest(
+        db, req('GET', identityVersions, token),
+    );
+    assertStrictEquals(identityList.status, 200, identityVersions);
+    const rows = await identityList.json() as unknown[];
+    assert(rows.length >= 1, identityVersions);
+    const membershipName = membershipNameOf(
+        'AjdvjuECVZEgZoFajaIEkg', 'XXZruirZyAOoRpNxaDnpSA',
+    );
+    const membershipVersions =
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
+        + membershipName + '/versions/';
+    const membershipList = await handleRequest(
+        db, req('GET', membershipVersions, token),
+    );
+    assertStrictEquals(
+        membershipList.status, 200, membershipVersions,
+    );
+    const membershipParts = await partsOf(membershipList);
+    assert(membershipParts.length >= 1, membershipVersions);
     const invitations = await handleRequest(db, req(
         'GET',
         '/identities/' + DAVE + '/invitations/' + name
@@ -403,40 +403,6 @@ async () => {
     const parts = await partsOf<MembershipEntity>(invitations);
     assert(parts.length >= 1);
 });
-
-// Task 4 fix round 1, Finding 3: the member entity's OWN
-// `at` (validateSeatDocumentBody's grant time, seatEntityOf
-// derive-memberships.ts:127) and the versions row's `at`
-// (the ledger's response_at, stamped by versionSnapshotsAt)
-// are different facts that share a name. This pins the
-// versions wire to the ledger fact and proves it is NOT the
-// seat's own grant time.
-Deno.test(
-    'member versions at is the ledger arrival time,'
-    + ' not the seat grant time',
-    async () => {
-        const db = await seedMemberOrganizations();
-        const token = await organizationToken(
-            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_A,
-        );
-        const list = await handleRequest(db, req(
-            'GET',
-            '/organizations/' + ORGANIZATION_A
-                + '/members/XXZruirZyAOoRpNxaDnpSA/versions/',
-            token,
-        ));
-        assertStrictEquals(list.status, 200);
-        const rows = await list.json() as { at: string }[];
-        assertStrictEquals(rows.length, 1);
-        const stored = await messageStore(db).getDocumentHead(
-            seatsPrefixFor(ORGANIZATION_A),
-            'XXZruirZyAOoRpNxaDnpSA',
-        );
-        assert(stored);
-        assertStrictEquals(rows[0]!.at, stored.response_at);
-        assertNotStrictEquals(rows[0]!.at, AT);
-    },
-);
 
 // The body's at is the grant time the client sent.
 // The stored date line is the statement's splice of

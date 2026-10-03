@@ -31,8 +31,7 @@ import { generateIdentifier } from '../shared/identifier.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { landMembership } from './membership-fixtures.ts';
-import { deriveOrganizationMemberSeat } from
-    '../api/derive-memberships.ts';
+import { membershipOf } from '../api/memberships.ts';
 import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
@@ -280,10 +279,10 @@ for (const state of NON_ACCEPTED) {
             db, STARK, id, state, 'member',
             '2026-07-01T00:00:00.000000Z',
         );
-        const seat = await deriveOrganizationMemberSeat(
-            db, STARK, id,
+        assertStrictEquals(
+            await membershipOf(db, STARK, id),
+            null,
         );
-        assertStrictEquals(seat.type, 'member');
         const got = await handleRequest(db, apiRequest({
             method: 'GET',
             path: '/identities/' + id + '/organizations/',
@@ -816,14 +815,15 @@ async () => {
     assertMatch(got.headers.get('date')!, /GMT$/);
 });
 
-const MEMBERS = ORGANIZATION + '/members/';
+const ACCEPTED = ORGANIZATION
+    + '/invitations/?state=accepted';
 
-Deno.test(MEMBERS + ' serves its seat heads as parts, each'
-    + ' its document GET', async () => {
+Deno.test(ACCEPTED + ' serves its accepted heads as parts,'
+    + ' each its document GET', async () => {
     const db = await seededMockDb();
     const token = await organizationToken();
     const got = await handleRequest(db, apiRequest({
-        method: 'GET', path: MEMBERS, token,
+        method: 'GET', path: ACCEPTED, token,
     }));
     assertStrictEquals(got.status, 200);
     assertMatch(
@@ -831,26 +831,27 @@ Deno.test(MEMBERS + ' serves its seat heads as parts, each'
         /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
     );
     assertStrictEquals(got.headers.get('etag'), null);
-    const parts = await partsOf<{ identity_id: string }>(got);
+    const parts = await partsOf<{ id: string }>(got);
     await assertPartsAreHeads(db, parts, { sees: 'whole' });
     for (const part of parts) {
         await assertPartIsDocumentGet(
             db, token, part,
-            MEMBERS + part.body().toValue().identity_id,
+            ORGANIZATION + '/invitations/'
+                + part.body().toValue().id,
         );
     }
 });
 
-Deno.test('a removed seat is no part of its roster',
-async () => {
+Deno.test('a removed membership is no part of the'
+    + ' accepted view', async () => {
     const db = await seededMockDb();
     const id = generateIdentifier();
     await seedSeat(db, STARK, id, 'member');
     const token = await organizationToken();
-    const seatedOf = async (): Promise<string[]> => {
+    const acceptedOf = async (): Promise<string[]> => {
         const parts = await partsOf<{ identity_id: string }>(
             await handleRequest(db, apiRequest({
-                method: 'GET', path: MEMBERS, token,
+                method: 'GET', path: ACCEPTED, token,
             })),
         );
         await assertPartsAreHeads(db, parts, { sees: 'whole' });
@@ -858,12 +859,12 @@ async () => {
             .map((part) => part.body().toValue().identity_id)
             .filter((seated) => seated === id);
     };
-    assertEquals(await seatedOf(), [id]);
-    const removed = await handleRequest(db, apiRequest({
-        method: 'DELETE', path: MEMBERS + id, token,
-    }));
-    assertStrictEquals(removed.status, 204);
-    assertEquals(await seatedOf(), []);
+    assertEquals(await acceptedOf(), [id]);
+    await landMembership(
+        db, STARK, id, 'removed', 'member',
+        '2026-07-01T00:00:00.000000Z',
+    );
+    assertEquals(await acceptedOf(), []);
 });
 
 // A 'state' family's PUT validator makes a stored head with

@@ -73,7 +73,7 @@ for (const path of RETIRED_PATHS) {
     });
 }
 
-Deno.test('seat collection stays live', async () => {
+Deno.test('the seat collection is retired', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -84,5 +84,5 @@ Deno.test('seat collection stays live', async () => {
             token,
         ),
     );
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 404);
 });

@@ -95,9 +95,10 @@ async () => {
         ctx, 'demo@example.com', 's3cret');
     assert(creds);
     assertStrictEquals((await GET(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
         creds.accessToken, operationIdHeader(),
-    )).query('status').toNumber(), 200);
+    )).query('status').toNumber(), 204);
 });
 
 Deno.test('postPasswordLogin issues a 30-day refresh token',

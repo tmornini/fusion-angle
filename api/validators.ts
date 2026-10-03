@@ -30,7 +30,6 @@ import type {
     FlowWorkOrderEntity,
     StateFieldValueEntity,
     OrganizationEntity,
-    SeatEntity,
     MembershipType,
     InvitationEntity,
     InvitationState,
@@ -1835,7 +1834,12 @@ const MEMBERSHIP_TYPES = [
 
 export function validateMembershipEntity(
     body: Record<string, unknown>,
-): Omit<SeatEntity, 'id'> {
+): {
+    organization_id: Id;
+    identity_id: Id;
+    type: MembershipType;
+    at: string;
+} {
     assertOnlyKeys(
         body, MEMBERSHIP_BODY_KEYS, 'SeatEntity',
     );
@@ -1859,7 +1863,12 @@ const MEMBERSHIP_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface MembershipDocumentBody {
-    readonly entity: Omit<SeatEntity, 'id'>;
+    readonly entity: {
+        organization_id: Id;
+        identity_id: Id;
+        type: MembershipType;
+        at: string;
+    };
 }
 
 // The HTTP-body gate for PUT /memberships/:id: the eighth
@@ -1898,35 +1907,6 @@ export function validateMembershipDocumentBody(
             type,
             at,
         },
-    };
-}
-
-const SEAT_DOCUMENT_BODY_KEYS: readonly string[] = [
-    'type', 'at',
-];
-
-export interface SeatDocumentBody {
-    readonly type: MembershipType;
-    readonly at: string;
-}
-
-// PUT organizations/:organization-id/members/:identity-id.
-// Organization and identity ride the path. Privilege type
-// and the moment of union ride the body.
-export function validateSeatDocumentBody(
-    body: Record<string, unknown>,
-): SeatDocumentBody {
-    assertOnlyKeys(
-        body, SEAT_DOCUMENT_BODY_KEYS, 'SeatDocumentBody',
-    );
-    return {
-        type: validateEnumField(
-            body, 'type', MEMBERSHIP_TYPES,
-            'membership type', 'SeatDocumentBody',
-        ),
-        at: validateTimestampField(
-            body, 'at', 'SeatDocumentBody',
-        ),
     };
 }
 

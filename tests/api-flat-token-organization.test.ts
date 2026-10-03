@@ -45,7 +45,7 @@ async function join(
 
 function getSeats(token: string, organization: string) {
     return framedRequest(
-        `${BASE}/organizations/${organization}/members/`,
+        `${BASE}/organizations/${organization}/ideas/`,
         {
             headers: {
                 'Authorization': 'Bearer ' + token,
@@ -88,7 +88,7 @@ async () => {
     const res = await handleRequest(
         db, getSeats(token, 'BBjWJsjYIDkTRKIIPrzWRw'),
     );
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 204);
 });
 
 Deno.test('a flat token falls back to its primary membership org',
@@ -103,14 +103,23 @@ async () => {
             'BBjWJsjYIDkTRKIIPrzWRw',
         ),
     );
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 204);
 });
 
 Deno.test('a flat token with no org resolution is denied',
 async () => {
     const db = await freshDb();   // role, no member
     const res = await handleRequest(
-        db, getSeats(await devToken(), 'AjdvjuECVZEgZoFajaIEkg'),
+        db, framedRequest(
+            `${BASE}/organizations/AjdvjuECVZEgZoFajaIEkg`
+                + '/ideas/',
+            {
+                headers: {
+                    'Authorization': 'Bearer '
+                        + await devToken(),
+                },
+            },
+        ),
     );
     assertStrictEquals(res.status, 403);
 });

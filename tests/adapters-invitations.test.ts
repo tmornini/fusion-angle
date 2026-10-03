@@ -77,8 +77,10 @@ import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
-import { deriveDocumentsAt } from
-    '../api/derive-documents.ts';
+import {
+    membershipOfHead,
+    organizationMembershipHeads,
+} from '../api/memberships.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -249,25 +251,22 @@ async function deriveMembershipsAll(db: DbAdapter) {
         type: string;
         at: string;
     }> = [];
+    const accepted = {
+        kind: 'state' as const,
+        state: 'accepted' as const,
+    };
     for (const organization of organizations) {
-        const seatPrefix = '/organizations/'
-            + organization.id + '/members/';
-        const [seatRequests] =
-            await Promise.all([
-                db.messagePairs.getCollectionPairs(seatPrefix,
-                ),
-                db.messagePairs.getCollectionPairs(seatPrefix,
-                ),
-            ]);
-        for (const document of deriveDocumentsAt(
-            seatRequests, seatPrefix,
-        ).values()) {
+        const heads = await organizationMembershipHeads(
+            db, organization.id, accepted,
+        );
+        for (const head of heads) {
+            const membership = membershipOfHead(head);
             rows.push({
-                id: document.name,
-                organization_id: organization.id,
-                identity_id: document.name,
-                type: String(document.body['type']),
-                at: String(document.body['at']),
+                id: membership.id,
+                organization_id: membership.organization_id,
+                identity_id: membership.identity_id,
+                type: membership.type,
+                at: membership.at,
             });
         }
     }

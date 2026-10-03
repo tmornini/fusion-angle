@@ -142,10 +142,6 @@ const MEMBER_VERBS: Readonly<
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
     '/ai-agents': ['GET'],
-    '/organizations/:id/members': ['GET'],
-    // The same roster's DELETEd seats — every member's
-    // name resolver reads it beside the live roster.
-    '/organizations/:id/former-members': ['GET'],
     // :id only — the root collection is retired.
     // The old '/organizations' prefix also matched
     // GET /organizations/:id; keep that document.

@@ -17,7 +17,13 @@ import { landMembership } from
     './membership-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import { framedRequest } from './http-fixtures.ts';
+import {
+    apiRequest,
+    framedRequest,
+    invitationLatched,
+} from './http-fixtures.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { responseRecordOf } from '../api/message-pair.ts';
 
 const BASE = 'http://localhost';
@@ -275,24 +281,23 @@ async () => {
         ),
     );
     assertStrictEquals(put.status, 201);
-    const revoked = await handleRequest(
-        db, framedRequest(
-            `${BASE}/organizations/`
-                + 'BBjWJsjYIDkTRKIIPrzWRw/members/'
-                + 'XXZruirZyAOoRpNxaDnpSA', {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': 'Bearer '
-                        + await organizationToken(
-                            'XXZruirZyAOoRpNxaDnpSA'
-                                , 'BBjWJsjYIDkTRKIIPrzWRw',
-                        ),
-                    'operation-id': generateIdentifier(),
-                },
+    const removed = await handleRequest(
+        db, await invitationLatched(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + OTHER
+                + '/invitations/'
+                + membershipNameOf(OTHER, MEMBER),
+            token: await organizationToken(
+                MEMBER, OTHER,
+            ),
+            body: {
+                state: 'removed',
+                at: LATER,
             },
-        ),
+        })),
     );
-    assertStrictEquals(revoked.status, 204);
+    assertStrictEquals(removed.status, 200);
+    await removed.body?.cancel();
     const got = await handleRequest(
         db, framedRequest(
             `${BASE}/identities/XXZruirZyAOoRpNxaDnpSA/default-organization`

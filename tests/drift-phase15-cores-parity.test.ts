@@ -42,8 +42,8 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
-import { deriveOrganizationMemberSeat } from
-    '../api/derive-memberships.ts';
+import { membershipOf, membershipsOfIdentity } from
+    '../api/memberships.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { landMembership } from
     './membership-fixtures.ts';
@@ -382,8 +382,9 @@ async () => {
     );
 });
 
-Deno.test('resolveOwningOrganization: identity without a seat'
-+ ' is unowned; seated identity is own-org / foreign-hidden',
+Deno.test('resolveOwningOrganization: identity without a'
++ ' membership is unowned; an accepted membership is'
++ ' own-org / foreign-hidden',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -418,14 +419,14 @@ async () => {
         },
     ));
     assertStrictEquals(ownedCreate.status, 201);
-    const membership = await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + STARK_ORGANIZATION
-            + '/members/' + ownedId,
-        token,
-        { type: 'member', at: nowUtc() },
-    ));
-    assertStrictEquals(membership.status, 201);
+    await seedSeat(
+        db, STARK_ORGANIZATION, ownedId, 'member', nowUtc(),
+    );
+    const accepted = await membershipOf(
+        db, STARK_ORGANIZATION, ownedId,
+    );
+    assert(accepted !== null);
+    assertStrictEquals(accepted.state, 'accepted');
 
     assertStrictEquals(
         await resolveOwningOrganization(
@@ -463,7 +464,7 @@ Deno.test('resolveOwningOrganization holds an accepted'
 });
 
 Deno.test('resolveOwningOrganization holds nothing when'
-+ ' a removed membership leaves its seat',
++ ' the membership is removed',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -476,12 +477,9 @@ async () => {
         db, organization, identity, 'removed', 'member',
         LATER,
     );
-    const seat = await deriveOrganizationMemberSeat(
-        db, organization, identity,
-    );
-    assertStrictEquals(seat.identity_id, identity);
     assertStrictEquals(
-        seat.organization_id, organization,
+        await membershipOf(db, organization, identity),
+        null,
     );
     assertStrictEquals(
         await resolveOwningOrganization(
@@ -773,11 +771,9 @@ async () => {
     const flowsTwo = await deriveFlows(
         db, ORGANIZATION_TWO,
     );
-    const { deriveMembershipsForIdentity } = await import(
-        '../api/derive-memberships.ts'
+    const currentMemberships = await membershipsOfIdentity(
+        db, 'XXZruirZyAOoRpNxaDnpSA',
     );
-    const currentMemberships =
-        await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA');
     const memberStark = currentMemberships.find(
         (m) => m.organization_id === STARK_ORGANIZATION,
     )!;

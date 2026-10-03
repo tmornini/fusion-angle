@@ -847,7 +847,7 @@ Deno.test('bootstrap lands in one statement', async () => {
     assertStrictEquals(
         (await adapterOver(backend).messagePairs.getAll())
             .length,
-        10,
+        9,
     );
 });
 

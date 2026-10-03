@@ -157,8 +157,8 @@ async () => {
     const organizationId = generateIdentifier();
     await putOrganization(db, organizationId, 'Flat');
     const requests = await db.messagePairs.getAll();
-    // nil root + seedAdminSchema's 3 pairs + this PUT.
-    assertStrictEquals(requests.length, 5);
+    // nil root + seedAdminSchema's 2 pairs + this PUT.
+    assertStrictEquals(requests.length, 4);
     const stored = requests.find(
         (row) => row.name === organizationId,
     );

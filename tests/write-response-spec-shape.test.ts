@@ -7,7 +7,6 @@ import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -133,9 +132,6 @@ const DUMMY_BODIES: Readonly<
         status: 'active',
     },
     'identities/:id/default-organization': { organization_id: ID },
-    [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
-        type: 'member', at: AT,
-    },
     'identities/:id/tokens/:jti': {
         jti: ID, identity_id: ID,
         action: 'issued', chain_id: ID, at: AT,

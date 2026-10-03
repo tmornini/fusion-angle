@@ -260,28 +260,22 @@ export function defineStoreAcceptance(
 
     Deno.test(name + ': DELETE head is gone', async () => {
         const { db, token } = await ready();
+        const tag = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/flows/yNqCXXgKLCqDESGScIzYrQ/tags/'
+            + 'tOGidMXUNrBnbXkIQWSpag';
         const put = await handleRequest(db, req(
-            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                + 'tOGidMXUNrBnbXkIQWSpag', token,
-            { type: 'member', at: '2026-01-01T00:00:00.000000Z' },
+            'PUT', tag, token,
+            {
+                flow_response_id: 'yNqCXXgKLCqDESGScIzYrQ',
+            },
         ));
         assertStrictEquals(put.status, 201);
         const del = await handleRequest(
-            db, req(
-                'DELETE',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                    + 'tOGidMXUNrBnbXkIQWSpag',
-                token,
-            ),
+            db, req('DELETE', tag, token),
         );
         assertStrictEquals(del.status, 204);
         const got = await handleRequest(
-            db, req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                    + 'tOGidMXUNrBnbXkIQWSpag',
-                token,
-            ),
+            db, req('GET', tag, token),
         );
         assertStrictEquals(got.status, 410);
     });

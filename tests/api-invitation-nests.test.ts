@@ -18,10 +18,8 @@ import { seedPersonIdentity } from
 import { seedSeat } from './root-admin-fixture.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
-import { deriveOrganizations } from
-    '../api/derive-organizations.ts';
-import { deriveDocumentsAt } from
-    '../api/derive-documents.ts';
+import { membershipsOfIdentity } from
+    '../api/memberships.ts';
 import {
     apiRequest,
     invitationLatched,
@@ -177,27 +175,8 @@ async function membershipsFor(
     db: DbAdapter,
     identityId: string,
 ): Promise<string[]> {
-    const organizations = await deriveOrganizations(db);
-    const ids: string[] = [];
-    for (const organization of organizations) {
-        const seatPrefix = '/organizations/'
-            + organization.id + '/members/';
-        const [seatRequests] =
-            await Promise.all([
-                db.messagePairs.getCollectionPairs(seatPrefix,
-                ),
-                db.messagePairs.getCollectionPairs(seatPrefix,
-                ),
-            ]);
-        for (const document of deriveDocumentsAt(
-            seatRequests, seatPrefix,
-        ).values()) {
-            if (document.name === identityId) {
-                ids.push(organization.id);
-            }
-        }
-    }
-    return ids.sort();
+    const rows = await membershipsOfIdentity(db, identityId);
+    return rows.map((row) => row.organization_id).sort();
 }
 
 Deno.test('admin POST org nest grants pending',

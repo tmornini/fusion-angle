@@ -18,7 +18,7 @@ import { partBodiesOf } from './http-fixtures.ts';
 // itself on the seats route tests/api-human-members.ts
 // reads, in the same organization adminToken() scopes to.
 const MEMBERS_PATH = '/api/organizations/'
-    + STARK_ORGANIZATION + '/members/';
+    + STARK_ORGANIZATION + '/invitations/?state=accepted';
 
 Deno.test('the in-process origin serves the seeded API',
 async () => {

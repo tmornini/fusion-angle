@@ -35,7 +35,6 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT,
@@ -1780,7 +1779,6 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     // Nested instances detail: PATCH create/update +
     // DELETE. Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
     // document via formSeedMessagePair + WRITE_RESPONSE_SPECS.

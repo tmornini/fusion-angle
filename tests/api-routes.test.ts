@@ -64,13 +64,15 @@ for (const route of SERVED_COLLECTIONS) {
 // The admin seat seedAdminSchema writes is the roster's one
 // part.
 Deno.test(
-    'GET organizations/' + STARK + '/members/ serves the'
-    + ' admin seat on an empty db',
+    'GET organizations/' + STARK
+    + '/invitations/?state=accepted serves the'
+    + ' admin membership on an empty db',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const parts = await GETCollection(
-            db, 'organizations/' + STARK + '/members/',
+            db, 'organizations/' + STARK
+                + '/invitations/?state=accepted',
             await devToken(), operationIdHeader(),
         );
         assertStrictEquals(parts.length, 1);

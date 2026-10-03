@@ -10,6 +10,8 @@ import {
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -33,7 +35,8 @@ async function freshDb() {
 }
 
 Deno.test(
-    'PUT identity + seat creates a seated person',
+    'PUT identity and an accepted membership'
+    + ' creates the person',
     async () => {
         const db = await freshDb();
         const token = await organizationToken();
@@ -54,13 +57,21 @@ Deno.test(
             bio: '',
         }, token,
             operationIdHeader());
-        const seat = await handleRequest(db, req(
-            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                + 'xdaJyuuPyHfffCGLhqDrOQ', token, {
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const identity = 'xdaJyuuPyHfffCGLhqDrOQ';
+        const seat = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + organization
+                + '/invitations/'
+                + membershipNameOf(organization, identity),
+            token,
+            body: {
+                state: 'accepted',
                 type: 'member',
                 at: AT,
             },
-        ));
+            headers: { 'If-None-Match': '*' },
+        }));
         assert(
             seat.status === 201 || seat.status === 200,
         );
@@ -70,10 +81,17 @@ Deno.test(
             operationIdHeader())).body().toValue();
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');
-        const seats = (await GETCollection<{ id: string }>(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-            operationIdHeader())).map((part) => part.body().toValue());
-        assert(seats.some(s => s.id === 'xdaJyuuPyHfffCGLhqDrOQ'));
+        const seats = (await GETCollection<{
+            identity_id: string;
+        }>(
+            db, 'organizations/' + organization
+                + '/invitations/?state=accepted',
+            token,
+            operationIdHeader()))
+            .map((part) => part.body().toValue());
+        assert(seats.some(
+            (s) => s.identity_id === identity,
+        ));
     },
 );
 

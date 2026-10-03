@@ -166,8 +166,8 @@ Deno.test(
             pairIdOf(second),
             pairIdOf(first),
         );
-        assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-        assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     },
 );
 
@@ -181,8 +181,8 @@ Deno.test(
             ideaGenesisBody('Should Not Create'),
         ));
         assertStrictEquals(res.status, 405);
-        // nil root, organization, admin seat, and its
-        // membership sibling; no write pair.
-        assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+        // nil root, organization, and the membership;
+        // no write pair.
+        assertStrictEquals((await db.messagePairs.getAll()).length, 3);
     },
 );

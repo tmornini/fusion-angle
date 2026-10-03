@@ -135,26 +135,6 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'delete/organizations/organization-id/members/identity-id',
-        verb: 'DELETE',
-        uri: '/api/organizations/:organization-id/members/:identity-id',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-            'If-Match (optional)',
-        ],
-        statuses:
-        [
-            '204',
-            '401',
-            '403',
-            '404',
-            '412',
-        ],
-    },
-    {
         hash:
             'delete/organizations/organization-id/record-types/record-type-i'
             + 'd',
@@ -1283,107 +1263,6 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
-        ],
-    },
-    {
-        hash: 'get/organizations/organization-id/former-members',
-        verb: 'GET',
-        uri: '/api/organizations/:organization-id/former-members/',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '403',
-            '404',
-        ],
-    },
-    {
-        hash: 'get/organizations/organization-id/members',
-        verb: 'GET',
-        uri: '/api/organizations/:organization-id/members/',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        statuses:
-        [
-            '200',
-            '204',
-            '401',
-            '403',
-            '404',
-        ],
-    },
-    {
-        hash: 'get/organizations/organization-id/members/identity-id',
-        verb: 'GET',
-        uri: '/api/organizations/:organization-id/members/:identity-id',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '403',
-            '404',
-            '410',
-        ],
-    },
-    {
-        hash:
-            'get/organizations/organization-id/members/identity-id/versions',
-        verb: 'GET',
-        uri:
-            '/api/organizations/:organization-id/members/:identity-id/versio'
-            + 'ns/',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '403',
-            '404',
-            '410',
-        ],
-    },
-    {
-        hash:
-            'get/organizations/organization-id/members/identity-id/versions/'
-            + 'etag',
-        verb: 'GET',
-        uri:
-            '/api/organizations/:organization-id/members/:identity-id/versio'
-            + 'ns/:etag',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '403',
-            '404',
-            '410',
         ],
     },
     {
@@ -2551,27 +2430,6 @@ export const API_DOC_ROOMS:
             '404',
             '412',
             '428',
-        ],
-    },
-    {
-        hash: 'put/organizations/organization-id/members/identity-id',
-        verb: 'PUT',
-        uri: '/api/organizations/:organization-id/members/:identity-id',
-        body: '{\n  "type": "member",\n  "at": "2020-01-01T00:00:00.000Z"\n}',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-            'If-Match or If-None-Match: * (optional)',
-        ],
-        statuses:
-        [
-            '200',
-            '400',
-            '401',
-            '403',
-            '404',
-            '412',
         ],
     },
     {

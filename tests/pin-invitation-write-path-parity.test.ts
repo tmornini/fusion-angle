@@ -1,7 +1,7 @@
 import { assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { membershipExistsFor } from '../api/derive-memberships.ts';
+import { membershipOf } from '../api/memberships.ts';
 import { ORGANIZATION_TWO } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
@@ -61,17 +61,19 @@ async function assertMembershipExistsWritePathParity(
     organization: string,
     identityId: string,
 ): Promise<boolean> {
-    const preTx = await membershipExistsFor(
+    const pre = await membershipOf(
         db, organization, identityId);
-    const inTx = await db.readTransaction(
-        (view) => membershipExistsFor(
+    const inside = await db.readTransaction(
+        (view) => membershipOf(
             view, organization, identityId),
     );
+    const preTx = pre !== null;
+    const inTx = inside !== null;
     assertStrictEquals(inTx, preTx);
     return preTx;
 }
 
-Deno.test('membershipExistsFor: pre-tx vs in-tx agree before and'
+Deno.test('membershipOf: pre-tx vs in-tx agree before and'
 + ' after a live accept — the `already` check\'s derived row'
 + ' source, held honest', async () => {
     const db = await seededDb();
@@ -124,9 +126,5 @@ Deno.test('membershipExistsFor: pre-tx vs in-tx agree before and'
         + ORGANIZATION_TWO + '/members/';
     const seatRows = await db.messagePairs.getCollectionPairs(seatPrefix,
     );
-    assertStrictEquals(
-        seatRows.some((row) => row.name === inviteeId
-            && row.operation_id === operationId),
-        true,
-    );
+    assertStrictEquals(seatRows.length, 0);
 });

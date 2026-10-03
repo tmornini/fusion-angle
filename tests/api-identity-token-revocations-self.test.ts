@@ -293,10 +293,11 @@ async () => {
     ));
     assertStrictEquals(res.status, 201);
     const still = await handleRequest(
-        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
+        db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/'
             , memberToken),
     );
-    assertStrictEquals(still.status, 200);
+    assertStrictEquals(still.status, 204);
     const refresh = await handleRequest(
         db,
         framedRequest('http://localhost/authentication/token', {

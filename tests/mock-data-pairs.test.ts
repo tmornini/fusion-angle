@@ -158,8 +158,8 @@ function messagePairJsonOf(message: string): {
 // invitation pairs (the seeded pending Stark
 // invitation's operation + document, granted by
 // postOrganizationInvitationGrant). Measure after
-// seed — do not invent. Bootstrap absolute is 10.
-const EXPECTED_MESSAGE_PAIR_COUNT = 2329;
+// seed — do not invent. Bootstrap absolute is 9.
+const EXPECTED_MESSAGE_PAIR_COUNT = 2317;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -321,26 +321,19 @@ Deno.test('a seeded AI agent pair sits at the global'
     );
 });
 
-Deno.test('a seeded seat document message pair sits at its org-nested'
-+ ' members document', async () => {
+Deno.test('a seeded membership sits at invitations'
++ ' and no seat path exists', async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
     const requests = await db.messagePairs.getAll();
-    const row = requests.find(
+    const seat = requests.find(
         r => r.name === firstMember.id
             && r.path
                 === '/organizations/'
                 + STARK_ORGANIZATION
                 + '/members/',
     );
-    assert(row, 'no request row for the seeded seat');
-    const embedded = messagePairJsonOf(row!.response) as {
-        body: Record<string, unknown>;
-    };
-    assertEquals(
-        Object.keys(embedded.body).sort(),
-        ['at', 'id', 'identity_id', 'organization_id', 'type'],
-    );
+    assertStrictEquals(seat, undefined);
     const membershipName = membershipNameOf(
         STARK_ORGANIZATION, firstMember.id,
     );
@@ -963,8 +956,8 @@ Deno.test('a seeded credential\'s response body carries the full'
     );
 });
 
-Deno.test('seeded seats carry type and no role-grant'
-+ ' pairs remain', async () => {
+Deno.test('seeded memberships carry type and no'
++ ' role-grant pairs remain', async () => {
     const db = await sharedMockDb();
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(
@@ -976,15 +969,17 @@ Deno.test('seeded seats carry type and no role-grant'
         /\/organizations\/[^/]+\/members\//.test(
             r.path,
         ));
-    assert(seatReqs.length > 0);
-    for (const row of seatReqs) {
-        const embedded = messagePairJsonOf(row.response) as {
-            body: Record<string, unknown>;
-        };
+    assertStrictEquals(seatReqs.length, 0);
+    const memberships = requests.filter(
+        r => r.path === '/invitations/',
+    );
+    assert(memberships.length > 0);
+    for (const row of memberships) {
+        const embedded = messagePairJsonOf(row.response);
         assert(
             embedded.body.type === 'admin'
             || embedded.body.type === 'member',
-            'seat ' + row.name + ' missing type',
+            'membership ' + row.name + ' missing type',
         );
     }
 });
@@ -999,7 +994,7 @@ Deno.test('seed pairs verify against their hashes', async () => {
     }
 });
 
-Deno.test('a bootstrap seed populates exactly ten balanced,'
+Deno.test('a bootstrap seed populates exactly nine balanced,'
 + ' hash-verified pairs for the current identity and the'
 + ' system identity', async () => {
     const db = memoryDbAdapter();
@@ -1007,7 +1002,7 @@ Deno.test('a bootstrap seed populates exactly ten balanced,'
         hashPassword: testHashPassword,
     });
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 10);
+    assertStrictEquals(requests.length, 9);
     const atIdentity = requests.filter(
         r => r.path === '/identities/'
             && r.name === 'XXZruirZyAOoRpNxaDnpSA',
@@ -1023,7 +1018,7 @@ Deno.test('a bootstrap seed populates exactly ten balanced,'
             === `/organizations/${STARK_ORGANIZATION}/members/`
             && r.name === 'XXZruirZyAOoRpNxaDnpSA',
     );
-    assertStrictEquals(atSeat.length, 1);
+    assertStrictEquals(atSeat.length, 0);
     const atPii = requests.filter(
         r => r.path === '/identities/XXZruirZyAOoRpNxaDnpSA/'
             && r.name === 'pii',

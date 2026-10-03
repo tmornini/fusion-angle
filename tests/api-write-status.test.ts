@@ -19,7 +19,9 @@ import {
 } from '../shared/identifier.ts';
 
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-const MEMBERSHIP_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/';
+const TAG_FLOW = 'yNqCXXgKLCqDESGScIzYrQ';
+const TAG_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+    + TAG_FLOW + '/tags/';
 
 function ideaDocument(title: string): Record<string, unknown> {
     return {
@@ -34,12 +36,9 @@ function ideaDocument(title: string): Record<string, unknown> {
     };
 }
 
-function membershipDocument(
-    _identityId: string,
-): Record<string, unknown> {
+function tagDocument(): Record<string, unknown> {
     return {
-        type: 'member',
-        at: '2026-01-01T00:00:00.000000Z',
+        flow_response_id: TAG_FLOW,
     };
 }
 
@@ -232,32 +231,29 @@ Deno.test('DELETE live is 204 and appends',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const name = 'yTCVdPetYIGKpMKGzQJxPQ';
     const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'yTCVdPetYIGKpMKGzQJxPQ',
+        'PUT', TAG_PREFIX + name,
         token,
-        membershipDocument('yTCVdPetYIGKpMKGzQJxPQ'),
+        tagDocument(),
     ));
     assertStrictEquals(put.status, 201);
     const before = await pairsAt(
-        db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
+        db, TAG_PREFIX, name,
     );
     assertStrictEquals(before, 1);
     const del = await handleRequest(db, req(
-        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'yTCVdPetYIGKpMKGzQJxPQ',
+        'DELETE', TAG_PREFIX + name,
         token,
     ));
     assertStrictEquals(del.status, 204);
     const stored = await storedResponseAt(
-        db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
+        db, TAG_PREFIX, name,
     );
     assertStrictEquals(stored.method, 'DELETE');
     assertStrictEquals(stored.status, 204);
     assertStrictEquals(
-        await pairsAt(
-            db, MEMBERSHIP_PREFIX, 'yTCVdPetYIGKpMKGzQJxPQ',
-        ),
+        await pairsAt(db, TAG_PREFIX, name),
         2,
     );
 });
@@ -266,27 +262,23 @@ Deno.test('DELETE already-gone is 204 and does not append',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const name = 'yPsWmFGqnMtjifSSmvZrUw';
     await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'yPsWmFGqnMtjifSSmvZrUw',
+        'PUT', TAG_PREFIX + name,
         token,
-        membershipDocument('yPsWmFGqnMtjifSSmvZrUw'),
+        tagDocument(),
     ));
     const first = await handleRequest(db, req(
-        'DELETE', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'yPsWmFGqnMtjifSSmvZrUw',
+        'DELETE', TAG_PREFIX + name,
         token,
     ));
     assertStrictEquals(first.status, 204);
-    const before = await pairsAt(
-        db, MEMBERSHIP_PREFIX, 'yPsWmFGqnMtjifSSmvZrUw',
-    );
+    const before = await pairsAt(db, TAG_PREFIX, name);
     assertStrictEquals(before, 2);
     const second = await handleRequest(
         db,
         framedRequest(
-            'http://localhost/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'yPsWmFGqnMtjifSSmvZrUw',
+            'http://localhost' + TAG_PREFIX + name,
             {
                 method: 'DELETE',
                 headers: {
@@ -299,9 +291,7 @@ async () => {
     );
     assertStrictEquals(second.status, 204);
     assertStrictEquals(
-        await pairsAt(
-            db, MEMBERSHIP_PREFIX, 'yPsWmFGqnMtjifSSmvZrUw',
-        ),
+        await pairsAt(db, TAG_PREFIX, name),
         2,
     );
 });
@@ -320,7 +310,9 @@ async () => {
     );
     assertStrictEquals(
         await pairsAt(
-            db, MEMBERSHIP_PREFIX, 'yatHlUsoiwxMlkqjKvCVGQ',
+            db,
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+            'yatHlUsoiwxMlkqjKvCVGQ',
         ),
         0,
     );

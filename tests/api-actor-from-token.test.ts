@@ -55,9 +55,13 @@ Deno.test(
         assertStrictEquals(
             principalFromToken(token).id, ALICE,
         );
-        const seats = (await GETCollection<{ id: string }>(
-            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/members/', token,
-            operationIdHeader())).map((part) => part.body().toValue());
-        assert(seats.some(s => s.id === ALICE));
+        const seats = (await GETCollection<{
+            identity_id: string;
+        }>(
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/invitations/?state=accepted',
+            token, operationIdHeader()))
+            .map((part) => part.body().toValue());
+        assert(seats.some(s => s.identity_id === ALICE));
     },
 );

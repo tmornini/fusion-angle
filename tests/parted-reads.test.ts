@@ -25,11 +25,6 @@ const PARTED = [
     'organizations/:id/versions/',
     'organizations/:id/versions/:etag',
     'organizations/:id/work-orders/:id/history',
-    'organizations/:organization-id/former-members/',
-    'organizations/:organization-id/members/:identity-id'
-        + '/versions/',
-    'organizations/:organization-id/members/:identity-id'
-        + '/versions/:etag',
     'organizations/:organization-id/record-types/'
         + ':record-type-id/instances/:instance-id/versions',
     'organizations/:organization-id/record-types/'

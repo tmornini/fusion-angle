@@ -184,8 +184,8 @@ async () => {
             + 'YIuEjXvCwXAgrpyvcvLJjg', token, body,
             operationId),
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 Deno.test('the pair request body carries domain state;'
@@ -210,8 +210,8 @@ Deno.test('the pair request body carries domain state;'
     assertStrictEquals(wire.state, 'under_review');
     assertStrictEquals('state_at' in wire, false);
     const requests = await db.messagePairs.getAll();
-    // nil root + seedRootAdmin 3 + project PUT 1
-    assertStrictEquals(requests.length, 5);
+    // nil root + seedRootAdmin 2 + project PUT 1
+    assertStrictEquals(requests.length, 4);
     const project = requests.find(
         (row) => row.name === 'YKtyCizelcaUAaHGwetojA',
     );

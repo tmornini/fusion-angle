@@ -268,11 +268,11 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // seedRootAdmin: organization, seat, and membership (3)
+    // seedRootAdmin: organization and membership (2)
     // + identity + pii + credential (3)
     // + rehash + authorize + code document
-    // + code DELETE + issued event + token = 13.
-    assertStrictEquals(requests.length, 13);
+    // + code DELETE + issued event + token = 12.
+    assertStrictEquals(requests.length, 12);
     // The AUTH hops stay operation documents (name '');
     // the issued event and the code document carry
     // non-empty names.
@@ -323,7 +323,7 @@ Deno.test('a full login flow keeps requests/responses balanced,'
     assertStrictEquals(codeDelete.supersedes, codePut.id);
     // The code DELETE is the one successor. Every other
     // row in this slice is a genesis.
-    for (const row of responses.slice(6)) {
+    for (const row of responses.slice(5)) {
         if (row.id === codeDelete.id) continue;
         assertStrictEquals(row.supersedes, NIL_IDENTIFIER);
         assertStrictEquals('follows' in row, false);
@@ -436,11 +436,11 @@ async () => {
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // fullLoginFlow is 13 (code document PUT and DELETE
+    // fullLoginFlow is 12 (code document PUT and DELETE
     // replace the spend marker). Refresh adds its own
     // pair plus the retired root and the issued
     // successor.
-    assertStrictEquals(requests.length, 16);
+    assertStrictEquals(requests.length, 15);
     const cookieLine = 'cookie: refresh_token='
         + first.refresh_token;
     const refreshRequest = requests.find(
@@ -500,7 +500,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
     // own event pair (Phase 13 Task 5: issueTokenPair's root
     // gains its own pair at the row's document) + its operation
     // pair.
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 8);
     const exchangeRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request_secrets.includes(subjectToken),
@@ -593,7 +593,7 @@ Deno.test('a client_credentials grant stores its own pair with live'
     // grant's spent-jti ticket, its own event pair (Phase 13
     // Task 5: the issued root's pair at the row's document),
     // and its operation message pair.
-    assertStrictEquals(requests.length, 10);
+    assertStrictEquals(requests.length, 9);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request_secrets.includes(assertion),

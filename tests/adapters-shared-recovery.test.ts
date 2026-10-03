@@ -335,7 +335,7 @@ Deno.test('a recover context silently refreshes a dead access token',
         deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
     const members = (await ctx.GETCollection(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/invitations/?state=accepted',
     )).map(part => part.body().toValue());
     assertStrictEquals(members.length, 1);
 }));
@@ -357,7 +357,8 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     // both reads 401 in parallel; a second refresh would be
     // branded reuse and revoke the fresh chain
     const [members, organizations] = await Promise.all([
-        ctx.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
+        ctx.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/invitations/?state=accepted')
             .then(parts => parts.map(part => part.body().toValue())),
         ctx.GETCollection(
             'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
@@ -395,7 +396,7 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
         seed);
     // recovery re-installs the live token, re-scopes, and retries
     const members = (await ctx.GETCollection(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/invitations/?state=accepted',
     )).map(part => part.body().toValue());
     assertStrictEquals(members.length, 1);
     // the live session is preserved (not scrubbed) and now scoped
@@ -419,7 +420,8 @@ Deno.test('recovery with both tokens dead scrubs and bounces',
         dead);
     // the 401 is unrecoverable: the original error propagates
     await assertRejects(
-        () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/')
+        () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/')
             , UnauthorizedError);
     // the dead credential was scrubbed...
     assertStrictEquals(client.getSessionCredentials(), null);
@@ -447,8 +449,10 @@ Deno.test('recovery with a corrupt credential scrubs, bounces,'
             const ctx = client.recoveringRequestContext(
                 dead);
             await assertRejects(
-                () => ctx.GET('organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-                    + ''), UnauthorizedError);
+                () => ctx.GET(
+                    'organizations/AjdvjuECVZEgZoFajaIEkg'
+                        + '/ideas/',
+                ), UnauthorizedError);
         },
     );
     assertStrictEquals(
@@ -624,7 +628,7 @@ Deno.test('a concurrent facade refresh and remint present'
     const row = held.body().toValue();
     await Promise.all([
         reader.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg/'
-            + 'members/').then(parts =>
+            + 'ideas/').then(parts =>
             parts.map(part => part.body().toValue())),
         postInvitationAcceptance(acceptor, {
             id: row.id,

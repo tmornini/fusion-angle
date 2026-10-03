@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
-    deriveMembershipsForIdentity,
-} from '../api/derive-memberships.ts';
+    membershipsOfIdentity,
+} from '../api/memberships.ts';
 import {
     deriveCredentialsFor,
     deriveIdentityPiiRows,
@@ -33,7 +33,7 @@ Deno.test('the seed yields a login-capable identity whose'
     const db = await sharedMockDb();
     const unaffiliated = buildUnaffiliatedIdentity();
     assertEquals(
-        await deriveMembershipsForIdentity(
+        await membershipsOfIdentity(
             db, unaffiliated.id,
         ),
         [],

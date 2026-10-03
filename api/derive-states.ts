@@ -378,10 +378,6 @@ function ownerProbeCollection(
     if (table === 'invitations') {
         return INVITATIONS_PREFIX;
     }
-    if (table === 'organization_members') {
-        return '/organizations/' + organization
-            + '/members/';
-    }
     if (table === 'role_grants') {
         return ROLE_GRANTS_URI_PREFIX;
     }

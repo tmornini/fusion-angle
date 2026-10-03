@@ -1,13 +1,10 @@
 import {
-    assertNotStrictEquals,
-    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { EntityNotFoundError } from '../api/db.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import { membershipOf } from '../api/memberships.ts';
 import {
@@ -15,13 +12,10 @@ import {
     attemptFor,
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { landMembership } from
     './membership-fixtures.ts';
-import { deriveOrganizationMemberSeat } from
-    '../api/derive-memberships.ts';
 import {
     compareIdentifiers,
     generateIdentifier,
@@ -183,74 +177,6 @@ Deno.test(
 );
 
 Deno.test(
-    'a seat removed below the mirror leaves the'
-    + ' accepted membership, so the SET holds',
-    async () => {
-        const db = await freshDb();
-        await seedMembershipPair(
-            db, generateIdentifier(),
-            STARK_ORGANIZATION, IDENTITY_ID, T1,
-        );
-        await seedMembershipPair(
-            db, generateIdentifier(),
-            ORGANIZATION_TWO, IDENTITY_ID, T2,
-        );
-        await seedDefaultOrganizationEvent(
-            db, IDENTITY_ID, ORGANIZATION_TWO, T2,
-        );
-        const tombstone = await formWriteMessagePair({
-            method: 'DELETE',
-            pathname: '/organizations/'
-                + ORGANIZATION_TWO
-                + '/members/' + IDENTITY_ID,
-            routePattern:
-                'organizations/:organization-id/members'
-                + '/:identity-id',
-            routeSegments: [
-                'organizations', ':organization-id',
-                'members', ':identity-id',
-            ],
-            pathSegments: [
-                'organizations', ORGANIZATION_TWO,
-                'members', IDENTITY_ID,
-            ],
-            headerFields: [],
-            body: {},
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            requestAt: T2,
-            organization: ORGANIZATION_TWO,
-            responseBody: undefined,
-            operationId: generateIdentifier(),
-            requestId: generateIdentifier(),
-        });
-        const answer = await runWrite(
-            db,
-            attemptFor([tombstone]),
-            [tombstone],
-        );
-        assertStrictEquals(answer.outcome, 'land');
-        await assertRejects(
-            () => deriveOrganizationMemberSeat(
-                db, ORGANIZATION_TWO, IDENTITY_ID,
-            ),
-            EntityNotFoundError,
-        );
-        assertNotStrictEquals(
-            await membershipOf(
-                db, ORGANIZATION_TWO, IDENTITY_ID,
-            ),
-            null,
-        );
-        assertStrictEquals(
-            await identityDefaultOrganization(
-                db, IDENTITY_ID,
-            ),
-            ORGANIZATION_TWO,
-        );
-    },
-);
-
-Deno.test(
     'identityDefaultOrganization falls to the primary'
     + ' when the SET membership is removed',
     async () => {
@@ -270,12 +196,11 @@ Deno.test(
             db, ORGANIZATION_TWO, IDENTITY_ID, 'removed',
             'member', '2026-03-01T00:00:00.000000Z',
         );
-        const seat = await deriveOrganizationMemberSeat(
-            db, ORGANIZATION_TWO, IDENTITY_ID,
-        );
-        assertStrictEquals(seat.type, 'member');
         assertStrictEquals(
-            seat.organization_id, ORGANIZATION_TWO,
+            await membershipOf(
+                db, ORGANIZATION_TWO, IDENTITY_ID,
+            ),
+            null,
         );
         assertStrictEquals(
             await identityDefaultOrganization(

@@ -37,7 +37,6 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     MembershipEntity,
-    SeatEntity,
     IdentityProviderEntity,
     WorkOrderFlowGraph,
     MessagePairEntity,
@@ -64,7 +63,6 @@ import {
     validateIdentityCreateBody,
     validateIdentityDocumentBody,
     validateIdentityCredentialEntity,
-    validateSeatDocumentBody,
     validateObjectiveCreateBody,
     validateObjectiveDocumentBody,
     validateObjectiveRevisionEntity,
@@ -97,7 +95,6 @@ import {
 import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
-    formStateWrite,
     runWrite,
     runStateWrite,
     sameAsHead,
@@ -107,14 +104,12 @@ import {
     documentHeadAt,
     ifMatchFromMessagePair,
     rawIfMatchFromMessagePair,
-    responseRecordOf,
     PII_DOCUMENT_NAME,
 } from './message-pair.ts';
 import type {
     MessagePair,
     ParentSibling,
     ReceivedRequest,
-    SiblingCondition,
     StateSibling,
 } from './message-pair.ts';
 import type { Reader } from './served-response.ts';
@@ -184,9 +179,6 @@ import {
     INSTANCE_DETAIL_PATTERN,
     INSTANCE_VERSIONS_PATTERN,
     INSTANCE_VERSION_PATTERN,
-    ORGANIZATION_MEMBERS_COLLECTION_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
-    ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN,
     CREDENTIALS_COLLECTION_PATTERN,
     CREDENTIAL_DETAIL_PATTERN,
     CREDENTIAL_KEY_READ_ROLES,
@@ -248,11 +240,6 @@ import {
     scoreEntityOf,
     scoresUriPrefix,
 } from './derive-project-scores.ts';
-import {
-    deriveOrganizationFormerSeats,
-    seatsPrefixFor,
-    seatEntityOf,
-} from './derive-memberships.ts';
 import {
     credentialsPrefixFor,
     deriveIdentityKind,
@@ -324,13 +311,8 @@ import {
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
 import {
-    MEMBERSHIPS_PATH,
-    membershipOfHead,
     membershipsOfIdentity,
-    organizationMembershipHeads,
 } from './memberships.ts';
-import { membershipNameOf } from
-    '../shared/membership-name.ts';
 import {
     viewQueryOf,
     type QueryRefusal,
@@ -2493,137 +2475,6 @@ export async function postActualScoreDocumentOp(
     return entity;
 }
 
-// A seat's stored path. Any other path is not a seat, so
-// the write grows no membership sibling.
-function organizationOfSeatPath(
-    path: string,
-): Id | undefined {
-    const head = '/organizations/';
-    const tail = '/members/';
-    if (!path.startsWith(head) || !path.endsWith(tail)) {
-        return undefined;
-    }
-    const organization = path.slice(
-        head.length, path.length - tail.length,
-    );
-    if (
-        organization === ''
-        || organization.includes('/')
-    ) {
-        return undefined;
-    }
-    return organization;
-}
-
-// While both shapes exist, a seat write lands the
-// membership that says the same thing, in the seat's own
-// statement. Task 26 deletes this with the seats.
-export async function membershipSiblingOf(
-    db: DbAdapter,
-    organization: Id,
-    identity: Id,
-    seat: MessagePair,
-): Promise<MessagePair | undefined> {
-    const name = membershipNameOf(organization, identity);
-    const head = await db.messagePairs.getHeadPair(
-        MEMBERSHIPS_PATH, name,
-    );
-    let state: Record<string, unknown>;
-    let condition: SiblingCondition;
-    if (seat.method === 'DELETE') {
-        if (head === null) return undefined;
-        state = {
-            id: name,
-            organization_id: organization,
-            identity_id: identity,
-            type: membershipOfHead(head).type,
-            state: 'removed',
-            at: seat.requestAt,
-        };
-        condition = { kind: 'in-order', head: head.id };
-    } else {
-        const record = responseRecordOf(
-            seat.responseMessage,
-        );
-        if (record === undefined) {
-            throw new Error('a seat PUT stored no body');
-        }
-        const fact = validateSeatDocumentBody({
-            type: record['type'],
-            at: record['at'],
-        });
-        state = {
-            id: name,
-            organization_id: organization,
-            identity_id: identity,
-            type: fact.type,
-            state: 'accepted',
-            at: fact.at,
-        };
-        condition = head === null
-            ? { kind: 'genesis', declarer: 'handler' }
-            : { kind: 'in-order', head: head.id };
-    }
-    const formed = await formStateWrite({
-        kind: 'events',
-        context: {
-            operationId: seat.operationId,
-            requestId: seat.requestId,
-            requesterIdentityId: seat.requesterIdentityId,
-            requestAt: seat.requestAt,
-        },
-        siblings: [{
-            method: 'PUT',
-            path: MEMBERSHIPS_PATH,
-            name,
-            state,
-            condition,
-        }],
-    });
-    const row = formed.rows[0];
-    if (row === undefined || !('requestMessage' in row)) {
-        throw new Error(
-            'membership sibling was not formed',
-        );
-    }
-    return row;
-}
-
-// Membership document write — Phase Final Task 2: the
-// memberships ROW half is stripped — pure message-plane
-// write (postFlowTagDocumentOp shape). A seat write also
-// lands the membership sibling in the same statement, so
-// the two shapes agree. `messagePair` is optional so a
-// below-facade caller keeps compiling; the live route
-// always supplies one. WRITE_RESPONSE_SPECS successBody
-// forms the wire bytes; the reconstructed return is for
-// type parity.
-export async function postMembershipDocumentOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<SeatEntity, 'id'>> {
-    const entity = withoutId(body) as unknown as
-        Omit<SeatEntity, 'id'>;
-    if (messagePair !== undefined) {
-        const organization = organizationOfSeatPath(
-            messagePair.path,
-        );
-        const sibling = organization === undefined
-            ? undefined
-            : await membershipSiblingOf(
-                db, organization, _id, messagePair,
-            );
-        const rows = sibling === undefined
-            ? [messagePair]
-            : [messagePair, sibling];
-        await runWrite(db, attemptFor(rows), rows);
-    }
-    return entity;
-}
-
 // Member document write — Phase Final Task 2: the members
 // ROW half is stripped — pure message-plane write. No states
 // interaction (genesis/archive ride the membership SEAT via
@@ -3214,26 +3065,6 @@ export const WRITE_RESPONSE_SPECS:
             id: param(params, 0),
             ...validateDefaultOrganizationBody(body ?? {}),
         }),
-    },
-    // Seat document: path is the relationship. Body is
-    // type + at. organization_id / identity_id are
-    // reconstructed from the path for the wire entity.
-    [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
-        conditional: 'optional',
-        successBody: (params, body) => {
-            const organization = param(params, 0);
-            const identityId = param(params, 1);
-            const seat = validateSeatDocumentBody(
-                withoutId(body ?? {}),
-            );
-            return {
-                id: identityId,
-                organization_id: organization,
-                identity_id: identityId,
-                type: seat.type,
-                at: seat.at,
-            };
-        },
     },
     // G4: GET wins. identityTokenEntityOf is id-first;
     // identity_id is stamped from the path so stored PUT
@@ -5399,127 +5230,6 @@ export const routes: Route[] = [
             + '/versions/:etag',
         {
             select: getInvitationVersionOnOrganizationNest,
-        },
-    ),
-    // The seats the ledger has DELETEd — the organization's
-    // former members. The name resolver reads it beside the
-    // live roster to tell "left" from "never existed".
-    // Same prefix as the roster, opposite head method;
-    // fenced by the path organization like every
-    // organizations/ route.
-    route(ORGANIZATION_FORMER_MEMBERS_COLLECTION_PATTERN, {
-        get: (db, _p, _actor, organization) =>
-            deriveOrganizationFormerSeats(
-                db, requireOrganization(organization),
-            ),
-    }),
-    // The roster serves in write order; a reader that wants
-    // grant order sorts the seat bodies by `at`.
-    route(ORGANIZATION_MEMBERS_COLLECTION_PATTERN, {
-        select: (db, _p, _actor, organization) => selectHeadsAtPath(
-            db, seatsPrefixFor(requireOrganization(organization)),
-            'stateless',
-        ),
-    }),
-    route(ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-        select: (db, p, _actor, organization) => selectHeadAtPath(
-            db, seatsPrefixFor(requireOrganization(organization)),
-            param(p, 1), 'organization_members',
-        ),
-        put: (db, p, body, actor, messagePair) =>
-            postMembershipDocumentOp(
-                db, param(p, 1), body, actor, messagePair,
-            ),
-        // The last admin seat cannot be removed: the actor
-        // is authorized, the organization's state forbids.
-        // The accepted admin memberships are derived INSIDE the transaction
-        // — a row op. The refusal is thrown after it, the
-        // invitations-domain shape.
-        delete: async (
-            db, p, _actor, messagePair, organization,
-        ) => {
-            const fenced = requireOrganization(organization);
-            const identityId = param(p, 1);
-            const lastAdmin = await db.readTransaction(
-                async (view) => {
-                    const admins = (
-                        await organizationMembershipHeads(
-                            view, fenced, {
-                                kind: 'state',
-                                state: 'accepted',
-                            },
-                        )
-                    ).map(membershipOfHead).filter(
-                        (membership) =>
-                            membership.type === 'admin',
-                    );
-                    return admins.length === 1
-                        && admins[0]!.identity_id
-                            === identityId;
-                },
-            );
-            if (lastAdmin) {
-                throw new ApiError(
-                    'the last admin seat cannot be removed',
-                    HTTP_CONFLICT,
-                );
-            }
-            if (messagePair !== undefined) {
-                const sibling = await membershipSiblingOf(
-                    db, fenced, identityId, messagePair,
-                );
-                const rows = sibling === undefined
-                    ? [messagePair]
-                    : [messagePair, sibling];
-                await runWrite(db, attemptFor(rows), rows);
-            }
-        },
-    }),
-    route(
-        ORGANIZATION_MEMBER_DETAIL_PATTERN
-            + '/versions/',
-        {
-            get: async (db, p, _actor, organization) => {
-                const org = requireOrganization(
-                    organization,
-                );
-                const id = param(p, 1);
-                const rows = await versionSnapshotsAt(
-                    db, seatsPrefixFor(org), id,
-                    (document) => seatEntityOf(
-                        document, org,
-                    ),
-                );
-                if (rows.length === 0) {
-                    throw new EntityNotFoundError(
-                        'organization_members', id,
-                    );
-                }
-                return rows;
-            },
-        },
-    ),
-    route(
-        ORGANIZATION_MEMBER_DETAIL_PATTERN
-            + '/versions/:etag',
-        {
-            get: async (db, p, _actor, organization) => {
-                const org = requireOrganization(
-                    organization,
-                );
-                const id = param(p, 1);
-                const etag = param(p, p.length - 1);
-                const document =
-                    await storedRevisionDocument(
-                        db, seatsPrefixFor(org), id, etag,
-                    );
-                if (document === undefined) {
-                    throw new EntityNotFoundError(
-                        'organization_members', id,
-                    );
-                }
-                return seatEntityOf(document, org);
-            },
         },
     ),
     // Absorbed (Phase 4 Task 2) into the generic

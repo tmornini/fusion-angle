@@ -9,7 +9,6 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { bodyOf } from '../api/derive-documents.ts';
-import { seatsPrefixFor } from '../api/derive-memberships.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
 import { seedPersonIdentity } from
@@ -202,16 +201,21 @@ async function seatHead(
     identity: string,
 ): Promise<{ method: string; type?: string } | null> {
     const head = await db.messagePairs.getHeadPair(
-        seatsPrefixFor(ORG), identity,
+        '/invitations/',
+        membershipNameOf(ORG, identity),
     );
     if (head === null) return null;
-    if (head.method === 'DELETE') {
+    const body = bodyOf(head.response);
+    if (body['state'] === 'removed') {
         return { method: 'DELETE' };
     }
-    return {
-        method: head.method,
-        type: String(bodyOf(head.response)['type']),
-    };
+    if (body['state'] === 'accepted') {
+        return {
+            method: 'PUT',
+            type: String(body['type']),
+        };
+    }
+    return null;
 }
 
 Deno.test('a grant from none is 201 pending at the name',

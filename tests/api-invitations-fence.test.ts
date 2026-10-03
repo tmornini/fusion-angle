@@ -16,9 +16,12 @@ import { deriveInvitations } from
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import {
-    deriveDocumentsAt,
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
+import {
+    membershipOfHead,
+    organizationMembershipHeads,
+} from '../api/memberships.ts';
 import {
     apiRequest,
     invitationLatched,
@@ -47,25 +50,22 @@ async function allMemberships(db: MemoryDbAdapter) {
         type: string;
         at: string;
     }> = [];
+    const accepted = {
+        kind: 'state' as const,
+        state: 'accepted' as const,
+    };
     for (const organization of organizations) {
-        const seatPrefix = '/organizations/'
-            + organization.id + '/members/';
-        const [seatRequests] =
-            await Promise.all([
-                db.messagePairs.getCollectionPairs(seatPrefix,
-                ),
-                db.messagePairs.getCollectionPairs(seatPrefix,
-                ),
-            ]);
-        for (const document of deriveDocumentsAt(
-            seatRequests, seatPrefix,
-        ).values()) {
+        const heads = await organizationMembershipHeads(
+            db, organization.id, accepted,
+        );
+        for (const head of heads) {
+            const membership = membershipOfHead(head);
             rows.push({
-                id: document.name,
-                organization_id: organization.id,
-                identity_id: document.name,
-                type: String(document.body['type']),
-                at: String(document.body['at']),
+                id: membership.id,
+                organization_id: membership.organization_id,
+                identity_id: membership.identity_id,
+                type: membership.type,
+                at: membership.at,
             });
         }
     }
@@ -317,12 +317,15 @@ async function rosterIds(
     db: MemoryDbAdapter,
 ): Promise<Set<string>> {
     const res = await handleRequest(db, req(
-        'GET', '/organizations/BBjWJsjYIDkTRKIIPrzWRw/members/',
+        'GET', '/organizations/' + WAYNE
+            + '/invitations/?state=accepted',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
-            , 'BBjWJsjYIDkTRKIIPrzWRw')));
+            , WAYNE)));
     assertStrictEquals(res.status, 200);
-    const rows = await partBodiesOf<{ id: string }>(res);
-    return new Set(rows.map(r => r.id));
+    const rows = await partBodiesOf<{
+        identity_id: string;
+    }>(res);
+    return new Set(rows.map(r => r.identity_id));
 }
 
 Deno.test('accept makes the invitation org reachable', async () => {
@@ -671,11 +674,21 @@ Deno.test('a removed member who re-accepts is 409 — not a'
         })));
     assertStrictEquals(accept.status, 200);
     await accept.body?.cancel();
-    const del = await handleRequest(db, req(
-        'DELETE', '/organizations/' + WAYNE + '/members/' + SARAH,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE)));
-    assertStrictEquals(del.status, 204);
-    await del.body?.cancel();
+    const removed = await handleRequest(
+        db, await invitationLatched(db, req(
+            'PUT', '/organizations/' + WAYNE
+                + '/invitations/' + id,
+            await organizationToken(
+                'XXZruirZyAOoRpNxaDnpSA', WAYNE,
+            ),
+            {
+                state: 'removed',
+                at: '2026-01-01T00:00:01.500000Z',
+            },
+        )),
+    );
+    assertStrictEquals(removed.status, 200);
+    await removed.body?.cancel();
     const versionsBefore = (await versionsOf(db, id)).length;
     const reaccept = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,

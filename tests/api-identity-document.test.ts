@@ -188,8 +188,8 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
         db, 'identities/' + id, body, DEV_TOKEN,
         operationIdHeader())).body().toValue();
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file

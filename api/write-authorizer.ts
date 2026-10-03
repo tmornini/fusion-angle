@@ -4,7 +4,6 @@ import type { Id } from '../shared/types.ts';
 import { resolveGlobalOwner } from './derive-states.ts';
 import {
     RECORD_TYPE_DETAIL_PATTERN,
-    ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from './family-registry.ts';
 
 // Pre-write ownership authorizer on the message plane. Probes
@@ -54,10 +53,6 @@ const WRITE_AUTHORIZERS:
         // index 1 (:record-type-id).
         [RECORD_TYPE_DETAIL_PATTERN, {
             table: 'record_types', idParamIndex: 1,
-        }],
-        [ORGANIZATION_MEMBER_DETAIL_PATTERN, {
-            table: 'organization_members',
-            idParamIndex: 1,
         }],
     ]);
 

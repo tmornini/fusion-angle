@@ -822,7 +822,7 @@ async () => {
         assertStrictEquals(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assertStrictEquals(messagePairs.length, 6);
+        assertStrictEquals(messagePairs.length, 5);
     });
 });
 

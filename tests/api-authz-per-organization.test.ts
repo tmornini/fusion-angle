@@ -15,16 +15,20 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 function req(
     method: string, path: string, token: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
         body,
+        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
@@ -77,39 +81,54 @@ async function memberOfBothAdminInA(): Promise<{
 
 Deno.test('admin type in org A does not authorize admin'
 + ' surfaces in org B', async () => {
-    const { db, organizationA, organizationB } = await memberOfBothAdminInA();
-    // Seat writes stay admin-only; member type in B must 403.
+    const { db, organizationA, organizationB } =
+        await memberOfBothAdminInA();
+    const identity = generateIdentifier();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationB + '/members/'
-            + generateIdentifier(),
+        'PUT', '/organizations/' + organizationB
+            + '/invitations/'
+            + membershipNameOf(organizationB, identity),
         await claimToken({
             organization: organizationB,
             organizations: [organizationA, organizationB],
-            roles: ['admin:' + organizationA, 'member:' + organizationB],
+            roles: [
+                'admin:' + organizationA,
+                'member:' + organizationB,
+            ],
         }),
         {
+            state: 'accepted',
             type: 'member',
             at: '2026-06-04T00:00:00.000000Z',
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(res.status, 403);
 });
 
 Deno.test('the same admin type authorizes within its own org',
 async () => {
-    const { db, organizationA, organizationB } = await memberOfBothAdminInA();
+    const { db, organizationA, organizationB } =
+        await memberOfBothAdminInA();
+    const identity = generateIdentifier();
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationA + '/members/'
-            + generateIdentifier(),
+        'PUT', '/organizations/' + organizationA
+            + '/invitations/'
+            + membershipNameOf(organizationA, identity),
         await claimToken({
             organization: organizationA,
             organizations: [organizationA, organizationB],
-            roles: ['admin:' + organizationA, 'member:' + organizationB],
+            roles: [
+                'admin:' + organizationA,
+                'member:' + organizationB,
+            ],
         }),
         {
+            state: 'accepted',
             type: 'member',
             at: '2026-06-04T00:00:00.000000Z',
         },
+        { 'If-None-Match': '*' },
     ));
     assertStrictEquals(res.status, 201);
 });
@@ -125,7 +144,8 @@ async () => {
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            , await devToken('XXZruirZyAOoRpNxaDnpSA')));
-    assertStrictEquals(res.status, 200);
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ideas/',
+        await devToken('XXZruirZyAOoRpNxaDnpSA')));
+    assertStrictEquals(res.status, 204);
 });

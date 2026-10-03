@@ -15,7 +15,7 @@ import type {
     Id,
     IdentityCredentialEntity,
     IdentityPiiEntity,
-    SeatEntity,
+    MembershipEntity,
 } from '../shared/types.ts';
 import { nowUtc } from
     '../shared/types.ts';
@@ -31,9 +31,10 @@ import {
     postIdentityDocumentOp,
 } from '../api/routes.ts';
 import {
-    deriveOrganizationMemberSeat,
-    deriveOrganizationMemberSeats,
-} from '../api/derive-memberships.ts';
+    membershipOf,
+    membershipOfHead,
+    organizationMembershipHeads,
+} from '../api/memberships.ts';
 import {
     deriveIdentityPiiRows,
     deriveIdentityPii,
@@ -217,13 +218,19 @@ async function derivedIdentity(
 
 async function pairPlaneMembershipsAcrossKnownOrganizations(
     db: DbAdapter,
-): Promise<SeatEntity[]> {
+): Promise<MembershipEntity[]> {
+    const accepted = {
+        kind: 'state' as const,
+        state: 'accepted' as const,
+    };
     const perOrganization = await Promise.all(
         [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
-            (organization) =>
-                deriveOrganizationMemberSeats(
-                    db, organization,
-                ),
+            async (organization) => {
+                const heads = await organizationMembershipHeads(
+                    db, organization, accepted,
+                );
+                return heads.map(membershipOfHead);
+            },
         ),
     );
     return perOrganization.flat();
@@ -235,7 +242,7 @@ async function pairPlaneMembershipsAcrossKnownOrganizations(
 // visible), the bound org (co-member, visible), or a DIFFERENT
 // org (foreign, hidden).
 function pairPlaneOwnerOrganization(
-    memberships: readonly SeatEntity[],
+    memberships: readonly MembershipEntity[],
     identityId: Id,
     boundOrganization: Id,
 ): Id | null {
@@ -418,13 +425,9 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
             phone: '', bio: '',
         },
     ));
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/members/' + foreignId,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
-        { type: 'member', at: nowUtc() },
-    ));
+    await seedSeat(
+        db, ORGANIZATION_TWO, foreignId, 'member', nowUtc(),
+    );
     assertStrictEquals(
         await assertPiiFenceLeg(
             db, STARK_ORGANIZATION, foreignId,
@@ -505,12 +508,19 @@ async function callerPiiAfterNonAccepted(
         db, ORGANIZATION_TWO, identityId, 'accepted',
         'member', ELSEWHERE_AT,
     );
-    const seat = await deriveOrganizationMemberSeat(
-        db, STARK_ORGANIZATION, identityId,
-    );
-    assertStrictEquals(seat.identity_id, identityId);
     assertStrictEquals(
-        seat.organization_id, STARK_ORGANIZATION,
+        await membershipOf(
+            db, STARK_ORGANIZATION, identityId,
+        ),
+        null,
+    );
+    const elsewhere = await membershipOf(
+        db, ORGANIZATION_TWO, identityId,
+    );
+    assert(elsewhere !== null);
+    assertStrictEquals(elsewhere.identity_id, identityId);
+    assertStrictEquals(
+        elsewhere.organization_id, ORGANIZATION_TWO,
     );
     const response = await handleRequest(db, req(
         'GET', '/identities/' + identityId + '/pii', token,
@@ -695,20 +705,12 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
     // Different org memberships (the adjudicated scenario): A in
     // STARK, B in ORGANIZATION_TWO only — so the fence's answer
     // depends entirely on WHICH identity it keys on.
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + STARK_ORGANIZATION
-            + '/members/' + identityA,
-        adminToken,
-        { type: 'member', at: nowUtc() },
-    ));
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + ORGANIZATION_TWO
-            + '/members/' + identityB,
-        await organizationToken('XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO),
-        { type: 'member', at: nowUtc() },
-    ));
+    await seedSeat(
+        db, STARK_ORGANIZATION, identityA, 'member', nowUtc(),
+    );
+    await seedSeat(
+        db, ORGANIZATION_TWO, identityB, 'member', nowUtc(),
+    );
 
     // The mismatched write itself — document under A, body names
     // B — producible only below-facade (no validator ties the

@@ -370,7 +370,8 @@ async () => {
             || r.email === EDITED_EMAIL));
     const roster = await handleRequest(db, req(
         'GET',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/invitations/?state=accepted',
         await organizationToken(),
     ));
     assertStrictEquals(roster.status, 200);

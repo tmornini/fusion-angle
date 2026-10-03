@@ -1,26 +1,13 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
-    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
-import { documentMessagePairsAt } from '../api/derive-documents.ts';
-import {
-    deriveOrganizationMemberSeat,
-    membershipExistsFor,
-} from '../api/derive-memberships.ts';
-import { writeAuthorizerFor } from
-    '../api/write-authorizer.ts';
+import { bodyOf } from '../api/derive-documents.ts';
+import { membershipOf } from '../api/memberships.ts';
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
-import {
-    postMembershipDocumentOp,
-} from '../api/routes.ts';
-import { formWriteMessagePair } from '../api/message-pair.ts';
-import {
-    nowUtc, SYSTEM_MEMBER_ID, type FormerSeatEntity,
-} from '../shared/types.ts';
 import { organizationToken, devToken } from
     './token-fixtures.ts';
 import {
@@ -41,16 +28,18 @@ import { membershipNameOf } from
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Task 52: the seat document is the membership
-// relationship. Accept writes the inner PUT;
-// mint bakes {type}:{organization_id} from seats;
-// write authorizer 403s a foreign path org.
+// Accept lands an accepted membership and no seat.
+// Mint bakes {type}:{organization_id} from that
+// membership. The last accepted admin cannot be
+// removed.
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const TONY = 'XXZruirZyAOoRpNxaDnpSA';
 const SARAH_ID = 'MQFcPtrZPIGjMCRAXtZUnA';
-const SEAT_DETAIL =
-    'organizations/:organization-id/members/'
-    + ':identity-id';
+const LAST_ADMIN =
+    'the last accepted admin cannot be removed'
+    + ' or demoted';
 
 function req(
     method: string,
@@ -73,11 +62,20 @@ function seatsPrefix(organization: string): string {
         + '/members/';
 }
 
+function membershipPath(
+    organization: string,
+    identity: string,
+): string {
+    return '/organizations/' + organization
+        + '/invitations/'
+        + membershipNameOf(organization, identity);
+}
+
 Deno.test('accept writes the seat at the invitation'
 + ' organization, copying Operation-ID', async () => {
     const db = await seededMockDb();
     const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO);
+        TONY, ORGANIZATION_TWO);
     const grant = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
@@ -88,10 +86,13 @@ Deno.test('accept writes the seat at the invitation'
     assertStrictEquals(grant.status, 201);
 
     const operationId = generateIdentifier();
+    const name = membershipNameOf(
+        ORGANIZATION_TWO, SARAH_ID,
+    );
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + SARAH_ID + '/invitations/'
-            + membershipNameOf(ORGANIZATION_TWO, SARAH_ID),
+            + name,
         await organizationToken(
             SARAH_ID, ORGANIZATION_TWO),
         {
@@ -102,33 +103,27 @@ Deno.test('accept writes the seat at the invitation'
     )));
     assertStrictEquals(accept.status, 200);
 
-    const prefix = seatsPrefix(ORGANIZATION_TWO);
-    const [requests] = await Promise.all([
-        db.messagePairs.getCollectionPairs(prefix),
-        db.messagePairs.getCollectionPairs(prefix),
-    ]);
-    const seats = documentMessagePairsAt(
-        requests, prefix,
-    ).filter((messagePair) => messagePair.name === SARAH_ID
-        && messagePair.method === 'PUT');
-    assertStrictEquals(seats.length, 1);
-    assertEquals(seats[0]!.body, {
-        id: SARAH_ID,
+    const head = await db.messagePairs.getHeadPair(
+        '/invitations/', name,
+    );
+    assertStrictEquals(head !== null, true);
+    assertEquals(bodyOf(head!.response), {
+        id: name,
         organization_id: ORGANIZATION_TWO,
         identity_id: SARAH_ID,
         type: 'member',
+        state: 'accepted',
         at: '2026-06-05T00:00:01.000000Z',
     });
-    const written = requests.find(
-        (row) => row.name === SARAH_ID,
+    assertStrictEquals(head!.operation_id, operationId);
+    const seats = await db.messagePairs.getCollectionPairs(
+        seatsPrefix(ORGANIZATION_TWO),
     );
-    assert(written);
+    assertStrictEquals(seats.length, 0);
     assertStrictEquals(
-        written.operation_id, operationId,
-    );
-    assertStrictEquals(
-        await membershipExistsFor(
-            db, ORGANIZATION_TWO, SARAH_ID),
+        (await membershipOf(
+            db, ORGANIZATION_TWO, SARAH_ID,
+        )) !== null,
         true,
     );
 });
@@ -137,38 +132,10 @@ Deno.test('mint bakes claim roles from a seat, not a'
 + ' memberships/:id row', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Stark');
-    const body = { type: 'admin', at: AT };
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + 'XXZruirZyAOoRpNxaDnpSA',
-        routePattern: SEAT_DETAIL,
-        routeSegments: SEAT_DETAIL.split('/'),
-        pathSegments: [
-            'organizations', 'AjdvjuECVZEgZoFajaIEkg', 'members',
-            'XXZruirZyAOoRpNxaDnpSA',
-        ],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: 'AjdvjuECVZEgZoFajaIEkg',
-        responseBody: {
-            id: 'XXZruirZyAOoRpNxaDnpSA',
-            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-            identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-            ...body,
-        },
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await postMembershipDocumentOp(
-        db, 'XXZruirZyAOoRpNxaDnpSA', body, SYSTEM_MEMBER_ID,
-        messagePair,
-    );
+    await seedOrganizationDocument(db, STARK, 'Stark');
+    await seedSeat(db, STARK, TONY, 'admin', AT);
 
-    const bearer = await devToken('XXZruirZyAOoRpNxaDnpSA');
+    const bearer = await devToken(TONY);
     const tokenRequest = framedRequest(
         'http://localhost/authentication/token', {
             method: 'POST',
@@ -178,7 +145,7 @@ Deno.test('mint bakes claim roles from a seat, not a'
             },
             body: JSON.stringify({
                 grant_type: 'token-exchange',
-                organization: 'AjdvjuECVZEgZoFajaIEkg',
+                organization: STARK,
             }),
         },
     );
@@ -192,172 +159,68 @@ Deno.test('mint bakes claim roles from a seat, not a'
         payload.access_token);
     assertEquals(
         claims.roles,
-        ['admin:AjdvjuECVZEgZoFajaIEkg'],
+        ['admin:' + STARK],
     );
-    assertEquals(claims.organizations, ['AjdvjuECVZEgZoFajaIEkg']);
+    assertEquals(claims.organizations, [STARK]);
 });
 
-Deno.test('write authorizer 403s a foreign seat path',
-async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Alpha');
-    const organizationB = generateIdentifier();
-    await seedOrganizationDocument(db, organizationB, 'Beta');
-    const memBody = {
-        organization_id: organizationB,
-        identity_id: 'XXZruirZyAOoRpNxaDnpSA',
-        type: 'admin',
-        at: AT,
-    };
-    await seedSeat(
-        db,
-        String(memBody['organization_id'] ?? memBody.organization_id),
-        String(memBody['identity_id'] ?? memBody.identity_id),
-        (memBody['type'] ?? memBody.type) as 'admin' | 'member',
-        String(memBody['at'] ?? memBody.at),
-    );
-    const tokenB = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', organizationB);
-    const foreign = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-            + generateIdentifier(),
-        tokenB, { type: 'member', at: AT },
-    ));
-    assertStrictEquals(foreign.status, 403);
-    const wire = await foreign.json() as {
-        error: string;
-    };
-    assertStrictEquals(
-        wire.error,
-        'forbidden: path organization does not'
-            + ' match the token organization',
-    );
-    const authorizer = writeAuthorizerFor(
-        SEAT_DETAIL, 'PUT');
-    assert(authorizer);
-    assertStrictEquals(authorizer.idParamIndex, 1);
-});
-
-async function mintedOrganizations(
-    db: MemoryDbAdapter,
-    identity: string,
-): Promise<readonly string[] | undefined> {
-    const bearer = await devToken(identity);
-    const minted = await handleRequest(
-        db, framedRequest(
-            'http://localhost/authentication/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    authorization: 'Bearer ' + bearer,
-                },
-                body: JSON.stringify({
-                    grant_type: 'token-exchange',
-                }),
-            },
-        ),
-    );
-    assertStrictEquals(minted.status, 200);
-    const payload = await presentedFields(minted) as {
-        access_token: string;
-    };
-    return decodeAccessToken(
-        payload.access_token,
-    ).organizations;
-}
-
-Deno.test('live admin PUT of a seat 201s and GETs back;'
-+ ' DELETE then mint omits that organization',
-async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    const identity = generateIdentifier();
-    const path = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + identity;
-    const body = { type: 'member', at: AT };
-    const created = await handleRequest(db, req(
-        'PUT', path, admin, body,
-    ));
-    assertStrictEquals(created.status, 201);
-    const got = await handleRequest(db, req(
-        'GET', path, admin,
-    ));
-    assertStrictEquals(got.status, 200);
-    assertEquals(await got.json(), {
-        id: identity,
-        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-        identity_id: identity,
-        ...body,
-    });
-    assertEquals(
-        await mintedOrganizations(db, identity),
-        ['AjdvjuECVZEgZoFajaIEkg'],
-    );
-    const removed = await handleRequest(db, req(
-        'DELETE', path, admin,
-    ));
-    assertStrictEquals(removed.status, 204);
-    assertStrictEquals(
-        await mintedOrganizations(db, identity),
-        undefined,
-    );
-});
-
-// Decision 7: the last admin seat cannot be removed. The
-// actor is authorized; the organization's state forbids —
-// 409, the domain conflict, never the wrong-actor 403.
+// Decision 7: the last accepted admin cannot be
+// removed. The actor is authorized; the organization's
+// state forbids — 409, the domain conflict, never the
+// wrong-actor 403.
 Deno.test('the last admin seat refuses removal', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    const path = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + 'XXZruirZyAOoRpNxaDnpSA';
-    const refused = await handleRequest(db, req(
-        'DELETE', path, admin,
-    ));
+    const admin = await organizationToken(TONY, STARK);
+    const path = membershipPath(STARK, TONY);
+    const refused = await handleRequest(
+        db, await invitationLatched(db, req(
+            'PUT', path, admin,
+            {
+                state: 'removed',
+                at: '2026-06-01T00:00:00.000000Z',
+            },
+        )),
+    );
     assertStrictEquals(refused.status, 409);
     assertEquals(await refused.json(), {
-        error: 'the last admin seat cannot be removed',
+        error: LAST_ADMIN,
     });
     const still = await handleRequest(db, req(
         'GET', path, admin,
     ));
     assertStrictEquals(still.status, 200);
+    const body = await still.json() as { state: string };
+    assertStrictEquals(body.state, 'accepted');
 });
 
-// The second admin's seat remains, but the membership
-// head is removed. One accepted admin is the last.
+// The second admin's membership is removed. One
+// accepted admin is the last.
 Deno.test('a removed co-admin membership refuses the'
 + ' last admin seat', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const second = generateIdentifier();
-    await seedSeat(
-        db, 'AjdvjuECVZEgZoFajaIEkg', second, 'admin', AT,
-    );
+    await seedSeat(db, STARK, second, 'admin', AT);
     await landMembership(
-        db, 'AjdvjuECVZEgZoFajaIEkg', second,
-        'removed', 'admin', AT,
+        db, STARK, second, 'removed', 'admin', AT,
     );
-    const seat = await deriveOrganizationMemberSeat(
-        db, 'AjdvjuECVZEgZoFajaIEkg', second,
+    assertStrictEquals(
+        await membershipOf(db, STARK, second),
+        null,
     );
-    assertStrictEquals(seat.type, 'admin');
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    const path = '/organizations/AjdvjuECVZEgZoFajaIEkg'
-        + '/members/XXZruirZyAOoRpNxaDnpSA';
-    const refused = await handleRequest(db, req(
-        'DELETE', path, admin,
-    ));
+    const admin = await organizationToken(TONY, STARK);
+    const refused = await handleRequest(
+        db, await invitationLatched(db, req(
+            'PUT', membershipPath(STARK, TONY), admin, {
+                state: 'removed',
+                at: '2026-06-01T00:00:00.000000Z',
+            },
+        )),
+    );
     assertStrictEquals(refused.status, 409);
     assertEquals(await refused.json(), {
-        error: 'the last admin seat cannot be removed',
+        error: LAST_ADMIN,
     });
 });
 
@@ -367,91 +230,31 @@ async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const second = generateIdentifier();
-    await seedSeat(
-        db, 'AjdvjuECVZEgZoFajaIEkg', second, 'admin', AT,
+    await seedSeat(db, STARK, second, 'admin', AT);
+    const admin = await organizationToken(TONY, STARK);
+    const removed = await handleRequest(
+        db, await invitationLatched(db, req(
+            'PUT', membershipPath(STARK, TONY), admin, {
+                state: 'removed',
+                at: '2026-06-01T00:00:00.000000Z',
+            },
+        )),
     );
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    const own = '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
-        + 'XXZruirZyAOoRpNxaDnpSA';
-    const removed = await handleRequest(db, req(
-        'DELETE', own, admin,
-    ));
-    assertStrictEquals(removed.status, 204);
-    const gone = await handleRequest(db, req(
-        'GET', own, admin,
-    ));
-    assertStrictEquals(gone.status, 410);
-    // The seat that remains is now the last admin.
-    const last = await handleRequest(db, req(
-        'DELETE',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/members/' + second,
-        admin,
-    ));
+    assertStrictEquals(removed.status, 200);
+    const gone = await removed.json() as {
+        state: string;
+        identity_id: string;
+    };
+    assertStrictEquals(gone.state, 'removed');
+    assertStrictEquals(gone.identity_id, TONY);
+    const last = await handleRequest(
+        db, await invitationLatched(db, req(
+            'PUT', membershipPath(STARK, second), admin, {
+                state: 'removed',
+                at: '2026-06-01T00:00:01.000000Z',
+            },
+        )),
+    );
     assertStrictEquals(last.status, 409);
-});
-
-// A removed seat is a DELETE head at the seats prefix. The
-// former-members read lists exactly those heads, with the
-// DELETE pair's own arrival as `at`; a re-seat (PUT after
-// DELETE) makes the head a PUT again and drops the row.
-Deno.test('former-members lists a removed seat and drops it'
-+ ' again on re-seat', async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    const leaver = generateIdentifier();
-    await seedSeat(
-        db, 'AjdvjuECVZEgZoFajaIEkg', leaver, 'member',
-    );
-    const former = '/organizations/AjdvjuECVZEgZoFajaIEkg'
-        + '/former-members/';
-    const seat = '/organizations/AjdvjuECVZEgZoFajaIEkg'
-        + '/members/' + leaver;
-    const before = await handleRequest(db, req(
-        'GET', former, admin,
-    ));
-    assertStrictEquals(before.status, 200);
-    assertEquals(await before.json(), []);
-    const removed = await handleRequest(db, req(
-        'DELETE', seat, admin,
-    ));
-    assertStrictEquals(removed.status, 204);
-    const after = await handleRequest(db, req(
-        'GET', former, admin,
-    ));
-    assertStrictEquals(after.status, 200);
-    const rows = await after.json() as FormerSeatEntity[];
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.id, leaver);
-    assertStrictEquals(rows[0]!.identity_id, leaver);
-    assertStrictEquals(
-        rows[0]!.organization_id, 'AjdvjuECVZEgZoFajaIEkg',
-    );
-    // The removal moment is the DELETE pair's arrival,
-    // never seedSeat's 2020 grant time.
-    assert(rows[0]!.at > '2020-01-02');
-    const reseated = await handleRequest(db, req(
-        'PUT', seat, admin, { type: 'member', at: AT },
-    ));
-    assertStrictEquals(reseated.status, 201);
-    const again = await handleRequest(db, req(
-        'GET', former, admin,
-    ));
-    assertEquals(await again.json(), []);
-});
-
-Deno.test('former-members is fenced to the token organization',
-async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    const admin = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
-    const foreign = await handleRequest(db, req(
-        'GET',
-        '/organizations/' + ORGANIZATION_TWO + '/former-members/',
-        admin,
-    ));
-    assertStrictEquals(foreign.status, 403);
+    assertEquals(await last.json(), { error: LAST_ADMIN });
 });

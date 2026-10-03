@@ -24,9 +24,10 @@ import {
 import {
     formWriteMessagePair,
     canonicalPath,
+    runWrite,
+    attemptFor,
 } from '../api/message-pair.ts';
 import {
-    postMembershipDocumentOp,
     postMemberDocumentOp,
 } from '../api/routes.ts';
 import { deriveMembers } from '../api/derive-members.ts';
@@ -40,8 +41,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { landMembership } from
     './membership-fixtures.ts';
-import { deriveOrganizationMemberSeat } from
-    '../api/derive-memberships.ts';
+import { membershipOf } from '../api/memberships.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
@@ -118,8 +118,8 @@ async function leftoverMembershipMessagePair(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, messagePair,
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
     );
 }
 
@@ -657,10 +657,10 @@ Deno.test('deriveMembers holds nothing for a removed'
     await landMembership(
         db, organizationA, identity, 'removed', 'member', AT,
     );
-    const seat = await deriveOrganizationMemberSeat(
-        db, organizationA, identity,
+    assertStrictEquals(
+        await membershipOf(db, organizationA, identity),
+        null,
     );
-    assertStrictEquals(seat.identity_id, identity);
     assertStrictEquals(
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === identity),

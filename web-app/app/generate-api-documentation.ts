@@ -499,12 +499,6 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     ),
     writeExample(
         'put',
-        '/organizations/:organization-id/members/'
-            + ':identity-id',
-        { type: 'member', at: AT },
-    ),
-    writeExample(
-        'put',
         '/organizations/:id/ideas/:id',
         ideaDocument(),
     ),

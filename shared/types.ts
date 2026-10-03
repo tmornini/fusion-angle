@@ -1369,28 +1369,6 @@ export interface OrganizationEntity {
 // no separate role-grants family.
 export type MembershipType = 'admin' | 'member';
 
-// The covenant binding an identity to an organization, with
-// the moment of union and the privilege of that join. Source
-// of "which orgs can this identity reach" and mint-time role
-// baking. A person in N orgs has N membership rows;
-// member.id === identity.id stays global (one profile, many
-// memberships). Not a pure join: `type` is a privilege
-// attribute of the relationship.
-export interface SeatEntity {
-    id: Id;
-    organization_id: Id;
-    identity_id: Id;
-    type: MembershipType;
-    // The seat's own grant time
-    // (validateSeatDocumentBody), a domain fact — NOT a
-    // ledger fact. GET .../members/:id/versions/ stamps a
-    // DIFFERENT `at` on each row: the message pair's own
-    // arrival time (versionSnapshotsAt, document-family.ts,
-    // seatEntityOf in derive-memberships.ts). Same name on
-    // this entity and on that versions row, different facts.
-    at: string;
-}
-
 // The membership body (spec §1): the name fixes the two
 // ids; `at` is when the current state was entered.
 export interface MembershipEntity {
@@ -1400,17 +1378,6 @@ export interface MembershipEntity {
     identity_id: Id;
     type: MembershipType;
     state: InvitationState;
-    at: string;
-}
-
-// A seat the ledger has DELETEd: the identity once held a
-// place in this organization and holds none now. `at` is
-// the removal pair's own arrival time — the moment the
-// seat ended — never the seat's grant time.
-export interface FormerSeatEntity {
-    id: Id;
-    organization_id: Id;
-    identity_id: Id;
     at: string;
 }
 

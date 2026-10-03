@@ -21,7 +21,6 @@ import {
 } from './validators.ts';
 import {
     attemptFor,
-    formStateWrite,
     formWriteMessagePair,
     httpDateOf,
     IF_MATCH_HEADER,
@@ -35,14 +34,12 @@ import type {
     ReceivedRequest,
     SiblingCondition,
     StateAnswerKind,
-    StateSibling,
     WriteAnswer,
 } from './message-pair.ts';
 import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityPiiRows,
 } from './derive-identity-spine.ts';
-import { seatsPrefixFor } from './derive-memberships.ts';
 import { param } from './document-family.ts';
 import {
     selectVersionAt,
@@ -301,7 +298,6 @@ async function landMembership(
     stateName: string,
     parentState: Record<string, unknown>,
     condition: SiblingCondition,
-    seat: StateSibling | undefined,
     answer: StateAnswerKind,
 ): Promise<WriteAnswer> {
     const receivedPair = await operationPair(
@@ -315,74 +311,13 @@ async function landMembership(
         state: parentState,
         condition,
     };
-    const siblings = seat === undefined
-        ? [parent] as const
-        : [parent, seat] as const;
     return runStateWrite(db, {
         kind: 'siblings',
         received: receivedPair,
-        siblings,
+        siblings: [parent],
         reader: { sees: 'whole' },
         answer,
     });
-}
-
-// Interpretation E, rows 1–3. A DELETE head is current, so
-// a later accept restores the seat in order on it.
-export async function seatSiblingOf(
-    db: DbAdapter,
-    from: MembershipEntity | null,
-    next: MembershipEntity,
-): Promise<StateSibling | undefined> {
-    if (
-        next.state !== 'accepted'
-        && next.state !== 'removed'
-    ) {
-        return undefined;
-    }
-    if (from === null && next.state === 'removed') {
-        return undefined;
-    }
-    const path = seatsPrefixFor(next.organization_id);
-    const head = await db.messagePairs.getHeadPair(
-        path, next.identity_id,
-    );
-    if (next.state === 'removed') {
-        if (head === null) return undefined;
-        return {
-            method: 'DELETE',
-            path,
-            name: next.identity_id,
-            condition: { kind: 'in-order', head: head.id },
-        };
-    }
-    // The seat route stores the path's ids on the wire.
-    // A later PUT of { type, at } matches this body.
-    const state = {
-        id: next.identity_id,
-        organization_id: next.organization_id,
-        identity_id: next.identity_id,
-        type: next.type,
-        at: next.at,
-    };
-    if (head === null) {
-        return {
-            method: 'PUT',
-            path,
-            name: next.identity_id,
-            state,
-            condition: {
-                kind: 'genesis', declarer: 'handler',
-            },
-        };
-    }
-    return {
-        method: 'PUT',
-        path,
-        name: next.identity_id,
-        state,
-        condition: { kind: 'in-order', head: head.id },
-    };
 }
 
 function guardsLastAdmin(
@@ -670,7 +605,7 @@ export async function postOrganizationInvitationGrant(
     const answer = await landMembership(
         db, 'POST', actor, requestAt, operationId,
         received, payload, name, 'pending',
-        storedMembership(outcome.next), condition, undefined,
+        storedMembership(outcome.next), condition,
         {
             kind: 'created',
             location: '/organizations/' + organizationId
@@ -712,7 +647,6 @@ async function putMembership(
                 ? { id: name }
                 : bodyOf(head.response),
             staleCondition(received, head),
-            undefined,
             { kind: 'parent' },
         );
         return stale.response;
@@ -756,14 +690,13 @@ async function putMembership(
     if (from !== null) {
         await refuseLastAdmin(db, from, outcome.next);
     }
-    const seat = await seatSiblingOf(db, from, outcome.next);
     const condition: SiblingCondition = head === null
         ? { kind: 'never-written', declarer: 'client' }
         : { kind: 'in-order', head: head.id };
     const answer = await landMembership(
         db, 'PUT', actor, requestAt, operationId,
         received, payload, name, request.state,
-        storedMembership(outcome.next), condition, seat,
+        storedMembership(outcome.next), condition,
         { kind: 'parent' },
     );
     if (answer.outcome === 'land') {
@@ -793,10 +726,8 @@ export async function putInvitationOnIdentityNest(
 
 // A seed supplies the membership document it formed. The
 // live route does not: it is exempt from pair wiring and
-// forms the operation, the document, and the seat itself.
-// The supplied document plus the seat sibling is two rows,
-// the same count a seat write plus its membership sibling
-// was. The live path is unchanged.
+// forms the operation and the document itself. The
+// supplied document is the one row.
 async function writeSuppliedMembership(
     db: DbAdapter,
     messagePair: MessagePair,
@@ -819,34 +750,9 @@ async function writeSuppliedMembership(
             + ' with its body',
         );
     }
-    const head = await readHead(db, next.id);
-    const from = head === null
-        ? null
-        : membershipOfHead(head);
-    const seat = await seatSiblingOf(db, from, next);
-    if (seat === undefined) {
-        await runWrite(
-            db, attemptFor([messagePair]), [messagePair],
-        );
-        return;
-    }
-    const formed = await formStateWrite({
-        kind: 'events',
-        context: {
-            operationId: messagePair.operationId,
-            requestId: messagePair.requestId,
-            requesterIdentityId:
-                messagePair.requesterIdentityId,
-            requestAt: messagePair.requestAt,
-        },
-        siblings: [seat],
-    });
-    const row = formed.rows[0];
-    if (row === undefined || !('requestMessage' in row)) {
-        throw new Error('seat sibling was not formed');
-    }
-    const rows = [messagePair, row];
-    await runWrite(db, attemptFor(rows), rows);
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
+    );
 }
 
 // PUT /organizations/:id/invitations/:membership-id

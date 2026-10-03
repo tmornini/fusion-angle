@@ -131,7 +131,7 @@ Deno.test('PUT identity-tokens/:id appends its pair at the entity'
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 5);
+    assertStrictEquals(requests.length, 4);
     const token = requests.find(
         (row) => row.name === 'vNIIMoezHOyoUeTsbqSzCA',
     );
@@ -211,7 +211,7 @@ Deno.test('PUT identities/:id/token-revocations/:rid appends its'
     ));
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 5);
+    assertStrictEquals(requests.length, 4);
     const revocation = requests.find(
         (row) => row.name === 'sVWUntTCtQYFCpONjkzAKg',
     );
@@ -310,11 +310,11 @@ async () => {
         DEV_TOKEN, {},
     ));
     assertStrictEquals(res.status, 409);
-    // 3 bootstrap + the admin membership sibling
-    // + seededDb's own pair-forming PUT = 5; the 409
+    // nil root, organization, and the membership
+    // + seededDb's own pair-forming PUT = 4; the 409
     // itself appends nothing further.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 // ── identity-tokens/:jti/revocation — operation path ──
@@ -614,10 +614,10 @@ async () => {
     );
     assert(operationMessagePair);
     assertStrictEquals(operationMessagePair!.name, '');
-    // 3 bootstrap + the admin membership sibling
+    // nil root, organization, and the membership
     // + seeded authorize + code document + its DELETE
     // + the issued event + the grant pair.
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 8);
 });
 
 Deno.test('a token-exchange grant (a real /authentication/token'

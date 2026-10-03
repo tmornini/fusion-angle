@@ -13,13 +13,10 @@ import {
 } from '../api/mock-data/seed-message-pairs.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
-import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
-    '../api/family-registry.ts';
 import {
     runWrite,
     attemptFor,
     formWriteMessagePair,
-    type MessagePair,
 } from '../api/message-pair.ts';
 import { deriveOrganizations } from '../api/derive-organizations.ts';
 import { generateIdentifier } from
@@ -108,45 +105,6 @@ export async function seedOrganizationDocument(
         attemptFor([messagePair]),
         [messagePair],
     );
-}
-
-export async function seatDocumentMessagePair(
-    organization: Id,
-    identityId: Id,
-    body: Record<string, unknown>,
-    requestAt: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS[
-        ORGANIZATION_MEMBER_DETAIL_PATTERN
-    ];
-    if (spec === undefined || !('conditional' in spec)) {
-        throw new Error(
-            'no per-write response spec for seat',
-        );
-    }
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/organizations/' + organization
-            + '/members/' + identityId,
-        routePattern: ORGANIZATION_MEMBER_DETAIL_PATTERN,
-        routeSegments:
-            ORGANIZATION_MEMBER_DETAIL_PATTERN.split('/'),
-        pathSegments: [
-            'organizations', organization, 'members',
-            identityId,
-        ],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt,
-        organization,
-        responseBody: spec.successBody?.(
-            [organization, identityId], body,
-            SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
 }
 
 export async function seedSeat(

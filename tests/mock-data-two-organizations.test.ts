@@ -38,8 +38,8 @@ import type {
     ObjectiveEntity,
 } from '../shared/types.ts';
 import { handleRequest } from '../api/api.ts';
-import { deriveMembershipsForIdentity } from
-    '../api/derive-memberships.ts';
+import { membershipsOfIdentity } from
+    '../api/memberships.ts';
 import {
     deriveCredentialsFor,
 } from '../api/derive-identity-spine.ts';
@@ -210,7 +210,7 @@ async function membershipsByIdentity(
     const ids = await liveIdentityIds(db);
     const byIdentity = new Map<string, Set<string>>();
     for (const id of ids) {
-        const rows = await deriveMembershipsForIdentity(
+        const rows = await membershipsOfIdentity(
             db, id,
         );
         if (rows.length === 0) continue;
@@ -227,7 +227,7 @@ async () => {
     const { db } = await seed();
     // Phase Final Task 2: memberships on the message plane.
     const organizations = (
-        await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA')
+        await membershipsOfIdentity(db, 'XXZruirZyAOoRpNxaDnpSA')
     )
         .map(m => m.organization_id)
         .sort();
@@ -240,7 +240,7 @@ Deno.test('current holds admin in both orgs', async () => {
     const { db } = await seed();
     // Privilege is membership type:"admin"; mint bakes
     // claim roles from that type.
-    const rows = await deriveMembershipsForIdentity(
+    const rows = await membershipsOfIdentity(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );
     const byOrganization = new Map(
