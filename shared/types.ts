@@ -899,13 +899,17 @@ export const FORMER_MEMBER_NAME = 'Former member';
 // names it, so the name resolver must know it and paint
 // it as what it is. Identity only: no profile, and no
 // PII read (a removed identity's PII is not the
-// organization's to paint). Never a roster row.
+// organization's to paint). The members roster lists it
+// when Former members is selected: this name and the
+// removal instant, never an edit.
 export class FormerMember {
     readonly kind = 'former' as const;
     readonly #id: MemberId;
+    readonly #at: string;
 
     constructor(membership: MembershipEntity) {
         this.#id = membership.identity_id;
+        this.#at = membership.at;
     }
 
     idForLink(): string {
@@ -914,6 +918,10 @@ export class FormerMember {
 
     name(): string {
         return FORMER_MEMBER_NAME;
+    }
+
+    at(): string {
+        return this.#at;
     }
 
     matchesSearch(_term: string): boolean {

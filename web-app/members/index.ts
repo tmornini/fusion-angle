@@ -28,6 +28,7 @@ import {
 } from '../app/dialog.ts';
 import {
     getMembers,
+    getFormerMembers,
     fillHumanMemberProfile,
     postHumanMemberCreation,
     postAIMemberCreation,
@@ -55,6 +56,17 @@ const { signal } = createPageAbort();
 let membersState:
     ManagedMembersState | null = null;
 let memberListEl: HTMLElement | null = null;
+// List on screen. A click does not move it until that
+// roster returns, so a search or kind repaint keeps
+// the rows already painted.
+let paintedMembership: ManagedMembersState['membership'] =
+    'accepted';
+// Pressed button. It may lead the list during a read.
+let chosenMembership: ManagedMembersState['membership'] =
+    'accepted';
+// Two presses of one membership are different choices.
+// The earlier read must not paint over the later one.
+let membershipChoice = 0;
 
 // Mint-once discipline (Phase 10 Task 2): the Add Member
 // dialog mints its entity id ONCE per dialog session and reuses
@@ -146,17 +158,43 @@ export async function init(): Promise<void> {
     });
 }
 
-async function refresh(): Promise<void> {
-    if (!membersState || !memberListEl) return;
+async function fetchMemberRoster(
+    selected: ManagedMembersState['membership'],
+) {
     const ctx = sessionContext();
-    const fresh = await fillHumanMemberProfile(
+    if (selected === 'removed') {
+        return await getFormerMembers(ctx);
+    }
+    return await fillHumanMemberProfile(
         ctx, await getMembers(ctx),
     );
-    membersState =
-        buildInitialManagedMembersState(
-            fresh,
+}
+
+async function refresh(): Promise<void> {
+    if (!membersState || !memberListEl) return;
+    const selected = paintedMembership;
+    if (
+        membersState.membership !== selected
+        || chosenMembership !== selected
+    ) return;
+    const members = await fetchMemberRoster(selected);
+    if (
+        !membersState
+        || paintedMembership !== selected
+        || membersState.membership !== selected
+        || chosenMembership !== selected
+    ) return;
+    if (selected === 'accepted') {
+        membersState = buildInitialManagedMembersState(
+            members,
             membersState.currentMemberId,
         );
+    } else {
+        membersState = {
+            ...membersState,
+            members,
+        };
+    }
     rerenderMembers();
 }
 
@@ -178,6 +216,99 @@ function initMemberListFilters(): void {
             { signal },
         );
     });
+    bindMembershipState();
+}
+
+const MEMBERSHIP_STATES: readonly (
+    ManagedMembersState['membership']
+)[] = ['accepted', 'removed'];
+
+function membershipStateButton(
+    selected: ManagedMembersState['membership'],
+): HTMLElement | null {
+    return $(
+        '[data-membership-state="'
+            + selected + '"]',
+        document,
+    );
+}
+
+function bindMembershipState(): void {
+    for (const selected of MEMBERSHIP_STATES) {
+        membershipStateButton(selected)
+            ?.addEventListener(
+                'click',
+                e => void onMembershipStateClick(e),
+                { signal },
+            );
+    }
+}
+
+function pressMembershipState(
+    selected: ManagedMembersState['membership'],
+): void {
+    chosenMembership = selected;
+    for (const candidate of MEMBERSHIP_STATES) {
+        membershipStateButton(candidate)
+            ?.setAttribute(
+                'aria-pressed',
+                candidate === selected
+                    ? 'true'
+                    : 'false',
+            );
+    }
+}
+
+async function onMembershipStateClick(
+    e: Event,
+): Promise<void> {
+    if (!membersState || !memberListEl) return;
+    const target = e.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    const selected = target.getAttribute(
+        'data-membership-state',
+    );
+    if (
+        selected !== 'accepted'
+        && selected !== 'removed'
+    ) return;
+    membershipChoice += 1;
+    const choice = membershipChoice;
+    pressMembershipState(selected);
+    try {
+        const members = await fetchMemberRoster(
+            selected,
+        );
+        if (
+            !membersState
+            || membershipChoice !== choice
+        ) return;
+        membersState = {
+            ...membersState,
+            members,
+            membership: selected,
+        };
+        paintedMembership = selected;
+        rerenderMembers();
+    } catch (err) {
+        const roster = selected === 'removed'
+            ? 'former members'
+            : 'members';
+        log.error(
+            roster + ' roster read failed',
+            'members', err,
+        );
+        if (
+            !membersState
+            || membershipChoice !== choice
+        ) return;
+        pressMembershipState(paintedMembership);
+        showToast(
+            'Failed to load ' + roster + ': '
+                + extractErrorMessage(err),
+            'error',
+        );
+    }
 }
 
 function onSearchInput(e: Event): void {

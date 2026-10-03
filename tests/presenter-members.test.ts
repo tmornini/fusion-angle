@@ -1,9 +1,14 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import {
+    FormerMember,
     HumanMember,
     AIMember,
     type Member,
 } from '../shared/types.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
+import { formatDate } from
+    '../web-app/app/format.ts';
 import {
     makeHumanMember,
     makeAIMember,
@@ -274,5 +279,162 @@ Deno.test(
             !html.includes('Claude'),
             'Claude filtered out by search',
         );
+    },
+);
+
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const LEAVER = 'toccYYkLEABmlbpHJalgtQ';
+const OTHER_LEAVER = 'bwucHkonTVuOMXyaLxC21A';
+const REMOVED_AT = '2026-03-15T18:04:05.000000Z';
+const OTHER_REMOVED_AT = '2026-04-02T12:00:00.000000Z';
+
+function makeFormer(
+    identityId: string,
+    at: string,
+): FormerMember {
+    return new FormerMember({
+        id: membershipNameOf(STARK, identityId),
+        organization_id: STARK,
+        identity_id: identityId,
+        type: 'member',
+        state: 'removed',
+        at,
+    });
+}
+
+function formerHtml(
+    members: Member[],
+    membership: 'accepted' | 'removed',
+    transform: (s: ReturnType<
+        typeof buildInitialManagedMembersState
+    >) => ReturnType<
+        typeof buildInitialManagedMembersState
+    > = s => s,
+): string {
+    return htmlOf(
+        members,
+        'self',
+        s => ({
+            ...transform(s),
+            membership,
+        }),
+    );
+}
+
+Deno.test(
+    'former members render one row each, the removal'
+    + ' date, and no edit link',
+    () => {
+        const html = formerHtml(
+            [
+                makeHuman('self', 'Demo'),
+                makeFormer(LEAVER, REMOVED_AT),
+                makeFormer(OTHER_LEAVER, OTHER_REMOVED_AT),
+            ],
+            'removed',
+        );
+        assertStrictEquals(
+            html.split('member-row-former').length - 1,
+            2,
+        );
+        assertStrictEquals(
+            html.split('Former member').length - 1,
+            2,
+        );
+        assert(
+            html.includes(formatDate(REMOVED_AT)),
+            'the row shows the removal date',
+        );
+        assert(
+            html.includes(formatDate(OTHER_REMOVED_AT)),
+            'each removed membership keeps its own date',
+        );
+        assert(
+            !html.includes('<a'),
+            'a former row has no edit link',
+        );
+        assert(
+            !html.includes('member-detail'),
+            'a former row does not open member detail',
+        );
+        assert(
+            !html.includes('data-member-id'),
+            'a former row is not an editable member',
+        );
+        assert(
+            !html.includes(LEAVER),
+            'a former row does not show the identity id',
+        );
+        assert(
+            !html.includes(OTHER_LEAVER),
+            'a former row does not show the identity id',
+        );
+        assert(
+            !html.includes('@'),
+            'a former row invents no email',
+        );
+        assert(
+            !html.includes('YOU'),
+            'former members are not the YOU section',
+        );
+        assert(
+            !html.includes('HUMANS'),
+            'former members are not the HUMANS section',
+        );
+        assert(
+            !html.includes('Demo'),
+            'a live member is not a former row',
+        );
+    },
+);
+
+Deno.test(
+    'a former list with kind and search still shows'
+    + ' every former row',
+    () => {
+        const html = formerHtml(
+            [
+                makeHuman('self', 'Demo'),
+                makeFormer(LEAVER, REMOVED_AT),
+            ],
+            'removed',
+            s => applyManagedMembersKind(
+                applyManagedMembersSearch(s, 'zzz'),
+                'ai',
+            ),
+        );
+        assertStrictEquals(
+            html.split('member-row-former').length - 1,
+            1,
+        );
+        assert(html.includes('Former member'));
+        assert(html.includes(formatDate(REMOVED_AT)));
+        assert(!html.includes('YOU'));
+        assert(!html.includes('HUMANS'));
+        assert(!html.includes('AIs'));
+        assert(!html.includes('Demo'));
+        assert(!html.includes(LEAVER));
+    },
+);
+
+Deno.test(
+    'members pressed still renders today\'s rows',
+    () => {
+        const html = formerHtml(
+            [
+                makeHuman('self', 'Demo'),
+                makeHuman(
+                    'xdaJyuuPyHfffCGLhqDrOQ', 'Alice',
+                ),
+            ],
+            'accepted',
+        );
+        assert(html.includes('YOU'));
+        assert(html.includes('Demo'));
+        assert(html.includes('HUMANS'));
+        assert(html.includes('Alice'));
+        assert(html.includes('data-member-id'));
+        assert(!html.includes('member-row-former'));
+        assert(!html.includes('Former member'));
     },
 );

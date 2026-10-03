@@ -127,7 +127,7 @@ export async function fillHumanMemberProfile(
 // Removed memberships for this organization, resolved
 // beside the live roster so an author who has left still
 // names. A flat session with no organization has none.
-async function getFormerMembers(
+export async function getFormerMembers(
     ctx: RequestContext,
 ): Promise<FormerMember[]> {
     const organization = ctx.identity.organization

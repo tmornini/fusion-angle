@@ -9,11 +9,19 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    IN_PROCESS_ORIGIN,
+    inPageContext,
+    inProcessFetch,
+} from './in-page-facade.ts';
+import { createHttpFacade } from '../client/http-facade.ts';
+import { createAppClient } from
+    '../web-app/app/client.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getMembers,
+    getFormerMembers,
     getMemberMap,
     memberName,
     MEMBER_WITHOUT_PII_NAME,
@@ -445,6 +453,39 @@ Deno.test(
         assertStrictEquals(
             memberName(await getMemberMap(ctx), leaverId),
             'Lisa Leaver',
+        );
+    }),
+);
+
+Deno.test(
+    'getFormerMembers reads ?state=removed once',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const urls: string[] = [];
+        const inner = inProcessFetch(db);
+        const recording: typeof fetch = async (
+            input, init,
+        ) => {
+            const request = new Request(input, init);
+            urls.push(request.url);
+            return inner(request);
+        };
+        const ctx = createAppClient(createHttpFacade(
+            IN_PROCESS_ORIGIN, recording,
+        )).requestContext(await organizationToken());
+        const former = await getFormerMembers(ctx);
+        assertStrictEquals(former.length, 0);
+        assertStrictEquals(urls.length, 1);
+        const url = new URL(urls[0]!);
+        assertStrictEquals(
+            url.pathname,
+            '/api/organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/invitations/',
+        );
+        assertStrictEquals(url.search, '?state=removed');
+        assertStrictEquals(
+            url.search.match(/state=/g)?.length, 1,
         );
     }),
 );

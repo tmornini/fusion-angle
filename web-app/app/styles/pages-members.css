@@ -44,3 +44,17 @@
 .sidebar-member:hover {
     background: hsl(var(--muted) / 0.5);
 }
+
+/* A removed membership. The row shows the constant
+   "Former member" and the removal date. A removed
+   identity's name is not readable, so the row stays
+   muted and offers no edit affordance. */
+.member-row-former {
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
