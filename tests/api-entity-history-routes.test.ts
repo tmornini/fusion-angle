@@ -21,8 +21,10 @@ import { parseIfMatch } from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
 import {
     apiRequest,
+    messageOfResponse,
     pairIdOf,
     partBodiesOf,
+    partsOf,
 } from './http-fixtures.ts';
 import {
     generateIdentifier,
@@ -131,8 +133,9 @@ function versionOf(res: Response): string {
 }
 
 Deno.test(
-    'GET organizations/:id/ideas/:id/versions/ 200 DESC; /history 404; '
-    + '/versions/:etag serves that revision',
+    'GET organizations/:id/ideas/:id/versions/ 200 oldest'
+    + ' first; /history 404; /versions/:etag serves that'
+    + ' revision',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -166,19 +169,31 @@ Deno.test(
                 '/versions/', DEV_TOKEN),
         );
         assertStrictEquals(index.status, 200);
-        const rows = await index.json() as {
+        const parts = await partsOf<{
             id: string;
             title: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.title, 'Hist Idea Revised');
-        assertStrictEquals(rows[0]!.state, 'in_review');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.title, 'Hist Idea');
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(index);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.title, 'Hist Idea');
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.title, 'Hist Idea Revised');
+        assertStrictEquals(current.state, 'in_review');
+        assertStrictEquals('state_at' in oldest, false);
+        assertStrictEquals(
+            parts[0]!.query('header.etag').toText()
+                .slice(1, -1),
+            xDyDkxEPwtcNmJVknUHDsg,
+        );
+        assertStrictEquals(
+            parts[1]!.query('header.etag').toText()
+                .slice(1, -1),
+            v2,
+        );
 
         const retired = await handleRequest(
             db,
@@ -187,49 +202,51 @@ Deno.test(
         );
         assertStrictEquals(retired.status, 404);
 
-        const first = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id
-                    + '/versions/' + xDyDkxEPwtcNmJVknUHDsg,
-                DEV_TOKEN,
-            ),
-        );
-        assertStrictEquals(first.status, 200);
-        const firstBody = await first.json() as {
-            id: string;
-            title: string;
-            state: string;
-        };
-        assertStrictEquals(firstBody.id, id);
-        assertStrictEquals(firstBody.title, 'Hist Idea');
-        assertStrictEquals(firstBody.state, 'active');
-        assertStrictEquals(versionOf(first), xDyDkxEPwtcNmJVknUHDsg);
-
-        const second = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + id
-                    + '/versions/' + v2,
-                DEV_TOKEN,
-            ),
-        );
-        assertStrictEquals(second.status, 200);
-        const secondBody = await second.json() as {
-            id: string;
-            title: string;
-            state: string;
-        };
-        assertStrictEquals(secondBody.title, 'Hist Idea Revised');
-        assertStrictEquals(secondBody.state, 'in_review');
-        assertStrictEquals(versionOf(second), v2);
+        for (const part of parts) {
+            const tag = part.query('header.etag').toText()
+                .slice(1, -1);
+            const item = await handleRequest(
+                db,
+                req(
+                    'GET',
+                    '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+                        + id + '/versions/' + tag,
+                    DEV_TOKEN,
+                ),
+            );
+            assertStrictEquals(item.status, 200);
+            assertStrictEquals(versionOf(item), tag);
+            const served = await messageOfResponse(item);
+            const body = served.body().toValue() as {
+                id: string;
+                title: string;
+                state: string;
+            };
+            if (tag === xDyDkxEPwtcNmJVknUHDsg) {
+                assertStrictEquals(body.id, id);
+                assertStrictEquals(body.title, 'Hist Idea');
+                assertStrictEquals(body.state, 'active');
+            } else {
+                assertStrictEquals(
+                    body.title, 'Hist Idea Revised',
+                );
+                assertStrictEquals(body.state, 'in_review');
+            }
+            assertStrictEquals(
+                served.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+                part.withFieldDeleted('date')
+                    .withFieldDeleted('request-id')
+                    .toWire(),
+            );
+        }
     },
 );
 
 Deno.test(
-    'GET organizations/:id/ideas/:id/versions/: 200 DESC current-first',
+    'GET organizations/:id/ideas/:id/versions/ 200'
+    + ' oldest first',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();
@@ -240,16 +257,18 @@ Deno.test(
                 '/versions/', DEV_TOKEN),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'in_review');
-        assertStrictEquals(rows[1]!.id, id);
-        assertStrictEquals(rows[1]!.state, 'active');
-        assertStrictEquals('state_at' in rows[0]!, false);
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const oldest = parts[0]!.body().toValue();
+        const current = parts[1]!.body().toValue();
+        assertStrictEquals(oldest.id, id);
+        assertStrictEquals(oldest.state, 'active');
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'in_review');
+        assertStrictEquals('state_at' in oldest, false);
     },
 );
 
@@ -329,13 +348,15 @@ Deno.test(
             ),
         );
         assertStrictEquals(res.status, 200);
-        const rows = await res.json() as {
+        const parts = await partsOf<{
             id: string;
             state: string;
-        }[];
-        assertStrictEquals(rows.length, 2);
-        assertStrictEquals(rows[0]!.id, id);
-        assertStrictEquals(rows[0]!.state, 'in_review');
+        }>(res);
+        assertStrictEquals(parts.length, 2);
+        const current = parts[parts.length - 1]!
+            .body().toValue();
+        assertStrictEquals(current.id, id);
+        assertStrictEquals(current.state, 'in_review');
     },
 );
 

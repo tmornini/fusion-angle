@@ -8,6 +8,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     apiRequest,
+    partsOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
@@ -95,13 +96,16 @@ Deno.test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
             , token,
     ));
     assertStrictEquals(res.status, 200);
-    const rows = await res.json() as {
+    const parts = await partsOf<{
         id: string;
         state: string;
-    }[];
+    }>(res);
     assert(
-        rows.some(r => r.id === 'gfwcurTzrfssEsWJyNeUyQ'
-            && r.state === 'active'),
+        parts.some((part) => {
+            const row = part.body().toValue();
+            return row.id === 'gfwcurTzrfssEsWJyNeUyQ'
+                && row.state === 'active';
+        }),
         'own-org versions list the idea collection item',
     );
 });

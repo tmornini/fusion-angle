@@ -1,7 +1,8 @@
 import { operationIdHeader } from './operation-id-header.ts';
 import { assert, assertStrictEquals } from '@std/assert';
 import { seededMockDb } from './mock-seed.ts';
-import { GET } from './in-page-facade.ts';
+import { GET, GETCollection } from
+    './in-page-facade.ts';
 import { organizationToken } from
     './token-fixtures.ts';
 import { buildIdeas } from
@@ -44,15 +45,15 @@ Deno.test('GET idea versions/ is collection item'
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
     const token = await organizationToken();
-    const rows = (await GET<
-        Record<string, unknown>[]
+    const parts = await GETCollection<
+        Record<string, unknown>
     >(
         db,
         nest('ideas', idea.id) + '/versions/',
         token,
-        operationIdHeader())).body().toValue();
-    assert(rows.length >= 1);
-    const first = rows[0]!;
+        operationIdHeader());
+    assert(parts.length >= 1);
+    const first = parts[0]!.body().toValue();
     assertStrictEquals('state_at' in first, false);
     assertStrictEquals(typeof first.title, 'string');
     assertStrictEquals(typeof first.state, 'string');

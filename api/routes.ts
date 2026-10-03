@@ -5241,11 +5241,8 @@ export const routes: Route[] = [
     // MEMBER_ID-CAVEAT prose that lived here moved to the
     // IDEAS_WIRING block above.
     documentEntityRoute(IDEAS_WIRING),
-    // GET ideas/:id/versions/: entityOf snapshots
-    // DESC, each stamped with the pair facts (etag, at,
-    // member_id); empty → missedReadError('ideas').
-    documentVersionListRoute(IDEAS_WIRING),
-    documentVersionRoute(IDEAS_WIRING),
+    documentVersionsSelectRoute(IDEAS_WIRING),
+    documentVersionSelectRoute(IDEAS_WIRING),
     // Absorbed (Phase 4 Task 2) into the generic
     // documentEntityRoute — see the ideas/:id entry above for
     // the shared rationale; the Decision-7/MEMBER_ID-CAVEAT

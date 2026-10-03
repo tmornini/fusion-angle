@@ -12,8 +12,6 @@ import { routePatternOf } from '../api/route-surface.ts';
 const PARTED = [
     'organizations/:id/flows/:id/versions/',
     'organizations/:id/flows/:id/versions/:etag',
-    'organizations/:id/ideas/:id/versions/',
-    'organizations/:id/ideas/:id/versions/:etag',
     'organizations/:id/objectives/:id/versions/',
     'organizations/:id/objectives/:id/versions/:etag',
     'organizations/:id/projects/:id/versions/',

@@ -38,6 +38,7 @@ import {
     apiRequest,
     framedRequest,
     partBodiesOf,
+    partsOf,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -1142,8 +1143,8 @@ async () => {
         fx.db, fx.organizationA,
         '/ideas/' + fx.chainA.idea + '/versions/');
     assertStrictEquals(mine.status, 200);
-    const mineRows = await mine.json() as { id: string }[];
-    assert(mineRows.length >= 1);
+    const mineParts = await partsOf<{ id: string }>(mine);
+    assert(mineParts.length >= 1);
     // iB exists on the message plane (seedChain PUT), but A does
     // not own it — the history-leak bug. Phase Final Task 2:
     // no ideas row to assert; B-org GET proves presence.

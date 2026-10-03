@@ -39,6 +39,7 @@ import {
     apiRequest,
     pairIdOf,
     partBodiesOf,
+    partsOf,
     invitationLatched,
 } from './http-fixtures.ts';
 
@@ -499,8 +500,9 @@ async () => {
 // retired with the document — the own/foreign/deleted legs
 // ride documents.
 Deno.test('case 3: the fence\'s legs — own-org history visible,'
-+ ' foreign history 404 (miss at this document), and a'
-+ ' DELETED foreign entity still names its owner',
++ ' foreign history 404 (miss at this document), a'
++ ' state-deleted idea\'s versions are Gone, and it'
++ ' still names its owner',
 async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
@@ -526,6 +528,8 @@ async () => {
         ideaDocument('Foreign'),
     ));
     assertStrictEquals(foreignCreated.status, 201);
+    const foreignTag = pairIdOf(foreignCreated);
+    assert(foreignTag !== null);
 
     // The DELETED-entity leg: org 2 tombstones its OWN idea —
     // message plane is IMMUNE to deleted filter, so owner still
@@ -545,9 +549,10 @@ async () => {
             '/versions/', tokenStark,
     ));
     assertStrictEquals(ownRes.status, 200);
-    const ownWire = await ownRes.json() as { id: string }[];
+    const ownParts = await partsOf<{ id: string }>(ownRes);
     assert(
-        ownWire.some((r) => r.id === ownIdeaId),
+        ownParts.some((part) =>
+            part.body().toValue().id === ownIdeaId),
     );
 
     // Foreign history from STARK → 404; owner still org 2
@@ -566,25 +571,29 @@ async () => {
         ORGANIZATION_TWO,
     );
 
-    // Org 2 still sees its own genesis + delete on history.
+    // A state-deleted idea is Gone on both version
+    // routes. The list and the item name the document.
     const org2Res = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_TWO
             + '/ideas/' + foreignIdeaId + '/versions/',
         tokenOrg2,
     ));
-    assertStrictEquals(org2Res.status, 200);
-    const org2Wire = await org2Res.json() as {
-        id: string;
-        state: string;
-    }[];
-    assertStrictEquals(org2Wire.length, 2);
-    assert(
-        org2Wire.every((r) => r.id === foreignIdeaId),
-    );
-    assert(
-        org2Wire.some((r) => r.state === 'deleted'),
-    );
+    assertStrictEquals(org2Res.status, 410);
+    assertEquals(await org2Res.json(), {
+        error: 'Gone: ideas/' + foreignIdeaId,
+    });
+    const org2Item = await handleRequest(db, req(
+        'GET',
+        '/organizations/' + ORGANIZATION_TWO
+            + '/ideas/' + foreignIdeaId + '/versions/'
+            + foreignTag,
+        tokenOrg2,
+    ));
+    assertStrictEquals(org2Item.status, 410);
+    assertEquals(await org2Item.json(), {
+        error: 'Gone: ideas/' + foreignIdeaId,
+    });
 
     // STARK idea absent from org 2 history read (404).
     const ownFromOrg2 = await handleRequest(db, req(
