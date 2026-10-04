@@ -382,34 +382,57 @@ Deno.test('applyPanToRevealSelected centers a node, else null',
         null);
 });
 
-Deno.test('applyPanelTransition saves the viewBox on open', () => {
-    const vb = { x: 5, y: 6, w: 800, h: 600 };
-    // autoFit short-circuits to null.
-    assertStrictEquals(
-        applyPanelTransition(
-            true, true, { kind: 'none' }, vb),
-        null);
-    // Panel just opened → save the viewBox + request a pan.
-    const opened = applyPanelTransition(
-        false, true, { kind: 'none' }, vb);
-    assert(opened !== null);
-    assertStrictEquals(opened!.shouldPanToReveal, true);
-    assertStrictEquals(opened!.savedViewBox.kind, 'saved');
-});
+Deno.test(
+    'applyPanelTransition saves the viewBox on open',
+    () => {
+        const vb = { x: 5, y: 6, w: 800, h: 600 };
+        // autoFit short-circuits to null.
+        assertStrictEquals(
+            applyPanelTransition(
+                true, false, true,
+                { kind: 'none' }, vb,
+            ),
+            null,
+        );
+        // Panel just opened → save + request a pan.
+        const opened = applyPanelTransition(
+            false, false, true,
+            { kind: 'none' }, vb,
+        );
+        assert(opened !== null);
+        assertStrictEquals(
+            opened!.shouldPanToReveal, true,
+        );
+        assertStrictEquals(
+            opened!.savedViewBox.kind, 'saved',
+        );
+    },
+);
 
-Deno.test('applyPanelTransition restores the viewBox on close',
+Deno.test(
+    'applyPanelTransition restores the viewBox'
+    + ' on close',
     () => {
         const pre = { x: 5, y: 6, w: 800, h: 600 };
         const opened = applyPanelTransition(
-            false, true, { kind: 'none' }, pre);
+            false, false, true,
+            { kind: 'none' }, pre,
+        );
         assert(opened !== null);
         const panned = {
             x: 50, y: 60, w: 800, h: 600,
         };
         const closed = applyPanelTransition(
-            false, false, opened!.savedViewBox, panned);
+            false, true, false,
+            opened!.savedViewBox, panned,
+        );
         assert(closed !== null);
-        assertStrictEquals(closed!.savedViewBox.kind, 'none');
+        assertStrictEquals(
+            closed!.savedViewBox.kind, 'none',
+        );
         assertEquals(closed!.viewBox, pre);
-        assertStrictEquals(closed!.shouldPanToReveal, false);
-    });
+        assertStrictEquals(
+            closed!.shouldPanToReveal, false,
+        );
+    },
+);

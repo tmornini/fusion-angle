@@ -466,11 +466,14 @@ export class FlowDesignerPresenter {
     }
 
     withPanelOpen(open: boolean): FlowSnapshot {
+        const wasOpen = this.#snapshot.isPanelOpen;
         const next: FlowSnapshot = {
             ...this.#snapshot,
             isPanelOpen: open,
         };
-        return this.#handlePanelTransition(next);
+        return this.#handlePanelTransition(
+            next, wasOpen,
+        );
     }
 
     withInteractionState(
@@ -542,9 +545,11 @@ export class FlowDesignerPresenter {
 
     #handlePanelTransition(
         snap: FlowSnapshot,
+        wasOpen: boolean,
     ): FlowSnapshot {
         const result = applyPanelTransition(
             snap.isAutoFit,
+            wasOpen,
             snap.isPanelOpen,
             snap.savedViewBox,
             snap.interaction.viewBox,

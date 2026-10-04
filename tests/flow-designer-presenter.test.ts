@@ -743,3 +743,108 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'opening the panel replaces a stale saved'
+    + ' viewBox (F14)',
+    () => {
+        const base = buildInitialFlowSnapshot(
+            emptyGraph, 800, 600, [], [], [],
+        );
+        const snap = {
+            ...base,
+            isAutoFit: false,
+            isPanelOpen: false,
+            savedViewBox: {
+                kind: 'saved' as const,
+                x: -3421,
+                y: -887,
+                w: 2826,
+                h: 1705,
+            },
+            interaction: {
+                ...base.interaction,
+                viewBox: {
+                    x: -1921,
+                    y: -650,
+                    w: 2156,
+                    h: 1301,
+                },
+                zoom: 1.1,
+            },
+        };
+        const opened = new FlowDesignerPresenter(
+            snap, 800, 600,
+            buildFlowHistorySnapshot(false),
+        ).withPanelOpen(true);
+        assertEquals(opened.savedViewBox, {
+            kind: 'saved',
+            x: -1921,
+            y: -650,
+            w: 2156,
+            h: 1301,
+        });
+        const closed = new FlowDesignerPresenter(
+            opened, 800, 600,
+            buildFlowHistorySnapshot(false),
+        ).withPanelOpen(false);
+        assertEquals(closed.interaction.viewBox, {
+            x: -1921,
+            y: -650,
+            w: 2156,
+            h: 1301,
+        });
+        assertEquals(closed.savedViewBox, {
+            kind: 'none',
+        });
+    },
+);
+
+Deno.test(
+    'a close while the panel is already shut'
+    + ' keeps the live viewBox (F29)',
+    () => {
+        const base = buildInitialFlowSnapshot(
+            emptyGraph, 800, 600, [], [], [],
+        );
+        const snap = {
+            ...base,
+            isAutoFit: false,
+            isPanelOpen: false,
+            savedViewBox: {
+                kind: 'saved' as const,
+                x: -3421,
+                y: -887,
+                w: 2826,
+                h: 1705,
+            },
+            interaction: {
+                ...base.interaction,
+                viewBox: {
+                    x: -1921,
+                    y: -650,
+                    w: 2156,
+                    h: 1301,
+                },
+                zoom: 1.1,
+            },
+        };
+        const closed = new FlowDesignerPresenter(
+            snap, 800, 600,
+            buildFlowHistorySnapshot(false),
+        ).withPanelOpen(false);
+        assertEquals(closed.interaction.viewBox, {
+            x: -1921,
+            y: -650,
+            w: 2156,
+            h: 1301,
+        });
+        assertEquals(closed.savedViewBox, {
+            kind: 'saved',
+            x: -3421,
+            y: -887,
+            w: 2826,
+            h: 1705,
+        });
+    },
+);
