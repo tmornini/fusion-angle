@@ -1888,6 +1888,17 @@ Off the critical path; each with its oracle.
   `tests/ideas-empty-subscribe.test.ts` stays green;
   a bell after the ideas document is gone does not
   log and does not paint the error state
+- The 2026-10-03 walk on `a6af68a6` left five
+  failure stubs. D16 paints "Something went wrong"
+  after a successful org switch that stays on a
+  foreign URL. F14 and F29 drop a zoomed viewBox.
+  F21 commits the cycle dash on the opposite edge.
+  K17 shows an em dash and an ASCII hyphen where
+  the row should show U+2212. None is a red test
+  yet. Stubs:
+  `docs/superpowers/test-plan-mitigations/2026-10-03-D-D16.md`,
+  `2026-10-03-F-F14.md`, `2026-10-03-F-F21.md`,
+  `2026-10-03-F-F29.md`, `2026-10-03-K-K17.md`
 - The records list's steady-state subscribe is still
   fire-and-forget. `subscribeRecordChanges(async () => {
   … await getRecords … })` (`web-app/records/index.ts:
