@@ -480,8 +480,18 @@ skew tests, which went with item 8's trio.
    (`docs/superpowers/specs/2026-10-01-membership-and-versions-design.md`).
    The census is one pattern,
    `organizations/:id/work-orders/:id/history`
-   (`tests/parted-reads.test.ts`). Its `./test` seconds
-   and readyMs are the next measure, not this record.
+   (`tests/parted-reads.test.ts`). `./test` 104.6 s →
+   112.8 s (medians of three; the base three
+   invocations: parallel pass, serial lane, and tz; the
+   tip two: parallel pass and tz); readyMs per list
+   page, `9a8396a` → base → tip (medians of 25; the base
+   `32a79f5`, whose sweep `measurements/history.jsonl`
+   does not hold, the tip `28dfa4d`): dashboard 61.5 →
+   61.7 → 59.4, ideas 58.4 → 57.4 → 47.3, projects 62.3
+   → 61.0 → 59.9, records 54.9 → 57.6 → 53.1, flows 56.4
+   → 55.6 → 53.8, workbox 142.0 → 142.3 → 141.8,
+   members 54.1 → 55.1 → 50.6, identities 56.4 → 53.5 →
+   49.8, organization 54.1 → 54.8 → 48.4.
    The fifth follows: work-order events, which builds
    that read once, as a heads read of the work order's
    event documents. The covenant, and
