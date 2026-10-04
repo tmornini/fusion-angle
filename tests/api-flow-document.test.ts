@@ -1186,8 +1186,9 @@ async () => {
     if (flow.name === 'Fresh Flow') {
         // Undo won the race, reverting all the way back to
         // genesis (the only pair before "Before Race"); the
-        // save's write never landed.
-        assertStrictEquals(undo.status, 201);
+        // save's write never landed. The undo lands in order
+        // on the client's tag, so it answers 200.
+        assertStrictEquals(undo.status, 200);
         assertStrictEquals(save.status, 412);
     } else {
         // The save won the race; the undo's write never landed
@@ -1204,6 +1205,54 @@ async () => {
             'the losing undo must not have posted its event',
         );
     }
+});
+
+// The race above takes its undo-won branch only when the undo
+// lands first, which a quiet run rarely deals; this pins that
+// order, so the branch's expectations run on every pass.
+Deno.test('e2e: an undo landing before a save on the same tag'
++ ' reverts to genesis, and the save 412s', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'rYqGcTqlRuu2ZWlDCaiRmA');
+    const before = await handleRequest(db, req(
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'rYqGcTqlRuu2ZWlDCaiRmA', token,
+        documentBody('Before Race', generateIdentifier()),
+        { 'if-match': await headEtag(
+            db, token, 'rYqGcTqlRuu2ZWlDCaiRmA',
+        ) },
+    ));
+    assertStrictEquals(before.status, 200);
+    const headEtagValue = await headEtag(
+        db, token, 'rYqGcTqlRuu2ZWlDCaiRmA',
+    );
+
+    const undo = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'rYqGcTqlRuu2ZWlDCaiRmA/undo', token, {
+            eventId: generateIdentifier(),
+            at: AT,
+        },
+        { 'if-match': headEtagValue },
+    ));
+    const save = await handleRequest(db, req(
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'rYqGcTqlRuu2ZWlDCaiRmA', token,
+        documentBody('Saved', generateIdentifier()),
+        { 'if-match': headEtagValue },
+    ));
+
+    const got = await handleRequest(
+        db, req('GET'
+            , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
+            + 'rYqGcTqlRuu2ZWlDCaiRmA', token),
+    );
+    assertStrictEquals(got.status, 200);
+    const flow = await got.json() as { name: string };
+    assertStrictEquals(flow.name, 'Fresh Flow');
+    assertStrictEquals(undo.status, 200);
+    assertStrictEquals(save.status, 412);
 });
 
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
