@@ -174,8 +174,9 @@ Deno.test(
             const { init } = await import(
                 '../web-app/ideas/index.ts'
             );
-            // Another file may have replaced the globals
-            // during the awaits above. The empty list
+            // No other file can replace these globals:
+            // under --parallel each test file is a worker
+            // with globals of its own. The empty list
             // reads this window's private bus.
             reclaim();
             await init();
