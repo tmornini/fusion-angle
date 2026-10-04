@@ -1135,133 +1135,29 @@ skew tests, which went with item 8's trio.
 
 Off the critical path; each with its oracle.
 
-- Flaky tests under `--parallel`. Each passes alone and
-  on re-run and fails in some runs of the parallel gate.
-  Seven of the suites below run in `test`'s serial pass
-  (`SERIAL_SUITES`, `ae0541a2`), a mitigation and not a
-  fix; a suite leaves that pass when its oracle is met.
-  Lines are at `c91c7ac8`. By mechanism:
-  - **(A) Fixed-count `setImmediate` drains guard
-    negative assertions** after an asynchronous delivery:
-    the raw-PUT "must not wake the page" checks in
-    `tests/flow-stats-subscribe.test.ts:182-190` and
-    `tests/ideas-empty-subscribe.test.ts:209-223`, and
-    the "idle tab ignores a peer refresh broadcast" check
-    in `tests/adapters-refresh-mutex.test.ts:158-160`. A
-    late delivery can only pass them wrongly, never fail
-    them — but this branch saw
-    `tests/ideas-empty-subscribe.test.ts` fail three
-    times under `--parallel` (the file itself untouched;
-    `BroadcastChannel` is process-global) and
-    `tests/adapters-flow-stats.test.ts` fail once (it has
-    no `setImmediate` drain and no named mechanism), and
-    `ledger-decisions` saw the ideas file fail a fourth
-    and a fifth time, TODO.md its only change and a
-    second gate running beside it, so the fixed count
-    still proves less than it reads as proving; the ideas
-    comment still says its drain matches the post-bell
-    assert, which `90f5c722` turned into a deadline wait.
-    Oracle: each check reads after a signal that the
-    delivery was processed — a render count on the host
-    stub for the two page tests, a second listener on
-    `fusion-angle:refresh` for the mutex test — and no
-    fixed-count drain remains at those three sites
-  - **(B) Session and token races through the
-    process-global `navigator.locks` and
-    `BroadcastChannel`.** The ledger arc saw four more
-    suites fail under `--parallel`, each green on re-run,
-    three failures in ten `./test` runs on 2026-09-24,
-    and state-by-put (2026-09-25 to 2026-09-29) tripped
-    each of these again and two more, all green on
-    re-run. Three of the four are these:
-    `tests/adapters-shared-recovery.test.ts:542`
-    (`recovery leaves the cross-tab active-org preference
-    untouched`; "malformed token: expected 3 segments" at
-    `:564`) and `:507` (`recovery re-scopes to the vessel
-    org claim, not the cross-tab preference`);
-    `tests/apex-destination.test.ts:73`
-    (`probeRefreshSession posts a cookie refresh grant`,
-    one expected and none seen), `:113`
-    (`probeRefreshSession treats 401 as unsigned`), and
-    `:132` (`concurrent probes share one refresh POST`,
-    asserting one POST at `:158`); and
-    `tests/adapters-invitations.test.ts:1282` (`a
-    re-minted token without the seat earns one more
-    attempt`: the re-minted token did not list the
-    organization), `:1337` (`two re-minted tokens without
-    the seat surface a named failure`), `:1207` (`the
-    remint waits for an in-flight facade refresh`),
-    `:1146` (`a failed re-mint after accept surfaces, seat
-    kept`), and `:1096` (`cookie-session accept remints
-    via refresh POST`). The fourth is
-    `tests/api-shadow-ledger-tokens.test.ts:874`, under
-    (C). On 2026-10-04 a targeted loop — the 27 files
-    that name these buses, locks, or refresh paths,
-    plus `adapters-flow-stats`, `api-shadow-ledger-tokens`,
-    and `api-flow-document`, under `--parallel` with a
-    fresh `--shuffle` seed per run — failed 10 of 40
-    runs, every failure this cause, and found two more
-    suites, both in the parallel pass:
-    `tests/channels.test.ts:266` (`a scoped event naming
-    this identity fires`, 2 bells counted where 1 was
-    expected at `:282`) and `:312` (`a scoped event
-    naming neither is a miss`, 1 where 0 at `:331`); and
-    `tests/adapters-http-facade.test.ts:173` (`a 401 raw
-    exchange carries the failing operation-id`,
-    `UnauthorizedError: invalid_token` at `:233`). The
-    same loop tripped `adapters-shared-recovery`'s
-    `:343` (`concurrent 401s share exactly one refresh
-    grant`) and `:650` (`a 401 recovery carries the
-    failing operation-id`), both `invalid_token`; the
-    mutex suite's `:55` (`two concurrent 401s cause one
-    refresh POST`) and `:149` (`idle tab ignores a peer
-    refresh broadcast`, 1 POST where 2); and
-    `flow-stats-subscribe`'s raw-PUT check in (A), which
-    showed the renamed flow before the bell — a peer
-    file's bell on the shared `fusion-angle:data`. These three are session and token races, not
-    drains, and share a confirmed cause: under
-    `--parallel` every test file is a worker in one
-    process, and `navigator.locks` and `BroadcastChannel`
-    are shared across those workers, so a refresh in one
-    file waits on another file's `fusion-refresh` lock and
-    adopts its `fusion-angle:refresh` broadcast
-    (signatures: a missing seat after remint, refresh
-    counts below expected, "malformed token"); the
-    harness fix is a `--preload` that gives lock and
-    channel names a per-worker prefix, as
-    `subscribeNamedNotificationEvents` gives the bell a
-    private bus.
-    Oracle: each of the three suites passes ten
-    consecutive `./test` runs, or its failure has a named
-    cause and a fix
-  - **(C) Server-side races with no named mechanism
-    yet.** Neither test below touches `navigator.locks`
-    or `BroadcastChannel` (none under `api/`), so the
-    per-worker prefix preload in (B) will not fix them;
-    each needs its own investigation.
-    `tests/api-shadow-ledger-tokens.test.ts:874`
-    (`revokeTokenChain racing a concurrent
-    rotateRefreshJti on the chain's live successor…`: a
-    rotated jti read `issued` where every jti should read
-    `revoked`) — named in (B)'s 2026-09-24 ten-run sample
-    — deliberately races two server-side ledger
-    operations and fails under `--parallel` load with
-    "revoked" expected, "issued" got (at `:916`) — an
-    interleaving the test does not pin.
-    `tests/api-flow-document.test.ts:1123` (`e2e: an undo
-    racing a save — the loser 412s…`) failed once in a
-    `./test validate` run on 2026-10-04, on a docs-only
-    change atop `30a77f4d`, and passed on re-run with no
-    code change; the failing assert was not captured. It
-    races two server-side operations by design, on the
-    memory backend through `handleRequest`. It stays in
-    the parallel pass, not the serial one, until
-    diagnosed.
-    Oracle: ten consecutive `./test` runs under
-    `--parallel` with no failure in
-    `tests/api-shadow-ledger-tokens.test.ts`, and the
-    same for `tests/api-flow-document.test.ts`; or each
-    failure has a named cause and a fix
+- Flaky tests under `--parallel`. One remains open:
+  `tests/adapters-flow-stats.test.ts` failed once under
+  `--parallel` (recorded by `ca5ed32e`, 2026-09-15); the
+  failing test and assert were never captured, and it has
+  no named mechanism. Its only fixed-count wait is the
+  one-macrotask yield at `:405` in `getFlowStats unknown
+  flowId propagates the underlying error` (`:390`), added
+  by `11cd89f8` so the two reads a rejected `Promise.all`
+  abandons finish inside the test that started them;
+  `tests/adapters-ideas.test.ts` carries the same yield
+  after `getIdea`. With every memory-backend entry delayed
+  by up to 20 ms the ops sanitizer fails that test ("A
+  timer was started in this test, but never completed"),
+  so one turn proves only that the abandoned reads were
+  fast. Unmodified, it passed 60 runs beside ten
+  CPU-saturating processes, 80 targeted `--parallel`
+  runs, and ten consecutive `./test` runs on 2026-10-04.
+  Ruled out: the process-global bus and lock names (it
+  opens neither, and `tests/worker-name-prefix.ts` now
+  gives each worker its own).
+  Oracle: its failure has a named cause and a fix, or the
+  yield at `:405` waits on the abandoned reads settling
+  rather than on one turn
 - An inner pair of a composed operation skipped while the
   top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
