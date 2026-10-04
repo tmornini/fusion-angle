@@ -486,12 +486,12 @@ skew tests, which went with item 8's trio.
    tip two: parallel pass and tz); readyMs per list
    page, `9a8396a` → base → tip (medians of 25; the base
    `32a79f5`, whose sweep `measurements/history.jsonl`
-   does not hold, the tip `28dfa4d`): dashboard 61.5 →
-   61.7 → 59.4, ideas 58.4 → 57.4 → 47.3, projects 62.3
-   → 61.0 → 59.9, records 54.9 → 57.6 → 53.1, flows 56.4
-   → 55.6 → 53.8, workbox 142.0 → 142.3 → 141.8,
-   members 54.1 → 55.1 → 50.6, identities 56.4 → 53.5 →
-   49.8, organization 54.1 → 54.8 → 48.4.
+   does not hold, the tip `7d34749`): dashboard 61.5 →
+   61.7 → 60.6, ideas 58.4 → 57.4 → 52.5, projects 62.3
+   → 61.0 → 62.5, records 54.9 → 57.6 → 53.7, flows 56.4
+   → 55.6 → 56.3, workbox 142.0 → 142.3 → 141.5,
+   members 54.1 → 55.1 → 52.1, identities 56.4 → 53.5 →
+   50.3, organization 54.1 → 54.8 → 49.7.
    The fifth follows: work-order events, which builds
    that read once, as a heads read of the work order's
    event documents. The covenant, and
