@@ -64,7 +64,6 @@ run_memory() {
     # glob is filtered here because deno 2.9.6 honors
     # only the first path given to --ignore.
     SERIAL_SUITES=(
-        tests/api-shadow-ledger-tokens.test.ts
         tests/flow-stats-subscribe.test.ts
         tests/ideas-empty-subscribe.test.ts
     )
