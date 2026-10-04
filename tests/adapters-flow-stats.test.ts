@@ -9,7 +9,13 @@ import {
     type RequestContext,
 } from '../client/request-context.ts';
 import { responseMessage } from './fixtures/response-message.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    IN_PROCESS_ORIGIN,
+    inPageContext,
+    inProcessFetch,
+} from './in-page-facade.ts';
+import { createHttpFacade } from '../client/http-facade.ts';
+import { createAppClient } from '../web-app/app/client.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
@@ -397,12 +403,56 @@ Deno.test(
                 ctx, generateIdentifier(), Date.now(),
             ),
         );
-        // getFlowStats fans three reads out through
-        // Promise.all; getFlowGraph's rejection settles the
-        // caller while the other two are still in flight.
-        // Yield a macrotask turn so those ops complete in
-        // the test that started them.
-        await new Promise(resolve => setTimeout(resolve, 0));
+    },
+);
+
+Deno.test(
+    'a rejected getFlowStats leaves none of its reads in'
+    + ' flight',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const flowId = generateIdentifier();
+        const inner = inProcessFetch(db);
+        // The work-order read is held until the flow read
+        // has answered its 404, so the rejection always
+        // arrives while a sibling is still running.
+        let releaseHeld = (): void => {};
+        const held = new Promise<void>((resolve) => {
+            releaseHeld = resolve;
+        });
+        let inFlight = 0;
+        const fetch: typeof globalThis.fetch = async (
+            input, init,
+        ) => {
+            const path = new URL(new Request(input, init).url)
+                .pathname;
+            inFlight += 1;
+            try {
+                if (path.endsWith('/work-orders/')) {
+                    await held;
+                }
+                return await inner(input, init);
+            } finally {
+                inFlight -= 1;
+                if (path.endsWith('/flows/' + flowId)) {
+                    releaseHeld();
+                }
+            }
+        };
+        const ctx = createAppClient(
+            createHttpFacade(IN_PROCESS_ORIGIN, fetch),
+        ).requestContext(await organizationToken());
+        const inFlightAtRejection = await getFlowStats(
+            ctx, flowId, Date.now(),
+        ).then(
+            () => 'resolved',
+            () => inFlight,
+        );
+        assertStrictEquals(
+            inFlightAtRejection, 0,
+            'every read settles before the rejection does',
+        );
     },
 );
 

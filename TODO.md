@@ -1135,29 +1135,21 @@ skew tests, which went with item 8's trio.
 
 Off the critical path; each with its oracle.
 
-- Flaky tests under `--parallel`. One remains open:
-  `tests/adapters-flow-stats.test.ts` failed once under
-  `--parallel` (recorded by `ca5ed32e`, 2026-09-15); the
-  failing test and assert were never captured, and it has
-  no named mechanism. Its only fixed-count wait is the
-  one-macrotask yield at `:405` in `getFlowStats unknown
-  flowId propagates the underlying error` (`:390`), added
-  by `11cd89f8` so the two reads a rejected `Promise.all`
-  abandons finish inside the test that started them;
-  `tests/adapters-ideas.test.ts` carries the same yield
-  after `getIdea`. With every memory-backend entry delayed
-  by up to 20 ms the ops sanitizer fails that test ("A
-  timer was started in this test, but never completed"),
-  so one turn proves only that the abandoned reads were
-  fast. Unmodified, it passed 60 runs beside ten
-  CPU-saturating processes, 80 targeted `--parallel`
-  runs, and ten consecutive `./test` runs on 2026-10-04.
-  Ruled out: the process-global bus and lock names (it
-  opens neither, and `tests/worker-name-prefix.ts` now
-  gives each worker its own).
-  Oracle: its failure has a named cause and a fix, or the
-  yield at `:405` waits on the abandoned reads settling
-  rather than on one turn
+- `getIdea` (`client/ideas.ts:166`) fans three reads out
+  through `Promise.all` at `:172`, so a rejection settles
+  the caller while its siblings still run, and
+  `tests/adapters-ideas.test.ts:195` (`getIdea throws on
+  missing submission`, `:182`) waits one macrotask turn
+  for them (`11cd89f8`). It was never seen to flake, but
+  one turn proves only that the abandoned reads were
+  fast: `getFlowStats` had the same shape, and with every
+  memory-backend entry delayed by up to 20 ms its twin
+  yield failed the ops sanitizer ("A timer was started in
+  this test, but never completed") until its fan-out
+  settled every read before rejecting.
+  Oracle: a rejected `getIdea` leaves none of its reads
+  in flight, pinned as `tests/adapters-flow-stats.test.ts`
+  pins `getFlowStats`, and the yield at `:195` is gone
 - An inner pair of a composed operation skipped while the
   top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
@@ -3291,8 +3283,6 @@ Off the critical path; each with its oracle.
 - The examination report
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
   → 0–2, 6, 9, 11, 13 (its findings are their oracles).
-  The flaky-tests bullet (Critical functionality path,
-  first) lands next, after packageable-client lands
 - 0–2 → 5 (its link token is a secret at rest: item 0
   hoists it, item 2 fences it); item 2 no longer orders
   item 6, since a backup carries the table whole

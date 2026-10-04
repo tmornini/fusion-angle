@@ -26,15 +26,29 @@ export async function getFlowStats(
     model: FlowStatsModel;
     graph: FlowGraph;
 }> {
+    // Every read settles before this call does: a rejection
+    // must not leave its siblings running past the caller.
     const [
-        graph,
-        fwoRows,
-        memberMap,
-    ] = await Promise.all([
+        graphRead,
+        fwoRead,
+        memberRead,
+    ] = await Promise.allSettled([
         getRenderableFlowGraph(ctx, flowId),
         getFlowWorkOrderEntities(ctx, flowId),
         getMemberMap(ctx),
     ]);
+    if (graphRead.status === 'rejected') {
+        throw graphRead.reason;
+    }
+    if (fwoRead.status === 'rejected') {
+        throw fwoRead.reason;
+    }
+    if (memberRead.status === 'rejected') {
+        throw memberRead.reason;
+    }
+    const graph = graphRead.value;
+    const fwoRows = fwoRead.value;
+    const memberMap = memberRead.value;
     const histories = await getWorkOrderHistories(
         ctx,
         fwoRows.map(r => ({
