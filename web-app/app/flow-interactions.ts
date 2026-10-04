@@ -1014,6 +1014,10 @@ export function nodeBoundsBox(
 // whatever the content occupies — nodes alone for
 // the provisional, or the measured render for the
 // real fit. Padding absorbs stroke/marker overflow.
+// Zoom stays inside MIN_ZOOM..MAX_ZOOM, the range the
+// zoom buttons clamp to, so a fit can always be zoomed
+// back to; content wider or taller than
+// canvas / MIN_ZOOM is cropped about its center.
 export function fitBoxToCanvas(
     box: FitBox,
     canvasW: number,
