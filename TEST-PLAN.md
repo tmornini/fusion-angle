@@ -2805,7 +2805,13 @@ opens and renders.)
        'fitBoxToCanvas with
        panel offset centers content in the right visible
        region (panel is on the left)' (decides the Auto Fit
-       re-fit is panel-aware); exploratory — the live
+       re-fit is panel-aware);
+       tests/flow-designer-presenter.test.ts
+       'opening the panel replaces a stale saved viewBox
+       (F14)' (decides opening the panel overwrites a stale
+       saved viewBox with the live one, and closing writes
+       that live viewBox back and clears the save);
+       exploratory — the live
        zoom-then-open-then-close restore
 - [ ] **F15** Drag from a middle node's port into empty
   canvas past 20 pixels, without holding Shift. PASS:
@@ -3102,10 +3108,24 @@ opens and renders.)
        width); tests/flow-zoom-to-fit.test.ts
        'fitBoxToCanvas clamps zoom to MAX_ZOOM for tiny
        content with panel offset' (decides the upper clamp
-       through the shared `MAX_ZOOM`); exploratory — the
-       0.25 LOWER clamp, which no cited test asserts; the
-       Auto-Fit refusal toast on the zoom BUTTONS (only the
-       wheel path carries a test); tests/flow-fsm-reduce.test.ts
+       through the shared `MAX_ZOOM`);
+       tests/flow-zoom-to-fit.test.ts
+       'fitBoxToCanvas clamps zoom to MIN_ZOOM for a huge
+       box' (decides the lower clamp: a 20000-square box
+       fits at zoom 0.25 with the viewBox centred on the
+       box); tests/flow-zoom-to-fit.test.ts
+       'a fit just under MIN_ZOOM restores after zoom in and
+       out' (decides this case's PASS: from a fit near 0.25
+       that covers the box, Zoom in shrinks the viewBox
+       width and height and Zoom out restores them, zoom
+       staying within 0.25–2.0);
+       tests/flow-designer-presenter.test.ts
+       'a close while the panel is already shut keeps the
+       live viewBox (F29)' (decides closing an already-shut
+       panel leaves the live viewBox alone and keeps the
+       earlier save); exploratory — the Auto-Fit refusal
+       toast on the zoom BUTTONS (only the wheel path
+       carries a test); tests/flow-fsm-reduce.test.ts
        'empty canvas click keeps a zoomed viewBox'
        (decides pointer-down + pointer-up on empty
        canvas leaves viewBox and zoom untouched);
