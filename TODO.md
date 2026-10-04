@@ -1231,7 +1231,9 @@ Off the critical path; each with its oracle.
   server-side operations by design, on the memory
   backend through `handleRequest`, and touches no
   `navigator.locks` or `BroadcastChannel`, so the
-  per-worker prefix preload will not fix it.
+  per-worker prefix preload will not fix it. It
+  stays in the parallel pass, not the serial one,
+  until diagnosed.
   Oracle: ten consecutive `./test` runs under
   `--parallel` with no failure in
   `tests/api-flow-document.test.ts`, or its failure
