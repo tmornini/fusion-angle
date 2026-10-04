@@ -222,6 +222,16 @@ Deno.test(
         assertStrictEquals(
             r.viewBox.w, CANVAS_W / 0.25,
         );
+        assertStrictEquals(
+            r.viewBox.h, CANVAS_H / 0.25,
+        );
+        assert(
+            Math.abs(
+                r.viewBox.y + r.viewBox.h / 2
+                - (box.minY + box.maxY) / 2,
+            ) < 0.001,
+            'viewBox centers on the box (y)',
+        );
         const cx = (box.minX + box.maxX) / 2;
         const pixelXOfBoxCenter =
             (cx - r.viewBox.x) * CANVAS_W / r.viewBox.w;
