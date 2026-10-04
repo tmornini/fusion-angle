@@ -1195,7 +1195,30 @@ Off the critical path; each with its oracle.
     kept`), and `:1096` (`cookie-session accept remints
     via refresh POST`). The fourth is
     `tests/api-shadow-ledger-tokens.test.ts:874`, under
-    (C). These three are session and token races, not
+    (C). On 2026-10-04 a targeted loop — the 27 files
+    that name these buses, locks, or refresh paths,
+    plus `adapters-flow-stats`, `api-shadow-ledger-tokens`,
+    and `api-flow-document`, under `--parallel` with a
+    fresh `--shuffle` seed per run — failed 10 of 40
+    runs, every failure this cause, and found two more
+    suites, both in the parallel pass:
+    `tests/channels.test.ts:266` (`a scoped event naming
+    this identity fires`, 2 bells counted where 1 was
+    expected at `:282`) and `:312` (`a scoped event
+    naming neither is a miss`, 1 where 0 at `:331`); and
+    `tests/adapters-http-facade.test.ts:173` (`a 401 raw
+    exchange carries the failing operation-id`,
+    `UnauthorizedError: invalid_token` at `:233`). The
+    same loop tripped `adapters-shared-recovery`'s
+    `:343` (`concurrent 401s share exactly one refresh
+    grant`) and `:650` (`a 401 recovery carries the
+    failing operation-id`), both `invalid_token`; the
+    mutex suite's `:55` (`two concurrent 401s cause one
+    refresh POST`) and `:149` (`idle tab ignores a peer
+    refresh broadcast`, 1 POST where 2); and
+    `flow-stats-subscribe`'s raw-PUT check in (A), which
+    showed the renamed flow before the bell — a peer
+    file's bell on the shared `fusion-angle:data`. These three are session and token races, not
     drains, and share a confirmed cause: under
     `--parallel` every test file is a worker in one
     process, and `navigator.locks` and `BroadcastChannel`
