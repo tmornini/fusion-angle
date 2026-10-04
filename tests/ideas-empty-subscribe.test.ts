@@ -1,4 +1,8 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import './hmac-test-key.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { withLocalStorageAsync } from
@@ -22,14 +26,28 @@ const SUBMITTED_AT = '2026-08-25T00:00:00.000000Z';
 
 function makeListStub(): {
     innerHTML: string;
+    readonly renders: number;
     id: string;
     addEventListener: () => void;
     querySelector: () => null;
     querySelectorAll: () => never[];
     insertAdjacentElement: () => void;
 } {
+    // Every init writes the list first, before its fetch, so
+    // a wake shows here the moment it is delivered.
+    let markup = '';
+    let renders = 0;
     return {
-        innerHTML: '',
+        get innerHTML(): string {
+            return markup;
+        },
+        set innerHTML(value: string) {
+            markup = value;
+            renders += 1;
+        },
+        get renders(): number {
+            return renders;
+        },
         id: 'ideas-list',
         addEventListener: () => {},
         querySelector: () => null,
@@ -115,6 +133,16 @@ Deno.test(
             observe(): void {}
         };
         g['document'] = doc;
+        // A bus delivers to its listeners in the order they
+        // opened. Opened before the empty list opens its
+        // bus, arrival hears each message before the page
+        // does, and reads what the page had rendered.
+        const arrival = new BroadcastChannel(CHANNEL_NAME);
+        const rendersAtArrival: number[] = [];
+        arrival.onmessage = () => {
+            rendersAtArrival.push(listStub.renders);
+        };
+        let witness: BroadcastChannel | undefined;
         try {
             const { initAdapter } =
                 await import(
@@ -180,6 +208,7 @@ Deno.test(
                 db, await organizationToken(),
             );
             const ideaId = generateIdentifier();
+            const rendersBeforePuts = listStub.renders;
             await ctx.PUT(
                 organizationItem(
                     ctx, 'ideas', ideaId,
@@ -206,26 +235,27 @@ Deno.test(
                     at: SUBMITTED_AT,
                 },
             );
-            // The two PUTs alone must not wake the page:
-            // drain as generously as the post-bell assert
-            // does, then prove the list is still empty.
-            for (let i = 0; i < 25; i++) {
-                await new Promise(
-                    r => setImmediate(r),
-                );
-            }
-            assert(
-                !listStub.innerHTML.includes(
-                    'Cross-tab idea',
-                ),
-                'the raw PUTs alone must not wake'
-                + ' the empty page',
-            );
+            // Opened after the page's bus: once it hears the
+            // bell, the page has handled every message up to
+            // and including it.
+            witness = new BroadcastChannel(CHANNEL_NAME);
+            const bellHandled = new Promise<void>((resolve) => {
+                witness!.onmessage = () => resolve();
+            });
             const poster = new BroadcastChannel(
                 CHANNEL_NAME,
             );
             reclaim();
             poster.postMessage({ kind: 'full' });
+            await bellHandled;
+            // The two PUTs alone must not wake the page:
+            // the bell is the first message since them,
+            // and nothing rendered before it arrived.
+            assertEquals(
+                rendersAtArrival, [rendersBeforePuts],
+                'the raw PUTs alone must not wake'
+                + ' the empty page',
+            );
             // BroadcastChannel delivery and the
             // re-run init's fetch/render pipeline
             // are asynchronous and not fixed in
@@ -257,6 +287,8 @@ Deno.test(
                 + ' create button again',
             );
         } finally {
+            arrival.close();
+            witness?.close();
             // The divorce point opened ONE channel per
             // process when init subscribed; a test process
             // has no unload to reclaim it, so release it
