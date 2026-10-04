@@ -87,9 +87,10 @@ test --frozen --parallel --no-check
 --sanitize-ops --sanitize-resources` with three
 preloads, in two TZ passes: `TZ=UTC` on
 `tests/*.test.ts`, then `TZ=Pacific/Honolulu` on
-`tests/tz/*.test.ts`; the seven suites TODO.md names
-as racing under `--parallel` (`navigator.locks` and
-`BroadcastChannel` are process-global) are filtered
+`tests/tz/*.test.ts`; the seven suites TODO.md's
+flaky-tests bullet names under `--parallel`
+(`navigator.locks` and `BroadcastChannel` are
+process-global) are filtered
 out of the UTC glob and run serially, same flags and
 preloads, in a third invocation between the two — then
 78-character lint of code

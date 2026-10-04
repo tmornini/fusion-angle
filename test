@@ -57,8 +57,9 @@ run_memory() {
     # process, and navigator.locks and BroadcastChannel
     # are process-global: a refresh in one file waits on
     # a peer's lock and adopts its broadcast, and a
-    # drain reads a peer's delivery. The suites TODO.md
-    # names as racing run in their own serial pass. The
+    # drain reads a peer's delivery. The suites TODO.md's
+    # flaky-tests bullet names run in their own serial
+    # pass, until each meets its oracle. The
     # glob is filtered here because deno 2.9.6 honors
     # only the first path given to --ignore.
     SERIAL_SUITES=(
