@@ -443,33 +443,36 @@ type SavedViewBoxOpen =
 
 function panelJustOpened(
     isPanelOpen: boolean,
-    savedViewBox: SavedViewBox,
+    wasOpen: boolean,
 ): boolean {
-    return isPanelOpen && savedViewBox.kind !== 'saved';
+    return isPanelOpen && !wasOpen;
 }
 
 function panelJustClosed(
     isPanelOpen: boolean,
+    wasOpen: boolean,
     savedViewBox: SavedViewBox,
 ): savedViewBox is SavedViewBoxOpen {
-    return !isPanelOpen && savedViewBox.kind === 'saved';
+    return !isPanelOpen && wasOpen
+        && savedViewBox.kind === 'saved';
 }
 
 function panelStaysOpen(
     isPanelOpen: boolean,
-    savedViewBox: SavedViewBox,
+    wasOpen: boolean,
 ): boolean {
-    return isPanelOpen && savedViewBox.kind === 'saved';
+    return isPanelOpen && wasOpen;
 }
 
 export function applyPanelTransition(
     isAutoFit: boolean,
+    wasOpen: boolean,
     isPanelOpen: boolean,
     savedViewBox: SavedViewBox,
     viewBox: ViewBox,
 ): PanelTransitionResult | null {
     if (isAutoFit) return null;
-    if (panelJustOpened(isPanelOpen, savedViewBox)) {
+    if (panelJustOpened(isPanelOpen, wasOpen)) {
         return {
             savedViewBox: {
                 kind: 'saved',
@@ -482,7 +485,9 @@ export function applyPanelTransition(
             shouldPanToReveal: true,
         };
     }
-    if (panelJustClosed(isPanelOpen, savedViewBox)) {
+    if (panelJustClosed(
+        isPanelOpen, wasOpen, savedViewBox,
+    )) {
         return {
             savedViewBox: { kind: 'none' },
             viewBox: {
@@ -494,7 +499,7 @@ export function applyPanelTransition(
             shouldPanToReveal: false,
         };
     }
-    if (panelStaysOpen(isPanelOpen, savedViewBox)) {
+    if (panelStaysOpen(isPanelOpen, wasOpen)) {
         return {
             savedViewBox,
             viewBox,

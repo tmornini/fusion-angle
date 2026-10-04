@@ -422,11 +422,17 @@ TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
 `tests/tz/*.test.ts` timezone suite; AT2 without
-`POSTGRES_URL` ignores eight live-Postgres
-placeholders — one in each of the seven
-`pg-*.test.ts` files and one in
-`schema-lifecycle.test.ts` — and AT4 runs those eight
-files against its own Postgres. The number grows as
+`POSTGRES_URL` ignores 11 live-Postgres
+placeholders, and AT4 runs the eleven files
+`tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`,
+`tests/pg-message-plane.test.ts`,
+`tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`,
+`tests/pg-explain.test.ts`,
+`tests/pg-identifier-order.test.ts`,
+`tests/pg-standalone-read.test.ts`,
+`tests/schema-lifecycle.test.ts`,
+`tests/pg-ledger-store.test.ts`, and
+`tests/pg-ledger-seed.test.ts` against its own Postgres. The number grows as
 tests land in either
 glob and is not pinned here. Update the case count
 when a case is added or removed.
@@ -447,22 +453,29 @@ Layer 3 runs all five through `./deploy --local`;
 the walk never invokes them separately. Abort on
 any AT red.
 
-- [ ] **AT1** Run `deno check --frozen api shared server
-  tests web-app`. PASS: exits 0; no diagnostics emitted.
+- [ ] **AT1** Run `deno check --frozen api client shared
+  server tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; both suites report `ok | N passed | 0 failed`, on 29 Sep `ok | 3622 passed | 0 failed | 8 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite. The eight ignored are the live-Postgres placeholders — one in each of the seven `pg-*.test.ts` files and one in `schema-lifecycle.test.ts` — which skip without `POSTGRES_URL`; AT4 runs those files.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` minus the seven racing suites for the main `Deno.test` suite, written against `@std/assert`, then `TZ=UTC deno test --frozen --no-check --sanitize-ops --sanitize-resources` serially on those seven racing suites, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; all three carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; each pass reports `ok | N passed | 0 failed`, on 4 Oct `./test` printed `ok | 4034 passed | 0 failed | 11 ignored` for the main suite, `ok | 87 passed | 0 failed` for the serial pass of the racing suites, and `ok | 8 passed | 0 failed` for the timezone suite. The 11 ignored are the live-Postgres placeholders, which skip without `POSTGRES_URL`; AT4 runs the eleven files `bin/test-postgres` names: `tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`, `tests/pg-message-plane.test.ts`, `tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`, `tests/pg-explain.test.ts`, `tests/pg-identifier-order.test.ts`, `tests/pg-standalone-read.test.ts`, `tests/schema-lifecycle.test.ts`, `tests/pg-ledger-store.test.ts`, and `tests/pg-ledger-seed.test.ts`.
   Pin: exploratory — the command is its own witness
-- [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, `bin/postgres-seed`, and `bin/compose-lib`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api client shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `client/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, `bin/postgres-seed`, and `bin/compose-lib`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `client/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
 - [ ] **AT4** Run `./test postgres`. It
   owns its own Docker Postgres, not the
   walk DB. The suite creates and drops
   its own `fusion_test_*` schema. PASS:
   exits 0, `ok | N passed | 0 failed`
-  across the eight files `bin/test-postgres`
-  names — the seven `pg-*.test.ts` and
-  `schema-lifecycle.test.ts`; on 29 Sep
-  `ok | 67 passed | 0 failed`.
+  across the eleven files `bin/test-postgres`
+  names — `tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`,
+  `tests/pg-message-plane.test.ts`,
+  `tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`,
+  `tests/pg-explain.test.ts`,
+  `tests/pg-identifier-order.test.ts`,
+  `tests/pg-standalone-read.test.ts`,
+  `tests/schema-lifecycle.test.ts`,
+  `tests/pg-ledger-store.test.ts`, and
+  `tests/pg-ledger-seed.test.ts`; on 4 Oct
+  `ok | 112 passed | 0 failed`.
   `./test validate` stays Postgres-free.
   Pin: exploratory — the command is its own witness
 - [ ] **AT5** Run `./test browser`. It bundles the client with
@@ -1956,14 +1969,20 @@ covering the D20–D24 run between them.
   visible; one click (list or detail) navigates
   to `ideas/convert.html`. That click does
   **not** promote (D24 does). Then select Stark
-  Industries in `.org-switcher` before D17–D19.
+  Industries in `.org-switcher` before D17–D19 —
+  the switch leaves `ideas/convert.html` for
+  `ideas/index.html`.
   Pin: tests/presenter-idea.test.ts
        'IdeaPresenter.buildCard exposes a Convert
        affordance only for approved ideas' (decides
        Convert renders for an `approved` idea and
        not for others — `isConvertible()` is a plain
        equality against `approved`, so this
-       generalizes); exploratory — the live
+       generalizes); tests/organization-switcher.test.ts
+       'a switch off convert leaves the ideas index
+       (D16)' (decides a switch on `ideas/convert.html`
+       lands on `/ideas/index.html`, dropping the query
+       and hash); exploratory — the live
        org-switcher navigation and the detail-page
        Convert button
 - [ ] **D17** Navigate to
@@ -2792,7 +2811,13 @@ opens and renders.)
        'fitBoxToCanvas with
        panel offset centers content in the right visible
        region (panel is on the left)' (decides the Auto Fit
-       re-fit is panel-aware); exploratory — the live
+       re-fit is panel-aware);
+       tests/flow-designer-presenter.test.ts
+       'opening the panel replaces a stale saved viewBox
+       (F14)' (decides opening the panel overwrites a stale
+       saved viewBox with the live one, and closing writes
+       that live viewBox back and clears the save);
+       exploratory — the live
        zoom-then-open-then-close restore
 - [ ] **F15** Drag from a middle node's port into empty
   canvas past 20 pixels, without holding Shift. PASS:
@@ -3089,10 +3114,24 @@ opens and renders.)
        width); tests/flow-zoom-to-fit.test.ts
        'fitBoxToCanvas clamps zoom to MAX_ZOOM for tiny
        content with panel offset' (decides the upper clamp
-       through the shared `MAX_ZOOM`); exploratory — the
-       0.25 LOWER clamp, which no cited test asserts; the
-       Auto-Fit refusal toast on the zoom BUTTONS (only the
-       wheel path carries a test); tests/flow-fsm-reduce.test.ts
+       through the shared `MAX_ZOOM`);
+       tests/flow-zoom-to-fit.test.ts
+       'fitBoxToCanvas clamps zoom to MIN_ZOOM for a huge
+       box' (decides the lower clamp: a 20000-square box
+       fits at zoom 0.25 with the viewBox centred on the
+       box); tests/flow-zoom-to-fit.test.ts
+       'a fit just under MIN_ZOOM restores after zoom in and
+       out' (decides this case's PASS: from a fit near 0.25
+       that covers the box, Zoom in shrinks the viewBox
+       width and height and Zoom out restores them, zoom
+       staying within 0.25–2.0);
+       tests/flow-designer-presenter.test.ts
+       'a close while the panel is already shut keeps the
+       live viewBox (F29)' (decides closing an already-shut
+       panel leaves the live viewBox alone and keeps the
+       earlier save); exploratory — the Auto-Fit refusal
+       toast on the zoom BUTTONS (only the wheel path
+       carries a test); tests/flow-fsm-reduce.test.ts
        'empty canvas click keeps a zoomed viewBox'
        (decides pointer-down + pointer-up on empty
        canvas leaves viewBox and zoom untouched);
@@ -4075,11 +4114,10 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        content area, not the viewport); exploratory — the
        live content-area measurement
 - [ ] **F75** Open the seeded "Layout Test: Proposal Review
-  Cycle" with Auto Fit on — its layout routes edges beyond
-  the node bounding box, its long back-edges arcing above
-  the top row and dipping well below the bottom row. PASS:
-  the whole graph, including the edge curves and waypoints
-  that bow past the outermost nodes, sits inside the canvas
+  Cycle" with Auto Fit on — this seed's edges sit inside the
+  nodes' bounding box and do not arc past the outermost nodes. PASS:
+  the whole drawn graph, including the edge curves and waypoints,
+  sits inside the canvas
   with margin; nothing clips at any edge (the prior bug
   sliced the bottom routing). Then toggle Auto Fit off then
   on, add then delete an edge, and undo. PASS: every re-fit
@@ -4682,7 +4720,10 @@ FSM, unlike `flows/detail`).
        and the preserved `projectId`
 - [ ] **FS3** Node tints span the ramp on the flagship flow
   ("Customer Onboarding"): Data Capture is yellow/red (hot),
-  Review is warm, Create/Archive carry the cool (or no-data)
+  Review (heat 0.24) is cool teal — `pages-flow-stats.css`
+  mixes `--heat-stop-low` toward `--heat-stop-mid` across
+  heat-t 0..0.5, and 0.24 is 48% of that segment —
+  Create/Archive at heat 0 carry the cool (or no-data)
   tint. Node faces show the em-dash on Create and Archive and
   a value like `8.5m` / `2.1d` on regular nodes.
   Pin: tests/presenter-flow-stats.test.ts 'each node
@@ -4690,7 +4731,7 @@ FSM, unlike `flows/detail`).
        tests/presenter-flow-stats.test.ts 'regular
        nodes show avg-sojourn face; special nodes show
        —'; exploratory — the painted color ramp
-       (yellow/red hot, warm, cool/no-data)
+       (yellow/red hot, cool teal, cool/no-data)
 - [ ] **FS4** Hover a node → a read-only stat card pops near
   it with: % of flow time, avg/median/p90 durations, visits /
   distinct WOs / Here now, ~N/wk throughput, loop-back rate, clan
@@ -5072,8 +5113,9 @@ FSM, unlike `flows/detail`).
   (Stark's admin), click `+ Invite member` (`#invite-
   member-btn`, mail icon). PASS: the `invite-member`
   dialog opens with a single Email input (`#invite-
-  email`), helper text "Invite an existing person to
-  this organization", a Cancel and a "Send invitation"
+  email`), helper text "Invite an existing person to this
+  organization by email. They decide whether to accept or
+  decline.", a Cancel and a "Send invitation"
   submit (`#invite-member-submit`). Enter the email of an
   EXISTING identity who is NOT yet a member of the
   inviting org: `david.martinez@company.com` (Wayne-
@@ -5772,8 +5814,10 @@ FSM, unlike `flows/detail`).
   and Members lists for Stark. Select "Wayne
   Enterprises" → the page does a FULL reload onto
   Wayne: Ideas shows Wayne's ideas and Members shows
-  Wayne's humans (org-fenced — Stark's rows are no
-  longer visible). Reload the page again WITHOUT
+  Wayne's humans; Stark's humans and Stark's ideas
+  are gone (organization-fenced); AI rows stay because
+  the catalog is global; and the switch paints no
+  `Something went wrong` card. Reload the page again WITHOUT
   changing the select → Wayne stays active (the choice
   is stored under `fusion-angle:active-organization-id`
   and boot re-exchanges a scoped token from it). A

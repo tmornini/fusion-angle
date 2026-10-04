@@ -1222,6 +1222,20 @@ Off the critical path; each with its oracle.
   `--parallel` with no failure in
   `tests/api-shadow-ledger-tokens.test.ts`, or its
   failure has a named cause and a fix
+- `tests/api-flow-document.test.ts:1123` (`e2e: an
+  undo racing a save — the loser 412s…`) failed once
+  in a `./test validate` run on 2026-10-04, on a
+  docs-only change atop `30a77f4d`, and passed on
+  re-run with no code change; the failing assert was
+  not captured. Like the bullet above, it races two
+  server-side operations by design, on the memory
+  backend through `handleRequest`, and touches no
+  `navigator.locks` or `BroadcastChannel`, so the
+  per-worker prefix preload will not fix it.
+  Oracle: ten consecutive `./test` runs under
+  `--parallel` with no failure in
+  `tests/api-flow-document.test.ts`, or its failure
+  has a named cause and a fix
 - An inner pair of a composed operation skipped while the
   top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
@@ -1871,6 +1885,34 @@ Off the critical path; each with its oracle.
   fetch window; a pending flag would close it but
   reintroduces the shared state the design avoids —
   `web-app/app/channels.ts:138-154`
+- A `fusion-angle:data` bell during `./test` re-enters
+  the ideas list `init` on a document that has no
+  `#ideas-list`. `subscribeOnce`
+  (`web-app/app/channels.ts:149`) calls `init`
+  (`web-app/ideas/index.ts:43`), `$required` throws,
+  and `handlePageLoadError` logs `page failed to init`
+  with `Required element not found: #ideas-list`
+  (`web-app/app/page-loader.ts:49`). Witnessed
+  2026-10-03 on `a6af68a6` as post-test output between
+  `identity-tokens-reduce` and `drift-states`; the
+  suite still reported 0 failed, so the gate stays
+  green. `BroadcastChannel` is process-global.
+  Oracle: `./test` prints neither `page failed to
+  init` nor `Required element not found: #ideas-list`;
+  `tests/ideas-empty-subscribe.test.ts` stays green;
+  a bell after the ideas document is gone does not
+  log and does not paint the error state
+- The 2026-10-03 walk on `a6af68a6` left five
+  failure stubs. D16 paints "Something went wrong"
+  after a successful org switch that stays on a
+  foreign URL. F14 and F29 drop a zoomed viewBox.
+  F21 commits the cycle dash on the opposite edge.
+  K17 shows an em dash and an ASCII hyphen where
+  the row should show U+2212. None is a red test
+  yet. Stubs:
+  `docs/superpowers/test-plan-mitigations/2026-10-03-D-D16.md`,
+  `2026-10-03-F-F14.md`, `2026-10-03-F-F21.md`,
+  `2026-10-03-F-F29.md`, `2026-10-03-K-K17.md`
 - The records list's steady-state subscribe is still
   fire-and-forget. `subscribeRecordChanges(async () => {
   … await getRecords … })` (`web-app/records/index.ts:
