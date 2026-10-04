@@ -57,8 +57,8 @@ Deno.test(
 );
 
 Deno.test(
-    'a switch on idea detail keeps the id'
-    + ' (D35 stays put)',
+    'a switch on idea detail keeps its ideaId'
+    + ' (D16)',
     () => {
         assertStrictEquals(
             urlAfterOrganizationSwitch(
