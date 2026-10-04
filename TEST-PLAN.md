@@ -1969,14 +1969,20 @@ covering the D20–D24 run between them.
   visible; one click (list or detail) navigates
   to `ideas/convert.html`. That click does
   **not** promote (D24 does). Then select Stark
-  Industries in `.org-switcher` before D17–D19.
+  Industries in `.org-switcher` before D17–D19 —
+  the switch leaves `ideas/convert.html` for
+  `ideas/index.html`.
   Pin: tests/presenter-idea.test.ts
        'IdeaPresenter.buildCard exposes a Convert
        affordance only for approved ideas' (decides
        Convert renders for an `approved` idea and
        not for others — `isConvertible()` is a plain
        equality against `approved`, so this
-       generalizes); exploratory — the live
+       generalizes); tests/organization-switcher.test.ts
+       'a switch off convert leaves the ideas index
+       (D16)' (decides a switch on `ideas/convert.html`
+       lands on `/ideas/index.html`, dropping the query
+       and hash); exploratory — the live
        org-switcher navigation and the detail-page
        Convert button
 - [ ] **D17** Navigate to
@@ -4109,7 +4115,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        live content-area measurement
 - [ ] **F75** Open the seeded "Layout Test: Proposal Review
   Cycle" with Auto Fit on — this seed's edges sit inside the
-  node boxes and do not arc past the outermost nodes. PASS:
+  nodes' bounding box and do not arc past the outermost nodes. PASS:
   the whole drawn graph, including the edge curves and waypoints,
   sits inside the canvas
   with margin; nothing clips at any edge (the prior bug
@@ -5808,9 +5814,9 @@ FSM, unlike `flows/detail`).
   and Members lists for Stark. Select "Wayne
   Enterprises" → the page does a FULL reload onto
   Wayne: Ideas shows Wayne's ideas and Members shows
-  Wayne's humans, Stark's humans and Stark's ideas
-  are gone (organization-fenced), AI rows stay because
-  the catalog is global, and the switch paints no
+  Wayne's humans; Stark's humans and Stark's ideas
+  are gone (organization-fenced); AI rows stay because
+  the catalog is global; and the switch paints no
   `Something went wrong` card. Reload the page again WITHOUT
   changing the select → Wayne stays active (the choice
   is stored under `fusion-angle:active-organization-id`
