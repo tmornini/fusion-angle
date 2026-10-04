@@ -1050,6 +1050,11 @@ export function fitBoxToCanvas(
         vbW = canvasW / MAX_ZOOM;
         vbH = canvasH / MAX_ZOOM;
     }
+    if (zoom < MIN_ZOOM) {
+        zoom = MIN_ZOOM;
+        vbW = canvasW / MIN_ZOOM;
+        vbH = canvasH / MIN_ZOOM;
+    }
     return {
         zoom,
         viewBox: {

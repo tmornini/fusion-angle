@@ -1,7 +1,10 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import {
+    buildInteractionState,
     fitBoxToCanvas,
     nodeBoundsBox,
+    zoomIn,
+    zoomOut,
 } from '../web-app/app/flow-interactions.ts';
 import {
     NODE_WIDTH,
@@ -156,6 +159,114 @@ Deno.test(
         );
         assert(r);
         assert(r.zoom <= 2.0 + 0.001);
+    },
+);
+
+Deno.test(
+    'fitBoxToCanvas clamps zoom to MIN_ZOOM for'
+    + ' a huge box',
+    () => {
+        const box = {
+            minX: 0,
+            minY: 0,
+            maxX: 20000,
+            maxY: 20000,
+        };
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, 0,
+        );
+        assert(
+            Math.abs(r.zoom - 0.25) < 1e-9,
+            'zoom lands on MIN_ZOOM',
+        );
+        assertStrictEquals(
+            r.viewBox.w, CANVAS_W / 0.25,
+        );
+        assertStrictEquals(
+            r.viewBox.h, CANVAS_H / 0.25,
+        );
+        assert(
+            Math.abs(
+                r.viewBox.x + r.viewBox.w / 2
+                - (box.minX + box.maxX) / 2,
+            ) < 0.001,
+            'viewBox centers on the box (x)',
+        );
+        assert(
+            Math.abs(
+                r.viewBox.y + r.viewBox.h / 2
+                - (box.minY + box.maxY) / 2,
+            ) < 0.001,
+            'viewBox centers on the box (y)',
+        );
+    },
+);
+
+// Oct 3 walk (F29): Auto Fit off, a fit just under
+// MIN_ZOOM. Zoom in, then out, must restore it.
+Deno.test(
+    'a fit just under MIN_ZOOM restores after'
+    + ' zoom in and out',
+    () => {
+        const wrapW = 910;
+        const wrapH = 549;
+        const box = {
+            minX: 0,
+            minY: 0,
+            maxX: 2000,
+            maxY: 2060,
+        };
+        const fit = fitBoxToCanvas(
+            box, wrapW, wrapH, 0,
+        );
+        const vb = fit.viewBox;
+        assert(
+            vb.y <= box.minY,
+            'fit covers box top',
+        );
+        assert(
+            vb.y + vb.h >= box.maxY,
+            'fit covers box bottom',
+        );
+        assert(
+            vb.x <= box.minX,
+            'fit covers box left',
+        );
+        assert(
+            vb.x + vb.w >= box.maxX,
+            'fit covers box right',
+        );
+        const fitted = {
+            ...buildInteractionState(vb.w, vb.h),
+            zoom: fit.zoom,
+            viewBox: { ...vb },
+        };
+        const zoomedIn = zoomIn(fitted);
+        assert(
+            zoomedIn.viewBox.w < vb.w
+                && zoomedIn.viewBox.h < vb.h,
+            'zoom in shrinks the camera',
+        );
+        const restored = zoomOut(zoomedIn);
+        assert(
+            Math.abs(restored.viewBox.w - vb.w)
+                < 1e-9,
+            'zoom out restores the fitted width',
+        );
+        assert(
+            Math.abs(restored.viewBox.h - vb.h)
+                < 1e-9,
+            'zoom out restores the fitted height',
+        );
+        assert(
+            restored.zoom >= 0.25
+                && restored.zoom <= 2.0,
+            'restored zoom sits inside 0.25..2.0',
+        );
+        assert(
+            Math.abs(fit.zoom - 0.25) < 1e-9,
+            'fit lands on MIN_ZOOM',
+        );
     },
 );
 
