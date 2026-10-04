@@ -154,10 +154,16 @@ async () => {
         return 'first';
     });
     const peer = new BroadcastChannel('fusion-angle:refresh');
+    // Opened after the client's refresh bus, and a bus
+    // delivers to its listeners in the order they opened:
+    // once this one hears the broadcast, the client's has.
+    const witness = new BroadcastChannel('fusion-angle:refresh');
+    const heard = new Promise<void>((resolve) => {
+        witness.onmessage = () => resolve();
+    });
     peer.postMessage({ accessToken: null });
-    for (let i = 0; i < 5; i++) {
-        await new Promise(r => setImmediate(r));
-    }
+    await heard;
+    witness.close();
     peer.close();
     const result = await client.runSingleFlightRefresh(async () => {
         posts += 1;
