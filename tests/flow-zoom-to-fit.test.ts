@@ -259,9 +259,8 @@ Deno.test(
             'zoom out restores the fitted height',
         );
         assert(
-            restored.zoom >= 0.25
-                && restored.zoom <= 2.0,
-            'restored zoom sits inside 0.25..2.0',
+            Math.abs(restored.zoom - fit.zoom) < 1e-9,
+            'zoom out restores the fitted zoom',
         );
         assert(
             Math.abs(fit.zoom - 0.25) < 1e-9,
