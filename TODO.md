@@ -1222,6 +1222,20 @@ Off the critical path; each with its oracle.
   `--parallel` with no failure in
   `tests/api-shadow-ledger-tokens.test.ts`, or its
   failure has a named cause and a fix
+- `tests/api-flow-document.test.ts:1123` (`e2e: an
+  undo racing a save — the loser 412s…`) failed once
+  in a `./test validate` run on 2026-10-04, on a
+  docs-only change atop `30a77f4d`, and passed on
+  re-run with no code change; the failing assert was
+  not captured. Like the bullet above, it races two
+  server-side operations by design, on the memory
+  backend through `handleRequest`, and touches no
+  `navigator.locks` or `BroadcastChannel`, so the
+  per-worker prefix preload will not fix it.
+  Oracle: ten consecutive `./test` runs under
+  `--parallel` with no failure in
+  `tests/api-flow-document.test.ts`, or its failure
+  has a named cause and a fix
 - An inner pair of a composed operation skipped while the
   top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
