@@ -52,6 +52,7 @@ run_memory() {
         --preload ./tests/hmac-test-key.ts
         --preload ./tests/local-storage-stub.ts
         --preload ./tests/session-storage-stub.ts
+        --preload ./tests/worker-name-prefix.ts
     )
     # Under --parallel every file is a worker in one
     # process, and navigator.locks and BroadcastChannel
