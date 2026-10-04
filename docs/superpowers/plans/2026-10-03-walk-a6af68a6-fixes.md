@@ -931,33 +931,94 @@ under the minimum zoom must land on that minimum,
 so a later zoom-out clamp returns the same width
 and height.
 
+**Decision (owner, Oct 4): the minimum zoom wins.**
+A fit always lands inside `0.25`–`2.0`. Content
+wider or taller than `canvas / 0.25` is cropped
+about the box center. While the raw box span fits
+inside `canvas / 0.25`, the clamp eats only the
+`ZOOM_TO_FIT_PADDING_PX` (`70`) padding and the
+viewBox still contains the box. Past that span, no
+canvas-aspect viewBox at zoom `0.25` can contain
+the box, whatever the clamp formula. So a
+containment assert belongs on the walk test, not on
+the huge-box test. The first draft of this task
+paired a `20000` box with containment asserts. That
+draft was never committed. It is replaced here,
+not weakened.
+
 **Abominations:** changing `withCanvasSize`,
 weakening `fitBoxToCanvas viewBox contains a box
 that extends far beyond the node cluster`, editing
-the MAX_ZOOM test.
+the MAX_ZOOM test, adding a containment assert to
+the huge-box test, building the walk test's
+zoomed viewBoxes by hand instead of through
+`zoomIn` and `zoomOut`.
 
-`MIN_ZOOM` is `0.25`. `MAX_ZOOM` is `2.0`. Both
-already exist in `flow-interactions.ts`. Today
-`fitBoxToCanvas` clamps only when `zoom > MAX_ZOOM`.
-Oct 3: Auto Fit off kept a fitted viewBox about
-`3644.39×2198.65` (zoom about `0.2497` on a
+`MIN_ZOOM` is `0.25`. `MAX_ZOOM` is `2.0`.
+`ZOOM_STEP` is `0.1`. All three already exist in
+`flow-interactions.ts`. Today `fitBoxToCanvas`
+clamps only when `zoom > MAX_ZOOM`.
+`applyButtonZoom` clamps every button step to
+`[MIN_ZOOM, MAX_ZOOM]` and rescales the viewBox by
+`prevZoom / nextZoom`, so a fit under `0.25` can
+never be returned to once you zoom in.
+
+Oct 3 (F29): Auto Fit off kept a fitted viewBox
+about `3644.39×2198.65` (zoom about `0.2497` on a
 `910×549` wrap). Zoom in shrank it. Zoom out
 clamped to `0.25` and landed `3640×2196`
 (`910/0.25` by `549/0.25`), not the fitted camera.
 PASS text for that walk requires width and height
 to shrink, then restore, inside `0.25`–`2.0`.
 
-- [ ] **Step 1: Write the failing test**
+Measured at `a937df40` (numbers the steps below
+rely on):
 
-Insert it immediately after
-`fitBoxToCanvas clamps zoom to MAX_ZOOM for tiny
-content with panel offset`. Do not edit that test.
-Do not edit `fitBoxToCanvas viewBox contains a box
-that extends far beyond the node cluster`.
+- Walk box `{0, 0, 2000, 2060}` on `910×549`,
+  panel offset `0`, is height-bound. Today the fit
+  is zoom `0.24954…`, viewBox
+  `{-823.32, -70, 3646.63, 2200}`. Zoom in lands
+  `0.3495…`. Zoom out clamps to `0.25` and lands
+  `3639.9999999999995×2196`, off the fit by
+  `-6.63` and `-4`.
+- With the clamp, the same fit is zoom `0.25`,
+  viewBox `{-820, -68, 3640, 2196}`, which contains
+  `0..2000` by `0..2060`. Zoom in lands `0.35` at
+  `2600×1568.57…`. Zoom out lands `0.25` at
+  `3639.9999999999995×2196`, within `5e-13` of the
+  fit. Hence the `1e-9` tolerance, not strict
+  equality: `0.35 - 0.1` is `0.24999999999999997`
+  and the zoom-out clamp rounds it back to `0.25`.
+- Huge box `0..20000` both axes on `1200×800`,
+  offset `0`. Today: zoom `0.0397…`, viewBox
+  `{-5105, -70, 30210, 20140}`. With the clamp:
+  zoom `0.25`, viewBox `{7600, 8400, 4800, 3200}`,
+  center `(10000, 10000)`.
 
-`CANVAS_W` is `1200`. `CANVAS_H` is `800`. `assert`
-and `assertStrictEquals` are already imported.
-`fitBoxToCanvas` is already imported.
+- [ ] **Step 1: Write the failing tests**
+
+Widen the `flow-interactions.ts` import at the top
+of `tests/flow-zoom-to-fit.test.ts` to:
+
+```ts
+import {
+    buildInteractionState,
+    fitBoxToCanvas,
+    nodeBoundsBox,
+    zoomIn,
+    zoomOut,
+} from '../web-app/app/flow-interactions.ts';
+```
+
+`assert` and `assertStrictEquals` are already
+imported. `CANVAS_W` is `1200`. `CANVAS_H` is
+`800`.
+
+Insert both tests, in this order, immediately
+after `fitBoxToCanvas clamps zoom to MAX_ZOOM for
+tiny content with panel offset`. Do not edit that
+test. Do not edit `fitBoxToCanvas viewBox contains
+a box that extends far beyond the node cluster`.
 
 ```ts
 Deno.test(
@@ -973,25 +1034,105 @@ Deno.test(
         const r = fitBoxToCanvas(
             box, CANVAS_W, CANVAS_H, 0,
         );
-        assert(r);
-        assert(Math.abs(r.zoom - 0.25) < 1e-9);
+        assert(
+            Math.abs(r.zoom - 0.25) < 1e-9,
+            'zoom lands on MIN_ZOOM',
+        );
         assertStrictEquals(
             r.viewBox.w, CANVAS_W / 0.25,
         );
         assertStrictEquals(
             r.viewBox.h, CANVAS_H / 0.25,
         );
-        assert(r.viewBox.x <= box.minX);
         assert(
-            r.viewBox.x + r.viewBox.w >= box.maxX,
+            Math.abs(
+                r.viewBox.x + r.viewBox.w / 2
+                - (box.minX + box.maxX) / 2,
+            ) < 0.001,
+            'viewBox centers on the box (x)',
         );
-        assert(r.viewBox.y <= box.minY);
         assert(
-            r.viewBox.y + r.viewBox.h >= box.maxY,
+            Math.abs(
+                r.viewBox.y + r.viewBox.h / 2
+                - (box.minY + box.maxY) / 2,
+            ) < 0.001,
+            'viewBox centers on the box (y)',
+        );
+    },
+);
+
+// Oct 3 walk (F29): Auto Fit off, a fit just under
+// MIN_ZOOM. Zoom in, then out, must restore it.
+Deno.test(
+    'a fit just under MIN_ZOOM restores after'
+    + ' zoom in and out',
+    () => {
+        const wrapW = 910;
+        const wrapH = 549;
+        const box = {
+            minX: 0,
+            minY: 0,
+            maxX: 2000,
+            maxY: 2060,
+        };
+        const fit = fitBoxToCanvas(
+            box, wrapW, wrapH, 0,
+        );
+        const vb = fit.viewBox;
+        assert(
+            vb.y <= box.minY,
+            'fit covers box top',
+        );
+        assert(
+            vb.y + vb.h >= box.maxY,
+            'fit covers box bottom',
+        );
+        assert(
+            vb.x <= box.minX,
+            'fit covers box left',
+        );
+        assert(
+            vb.x + vb.w >= box.maxX,
+            'fit covers box right',
+        );
+        const fitted = {
+            ...buildInteractionState(vb.w, vb.h),
+            zoom: fit.zoom,
+            viewBox: { ...vb },
+        };
+        const zoomedIn = zoomIn(fitted);
+        assert(
+            zoomedIn.viewBox.w < vb.w
+                && zoomedIn.viewBox.h < vb.h,
+            'zoom in shrinks the camera',
+        );
+        const restored = zoomOut(zoomedIn);
+        assert(
+            Math.abs(restored.viewBox.w - vb.w)
+                < 1e-9,
+            'zoom out restores the fitted width',
+        );
+        assert(
+            Math.abs(restored.viewBox.h - vb.h)
+                < 1e-9,
+            'zoom out restores the fitted height',
+        );
+        assert(
+            restored.zoom >= 0.25
+                && restored.zoom <= 2.0,
+            'restored zoom sits inside 0.25..2.0',
+        );
+        assert(
+            Math.abs(fit.zoom - 0.25) < 1e-9,
+            'fit lands on MIN_ZOOM',
         );
     },
 );
 ```
+
+The restore asserts come before `fit lands on
+MIN_ZOOM` on purpose: the red then names the walk
+symptom, not the mechanism.
 
 - [ ] **Step 2: Watch the red**
 
@@ -1007,14 +1148,23 @@ deno test --frozen --no-check \
     --preload ./tests/hmac-test-key.ts \
     --preload ./tests/local-storage-stub.ts \
     --preload ./tests/session-storage-stub.ts \
-    --filter "clamps zoom to MIN_ZOOM" \
+    --filter "MIN_ZOOM" \
     tests/flow-zoom-to-fit.test.ts
 ```
 
-Expected FAIL because zoom is well under `0.25`
-and `viewBox.w` is well above `CANVAS_W / 0.25`.
-If the test already passes, or fails to load,
-stop.
+Expected: 2 tests run, 2 FAIL.
+
+- `fitBoxToCanvas clamps zoom to MIN_ZOOM for a
+  huge box` fails on `zoom lands on MIN_ZOOM`
+  (zoom about `0.0397`).
+- `a fit just under MIN_ZOOM restores after zoom in
+  and out` fails on `zoom out restores the fitted
+  width` (`3639.9999999999995` against
+  `3646.63…`). Its four containment asserts and
+  `zoom in shrinks the camera` pass before it.
+
+If either test passes, fails on a different
+assert, or the file fails to load, stop.
 
 - [ ] **Step 3: Clamp after the MAX_ZOOM clamp**
 
@@ -1036,29 +1186,20 @@ shape for `MIN_ZOOM` immediately after the
 Do not change the `x` or `y` formulas. Do not
 change `withCanvasSize`.
 
-- [ ] **Step 4: Watch the green, or stop**
+- [ ] **Step 4: Watch the green**
 
 Re-run the Step 2 command.
 
-The zoom and the width and height assertions
-should pass: the clamp assigns `MIN_ZOOM` and
-`canvas / MIN_ZOOM`.
+Expected: 2 tests run, 2 pass. The huge box lands
+`{7600, 8400, 4800, 3200}`. The walk fit lands
+`{-820, -68, 3640, 2196}` and the round trip
+returns to it within `1e-9`.
 
-The contains assertions compare a centered
-viewBox of `CANVAS_W / 0.25` by `CANVAS_H / 0.25`
-(`4800×3200`) with a box whose span is `20000`.
-A centered box of that clamped size does not
-cover `0..20000`. If those four `assert` lines
-fail after the clamp is in, stop. Do not delete
-them. Do not shrink the box. Do not change the
-clamp formula. Do not commit. Report the red
-contains checks and leave the task open.
-
-If every assertion passes, continue.
+If either fails, stop. Do not loosen a tolerance,
+reorder, or delete an assert. Do not commit.
+Report the failing assert and its numbers.
 
 - [ ] **Step 5: Validate and commit**
-
-Only if Step 4 was fully green.
 
 ```bash
 export DENO_DIR="$TMPDIR/deno-dir"
@@ -1068,18 +1209,29 @@ git add web-app/app/flow-interactions.ts \
 git commit -m "$(cat <<'EOF'
 Clamp a fitted camera to the minimum zoom
 
-Co-Authored-By: Grok 4.7 <noreply@x.ai>
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
 )"
 ```
 
+This trailer is the owner's Oct 4 choice for this
+commit. It replaces the Global Constraints trailer
+for Task 4 only.
+
 - [ ] **Step 6: Reviews**
 
-Skip if Step 4 stopped the task. Otherwise: fresh
-planner, spec-compliance, then a different fresh
-planner, code-quality. Prompts start with
-`Go to Medium Church!`. The MAX_ZOOM test and the
-far-beyond contains test must be untouched.
+Fresh planner, spec-compliance, then a different
+fresh planner, code-quality. Prompts start with
+`Go to Medium Church!`. Reviewers check:
+
+- The MAX_ZOOM test and the far-beyond contains
+  test are untouched.
+- The huge-box test carries no containment assert.
+- The walk test drives `zoomIn` and `zoomOut` on a
+  state built from the fit, and asserts the fit
+  contains the raw box.
+- The product diff is the five-line clamp and
+  nothing else.
 
 ---
 
