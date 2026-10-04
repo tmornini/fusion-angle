@@ -202,6 +202,39 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'fitBoxToCanvas clamps zoom to MIN_ZOOM for'
+    + ' a huge box with panel offset',
+    () => {
+        const box = {
+            minX: 0,
+            minY: 0,
+            maxX: 20000,
+            maxY: 20000,
+        };
+        const r = fitBoxToCanvas(
+            box, CANVAS_W, CANVAS_H, PANEL,
+        );
+        assert(
+            Math.abs(r.zoom - 0.25) < 1e-9,
+            'zoom lands on MIN_ZOOM',
+        );
+        assertStrictEquals(
+            r.viewBox.w, CANVAS_W / 0.25,
+        );
+        const cx = (box.minX + box.maxX) / 2;
+        const pixelXOfBoxCenter =
+            (cx - r.viewBox.x) * CANVAS_W / r.viewBox.w;
+        assert(
+            Math.abs(
+                pixelXOfBoxCenter
+                - (CANVAS_W + PANEL) / 2,
+            ) < 0.5,
+            'box center sits mid visible region',
+        );
+    },
+);
+
 // Oct 3 walk (F29): Auto Fit off, a fit just under
 // MIN_ZOOM. Zoom in, then out, must restore it.
 Deno.test(
