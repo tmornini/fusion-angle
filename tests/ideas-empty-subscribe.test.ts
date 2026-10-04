@@ -148,9 +148,7 @@ Deno.test(
                 await import(
                     './client-init.ts'
                 );
-            const {
-                getClient, putClient,
-            } = await import(
+            const { getClient } = await import(
                 '../web-app/app/client.ts'
             );
             const db = memoryDbAdapter();
@@ -165,20 +163,9 @@ Deno.test(
             const token = await organizationToken();
             const client = getClient();
             client.putSessionToken(token);
-            const reclaim = (): void => {
-                g['window'] = win;
-                g['document'] = doc;
-                putClient(client);
-                client.putSessionToken(token);
-            };
             const { init } = await import(
                 '../web-app/ideas/index.ts'
             );
-            // No other file can replace these globals:
-            // under --parallel each test file is a worker
-            // with globals of its own. The empty list
-            // reads this window's private bus.
-            reclaim();
             await init();
             assert(
                 listStub.innerHTML.includes(
@@ -246,7 +233,6 @@ Deno.test(
             const poster = new BroadcastChannel(
                 CHANNEL_NAME,
             );
-            reclaim();
             poster.postMessage({ kind: 'full' });
             await bellHandled;
             // The two PUTs alone must not wake the page:
