@@ -1,6 +1,7 @@
 import { assertMatch, assertStrictEquals } from '@std/assert';
 import {
     organizationSwitcherHtml,
+    urlAfterOrganizationSwitch,
 } from '../web-app/app/organization-switcher.ts';
 
 const TWO = [
@@ -27,3 +28,44 @@ Deno.test('organizationSwitcherHtml is empty below two orgs', () => {
             .toString(),
         '');
 });
+
+Deno.test(
+    'a switch off convert leaves the ideas'
+    + ' index (D16)',
+    () => {
+        assertStrictEquals(
+            urlAfterOrganizationSwitch(
+                'http://local/ideas/convert.html'
+                + '?ideaId=WurwPqXxGtLhRAoCEcPzfQ'
+                + '#stay',
+            ),
+            '/ideas/index.html',
+        );
+    },
+);
+
+Deno.test(
+    'a switch on the ideas index keeps its query',
+    () => {
+        assertStrictEquals(
+            urlAfterOrganizationSwitch(
+                'http://local/ideas/index.html?x=1',
+            ),
+            '/ideas/index.html?x=1',
+        );
+    },
+);
+
+Deno.test(
+    'a switch on idea detail keeps the id'
+    + ' (D35 stays put)',
+    () => {
+        assertStrictEquals(
+            urlAfterOrganizationSwitch(
+                'http://local/ideas/detail.html'
+                + '?ideaId=999',
+            ),
+            '/ideas/detail.html?ideaId=999',
+        );
+    },
+);

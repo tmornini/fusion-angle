@@ -30,11 +30,30 @@ export function organizationSwitcherHtml(
         class="org-set-default">Set as default</button></span>`;
 }
 
-// Persist the chosen org and re-scope via a FULL reload: boot
-// re-exchanges a scoped token from the persisted id, so no
-// mixed-org view can survive the switch. Reload only on a
-// confirmed persist — a false return means the id never
-// landed, so a reload would silently keep the prior org.
+export function urlAfterOrganizationSwitch(
+    href: string,
+): string {
+    const url = new URL(href, 'http://local');
+    if (url.pathname.endsWith(
+        '/ideas/convert.html',
+    )) {
+        url.pathname = url.pathname.replace(
+            /convert\.html$/,
+            'index.html',
+        );
+        url.search = '';
+        url.hash = '';
+    }
+    return url.pathname + url.search + url.hash;
+}
+
+// Persist the chosen organization and re-scope.
+// Boot re-exchanges a scoped token from the
+// persisted id, so no mixed view survives. A
+// convert URL leaves for the ideas index; every
+// other URL reloads. Move only after a confirmed
+// persist — a false return means the id never
+// landed, so leaving would keep the prior one.
 function switchToOrganization(organization: string): void {
     if (!putPreference(ACTIVE_ORGANIZATION_ID, organization)) {
         showToast(
@@ -42,6 +61,16 @@ function switchToOrganization(organization: string): void {
             + ' please try again.',
             'error',
         );
+        return;
+    }
+    const next = urlAfterOrganizationSwitch(
+        location.href,
+    );
+    const here = location.pathname
+        + location.search
+        + location.hash;
+    if (next !== here) {
+        location.assign(next);
         return;
     }
     location.reload();
