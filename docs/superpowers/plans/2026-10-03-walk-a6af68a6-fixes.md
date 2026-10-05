@@ -1258,13 +1258,18 @@ deno test --frozen --no-check \
     --preload ./tests/hmac-test-key.ts \
     --preload ./tests/local-storage-stub.ts \
     --preload ./tests/session-storage-stub.ts \
-    --filter "signed baseline \\(K17\\)" \
+    --filter "/signed baseline \\(K17\\)/" \
     tests/presenter-project-objectives.test.ts
 ```
 
 Expected: PASS for `approved row with no actual
-reads its signed baseline (K17)`. The readout pin
-is U+2212 + `100`.
+reads its signed baseline (K17)`, printed as
+`ok | 1 passed | 0 failed | 11 filtered out`. The
+readout pin is U+2212 + `100`. `deno test` reads a
+`--filter` as a substring unless it is wrapped in
+`/…/`, so an unwrapped `\(` matches a literal
+backslash. A run that reports `0 passed` selected
+nothing: treat it as red.
 
 - [ ] **Step 2: Stop on red**
 

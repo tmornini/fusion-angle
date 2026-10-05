@@ -149,6 +149,16 @@ function organizationToRestore(
     }
 }
 
+function organizationClaim(
+    token: string,
+): string | undefined {
+    try {
+        return principalFromToken(token).organization;
+    } catch {
+        return undefined;
+    }
+}
+
 function requestHeaders(
     token: string,
     contentType: boolean,
@@ -275,6 +285,29 @@ export function createHttpFacade(
             ) ?? flat;
         }
 
+        // The single flight may hand back a peer tab's
+        // token, scoped to the peer's organization.
+        // Exchange it back to the organization the dead
+        // token named; a token with no organization claim,
+        // or one that cannot be decoded, stands.
+        async function scopedLike(
+            access: string,
+            deadToken: string,
+            operationId: string | undefined,
+        ): Promise<string | null> {
+            const wanted = organizationToRestore(deadToken);
+            if (wanted === undefined) {
+                return access;
+            }
+            const held = organizationClaim(access);
+            if (held === undefined || held === wanted) {
+                return access;
+            }
+            return await postOrganizationExchange(
+                access, wanted, operationId,
+            );
+        }
+
         async function exchangeOnce(
             method: string,
             resource: string,
@@ -302,11 +335,18 @@ export function createHttpFacade(
                     }
                 }
             }
-            const access = await client.runSingleFlightRefresh(
-                () => refreshAndScope(token, operationId),
+            const refreshed =
+                await client.runSingleFlightRefresh(
+                    () => refreshAndScope(token, operationId),
+                );
+            if (refreshed === null) {
+                client.navigateToAuth();
+                return first;
+            }
+            const access = await scopedLike(
+                refreshed, token, operationId,
             );
             if (access === null) {
-                client.navigateToAuth();
                 return first;
             }
             client.putSessionToken(access);

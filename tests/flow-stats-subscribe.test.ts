@@ -1,4 +1,4 @@
-import { assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import './hmac-test-key.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { withLocalStorageAsync } from
@@ -29,6 +29,7 @@ const RENAMED = 'Stats flow, renamed in another tab';
 function makeHostStub(): {
     id: string;
     innerHTML: string;
+    readonly renders: number;
     nameEl: { textContent: string };
     addEventListener: () => void;
     querySelector: (selector: string) => unknown;
@@ -40,9 +41,22 @@ function makeHostStub(): {
         innerHTML: '',
         classList: { add: () => {}, remove: () => {} },
     };
+    // Every load writes the host first, before its fetch, so
+    // a wake shows here the moment it is delivered.
+    let markup = '';
+    let renders = 0;
     return {
         id: 'flow-stats',
-        innerHTML: '',
+        get innerHTML(): string {
+            return markup;
+        },
+        set innerHTML(value: string) {
+            markup = value;
+            renders += 1;
+        },
+        get renders(): number {
+            return renders;
+        },
         nameEl,
         addEventListener: () => {},
         querySelector: (selector: string) => {
@@ -99,6 +113,19 @@ Deno.test(
             querySelector: (sel: string) =>
                 sel === '#flow-stats' ? host : null,
         };
+        // A bus delivers to its listeners in the order they
+        // opened. Opened before any page module opens the
+        // page's bus, arrival hears each message before the
+        // page does, and reads what the page had rendered.
+        const arrival = new BroadcastChannel(CHANNEL_NAME);
+        const rendersAtArrival: number[] = [];
+        const firstArrival = new Promise<void>((resolve) => {
+            arrival.onmessage = () => {
+                rendersAtArrival.push(host.renders);
+                resolve();
+            };
+        });
+        let witness: BroadcastChannel | undefined;
         try {
             const { initAdapter } =
                 await import(
@@ -138,6 +165,10 @@ Deno.test(
                 projectId: generateIdentifier(),
                 name: FLOW_NAME,
             });
+            // The creation rang this tab's own bell; the bus
+            // never echoes it to the page, but arrival hears
+            // it, and it must land before the PUT below.
+            await firstArrival;
             const { init } = await import(
                 '../web-app/flows/stats.ts'
             );
@@ -147,6 +178,8 @@ Deno.test(
                 'precondition: the first load names'
                 + ' the flow',
             );
+            const rendersBeforePut = host.renders;
+            const arrivalsBeforePut = rendersAtArrival.length;
             // Another tab renames the flow. The raw
             // document PUT is the wire putFlow drives —
             // the same graph back, a new name and trio —
@@ -179,20 +212,24 @@ Deno.test(
                 },
                 [read],
             );
-            for (let i = 0; i < 25; i++) {
-                await new Promise(
-                    r => setImmediate(r),
-                );
-            }
-            assertStrictEquals(
-                host.nameEl.textContent, FLOW_NAME,
-                'the raw PUT alone must not wake'
-                + ' the page',
-            );
+            // Opened after the page's bus: once it hears the
+            // bell, the page has handled every message up to
+            // and including it.
+            witness = new BroadcastChannel(CHANNEL_NAME);
+            const bellHandled = new Promise<void>((resolve) => {
+                witness!.onmessage = () => resolve();
+            });
             const poster = new BroadcastChannel(
                 CHANNEL_NAME,
             );
             poster.postMessage({ kind: 'full' });
+            await bellHandled;
+            assertEquals(
+                rendersAtArrival.slice(arrivalsBeforePut),
+                [rendersBeforePut],
+                'the raw PUT alone must not wake'
+                + ' the page',
+            );
             // BroadcastChannel delivery and the re-run
             // load's fetch/render pipeline are
             // asynchronous and not fixed in length, so
@@ -218,6 +255,8 @@ Deno.test(
                 + ' on the cross-tab bell',
             );
         } finally {
+            arrival.close();
+            witness?.close();
             // The divorce point opened ONE channel per
             // process when init subscribed; a test process
             // has no unload to reclaim it, so release it

@@ -32,11 +32,18 @@ Deno.test(
 );
 
 Deno.test(
-    'a reachable token organization is scoped',
+    'a reachable token organization is scoped when it is'
+    + ' the stored choice or none is stored',
     () => {
         assertEquals(
             resolveBootOrganizationBranch(
-                'a', ['a', 'b'], 'b',
+                'a', ['a', 'b'], 'a',
+            ),
+            { kind: 'scoped', id: 'a' },
+        );
+        assertEquals(
+            resolveBootOrganizationBranch(
+                'a', ['a', 'b'], null,
             ),
             { kind: 'scoped', id: 'a' },
         );
@@ -51,6 +58,19 @@ Deno.test(
                 'a', [], 'a',
             ),
             { kind: 'walk' },
+        );
+    },
+);
+
+Deno.test(
+    'a reachable stored choice exchanges a token scoped'
+        + ' elsewhere',
+    () => {
+        assertEquals(
+            resolveBootOrganizationBranch(
+                'a', ['a', 'b'], 'b',
+            ),
+            { kind: 'exchange', id: 'b' },
         );
     },
 );

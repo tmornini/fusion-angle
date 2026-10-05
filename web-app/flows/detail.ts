@@ -1723,17 +1723,12 @@ function onFlowLoaded(
             loaded.aiMembers,
             loaded.recordAttributes,
         );
-    // migrateToCenter=true ONLY here — this is the one
-    // per-load construction, never the commit()-driven
-    // per-render path (flow-designer.ts's constructor comment
-    // has the full fix-wave-2 root cause).
     const presenter =
         new FlowDesignerPresenter(
             initialSnap,
             FALLBACK_W,
             FALLBACK_H,
             pageState.history(),
-            true,
         );
     pageState.setPresenter(presenter);
     const panelStateRef =

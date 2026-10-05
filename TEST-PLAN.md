@@ -456,7 +456,7 @@ any AT red.
 - [ ] **AT1** Run `deno check --frozen api client shared
   server tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` minus the seven racing suites for the main `Deno.test` suite, written against `@std/assert`, then `TZ=UTC deno test --frozen --no-check --sanitize-ops --sanitize-resources` serially on those seven racing suites, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; all three carry the named permissions and three preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub). PASS: exits 0; each pass reports `ok | N passed | 0 failed`, on 4 Oct `./test` printed `ok | 4034 passed | 0 failed | 11 ignored` for the main suite, `ok | 87 passed | 0 failed` for the serial pass of the racing suites, and `ok | 8 passed | 0 failed` for the timezone suite. The 11 ignored are the live-Postgres placeholders, which skip without `POSTGRES_URL`; AT4 runs the eleven files `bin/test-postgres` names: `tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`, `tests/pg-message-plane.test.ts`, `tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`, `tests/pg-explain.test.ts`, `tests/pg-identifier-order.test.ts`, `tests/pg-standalone-read.test.ts`, `tests/schema-lifecycle.test.ts`, `tests/pg-ledger-store.test.ts`, and `tests/pg-ledger-seed.test.ts`.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and four preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub, the per-worker prefix on `BroadcastChannel` and `navigator.locks` names). PASS: exits 0; each pass reports `ok | N passed | 0 failed`, on 4 Oct `./test` printed `ok | 4124 passed | 0 failed | 11 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite. The 11 ignored are the live-Postgres placeholders, which skip without `POSTGRES_URL`; AT4 runs the eleven files `bin/test-postgres` names: `tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`, `tests/pg-message-plane.test.ts`, `tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`, `tests/pg-explain.test.ts`, `tests/pg-identifier-order.test.ts`, `tests/pg-standalone-read.test.ts`, `tests/schema-lifecycle.test.ts`, `tests/pg-ledger-store.test.ts`, and `tests/pg-ledger-seed.test.ts`.
   Pin: exploratory — the command is its own witness
 - [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api client shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `client/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, `bin/postgres-seed`, and `bin/compose-lib`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `client/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
@@ -3163,7 +3163,13 @@ opens and renders.)
        tests/adapters-flow-queries.test.ts 'getFlowGraph
        lays out an auto-layout flow whose stored positions
        are placeholders' (decides the re-layout-on-load
-       this case must not read as a fail); exploratory —
+       this case must not read as a fail);
+       tests/flow-designer-open.test.ts 'with Auto
+       Layout off, boot paints the positions the
+       designer left (F30)' (decides a boot with Auto
+       Layout off paints exactly the positions the
+       toggle and rename PUTs stored — no recentre);
+       exploratory —
        the 800 ms debounce and the navigate-away/back cycle
 - [ ] **F31** Navigate to
   `flows/detail.html?flowId=nonexistent`. PASS:
@@ -6335,14 +6341,20 @@ document order with the rest of this section.
        exploratory — the live modal and the visual
        bottom-of-list placement
 - [ ] **K3** Click `Edit` on "Lower expenses"; confirm
-  modal opens pre-filled. Change the name to "Cut costs";
-  click Save. PASS if the list re-renders with the new
-  name. K30 and K7 later confirm this rename resolves
-  temporally.
+  modal opens pre-filled. Select the whole name
+  (`Input.dispatchKeyEvent` `keyDown` `a` with
+  modifiers 4 and `commands: ["selectAll"]`, or a
+  triple-click in the field), type
+  "Cut costs", and click Save once. PASS if the list
+  re-renders with exactly "Cut costs". Every Save
+  writes a revision row K30 shows verbatim: a smashed
+  or repeated name is a driver artifact — note it,
+  re-seed, and re-drive K3 before K30/K7. K30 and K7
+  later confirm this rename resolves temporally.
   Pin: exploratory — the live modal, pre-fill, and
        re-render; `postObjectiveRevision` in
-       web-app/app/adapters/objectives.ts (the write this
-       Save triggers) carries no test today
+       client/objectives.ts (the write this Save
+       triggers) carries no test today
 - [ ] **K4** Click `Archive` on "Test Objective" (K2);
   confirm dialog opens. Confirm. PASS if the objective
   moves from active to the Archived sub-section, with
@@ -6794,6 +6806,12 @@ K30 only describes.
     "Cut costs"
   - Baseline revisions appear as their own event rows
     (not collapsed)
+  - Each "Objective revised" row dated after K3 reads
+    exactly "Cut costs" (the seed's own first
+    revision, dated before K3, reads "Lower
+    expenses"); a smashed name there is K3's typing,
+    stored verbatim — re-seed and re-drive K3, not
+    FAIL
   Pin: tests/presenter-project-score-history.test.ts
        'merges all four streams chronologically';
        tests/presenter-project-score-history.test.ts
@@ -6802,9 +6820,13 @@ K30 only describes.
        name correct for its own timestamp, GIVEN a
        resolver — the production resolver is inline,
        unexported glue in web-app/projects/detail.ts and
-       carries no test of its own); exploratory — the
-       live pre-/post-rename split on this specific
-       project
+       carries no test of its own);
+       tests/presenter-project-score-history.test.ts
+       'revision event row shows the new objective
+       name' (decides a revision row prints that
+       revision's own name);
+       exploratory — the live pre-/post-rename split on
+       this specific project
 - [ ] **K7** Reopen Smart Inventory Optimization's
   history modal (same as K30). PASS if events dated
   before K3's edit display the OLD objective name
@@ -6836,9 +6858,18 @@ K30 only describes.
   app navigates to its detail page.
   Pin: tests/adapters-records.test.ts 'postRecordChange
        create writes the row and the initial state
-       event'; exploratory — the create page's fields,
-       the live navigation, and the new card's position
-       at the bottom of the list
+       event'; tests/adapters-refresh-mutex.test.ts 'a
+       boot refresh asked for Stark keeps Stark when a
+       Wayne tab broadcasts' (decides the detail page
+       boots in the organization the create wrote
+       under, even when a same-jar tab in another
+       organization refreshes during the navigation);
+       tests/adapters-refresh-mutex.test.ts 'a 401
+       recovery that adopts a Wayne peer token
+       exchanges it back to Stark'; exploratory — the
+       create page's fields, the live navigation, and
+       the new card's position at the bottom of the
+       list
 - [ ] **R3** Open Customer Profile detail. PASS: read mode
   shows name + description + attribute table sorted by
   sort_order + Bound flows (Customer Onboarding, Lead-to-

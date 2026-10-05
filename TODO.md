@@ -480,8 +480,18 @@ skew tests, which went with item 8's trio.
    (`docs/superpowers/specs/2026-10-01-membership-and-versions-design.md`).
    The census is one pattern,
    `organizations/:id/work-orders/:id/history`
-   (`tests/parted-reads.test.ts`). Its `./test` seconds
-   and readyMs are the next measure, not this record.
+   (`tests/parted-reads.test.ts`). `./test` 104.6 s →
+   112.8 s (medians of three; the base three
+   invocations: parallel pass, serial lane, and tz; the
+   tip two: parallel pass and tz); readyMs per list
+   page, `9a8396a` → base → tip (medians of 25; the base
+   `32a79f5`, whose sweep `measurements/history.jsonl`
+   does not hold, the tip `7d34749`): dashboard 61.5 →
+   61.7 → 60.6, ideas 58.4 → 57.4 → 52.5, projects 62.3
+   → 61.0 → 62.5, records 54.9 → 57.6 → 53.7, flows 56.4
+   → 55.6 → 56.3, workbox 142.0 → 142.3 → 141.5,
+   members 54.1 → 55.1 → 52.1, identities 56.4 → 53.5 →
+   50.3, organization 54.1 → 54.8 → 49.7.
    The fifth follows: work-order events, which builds
    that read once, as a heads read of the work order's
    event documents. The covenant, and
@@ -1135,107 +1145,21 @@ skew tests, which went with item 8's trio.
 
 Off the critical path; each with its oracle.
 
-- Three fixed `setImmediate` drains guard negative
-  assertions after an asynchronous delivery: the raw-PUT
-  "must not wake the page" checks in
-  `tests/flow-stats-subscribe.test.ts:182-190` and
-  `tests/ideas-empty-subscribe.test.ts:190-203`, and the
-  "idle tab ignores a peer refresh broadcast" check in
-  `tests/adapters-refresh-mutex.test.ts:153-155`. A late
-  delivery can only pass them wrongly, never fail them —
-  but this branch saw `tests/ideas-empty-subscribe.test.ts`
-  fail three times under `--parallel` (the file itself
-  untouched; `BroadcastChannel` is process-global) and
-  `tests/adapters-flow-stats.test.ts` fail once, and
-  `ledger-decisions` saw the ideas file fail a fourth
-  and a fifth time, TODO.md its only change and a
-  second gate
-  running beside it, so the
-  fixed count still proves less than it reads as proving;
-  the ideas comment still says its drain matches the
-  post-bell assert, which 90f5c722 turned into a deadline
-  wait.
-  The ledger arc saw four more suites fail under
-  `--parallel`, each green on re-run, three failures in
-  ten `./test` runs on 2026-09-24, and state-by-put
-  (2026-09-25 to 2026-09-29) tripped each of these
-  again and two more, all green on re-run (lines at
-  its tip):
-  `tests/adapters-shared-recovery.test.ts:524`
-  (`recovery leaves the cross-tab active-org preference
-  untouched`; "malformed token: expected 3 segments" at
-  `:546`) and `:489` (`recovery re-scopes to the vessel
-  org claim, not the cross-tab preference`);
-  `tests/apex-destination.test.ts:73`
-  (`probeRefreshSession posts a cookie refresh grant`,
-  one expected and none seen), `:113`
-  (`probeRefreshSession treats 401 as unsigned`), and
-  `:132` (`concurrent probes share one refresh POST`,
-  asserting one POST at `:158`);
-  `tests/adapters-invitations.test.ts:1063` (`a
-  re-minted token without the seat earns one more
-  attempt`: the re-minted token did not list the
-  organization), `:1118` (`two re-minted tokens without
-  the seat surface a named failure`), `:989` (`the
-  remint waits for an in-flight facade refresh`),
-  `:929` (`a failed re-mint after accept surfaces, seat
-  kept`), and `:880` (`cookie-session accept remints via
-  refresh POST`); and (the next bullet)
-  `tests/api-shadow-ledger-tokens.test.ts:859`. The
-  first three are session and token races, not drains,
-  and share a confirmed cause: under `--parallel` every
-  test file is a worker in one process, and
-  `navigator.locks` and `BroadcastChannel` are shared
-  across those workers, so a refresh in one file waits
-  on another file's `fusion-refresh` lock and adopts
-  its `fusion-angle:refresh` broadcast (signatures: a
-  missing seat after remint, refresh counts below
-  expected, "malformed token"); the harness fix is a
-  `--preload` that gives lock and channel names a
-  per-worker prefix, as
-  `subscribeNamedNotificationEvents` gives the bell a
-  private bus.
-  Oracle: each check reads after a signal that the
-  delivery was processed — a render count on the host
-  stub for the two page tests, a second listener on
-  `fusion-angle:refresh` for the mutex test — and no
-  fixed-count drain remains at those three sites; and
-  each of the three suites above passes ten consecutive
-  `./test` runs, or its failure has a named cause and a
-  fix
-- `tests/api-shadow-ledger-tokens.test.ts:859`
-  (`revokeTokenChain racing a concurrent
-  rotateRefreshJti`: a rotated jti read `issued` where
-  every jti should read `revoked`) — named in the bullet
-  above's 2026-09-24 ten-run sample — is a separate,
-  unexplained mechanism: its test
-  ("revokeTokenChain racing a concurrent
-  rotateRefreshJti on the chain's live successor…",
-  `:859`) deliberately races two server-side ledger
-  operations; nothing it runs touches `navigator.locks`
-  or `BroadcastChannel` (none under `api/`), and it
-  fails under `--parallel` load with "revoked" expected,
-  "issued" got (at `:901`) — an interleaving the test
-  does not pin; it needs its own investigation, and the
-  per-worker prefix preload above will not fix it.
-  Oracle: ten consecutive `./test` runs under
-  `--parallel` with no failure in
-  `tests/api-shadow-ledger-tokens.test.ts`, or its
-  failure has a named cause and a fix
-- `tests/api-flow-document.test.ts:1123` (`e2e: an
-  undo racing a save — the loser 412s…`) failed once
-  in a `./test validate` run on 2026-10-04, on a
-  docs-only change atop `30a77f4d`, and passed on
-  re-run with no code change; the failing assert was
-  not captured. Like the bullet above, it races two
-  server-side operations by design, on the memory
-  backend through `handleRequest`, and touches no
-  `navigator.locks` or `BroadcastChannel`, so the
-  per-worker prefix preload will not fix it.
-  Oracle: ten consecutive `./test` runs under
-  `--parallel` with no failure in
-  `tests/api-flow-document.test.ts`, or its failure
-  has a named cause and a fix
+- `getIdea` (`client/ideas.ts:166`) fans three reads out
+  through `Promise.all` at `:172`, so a rejection settles
+  the caller while its siblings still run, and
+  `tests/adapters-ideas.test.ts:195` (`getIdea throws on
+  missing submission`, `:182`) waits one macrotask turn
+  for them (`11cd89f8`). It was never seen to flake, but
+  one turn proves only that the abandoned reads were
+  fast: `getFlowStats` had the same shape, and with every
+  memory-backend entry delayed by up to 20 ms its twin
+  yield failed the ops sanitizer ("A timer was started in
+  this test, but never completed") until its fan-out
+  settled every read before rejecting.
+  Oracle: a rejected `getIdea` leaves none of its reads
+  in flight, pinned as `tests/adapters-flow-stats.test.ts`
+  pins `getFlowStats`, and the yield at `:195` is gone
 - An inner pair of a composed operation skipped while the
   top-level pair landed answers 201;
   `appendMessagePairOnce` returns void and the gate never
@@ -3369,9 +3293,6 @@ Off the critical path; each with its oracle.
 - The examination report
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
   → 0–2, 6, 9, 11, 13 (its findings are their oracles).
-  The two parallel-race bullets (Critical functionality
-  path, first two) land next, after packageable-client
-  lands
 - 0–2 → 5 (its link token is a secret at rest: item 0
   hoists it, item 2 fences it); item 2 no longer orders
   item 6, since a backup carries the table whole
