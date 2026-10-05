@@ -16,8 +16,6 @@ import {
 } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import { byAtThenIdAscending } from
-    '../shared/identifier.ts';
 
 /* ── Types ───────────────── */
 
@@ -186,20 +184,19 @@ export function fieldValuesByEventFromHistory(
     return byEvent;
 }
 
-// Project non-claim history rows into TransitionEvent
-// ASC order for presenters and the transition gate.
+// Project non-claim events into TransitionEvents in the
+// order given, which every caller passes in chain order.
 // Creation is first; each later event is a step from
 // the prior node.
 export function projectTransitions(
     workOrderId: Id,
     events: readonly WorkOrderEventEntity[],
 ): TransitionEvent[] {
-    // ASC by the wire's (at, id) total order — not at alone.
-    // History is DESC; a stable sort on at would reverse
-    // equal-timestamp ties (same second, later id first).
+    // Chain order is the order (spec Decision 8): the
+    // ledger's, oldest first. Two events can share an `at`,
+    // so no sort on `at` or id may reorder them.
     const transitions = events
-        .filter(ev => !isClaimState(ev.state))
-        .toSorted(byAtThenIdAscending);
+        .filter(ev => !isClaimState(ev.state));
     const out: TransitionEvent[] = [];
     let prior: Id | null = null;
     for (const ev of transitions) {

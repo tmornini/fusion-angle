@@ -1320,3 +1320,22 @@ Deno.test('a work order\'s events fold from its versions in'
             'claim_released'],
     );
 });
+
+Deno.test('projectTransitions keeps chain order for two'
++ ' events at one at', () => {
+    const at = '2026-01-01T00:00:00.000000Z';
+    const event = (id: string, state: string) => ({
+        id, state, member_id: 'XXZruirZyAOoRpNxaDnpSA', at,
+        field_values: [],
+    });
+    const moves = projectTransitions('wo', [
+        event('z-first', 'n-1'),
+        event('a-second', 'n-2'),
+    ]);
+    assertEquals(moves.map((m) => m.id), [
+        'z-first', 'a-second',
+    ]);
+    assertEquals(moves.map((m) => m.toNodeId), [
+        'n-1', 'n-2',
+    ]);
+});
