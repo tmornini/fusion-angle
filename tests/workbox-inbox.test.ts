@@ -3,7 +3,6 @@ import {
     assertEquals,
     assertNotStrictEquals,
     assertStrictEquals,
-    assertThrows,
 } from '@std/assert';
 import {
     memoryDbAdapter,
@@ -13,7 +12,10 @@ import {
     organizationItem,
     type RequestContext,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     createWorkOrderFromFlow,
@@ -25,19 +27,17 @@ import {
 } from
 '../client/flow-mutations.ts';
 import {
-    getMemberMap,
-    getTransitionEventsByWorkOrder,
-    getWorkOrderActiveClaim,
     getWorkOrders,
     putWorkOrderPosition,
-    type WorkOrder,
-    type TransitionEvent,
 } from '../client/index.ts';
 import {
     buildInboxItems,
-    type ActiveClaim,
 } from
 '../web-app/app/presenters/workbox-inbox.ts';
+import {
+    getInboxRows,
+    type InboxRows,
+} from '../web-app/app/workbox-inbox-rows.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
     FORMER_MEMBER_NAME,
@@ -47,9 +47,6 @@ import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-    Member,
-    MemberId,
-    Id,
 } from '../shared/types.ts';
 import {
     seedHumanMember,
@@ -157,37 +154,13 @@ async function seedFlow(
     });
 }
 
-interface WoTables {
-    workOrders: WorkOrder[];
-    transitionsByWo:
-        Map<Id, readonly TransitionEvent[]>;
-    activeClaimsByWo: Map<Id, ActiveClaim>;
-    memberMap: Map<MemberId, Member>;
-}
+type WoTables = InboxRows;
 
 async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
     const ctx = inPageContext(db, await organizationToken());
-    const workOrders = await getWorkOrders(ctx);
-    const transitionsByWo =
-        await getTransitionEventsByWorkOrder(ctx);
-    const activeClaimsByWo =
-        new Map<Id, ActiveClaim>();
-    for (const wo of workOrders) {
-        const claim = await getWorkOrderActiveClaim(
-            ctx, wo.id, wo.flowGraph.lockTimeout,
-        );
-        if (claim !== null) {
-            activeClaimsByWo.set(wo.id, claim);
-        }
-    }
-    return {
-        workOrders,
-        transitionsByWo,
-        activeClaimsByWo,
-        memberMap: await getMemberMap(ctx),
-    };
+    return await getInboxRows(ctx);
 }
 
 async function setupOneWorkOrder(): Promise<{
@@ -218,8 +191,7 @@ Deno.test(
     + ' active mode with no work orders',
     () => {
         const items = buildInboxItems(
-            [], new Map(), new Map(),
-            new Map(), 'active',
+            [], new Map(), new Map(), 'active',
         );
         assertEquals(items, []);
     },
@@ -230,8 +202,7 @@ Deno.test(
     + ' archived mode with no work orders',
     () => {
         const items = buildInboxItems(
-            [], new Map(), new Map(),
-            new Map(), 'archived',
+            [], new Map(), new Map(), 'archived',
         );
         assertEquals(items, []);
     },
@@ -244,11 +215,10 @@ Deno.test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo, memberMap,
+            workOrders, memberMap,
         } = await tables();
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            new Map(), memberMap, 'active',
+            workOrders, new Map(), memberMap, 'active',
         );
         assertStrictEquals(items.length, 1);
         const item = items[0]!;
@@ -278,11 +248,10 @@ Deno.test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo, memberMap,
+            workOrders, memberMap,
         } = await tables();
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            new Map(), memberMap, 'archived',
+            workOrders, new Map(), memberMap, 'archived',
         );
         assertEquals(items, []);
     },
@@ -296,15 +265,14 @@ Deno.test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo,
+            workOrders,
             activeClaimsByWo, memberMap,
         } = await tables();
         // postWorkOrderCreation already minted a
         // fresh claim event, so it is active.
         assertStrictEquals(activeClaimsByWo.size, 1);
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            activeClaimsByWo, memberMap, 'active',
+            workOrders, activeClaimsByWo, memberMap, 'active',
         );
         assertStrictEquals(items.length, 1);
         assertStrictEquals(
@@ -336,18 +304,16 @@ Deno.test(
             [read],
         );
         const {
-            workOrders, transitionsByWo, memberMap,
+            workOrders, memberMap,
         } = await tables();
         assertEquals(
             buildInboxItems(
-                workOrders, transitionsByWo,
-                new Map(), memberMap, 'active',
+                workOrders, new Map(), memberMap, 'active',
             ),
             [],
         );
         const archived = buildInboxItems(
-            workOrders, transitionsByWo,
-            new Map(), memberMap, 'archived',
+            workOrders, new Map(), memberMap, 'archived',
         );
         assertStrictEquals(archived.length, 1);
         assertStrictEquals(archived[0]!.completed, true);
@@ -389,7 +355,6 @@ Deno.test(
         const tables = await collectTables(db);
         const items = buildInboxItems(
             tables.workOrders,
-            tables.transitionsByWo,
             new Map(),
             tables.memberMap,
             'active',
@@ -397,24 +362,6 @@ Deno.test(
         assertEquals(
             items.map(i => i.position),
             [2.5, 5, 7.5],
-        );
-    },
-);
-
-Deno.test(
-    'buildInboxItems throws when a work order'
-    + ' has no transitions',
-    async () => {
-        const { tables } =
-            await setupOneWorkOrder();
-        const { workOrders, memberMap } =
-            await tables();
-        assertThrows(
-            () => buildInboxItems(
-                workOrders, new Map(),
-                new Map(), memberMap, 'active',
-            ),
-            Error, 'no transitions',
         );
     },
 );
@@ -462,11 +409,10 @@ Deno.test(
             flowId: 'ZOousbbnzpqlxJExVAruYQ',
         });
         const {
-            workOrders, transitionsByWo, memberMap,
+            workOrders, memberMap,
         } = await collectTables(db);
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            new Map(), memberMap, 'active',
+            workOrders, new Map(), memberMap, 'active',
         );
         assertStrictEquals(
             items[0]!.taskInstructions,
@@ -482,11 +428,10 @@ Deno.test(
         const { tables } =
             await setupOneWorkOrder();
         const {
-            workOrders, transitionsByWo, memberMap,
+            workOrders, memberMap,
         } = await tables();
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            new Map(), memberMap, 'active',
+            workOrders, new Map(), memberMap, 'active',
         );
         assertStrictEquals(
             items[0]!.taskInstructions, '',
@@ -547,14 +492,13 @@ Deno.test(
             flowId: 'ZOousbbnzpqlxJExVAruYQ',
         });
         const {
-            workOrders, transitionsByWo, memberMap,
+            workOrders, memberMap,
         } = await tables();
         assertStrictEquals(workOrders.length, 2);
         // Claims ignored: the graph-derivation
         // path alone. Both work orders derive.
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            new Map(), memberMap, 'active',
+            workOrders, new Map(), memberMap, 'active',
         );
         assertStrictEquals(items.length, 2);
     },
@@ -612,12 +556,11 @@ Deno.test(
         assert(leaver !== null);
         await postMembershipRemoval(admin, leaver);
         const {
-            workOrders, transitionsByWo,
+            workOrders,
             activeClaimsByWo, memberMap,
         } = await collectTables(db);
         const items = buildInboxItems(
-            workOrders, transitionsByWo,
-            activeClaimsByWo, memberMap, 'active',
+            workOrders, activeClaimsByWo, memberMap, 'active',
         );
         assertStrictEquals(items.length, 1);
         assertStrictEquals(
@@ -628,3 +571,70 @@ Deno.test(
         );
     },
 );
+
+Deno.test('the inbox reads heads only', async () => {
+    const { db } = await setupOneWorkOrder();
+    const { ctx, sent } = recordedContext(
+        db, await organizationToken(),
+    );
+    await getInboxRows(ctx);
+    assertEquals(
+        sent.filter((request) =>
+            /\/work-orders\/[^/]+\//.test(request.path)),
+        [],
+    );
+});
+
+Deno.test('an inbox item names the head\'s node and last'
++ ' mover', async () => {
+    const { tables, woId } = await setupOneWorkOrder();
+    const t = await tables();
+    const wo = t.workOrders.find((w) => w.id === woId)!;
+    const [item] = buildInboxItems(
+        [wo], t.activeClaimsByWo, t.memberMap, 'active',
+    );
+    const node = wo.flowGraph.nodes.find(
+        (n) => n.id === wo.nodeId,
+    )!;
+    assertStrictEquals(item!.stateName, node.name);
+    assertStrictEquals(
+        item!.lastTransitionedAt, wo.transition.at,
+    );
+});
+
+// A zero lockTimeout lapses the birth claim at once: the head
+// stores it, and the page's clock judges it not active.
+Deno.test('a lapsed claim is not an active claim in the'
++ ' inbox', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedHumanMember(
+        db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
+    );
+    const ctx = inPageContext(db, await organizationToken());
+    await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
+    const graph = buildLinearGraph();
+    await putFlow(ctx, 'ZOousbbnzpqlxJExVAruYQ', {
+        name: 'Test flow',
+        isLocked: false,
+        isAutoLayout: true,
+        isAutoFit: true,
+        lockTimeout: 0,
+        nodes: graph.nodes,
+        edges: graph.edges,
+    });
+    const woId = generateIdentifier();
+    await createWorkOrderFromFlow(ctx, {
+        workOrderId: woId,
+        flowLinkId: generateIdentifier(),
+        flowId: 'ZOousbbnzpqlxJExVAruYQ',
+    });
+    const t = await getInboxRows(ctx);
+    const wo = t.workOrders.find((w) => w.id === woId)!;
+    assertStrictEquals(wo.claim.state, 'claimed');
+    assertEquals(t.activeClaimsByWo.has(woId), false);
+    const [item] = buildInboxItems(
+        [wo], t.activeClaimsByWo, t.memberMap, 'active',
+    );
+    assertStrictEquals(item!.claimedByName, null);
+});

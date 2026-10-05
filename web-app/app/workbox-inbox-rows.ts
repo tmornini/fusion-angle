@@ -1,70 +1,43 @@
 import {
     getWorkOrders,
-    getWorkOrderHistories,
-    projectTransitions,
-    activeClaimFromHistory,
     getMemberMap,
     type RequestContext,
     type WorkOrder,
-    type TransitionEvent,
 } from '../../client/index.ts';
+import { isExpiresAtPassed } from
+    '../../shared/work-order-claims.ts';
 import { type Member } from '../../shared/types.ts';
 import type { Id } from '../../shared/types.ts';
+import type { ActiveClaim } from
+    './presenters/workbox-inbox.ts';
 
 export interface InboxRows {
     workOrders: WorkOrder[];
-    transitionsByWo: Map<Id, TransitionEvent[]>;
-    activeClaimsByWo: Map<
-        Id, { memberId: Id; at: string }
-    >;
+    activeClaimsByWo: Map<Id, ActiveClaim>;
     memberMap: Map<string, Member>;
 }
 
+// The inbox reads heads only (spec §4): each work order's
+// node, last move, and claim ride its head, so one
+// collection read serves every row.
 export async function getInboxRows(
     ctx: RequestContext,
 ): Promise<InboxRows> {
-    const [
-        workOrders, memberMap,
-    ] = await Promise.all([
+    const [workOrders, memberMap] = await Promise.all([
         getWorkOrders(ctx),
         getMemberMap(ctx),
     ]);
-    const histories = await getWorkOrderHistories(
-        ctx, workOrders,
-    );
-    const lockTimeoutByWo = new Map<Id, number>(
-        workOrders.map(wo => [
-            wo.id,
-            wo.flowGraph.lockTimeout,
-        ]),
-    );
-    const transitionsByWo = new Map<
-        Id, TransitionEvent[]
-    >();
-    const activeClaimsByWo = new Map<
-        Id, { memberId: Id; at: string }
-    >();
-    for (const [woId, history] of histories) {
-        const events = projectTransitions(
-            woId, history,
-        );
-        if (events.length > 0) {
-            transitionsByWo.set(woId, events);
-        }
-        const lockTimeout =
-            lockTimeoutByWo.get(woId);
-        if (lockTimeout === undefined) continue;
-        const claim = activeClaimFromHistory(
-            history, lockTimeout,
-        );
-        if (claim !== null) {
-            activeClaimsByWo.set(woId, claim);
+    const activeClaimsByWo = new Map<Id, ActiveClaim>();
+    for (const wo of workOrders) {
+        if (
+            wo.claim.state === 'claimed'
+            && !isExpiresAtPassed(wo.claim.expiresAt)
+        ) {
+            activeClaimsByWo.set(wo.id, {
+                memberId: wo.claim.memberId,
+                at: wo.claim.at,
+            });
         }
     }
-    return {
-        workOrders,
-        transitionsByWo,
-        activeClaimsByWo,
-        memberMap,
-    };
+    return { workOrders, activeClaimsByWo, memberMap };
 }

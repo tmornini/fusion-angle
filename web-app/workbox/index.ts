@@ -190,7 +190,6 @@ function buildItems(
 ): InboxItem[] {
     return buildInboxItems(
         rows.workOrders,
-        rows.transitionsByWo,
         rows.activeClaimsByWo,
         rows.memberMap,
         mode,

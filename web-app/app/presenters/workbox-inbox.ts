@@ -8,7 +8,6 @@ import { buildPageUrl } from '../navigation.ts';
 import {
     memberName,
     type WorkOrder,
-    type TransitionEvent,
 } from '../../../client/index.ts';
 import type { Member } from '../../../shared/types.ts';
 import {
@@ -56,10 +55,10 @@ export interface InboxItem {
 
 export type InboxMode = 'active' | 'archived';
 
-// An active claim resolved from the states log for one
-// work order. The inbox names the claim-holder on the
-// item it renders — a claimed work order is shown, never
-// hidden.
+// A work order's claim that is live now: the head's claim,
+// judged against its expiresAt by the page that reads the
+// twin. The inbox names the claim-holder on the item it
+// renders — a claimed work order is shown, never hidden.
 export interface ActiveClaim {
     memberId: Id;
     at: string;
@@ -188,8 +187,6 @@ export class WorkboxInboxPresenter {
 export function buildInboxItems(
     workOrders:
         readonly WorkOrder[],
-    transitionsByWo:
-        ReadonlyMap<Id, readonly TransitionEvent[]>,
     activeClaimsByWo:
         ReadonlyMap<Id, ActiveClaim>,
     memberMap: Map<Id, Member>,
@@ -198,33 +195,15 @@ export function buildInboxItems(
     const items: InboxItem[] = [];
     for (const wo of workOrders) {
         const fg = wo.flowGraph;
-        const woTransitions =
-            transitionsByWo.get(wo.id);
-        if (!woTransitions
-            || woTransitions.length === 0) {
-            throw new Error(
-                `Work order ${wo.id}`
-                + ' has no transitions',
-            );
-        }
-        const sorted = [...woTransitions]
-            .sort(
-                (a, b) =>
-                    a.at.localeCompare(b.at),
-            );
-        const lastTransition = sorted.at(-1)!;
-        const lastToId =
-            lastTransition.toNodeId;
         const curNode = fg.nodes.find(
-            n => n.id === lastToId,
+            n => n.id === wo.nodeId,
         );
         if (!curNode) {
             throw new Error(
-                'invariant violated:'
-                + ' transition for work'
-                + ' order ' + wo.id
-                + ' references unknown'
-                + ' node ' + lastToId,
+                'invariant violated: the head of'
+                + ' work order ' + wo.id
+                + ' references unknown node '
+                + wo.nodeId,
             );
         }
         const completed = curNode.isArchive;
@@ -240,7 +219,7 @@ export function buildInboxItems(
             flowName: fg.name,
             stateName: curNode.name,
             transitionerName: memberName(
-                memberMap, lastTransition.memberId,
+                memberMap, wo.transition.memberId,
             ),
             claimedByName: activeClaim
                 ? memberName(
@@ -248,8 +227,7 @@ export function buildInboxItems(
                     activeClaim.memberId,
                 )
                 : null,
-            lastTransitionedAt:
-                lastTransition.at,
+            lastTransitionedAt: wo.transition.at,
             completed,
             position: wo.position,
             taskInstructions:
