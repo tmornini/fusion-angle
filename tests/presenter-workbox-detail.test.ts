@@ -149,6 +149,7 @@ function makeWorkOrder(
                 member_id: 'pjQzgITAPDQVyvCVpzpIfQ',
                 at: '2026-04-01T12:00:00.000000Z',
             },
+            events: [],
         }),
         id: 'wo-1',
         organizationId: 'AjdvjuECVZEgZoFajaIEkg',

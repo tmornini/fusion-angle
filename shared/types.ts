@@ -456,6 +456,18 @@ export interface WorkOrderHistoryEventEntity
     field_values: TransitionFieldValueEntity[];
 }
 
+// One event a work-order version recorded (spec §4): a
+// move into a node, or a claim's birth, release, or
+// expiry. The path names its work order.
+export interface WorkOrderEventEntity {
+    readonly id: Id;
+    readonly state: string;
+    readonly member_id: Id;
+    readonly at: string;
+    readonly field_values:
+        readonly TransitionFieldValueEntity[];
+}
+
 export const SYSTEM_MEMBER_ID: Id = NIL_IDENTIFIER;
 
 export const SYSTEM_MEMBER_NAME = 'System';
@@ -1289,6 +1301,7 @@ export interface WorkOrderEntity extends WorkOrderFieldsEntity {
         member_id: Id;
         at: string;
     };
+    events: WorkOrderEventEntity[];
     // GET embed when bound (absent when unbound).
     instance_id?: Id;
     record_type_id?: Id;

@@ -49,10 +49,10 @@ import type {
     MessagePairEntity,
     StateEntity,
     TransitionFieldValueEntity,
+    WorkOrderEventEntity,
 } from '../shared/types.ts';
 import type {
     WorkOrderClaim,
-    WorkOrderEvent,
     WorkOrderTransition,
     WorkOrderVersion,
 } from './work-order-version.ts';
@@ -1661,7 +1661,7 @@ function validateTransitionFieldValueEntity(
 function validateWorkOrderEvent(
     value: unknown,
     label: string,
-): WorkOrderEvent {
+): WorkOrderEventEntity {
     const event = asObject(value, label);
     assertOnlyKeys(event, WORK_ORDER_EVENT_KEYS, label);
     // A transition's event id is the caller's string

@@ -8,6 +8,7 @@
 import type {
     Id,
     TransitionFieldValueEntity,
+    WorkOrderEventEntity,
 } from '../shared/types.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { microsOf } from '../shared/pair-root.ts';
@@ -17,14 +18,6 @@ export type WorkOrderClaim = {
     readonly member_id: Id,
     readonly at: string,
     readonly expires_at: string,
-};
-
-export type WorkOrderEvent = {
-    readonly id: Id,
-    readonly state: string,
-    readonly member_id: Id,
-    readonly at: string,
-    readonly field_values: readonly TransitionFieldValueEntity[],
 };
 
 export type WorkOrderTransition = {
@@ -46,7 +39,7 @@ export type WorkOrderVersion = WorkOrderFields & {
     readonly instance_id?: Id,
     readonly record_type_id?: Id,
     readonly claim?: WorkOrderClaim,
-    readonly events: readonly WorkOrderEvent[],
+    readonly events: readonly WorkOrderEventEntity[],
 };
 
 export type ClaimChange =
@@ -99,7 +92,7 @@ function event(
     member: Id,
     at: string,
     fieldValueEntities: readonly TransitionFieldValueEntity[],
-): WorkOrderEvent {
+): WorkOrderEventEntity {
     return {
         id, state, member_id: member, at,
         field_values: fieldValueEntities,
@@ -323,7 +316,7 @@ export function boundVersion(
 // every event newest first out.
 export function historyOf(
     versions: readonly WorkOrderVersion[],
-): WorkOrderEvent[] {
+): WorkOrderEventEntity[] {
     return versions.flatMap((version) => version.events)
         .reverse();
 }
