@@ -31,7 +31,7 @@ const SKIP_PARAMS = new Set(['name']);
 
 function verbsOn(route: Route): string[] {
     const verbs: string[] = [];
-    if (route.get !== undefined || route.select !== undefined) {
+    if (route.select !== undefined) {
         verbs.push('GET');
     }
     if (route.put !== undefined) verbs.push('PUT');

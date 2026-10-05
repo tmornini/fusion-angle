@@ -548,7 +548,10 @@ registerDocumentFamilyWiring(AI_AGENTS_WIRING);
 // alias.
 // GetHandler trails organization + roles (the fenced claim
 // projection). Existing handlers may ignore trailing args —
-// fewer-parameter closures are assignable.
+// fewer-parameter closures are assignable. No Route slot takes
+// one: a GET selects (SelectHandler) or is 405, so GetHandler
+// serves only documentGetHandler and
+// documentCollectionGetHandler.
 export type GetHandler = (
     adapter: DbAdapter,
     params: string[],
@@ -645,7 +648,6 @@ type PostHandler = (
 
 export interface Route {
     segments: string[];
-    get?: GetHandler;
     select?: SelectHandler;
     put?: PutHandler;
     patch?: PatchHandler;
@@ -659,7 +661,6 @@ export interface Route {
 export function route(
     pattern: string,
     handlers: {
-        get?: GetHandler;
         select?: SelectHandler;
         put?: PutHandler;
         patch?: PatchHandler;

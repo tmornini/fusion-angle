@@ -1,4 +1,4 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import { assertStrictEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { routes, route } from '../api/routes.ts';
@@ -26,7 +26,14 @@ Deno.test('an in-table nested organizations route matches',
     async () => {
         const probe = route(
             'organizations/:organization-id/XpBeHmMjsWMQXipgvzBjqA',
-            { get: async () => ({ probed: true }) },
+            {
+                select: async () => ({
+                    kind: 'collection',
+                    heads: [],
+                    lifecycle: 'stateless',
+                    reader: { sees: 'whole' },
+                }),
+            },
         );
         routes.push(probe);
         try {
@@ -38,10 +45,8 @@ Deno.test('an in-table nested organizations route matches',
                     + 'XpBeHmMjsWMQXipgvzBjqA',
                 token,
             ));
-            assertStrictEquals(res.status, 200);
-            assertEquals(
-                await res.json(), { probed: true },
-            );
+            assertStrictEquals(res.status, 204);
+            await res.body?.cancel();
         } finally {
             const i = routes.indexOf(probe);
             if (i >= 0) routes.splice(i, 1);
@@ -74,7 +79,14 @@ Deno.test('unauthenticated in-table nested path answers the '
     + 'gate 401, not the facade 401', async () => {
     const probe = route(
         'organizations/:organization-id/XpBeHmMjsWMQXipgvzBjqA',
-        { get: async () => ({ probed: true }) },
+        {
+            select: async () => ({
+                kind: 'collection',
+                heads: [],
+                lifecycle: 'stateless',
+                reader: { sees: 'whole' },
+            }),
+        },
     );
     routes.push(probe);
     try {
@@ -90,5 +102,27 @@ Deno.test('unauthenticated in-table nested path answers the '
     } finally {
         const i = routes.indexOf(probe);
         if (i >= 0) routes.splice(i, 1);
+    }
+});
+
+Deno.test('a GET on a route that selects nothing is 405',
+async () => {
+    const probe = route(
+        'organizations/:organization-id/YpBeHmMjsWMQXipgvzBjqA',
+        { put: async () => {} },
+    );
+    routes.push(probe);
+    try {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const res = await handleRequest(db, req(
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+                + 'YpBeHmMjsWMQXipgvzBjqA',
+            await organizationToken(),
+        ));
+        assertStrictEquals(res.status, 405);
+        await res.body?.cancel();
+    } finally {
+        routes.splice(routes.indexOf(probe), 1);
     }
 });

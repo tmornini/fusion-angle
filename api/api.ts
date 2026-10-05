@@ -1015,30 +1015,15 @@ async function dispatched(
                         },
                     );
                 }
-                if (!matched.get) {
-                    return Response.json(
-                        {
-                            error:
-                                'Method GET not'
-                                + ' allowed on '
-                                + pathname,
-                        },
-                        { status: HTTP_METHOD_NOT_ALLOWED },
-                    );
-                }
-                const result = await matched.get(
-                    effective,
-                    params,
-                    actor,
-                    organization,
-                    roles,
+                return Response.json(
+                    {
+                        error:
+                            'Method GET not'
+                            + ' allowed on '
+                            + pathname,
+                    },
+                    { status: HTTP_METHOD_NOT_ALLOWED },
                 );
-                // A handler that attaches its head's ETag answers
-                // with its own response.
-                if (result instanceof Response) {
-                    return result;
-                }
-                return Response.json(result);
             }
             case 'PUT': {
                 if (!matched.put) {
@@ -1219,8 +1204,9 @@ async function dispatched(
                 // is visible; this arm still intercepts before
                 // `matched.post` runs (matchRoute still matches
                 // both patterns, so an unknown path still 404s
-                // and a non-POST verb still 405s via the
-                // ordinary matched.get/put/delete checks). The
+                // and a non-POST verb still 405s in its own
+                // arm: a GET has no select, and PUT, PATCH, and
+                // DELETE find no handler). The
                 // seed carries everything
                 // WriteMessagePairInput needs except the
                 // requester identity and the response — only

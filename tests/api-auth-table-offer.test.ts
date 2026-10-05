@@ -10,7 +10,6 @@ Deno.test('authentication/token offers POST', () => {
     const row = routeNamed('authentication/token');
     assert(row);
     assertStrictEquals(typeof row.post, 'function');
-    assertStrictEquals(row.get, undefined);
     assertStrictEquals(row.put, undefined);
 });
 
