@@ -600,35 +600,6 @@ Deno.test(
 );
 
 Deno.test(
-    'the current node is the destination of the'
-    + ' latest transition',
-    () => {
-        // Two transitions: created -> n-1, then
-        // n-1 -> n-2 (the complete node).
-        const presenter = makePresenter({
-            transitions: [
-                makeCreation({
-                    id: 't-1',
-                    toNodeId: 'n-1',
-                    at:
-                        '2026-04-01T12:00:00.000000Z',
-                }),
-                makeStep({
-                    id: 't-2', fromNodeId: 'n-1',
-                    toNodeId: 'n-2',
-                    at:
-                        '2026-04-02T09:00:00.000000Z',
-                }),
-            ],
-        });
-        assertStrictEquals(
-            presenter.currentNodeId(), 'n-2',
-        );
-        assertStrictEquals(presenter.isArchive(), true);
-    },
-);
-
-Deno.test(
     'renderableAttributes are the current node'
     + ' refs and buildPage renders a labeled input'
     + ' per required attribute with a marker',
@@ -736,7 +707,12 @@ Deno.test(
     + ' attributes card, transition buttons, and'
     + ' release button',
     () => {
+        const graph = makeFlowGraph();
         const presenter = makePresenter({
+            graph,
+            workOrder: makeWorkOrder(
+                graph, { nodeId: 'n-2' },
+            ),
             transitions: [
                 makeCreation({
                     id: 't-1',
@@ -803,6 +779,9 @@ Deno.test(
         ]);
         const presenter = makePresenter({
             graph,
+            workOrder: makeWorkOrder(
+                graph, { nodeId: 'n-2' },
+            ),
             transitions: [
                 makeCreation({
                     id: 't-1',
@@ -960,3 +939,13 @@ Deno.test(
         );
     },
 );
+
+Deno.test('the detail reads its node from the head', () => {
+    const graph = makeFlowGraph();
+    const presenter = makePresenter({
+        graph,
+        workOrder: makeWorkOrder(graph, { nodeId: 'n-2' }),
+        transitions: [],
+    });
+    assertStrictEquals(presenter.currentNodeId(), 'n-2');
+});

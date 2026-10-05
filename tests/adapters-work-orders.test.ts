@@ -53,6 +53,8 @@ import {
     getWorkOrder,
     getWorkOrderActiveClaim,
     getWorkOrderCurrentNodeId,
+    getWorkOrderVersions,
+    workOrderEventsOf,
     getWorkOrderTransitionEvents,
     getActiveClaimsByWorkOrder,
 } from
@@ -1343,3 +1345,22 @@ Deno.test(
         );
     },
 );
+
+Deno.test('a work order\'s events fold from its versions in'
++ ' chain order', async () => {
+    const { db, ctx } = await setupDb();
+    await seedFlow(
+        db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+    );
+    const id = await createWorkOrder(
+        ctx, 'ZOousbbnzpqlxJExVAruYQ',
+    );
+    await seedRelease(ctx, id);
+    const versions = await getWorkOrderVersions(ctx, id);
+    assertStrictEquals(versions.length, 2);
+    assertEquals(
+        workOrderEventsOf(versions).map((e) => e.state),
+        [START_NODE, MIDDLE_NODE, 'claimed',
+            'claim_released'],
+    );
+});

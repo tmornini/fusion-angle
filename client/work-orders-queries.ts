@@ -2,6 +2,7 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderEntity,
     WorkOrderFlowGraph,
+    WorkOrderEventEntity,
     WorkOrderHistoryEventEntity,
     Id,
 } from '../shared/types.ts';
@@ -174,7 +175,7 @@ export interface StateFieldValue {
 // no map entry (Map.get returns undefined — the call
 // site treats that as "no field values").
 export function fieldValuesByEventFromHistory(
-    history: readonly WorkOrderHistoryEventEntity[],
+    history: readonly WorkOrderEventEntity[],
 ): Map<Id, StateFieldValue[]> {
     const byEvent = new Map<Id, StateFieldValue[]>();
     for (const row of history) {
@@ -252,7 +253,7 @@ export async function getActiveClaimsByWorkOrder(
 // raw wire) should read getWorkOrderHistory directly.
 export function projectTransitions(
     workOrderId: Id,
-    events: readonly WorkOrderHistoryEventEntity[],
+    events: readonly WorkOrderEventEntity[],
 ): TransitionEvent[] {
     // ASC by the wire's (at, id) total order — not at alone.
     // History is DESC; a stable sort on at would reverse
@@ -404,6 +405,29 @@ export async function getWorkOrderTransitionEvents(
 }
 
 /* ── Reads ───────────────── */
+
+// GET work-orders/:id/versions/: every version the work
+// order stored, oldest first, each the stored response.
+export async function getWorkOrderVersions(
+    ctx: RequestContext,
+    id: Id,
+): Promise<HttpMessage<WorkOrderEntity>[]> {
+    return await ctx.GETCollection<WorkOrderEntity>(
+        organizationItem(ctx, 'work-orders', id)
+            + '/versions/',
+    );
+}
+
+// A work order's events, in chain order: each version
+// carries the events it recorded, and versions arrive
+// oldest first.
+export function workOrderEventsOf(
+    versions: readonly HttpMessage<WorkOrderEntity>[],
+): WorkOrderEventEntity[] {
+    return versions.flatMap(
+        (version) => version.body().toValue().events,
+    );
+}
 
 export async function getWorkOrderEntities(
     ctx: RequestContext,

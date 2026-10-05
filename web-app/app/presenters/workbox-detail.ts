@@ -221,10 +221,16 @@ export class WorkboxDetailPresenter {
                         .localeCompare(b.at),
             );
 
-        this.#currentNode = findCurrentNode(
-            this.#flowGraph.nodes,
-            sorted,
+        const head = this.#flowGraph.nodes.find(
+            (n) => n.id === workOrder.nodeId,
         );
+        if (head === undefined) {
+            throw new Error(
+                'invariant violated: the head names'
+                + ' unknown node ' + workOrder.nodeId,
+            );
+        }
+        this.#currentNode = head;
         this.#outgoingEdges =
             this.#flowGraph.edges.filter(
                 e => e.fromNodeId
@@ -756,33 +762,6 @@ export class WorkboxDetailPresenter {
         readonly HistoryEntry[] {
         return this.#history;
     }
-}
-
-function findCurrentNode(
-    nodes: readonly GraphNode[],
-    sortedTransitions:
-        readonly TransitionEvent[],
-): GraphNode {
-    const lastTransition =
-        sortedTransitions.at(-1);
-    if (!lastTransition) {
-        throw new Error(
-            'invariant violated: work'
-            + ' order has no transitions',
-        );
-    }
-    const lastToId = lastTransition.toNodeId;
-    const node = nodes.find(
-        n => n.id === lastToId,
-    );
-    if (!node) {
-        throw new Error(
-            'invariant violated:'
-            + ' transition references'
-            + ' unknown node ' + lastToId,
-        );
-    }
-    return node;
 }
 
 function nodeNameById(

@@ -25,10 +25,10 @@ import {
 } from '../app/dialog.ts';
 import {
     getWorkOrder,
-    getWorkOrderHistory,
-    transitionEventsFromHistory,
+    getWorkOrderVersions,
+    workOrderEventsOf,
+    projectTransitions,
     fieldValuesByEventFromHistory,
-    activeClaimFromHistory,
     getMemberMap,
     postWorkOrderTransition,
     putWorkOrderClaim,
@@ -56,6 +56,8 @@ import {
 } from '../../shared/http-errors.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
+import { isExpiresAtPassed } from
+    '../../shared/work-order-claims.ts';
 
 /* ── Module state ────────── */
 
@@ -366,28 +368,32 @@ async function loadPresenter(
     // Wave 1: five independent reads (member id is a
     // settled or in-flight promise from init).
     const [
-        workOrder, history, memberMap, recordId,
+        workOrder, versions, memberMap, recordId,
         currentMemberId,
     ] = await Promise.all([
         getWorkOrder(ctx, workOrderId),
-        getWorkOrderHistory(ctx, workOrderId),
+        getWorkOrderVersions(ctx, workOrderId),
         getMemberMap(ctx),
         getRecordForWorkOrder(ctx, workOrderId),
         currentMemberIdPromise,
     ]);
-    // One per-id history read supplies transitions,
-    // historical field values, and the active claim
-    // (DESC wire; transitionEventsFromHistory sorts
-    // ASC). Live form values come from the instance
-    // head when bound.
-    const transitions = transitionEventsFromHistory(
-        workOrderId, history,
+    // The present is the head; the timeline is the
+    // versions' events in chain order (spec §4). Live
+    // form values come from the instance head when bound.
+    const events = workOrderEventsOf(versions);
+    const transitions = projectTransitions(
+        workOrderId, events,
     );
     const fieldValuesByEvent =
-        fieldValuesByEventFromHistory(history);
-    const activeClaim = activeClaimFromHistory(
-        history, workOrder.flowGraph.lockTimeout,
-    );
+        fieldValuesByEventFromHistory(events);
+    const activeClaim =
+        workOrder.claim.state === 'claimed'
+        && !isExpiresAtPassed(workOrder.claim.expiresAt)
+            ? {
+                memberId: workOrder.claim.memberId,
+                at: workOrder.claim.at,
+            }
+            : null;
 
     const bound =
         workOrder.instanceId !== undefined
