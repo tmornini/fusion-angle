@@ -156,16 +156,12 @@ function sameFields(
 // The PUT (§5): the request's fields over the head's
 // facets, no event. Fields equal to the head's are the
 // head, so the statement matches and nothing lands
-// (Decision 11). With no head the version is born with no
-// state.
+// (Decision 11).
 export function fieldsVersion(
-    head: WorkOrderVersion | {
-        readonly id: Id,
-        readonly organization_id: Id,
-    },
+    head: WorkOrderVersion,
     fields: WorkOrderFields,
 ): WorkOrderVersion {
-    if ('events' in head && sameFields(head, fields)) {
+    if (sameFields(head, fields)) {
         return head;
     }
     return ordered({ ...head, ...fields, events: [] });

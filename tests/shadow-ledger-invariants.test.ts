@@ -22,6 +22,8 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -307,18 +309,28 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     ));
     assertStrictEquals(recordDeleted.status, 204);
 
-    // Entity PUT (work-orders, org 1) — the entity-PUT hash path,
-    // shared code but never route-exercised in this mixed batch
-    // before now.
+    // Entity PUT (work-orders, org 1) — the entity-PUT hash
+    // path of a superseding PUT: the work order is born by
+    // its create, then the PUT latches that head.
+    const head = await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: 'jAzfROfUUwRELEudEFwdGw',
+        fields: workOrderFields('INV-WO-1'),
+        flowId: generateIdentifier(),
+        births: [N_START, N_FINISH],
+        at: AT,
+        token: org1Token,
+        claim: 'kept',
+    });
     const workOrderPut = await handleRequest(db, apiRequest({
         method: 'PUT',
         path: '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'jAzfROfUUwRELEudEFwdGw',
         token: org1Token,
-        body: workOrderFields('INV-WO-1'),
-        headers: { 'if-none-match': '*' },
+        body: { ...workOrderFields('INV-WO-1'), position: 2 },
+        headers: { 'if-match': head.query('header.etag').toText() },
     }));
-    assertStrictEquals(workOrderPut.status, 201);
+    assertStrictEquals(workOrderPut.status, 200);
 
     // Operation POST (identity-tokens — global, not org-
     // nested): revoke a pre-seeded chain. The seed itself rides

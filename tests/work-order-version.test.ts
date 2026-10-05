@@ -72,17 +72,6 @@ Deno.test('a fields version keeps the facets, no events',
     assertEquals(version.events, []);
 });
 
-Deno.test('a version born by PUT has no state', () => {
-    const version = fieldsVersion(
-        { id: WORK_ORDER, organization_id: ORGANIZATION },
-        FIELDS,
-    );
-    assertEquals(Object.keys(version), [
-        'id', 'organization_id', 'display_id', 'flow_graph',
-        'position', 'events',
-    ]);
-});
-
 Deno.test('a foreign live claim holds', () => {
     const change = claimedVersion(created(), {
         member: BOB,

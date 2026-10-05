@@ -2275,10 +2275,14 @@ export async function postWorkOrderBindingOp(
     );
 }
 
-// Work-order document PUT (§5): the received PUT is the
-// version, the request's fields over the head's facets
-// with no event of its own. Its own tag, or If-None-Match:
-// *, latches it; the statement judges it.
+// Work-order document PUT (§1): the request's fields over
+// the head's facets, with no event of its own. Only the
+// POST creates, so a conditional PUT on an absent work
+// order is the head read's miss, 404, whichever
+// conditional it carries (RFC 9110 §13.2.1); a foreign
+// path is the fence's 403 before this runs. Its own tag
+// latches it; If-None-Match: * on a work order that
+// exists is the statement's 412.
 export async function postWorkOrderDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -2291,16 +2295,11 @@ export async function postWorkOrderDocumentOp(
     const fields = validateWorkOrderDocumentBody(
         withoutId(body),
     ).entity;
-    const head = await workOrderHeadFor(db, org, id);
+    const head = await requireWorkOrderHead(db, org, id);
     await runStateWrite(db, {
         kind: 'own',
         received: requirePair(messagePair),
-        state: fieldsVersion(
-            head === null
-                ? { id, organization_id: org }
-                : head.version,
-            fields,
-        ),
+        state: fieldsVersion(head.version, fields),
     });
 }
 
