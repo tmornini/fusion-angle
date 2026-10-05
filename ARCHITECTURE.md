@@ -219,11 +219,7 @@ pair. `versions/:etag` serves that pair through
 `api/head-reads.ts`). A DELETE pair is not a version.
 A deleted document — a DELETE head, or a body state
 `deleted` in a lifecycle family — is 410 on its GET
-and on both version routes. One GET route still
-answers handler JSON:
-`organizations/:id/work-orders/:id/history`
-(`tests/parted-reads.test.ts`).
-Nothing
+and on both version routes. Nothing
 derives from the `request` column;
 `tests/request-readers.test.ts` pins that. The
 view-accepting convention is five rules, not a
@@ -240,6 +236,33 @@ caller handed in `transaction(fn)`;
 `message_pairs` on a hot path;
 (e) a pre-tx call and an in-tx call of the same core
 return byte-identical results.
+
+## A response is one unit
+
+The API, the client, and the application treat a response — status line,
+headers, and body — as one unit. A stored response is a response message: for
+a received request, the message handed to the wire; for a sibling PUT, which
+received nothing and sent nothing, the message a read of it serves before the
+substitutions below. A read serves those stored bytes with exactly three
+substitutions — the status line, `date`, and `request-id`, the lines that
+describe this transmission — and three additions from the pair's envelope —
+`last-modified` and `response-at` from `response_at`, and
+`requester-identity-id` from `requester_identity_id`, the lines that describe
+the write — made by ONE function on the pair it serves; `etag` and
+`operation-id` stay, naming the state and the write that made it; the body
+bytes are never touched, except that a document whose fields carry read roles
+is projected to the fields the reader may see, by that same function, the only
+place a body is ever transformed. A list is whole responses: `multipart/mixed`
+of `application/http; msgtype=response` parts, each the unit a document GET
+serves. Nothing parts a response into a body plus picked headers. The client
+keeps each response whole, and pages and presenters read from the unit they
+were given. The application derives from `response` only, never from
+`request`.
+
+The one read function is `servedResponse`
+(`api/served-response.ts:74`); the client's splitter is
+`splitParts` (`shared/http-message/multipart.ts:90`),
+which the collection GET calls (`client/http-facade.ts:390`).
 
 ## Flow graph
 
@@ -446,6 +469,9 @@ KNOWN.
   `tests/api-members-history.test.ts` (404; membership
   versions are the invitation document's PUT pairs)
 - redo — `tests/api-flows-verb-gaps.test.ts`
+- a work order's `/history` —
+  `tests/api-work-order-history.test.ts` ('a work order's
+  /history is a router 404'; history is `versions/`)
 
 ## How we got here
 

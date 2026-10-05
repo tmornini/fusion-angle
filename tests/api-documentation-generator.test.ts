@@ -383,8 +383,6 @@ Deno.test('a stored pair\'s 2xx names the three lines'
         ['get', '/identities/:id/invitations/'],
         ['get', '/organizations/:id/ideas/'],
         ['get', '/organizations/:id/ideas/:id/versions/'],
-        ['get', '/organizations/:id/work-orders/:id'
-            + '/history'],
     ] as const;
     for (const [verb, uri] of omits) {
         const html = roomHtmlOf(rooms, verb, uri);

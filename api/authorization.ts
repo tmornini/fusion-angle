@@ -136,7 +136,7 @@ const MEMBER_VERBS: Readonly<
     '/organizations/:id/record-types/:tid/instances':
         ['GET', 'PUT', 'PATCH', 'DELETE'],
     // Nested field-values collection RETIRED (states-URI
-    // elimination C4); field values fold on WO history.
+    // elimination C4); field values ride work-order events.
     '/organizations/:id/work-orders':
         ['GET', 'PUT', 'POST', 'DELETE'],
     // Bulk lifecycle collection RETIRED (states-URI

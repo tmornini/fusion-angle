@@ -42,6 +42,8 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
 
@@ -1062,30 +1064,24 @@ for (const seg of NESTED_PROJECT_SEGS) {
 
 // Bulk lifecycle collection RETIRED (states-URI elimination
 // C3). Org isolation force lives on per-item work-order
-// history and objective versions. Nested field-values
-// collection retired (C4) — field values fold on work-order
-// history; family history pins ownership below.
+// versions and objective versions. Nested field-values
+// collection retired (C4) — field values ride the events of
+// work-order versions; family versions pin ownership below.
 
-// C4: field-values fence re-homes onto work-order history
-// (inline field_values on transition rows).
-Deno.test('organizations/:id/work-orders/:id/history fold'
-    + ' carries own field_values',
+// C4: field-values fence re-homes onto work-order versions
+// (field_values on transition events).
+Deno.test('organizations/:id/work-orders/:id/versions/ events'
+    + ' carry own field_values',
 async () => {
     const fx = await deepDb();
     // Phase Final Stage B: state_field_values table retired —
-    // prove foreign transition fold via B history, then A's
-    // history carries only A's fold.
-    const foreign = await handleRequest(fx.db, req(
-        'GET', '/organizations/' + fx.organizationB
-            + '/work-orders/' + fx.chainB.workOrder
-            + '/history',
+    // prove foreign transition fold via B's versions, then A's
+    // versions carry only A's fold.
+    const foreignRows = await getWorkOrderEvents(
+        fx.db,
         await organizationToken(fx.pb, fx.organizationB),
-    ));
-    assertStrictEquals(foreign.status, 200);
-    const foreignRows = await foreign.json() as {
-        id: string;
-        field_values: { id: string }[];
-    }[];
+        fx.organizationB, fx.chainB.workOrder,
+    );
     const foreignTe = foreignRows.find(
         r => r.id === fx.chainB.transitionEvent,
     );
@@ -1099,14 +1095,13 @@ async () => {
         ),
         'foreign SFV fold missing',
     );
-    const res = await facadeGet(
-        fx.db, fx.organizationA,
-        '/work-orders/' + fx.chainA.workOrder + '/history');
-    assertStrictEquals(res.status, 200);
-    const rows = await res.json() as {
-        id: string;
-        field_values: { id: string }[];
-    }[];
+    const rows = await getWorkOrderEvents(
+        fx.db,
+        await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
+        ),
+        fx.organizationA, fx.chainA.workOrder,
+    );
     const ownTe = rows.find(
         r => r.id === fx.chainA.transitionEvent,
     );
@@ -1119,13 +1114,14 @@ async () => {
     );
 });
 
-Deno.test('organizations/:id/work-orders/:id/history 404s a foreign work'
-+ ' order', async () => {
+Deno.test('organizations/:id/work-orders/:id/versions/ 404s a'
++ ' foreign work order\'s id under the caller\'s own path',
+async () => {
     const fx = await deepDb();
     // woB is B-org; never written at A's document → 404.
     const res = await facadeGet(
         fx.db, fx.organizationA,
-        '/work-orders/' + fx.chainB.workOrder + '/history');
+        '/work-orders/' + fx.chainB.workOrder + '/versions/');
     assertStrictEquals(res.status, 404);
     const body = await res.json() as { error: string };
     assertStrictEquals(

@@ -89,11 +89,12 @@ Deno.test('idea snapshot is :etag not :version',
     );
 });
 
-Deno.test('work-order versions sit beside /history',
+Deno.test('work-order versions are the history; /history'
++ ' matches nothing',
 () => {
     const item = '/organizations/AjdvjuECVZEgZoFajaIEkg/'
         + 'work-orders/xdaJyuuPyHfffCGLhqDrOQ';
-    assert(match(item + '/history'));
+    assertStrictEquals(match(item + '/history'), null);
     assert(match(item + '/versions/'));
 });
 

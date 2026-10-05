@@ -253,7 +253,6 @@ import {
 } from './derive-identity-spine.ts';
 import {
     workOrderHeadFor,
-    workOrderHistoryFor,
 } from './derive-states.ts';
 import {
     boundVersion,
@@ -4462,21 +4461,6 @@ export const routes: Route[] = [
                 requireOrganization(organization), messagePair,
             ),
     }),
-    // GET work-orders/:id/history (states-URI elimination A1):
-    // the version chain's events, newest first.
-    // Miss posture lives inside workOrderHistoryFor (empty →
-    // missedReadError). No api.ts pre-dispatch guard — the
-    // derive reads only this org's paths.
-    // Member-tier GET via matchesOnSegmentBoundary on
-    // '/work-orders'.
-    route('organizations/:id/work-orders/:id/history', {
-        get: (db, p, _actor, organization) =>
-            workOrderHistoryFor(
-                db,
-                requireOrganization(organization),
-                param(p, 1),
-            ),
-    }),
     // Flow work-order joins nest under their parent flow:
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
@@ -4502,8 +4486,8 @@ export const routes: Route[] = [
             ),
     }),
     // GET states/:id/field-values RETIRED (states-URI
-    // elimination C4): field values fold inline on
-    // GET organizations/:id/work-orders/:id/history.
+    // elimination C4): field values ride the events of
+    // GET organizations/:id/work-orders/:id/versions/.
     // PUT/DELETE states/:id/field-values/:fvid RETIRED
     // (Phase 15 Task 7): live writes ride the transition
     // fold only. WRITE_RESPONSE_SPECS entry + seed document
@@ -5417,10 +5401,9 @@ export const routes: Route[] = [
     }),
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3): the five-source union is gone.
-    // Per-entity history lives on GET <family>/:id/history
-    // (work-orders stay /history; every other family stays
-    // /versions/). Nested field-values collection retired
-    // with C4 (inline fold on WO history). bare states/:id
+    // Per-entity history lives on GET <family>/:id/versions/.
+    // Nested field-values collection retired with C4
+    // (events carry them). bare states/:id
     // is already a router 404 (states-document retirement
     // Task 13). Per-entity history alias retired with C2.
 ];

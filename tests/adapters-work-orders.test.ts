@@ -712,7 +712,8 @@ Deno.test('a transition reads no history', async () => {
     });
     assertEquals(
         recorded.sent.filter(
-            (r) => r.path.endsWith('/history'),
+            (r) => r.path.endsWith('/history')
+                || r.path.includes('/versions/'),
         ),
         [],
     );

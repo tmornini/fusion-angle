@@ -431,7 +431,7 @@ export interface StateEntity {
 }
 
 // Nested field-value shape on work-order history events
-// (GET work-orders/:id/history). Folded from transition pair
+// (GET work-orders/:id/versions/). Folded from transition pair
 // bodies — no state_event_id on the wire (the parent event
 // already carries id). Distinct from StateFieldValueEntity,
 // which still carries state_event_id for the transition-body

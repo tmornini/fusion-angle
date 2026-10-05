@@ -45,6 +45,8 @@ import {
 import { membershipOf, membershipsOfIdentity } from
     '../api/memberships.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { landMembership } from
     './membership-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -1306,12 +1308,11 @@ async function transitionWithFieldValue(
     );
 }
 
-// Wire-shape pin (C4): GET organizations/:id/work-orders/:id/history is
-// 200 / 404 by document (own → rows with field_values;
-// never written here → 404; absent → 404). Field values
-// fold inline; the retired GET states/:id/field-values
-// three-way force lives here.
-Deno.test('work-order history GET: 200/404 two-way for'
+// Wire-shape pin (C4): GET organizations/:id/work-orders/:id/
+// versions/ is 200 / 404 by document (own → the events,
+// transition rows carrying field_values; never written here
+// → 404; absent → 404).
+Deno.test('work-order versions GET: 200/404 two-way for'
 + ' own / foreign-or-absent work orders', async () => {
     const db = await seededDb();
     const starkToken = await organizationToken(
@@ -1328,21 +1329,10 @@ Deno.test('work-order history GET: 200/404 two-way for'
         fieldValueId, WORKORDERID_ATTR,
     );
 
-    // (own) Stark sees the folded row on history.
-    const own = await handleRequest(
-        db,
-        req(
-            'GET',
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                + workOrderId + '/history',
-            starkToken,
-        ),
+    // (own) Stark sees the folded row on its versions.
+    const ownRows = await getWorkOrderEvents(
+        db, starkToken, STARK_ORGANIZATION, workOrderId,
     );
-    assertStrictEquals(own.status, 200);
-    const ownRows = await own.json() as {
-        id: string;
-        field_values: { id: string }[];
-    }[];
     const ownTe = ownRows.find(
         (r) => r.id === transitionEventId,
     );
@@ -1357,7 +1347,7 @@ Deno.test('work-order history GET: 200/404 two-way for'
         req(
             'GET',
             '/organizations/' + ORGANIZATION_TWO
-                + '/work-orders/' + workOrderId + '/history',
+                + '/work-orders/' + workOrderId + '/versions/',
             twoToken,
         ),
     );
@@ -1375,7 +1365,7 @@ Deno.test('work-order history GET: 200/404 two-way for'
         req(
             'GET',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                + 'ecupcwyehqSNYeaJpJtNFw/history',
+                + 'ecupcwyehqSNYeaJpJtNFw/versions/',
             starkToken,
         ),
     );

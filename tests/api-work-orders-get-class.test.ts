@@ -28,9 +28,8 @@ import { seedCreatedWorkOrder } from
 // GET work-orders (inbox) and GET
 // organizations/:id/work-orders/:id are Stream: a work
 // order's head is its whole state, binding included (§5).
-// Work-order history is Assemble over the version chain and
-// stays /history until its retirement; versions/ serves the
-// stored parts beside it.
+// Work-order history is its versions: versions/ serves the
+// stored parts; /history is a router 404.
 
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -356,8 +355,8 @@ function createBody(id: string) {
     };
 }
 
-Deno.test('work-order versions are stored parts beside'
-+ ' /history',
+Deno.test('work-order versions are stored parts and'
++ ' /history is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -374,8 +373,8 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             + '/history', token,
     ));
-    assertStrictEquals(history.status, 200);
-    assert(Array.isArray(await history.json()));
+    assertStrictEquals(history.status, 404);
+    await history.body?.cancel();
 
     const versions = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID

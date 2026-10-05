@@ -44,6 +44,8 @@ import {
 } from './http-fixtures.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 
 const DRIFT_STATES_FENCE_OWN_IDEA = generateIdentifier();
 const DRIFT_STATES_FENCE_FOREIGN_IDEA = generateIdentifier();
@@ -338,19 +340,9 @@ async () => {
             woList,
         );
         for (const row of workOrders) {
-            const history = await handleRequest(
-                db, req(
-                    'GET',
-                    '/organizations/' + organization
-                        + '/work-orders/' + row.id
-                        + '/history',
-                    token,
-                ),
+            const events = await getWorkOrderEvents(
+                db, token, organization, row.id,
             );
-            assertStrictEquals(history.status, 200);
-            const events = await history.json() as {
-                id: string;
-            }[];
             woSeen += events.length;
         }
 
@@ -385,7 +377,7 @@ async () => {
     assert(objSeen > 0, 'objectives history thin');
 });
 
-// ---- case 2: GET <family>/:id/history parity, one entity --------
+// ---- case 2: GET <family>/:id/versions/ parity, one entity -----
 // ---- per family (states-URI elimination C1) ----------------------
 
 const CASE_2_FAMILY_ENTITY_IDS: readonly {
@@ -408,105 +400,77 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
 ];
 
 Deno.test('case 2: flow parts match deriveFlowStateHistory;'
-+ ' work-order history stays (at, id) DESC',
++ ' work-order events equal the derive in (at, id) order',
 async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+    );
     for (const { family, routeFamily, id }
         of CASE_2_FAMILY_ENTITY_IDS
     ) {
         const derived = await entityHistory(
             db, STARK_ORGANIZATION, id,
         );
-        // Work-order history is newest first. Its wire
-        // widens StateEntity with field_values — parity
-        // is the lifecycle core (id/state/at/member_id),
-        // not full JSON equality with the bare derive.
-        const expected = derived.toReversed();
-        const token = await organizationToken(
-            'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
-        );
-        const suffix = family === 'work-order'
-            ? '/history'
-            : '/versions/';
+        if (family === 'work-order') {
+            // An event names no work order (the path does),
+            // so parity is the lifecycle core: id, state,
+            // at, member_id.
+            const events = await getWorkOrderEvents(
+                db, token, STARK_ORGANIZATION, id,
+            );
+            assertStrictEquals(
+                events.length, derived.length, family,
+            );
+            for (let i = 0; i < derived.length; i++) {
+                const e = derived[i]!;
+                const w = events[i]!;
+                assertStrictEquals(
+                    w.id, e.id, family + ' id@' + i,
+                );
+                assertStrictEquals(
+                    w.member_id, e.member_id,
+                    family + ' member_id@' + i,
+                );
+                assertStrictEquals(
+                    w.at, e.at, family + ' at@' + i,
+                );
+                assertStrictEquals(
+                    w.state, e.state, family + ' state@' + i,
+                );
+            }
+            continue;
+        }
         const res = await handleRequest(db, req(
             'GET',
-            '/' + routeFamily + '/' + id + suffix,
+            '/' + routeFamily + '/' + id + '/versions/',
             token,
         ));
         assertStrictEquals(res.status, 200, family);
-        if (family === 'flow') {
-            const parts = await partsOf<{
-                state_event_id: string;
-                state: string;
-                state_at: string;
-            }>(res);
-            const history = await deriveFlowStateHistory(
-                db, STARK_ORGANIZATION, id,
-            );
-            assertEquals(
-                parts.map((part) => {
-                    const body = part.body().toValue();
-                    return {
-                        state_event_id:
-                            body.state_event_id,
-                        state: body.state,
-                        state_at: body.state_at,
-                    };
-                }),
-                history.map((row) => ({
-                    state_event_id: row.id,
-                    state: row.state,
-                    state_at: row.at,
-                })),
-                family,
-            );
-            continue;
-        }
-        const wire = await res.json() as {
-            id: string;
-            entity_id?: string;
+        const parts = await partsOf<{
+            state_event_id: string;
             state: string;
-            member_id?: string;
-            at?: string;
-        }[];
-        assertStrictEquals(wire.length, expected.length, family);
-        for (let i = 0; i < expected.length; i++) {
-            const e = expected[i]!;
-            const w = wire[i]!;
-            assertStrictEquals(
-                w.id, e.id, family + ' id@' + i,
-            );
-            assertStrictEquals(
-                w.entity_id, e.entity_id,
-                family + ' entity_id@' + i,
-            );
-            assertStrictEquals(
-                w.member_id, e.member_id,
-                family + ' member_id@' + i,
-            );
-            assertStrictEquals(
-                w.at, e.at, family + ' at@' + i,
-            );
-            assertStrictEquals(
-                w.state, e.state, family + ' state@' + i,
-            );
-        }
-        for (let i = 1; i < wire.length; i++) {
-            const prev = wire[i - 1]!;
-            const cur = wire[i]!;
-            const prevAt = prev.at;
-            const curAt = cur.at;
-            assert(
-                prevAt !== undefined && curAt !== undefined,
-                family + ' history row missing at@' + i,
-            );
-            assert(
-                prevAt > curAt
-                || (prevAt === curAt
-                    && prev.id > cur.id),
-                family + ' history is not (at, id) DESC',
-            );
-        }
+            state_at: string;
+        }>(res);
+        const history = await deriveFlowStateHistory(
+            db, STARK_ORGANIZATION, id,
+        );
+        assertEquals(
+            parts.map((part) => {
+                const body = part.body().toValue();
+                return {
+                    state_event_id: body.state_event_id,
+                    state: body.state,
+                    state_at: body.state_at,
+                };
+            }),
+            history.map((row) => ({
+                state_event_id: row.id,
+                state: row.state,
+                state_at: row.at,
+            })),
+            family,
+        );
     }
     // The work order carries its 4-event hand-authored trace
     // and its claim birth — a non-vacuous, multi-event leg

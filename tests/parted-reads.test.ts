@@ -2,14 +2,12 @@ import { assertEquals } from '@std/assert';
 import { routes } from '../api/routes.ts';
 import { routePatternOf } from '../api/route-surface.ts';
 
-// The GET routes that still answer handler JSON instead of
-// the stored response (spec §12). A conversion deletes its
-// patterns here in the commit that converts them. The fifth
-// spec builds the one route left, and the commit that
-// empties the list lands the covenant.
-const PARTED = [
-    'organizations/:id/work-orders/:id/history',
-];
+// The GET routes that answer handler JSON instead of the
+// stored response. The list is empty: every GET serves a
+// stored response (ARCHITECTURE.md § A response is one
+// unit). Until the get slot retires, a route that adds a
+// `get` fails here.
+const PARTED: string[] = [];
 
 Deno.test('the parted GET routes are exactly the census',
 () => {

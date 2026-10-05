@@ -36,8 +36,7 @@ import {
 // (Phase 11
 // onward; bulk lifecycle collection retired — states-URI
 // elimination C3). Per-entity history rides GET
-// <family>/:id/history (work-orders) or /versions/
-// (every other family). Surviving derives in this module:
+// <family>/:id/versions/. Surviving derives in this module:
 //   (a) flows — the per-id derive*StateHistory reader lives
 //       in its own family module; write paths use flows'
 //       own currentDocumentState / row-stamped trio.
@@ -538,9 +537,8 @@ export async function workOrderLifecycleStatesFor(
     }));
 }
 
-// GET work-orders/:id/history: the version chain's events,
-// newest first, each naming its work order. No event is a
-// miss (403 foreign, 404 absent).
+// The version chain's events, newest first, each naming its
+// work order. No event is a miss (403 foreign, 404 absent).
 export async function workOrderHistoryFor(
     db: DbAdapter,
     organization: Id,
@@ -618,6 +616,6 @@ export async function deriveInvitationStates(
 // unionById / sameStateEntity RETIRED with the bulk lifecycle
 // collection (states-URI elimination C3). documentStateHeadFor
 // RETIRED with C5 (write paths use family currentDocumentState).
-// Per-entity history lives on GET <family>/:id/history and
+// Per-entity history lives on GET <family>/:id/versions/ and
 // family-scoped derives (derive*StateHistory,
 // workOrderLifecycleStatesFor, invitation sources).

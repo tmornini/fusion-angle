@@ -1,9 +1,8 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { handleRequest } from '../api/api.ts';
 import { PUT } from './in-page-facade.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -17,8 +16,6 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
 } from '../shared/types.ts';
-import { workOrderHistoryFor } from
-    '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
@@ -27,20 +24,17 @@ import {
 import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
-import {
-    apiRequest,
-} from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 
 
 const N_NEXT = generateIdentifier();
 const N_CREATE = generateIdentifier();
 const FLOW_ID = generateIdentifier();
-const TE_1 = generateIdentifier();
-const FV_1 = generateIdentifier();
 const TE_LEX = generateIdentifier();
 const FV_Z = generateIdentifier();
 const FV_A = generateIdentifier();
@@ -52,28 +46,14 @@ const FV_M = generateIdentifier();
 // re-homes to message-plane derive + wire-byte handleRequest
 // assertions. Leaf PUT/DELETE routes retired Phase 15 Task 7;
 // GET states/:id/field-values retired (states-URI elimination
-// C4) — product reads fold field values on work-order
-// history. Task 8 CUT: legacy fieldValues appends stay
+// C4) — product reads carry field values on work-order
+// events. Task 8 CUT: legacy fieldValues appends stay
 // BELOW the gate. RESTRICT no longer reads this fold at
 // all — Task 6 (spec § 4) re-anchors the census on live
 // instance heads (deriveInstanceCollection).
 
 const LOCK_TIMEOUT_SECONDS = 300;
 const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 function graphJson(): Record<string, unknown> {
     return {
@@ -156,51 +136,9 @@ async function appendLegacyTransition(
     );
 }
 
-// C4: route parity re-homes onto work-order history
-// (inline field_values fold), not GET states/:id/field-values.
-Deno.test('GET organizations/:id/work-orders/:id/history wire equals'
-+ ' workOrderHistoryFor over a live fold',
-async () => {
-    const db = await seededDb();
-    await appendLegacyTransition(db, {
-        transitionEventId: TE_1,
-        targetState: N_NEXT,
-        fieldValues: [{
-            id: FV_1,
-            fields: {
-                state_event_id: TE_1,
-                attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                value: 'high',
-            },
-        }],
-        release: null,
-        transitionAt: nowUtc(),
-    });
-
-    const token = await organizationToken();
-    const res = await handleRequest(
-        db, req('GET'
-            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA/history', token),
-    );
-    assertStrictEquals(res.status, 200);
-    const wireText = await res.text();
-    const derived = await workOrderHistoryFor(
-        db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
-    );
-    assertStrictEquals(wireText, JSON.stringify(derived));
-    const transition = derived.find((row) => row.id === TE_1);
-    assert(transition !== undefined);
-    assertEquals(transition!.field_values, [{
-        id: FV_1,
-        attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-        value: 'high',
-    }]);
-});
-
 // Non-lex field-value ids so collection order is not
 // insertion order (byIdAscending craftsmanship).
-Deno.test('work-order history field_values are identifier-'
+Deno.test('work-order events field_values are identifier-'
 + 'ordered after non-lex transition fold', async () => {
     const db = await seededDb();
     await appendLegacyTransition(db, {
@@ -236,16 +174,9 @@ Deno.test('work-order history field_values are identifier-'
         transitionAt: nowUtc(),
     });
     const token = await organizationToken();
-    const res = await handleRequest(
-        db, req('GET'
-            , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA/history', token),
+    const list = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
     );
-    assertStrictEquals(res.status, 200);
-    const list = await res.json() as {
-        id: string;
-        field_values: { id: string }[];
-    }[];
     const transition = list.find((row) => row.id === TE_LEX);
     assert(transition !== undefined);
     assertEquals(
