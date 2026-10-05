@@ -6341,14 +6341,20 @@ document order with the rest of this section.
        exploratory — the live modal and the visual
        bottom-of-list placement
 - [ ] **K3** Click `Edit` on "Lower expenses"; confirm
-  modal opens pre-filled. Change the name to "Cut costs";
-  click Save. PASS if the list re-renders with the new
-  name. K30 and K7 later confirm this rename resolves
-  temporally.
+  modal opens pre-filled. Select the whole name
+  (`Input.dispatchKeyEvent` `keyDown` `a` with
+  modifiers 4 and `commands: ["selectAll"]`, or a
+  triple-click in the field), type
+  "Cut costs", and click Save once. PASS if the list
+  re-renders with exactly "Cut costs". Every Save
+  writes a revision row K30 shows verbatim: a smashed
+  or repeated name is a driver artifact — note it,
+  re-seed, and re-drive K3 before K30/K7. K30 and K7
+  later confirm this rename resolves temporally.
   Pin: exploratory — the live modal, pre-fill, and
        re-render; `postObjectiveRevision` in
-       web-app/app/adapters/objectives.ts (the write this
-       Save triggers) carries no test today
+       client/objectives.ts (the write this Save
+       triggers) carries no test today
 - [ ] **K4** Click `Archive` on "Test Objective" (K2);
   confirm dialog opens. Confirm. PASS if the objective
   moves from active to the Archived sub-section, with
@@ -6800,6 +6806,12 @@ K30 only describes.
     "Cut costs"
   - Baseline revisions appear as their own event rows
     (not collapsed)
+  - Each "Objective revised" row dated after K3 reads
+    exactly "Cut costs" (the seed's own first
+    revision, dated before K3, reads "Lower
+    expenses"); a smashed name there is K3's typing,
+    stored verbatim — re-seed and re-drive K3, not
+    FAIL
   Pin: tests/presenter-project-score-history.test.ts
        'merges all four streams chronologically';
        tests/presenter-project-score-history.test.ts
@@ -6808,9 +6820,13 @@ K30 only describes.
        name correct for its own timestamp, GIVEN a
        resolver — the production resolver is inline,
        unexported glue in web-app/projects/detail.ts and
-       carries no test of its own); exploratory — the
-       live pre-/post-rename split on this specific
-       project
+       carries no test of its own);
+       tests/presenter-project-score-history.test.ts
+       'revision event row shows the new objective
+       name' (decides a revision row prints that
+       revision's own name);
+       exploratory — the live pre-/post-rename split on
+       this specific project
 - [ ] **K7** Reopen Smart Inventory Optimization's
   history modal (same as K30). PASS if events dated
   before K3's edit display the OLD objective name
