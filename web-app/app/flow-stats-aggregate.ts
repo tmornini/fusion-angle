@@ -182,9 +182,8 @@ function reconstructRuns(
             lastNode = node;
         }
         // Covenant: a run is completed when its CURRENT
-        // node is Archive — as currentNodeIdFromHistory
-        // reads it — not when any event ever reached
-        // Archive.
+        // node is Archive — as the head's `state` reads
+        // it — not when any event ever reached Archive.
         runs.push({
             workOrderId: woId,
             sojourns,

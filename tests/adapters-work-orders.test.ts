@@ -51,12 +51,9 @@ import {
 '../client/records.ts';
 import {
     getWorkOrder,
-    getWorkOrderActiveClaim,
-    getWorkOrderCurrentNodeId,
     getWorkOrderVersions,
     workOrderEventsOf,
-    getWorkOrderTransitionEvents,
-    getActiveClaimsByWorkOrder,
+    projectTransitions,
 } from
 '../client/work-orders-queries.ts';
 import {
@@ -80,6 +77,9 @@ import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
+import {
+    isExpiresAtPassed,
+} from '../shared/work-order-claims.ts';
 import type {
     WorkOrderEntity,
     GraphNode,
@@ -628,15 +628,14 @@ Deno.test(
         await pause(2);
 
         const beforeNode =
-            await getWorkOrderCurrentNodeId(
-                ctx, woId,
-            );
+            (await getWorkOrder(ctx, woId)).nodeId;
         assertStrictEquals(beforeNode, MIDDLE_NODE);
         const beforeClaim =
-            await getWorkOrderActiveClaim(
-                ctx, woId, DEFAULT_LOCK_TIMEOUT,
-            );
-        assert(beforeClaim !== null);
+            (await getWorkOrder(ctx, woId)).claim;
+        assert(
+            beforeClaim.state === 'claimed'
+            && !isExpiresAtPassed(beforeClaim.expiresAt),
+        );
 
         await postWorkOrderTransition(ctx, {
             workOrder: await getWorkOrder(ctx, woId),
@@ -645,15 +644,15 @@ Deno.test(
         });
 
         const afterNode =
-            await getWorkOrderCurrentNodeId(
-                ctx, woId,
-            );
+            (await getWorkOrder(ctx, woId)).nodeId;
         assertStrictEquals(afterNode, FINISH_NODE);
         const afterClaim =
-            await getWorkOrderActiveClaim(
-                ctx, woId, DEFAULT_LOCK_TIMEOUT,
-            );
-        assertStrictEquals(afterClaim, null);
+            (await getWorkOrder(ctx, woId)).claim;
+        assertStrictEquals(
+            afterClaim.state === 'claimed'
+            && !isExpiresAtPassed(afterClaim.expiresAt),
+            false,
+        );
     },
 );
 
@@ -680,8 +679,11 @@ Deno.test(
         });
 
         const events =
-            await getWorkOrderTransitionEvents(
-                ctx, woId,
+            projectTransitions(
+                woId,
+                workOrderEventsOf(
+                    await getWorkOrderVersions(ctx, woId),
+                ),
             );
         // start, post-start, after-transition
         assertStrictEquals(events.length, 3);
@@ -836,9 +838,7 @@ Deno.test(
             'xDyDkxEPwtcNmJVknUHDsg',
         );
         assertStrictEquals(
-            await getWorkOrderCurrentNodeId(
-                ctx, woId,
-            ),
+            (await getWorkOrder(ctx, woId)).nodeId,
             FINISH_NODE,
         );
     },
@@ -862,9 +862,7 @@ Deno.test(
             ctx, RT_ID, INST_ID,
         );
         const beforeNode =
-            await getWorkOrderCurrentNodeId(
-                ctx, woId,
-            );
+            (await getWorkOrder(ctx, woId)).nodeId;
         await patchRecordInstance(
             ctx, RT_ID, INST_ID, loaded.message, {
                 set: [{
@@ -890,9 +888,7 @@ Deno.test(
             head.values.get(ATTR_ID), 'vB',
         );
         assertStrictEquals(
-            await getWorkOrderCurrentNodeId(
-                ctx, woId,
-            ),
+            (await getWorkOrder(ctx, woId)).nodeId,
             beforeNode,
         );
     },
@@ -961,9 +957,7 @@ Deno.test(
             after.values.get(ATTR_ID), 'v0',
         );
         assertStrictEquals(
-            await getWorkOrderCurrentNodeId(
-                ctx, woId,
-            ),
+            (await getWorkOrder(ctx, woId)).nodeId,
             FINISH_NODE,
         );
     },
@@ -1005,11 +999,11 @@ Deno.test(
             ctx, await getWorkOrder(ctx, woId),
         );
 
-        const claim =
-            await getWorkOrderActiveClaim(
-                ctx, woId, DEFAULT_LOCK_TIMEOUT,
-            );
-        assert(claim !== null);
+        const claim = (await getWorkOrder(ctx, woId)).claim;
+        assert(
+            claim.state === 'claimed'
+            && !isExpiresAtPassed(claim.expiresAt),
+        );
         assertStrictEquals(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
@@ -1171,10 +1165,10 @@ Deno.test(
     },
 );
 
-// ── lockTimeout-aware getWorkOrderActiveClaim ────
+// ── the twin's claim, judged as the pages judge it ────
 
 Deno.test(
-    'getWorkOrderActiveClaim treats a stale '
+    'the twin treats a stale '
     + 'claimed event as implicitly expired',
     async () => {
         const db = memoryDbAdapter();
@@ -1186,22 +1180,25 @@ Deno.test(
         const ctx = inPageContext(db, token);
         const woId = generateIdentifier();
         await seedBareWorkOrder(db, token, woId);
-        // Backdate ten seconds; lockTimeout=1s
-        // means this is past the live window.
+        // Backdate past the graph's lockTimeout, so the
+        // claim's expires_at is already behind us.
         const longAgo = new Date(
-            Date.now() - 10_000,
+            Date.now()
+            - (DEFAULT_LOCK_TIMEOUT + 1) * 1000,
         ).toISOString()
         .replace('Z', '000Z');
         await seedClaim(ctx, woId, longAgo);
-        const claim = await getWorkOrderActiveClaim(
-            ctx, woId, 1,
+        const claim = (await getWorkOrder(ctx, woId)).claim;
+        assertStrictEquals(
+            claim.state === 'claimed'
+            && !isExpiresAtPassed(claim.expiresAt),
+            false,
         );
-        assertStrictEquals(claim, null);
     },
 );
 
 Deno.test(
-    'getWorkOrderActiveClaim returns the fresh '
+    'the twin shows the fresh '
     + 'claim when within the lock window',
     async () => {
         const db = memoryDbAdapter();
@@ -1214,73 +1211,12 @@ Deno.test(
         const woId = generateIdentifier();
         await seedBareWorkOrder(db, token, woId);
         await seedClaim(ctx, woId, nowUtc());
-        const claim = await getWorkOrderActiveClaim(
-            ctx, woId, DEFAULT_LOCK_TIMEOUT,
+        const claim = (await getWorkOrder(ctx, woId)).claim;
+        assert(
+            claim.state === 'claimed'
+            && !isExpiresAtPassed(claim.expiresAt),
         );
-        assert(claim !== null);
         assertStrictEquals(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
-    },
-);
-
-// ── fan-in getActiveClaimsByWorkOrder ────
-
-Deno.test(
-    'getActiveClaimsByWorkOrder resolves every '
-    + 'order claim via per-item history, honoring '
-    + 'per-order lockTimeout and the work-order set',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await seedHumanMember(
-            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
-        );
-        const token = await organizationToken();
-        const ctx = inPageContext(db, token);
-        const fresh1 = generateIdentifier();
-        const fresh2 = generateIdentifier();
-        const stale = generateIdentifier();
-        const released = generateIdentifier();
-        const orphan = generateIdentifier();
-        const now = nowUtc();
-        const longAgo = new Date(
-            Date.now() - 10_000,
-        ).toISOString()
-        .replace('Z', '000Z');
-        for (const id of [
-            fresh1, fresh2, stale, released, orphan,
-        ]) {
-            await seedBareWorkOrder(db, token, id);
-        }
-        await seedClaim(ctx, fresh1, now);
-        await seedClaim(ctx, fresh2, now);
-        await seedClaim(ctx, stale, longAgo);
-        await seedClaim(ctx, orphan, now);
-        await seedClaim(ctx, released, now);
-        // releaseAt strictly after claimAt so the replay
-        // sees a live prior claim and emits claim_released.
-        await seedRelease(ctx, released);
-        const timeouts = new Map<string, number>([
-            [fresh1, DEFAULT_LOCK_TIMEOUT],
-            [fresh2, DEFAULT_LOCK_TIMEOUT],
-            [stale, 1],
-            [released, DEFAULT_LOCK_TIMEOUT],
-        ]);
-        const claims =
-            await getActiveClaimsByWorkOrder(
-                ctx, timeouts,
-            );
-        assertStrictEquals(claims.size, 2);
-        assertStrictEquals(
-            claims.get(fresh1)!.memberId, 'XXZruirZyAOoRpNxaDnpSA',
-        );
-        assert(claims.has(fresh2));
-        // Stale claim past its lockTimeout: excluded.
-        assertStrictEquals(claims.has(stale), false);
-        // Released claim: excluded.
-        assertStrictEquals(claims.has(released), false);
-        // Claimed but outside the work-order set:
-        // excluded (no timeout entry).
-        assertStrictEquals(claims.has(orphan), false);
     },
 );
 
@@ -1296,13 +1232,9 @@ Deno.test(
         await deleteWorkOrderClaim(
             ctx, await getWorkOrder(ctx, woId),
         );
-        const events = (await ctx.GET<StateEntity[]>(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-                + '/history',
-        )).body().toValue();
-        const released = events.filter(
-            (e) => e.state === 'claim_released',
-        );
+        const released = workOrderEventsOf(
+            await getWorkOrderVersions(ctx, woId),
+        ).filter((e) => e.state === 'claim_released');
         assertStrictEquals(released.length, 1);
         assert(released[0]!.id.length > 0);
         assert(released[0]!.at.length > 0);
@@ -1324,11 +1256,10 @@ Deno.test(
 
         // Verify a live claim exists before transition.
         const beforeClaim =
-            await getWorkOrderActiveClaim(
-                ctx, woId, DEFAULT_LOCK_TIMEOUT,
-            );
+            (await getWorkOrder(ctx, woId)).claim;
         assert(
-            beforeClaim !== null,
+            beforeClaim.state === 'claimed'
+            && !isExpiresAtPassed(beforeClaim.expiresAt),
             'expected a live claim before transition',
         );
 

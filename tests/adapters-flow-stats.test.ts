@@ -116,9 +116,8 @@ function daysAgo(d: number): string {
 
 // A work-order transition, posted through the SAME
 // wire-reachable POST the live route serves
-// (postWorkOrderTransitionOp) — required for the flipped
-// history derive (Task 7), which
-// getTransitionEventsByWorkOrder reads, to derive it. A raw
+// (postWorkOrderTransitionOp) — required for the versions
+// read getFlowStats charts to find it. A raw
 // db.states.put left no message pair at this document.
 async function transitionWorkOrder(
     ctx: RequestContext,

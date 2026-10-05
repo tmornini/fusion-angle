@@ -102,9 +102,9 @@ function buildFlowGraph(
 }
 
 // validateRecordTransition reads organizations/:id/work-orders/:id
-// through the GET, and getWorkOrderTransitionEvents reads the
-// work order's events: the work order lands through the live
-// create, its three births carrying the node it sits at.
+// through the GET, and the work order's versions carry its
+// events: the work order lands through the live create,
+// its three births carrying the node it sits at.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
     id: string,
