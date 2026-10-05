@@ -127,7 +127,7 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     ProjectFlowEntity,
-    WorkOrderEntity,
+    WorkOrderFieldsEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
     IdentityCredentialKind,
@@ -912,7 +912,7 @@ export function flowOrg2SeedBody(): Record<string, unknown> {
 // carry organization_id (STARK_ORGANIZATION, set by
 // generateFlowWorkload), so it is dropped here with the id.
 export function workOrderDocumentSeedBody(
-    row: Omit<WorkOrderEntity, 'organization_id'>
+    row: Omit<WorkOrderFieldsEntity, 'organization_id'>
         & { readonly organization_id?: string },
 ): Record<string, unknown> {
     const {
@@ -949,7 +949,7 @@ export function seedWorkOrderTraces(
 // and its creator's claim at the second's moment, which
 // keeps the version's chain monotonic in time.
 export function workOrderCreateSeedBody(
-    row: Omit<WorkOrderEntity, 'organization_id'>
+    row: Omit<WorkOrderFieldsEntity, 'organization_id'>
         & { readonly organization_id?: string },
     join: FlowWorkOrderEntity,
     trace: readonly StateEntity[],

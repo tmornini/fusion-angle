@@ -26,7 +26,7 @@ import type {
     FlowEdgeEntity,
     FlowNodeMemberEntity,
     FlowNodeAttributeEntity,
-    WorkOrderEntity,
+    WorkOrderFieldsEntity,
     FlowWorkOrderEntity,
     StateFieldValueEntity,
     OrganizationEntity,
@@ -1529,7 +1529,7 @@ const WORK_ORDER_BODY_KEYS:
 
 export function validateWorkOrderEntity(
     body: Record<string, unknown>,
-): Omit<WorkOrderEntity, 'id'> {
+): Omit<WorkOrderFieldsEntity, 'id'> {
     assertOnlyKeys(
         body,
         WORK_ORDER_BODY_KEYS,
@@ -1559,7 +1559,7 @@ const WORK_ORDER_DOCUMENT_BODY_KEYS: readonly string[] = [
 
 export interface WorkOrderDocumentBody {
     readonly entity:
-        Omit<WorkOrderEntity, 'id' | 'organization_id'>;
+        Omit<WorkOrderFieldsEntity, 'id' | 'organization_id'>;
 }
 
 // The HTTP-body gate for PUT /work-orders/:id: UNLIKE every

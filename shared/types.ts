@@ -1270,12 +1270,18 @@ export function storedWorkOrderFlowGraph(
     };
 }
 
-export interface WorkOrderEntity {
+// A work order's own fields: what the seed authors and a
+// document PUT writes.
+export interface WorkOrderFieldsEntity {
     id: Id;
     organization_id: Id;
     display_id: string;
     flow_graph: Record<string, unknown>;
     position: number;
+}
+
+// A work order's stored version, as a GET serves it.
+export interface WorkOrderEntity extends WorkOrderFieldsEntity {
     // GET embed when bound (absent when unbound).
     instance_id?: Id;
     record_type_id?: Id;
