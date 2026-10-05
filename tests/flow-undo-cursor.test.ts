@@ -875,7 +875,6 @@ Deno.test(
         getClient().putSessionToken(DEV_TOKEN);
 
         const livePresenter = async (
-            migrateToCenter = false,
         ): Promise<FlowDesignerPresenter> => {
             const graph = await getRenderableFlowGraph(
                 sessionContext(), flowId,
@@ -890,7 +889,6 @@ Deno.test(
                         sessionContext(), flowId,
                     )).length > 1,
                 ),
-                migrateToCenter,
             );
         };
 
@@ -907,7 +905,7 @@ Deno.test(
             flowId, async () => undefined,
         );
 
-        const opened = await livePresenter(true);
+        const opened = await livePresenter();
         opened.withCanvasSize(800, 600);
         opened.withLayoutReconciled();
         await enqueueFlowSave(

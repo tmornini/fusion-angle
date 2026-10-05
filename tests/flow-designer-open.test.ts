@@ -1,4 +1,6 @@
-import { assertNotStrictEquals, assertStrictEquals } from '@std/assert';
+import {
+    assertEquals, assertNotStrictEquals, assertStrictEquals,
+} from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
@@ -35,6 +37,7 @@ import {
 import {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
+    type FlowSnapshot,
 } from
     '../web-app/app/presenters/flow-designer.ts';
 import {
@@ -194,7 +197,6 @@ Deno.test(
                     (await getFlowVersions(ctx, flowId))
                         .length > 1,
                 ),
-                true,
             );
         presenter.withCanvasSize(
             CANVAS_W, CANVAS_H,
@@ -248,6 +250,87 @@ Deno.test(
         await enqueueFlowSave(flowId, async () => undefined);
         assertStrictEquals(
             await flowDocumentPairCount(db, flowId), n,
+        );
+    }),
+);
+
+// onFlowLoaded's boot, minus the DOM: read the renderable
+// graph, build the one per-load presenter, size its canvas,
+// and reconcile its layout — the snapshot boot paints.
+async function bootDesigner(
+    ctx: ReturnType<typeof inPageContext>,
+    flowId: string,
+): Promise<FlowSnapshot> {
+    const graph = await getRenderableFlowGraph(ctx, flowId);
+    const presenter = new FlowDesignerPresenter(
+        buildInitialFlowSnapshot(
+            graph, CANVAS_W, CANVAS_H, [], [], [],
+        ),
+        CANVAS_W, CANVAS_H,
+        buildFlowHistorySnapshot(
+            (await getFlowVersions(ctx, flowId)).length > 1,
+        ),
+    );
+    presenter.withCanvasSize(CANVAS_W, CANVAS_H);
+    return presenter.withLayoutReconciled();
+}
+
+Deno.test(
+    'with Auto Layout off, boot paints the positions'
+    + ' the designer left (F30)',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const db = await freshDb();
+        putClient(inPageClient(db));
+        getClient().putSessionToken(DEV_TOKEN);
+        const flowId = generateIdentifier();
+        await createFlow(db, DEV_TOKEN, flowId);
+        const ctx = inPageContext(db, DEV_TOKEN);
+        const { start, complete } =
+            buildStartAndCompleteNodes();
+        const panel = {
+            ...start,
+            id: generateIdentifier(),
+            name: 'Panel B',
+            isCreate: false,
+        };
+        await putFlow(ctx, flowId, {
+            name: 'Layout Test',
+            isLocked: false,
+            isAutoLayout: true,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [start, panel, complete],
+            edges: [
+                {
+                    id: generateIdentifier(), name: '',
+                    fromNodeId: start.id,
+                    toNodeId: panel.id,
+                },
+                {
+                    id: generateIdentifier(), name: 'Done',
+                    fromNodeId: panel.id,
+                    toNodeId: complete.id,
+                },
+            ],
+        });
+        const history = buildFlowHistorySnapshot(true);
+        const off = new FlowDesignerPresenter(
+            await bootDesigner(ctx, flowId),
+            CANVAS_W, CANVAS_H, history,
+        ).withAutoLayoutToggled();
+        const left = new FlowDesignerPresenter(
+            off, CANVAS_W, CANVAS_H, history,
+        ).withNodeNamed(panel.id, 'Panel B F30');
+        await enqueueFlowSave(flowId, async () => undefined);
+        const back = await bootDesigner(ctx, flowId);
+        assertStrictEquals(back.isAutoLayout, false);
+        assertEquals(
+            back.nodes.map(n => [
+                n.name, n.positionX, n.positionY,
+            ]),
+            left.nodes.map(n => [
+                n.name, n.positionX, n.positionY,
+            ]),
         );
     }),
 );

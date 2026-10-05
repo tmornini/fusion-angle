@@ -459,9 +459,7 @@ Deno.test(
 // that reaches #queueSave. This file still asserts
 // the STRUCTURAL guarantee that
 // implies no save was queued: an off-center snapshot survives
-// the plain constructor byte-for-byte. Only the 5-arg,
-// migrateToCenter=true form (onFlowLoaded's own one call
-// site) may recenter.
+// the plain constructor byte-for-byte.
 Deno.test(
     'the plain (commit()-style) constructor leaves an'
     + ' off-center snapshot untouched — no silent'
