@@ -37,7 +37,7 @@ import { operationIdHeader } from
 // fieldValues transition wire. Spec W2 / plan Task 8:
 // POST with the fieldValues key → 400; the below-facade
 // postSeedWorkOrderTransitionOp stays dual-tolerant for the
-// seed's ~859 pure-moves.
+// seed's 569 pure moves.
 // Gate-path rejection lives ONLY in the dispatch arrow.
 
 const ORGANIZATION = STARK_ORGANIZATION;

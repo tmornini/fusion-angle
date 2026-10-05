@@ -1613,7 +1613,7 @@ function requirePair(
 // the flow join, in one statement. Both declare their
 // genesis, so a resent create answers 409 and stores
 // nothing. Every event is authored by the verified caller.
-async function postWorkOrderCreationOp(
+export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     actor: Id,

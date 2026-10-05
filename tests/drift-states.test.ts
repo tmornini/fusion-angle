@@ -508,9 +508,10 @@ async () => {
             );
         }
     }
-    // The work order carries its full 4-event hand-authored
-    // trace — a non-vacuous, multi-event leg (case 6 below reuses
-    // this SAME entity for the field-values join proof).
+    // The work order carries its 4-event hand-authored trace
+    // and its claim birth — a non-vacuous, multi-event leg
+    // (case 6 below reuses this SAME entity for the
+    // field-values join proof).
     const workOrderEntry = CASE_2_FAMILY_ENTITY_IDS.find(
         (e) => e.family === 'work-order',
     )!;
@@ -518,7 +519,7 @@ async () => {
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderEntry.id,
         )).length,
-        4,
+        5,
     );
 });
 

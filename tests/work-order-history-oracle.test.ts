@@ -2,6 +2,9 @@ import { assertEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { testHashPassword } from './mock-seed.ts';
+import {
+    workOrderClaimEventId,
+} from '../api/mock-data/seed-message-pairs.ts';
 import { workOrderHistoryFor } from '../api/derive-states.ts';
 import { now as seedNow } from '../api/mock-data/seed-kit.ts';
 import { microsOf, stampOfMicros } from '../shared/pair-root.ts';
@@ -37,13 +40,39 @@ function shiftedRow(
     };
 }
 
+// The create births three (spec §2): the trace's first two
+// events and its creator's claim at the second's moment.
+// Newest first, the claim sits just above the second.
+function withClaimBirth(
+    rows: ReadonlyArray<WorkOrderHistoryEventEntity>,
+): WorkOrderHistoryEventEntity[] {
+    const start = rows.at(-1)!;
+    const node = rows.at(-2)!;
+    return [
+        ...rows.slice(0, -2),
+        {
+            id: workOrderClaimEventId(start.entity_id),
+            entity_id: start.entity_id,
+            state: 'claimed',
+            member_id: start.member_id,
+            at: node.at,
+            field_values: [],
+        },
+        node,
+        start,
+    ];
+}
+
 const expected = Object.fromEntries(
     Object.entries(fixture.histories).map(
-        ([key, rows]) => [key, rows.map(shiftedRow)],
+        ([key, rows]) => [
+            key, withClaimBirth(rows.map(shiftedRow)),
+        ],
     ),
 );
 
-Deno.test('every seeded work order keeps its history', async () => {
+Deno.test('every seeded work order keeps its history,'
++ ' born with its claim', async () => {
     const db = memoryDbAdapter();
     await postMockDataLoad(db, {
         hashPassword: testHashPassword,
@@ -59,5 +88,24 @@ Deno.test('every seeded work order keeps its history', async () => {
             );
         });
         assertEquals(actual, rows, key);
+    }
+});
+
+Deno.test('every seeded history holds exactly one claimed'
++ ' birth, at its second event', async () => {
+    const db = memoryDbAdapter();
+    await postMockDataLoad(db, {
+        hashPassword: testHashPassword,
+    });
+    for (const [key, rows] of Object.entries(expected)) {
+        const [organization, workOrder] = key.split('/');
+        const actual = await workOrderHistoryFor(
+            db, organization!, workOrder!,
+        );
+        const births = actual.filter(
+            (row) => row.state === 'claimed',
+        );
+        assertEquals(births.length, 1, key);
+        assertEquals(births[0]!.at, rows.at(-2)!.at, key);
     }
 });

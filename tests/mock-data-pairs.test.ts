@@ -9,8 +9,18 @@ import {
 } from '../api/derive-states.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postBootstrap } from '../api/mock-data.ts';
+import { handleRequest } from '../api/api.ts';
 import {
-    sharedMockDb, testHashPassword,
+    buildLeadToCloseWorkload,
+} from '../api/mock-data/lead-to-close-flow.ts';
+import { generateIdentifier } from '../shared/identifier.ts';
+import { nowUtc } from '../shared/types.ts';
+import {
+    apiRequest, messageOfResponse,
+} from './http-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
+import {
+    seededMockDb, sharedMockDb, testHashPassword,
 } from './mock-seed.ts';
 import { requestHashOfStored } from './ledger-row.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
@@ -29,6 +39,7 @@ import {
     mockFlowRecords,
     mockStateFieldValues,
     buildScoreSeedProjects,
+    workOrderClaimEventId,
     ORGANIZATION_TWO_OBJECTIVE,
 } from '../api/mock-data/seed-message-pairs.ts';
 import {
@@ -107,9 +118,8 @@ function messagePairJsonOf(message: string): {
 // precedent, over the same 4 STARK + seed-objective-org2 set;
 // states-document retirement rides the genesis state on those
 // same create/document bodies — pair COUNT unchanged)
-// + 145 work-order documents + 145 flow-work-order joins
-// (Phase 5 Task 4: the entity/join gap closed, one document
-// message pair and one join pair per seeded work order) + 49
+// + 145 work-order creates (each its received POST, the work
+// order's first version, and its flow join) + 49
 // baseline documents + 92 actual documents (Phase 7 Task 5:
 // the scores half of the Phase 0 seed deferral closes — one
 // document message pair per seeded baseline/actual-score
@@ -137,9 +147,10 @@ function messagePairJsonOf(message: string): {
 // hashSeedCredentials (api/mock-data.ts) computes first,
 // before pass 1) + 0 role-grant document message
 // pairs (retired: membership type carries privilege; mint
-// bakes claims) + 1718 legacy work-order historical-trace
-// pairs (861 traces minus WO01's two value-bearing events,
-// each its received POST and the work order's version) +
+// bakes claims) + 1138 trace pairs (861 events less each
+// work order's two births and WO01's two value-bearing
+// events, each its received POST and the work order's
+// version) +
 // 10 WO-instance chain pairs (the PATCH create's PATCH and
 // PUT, the binding's PUT and the work order's version, and
 // Review and Complete, each a POST with the work order's
@@ -159,7 +170,7 @@ function messagePairJsonOf(message: string): {
 // invitation's operation + document, granted by
 // postOrganizationInvitationGrant). Measure after
 // seed — do not invent. Bootstrap absolute is 9.
-const EXPECTED_MESSAGE_PAIR_COUNT = 2317;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1882;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -565,7 +576,7 @@ Deno.test('a seeded work-order document message pair sits at its'
     const firstWorkOrder = buildWorkOrders()[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
-        r => r.name === firstWorkOrder.id,
+        r => r.name === firstWorkOrder.id && r.method === 'PUT',
     );
     assert(row, 'no request row for the seeded work order');
     assertStrictEquals(row!.path
@@ -579,8 +590,8 @@ Deno.test('a seeded work-order document message pair sits at its'
     assertEquals(
         Object.keys(embedded.body).sort(),
         [
-            'display_id', 'events', 'flow_graph', 'id',
-            'organization_id', 'position',
+            'claim', 'display_id', 'events', 'flow_graph',
+            'id', 'organization_id', 'position', 'state',
         ],
     );
 });
@@ -630,7 +641,7 @@ async () => {
 });
 
 // Phase 11 Task 3: the work-order historical-trace carve-out
-// closes — every trace event (211 hand-authored + 649 generated)
+// closes — every trace event (212 hand-authored + 649 generated)
 // and every state_field_value now forms its own pair too, Path A
 // (the states / state_field_values rows themselves stay the SAME
 // direct writes mock-data.ts already made).
@@ -658,10 +669,8 @@ function transitionPairForEvent(
     });
 }
 
-Deno.test('a seeded work-order trace event\'s pair sits at its'
-+ ' org-nested transition document, its response carrying the'
-+ ' work order\'s version with the event (states/:id retired)',
-async () => {
+Deno.test('a seeded work order\'s first trace event rides its'
++ ' create pair', async () => {
     const db = await sharedMockDb();
     const firstTrace = buildWorkOrderStateEvents()[0]!;
     const requests = await db.messagePairs.getAll();
@@ -671,9 +680,9 @@ async () => {
     assert(row, 'no request row for the seeded transition');
     assertStrictEquals(
         row!.path,
-        `/organizations/${STARK_ORGANIZATION}/work-orders/`
-            + `${firstTrace.entity_id}/transition/`,
+        `/organizations/${STARK_ORGANIZATION}/work-orders/`,
     );
+    assertStrictEquals(row!.method, 'POST');
     const embedded = messagePairJsonOf(row!.response) as {
         body: {
             readonly events: readonly Record<string, unknown>[];
@@ -708,13 +717,10 @@ Deno.test('a seeded transition pair\'s stored request'
     const written = lifecycle.find(s => s.id === firstTrace.id)!;
     assert(written, 'derived state missing');
     assertStrictEquals(row!.requester_identity_id, written.member_id);
-    // Index 0 is its work order's OWN first event, so a
-    // regression that sources every trace pair's requester
-    // from the work order's first-event member (rather than
-    // the event's own) would pass the assertion above
-    // undetected. Index 2 is the SAME work order's third
-    // event, and its member_id diverges from index 0's —
-    // only the per-event implementation matches it.
+    // Index 0 rides its work order's create, requested by
+    // the trace's first member; index 2 is the same work
+    // order's third event, a transition by another member,
+    // so only a per-event requester matches both.
     const divergingTrace = buildWorkOrderStateEvents()[2]!;
     const divergingRow = transitionPairForEvent(
         requests, divergingTrace.id,
@@ -1041,4 +1047,61 @@ Deno.test('a bootstrap seed populates exactly nine balanced,'
             row.request_hash,
         );
     }
+});
+
+Deno.test('the seed mints one distinct claim birth per'
++ ' work order', () => {
+    const traces = [
+        ...buildWorkOrderStateEvents(),
+        ...buildLeadToCloseWorkload().stateEvents,
+    ];
+    const eventIds = new Set(traces.map((e) => e.id));
+    const ids = [
+        ...buildWorkOrders(),
+        ...buildLeadToCloseWorkload().workOrders,
+    ].map((wo) => workOrderClaimEventId(wo.id));
+    assertStrictEquals(new Set(ids).size, 145);
+    assertEquals(ids.filter((id) => eventIds.has(id)), []);
+    assertStrictEquals(
+        workOrderClaimEventId('xqcXYHXBJJXcLkRYkRngKA'),
+        'oFyLhsd2EDgP4un8UY0H-A',
+    );
+});
+
+Deno.test('claiming a seeded work order expires its birth'
++ ' claim', async () => {
+    const db = await seededMockDb();
+    const path = '/organizations/' + STARK_ORGANIZATION
+        + '/work-orders/xqcXYHXBJJXcLkRYkRngKA';
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+    );
+    const head = await handleRequest(db, apiRequest({
+        method: 'GET', path, token,
+    }));
+    const tag = head.headers.get('etag')!;
+    await head.body?.cancel();
+    const at = nowUtc();
+    const claimed = await handleRequest(db, apiRequest({
+        method: 'PUT', path: path + '/claim', token,
+        headers: { 'If-Match': tag },
+        body: {
+            claimEventId: generateIdentifier(),
+            claimAt: at,
+            expireEventId: generateIdentifier(),
+            expireAt: at,
+        },
+    }));
+    assertStrictEquals(claimed.status, 200);
+    const version = (await messageOfResponse(claimed))
+        .body().toValue() as {
+            events: { state: string, member_id: string }[],
+        };
+    assertEquals(version.events.map((e) => e.state), [
+        'claim_expired', 'claimed',
+    ]);
+    assertStrictEquals(
+        version.events[0]!.member_id,
+        'MQFcPtrZPIGjMCRAXtZUnA',
+    );
 });

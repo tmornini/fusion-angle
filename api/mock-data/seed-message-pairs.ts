@@ -94,8 +94,9 @@
 // SAME formSeedMessagePair pipeline every family above already rides.
 // States-document retirement Task 12 reshapes those 861 traces
 // (212 hand-authored + 649 generated) 1:1 into
-// work-orders/:id/transition op-shaped pairs (op: true),
-// folding the 7 mockStateFieldValues into the parent
+// work-orders/:id/transition op-shaped pairs (op: true) from
+// each third event, the first two riding the work order's
+// create, folding the 7 mockStateFieldValues into the parent
 // transition bodies' fieldValues — no bare states/:id or
 // states/:id/field-values/:fvid seed pairs remain. Leftover
 // members/:id genesis pairs are gone from the seed.
@@ -150,6 +151,7 @@ import type {
 } from '../message-pair.ts';
 import { buildRequestModel } from '../message-form.ts';
 import {
+    byAtThenIdAscending,
     generateIdentifier,
 } from '../../shared/identifier.ts';
 import {
@@ -903,13 +905,12 @@ export function flowOrg2SeedBody(): Record<string, unknown> {
     };
 }
 
-// The genesis case of the document PUT work-orders/:id
-// (Phase 5 Task 4): the flat entity fields, no `id` (a route
-// param, not a body field) and no organization_id — the op
-// takes the organization as the fence would hand it
-// (Interpretation R). Generated rows carry organization_id
-// (STARK_ORGANIZATION, set by generateFlowWorkload), so it is
-// dropped here with the id.
+// The `workOrder` member of the create body: the flat entity
+// fields, no `id` (the create carries it at its top level)
+// and no organization_id — the op takes the organization as
+// the fence would hand it (Interpretation R). Generated rows
+// carry organization_id (STARK_ORGANIZATION, set by
+// generateFlowWorkload), so it is dropped here with the id.
 export function workOrderDocumentSeedBody(
     row: Omit<WorkOrderEntity, 'organization_id'>
         & { readonly organization_id?: string },
@@ -920,11 +921,58 @@ export function workOrderDocumentSeedBody(
     return fields;
 }
 
-// The genesis case of the document PUT
-// flows/:id/work-orders/:woid (Phase 5 Task 4): the flat join
-// fields, no `id` (a route param, not a body field) — the SAME
-// three keys (flow_id, work_order_id, at) the live :woid PUT's
-// validateFlowWorkOrderEntity accepts.
+// A seeded work order's birth claim id: minted from its
+// work order's id, as a seeded member's initial state
+// event is from its member's (spec §2).
+export function workOrderClaimEventId(workOrderId: Id): Id {
+    return seedIdentifier(
+        `seed-work-order-${workOrderId}-claimed`,
+    );
+}
+
+// Each seeded work order's trace in (at, id) order, the
+// order its events land in.
+export function seedWorkOrderTraces(
+    events: readonly StateEntity[],
+): ReadonlyMap<Id, readonly StateEntity[]> {
+    const traces = Map.groupBy(
+        events, (event) => event.entity_id,
+    );
+    return new Map([...traces].map(([id, trace]) => [
+        id, trace.toSorted(byAtThenIdAscending),
+    ]));
+}
+
+// The live POST work-orders/ body this work order's birth
+// would have carried (spec §2): its fields, its one flow
+// join, and three births — the trace's first two events
+// and its creator's claim at the second's moment, which
+// keeps the version's chain monotonic in time.
+export function workOrderCreateSeedBody(
+    row: Omit<WorkOrderEntity, 'organization_id'>
+        & { readonly organization_id?: string },
+    join: FlowWorkOrderEntity,
+    trace: readonly StateEntity[],
+): Record<string, unknown> {
+    const start = trace[0]!;
+    const node = trace[1]!;
+    return {
+        id: row.id,
+        workOrder: workOrderDocumentSeedBody(row),
+        flowWorkOrderId: join.id,
+        flowWorkOrder: flowWorkOrderJoinSeedBody(join),
+        stateEventIds: [
+            start.id, node.id, workOrderClaimEventId(row.id),
+        ],
+        stateEventAts: [start.at, node.at, node.at],
+        states: [start.state, node.state, 'claimed'],
+    };
+}
+
+// The `flowWorkOrder` member of the create body: the flat
+// join fields, no `id` (the create carries it at its top
+// level as flowWorkOrderId) — the three keys (flow_id,
+// work_order_id, at) validateFlowWorkOrderEntity accepts.
 export function flowWorkOrderJoinSeedBody(
     row: FlowWorkOrderEntity,
 ): Record<string, unknown> {
@@ -938,8 +986,8 @@ export function flowWorkOrderJoinSeedBody(
 // + Complete 1) emit the NEW instance-head shape (set from
 // seedSetFor; fv row ids retire); every other transition keeps
 // the LEGACY fieldValues body forever (event fidelity; empty
-// bags on pure moves). release is null — traces never released
-// claims (zero seeded claim events).
+// bags on pure moves). release is null — a trace's moves keep
+// its creator's lapsed birth claim.
 export function transitionSeedBody(
     event: StateEntity,
 ): Record<string, unknown> {
@@ -1341,8 +1389,9 @@ interface MockDataInvocation {
 
 // Dependency-ordered (matches postMockDataLoadIn's write order):
 // memberships + human-members, ideas, organizations (Phase 12
-// Task 3), idea-submissions, projects, flows, work-orders,
-// flow-work-orders, the work-order historical traces as
+// Task 3), idea-submissions, projects, flows, work-order
+// creates, the work-order historical traces from each third
+// event as
 // work-orders/:id/transition ops (states-document retirement
 // Task 12; field values fold into those bodies), memberships
 // + ai-members, the system member's own document, records,
@@ -1378,24 +1427,14 @@ export function buildMockDataInvocations():
     const flowWorkOrderJoins = buildFlowWorkOrderJoins();
     const workOrderStateEvents = buildWorkOrderStateEvents();
     const leadToCloseWorkload = buildLeadToCloseWorkload();
-    // First-occurrence-wins: the WO's first seeded states event's
-    // member_id (the flows genesis-member precedent), read off
-    // the SAME two state-event arrays mock-data.ts's historical-
-    // trace carve-out still writes directly. Empirically verified
-    // (lens 4): all 145 work orders carry at least one event, and
-    // first-in-array-order equals earliest-by-`at` for every one —
-    // the lookup is unambiguous.
-    const workOrderFirstEventMemberId = new Map<Id, Id>();
-    for (const event of [
+    const workOrderTraces = seedWorkOrderTraces([
         ...workOrderStateEvents,
         ...leadToCloseWorkload.stateEvents,
-    ]) {
-        if (!workOrderFirstEventMemberId.has(event.entity_id)) {
-            workOrderFirstEventMemberId.set(
-                event.entity_id, event.member_id,
-            );
-        }
-    }
+    ]);
+    const joinByWorkOrder = new Map([
+        ...flowWorkOrderJoins,
+        ...leadToCloseWorkload.flowWorkOrders,
+    ].map((join) => [join.work_order_id, join]));
 
     const invocations: MockDataInvocation[] = [];
 
@@ -1686,102 +1725,64 @@ export function buildMockDataInvocations():
         body: flowOrg2SeedBody(),
         operation: flowOrg2Key,
     });
-    // Phase 5 Task 4: the entity/join gap closed — one document
-    // message pair per seeded work order (hand-authored +
-    // generated) and one join pair per seeded
-    // flow-work-order join, mirroring the flows family's
-    // document-genesis shape. The work-order
-    // HISTORICAL TRACES (states events + state_field_values) stay
-    // a direct WRITE — Path A, the fingerprint-critical invariant
-    // (op-replay would rearrange the pinned states fingerprint) —
-    // but the carve-out that once left them PAIR-less is CLOSED
-    // below (Phase 11 Task 3): each trace event and field value
-    // now forms its OWN message pair beside the untouched row.
+    // Each seeded work order is born through the live POST
+    // (spec §2), requested by its trace's first member: its
+    // first version and its flow join land as the create's
+    // siblings, so no document PUT or join PUT is seeded.
     for (
         const wo of [
             ...workOrders, ...leadToCloseWorkload.workOrders,
         ]
     ) {
-        const key = seedMessagePairKey('work-orders/:id', wo.id);
+        const trace = workOrderTraces.get(wo.id)!;
+        const key = seedMessagePairKey('work-orders', wo.id);
         invocations.push({
             key,
-            routePattern:
-                'organizations/:id/work-orders/:id',
-            idParams: [STARK_ORGANIZATION, wo.id],
-            organization: STARK_ORGANIZATION,
-            requesterIdentityId:
-                workOrderFirstEventMemberId.get(wo.id)!,
-            body: workOrderDocumentSeedBody(wo),
-            operation: key,
-        });
-    }
-    for (
-        const join of [
-            ...flowWorkOrderJoins,
-            ...leadToCloseWorkload.flowWorkOrders,
-        ]
-    ) {
-        const key = seedMessagePairKey(
-            'flows/:id/work-orders/:woid', join.id,
-        );
-        invocations.push({
-            key,
-            routePattern:
-                'organizations/:id/flows/:id/work-orders/:woid',
-            idParams: [
-                STARK_ORGANIZATION, join.flow_id, join.id,
-            ],
-            organization: STARK_ORGANIZATION,
-            // The SAME member as the join's own work order's
-            // document message pair — the requesting identity
-            // is who brought the work order into being, not a
-            // second, independently-picked author.
-            requesterIdentityId: workOrderFirstEventMemberId.get(
-                join.work_order_id,
-            )!,
-            body: flowWorkOrderJoinSeedBody(join),
-            operation: key,
-        });
-    }
-    // States-document retirement: every trace event (212 hand-
-    // authored + 649 generated = 861) reshapes 1:1 into a
-    // work-orders/:id/transition op-shaped pair — the LIVE op
-    // shape, nothing invented: transitionEventId = the event's
-    // own id, transitionAt = its at, targetState = its node
-    // state, requester = the event's OWN member. NOT creation
-    // ops: the creation gate's exact-3 'claimed'-slot
-    // semantics do not match historical traces (zero seeded
-    // claim events; the in-flight fixtures are 2- and
-    // 3-event). WO01's two value-bearing events leave this
-    // loop: formInstanceChainSeedInput carries them to the
-    // rehearsal's organization-scoped transition op, so they
-    // are not double-appended.
-    const traceEvents = [
-        ...workOrderStateEvents,
-        ...leadToCloseWorkload.stateEvents,
-    ];
-    for (const event of traceEvents) {
-        if (
-            VALUE_BEARING_TRANSITION_EVENT_IDS.has(
-                event.id,
-            )
-        ) {
-            continue;
-        }
-        const key = seedMessagePairKey(
-            'work-orders/:id/transition', event.id,
-        );
-        invocations.push({
-            key,
-            routePattern:
-                'organizations/:id/work-orders/:id/transition',
-            idParams: [STARK_ORGANIZATION, event.entity_id],
+            routePattern: 'organizations/:id/work-orders/',
+            idParams: [STARK_ORGANIZATION],
             op: true,
             organization: STARK_ORGANIZATION,
-            requesterIdentityId: event.member_id,
-            body: transitionSeedBody(event),
+            requesterIdentityId: trace[0]!.member_id,
+            body: workOrderCreateSeedBody(
+                wo, joinByWorkOrder.get(wo.id)!, trace,
+            ),
             operation: key,
         });
+    }
+    // States-document retirement: every trace event from its
+    // third (861 less 290 births its create carries) reshapes
+    // 1:1 into a work-orders/:id/transition op-shaped pair —
+    // the LIVE op shape, nothing invented: transitionEventId =
+    // the event's own id, transitionAt = its at, targetState =
+    // its node state, requester = the event's OWN member.
+    // WO01's two value-bearing events leave this loop:
+    // formInstanceChainSeedInput carries them to the
+    // rehearsal's organization-scoped transition op, so they
+    // are not double-appended.
+    for (const trace of workOrderTraces.values()) {
+        for (const event of trace.slice(2)) {
+            if (
+                VALUE_BEARING_TRANSITION_EVENT_IDS.has(
+                    event.id,
+                )
+            ) {
+                continue;
+            }
+            const key = seedMessagePairKey(
+                'work-orders/:id/transition', event.id,
+            );
+            invocations.push({
+                key,
+                routePattern:
+                    'organizations/:id/work-orders/:id/transition',
+                idParams: [STARK_ORGANIZATION, event.entity_id],
+                op: true,
+                organization: STARK_ORGANIZATION,
+                requesterIdentityId: event.member_id,
+                body: transitionSeedBody(event),
+                operation: key,
+            });
+        }
     }
     for (const m of aiMembers) {
         const { id: _id, ...fields } = m;
