@@ -156,6 +156,12 @@ function makeWorkOrder(
         displayId: 'WO-42',
         flowGraph: graph,
         position: 0,
+        nodeId: graph.nodes[0]!.id,
+        transition: {
+            memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
+            at: '2026-04-01T12:00:00.000000Z',
+        },
+        claim: { state: 'unclaimed' },
         ...overrides,
     };
 }

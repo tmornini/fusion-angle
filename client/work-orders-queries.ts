@@ -89,6 +89,17 @@ export function validateWorkOrderFlowGraph(
     );
 }
 
+// Absence of a claim is named at the adapter, so no
+// reader tests a field for undefined or null.
+export type WorkOrderClaim =
+    | { readonly state: 'unclaimed' }
+    | {
+        readonly state: 'claimed',
+        readonly memberId: Id,
+        readonly at: string,
+        readonly expiresAt: string,
+    };
+
 // The parsed domain twin of WorkOrderEntity: the
 // adapter is the divorce point, so above the storage
 // seam the flow graph is a real WorkOrderFlowGraph,
@@ -102,6 +113,9 @@ export interface WorkOrder {
     displayId: string;
     flowGraph: WorkOrderFlowGraph;
     position: number;
+    nodeId: Id;
+    transition: { readonly memberId: Id; readonly at: string };
+    claim: WorkOrderClaim;
     // Optional bind embed from GET (absent when unbound).
     instanceId?: Id;
     recordTypeId?: Id;
@@ -120,6 +134,19 @@ export function toWorkOrder(
             entity.flow_graph,
         ),
         position: entity.position,
+        nodeId: entity.state,
+        transition: {
+            memberId: entity.transition.member_id,
+            at: entity.transition.at,
+        },
+        claim: entity.claim === undefined
+            ? { state: 'unclaimed' }
+            : {
+                state: 'claimed',
+                memberId: entity.claim.member_id,
+                at: entity.claim.at,
+                expiresAt: entity.claim.expires_at,
+            },
     };
     if (
         entity.instance_id !== undefined
