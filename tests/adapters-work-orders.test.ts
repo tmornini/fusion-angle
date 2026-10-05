@@ -691,6 +691,31 @@ Deno.test(
     },
 );
 
+Deno.test('a transition reads no history', async () => {
+    const { db, ctx } = await setupDb();
+    await seedFlow(
+        db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph(),
+    );
+    const woId = await createWorkOrder(
+        ctx, 'ZOousbbnzpqlxJExVAruYQ',
+    );
+    const held = await getWorkOrder(ctx, woId);
+    const recorded = recordedContext(
+        db, await organizationToken(),
+    );
+    await postWorkOrderTransition(recorded.ctx, {
+        workOrder: held,
+        edgeId: EDGE_MIDDLE_FINISH,
+        values: {},
+    });
+    assertEquals(
+        recorded.sent.filter(
+            (r) => r.path.endsWith('/history'),
+        ),
+        [],
+    );
+});
+
 Deno.test(
     'postWorkOrderTransition throws '
     + 'when edge id does not exist',

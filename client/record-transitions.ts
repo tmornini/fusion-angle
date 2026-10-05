@@ -3,7 +3,6 @@ import type {
     RecordAttributeId,
     WorkOrderEntity,
     WorkOrderFlowGraph,
-    WorkOrderHistoryEventEntity,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import { organizationItem } from './request-context.ts';
@@ -54,23 +53,14 @@ export class RecordTransitionViolations
 // Constraints run on pending values only; requiredness
 // overlays pending on stored (or reports when unbound).
 export function recordTransitionViolationsFrom(
-    workOrderId: Id,
     flowGraph: WorkOrderFlowGraph,
-    history: readonly WorkOrderHistoryEventEntity[],
+    currentNodeId: Id,
     attributes: readonly RecordAttribute[],
     pendingValues:
         ReadonlyMap<RecordAttributeId, string>,
     storedValues:
         ReadonlyMap<RecordAttributeId, string> | null,
 ): ConstraintViolation[] {
-    const currentNodeId =
-        currentNodeIdFromHistory(history);
-    if (currentNodeId === null) {
-        throw new Error(
-            'work order has no current node: '
-            + workOrderId,
-        );
-    }
     const currentNode = flowGraph.nodes.find(
         n => n.id === currentNodeId,
     );
@@ -151,6 +141,14 @@ export async function validateRecordTransition(
             getWorkOrderHistory(ctx, workOrderId),
             getRecordForWorkOrder(ctx, workOrderId),
         ]);
+    const currentNodeId =
+        currentNodeIdFromHistory(history);
+    if (currentNodeId === null) {
+        throw new Error(
+            'work order has no current node: '
+            + workOrderId,
+        );
+    }
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
@@ -161,7 +159,7 @@ export async function validateRecordTransition(
             ctx, recordId,
         );
     return recordTransitionViolationsFrom(
-        workOrderId, fg, history, attributes,
+        fg, currentNodeId, attributes,
         pendingValues, storedValues,
     );
 }
