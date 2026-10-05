@@ -18,6 +18,9 @@ import {
 } from './token-fixtures.ts';
 import { principalFromToken } from
     '../shared/access-token-decode.ts';
+import {
+    resolveBootOrganizationBranch,
+} from '../client/credential-resolution.ts';
 
 // The tab's one client: each test's transport binds it, as
 // the client binds its own.
@@ -286,4 +289,76 @@ async () => {
             .organization,
         org,
     );
+});
+
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
+
+function scopedTo(organization: string): Promise<string> {
+    return claimToken({
+        organization,
+        organizations: [STARK, WAYNE],
+        roles: ['admin:' + STARK, 'admin:' + WAYNE],
+        jti: 'scoped-' + organization,
+    });
+}
+
+Deno.test('a boot refresh asked for Stark keeps Stark when'
+    + ' a Wayne tab broadcasts', async () => {
+    const starkTab = createAppClient(createHttpFacade(
+        'http://example.test',
+        (input, init) => globalThis.fetch(input, init),
+    ));
+    const wayneToken = await scopedTo(WAYNE);
+    const starkToken = await scopedTo(STARK);
+    let release = (): void => {};
+    const held = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    let locked = (): void => {};
+    const inside = new Promise<void>((resolve) => {
+        locked = resolve;
+    });
+    // The Wayne tab: holds the refresh lock across its
+    // refresh, then broadcasts its Wayne-scoped token.
+    const wayneHold = navigator.locks.request(
+        'fusion-refresh', async () => {
+            locked();
+            await held;
+        },
+    );
+    await inside;
+    const starkFlight = starkTab.runSingleFlightRefresh(
+        () => Promise.resolve(starkToken),
+    );
+    const wayneBus = new BroadcastChannel(
+        'fusion-angle:refresh',
+    );
+    const witness = new BroadcastChannel(
+        'fusion-angle:refresh',
+    );
+    const heard = new Promise<void>((resolve) => {
+        witness.onmessage = () => resolve();
+    });
+    try {
+        wayneBus.postMessage({ accessToken: wayneToken });
+        await heard;
+        release();
+        await wayneHold;
+        const access = await starkFlight;
+        if (access === null) throw new Error('no access');
+        const principal = principalFromToken(access);
+        assertEquals(
+            resolveBootOrganizationBranch(
+                principal.organization,
+                principal.organizations,
+                STARK,
+            ),
+            { kind: 'exchange', id: STARK },
+        );
+    } finally {
+        witness.close();
+        wayneBus.close();
+        starkTab.deleteRefreshChannel();
+    }
 });

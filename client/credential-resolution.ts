@@ -74,26 +74,27 @@ export type BootOrganizationBranch =
     }
     | { readonly kind: 'walk' };
 
+// The tab's own refresh asks for the stored choice, so a
+// token scoped elsewhere arrived from a peer tab's
+// broadcast. A reachable stored choice wins; the token's
+// own organization stands only when nothing reachable is
+// stored.
 export function resolveBootOrganizationBranch(
     tokenOrganization: string | undefined,
     tokenOrganizations: readonly string[] | undefined,
     persisted: string | null,
 ): BootOrganizationBranch {
     const reachable = tokenOrganizations ?? [];
+    if (persisted !== null && reachable.includes(persisted)) {
+        return persisted === tokenOrganization
+            ? { kind: 'scoped', id: persisted }
+            : { kind: 'exchange', id: persisted };
+    }
     if (
         tokenOrganization !== undefined
         && reachable.includes(tokenOrganization)
     ) {
-        return {
-            kind: 'scoped',
-            id: tokenOrganization,
-        };
-    }
-    if (
-        persisted !== null
-        && reachable.includes(persisted)
-    ) {
-        return { kind: 'exchange', id: persisted };
+        return { kind: 'scoped', id: tokenOrganization };
     }
     return { kind: 'walk' };
 }
