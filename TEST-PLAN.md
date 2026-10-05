@@ -3163,7 +3163,13 @@ opens and renders.)
        tests/adapters-flow-queries.test.ts 'getFlowGraph
        lays out an auto-layout flow whose stored positions
        are placeholders' (decides the re-layout-on-load
-       this case must not read as a fail); exploratory —
+       this case must not read as a fail);
+       tests/flow-designer-open.test.ts 'with Auto
+       Layout off, boot paints the positions the
+       designer left (F30)' (decides a boot with Auto
+       Layout off paints exactly the positions the
+       toggle and rename PUTs stored — no recentre);
+       exploratory —
        the 800 ms debounce and the navigate-away/back cycle
 - [ ] **F31** Navigate to
   `flows/detail.html?flowId=nonexistent`. PASS:
