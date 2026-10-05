@@ -38,7 +38,6 @@ import type {
     RecordAttributeEntity,
     MembershipEntity,
     IdentityProviderEntity,
-    WorkOrderFlowGraph,
     MessagePairEntity,
     TransitionFieldValueEntity,
     MemberEntity,
@@ -1814,22 +1813,6 @@ export async function deleteWorkOrderClaimOp(
     );
 }
 
-// The node a work order sits at: its version's state, or
-// its graph's create node before any event sets one;
-// undefined only for a graph with neither.
-function currentNodeIdFor(
-    version: WorkOrderVersion,
-    graph: WorkOrderFlowGraph,
-): string | undefined {
-    if (version.state !== undefined) {
-        return version.state;
-    }
-    const create = graph.nodes.find(
-        (node) => node.isCreate,
-    );
-    return create?.id;
-}
-
 // W10 required-at-exit: every gate-tier leave of a node
 // with isRequired refs validates MERGED state (head +
 // this delta). Unbound → 400 naming the bind (A3).
@@ -1856,10 +1839,7 @@ async function assertRequiredAttributesAtExit(
     const graph = asWorkOrderFlowGraph(
         version.flow_graph, 'work_orders.flow_graph',
     );
-    const nodeId = currentNodeIdFor(version, graph);
-    if (nodeId === undefined) {
-        return;
-    }
+    const nodeId = version.state;
     const node = graph.nodes.find(
         (candidate) => candidate.id === nodeId,
     );
@@ -3254,8 +3234,7 @@ export async function postInstanceDeleteOp(
 // frozen flow_graph. Entity-scoped in-tx reads only
 // (collectAttributeReferrers shape): ONE collection-prefix
 // read names the work orders; each head version carries
-// its binding and its node. A WO with no transition yet
-// sits at its graph's isCreate node. Terminal = no
+// its binding and its node. Terminal = no
 // outgoing edge.
 async function inFlightPlacementBlockersFor(
     view: DbAdapter,
@@ -3286,12 +3265,7 @@ async function inFlightPlacementBlockersFor(
             head.version.flow_graph,
             'work_orders.flow_graph',
         );
-        const nodeId = currentNodeIdFor(
-            head.version, graph,
-        );
-        if (nodeId === undefined) {
-            continue;
-        }
+        const nodeId = head.version.state;
         const inFlight = graph.edges.some(
             (edge) => edge.fromNodeId === nodeId,
         );

@@ -144,6 +144,11 @@ function makeWorkOrder(
             display_id: 'WO-42',
             flow_graph: storedWorkOrderFlowGraph(graph),
             position: 0,
+            state: graph.nodes[0]!.id,
+            transition: {
+                member_id: 'pjQzgITAPDQVyvCVpzpIfQ',
+                at: '2026-04-01T12:00:00.000000Z',
+            },
         }),
         id: 'wo-1',
         organizationId: 'AjdvjuECVZEgZoFajaIEkg',

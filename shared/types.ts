@@ -1282,6 +1282,13 @@ export interface WorkOrderFieldsEntity {
 
 // A work order's stored version, as a GET serves it.
 export interface WorkOrderEntity extends WorkOrderFieldsEntity {
+    // The node the work order sits at, and who moved it
+    // there, when (spec §1).
+    state: Id;
+    transition: {
+        member_id: Id;
+        at: string;
+    };
     // GET embed when bound (absent when unbound).
     instance_id?: Id;
     record_type_id?: Id;

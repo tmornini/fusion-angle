@@ -6,6 +6,7 @@ import {
     validateProjectEntity,
     validateFlowEntity,
     validateWorkOrderEntity,
+    validateWorkOrderVersion,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
     validateOrganizationEntity,
@@ -21,6 +22,7 @@ import {
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
+    ValidationError,
 } from '../shared/types.ts';
 import {
     firstProviderModel,
@@ -1422,3 +1424,47 @@ Deno.test(
         );
     },
 );
+
+function storedWorkOrderVersion(): Record<string, unknown> {
+    return {
+        id: 'xqcXYHXBJJXcLkRYkRngKA',
+        organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+        display_id: 'WO-1',
+        flow_graph: {
+            name: 'g', lockTimeout: 300,
+            nodes: [], edges: [],
+        },
+        position: 1,
+        state: 'node-1',
+        transition: {
+            member_id: 'XXZruirZyAOoRpNxaDnpSA',
+            at: '2026-09-25T10:00:01.000000Z',
+        },
+        events: [],
+    };
+}
+
+Deno.test('validateWorkOrderVersion requires state and'
++ ' transition', () => {
+    validateWorkOrderVersion(storedWorkOrderVersion());
+    for (const key of ['state', 'transition']) {
+        const { [key]: _gone, ...rest } =
+            storedWorkOrderVersion();
+        assertThrows(
+            () => validateWorkOrderVersion(rest),
+            ValidationError,
+        );
+    }
+});
+
+Deno.test('validateWorkOrderVersion refuses a transition'
++ ' with any other key', () => {
+    assertThrows(() => validateWorkOrderVersion({
+        ...storedWorkOrderVersion(),
+        transition: {
+            member_id: 'XXZruirZyAOoRpNxaDnpSA',
+            at: '2026-09-25T10:00:01.000000Z',
+            etag: 'x',
+        },
+    }), ValidationError);
+});

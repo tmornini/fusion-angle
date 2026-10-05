@@ -271,6 +271,10 @@ Deno.test(
             flow_graph: flowGraph(),
             position: 1,
             state: NODE_MIDDLE,
+            transition: {
+                member_id: 'XXZruirZyAOoRpNxaDnpSA',
+                at: at[1],
+            },
             claim: {
                 member_id: 'XXZruirZyAOoRpNxaDnpSA',
                 at: at[2],

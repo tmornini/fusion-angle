@@ -1,6 +1,6 @@
-// A work order's whole state (§5): its fields, its node,
-// its binding, its claim, and the events this version
-// recorded. History is the chain of versions; no version
+// A work order's whole state (§5): its fields, its node
+// and the move into it, its binding, its claim, and the
+// events this version recorded. History is the chain of versions; no version
 // carries an earlier one's events. Every function here is
 // pure: the handler reads the head and the clock, then
 // asks for the next version.
@@ -27,6 +27,11 @@ export type WorkOrderEvent = {
     readonly field_values: readonly TransitionFieldValueEntity[],
 };
 
+export type WorkOrderTransition = {
+    readonly member_id: Id,
+    readonly at: string,
+};
+
 export type WorkOrderFields = {
     readonly display_id: string,
     readonly flow_graph: Record<string, unknown>,
@@ -36,7 +41,8 @@ export type WorkOrderFields = {
 export type WorkOrderVersion = WorkOrderFields & {
     readonly id: Id,
     readonly organization_id: Id,
-    readonly state?: string,
+    readonly state: string,
+    readonly transition: WorkOrderTransition,
     readonly instance_id?: Id,
     readonly record_type_id?: Id,
     readonly claim?: WorkOrderClaim,
@@ -66,9 +72,8 @@ function ordered(version: WorkOrderVersion): WorkOrderVersion {
         display_id: version.display_id,
         flow_graph: version.flow_graph,
         position: version.position,
-        ...(version.state === undefined
-            ? {}
-            : { state: version.state }),
+        state: version.state,
+        transition: version.transition,
         ...(version.instance_id === undefined
             || version.record_type_id === undefined
             ? {}
@@ -130,6 +135,7 @@ export function createdVersion(input: {
         organization_id: input.organization_id,
         ...input.fields,
         state: node.state,
+        transition: { member_id: input.creator, at: node.at },
         claim: {
             member_id: input.creator,
             at: claimed.at,
@@ -270,12 +276,14 @@ export function transitionedVersion(
         return ordered({
             ...head,
             state: input.targetState,
+            transition: { member_id: input.member, at: input.at },
             events: [moved],
         });
     }
     return ordered({
         ...withoutClaim(head),
         state: input.targetState,
+        transition: { member_id: input.member, at: input.at },
         events: [
             moved,
             event(

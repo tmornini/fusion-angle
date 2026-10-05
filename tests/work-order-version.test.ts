@@ -46,9 +46,10 @@ Deno.test('a created version holds three births and a claim',
     const version = created();
     assertEquals(Object.keys(version), [
         'id', 'organization_id', 'display_id', 'flow_graph',
-        'position', 'state', 'claim', 'events',
+        'position', 'state', 'transition', 'claim', 'events',
     ]);
     assertStrictEquals(version.state, 'node-1');
+    assertEquals(version.transition, { member_id: ALICE, at: T1 });
     assertEquals(version.claim, {
         member_id: ALICE, at: T2, expires_at: EXPIRES,
     });
@@ -185,4 +186,47 @@ Deno.test('a claim is live strictly before it expires', () => {
     const claim = created().claim!;
     assertStrictEquals(isClaimLive(claim, T2), true);
     assertStrictEquals(isClaimLive(claim, EXPIRES), false);
+});
+
+Deno.test('a transition records its move, kept or'
++ ' released', () => {
+    for (const release of [
+        { kind: 'kept' } as const,
+        { kind: 'released', id: 'r1', at: T2 } as const,
+    ]) {
+        const moved = transitionedVersion(created(), {
+            eventId: 't1', targetState: 'node-2',
+            member: BOB, at: T2, fieldValueEntities: [],
+            release,
+        });
+        assertEquals(moved.transition, {
+            member_id: BOB, at: T2,
+        });
+    }
+});
+
+Deno.test('claim, release, bind, and fields carry the'
++ ' transition', () => {
+    const head = created();
+    const claimed = claimedVersion(head, {
+        member: BOB, claimEventId: 'c1', claimAt: EXPIRES,
+        expireEventId: 'x1', expireAt: EXPIRES,
+        expiresAt: '2026-09-25T10:10:02.000000Z',
+        now: EXPIRES,
+    });
+    assertStrictEquals(claimed.kind, 'claimed');
+    if (claimed.kind !== 'claimed') return;
+    const bound = boundVersion(head, 'i1', 'rt1');
+    assertStrictEquals(bound.kind, 'bound');
+    if (bound.kind !== 'bound') return;
+    for (const version of [
+        claimed.version,
+        releasedVersion(head, {
+            eventId: 'r1', member: ALICE, at: T2, now: T2,
+        }),
+        bound.version,
+        fieldsVersion(head, { ...FIELDS, position: 2 }),
+    ]) {
+        assertEquals(version.transition, head.transition);
+    }
 });

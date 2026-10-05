@@ -592,6 +592,7 @@ Deno.test('a seeded work-order document message pair sits at its'
         [
             'claim', 'display_id', 'events', 'flow_graph',
             'id', 'organization_id', 'position', 'state',
+            'transition',
         ],
     );
 });
