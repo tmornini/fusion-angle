@@ -6842,9 +6842,18 @@ K30 only describes.
   app navigates to its detail page.
   Pin: tests/adapters-records.test.ts 'postRecordChange
        create writes the row and the initial state
-       event'; exploratory — the create page's fields,
-       the live navigation, and the new card's position
-       at the bottom of the list
+       event'; tests/adapters-refresh-mutex.test.ts 'a
+       boot refresh asked for Stark keeps Stark when a
+       Wayne tab broadcasts' (decides the detail page
+       boots in the organization the create wrote
+       under, even when a same-jar tab in another
+       organization refreshes during the navigation);
+       tests/adapters-refresh-mutex.test.ts 'a 401
+       recovery that adopts a Wayne peer token
+       exchanges it back to Stark'; exploratory — the
+       create page's fields, the live navigation, and
+       the new card's position at the bottom of the
+       list
 - [ ] **R3** Open Customer Profile detail. PASS: read mode
   shows name + description + attribute table sorted by
   sort_order + Bound flows (Customer Onboarding, Lead-to-
