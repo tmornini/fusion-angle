@@ -26,8 +26,11 @@ import {
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 const AT = '2026-05-01T00:00:00.000000Z';
+const CREATE_NODE = generateIdentifier();
 
 // Seeds a flow through the SAME gate-driven create the live
 // route uses (postFlowCreation), so a message pair exists at
@@ -61,40 +64,29 @@ async function seedWorkOrder(
     // The flow↔work-order join now nests under its parent flow,
     // so the parent flow must exist to be enumerated.
     await seedFlow(db, flowId, flowId);
-    const ctx = inPageContext(db, await organizationToken());
     const flowGraph: WorkOrderFlowGraph = {
         name: 'Flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: [],
         edges: [],
     };
-    // NAMED re-pin (Task 7): getWorkOrdersForRecord reads the
-    // work-orders collection through the flipped GET (this
-    // commit) — a raw db.workOrders.put leaves no message pair
-    // at this document, so the entity must land through the
-    // SAME wire-reachable PUT the live route serves.
-    await ctx.PUT(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
-        {
+    // getWorkOrdersForRecord reads the work-orders collection
+    // and getAllFlowWorkOrderEntities the flow's joins: the
+    // live create lands both in one statement.
+    await seedCreatedWorkOrder(db, {
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
+        id,
+        fields: {
             display_id: displayId,
             flow_graph: storedWorkOrderFlowGraph(flowGraph),
             position,
         },
-        'creates',
-    );
-    // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
-    // organizations/:id/flows/:id/work-orders through the flipped GET too —
-    // same
-    // reason, different document.
-    await ctx.PUT(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
-            + '/work-orders/' + generateIdentifier(),
-        {
-            flow_id: flowId,
-            work_order_id: id,
-            at: AT,
-        },
-    );
+        flowId,
+        births: [CREATE_NODE, CREATE_NODE],
+        at: AT,
+        token: await organizationToken(),
+        claim: 'released',
+    });
 }
 
 // The binding PUT probes the bound record's own existence,

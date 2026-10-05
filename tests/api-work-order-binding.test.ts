@@ -29,6 +29,8 @@ import {
     partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // PUT organizations/:id/work-orders/:id/binding — bind WO ↔ instance.
 // Ladder order is the covenant's (fence → body → instance →
@@ -40,6 +42,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const ORGANIZATION_B = generateIdentifier();
 const FLOW_ID = generateIdentifier();
+const NODE_CREATE = generateIdentifier();
 const WO_ID = generateIdentifier();
 const WO_UNBOUND = generateIdentifier();
 const TYPE_ID = generateIdentifier();
@@ -49,8 +52,6 @@ const INSTANCE_ID = generateIdentifier();
 const INSTANCE_2 = generateIdentifier();
 const INSTANCE_TOMB = generateIdentifier();
 const FR_ID = generateIdentifier();
-const FWO_ID = generateIdentifier();
-const FWO_UNBOUND = generateIdentifier();
 const INSTANCE_OTHER = generateIdentifier();
 const INSTANCE_MISSING = generateIdentifier();
 const TYPE_FOREIGN = generateIdentifier();
@@ -191,30 +192,21 @@ async function seedWorkOrder(
     db: MemoryDbAdapter,
     token: string,
     woId: string,
-    fwoId: string,
 ): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-            , token, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION,
+        id: woId,
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        { [IF_NONE_MATCH_HEADER]: '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    const join = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
-            + '/work-orders/' + fwoId,
+        flowId: FLOW_ID,
+        births: [NODE_CREATE, NODE_CREATE],
+        at: AT,
         token,
-        {
-            flow_id: FLOW_ID,
-            work_order_id: woId,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(join.status, 201);
+        claim: 'released',
+    });
 }
 
 async function seedLiveType(
@@ -311,10 +303,8 @@ async function seededDb(): Promise<{
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_B,
     );
     await seedFlow(db, token);
-    await seedWorkOrder(db, token, WO_ID, FWO_ID);
-    await seedWorkOrder(
-        db, token, WO_UNBOUND, FWO_UNBOUND,
-    );
+    await seedWorkOrder(db, token, WO_ID);
+    await seedWorkOrder(db, token, WO_UNBOUND);
     await seedLiveType(db, token, TYPE_ID);
     await seedAttribute(db, token);
     await seedInstance(db, token, INSTANCE_ID);

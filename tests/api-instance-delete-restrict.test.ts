@@ -22,6 +22,8 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
 } from '../shared/types.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // Instance DELETE RESTRICT (W5 / Task 5): 409 when any org
 // WO currently binds the instance AND that WO's current
@@ -53,9 +55,6 @@ const N_TERM = generateIdentifier();
 const E_CREATE_MID = generateIdentifier();
 const E_MID_TERM = generateIdentifier();
 const PROJECT_ID = generateIdentifier();
-const FWO_A = generateIdentifier();
-const FWO_B = generateIdentifier();
-const FWO_UNBOUND = generateIdentifier();
 const TE_A_MID = generateIdentifier();
 const TE_B_TERM = generateIdentifier();
 const TE_A_TERM = generateIdentifier();
@@ -175,31 +174,21 @@ async function seedWorkOrder(
     db: MemoryDbAdapter,
     token: string,
     woId: string,
-    fwoId: string,
 ): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-            , token, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION,
+        id: woId,
+        fields: {
             display_id: 'abcd',
             flow_graph: flowGraph(),
             position: 1,
         },
-        undefined,
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    const join = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
-            + '/work-orders/' + fwoId,
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: AT,
         token,
-        {
-            flow_id: FLOW_ID,
-            work_order_id: woId,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(join.status, 201);
+        claim: 'released',
+    });
 }
 
 async function seedLiveType(
@@ -337,11 +326,9 @@ async function seededInFlightDb(): Promise<{
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
     );
     await seedFlow(db, token);
-    await seedWorkOrder(db, token, WO_A, FWO_A);
-    await seedWorkOrder(db, token, WO_B, FWO_B);
-    await seedWorkOrder(
-        db, token, WO_UNBOUND, FWO_UNBOUND,
-    );
+    await seedWorkOrder(db, token, WO_A);
+    await seedWorkOrder(db, token, WO_B);
+    await seedWorkOrder(db, token, WO_UNBOUND);
     await seedLiveType(db, token);
     await seedAttribute(db, token);
     await seedInstance(db, token, INSTANCE_ID);

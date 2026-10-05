@@ -42,6 +42,8 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -273,6 +275,7 @@ async () => {
 // ---- T8: the parent-derived READ fence (server-side join) ----
 
 const T8_AT = '2026-06-04T00:00:00.000000Z';
+const WO_CREATE_NODE = generateIdentifier();
 
 function projectBody(organization: string) {
     return {
@@ -453,21 +456,33 @@ async function seedChain(
         },
     ));
     assertStrictEquals(recWrite.status, 201);
-    // Phase Final Stage B: work_orders table retired — seed
-    // through the live document PUT so the message plane owns it.
+    // Seeded through the live create, so the message plane owns
+    // the work order and its flow join; the join's id is read
+    // back for the nested-join pins below.
     const {
         organization_id: _woOrganizationId,
         ...woFields
     } = workOrderBody(organization);
-    const woWrite = await handleRequest(db, apiRequest({
-        method: 'PUT',
-        path: '/organizations/' + organization
-            + '/work-orders/' + ids.workOrder,
-        token: await organizationToken(identity, organization),
-        headers: { 'if-none-match': '*' },
-        body: woFields,
-    }));
-    assertStrictEquals(woWrite.status, 201);
+    const woToken = await organizationToken(identity, organization);
+    await seedCreatedWorkOrder(db, {
+        organization,
+        id: ids.workOrder,
+        fields: woFields,
+        flowId: ids.flow,
+        births: [WO_CREATE_NODE, WO_CREATE_NODE],
+        at: T8_AT,
+        token: woToken,
+        claim: 'released',
+    });
+    const joins = await partBodiesOf<{ id: string }>(
+        await handleRequest(db, req(
+            'GET',
+            '/organizations/' + organization
+                + '/flows/' + ids.flow + '/work-orders/',
+            woToken,
+        )),
+    );
+    ids.flowWorkOrder = joins[0]!.id;
     // Phase Final Stage B: flow_versions table retired with
     // flows (no residual seed).
     // NAMED re-pin (Phase 4 Task 8): the flipped GET
@@ -488,21 +503,6 @@ async function seedChain(
         await organizationToken(identity, organization),
         {
             project_id: ids.project, flow_id: ids.flow,
-            at: T8_AT,
-        },
-    ));
-    // NAMED re-pin (Task 7): the flipped GET organizations/:id/flows/:id/
-    // work-orders derives from the message ledger too, the SAME
-    // reason as the project-flow join above — a raw
-    // db.flowWorkOrders.put leaves no pair at this document.
-    await handleRequest(db, req(
-        'PUT',
-        '/organizations/' + organization
-            + '/flows/' + ids.flow
-            + '/work-orders/' + ids.flowWorkOrder,
-        await organizationToken(identity, organization),
-        {
-            flow_id: ids.flow, work_order_id: ids.workOrder,
             at: T8_AT,
         },
     ));

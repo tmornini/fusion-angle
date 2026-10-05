@@ -23,12 +23,16 @@ import {
 } from '../shared/identifier.ts';
 
 const OTHER = generateIdentifier();
+const FLOW_ID = generateIdentifier();
+const N_CREATE = generateIdentifier();
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 
 const WO_ID = 'yNSSnbrpacodQTzUEcdEVA';
@@ -89,8 +93,8 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// yNSSnbrpacodQTzUEcdEVA is seeded via a REAL PUT (never a raw
-// db.workOrders.put)
+// yNSSnbrpacodQTzUEcdEVA is seeded through the live create
+// (never a raw db.workOrders.put)
 // so it carries a genuine organizations/:id/work-orders/:id
 // document message pair —
 // same fixture posture as api-work-order-claim.test.ts.
@@ -98,18 +102,28 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID, {
+    await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: WO_ID,
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: nowUtc(),
+        token: DEV_TOKEN,
+        claim: 'released',
+    });
     return db;
 }
 
-function claimEventsFor(
+// The three births and the creator's release come with the
+// seeded work order; the claim events are what lands after.
+const SEEDED_EVENTS = 4;
+
+async function claimEventsFor(
     db: MemoryDbAdapter,
 ): Promise<{
     id: string;
@@ -117,9 +131,14 @@ function claimEventsFor(
     member_id: string;
     at: string;
 }[]> {
-    return workOrderLifecycleStatesFor(
+    const all = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, WO_ID,
     );
+    assertEquals(
+        all.slice(0, SEEDED_EVENTS).map((event) => event.state),
+        [N_CREATE, N_CREATE, 'claimed', 'claim_released'],
+    );
+    return all.slice(SEEDED_EVENTS);
 }
 
 function freshClaimBody() {
@@ -279,11 +298,13 @@ Deno.test('a release lands one version', async () => {
     const deletes = (await db.messagePairs.getCollectionPairs(
         CLAIM_PATH + '/',
     )).filter((pair) => pair.method === 'DELETE');
-    assertStrictEquals(deletes.length, 1);
+    // The seed's release of the creator's birth claim, then
+    // this one.
+    assertStrictEquals(deletes.length, 2);
     assertEquals(
         (version['events'] as { id: string; state: string }[])
             .map((event) => [event.id, event.state]),
-        [[deletes[0]!.id, 'claim_released']],
+        [[deletes[1]!.id, 'claim_released']],
     );
     assertStrictEquals(await headTag(db), pairIdOf(res));
 });

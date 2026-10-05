@@ -23,7 +23,6 @@ import {
     SYSTEM_MEMBER_ID,
     ValidationError,
 } from '../shared/types.ts';
-import { EntityNotFoundError } from '../api/db.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
@@ -36,6 +35,8 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 
 const FIELD_VALUE_ID = generateIdentifier();
@@ -54,6 +55,8 @@ const TRANSITION_EVENT_ID = generateIdentifier();
 // Task 8.
 
 const LOCK_TIMEOUT_SECONDS = 300;
+const FLOW_ID = generateIdentifier();
+const N_CREATE = generateIdentifier();
 const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 
 function graphJson(): Record<string, unknown> {
@@ -65,22 +68,27 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// Seed via REAL PUT so the WO carries a document message pair
+// Seed through the live create so the WO carries its pairs
 // (row half stripped; claim/transition gates read the
 // message plane).
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
+    await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: 'yNSSnbrpacodQTzUEcdEVA',
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: nowUtc(),
+        token: DEV_TOKEN,
+        claim: 'released',
+    });
     return db;
 }
 
@@ -98,11 +106,21 @@ async function latched(
     ]);
 }
 
-function eventsFor(
+// The three births and the creator's release come with the
+// seeded work order; the events are what lands after.
+const SEEDED_EVENTS = 4;
+
+async function eventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string; at: string }[]> {
-    return workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
-        , 'yNSSnbrpacodQTzUEcdEVA');
+    const all = await workOrderLifecycleStatesFor(
+        db, 'AjdvjuECVZEgZoFajaIEkg', 'yNSSnbrpacodQTzUEcdEVA',
+    );
+    assertEquals(
+        all.slice(0, SEEDED_EVENTS).map((event) => event.state),
+        [N_CREATE, N_CREATE, 'claimed', 'claim_released'],
+    );
+    return all.slice(SEEDED_EVENTS);
 }
 
 // Below-facade legacy append (organization === undefined).
@@ -338,14 +356,14 @@ Deno.test(
         );
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 0);
-        // Failed gate left no lifecycle → history 404s
-        // (empty lifecycle), not an empty field_values array
-        // under a ghost event id.
-        await assertRejects(
-            () => workOrderHistoryFor(
-                db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
-            ),
-            EntityNotFoundError,
+        // Failed gate left no ghost event: the history holds
+        // the seeded work order's own events, none under the
+        // rejected transition's id.
+        const history = await workOrderHistoryFor(
+            db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
+        );
+        assertStrictEquals(
+            history.find((row) => row.id === 'te1'), undefined,
         );
     },
 );

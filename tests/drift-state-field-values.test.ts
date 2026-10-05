@@ -32,9 +32,13 @@ import {
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 
 const N_NEXT = generateIdentifier();
+const N_CREATE = generateIdentifier();
+const FLOW_ID = generateIdentifier();
 const TE_1 = generateIdentifier();
 const FV_1 = generateIdentifier();
 const TE_LEX = generateIdentifier();
@@ -79,20 +83,25 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// Seed via REAL PUT so the WO carries a document message pair.
+// Seed via the live create so the WO carries its pairs.
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
+    await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: 'yNSSnbrpacodQTzUEcdEVA',
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: nowUtc(),
+        token: DEV_TOKEN,
+        claim: 'released',
+    });
     // Phase Final Stage B: record_attributes retired.
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'

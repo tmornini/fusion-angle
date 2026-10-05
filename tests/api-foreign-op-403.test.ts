@@ -17,6 +17,8 @@ import {
     apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // Foreign-op miss pins: work-order claim/release/transition
 // and flow undo. The write authorizer never covers these
@@ -24,6 +26,8 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2020-01-01T00:00:00.000000Z';
+const FLOW_ID = generateIdentifier();
+const N_CREATE = generateIdentifier();
 
 function req(
     method: string,
@@ -84,16 +88,20 @@ Deno.test('foreign-org work-order claim is 404', async () => {
     const tokenB = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
-    const created = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yCFjxREVDLjycQDxFIsqIg', tokenA, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: 'yCFjxREVDLjycQDxFIsqIg',
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(created.status, 201);
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: AT,
+        token: tokenA,
+        claim: 'released',
+    });
 
     const claimAt = nowUtc();
     const foreign = await handleRequest(db, req(
@@ -123,16 +131,20 @@ Deno.test('foreign-org work-order release is 404', async () => {
     const tokenB = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
-    const created = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yDEYnDEKhTTMRnyKdusvCw', tokenA, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: 'yDEYnDEKhTTMRnyKdusvCw',
+        fields: {
             display_id: 'efgh',
             flow_graph: graphJson(),
             position: 2,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(created.status, 201);
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: AT,
+        token: tokenA,
+        claim: 'released',
+    });
 
     const foreign = await handleRequest(db, req(
         'DELETE',
@@ -153,16 +165,20 @@ Deno.test('foreign-org work-order transition is 404', async () => {
     const tokenB = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', organizationB,
     );
-    const created = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yHJmosJCPJCTxoRaPwKdQA', tokenA, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: 'yHJmosJCPJCTxoRaPwKdQA',
+        fields: {
             display_id: 'ijkl',
             flow_graph: graphJson(),
             position: 3,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(created.status, 201);
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: AT,
+        token: tokenA,
+        claim: 'released',
+    });
 
     const foreign = await handleRequest(db, req(
         'POST',

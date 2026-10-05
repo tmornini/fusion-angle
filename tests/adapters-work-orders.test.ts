@@ -91,6 +91,8 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 interface CreateIds {
     workOrderId: string;
@@ -292,13 +294,14 @@ async function seedRelease(
 }
 
 async function seedBareWorkOrder(
-    ctx: RequestContext,
+    db: MemoryDbAdapter,
+    token: string,
     workOrderId: string,
 ): Promise<void> {
-    await ctx.PUT(
-        'organizations/AjdvjuECVZEgZoFajaIEkg'
-        + '/work-orders/' + workOrderId,
-        {
+    await seedCreatedWorkOrder(db, {
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
+        id: workOrderId,
+        fields: {
             display_id: 'WO-T',
             flow_graph: {
                 name: 'test',
@@ -308,8 +311,12 @@ async function seedBareWorkOrder(
             },
             position: 0,
         },
-        'creates',
-    );
+        flowId: generateIdentifier(),
+        births: [START_NODE, START_NODE],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 }
 
 // ── postWorkOrderCreation ─────────
@@ -1148,9 +1155,10 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = inPageContext(db, await organizationToken());
+        const token = await organizationToken();
+        const ctx = inPageContext(db, token);
         const woId = generateIdentifier();
-        await seedBareWorkOrder(ctx, woId);
+        await seedBareWorkOrder(db, token, woId);
         // Backdate ten seconds; lockTimeout=1s
         // means this is past the live window.
         const longAgo = new Date(
@@ -1174,9 +1182,10 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = inPageContext(db, await organizationToken());
+        const token = await organizationToken();
+        const ctx = inPageContext(db, token);
         const woId = generateIdentifier();
-        await seedBareWorkOrder(ctx, woId);
+        await seedBareWorkOrder(db, token, woId);
         await seedClaim(ctx, woId, nowUtc());
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, DEFAULT_LOCK_TIMEOUT,
@@ -1198,7 +1207,8 @@ Deno.test(
         await seedHumanMember(
             db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
         );
-        const ctx = inPageContext(db, await organizationToken());
+        const token = await organizationToken();
+        const ctx = inPageContext(db, token);
         const fresh1 = generateIdentifier();
         const fresh2 = generateIdentifier();
         const stale = generateIdentifier();
@@ -1212,7 +1222,7 @@ Deno.test(
         for (const id of [
             fresh1, fresh2, stale, released, orphan,
         ]) {
-            await seedBareWorkOrder(ctx, id);
+            await seedBareWorkOrder(db, token, id);
         }
         await seedClaim(ctx, fresh1, now);
         await seedClaim(ctx, fresh2, now);

@@ -38,6 +38,8 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // -- Fixture helpers --------------------------
 
@@ -300,56 +302,49 @@ Deno.test(
         // Minimal VALID work-order graphs — the gate
         // demands shape, but getFlowStats reads from
         // flow-work-orders and flow transitions,
-        // not from work-order.flow_graph
-        // Phase Final Stage B: work_orders table retired —
-        // seed through the live document PUT.
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
-            display_id: 'WO-1',
-            flow_graph: {
-                name: 'Onboarding',
-                lockTimeout: 0, nodes: [], edges: [],
-            },
-            position: 1,
-        }, 'creates');
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNXXsTEwShOozlQCEWKIIw', {
-            display_id: 'WO-2',
-            flow_graph: {
-                name: 'Onboarding',
-                lockTimeout: 0, nodes: [], edges: [],
-            },
-            position: 2,
-        }, 'creates');
-
-        // yNSSnbrpacodQTzUEcdEVA belongs to ZOousbbnzpqlxJExVAruYQ;
-        // yNXXsTEwShOozlQCEWKIIw belongs to OTHER. NAMED re-pin
-        // (Task 7): getFlowStats reads
-        // organizations/:id/flows/:id/work-orders
-        // through the flipped GET.
+        // not from work-order.flow_graph. Each work order
+        // lands through the live create with its flow join;
+        // yNSSnbrpacodQTzUEcdEVA belongs to ZOousbbnzpqlxJExVAruYQ,
+        // yNXXsTEwShOozlQCEWKIIw to OTHER.
+        const token = await organizationToken();
         const otherFlow = generateIdentifier();
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/'
-            + generateIdentifier(), {
-            flow_id: 'ZOousbbnzpqlxJExVAruYQ',
-            work_order_id: 'yNSSnbrpacodQTzUEcdEVA',
-            at: daysAgo(45),
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: 'yNSSnbrpacodQTzUEcdEVA',
+            fields: {
+                display_id: 'WO-1',
+                flow_graph: {
+                    name: 'Onboarding',
+                    lockTimeout: 0, nodes: [], edges: [],
+                },
+                position: 1,
+            },
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+            births: [f1Graph.createId, f1Graph.createId],
+            at: daysAgo(40),
+            token,
+            claim: 'released',
         });
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + otherFlow + '/work-orders/'
-            + generateIdentifier(), {
-            flow_id: otherFlow,
-            work_order_id: 'yNXXsTEwShOozlQCEWKIIw',
-            at: daysAgo(45),
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: 'yNXXsTEwShOozlQCEWKIIw',
+            fields: {
+                display_id: 'WO-2',
+                flow_graph: {
+                    name: 'Onboarding',
+                    lockTimeout: 0, nodes: [], edges: [],
+                },
+                position: 2,
+            },
+            flowId: otherFlow,
+            births: [f1Graph.createId, f1Graph.createId],
+            at: daysAgo(40),
+            token,
+            claim: 'released',
         });
 
         // yNSSnbrpacodQTzUEcdEVA: '' → create → active → done
         // ~35 days in the active node, within 90-day window
-        await transitionWorkOrder(
-            ctx, 'yNSSnbrpacodQTzUEcdEVA',
-            generateIdentifier(), f1Graph.createId,
-            daysAgo(40),
-        );
         await transitionWorkOrder(
             ctx, 'yNSSnbrpacodQTzUEcdEVA',
             generateIdentifier(), f1Graph.activeId,
@@ -359,13 +354,6 @@ Deno.test(
             ctx, 'yNSSnbrpacodQTzUEcdEVA',
             generateIdentifier(), f1Graph.doneId,
             daysAgo(5),
-        );
-
-        // Other flow: '' → create. Must not affect stats.
-        await transitionWorkOrder(
-            ctx, 'yNXXsTEwShOozlQCEWKIIw',
-            generateIdentifier(), f1Graph.createId,
-            daysAgo(40),
         );
 
         const { model, graph } =
@@ -468,29 +456,23 @@ Deno.test(
         const autoGraph = buildTestGraph();
         await seedFlow(ctx, 'ZOousbbnzpqlxJExVAruYQ', 'AutoLayout'
             , autoGraph.graph);
-        // Phase Final Stage B: work_orders table retired.
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
-            display_id: 'WO-1',
-            flow_graph: {
-                name: 'AutoLayout',
-                lockTimeout: 0, nodes: [], edges: [],
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: 'yNSSnbrpacodQTzUEcdEVA',
+            fields: {
+                display_id: 'WO-1',
+                flow_graph: {
+                    name: 'AutoLayout',
+                    lockTimeout: 0, nodes: [], edges: [],
+                },
+                position: 1,
             },
-            position: 1,
-        }, 'creates');
-        // NAMED re-pin (Task 7): same reason as above.
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/'
-            + generateIdentifier(), {
-            flow_id: 'ZOousbbnzpqlxJExVAruYQ',
-            work_order_id: 'yNSSnbrpacodQTzUEcdEVA',
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+            births: [autoGraph.createId, autoGraph.createId],
             at: daysAgo(10),
+            token: await organizationToken(),
+            claim: 'released',
         });
-        await transitionWorkOrder(
-            ctx, 'yNSSnbrpacodQTzUEcdEVA',
-            generateIdentifier(), autoGraph.createId,
-            daysAgo(10),
-        );
         const { model, graph } =
             await getFlowStats(ctx, 'ZOousbbnzpqlxJExVAruYQ', Date.now());
         const graphPos = new Set(

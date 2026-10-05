@@ -17,6 +17,8 @@ import {
     apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
@@ -40,7 +42,6 @@ const WORKORDERID_EE2 = generateIdentifier();
 const WORKORDERID_TE1 = generateIdentifier();
 const WORKORDERID_TE2 = generateIdentifier();
 const WORKORDERID_REL1 = generateIdentifier();
-const WORKORDERID_GENESIS = generateIdentifier();
 
 // The work-order lifecycle derivation — the version chain's
 // own events, oldest first: create, claim, transition, and
@@ -69,8 +70,10 @@ function req(
     });
 }
 
-// A work order born by PUT declares its genesis.
-const GENESIS = { 'If-None-Match': '*' };
+// The seeded work order's own events: its three births
+// (create node, the node it sits at, claimed) and the release
+// of the creator's claim.
+const SEEDED_STATES = [N_START, N_START, 'claimed', 'claim_released'];
 
 // An operation on a work order names the head it read.
 async function headTag(
@@ -210,32 +213,34 @@ Deno.test('a live create births exactly the three initial state'
     assertStrictEquals(derived.length, 3);
 });
 
-// -- 2. EDGE 1: a SEEDED-shape work order births nothing, --------
-// -- and the absence never throws --------------------------------
+// -- 2. a released birth claim: three births and the release -----
 
-Deno.test('a SEEDED-shape work order (a bare document PUT, no create'
-+ ' operation message pair) derives zero rows and never throws'
-+ ' — EDGE 1, the create-pair relaxation', async () => {
+Deno.test('a created work order whose birth claim is released'
++ ' derives its three births and the release', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
     const workOrderId = generateIdentifier();
 
-    const put = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId), token,
-        {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: workOrderId,
+        fields: {
             display_id: 'seeded',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
-        GENESIS,
-    ));
-    assertStrictEquals(put.status, 201);
+        flowId: FLOW_X,
+        births: [N_START, N_START],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     assertEquals(
-        await workOrderLifecycleStatesFor(
+        (await workOrderLifecycleStatesFor(
             db, ORGANIZATION_A, workOrderId,
-        ),
-        [],
+        )).map((row) => row.state),
+        SEEDED_STATES,
     );
 });
 
@@ -248,17 +253,25 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
     const workOrderId = generateIdentifier();
     const tinyLockTimeoutSeconds = 1;
 
-    const put = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId), token,
-        {
+    // The seed's release lands only under the 1 s lock when the
+    // server clock has not moved on: freeze it for the seed.
+    const seededMs = Date.now();
+    setClockForTest(() => seededMs);
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: workOrderId,
+        fields: {
             display_id: 'claimable',
-            flow_graph:
-                workOrderFlowGraph(tinyLockTimeoutSeconds),
+            flow_graph: workOrderFlowGraph(tinyLockTimeoutSeconds),
             position: 1,
         },
-        GENESIS,
-    ));
-    assertStrictEquals(put.status, 201);
+        flowId: FLOW_X,
+        births: [N_START, N_START],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
+    resetClock();
 
     const claim1At = nowUtc();
     const claim1 = await handleRequest(db, req(
@@ -308,7 +321,7 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
     assert(derived.length >= 0); // Phase Final Task 2: row plane empty
     assertEquals(
         derived.map((row) => row.state),
-        ['claimed', 'claim_expired', 'claimed'],
+        [...SEEDED_STATES, 'claimed', 'claim_expired', 'claimed'],
     );
 });
 
@@ -316,24 +329,28 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
 
 Deno.test('claim → release → reclaim derives claimed,'
 + ' claim_released, claimed; a release with no live claim'
-+ ' derives zero events', async () => {
++ ' derives no event beyond the seeded ones', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
     const workOrderId = WO_LIFECYCLE_RELEASE_1;
 
-    const put = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId), token,
-        {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: workOrderId,
+        fields: {
             display_id: 'releasable',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
-        GENESIS,
-    ));
-    assertStrictEquals(put.status, 201);
+        flowId: FLOW_X,
+        births: [N_START, N_START],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     // A release with no live claim answers the head and
-    // stores nothing; derive stays empty.
+    // stores nothing; derive holds only the seeded events.
     const bareRelease = await handleRequest(db, req(
         'DELETE',
         workOrderPath(workOrderId, '/claim'),
@@ -344,10 +361,10 @@ Deno.test('claim → release → reclaim derives claimed,'
     assertStrictEquals(bareRelease.status, 200);
     await bareRelease.body?.cancel();
     assertEquals(
-        await workOrderLifecycleStatesFor(
+        (await workOrderLifecycleStatesFor(
             db, ORGANIZATION_A, workOrderId,
-        ),
-        [],
+        )).map((row) => row.state),
+        SEEDED_STATES,
     );
 
     const claim1At = nowUtc();
@@ -395,11 +412,14 @@ Deno.test('claim → release → reclaim derives claimed,'
     );
     assertEquals(
         derived.map((row) => row.state),
-        ['claimed', 'claim_released', 'claimed'],
+        [
+            ...SEEDED_STATES,
+            'claimed', 'claim_released', 'claimed',
+        ],
     );
-    assertStrictEquals(derived[0]!.id, WORKORDERID_CE1);
-    assertStrictEquals(derived[1]!.state, 'claim_released');
-    assertStrictEquals(derived[2]!.id, WORKORDERID_CE2);
+    assertStrictEquals(derived[4]!.id, WORKORDERID_CE1);
+    assertStrictEquals(derived[5]!.state, 'claim_released');
+    assertStrictEquals(derived[6]!.id, WORKORDERID_CE2);
 });
 
 // -- 4. a transition, then a transition with release --------------
@@ -472,39 +492,29 @@ Deno.test('a transition, then a transition with release ends the'
     assertStrictEquals(derived.length, 6);
 });
 
-// -- 6. HYBRID: bare document + transition genesis + claim ------
+// -- 6. created work order + live claim --------------------------
 
-Deno.test('HYBRID: a bare document PUT plus a transition genesis'
-+ ' and a live claim — both events ride the lifecycle'
-+ ' reader (states/:id retired)', async () => {
+Deno.test('a created work order (three births and a release)'
++ ' plus a live claim — every event rides the lifecycle'
++ ' reader, in order, with distinct ids', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
     const workOrderId = generateIdentifier();
 
-    const put = await handleRequest(db, req(
-        'PUT', workOrderPath(workOrderId), token,
-        {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION_A,
+        id: workOrderId,
+        fields: {
             display_id: 'hybrid',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
-        GENESIS,
-    ));
-    assertStrictEquals(put.status, 201);
-
-    const genesis = await handleRequest(db, req(
-        'POST',
-        workOrderPath(workOrderId, '/transition'),
-        token, {
-            transitionEventId: WORKORDERID_GENESIS,
-            targetState: N_START,
-            release: null,
-            transitionAt: AT,
-        },
-        await headTag(db, token, workOrderId),
-    ));
-    assertStrictEquals(genesis.status, 200);
-    await genesis.body?.cancel();
+        flowId: FLOW_X,
+        births: [N_START, N_START],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -524,9 +534,14 @@ Deno.test('HYBRID: a bare document PUT plus a transition genesis'
     const ours = await workOrderLifecycleStatesFor(
         db, ORGANIZATION_A, workOrderId,
     );
+    // Three births, the release, the live claim.
     assertEquals(
-        ours.map((row) => row.id),
-        [WORKORDERID_GENESIS, WORKORDERID_CE1],
+        ours.map((row) => row.state),
+        [...SEEDED_STATES, 'claimed'],
     );
-    assertStrictEquals(ours.length, 2);
+    assertStrictEquals(ours.length, 5);
+    assertStrictEquals(ours.at(-1)!.id, WORKORDERID_CE1);
+    assertStrictEquals(
+        new Set(ours.map((row) => row.id)).size, 5,
+    );
 });

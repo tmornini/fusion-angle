@@ -26,6 +26,8 @@ import {
     apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // POST organizations/:id/work-orders/:id/transition — W10 required-at-exit
 // gate (Task 9). Gate tier only: every transition leaving
@@ -45,8 +47,6 @@ const ATTR_LOCKED = generateIdentifier();
 const ATTR_FOREIGN = generateIdentifier();
 const INSTANCE_ID = generateIdentifier();
 const FR_ID = generateIdentifier();
-const FWO_ID = generateIdentifier();
-const FWO_FREE = generateIdentifier();
 const NODE_CREATE = generateIdentifier();
 const NODE_STEP = generateIdentifier();
 const NODE_TARGET = generateIdentifier();
@@ -301,31 +301,23 @@ async function seedWorkOrder(
     db: MemoryDbAdapter,
     token: string,
     woId: string,
-    fwoId: string,
     flowGraph: Record<string, unknown>,
+    sitsAt: string,
 ): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-            , token, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION,
+        id: woId,
+        fields: {
             display_id: 'abcd',
             flow_graph: flowGraph,
             position: 1,
         },
-        { [IF_NONE_MATCH_HEADER]: '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    const join = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
-            + '/work-orders/' + fwoId,
+        flowId: FLOW_ID,
+        births: [NODE_CREATE, sitsAt],
+        at: AT,
         token,
-        {
-            flow_id: FLOW_ID,
-            work_order_id: woId,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(join.status, 201);
+        claim: 'released',
+    });
 }
 
 async function seedLiveType(
@@ -426,25 +418,6 @@ async function bindInstance(
     await res.body?.cancel();
 }
 
-// Place the WO on n-step by leaving n-create (no required).
-async function placeOnStep(
-    db: MemoryDbAdapter,
-    token: string,
-    woId: string,
-    eventId: string,
-): Promise<void> {
-    const res = await handleRequest(db, req(
-        'POST',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-            + '/transition',
-        token,
-        pureMoveBody(eventId, NODE_STEP),
-        await latched(db, token, woId),
-    ));
-    assertStrictEquals(res.status, 200);
-    await res.body?.cancel();
-}
-
 async function baseSeed(): Promise<{
     db: MemoryDbAdapter;
     adminToken: string;
@@ -474,11 +447,8 @@ Deno.test(
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph(),
-        );
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-1',
+            db, adminToken, WO_ID,
+            requiredStepGraph(), NODE_STEP,
         );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
@@ -498,16 +468,13 @@ Deno.test(
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph(),
+            db, adminToken, WO_ID,
+            requiredStepGraph(), NODE_STEP,
         );
         await seedInstance(db, adminToken, [
             { attribute_id: ATTR_ID, value: 'ok' },
         ]);
         await bindInstance(db, adminToken);
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-2',
-        );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-ok', NODE_TARGET),
@@ -523,15 +490,12 @@ Deno.test(
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph(),
+            db, adminToken, WO_ID,
+            requiredStepGraph(), NODE_STEP,
         );
         // Empty instance head — required Title absent.
         await seedInstance(db, adminToken, []);
         await bindInstance(db, adminToken);
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-3',
-        );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-miss', NODE_TARGET),
@@ -554,16 +518,13 @@ Deno.test(
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph(),
+            db, adminToken, WO_ID,
+            requiredStepGraph(), NODE_STEP,
         );
         const etag = await seedInstance(
             db, adminToken, [],
         );
         await bindInstance(db, adminToken);
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-4',
-        );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             valueBody({
@@ -587,8 +548,8 @@ Deno.test(
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph(),
+            db, adminToken, WO_ID,
+            requiredStepGraph(), NODE_STEP,
         );
         const etag = await seedInstance(
             db, adminToken, [
@@ -599,9 +560,6 @@ Deno.test(
             ],
         );
         await bindInstance(db, adminToken);
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-5',
-        );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             valueBody({
@@ -630,8 +588,8 @@ Deno.test(
     async () => {
         const { db, adminToken } = await baseSeed();
         await seedWorkOrder(
-            db, adminToken, WO_FREE, FWO_FREE,
-            freeGraph(),
+            db, adminToken, WO_FREE,
+            freeGraph(), NODE_CREATE,
         );
         // At n-create (no required). Unbound pure move.
         const res = await handleRequest(db, req(
@@ -664,8 +622,8 @@ Deno.test(
             },
         );
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph(),
+            db, adminToken, WO_ID,
+            requiredStepGraph(), NODE_STEP,
         );
         // Head missing required Title; body also tries
         // a role-locked set → must answer 403 (ACL),
@@ -674,9 +632,6 @@ Deno.test(
             db, adminToken, [],
         );
         await bindInstance(db, adminToken);
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-7',
-        );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, memberToken,
             valueBody({
@@ -708,16 +663,13 @@ Deno.test(
         // Required ref names an attribute that is NOT
         // on the bound type — permanently unsatisfiable.
         await seedWorkOrder(
-            db, adminToken, WO_ID, FWO_ID,
-            requiredStepGraph([ATTR_FOREIGN]),
+            db, adminToken, WO_ID,
+            requiredStepGraph([ATTR_FOREIGN]), NODE_STEP,
         );
         await seedInstance(db, adminToken, [
             { attribute_id: ATTR_ID, value: 'ok' },
         ]);
         await bindInstance(db, adminToken);
-        await placeOnStep(
-            db, adminToken, WO_ID, 'te-place-8',
-        );
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-foreign', NODE_TARGET),

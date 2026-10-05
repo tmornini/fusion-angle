@@ -48,6 +48,8 @@ import { organizationToken } from './token-fixtures.ts';
 import { landMembership } from
     './membership-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import type { DbAdapter } from '../api/db.ts';
 import {
@@ -263,17 +265,20 @@ async () => {
     const graph1 = workOrderFlowGraph(4 * 60 * 60);
     const graph2 = workOrderFlowGraph(12 * 60 * 60);
 
-    const put1 = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, token, {
+    const created = await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: workOrderId,
+        fields: {
             display_id: 'before',
             flow_graph: graph1,
             position: 1,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(put1.status, 201);
-    await put1.body?.cancel();
+        flowId: generateIdentifier(),
+        births: [generateIdentifier(), generateIdentifier()],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const put2 = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -282,7 +287,7 @@ async () => {
             flow_graph: graph2,
             position: 3,
         },
-        { 'If-Match': put1.headers.get('ETag')! },
+        { 'If-Match': created.query('header.etag').toText() },
     ));
     assertStrictEquals(put2.status, 200);
     await put2.body?.cancel();
@@ -305,8 +310,8 @@ async () => {
 // -- claim graph parity (Phase 15 Task 2) ------------------------
 
 // Phase Final Task 2: claim graph is message-plane only.
-// Seed via PUT (document message pair, no birth claim) so the live
-// claim is a real append, not an idempotent re-claim.
+// Seed through the live create, its birth claim released, so
+// the live claim is a real append, not an idempotent re-claim.
 Deno.test('claim graph: pre-tx vs in-tx flow_graph parity and'
 + ' claim-outcome on the message plane',
 async () => {
@@ -316,17 +321,20 @@ async () => {
     const lockTimeoutSeconds = 8 * 60 * 60;
     const graph = workOrderFlowGraph(lockTimeoutSeconds);
 
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, token, {
+    const created = await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: workOrderId,
+        fields: {
             display_id: 'p15-cg-' + workOrderId,
             flow_graph: graph,
             position: 2,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    await put.body?.cancel();
+        flowId: generateIdentifier(),
+        births: [generateIdentifier(), generateIdentifier()],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const preTx = await headVersionOf(db, workOrderId);
     const inTx = await db.readTransaction(
@@ -340,8 +348,8 @@ async () => {
     );
     assertStrictEquals(headGraph.lockTimeout, lockTimeoutSeconds);
 
-    // Fresh PUT: the head carries no claim.
-    assertStrictEquals(Object.hasOwn(preTx!, 'claim'), false);
+    // The released head carries no claim.
+    assertStrictEquals(preTx!['claim'], undefined);
 
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
@@ -354,7 +362,7 @@ async () => {
             expireEventId: generateIdentifier(),
             expireAt: nowUtc(),
         },
-        { 'If-Match': put.headers.get('ETag')! },
+        { 'If-Match': created.query('header.etag').toText() },
     ));
     assertStrictEquals(claimResponse.status, 200);
     await claimResponse.body?.cancel();

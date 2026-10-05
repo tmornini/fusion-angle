@@ -30,12 +30,16 @@ import {
 
 const OTHER = generateIdentifier();
 const PRIOR_HOLDER = generateIdentifier();
+const FLOW_ID = generateIdentifier();
+const N_CREATE = generateIdentifier();
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 
 function req(
@@ -99,7 +103,7 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// yNSSnbrpacodQTzUEcdEVA is seeded via a REAL conditional PUT
+// yNSSnbrpacodQTzUEcdEVA is seeded through the live create
 // (never a raw db.workOrders.put), so it carries a genuine
 // head: every claim reads and latches the work order's head.
 // A raw row poke has no real-world analog.
@@ -107,26 +111,40 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
+    await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: 'yNSSnbrpacodQTzUEcdEVA',
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
+        flowId: FLOW_ID,
+        births: [N_CREATE, N_CREATE],
+        at: nowUtc(),
+        token: DEV_TOKEN,
+        claim: 'released',
+    });
     return db;
 }
 
+// The three births and the creator's release come with the
+// seeded work order; the claim events are what lands after.
+const SEEDED_EVENTS = 4;
+
 // The claim events the version chain recorded. Releases ride
 // DELETE organizations/:id/work-orders/:id/claim.
-function claimEventsFor(
+async function claimEventsFor(
     db: MemoryDbAdapter,
 ): Promise<StateEntity[]> {
-    return workOrderLifecycleStatesFor(
+    const all = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
     );
+    assertEquals(
+        all.slice(0, SEEDED_EVENTS).map((event) => event.state),
+        [N_CREATE, N_CREATE, 'claimed', 'claim_released'],
+    );
+    return all.slice(SEEDED_EVENTS);
 }
 
 // Fresh caller-minted body for tests that don't assert

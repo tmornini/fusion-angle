@@ -61,9 +61,10 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
-    pairIdOf,
     partsOf,
 } from './http-fixtures.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 const N_START = generateIdentifier();
 const MEMBER_B = generateIdentifier();
@@ -801,33 +802,34 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
 // does NOT displace genesis'): for a stateless document,
 // envelope order and arrival order are STRUCTURALLY identical
 // (nowUtc is globally strictly monotonic and response `at` is
-// minted synchronously pre-commit), so no live two-PUT
+// minted synchronously pre-commit), so no live create-then-PUT
 // sequence can decouple them — and there is no body timestamp
 // to skew (that test skewed the flow document's state_at,
 // which this stateless family does not carry). This case
 // asserts plain Simple-PUT supersession only.
-// Like a flow PUT, a work-order PUT declares its genesis or
-// names the head it replaces.
-Deno.test('document supersession: PUT #2 (byte-divergent body)'
-+ ' supersedes PUT #1; derivation returns PUT #2\'s body',
+// A work-order PUT names the head it replaces.
+Deno.test('document supersession: a later PUT (byte-divergent'
++ ' body) supersedes the created head; derivation returns the'
++ ' later PUT\'s body',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = generateIdentifier();
 
-    const first = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, token, {
+    const first = await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: workOrderId,
+        fields: {
             display_id: 'first',
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(first.status, 201);
-    await first.body?.cancel();
-    const firstId = pairIdOf(first);
-    assert(firstId);
+        flowId: EMPTY_FLOW_ID,
+        births: [N_START, N_START],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const second = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -836,7 +838,7 @@ async () => {
             flow_graph: workOrderFlowGraph(4 * 60 * 60),
             position: 2,
         },
-        { 'If-Match': first.headers.get('ETag')! },
+        { 'If-Match': first.query('header.etag').toText() },
     ));
     assertStrictEquals(second.status, 200);
     await second.body?.cancel();

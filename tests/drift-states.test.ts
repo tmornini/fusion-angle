@@ -42,6 +42,8 @@ import {
     partsOf,
     invitationLatched,
 } from './http-fixtures.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 const DRIFT_STATES_FENCE_OWN_IDEA = generateIdentifier();
 const DRIFT_STATES_FENCE_FOREIGN_IDEA = generateIdentifier();
@@ -70,7 +72,7 @@ const WORKORDERID_CE2 = generateIdentifier();
 const WORKORDERID_EE2 = generateIdentifier();
 const WORKORDERID_CE3 = generateIdentifier();
 const WORKORDERID_EE3 = generateIdentifier();
-const WORKORDERID_GENESIS = generateIdentifier();
+const DRIFT_STATES_HYBRID_FLOW = generateIdentifier();
 const FLOWID_DELETE_SAVE = generateIdentifier();
 const FLOWID_NODE_DELETED = generateIdentifier();
 const FLOWID_UNDO_EV = generateIdentifier();
@@ -94,8 +96,6 @@ const FLOWID_UNDO_EV = generateIdentifier();
 // C3: bulk deriveStates / bulk lifecycle collection retired.
 // Cases rework onto per-family and collection history parity.
 // Graph sidecars pin document-message-pair graphDelta / revivals.
-
-const AT = '2026-01-01T00:00:00.000000Z';
 
 function req(
     method: string,
@@ -815,12 +815,11 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
     );
 });
 
-// HYBRID: bare document PUT (no create op) + transition
-// genesis + live claim. All events ride the work-order
-// lifecycle source (states/:id retired).
-Deno.test('case 4c: HYBRID — a seeded-shape work order (a bare'
-+ ' document PUT, no create operation) plus a transition'
-+ ' genesis and a LIVE claim — no id collision',
+// A created work order, its birth claim released, then a
+// live claim. All events ride the work-order lifecycle
+// source (states/:id retired).
+Deno.test('case 4c: a created work order (three births'
++ ' and a release) plus a LIVE claim — no id collision',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -828,31 +827,20 @@ async () => {
     );
     const workOrderId = DRIFT_STATES_WO_HYBRID_1;
 
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, token, {
+    await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: workOrderId,
+        fields: {
             display_id: DRIFT_STATES_HYBRID,
             flow_graph: workOrderFlowGraph(8 * 60 * 60),
             position: 1,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-
-    const genesis = await handleRequest(db, req(
-        'POST',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + workOrderId
-            + '/transition',
-        token, {
-            transitionEventId: WORKORDERID_GENESIS,
-            targetState: N_START,
-            release: null,
-            transitionAt: AT,
-        },
-        await headTag(db, token, workOrderId),
-    ));
-    assertStrictEquals(genesis.status, 200);
-    await genesis.body?.cancel();
+        flowId: DRIFT_STATES_HYBRID_FLOW,
+        births: [N_START, N_START],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -872,10 +860,19 @@ async () => {
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    assertStrictEquals(derived.length, 2);
+    // Three births, the release, the live claim.
+    // The three births share one `at`, so history orders them
+    // by id; the release and the claim follow in time.
+    const states = derived.map((row) => row.state);
     assertEquals(
-        derived.map((row) => row.id),
-        [WORKORDERID_GENESIS, WORKORDERID_CE1],
+        states.slice(0, 3).sort(),
+        [N_START, N_START, 'claimed'].sort(),
+    );
+    assertEquals(states.slice(3), ['claim_released', 'claimed']);
+    assertStrictEquals(derived.length, 5);
+    assertStrictEquals(derived.at(-1)!.id, WORKORDERID_CE1);
+    assertStrictEquals(
+        new Set(derived.map((row) => row.id)).size, 5,
     );
 });
 

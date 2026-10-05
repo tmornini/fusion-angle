@@ -36,6 +36,8 @@ import {
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 const CREATE_NODE = generateIdentifier();
 const STEP_NODE = generateIdentifier();
@@ -96,44 +98,30 @@ function buildFlowGraph(
     };
 }
 
-// NAMED re-pin (Task 7): validateRecordTransition reads
-// organizations/:id/work-orders/:id through the flipped GET (this commit), so
-// the fixture must land through the SAME wire-reachable PUT
-// the live route serves — a raw db.workOrders.put leaves no
-// message pair at this document. The genesis transition ALSO
-// re-pins here (finding 15's fixture budget): getWorkOrder
-// TransitionEvents reads family /history, which is flipped
-// too — a raw db.states.put left no pair at that document
-// either.
+// validateRecordTransition reads organizations/:id/work-orders/:id
+// through the GET, and getWorkOrderTransitionEvents reads the
+// work order's events: the work order lands through the live
+// create, its three births carrying the node it sits at.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
     id: string,
     flowGraph: WorkOrderFlowGraph,
     currentNodeId: string,
 ): Promise<void> {
-    const ctx = inPageContext(db, await organizationToken());
-    await ctx.PUT(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
-        {
+    await seedCreatedWorkOrder(db, {
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
+        id,
+        fields: {
             display_id: 'WO-1',
             flow_graph: storedWorkOrderFlowGraph(flowGraph),
             position: 0,
         },
-        'creates',
-    );
-    const read = await ctx.GET(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
-    );
-    // Genesis transition via the named op (states/:id
-    // retired). pure-move instance shape; no claim release.
-    await ctx.POST(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
-        + '/transition', {
-        transitionEventId: 't-create-' + id,
-        targetState: currentNodeId,
-        release: null,
-        transitionAt: AT_CREATED,
-    }, [read]);
+        flowId: generateIdentifier(),
+        births: [CREATE_NODE, currentNodeId],
+        at: AT_CREATED,
+        token: await organizationToken(),
+        claim: 'released',
+    });
 }
 
 // The binding PUT and the attribute PUT (below) both need
