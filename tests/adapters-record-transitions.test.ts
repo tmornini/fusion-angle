@@ -10,7 +10,10 @@ import {
 import {
     type RequestContext,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -282,6 +285,33 @@ Deno.test(
         assertEquals(out, []);
     },
 );
+
+Deno.test('validateRecordTransition reads the head, no'
++ ' history', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedSystemMember(db);
+    const flowGraph = buildFlowGraph(
+        [
+            buildNode(CREATE_NODE, [], { isCreate: true }),
+            buildNode(TARGET_NODE),
+        ],
+        [buildEdge(EDGE_1, CREATE_NODE, TARGET_NODE)],
+    );
+    await seedWorkOrder(db, WO_ID, flowGraph, CREATE_NODE);
+    const { ctx, sent } = recordedContext(
+        db, await organizationToken(),
+    );
+    const out = await validateRecordTransition(
+        ctx, WO_ID, new Map(), new Map(),
+    );
+    assertEquals(out, []);
+    assertEquals(
+        sent.filter((r) => r.path.endsWith('/history')
+            || r.path.includes('/versions/')),
+        [],
+    );
+});
 
 Deno.test(
     'validateRecordTransition returns a required'

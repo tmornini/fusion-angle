@@ -1,16 +1,10 @@
 import type {
     Id,
     RecordAttributeId,
-    WorkOrderEntity,
     WorkOrderFlowGraph,
 } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
-import { organizationItem } from './request-context.ts';
-import {
-    validateWorkOrderFlowGraph,
-    getWorkOrderHistory,
-    currentNodeIdFromHistory,
-} from './work-orders-queries.ts';
+import { getWorkOrder } from './work-orders-queries.ts';
 import {
     getRecordForWorkOrder,
 } from './flow-records.ts';
@@ -41,9 +35,9 @@ export class RecordTransitionViolations
     }
 }
 
-// Pure gate over already-fetched rows. Error bytes and
-// violation list match the former inlined body byte-for-
-// byte (pinned by adapters-record-transitions tests).
+// Pure gate over already-fetched rows. The violation
+// list matches the former inlined body byte-for-byte
+// (pinned by adapters-record-transitions tests).
 // Gate the leave of the CURRENT node — the same node
 // the workbox action screen paints. Required attrs and
 // constraint checks run against that node's refs only;
@@ -131,27 +125,10 @@ export async function validateRecordTransition(
         ReadonlyMap<RecordAttributeId, string> | null,
 ): Promise<ConstraintViolation[]> {
     // Wave 1: all keyed by workOrderId.
-    const [wo, history, recordId] =
-        await Promise.all([
-            ctx.GET<WorkOrderEntity>(
-                organizationItem(
-                    ctx, 'work-orders', workOrderId,
-                ),
-            ).then(read => read.body().toValue()),
-            getWorkOrderHistory(ctx, workOrderId),
-            getRecordForWorkOrder(ctx, workOrderId),
-        ]);
-    const currentNodeId =
-        currentNodeIdFromHistory(history);
-    if (currentNodeId === null) {
-        throw new Error(
-            'work order has no current node: '
-            + workOrderId,
-        );
-    }
-    const fg = validateWorkOrderFlowGraph(
-        wo.flow_graph,
-    );
+    const [workOrder, recordId] = await Promise.all([
+        getWorkOrder(ctx, workOrderId),
+        getRecordForWorkOrder(ctx, workOrderId),
+    ]);
     // Wave 2: attributes only when a record is bound.
     const attributes = recordId === null
         ? []
@@ -159,7 +136,7 @@ export async function validateRecordTransition(
             ctx, recordId,
         );
     return recordTransitionViolationsFrom(
-        fg, currentNodeId, attributes,
+        workOrder.flowGraph, workOrder.nodeId, attributes,
         pendingValues, storedValues,
     );
 }
