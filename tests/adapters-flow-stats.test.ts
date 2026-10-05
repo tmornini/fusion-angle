@@ -184,7 +184,7 @@ function buildTestGraph(): {
 // -- Tests ------------------------------------
 
 Deno.test(
-    'getFlowStats does not GET work-orders/',
+    'getFlowStats reads each joined work order\'s versions',
     async () => {
         const paths: string[] = [];
         const organization = 'AjdvjuECVZEgZoFajaIEkg';
@@ -193,9 +193,6 @@ Deno.test(
             identity: { organization },
             GET: async (path: string) => {
                 paths.push(path);
-                if (path.endsWith('/history')) {
-                    return responseMessage([]);
-                }
                 if (path.endsWith(
                     '/invitations/?state=removed',
                 )) {
@@ -218,7 +215,7 @@ Deno.test(
             // A collection read records its path, then answers
             // the flow's one work-order join, the one work
             // order, and empty members, former members, agents,
-            // and histories; any other collection path is a
+            // and versions; any other collection path is a
             // fault.
             GETCollection: async (path: string) => {
                 paths.push(path);
@@ -236,7 +233,7 @@ Deno.test(
                     return [responseMessage({ id: 'w-coll' })];
                 }
                 if (
-                    path.endsWith('/history')
+                    path.endsWith('/versions/')
                     || path.endsWith(
                         '/invitations/?state=accepted',
                     )
@@ -267,14 +264,14 @@ Deno.test(
         assert(
             paths.some(p =>
                 p.endsWith(
-                    '/work-orders/w-join/history',
+                    '/work-orders/w-join/versions/',
                 ),
             ),
         );
         assertEquals(
             paths.some(p =>
                 p.endsWith(
-                    '/work-orders/w-coll/history',
+                    '/work-orders/w-coll/versions/',
                 ),
             ),
             false,
@@ -443,6 +440,73 @@ Deno.test(
         );
     },
 );
+
+Deno.test('a rejected versions read leaves none in flight',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const built = buildTestGraph();
+    await seedFlow(
+        inPageContext(db, token), flowId, 'Stats',
+        built.graph,
+    );
+    const [failing, other] = [
+        generateIdentifier(), generateIdentifier(),
+    ];
+    for (const [position, id] of [failing, other].entries()) {
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg', id,
+            fields: {
+                display_id: 'WO-' + position,
+                flow_graph: {
+                    name: 'Stats', lockTimeout: 0,
+                    nodes: [], edges: [],
+                },
+                position,
+            },
+            flowId,
+            births: [built.createId, built.activeId],
+            at: daysAgo(1), token, claim: 'kept',
+        });
+    }
+    const inner = inProcessFetch(db);
+    let inFlight = 0;
+    let releaseHeld = (): void => {};
+    const held = new Promise<void>((resolve) => {
+        releaseHeld = resolve;
+    });
+    const fetch: typeof globalThis.fetch = async (
+        input, init,
+    ) => {
+        const path = new URL(new Request(input, init).url)
+            .pathname;
+        inFlight += 1;
+        try {
+            if (path.endsWith(failing + '/versions/')) {
+                throw new TypeError('network down');
+            }
+            if (path.endsWith('/versions/')) await held;
+            return await inner(input, init);
+        } finally {
+            inFlight -= 1;
+            if (path.endsWith(failing + '/versions/')) {
+                releaseHeld();
+            }
+        }
+    };
+    const ctx = createAppClient(
+        createHttpFacade(IN_PROCESS_ORIGIN, fetch),
+    ).requestContext(await organizationToken());
+    const inFlightAtRejection = await getFlowStats(
+        ctx, flowId, Date.now(),
+    ).then(
+        () => { throw new Error('expected a rejection'); },
+        () => inFlight,
+    );
+    assertStrictEquals(inFlightAtRejection, 0);
+});
 
 Deno.test(
     'getFlowStats lays out an auto-layout flow so the'

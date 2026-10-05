@@ -9,9 +9,10 @@ import {
 import { getRenderableFlowGraph } from './flow-graph-layout.ts';
 import {
     getFlowWorkOrderEntities,
-    getWorkOrderHistories,
+    getWorkOrderVersions,
     projectTransitions,
     type TransitionEvent,
+    workOrderEventsOf,
 } from '../../client/work-orders-queries.ts';
 import {
     getMemberMap,
@@ -49,25 +50,22 @@ export async function getFlowStats(
     const graph = graphRead.value;
     const fwoRows = fwoRead.value;
     const memberMap = memberRead.value;
-    const histories = await getWorkOrderHistories(
-        ctx,
-        fwoRows.map(r => ({
-            id: r.body().toValue().work_order_id,
-        })),
-    );
-
-    const woIds = new Set(
+    // One versions read per joined work order (spec §4);
+    // every read settles before this call does.
+    const ids = [...new Set(
         fwoRows.map(r => r.body().toValue().work_order_id),
+    )];
+    const reads = await Promise.allSettled(
+        ids.map((id) => getWorkOrderVersions(ctx, id)),
     );
-    // projectTransitions sorts ASC; bulk wire is DESC.
     const transitions: TransitionEvent[] = [];
-    for (const [woId, history] of histories) {
-        if (!woIds.has(woId)) continue;
-        for (const ev of projectTransitions(
-            woId, history,
-        )) {
-            transitions.push(ev);
+    for (const [index, read] of reads.entries()) {
+        if (read.status === 'rejected') {
+            throw read.reason;
         }
+        transitions.push(...projectTransitions(
+            ids[index]!, workOrderEventsOf(read.value),
+        ));
     }
 
     const memberNameById = new Map<Id, string>();
