@@ -29,7 +29,8 @@ import { seedCreatedWorkOrder } from
 // organizations/:id/work-orders/:id are Stream: a work
 // order's head is its whole state, binding included (§5).
 // Work-order history is Assemble over the version chain and
-// stays /history, not /versions.
+// stays /history until its retirement; versions/ serves the
+// stored parts beside it.
 
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -355,7 +356,8 @@ function createBody(id: string) {
     };
 }
 
-Deno.test('work-order history stays /history, not /versions',
+Deno.test('work-order versions are stored parts beside'
++ ' /history',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -377,9 +379,17 @@ async () => {
 
     const versions = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
+            + '/versions/', token,
+    ));
+    assertStrictEquals(versions.status, 200);
+    assertStrictEquals((await partsOf(versions)).length, 1);
+
+    const slashless = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             + '/versions', token,
     ));
-    assertStrictEquals(versions.status, 404);
+    assertStrictEquals(slashless.status, 404);
+    await slashless.body?.cancel();
 
     const bulk = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'

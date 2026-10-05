@@ -349,6 +349,8 @@ Deno.test('a stored pair\'s 2xx names the three lines'
         ['get', '/identities/:id'],
         ['get', '/organizations/:id/ideas/:id'
             + '/versions/:etag'],
+        ['get', '/organizations/:id/work-orders/:id'
+            + '/versions/:etag'],
         ['put', '/identities/:id'],
         ['get', '/organizations/:id/invitations'
             + '/:membership-id'],

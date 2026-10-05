@@ -4408,6 +4408,11 @@ export const routes: Route[] = [
         select: documentSelect(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
+    // A work order's history is its versions (spec §3):
+    // every PUT, oldest first, each as stored; the
+    // create's received POST is not a version.
+    documentVersionsSelectRoute(WORK_ORDERS_WIRING),
+    documentVersionSelectRoute(WORK_ORDERS_WIRING),
     // PUT claims and DELETE releases: operations on the work
     // order, answering its state. Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.

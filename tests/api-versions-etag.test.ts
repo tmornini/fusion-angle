@@ -89,20 +89,12 @@ Deno.test('idea snapshot is :etag not :version',
     );
 });
 
-Deno.test('work-order per-item history stays /history',
+Deno.test('work-order versions sit beside /history',
 () => {
-    assert(match(
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'xdaJyuuPyHfffCGLhqDrOQ/history',
-    ));
-    assertStrictEquals(
-        match(
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                + 'xdaJyuuPyHfffCGLhqDrOQ'
-                + '/versions/',
-        ),
-        null,
-    );
+    const item = '/organizations/AjdvjuECVZEgZoFajaIEkg/'
+        + 'work-orders/xdaJyuuPyHfffCGLhqDrOQ';
+    assert(match(item + '/history'));
+    assert(match(item + '/versions/'));
 });
 
 function hasLiteral(pattern: string): boolean {
@@ -162,6 +154,8 @@ Deno.test('registered families offer versions/ and :etag',
             + 'versions/',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/versions/',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg/versions/',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
@@ -182,6 +176,8 @@ Deno.test('registered families offer versions/ and :etag',
             + 'versions/YiJPbufDpkyrZcZCYbUJpg',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/'
             + 'pnXmXrxOWayANgDLdCjuBw/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
+            + 'xdaJyuuPyHfffCGLhqDrOQ/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'ohqxgUBEaFQwYbXsonRPmg/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
