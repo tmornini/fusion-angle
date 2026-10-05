@@ -240,13 +240,13 @@ export class WorkboxDetailPresenter {
 
         this.#claim = activeClaim
             ? {
-                kind: 'claimed',
+                state: 'claimed',
                 at: activeClaim.at,
                 byCurrentMember:
                     activeClaim.memberId
                         === currentMemberId,
             }
-            : { kind: 'unclaimed' };
+            : { state: 'unclaimed' };
     }
 
     // The work order the page holds: each write from this

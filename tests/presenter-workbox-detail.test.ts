@@ -842,8 +842,8 @@ Deno.test(
             currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const status = presenter.claimStatus();
-        assertStrictEquals(status.kind, 'claimed');
-        if (status.kind === 'claimed') {
+        assertStrictEquals(status.state, 'claimed');
+        if (status.state === 'claimed') {
             assertStrictEquals(
                 status.byCurrentMember, true,
             );
@@ -863,8 +863,8 @@ Deno.test(
             currentMemberId: 'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const status = presenter.claimStatus();
-        assertStrictEquals(status.kind, 'claimed');
-        if (status.kind === 'claimed') {
+        assertStrictEquals(status.state, 'claimed');
+        if (status.state === 'claimed') {
             assertStrictEquals(
                 status.byCurrentMember, false,
             );
@@ -880,7 +880,7 @@ Deno.test(
             activeClaim: null,
         });
         assertStrictEquals(
-            presenter.claimStatus().kind, 'unclaimed',
+            presenter.claimStatus().state, 'unclaimed',
         );
     },
 );

@@ -594,7 +594,7 @@ export async function init(
             const claim =
                 presenter.claimStatus();
             if (
-                (claim.kind !== 'claimed'
+                (claim.state !== 'claimed'
                     || !claim.byCurrentMember)
                 && !presenter.isArchive()
             ) {

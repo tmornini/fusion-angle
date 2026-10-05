@@ -39,9 +39,9 @@ export interface HistoryEntry {
 }
 
 export type ClaimStatus =
-    | { kind: 'unclaimed' }
+    | { state: 'unclaimed' }
     | {
-        kind: 'claimed';
+        state: 'claimed';
         byCurrentMember: boolean;
         at: string;
     };
