@@ -362,3 +362,139 @@ Deno.test('a boot refresh asked for Stark keeps Stark when'
         starkTab.deleteRefreshChannel();
     }
 });
+
+// Hold the refresh lock as a Wayne tab would, start a
+// Stark page's GET on a dead Stark token, let its 401
+// queue behind the lock, then broadcast the Wayne token.
+async function recoverBehindWayne(
+    exchanged: string | null,
+): Promise<{
+    grants: string[];
+    asked: (string | undefined)[];
+    retriedWith: string[];
+}> {
+    client.setCookieSession(true);
+    const dead = await scopedTo(STARK);
+    const wayne = await scopedTo(WAYNE);
+    const grants: string[] = [];
+    const asked: (string | undefined)[] = [];
+    const retriedWith: string[] = [];
+    let sent401 = (): void => {};
+    const refused = new Promise<void>((resolve) => {
+        sent401 = resolve;
+    });
+    let release = (): void => {};
+    const held = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    let locked = (): void => {};
+    const inside = new Promise<void>((resolve) => {
+        locked = resolve;
+    });
+    const wayneHold = navigator.locks.request(
+        'fusion-refresh', async () => {
+            locked();
+            await held;
+        },
+    );
+    await inside;
+    await withMockFetch(async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/authentication/token')) {
+            const body = JSON.parse(String(init?.body)) as {
+                grant_type?: string;
+                organization?: string;
+            };
+            grants.push(body.grant_type ?? '');
+            asked.push(body.organization);
+            if (exchanged === null) {
+                return Response.json(
+                    { error: 'forbidden' }, { status: 403 },
+                );
+            }
+            return new Response(
+                JSON.stringify({
+                    token_type: 'Bearer', expires_in: 900,
+                }),
+                {
+                    status: 200,
+                    headers: {
+                        'authentication-info':
+                            'access_token="' + exchanged + '"',
+                    },
+                },
+            );
+        }
+        const bearer = new Headers(init?.headers)
+            .get('Authorization');
+        if (bearer === 'Bearer ' + dead) {
+            sent401();
+            return Response.json(
+                { error: 'invalid_token' }, { status: 401 },
+            );
+        }
+        retriedWith.push(bearer ?? '');
+        return Response.json([]);
+    }, async () => {
+        const facade = createHttpFacade(
+            'http://example.test',
+            (input, init) => globalThis.fetch(input, init),
+        )({ ...client, navigateToAuth: () => {} });
+        const pending = facade.GET(
+            'organizations/' + STARK + '/records/', dead,
+        ).catch((err: unknown) => err);
+        await refused;
+        // One macrotask: the 401's microtasks reach the
+        // single flight, which now waits on the lock.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const bus = new BroadcastChannel('fusion-angle:refresh');
+        const witness = new BroadcastChannel(
+            'fusion-angle:refresh',
+        );
+        const heard = new Promise<void>((resolve) => {
+            witness.onmessage = () => resolve();
+        });
+        try {
+            bus.postMessage({ accessToken: wayne });
+            await heard;
+        } finally {
+            witness.close();
+            bus.close();
+        }
+        release();
+        await wayneHold;
+        await pending;
+    });
+    return { grants, asked, retriedWith };
+}
+
+Deno.test('a 401 recovery that adopts a Wayne peer token'
+    + ' exchanges it back to Stark', async () => {
+    const rescoped = await claimToken({
+        organization: STARK,
+        organizations: [STARK, WAYNE],
+        roles: ['admin:' + STARK, 'admin:' + WAYNE],
+        jti: 'rescoped-stark',
+    });
+    const seen = await recoverBehindWayne(rescoped);
+    assertEquals(seen.grants, ['token-exchange']);
+    assertEquals(seen.asked, [STARK]);
+    assertEquals(seen.retriedWith, ['Bearer ' + rescoped]);
+    assertStrictEquals(
+        principalFromToken(client.getSessionToken())
+            .organization,
+        STARK,
+    );
+});
+
+Deno.test('a 401 recovery never installs a Wayne peer'
+    + ' token it cannot exchange back', async () => {
+    const seen = await recoverBehindWayne(null);
+    assertEquals(seen.grants, ['token-exchange']);
+    assertEquals(seen.retriedWith, []);
+    assertStrictEquals(
+        principalFromToken(client.getSessionToken())
+            .organization === WAYNE,
+        false,
+    );
+});
