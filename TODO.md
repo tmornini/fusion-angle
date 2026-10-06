@@ -2831,7 +2831,20 @@ Off the critical path; each with its oracle.
   `api/derive-states.ts:211-234`; 6eee335c), yet two C4
   tombstone comments still narrate its retired
   document-trio history (`api/derive-states.ts:38-41`,
-  `:504-505`). Reword each to the
+  `:504-505`). The packageable client left seven
+  comments naming moved paths (`api/flow-graph-diff.ts:15`,
+  `tests/presenter-project-detail-impact.test.ts:16`,
+  `tests/presenter-identity-detail.test.ts:16`,
+  `tests/presenter-project-patch.test.ts:10`,
+  `tests/api-facade-write-preconditions.test.ts:26`,
+  `web-app/app/flow-operations.ts:720`, `:875`); the
+  store left `api/request-context.ts:42-45` keeping
+  `requestAt` in a requests row,
+  `api/postgres-client.ts:2-3` taking advisory locks
+  inside `begin`, and ARCHITECTURE.md:230-235 calling
+  reads an open write-gate transaction's; and 960f2ce8
+  wrote one comment twice (`api/mock-data.ts:179-183`,
+  `:190-194`). Reword each to the
   code that runs today, or delete it where the code now
   says it. Oracle:
   `git grep -nE 'appendMessagePair|sendWriteResponse'`
