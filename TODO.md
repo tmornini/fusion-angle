@@ -1510,16 +1510,17 @@ Off the critical path; each with its oracle.
   in `api/` or `server/` type-checks. Re-measured: a
   temp `document.body` under `api/` passed `deno check
   --frozen api`. WebCrypto/Fetch names the server needs
-  (`crypto.subtle` in `api/client-assertion.ts`,
-  `HeadersInit` in `api/message-pair.ts`) live on
-  `lib.webworker` without `document`. Oracle: a
+  (`crypto.subtle` in `api/client-assertion.ts:174`,
+  `:184`) live on `lib.webworker` without `document`.
+  Oracle: a
   `document` reference in `api/` fails `./test validate`
 - The Send Back feedback textarea is discarded.
   `web-app/app/presenters/idea.ts:410-425` renders
   `<textarea id="approval-send-back-feedback">` in the
-  Send Back dialog, and `grep -rn
-  "approval-send-back-feedback" web-app/ api/ shared/
-  tests/ server/` returns zero reads: the confirm path
+  Send Back dialog — its id split across a
+  concatenation (`'approval-send-back' + '-feedback'`),
+  so a grep for the whole id finds not even the render,
+  and `grep -rn "\-feedback'"` finds no read: the confirm path
   (`web-app/ideas/detail.ts:285-300` → `transitionIdea`
   → `postIdeaStateChange`) has no feedback parameter, so
   whatever a reviewer types is thrown away. Found by
