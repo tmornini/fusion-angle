@@ -778,34 +778,37 @@ Off the critical path; each with its oracle.
 - API retries, unified — the client resends by two
   unrelated mechanisms spread across its files, and leaves
   the commonest failures unhandled. Contention: flow PUT
-  (`web-app/app/adapters/flow-mutations.ts:441-546`,
-  `MAX_PUT_ATTEMPTS = 3`) and flow undo
-  (`web-app/app/flow-operations.ts:707-763`,
-  `MAX_UNDO_ATTEMPTS = 3`) each hand-roll a loop that
+  (`putFlow`, `client/flow-mutations.ts:579-612`,
+  `MAX_PUT_ATTEMPTS = 3` at `:504`) and flow undo
+  (`postFlowUndo`, `web-app/app/flow-operations.ts:740-777`,
+  `MAX_UNDO_ATTEMPTS = 3` at `:721`) each hand-roll a loop that
   absorbs a 412, rebuilds the body against the fresh head,
   and resends, sharing only `jitteredBackoff`
-  (`web-app/app/adapters/shared.ts:330`). Auth recovery,
+  (`client/request-context.ts:337`). Auth recovery,
   at two layers: on a 401 the facade refreshes once,
   single-flight, through a raw `fetch` and resends once
-  (`web-app/app/adapters/http-facade.ts:276-297`), while
-  `withAuthRecovery` does the same above it through
-  `postSessionRefresh`
-  (`web-app/app/adapters/shared.ts:374`, called at
-  `:175`); boot
-  refreshes twice more (`web-app/app/app-boot.ts:250`,
-  `:366`), and an accepted invitation re-mints its claims
+  (`exchangeOnce`, `client/http-facade.ts:311-356`),
+  while `withAuthRecovery` does the same above it
+  through `postSessionRefresh`
+  (`client/request-context.ts:355`, called at `:232`;
+  `client/session-refresh.ts:15`); boot
+  refreshes three times more (`web-app/app/app-boot.ts:243`,
+  its 403 fallback at `:256`, and `:359`), and an
+  accepted invitation re-mints its claims
   in two attempts, no loop (`remintSessionClaims`,
-  `web-app/app/adapters/invitations.ts:234`). Unhandled: a
+  `client/invitations.ts:242`). Unhandled: a
   `fetch` that rejects — a dropped connection surfaces as
   a raw `TypeError`; a request that never answers — no
   `fetch` in the client carries a timeout or an abort
   signal; a 429 — the throttle sends no `Retry-After`
-  (`server/http-server.ts:582-586`) and the client throws
+  (`server/http-server.ts:589-593`) and the client throws
   it like any failure; a 502, 503, or 504; and an error
-  body that is not JSON — `unwrapResponse` parses every
+  body that is not JSON — `answered` reads every
   failure as `{ error }`
-  (`web-app/app/adapters/http-facade.ts:80-98`), so a
-  proxy's HTML error page surfaces as a `SyntaxError` that
+  (`client/http-facade.ts:116-130`), so a proxy's HTML
+  error page finds no `error` and surfaces as an
+  `HttpMessageError` ('queried value does not exist',
+  `shared/http-message/field-value.ts:88-95`) that
   hides the status. One retry policy, in one place in the
   client: every request under a timeout; backoff with
   jitter, capped, never infinite; more attempts than
@@ -813,8 +816,9 @@ Off the critical path; each with its oracle.
   justifies it; and the verb decides what may be resent
   after an unknown outcome (RFC 9110 §9.2.2) — GET, PUT,
   and DELETE may, since a PUT that changes nothing lands
-  nothing (the ledger statement), while a POST or PATCH may only after
-  an answer that proves nothing landed (401, 412, 429). A
+  nothing (the ledger statement), while a POST or PATCH
+  may only after an answer that proves nothing landed
+  (401, 412, 429). A
   resend is the same operation and keeps its
   `operation-id`; the throttle sends `Retry-After` and the
   client honors it. Oracle: a facade test over a scripted
@@ -843,10 +847,10 @@ Off the critical path; each with its oracle.
   it held is gone (`web-app/ideas/index.ts:149`,
   `web-app/records/index.ts:140`,
   `web-app/projects/index.ts:189`,
-  `web-app/organization/index.ts:230`,
-  `web-app/workbox/index.ts:294`), as do the objective
+  `web-app/organization/index.ts:240`,
+  `web-app/workbox/index.ts:237`), as do the objective
   reactivate and archive clicks
-  (`web-app/organization/index.ts:300`, `:467`) — no
+  (`web-app/organization/index.ts:310`, `:480`) — no
   error, since a bell repaint landing mid-gesture has
   already resolved the list and a drop reverts visually,
   but nothing tells the person the gesture did nothing
