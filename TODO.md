@@ -1251,14 +1251,16 @@ Off the critical path; each with its oracle.
   them. A stamp bound as `timestamptz` (bare
   placeholder or `::timestamptz`) truncates to
   milliseconds on the second execution of a prepared
-  statement. Today only `insertPair` does this, and
-  `append casts both stamps to timestamptz` guards
-  `$6::text::timestamptz` / `$9::text::timestamptz`
-  (`api/backend-postgres.ts:581-583`). Oracle: every
-  stamp-bearing parameter in `api/backend-postgres.ts`
-  carries `::text::`, or text OIDs are forced at
-  `api/postgres-client.ts`; a second execution of a
-  stamp write still round-trips six digits
+  statement. The ledger statement mints its stamp in
+  SQL (`api/ledger-statement-sql.ts:88-99`), so one
+  stamp parameter remains, `insertPair`'s
+  `${responseAt}::text::timestamptz`
+  (`api/backend-postgres.ts:737`), guarded by 'append
+  casts the response stamp to timestamptz'
+  (`tests/backend-postgres.test.ts:424`); nothing pins
+  the round trip itself. Oracle: a Postgres test
+  executes a stamp write twice and reads six digits
+  back both times
 - The memory backend's sort coerces `response_at`
   with `?? ''` on a NOT NULL column
   (`byResponseAtThenId`, `api/backend-buffer-tx.ts:
