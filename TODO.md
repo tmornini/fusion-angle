@@ -37,6 +37,60 @@ lifecycle out of the document body, closed the other
 way with the trio's retirement
 (`docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`).
 
+- **0a.** Recipes a hidden, CDP-driven tab can execute
+  for AA32, C6, F13, and I22; Task 9 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
+  holds each case's text. AA32: the port is a 5-unit
+  circle on the node's widest perimeter gap
+  (`web-app/app/flow-graph.ts:220-270`), not its
+  right-middle, and a press that misses it starts a
+  body-drag or a marquee, so the case aims by selector
+  at `[data-connect-port]`'s center, confirmed by
+  `document.elementFromPoint`, and drops on the target
+  node's `> rect`. C6: the window is the scroller —
+  `.main-content` sets no overflow
+  (`web-app/app/styles/layout.css:145-151`) and the
+  sidebar is fixed — and CDP wheel and key input stall
+  on a tab that is not composited, so the case scrolls
+  with `window.scrollTo` through `Runtime.evaluate` and
+  reads the rects. F13: the double-click aims at the
+  node's body (`.flow-node[aria-label="<name>"] > rect`),
+  not its label or group, and the case names its Layer
+  2 pin, 'a node click under an open panel centers it
+  on release (F13)'
+  (`tests/browser/canvas-gestures.test.ts:451`). I22: a
+  CDP `Fetch` pattern answers the ideas collection GET
+  with a 500 — never `/api/authentication/*`, and never
+  a 401, which drives refresh instead — so the error
+  state and its Try Again are driven live. Oracle: the
+  next walk scores each of the four PASS or FAIL, never
+  BLOCKED
+- **0b.** F37a, R22, and WB22 moored to the product;
+  Task 10 of the same plan holds F37a's and R22's text.
+  F37a: one cookie jar cannot reach the 412 — a flow
+  save rings `fusion-angle:data`, and tab B re-reads
+  and latches the new head within one GET — so tab B
+  is a second jar (`Target.createBrowserContext`, as
+  SV6), which keeps the stale head. R22: nothing merges
+  two editors' values — a PATCH merges `set` and
+  `clear` onto the head it latched, a stale tag answers
+  412 (ARCHITECTURE.md:316-322), and the page re-reads
+  and asks the person to re-apply
+  (`INSTANCE_CONFLICT_NOTICE`, `web-app/records/detail.ts`)
+  — so the case reads refuse-and-refresh, not merged
+  values. WB22: `buildInboxItems` takes four
+  parameters, `(workOrders, activeClaimsByWo,
+  memberMap, mode)`
+  (`web-app/app/presenters/workbox-inbox.ts:255`),
+  where the case and its Pin name five. Oracle: each
+  case's text matches the code, and the next walk
+  drives F37a and R22 PASS
+- **0c.** AT2's count, current: after 0a and 0b, run
+  `./test validate browser` and replace AT2's "on 4 Oct
+  `./test` printed `ok | 4124 passed | 0 failed | 11
+  ignored`" (`TEST-PLAN.md:479`) with that run's date
+  and its main suite's line; Task 11 of the same plan.
+  Oracle: AT2 names the latest Layer 2 run's count
 - **14.** Admins act within their organization. Any
   organization's admin can write a password credential
   for an identity in another organization and sign in
@@ -2877,25 +2931,9 @@ Off the critical path; each with its oracle.
   says the state badge is claimed by nothing, though
   Declined and Revoked are, and expects "No outstanding
   invitations." (`:5381`, `:5400`) where the test asserts
-  "No pending invitations."; and WB22 gives
-  `buildInboxItems` five parameters (`:4704`), where it
-  takes four (`web-app/app/presenters/workbox-inbox.ts:255`).
-  Oracle: each named Pin line names its test, and each
-  named claim matches the code
-- The 4 Oct walk remedies' last tasks never landed:
-  C6's scroll driven by script, I22's fault forced with
-  Fetch, F37a's stale undo from a second jar, R22
-  moored to refuse-and-refresh, and AT2's count after
-  the remedies (Tasks 9–11 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
-  whose AA32, F13, WB18, WB22, and SV3 parts the
-  walk-green plan redid). The 5 Oct walk (`ed1fac5c`)
-  scored C6, F37a, and R22 PASS without them, I22
-  stays BLOCKED by walk-green's ruling, and TEST-PLAN.md
-  still reads AT2's 4 Oct count (`:479`). Owner call:
-  rule them superseded, or run them. Oracle: each task
-  is landed or struck in its plan, and AT2 reads the
-  current count
+  "No pending invitations." instead. Oracle: each named
+  Pin line names its test, and each named claim matches
+  the code
 - The small bipolar gauge's `display` text has no
   legend or caption (the K17 plan's deferral,
   `docs/superpowers/plans/`
