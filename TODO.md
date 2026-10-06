@@ -1322,7 +1322,7 @@ Off the critical path; each with its oracle.
   deliberately: extracting a shared module from any one
   Deno porting task would have reached into four other
   tasks' files. Oracle: one definition, five importers,
-  `./validate` green.
+  `./test validate` green.
 - Reword the exact-read plan's regex constraint.
   `docs/superpowers/plans/2026-09-15-exact-read-folds.md`
   Global Constraints say "No regex over the ledger's
@@ -1423,7 +1423,7 @@ Off the critical path; each with its oracle.
   retry branch, a work order both claimed and completed,
   and the archived-genesis walk
   (`web-app/app/adapters/objectives.ts:150-151`)
-- `./measure` harvests error-page timings;
+- `./bin/measure` harvests error-page timings;
   `page:ready` carries no status —
   `web-app/app/measure.ts`
 - Claim-on-load with no release-on-leave plus the
@@ -1490,7 +1490,7 @@ Off the critical path; each with its oracle.
   (`crypto.subtle` in `api/client-assertion.ts`,
   `HeadersInit` in `api/message-pair.ts`) live on
   `lib.webworker` without `document`. Oracle: a
-  `document` reference in `api/` fails `./validate`
+  `document` reference in `api/` fails `./test validate`
 - The Send Back feedback textarea is discarded.
   `web-app/app/presenters/idea.ts:410-425` renders
   `<textarea id="approval-send-back-feedback">` in the
@@ -1549,9 +1549,9 @@ Off the critical path; each with its oracle.
   `measure-viz.ts` 6) and none in browser page code. So
   that half needs the lib change PLUS the exclusion
   registry the `process` half escaped. Oracle for the
-  `process` half: that invocation in `./validate`, red
+  `process` half: that invocation in `./test validate`, red
   on a `process` reference under `web-app/`.
-- `./measure --record` writes the literal `'unknown'` as
+- `./bin/measure --record` writes the literal `'unknown'` as
   `cpuModel` (`web-app/app/measure.ts:946`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and the `sysctl` workaround was rejected as
@@ -2296,9 +2296,9 @@ Off the critical path; each with its oracle.
   only datastore, while the insulation above `SqlClient`
   is one adapter file, so keeping `postgres.js` costs one
   specifier and one file. Reopen at `@db/postgres` 1.0,
-  or on measured `./measure` headroom. Oracle: `grep -rn
+  or on measured `./bin/measure` headroom. Oracle: `grep -rn
   'npm:' deno.json deno.lock` prints nothing;
-  `./test-postgres` 52 passed; `./measure --check` green
+  `./test postgres` green; `./bin/measure --check` green
   against the committed budgets.
 - Cachability — hashed names and gzip sidecars have
   shipped; on the static server `HEAD` reports the same
@@ -2362,7 +2362,7 @@ Off the critical path; each with its oracle.
 - Fewer JSON parse/stringify — byte-stream header
   setting, mechanical sympathy and simplicity for
   the processor; measured first
-  (`./measure --profile`). Merged: the deferred
+  (`./bin/measure --profile`). Merged: the deferred
   content-coding seams
   (`shared/http-message/body.ts:76-79` and
   `shared/http-message/content-coding.ts:5-7` —
@@ -2390,9 +2390,9 @@ Off the critical path; each with its oracle.
   headless on Windows). Its one real effect was
   forcing software compositing, which made runs more
   alike across machines. Dropped UNVERIFIED —
-  `./test-browser` has run green on one machine
+  `./test browser` has run green on one machine
   (2026-08-28). Restore it if two machines disagree.
-  Oracle: `./test-browser` green on two machines
+  Oracle: `./test browser` green on two machines
 - `schema-svg.ts`'s `parseStores` still carries a dead
   `StateStore`-matching branch
   (`web-app/app/schema-svg.ts:156-162`): it can never
