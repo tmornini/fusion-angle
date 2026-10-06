@@ -1459,6 +1459,23 @@ Off the critical path; each with its oracle.
   `approved` (promoted, deleted, or any other state)
   answers 409 naming the idea and stores nothing; an
   approved idea converts as today.
+- The context is the one source of `operation-id`. The
+  message-plane spec retired the `?? ''` reads, the
+  server's mints, and `headerFieldsWithOperationId`
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:534-541`);
+  two of the three stayed. Two handler calls read the raw
+  header with `?? ''` (`api/api.ts:1011-1013`,
+  `:1303-1305`) after the gate has required it
+  (`:469-484`), and `headerFieldsWithOperationId`
+  (`api/message-pair.ts:227-238`, called at `:353`) adds
+  an `operation-id` line to a request the server forms
+  itself. On the client, the raw token verbs take
+  `operationId: string | undefined`
+  (`client/http-facade.ts:235`, `:255`, `:274`, `:296`)
+  and send no id when it is undefined, a branch no caller
+  reaches. Oracle: no `?? ''` reads `operation-id` under
+  `api/`, `headerFieldsWithOperationId` is gone, and the
+  raw verbs take a `string`.
 
 ## Later work
 
@@ -3254,6 +3271,27 @@ Off the critical path; each with its oracle.
   at least as strong, then delete all three. Oracle: `git
   grep -nw` finds none of the three names under `api/` or
   `tests/`.
+- The work-order gates check no node and no edge.
+  `assertRequiredAttributesAtExit` (`api/routes.ts`) returns
+  when the head's `state` names no node in its frozen
+  `flow_graph`, so the required-at-exit check is skipped
+  silently for that head. No gate would stop it:
+  `validateWorkOrderCreateBody` checks `states` only as
+  non-empty strings, and `validateWorkOrderInstanceTransitionBody`
+  and `postWorkOrderTransitionOp` (`api/validators.ts`,
+  `api/routes.ts`) check `targetState` only as non-empty, with
+  no edge from the head's `state`, and `postWorkOrderDocumentOp`
+  (`api/routes.ts`) lays a PUT's `flow_graph` over the head
+  without checking that `state` still names a node. Nothing
+  compares the browser-minted `transitionAt` with the head's
+  `transition.at` either. The inbox's static degraded row for an unplaced head
+  contains the gap; it does not close it. Plan gate validation
+  (node, edge, and `transitionAt`; real graphs in fixtures) as
+  its own spec; it decides whether a skewed `transitionAt` is
+  refused or clamped. Oracle: a create or transition naming a
+  node absent from the graph, a transition with no edge from
+  the head's `state`, or a PUT whose `flow_graph` drops the
+  head's `state`, is refused at the gate.
 
 ## Sequencing
 

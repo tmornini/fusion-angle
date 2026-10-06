@@ -182,12 +182,24 @@ as a sequential scan (`enable_bitmapscan` off and
 
 ## Figures whose script did not survive
 
-Stated in TODO.md as measured; re-measure when the statement
-exists.
+Stated in TODO.md as measured, or here for an item that
+has landed; re-measure when the statement exists.
 
-- item 0: the `clock_timestamp()` ties inside one statement
-  and the step-back stamping a successor before its
-  predecessor
+- item 0, landed, on 18.6: inside one statement
+  `clock_timestamp()` never steps back but ties — 149,680
+  of 200,000 minimal rows, 0 of 200,000 rows carrying 300
+  bytes and two uuids — and a predecessor landing in the
+  same statement is not visible to it. With the bare
+  clock, a step back stamps a successor before its
+  predecessor: reads serve the predecessor and every blind
+  PUT names it and is refused, for good. With the rule (the
+  later of the clock and the predecessor's stamp plus one
+  microsecond) the successor lands one microsecond after
+  its predecessor, and after a step back of N that
+  document's stamps and its `date` run up to N ahead of the
+  clock until it catches up. The seed's multi-row helper
+  landed 5,000 pairs in ten statements under
+  `fetch_types: false`, and a failed batch left no table.
 - item 2: a grant only the creator or a superuser may make;
   `fa_owner` owning what a session creates after `SET
   ROLE`; the image's `POSTGRES_USER` as a superuser
