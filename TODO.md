@@ -1686,9 +1686,11 @@ Off the critical path; each with its oracle.
   - The Add-Member dialog's Kind toggle, default-Human
     selection, and the AI form's disabled-until-Model
     Create gate (AA4, AA7a) — Layer 1 or 2;
-    `bindAddMemberDialog` (`web-app/members/index.ts`)
-    carries no test
-  - The live seat-derived roster and the Ideas list's
+    `bindAddMemberDialog` (`web-app/members/index.ts:369`)
+    is driven only for a human submit
+    (`tests/browser/member-create.test.ts:31`) and a
+    reset on reopen (`tests/browser/dialogs.test.ts:79`)
+  - The live membership-derived roster and the Ideas list's
     membership and counts against the real mock seed —
     which humans and which idea titles render on Stark
     (AA6, AA7, AA12, AA14) — Layer 1, a boot-level test
@@ -1781,7 +1783,7 @@ Off the critical path; each with its oracle.
     (D11) — Layer 1; `presenter-idea.test.ts` excludes
     `renderShell`/`renderUpdate` by choice, and
     `makeRecordingContainer`
-    (`tests/presenter-project-detail-impact.test.ts:30`)
+    (`tests/presenter-project-detail-impact.test.ts:28`)
     already renders a DOM-slot shell under `deno test`
   - The Edit → editable-inputs toggle and Cancel
     restoring the original (D12, D14) — Layer 2;
@@ -1797,15 +1799,17 @@ Off the critical path; each with its oracle.
     (`isReviewable`, `canSubmit`, `isConvertible`) are
     unit-tested in isolation
   - A `promoted` idea's badge label reading exactly
-    "Promoted", not "Approved" (D24) — Layer 1, a
-    `promoted` fixture in `tests/presenter-idea.test.ts`;
-    `IDEA_STATE_CONFIG`
-    (`web-app/app/presenters/state-display.ts:35`) is
-    untested
-  - The convert page's error state (D35) — Layer 1;
-    `web-app/ideas/convert.ts:96-115` hand-rolls its own
-    `buildErrorState` call outside the shared `loadInto`
-    helper, and `buildErrorState` has no test anywhere
+    "Promoted", not "Approved" (D24) — Layer 1, an
+    assertion on the label; `promoted` fixtures exist
+    (`tests/presenter-idea.test.ts:463`, `:750`) and none
+    reads it from `IDEA_STATE_CONFIG`
+    (`web-app/app/presenters/state-display.ts:34-37`)
+  - The convert page's error states (D35) — Layer 1;
+    `web-app/ideas/convert.ts` hand-rolls two
+    `buildErrorState` calls, the idea's and the
+    objectives' (`:99-120`, `:121-142`), outside the
+    shared `loadInto` helper, whose own error state is
+    pinned (`tests/loading-states.test.ts:79`)
   - The "New Idea" button, the create-form Cancel, and
     the convert-page back button — each a click then
     `navigateTo` (D4, D9, D34) — Layer 2; no test drives
@@ -1876,7 +1880,7 @@ Off the critical path; each with its oracle.
   - The ZIP resolution dialog's four shapes — Overwrite,
     Create New, Create, and the description (F6, F44) —
     Layer 1, a pure test of `buildDialogConfig`
-    (`web-app/app/adapters/flow-export.ts`), already pure
+    (`web-app/app/flow-export.ts:172`), already pure
     and only unexported
   - Which node kind wears which colour, the Archive
     node's red 3-px border, the centred special label,
@@ -1887,7 +1891,7 @@ Off the critical path; each with its oracle.
     kinds into one blob and asserts each token appears
     somewhere, so a green-for-red swap survives it, and
     cycle amber (`WARN`,
-    `web-app/app/flow-graph.ts:47`) is asserted nowhere
+    `web-app/app/flow-graph.ts:48`) is asserted nowhere
   - The cycle edge's rendered `stroke-dasharray` and
     `url(#flow-arrow-warn)` marker (F9, F21) — Layer 1, a
     `buildGraphSvg` assertion on a graph with a back-edge
@@ -2016,10 +2020,10 @@ Off the critical path; each with its oracle.
     (Layer 1, over `FlowStatsPresenter.buildCard`'s
     output) (FS4)
   - Review's card subtitle naming its two seeded
-    reviewers (FS4) — Layer 1, a `sharedMockDb()`-backed
+    reviewers (FS4) — Layer 1, extending
+    `tests/mock-data-stats-window.test.ts:20`, a
     `getFlowStats` test on the real Customer Onboarding
-    flow; `tests/mock-data-lead-to-close.test.ts` covers
-    a different flow
+    flow that asserts only its visit heat
   - The live click-to-pin, click-to-unpin, and re-pin
     transitions (FS5) — Layer 2; pin state is mutated
     inline in the click handler and only the
@@ -2056,7 +2060,7 @@ Off the critical path; each with its oracle.
     attributes (G10) — Layer 1,
     `tests/presenter-projects-organization.test.ts`,
     whose edit-form test already calls
-    `toGeneralInfoDraft` (`web-app/app/adapters/admin.ts:58`)
+    `toGeneralInfoDraft` (`web-app/app/organization-view.ts:44`)
     and makes no `value=` assertion
   - The sidebar member chip's click-to-profile navigation
     (G12) — Layer 2; `web-app/app/sidebar-member.ts`
@@ -2228,9 +2232,10 @@ Off the critical path; each with its oracle.
     (`tests/presenter-record-detail.test.ts:104`, `:123`,
     `:142`)
   - Returning to read mode after Save, and the rendered
-    constraint summaries (R10) — Layer 1, a new
-    `tests/records-detail-reduce.test.ts` mirroring
-    `tests/projects-detail-reduce.test.ts`
+    constraint summaries (R10) — Layer 1, extending
+    `tests/records-detail-reduce.test.ts`, which pins
+    only `instanceToDelete`, as
+    `tests/projects-detail-reduce.test.ts` covers its page
   - The toast-stack cap and the re-entrant-save guard for
     Record edits specifically (R10a) — Layer 2, a new
     `tests/browser/records.test.ts` in the spirit of
@@ -2245,23 +2250,27 @@ Off the critical path; each with its oracle.
   - A radio-option submit recording the chosen value
     through a transition (R14a) — Layer 1, a `radio`-typed
     case in `tests/adapters-record-transitions.test.ts`;
-    the option-membership check in
-    `api/record-constraints.ts` is exercised by nothing
+    the option-membership check
+    (`shared/record-constraints.ts:217`) is pinned alone
+    (`tests/instance-value-validation.test.ts:224`), not
+    through a transition
   - `instanceListItems`
     (`web-app/app/presenters/record-detail.ts:120`) —
     Layer 1, zero tests; it builds the
     id-plus-readable-values projection
-    `records/detail.ts:147` reads for R16's Instances
+    `records/detail.ts:145` reads for R16's Instances
     list
   - The exact conflict-notice text (R17, R19) — Layer 1,
     importing `INSTANCE_CONFLICT_NOTICE` in
     `tests/presenter-record-instances.test.ts` instead of
     asserting a hand-typed literal
-  - `crank`'s termination trap — a signal stopping the
-    live `crank` and its child `./serve`, and the temp
-    bundle removed afterward (J1, J2) — Layer 1,
-    extending `tests/crank-cli.test.ts` past its
-    docker-stub early abort
+  - `./deploy`'s termination trap — a signal stopping the
+    live `./deploy` and its trap running `compose down
+    --remove-orphans`, leaving no compose project and no
+    `.env` (J1, J2) — Layer 1, a test that sends the
+    signal; 'deploy INT TERM traps exit the park'
+    (`tests/deploy-cli.test.ts:248`) reads the traps as
+    source text
   - The `Secure` cookie attribute (SV3) — Layer 1, one
     `assert.match(cookie, /Secure/i)` in
     `tests/api-authentication-token.test.ts`;
