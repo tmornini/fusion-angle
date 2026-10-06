@@ -3222,15 +3222,23 @@ Off the critical path; each with its oracle.
 - 2 → 5 (its link token is a secret at rest: item 2
   fences it); item 2 no longer orders
   item 6, since a backup carries the table whole
-- The naming bullet (`fa_`) lands no later than the
-  deploy of items 0–3, so operators rename once
+- 14 → 17: no second tenant shares an origin until an
+  organization's admin stops at its own identities
+- 15 → 2 → 16 → 3 → 17, one deploy: names first, so
+  operators rename once and item 2's verbs read
+  `FA_POSTGRES_URL`; the fence; `FA_GIT_SHA`, which
+  item 3's migration documents name in their
+  `user-agent`; the migrations; then the wipe and
+  reseed that land them together
 - 4 → 6 → 13 (the health probe, then per process)
 - 7 → 11, 12 (the designer roster and AI seats read the
   profile)
 - 9 → 10 → 11 → 12 (the bell, then chats, then
   processes, then the worker)
-- Items 6, 9, and 13, and the later-work XSS bullet,
-  close KNOWN seams — the closer removes the
+- Items 6, 9, and 13, and the later-work XSS and
+  physical-erasure bullets, close KNOWN seams (the
+  erasure bullet "Erased PII persists as superseded
+  pairs") — the closer removes the
   ARCHITECTURE.md bullet and this file's line in one
   commit; item 2 rewords two and closes none
 - Item 7 precedes routing the roster through the
