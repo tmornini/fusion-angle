@@ -383,7 +383,7 @@ Claim alphabet (`shared/work-order-claims.ts`):
 
 The server judges a claim by one clock: a claim is live
 until its `expires_at`, against the request's stamp
-(`isClaimLive`). The client mints the claim's event ids
+(`isClaimUnlapsedAt`). The client mints the claim's event ids
 and stamps (`putWorkOrderClaim`); the server decides
 whether a prior claim lapsed. The workbox pages read a
 claim's liveness from the head's `claim.expires_at`,

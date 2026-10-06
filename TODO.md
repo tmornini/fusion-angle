@@ -1081,7 +1081,7 @@ skew tests, which went with item 8's trio.
 13. Two processes — high availability for the app and
     for Postgres on Render. The app's precondition is in
     the tree: a claim decides expiry against its
-    request's stamp (`isClaimLive`,
+    request's stamp (`isClaimUnlapsedAt`,
     `api/work-order-version.ts:107-112`), and the claim
     GET against the reading process's clock
     (`api/routes.ts:4525-4544`, `nowUtc()`), so each
@@ -3296,7 +3296,7 @@ Off the critical path; each with its oracle.
   commit; item 2 rewords two and closes none
 - Item 7 precedes routing the roster through the
   profile
-- `isClaimLive` (claim-expiry as its own event) lands
+- `isClaimUnlapsedAt` (claim-expiry as its own event) lands
   before any multi-process deployment
   — item 13's first commit, or item 12's if the worker
   is a second process

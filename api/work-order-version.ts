@@ -102,7 +102,7 @@ function event(
 // One clock (§5): the request's stamp against the claim's
 // expires_at. At the instant itself the claim has lapsed,
 // as isExpiresAtPassed decides today.
-export function isClaimLive(
+export function isClaimUnlapsedAt(
     claim: WorkOrderClaim,
     now: string,
 ): boolean {
@@ -180,7 +180,7 @@ export function claimedVersion(
 ): ClaimChange {
     const prior = head.claim;
     const live = prior !== undefined
-        && isClaimLive(prior, input.now);
+        && isClaimUnlapsedAt(prior, input.now);
     if (live && prior.member_id !== input.member) {
         return { kind: 'held', by: prior.member_id };
     }
@@ -230,7 +230,7 @@ export function releasedVersion(
 ): WorkOrderVersion {
     if (
         head.claim === undefined
-        || !isClaimLive(head.claim, input.now)
+        || !isClaimUnlapsedAt(head.claim, input.now)
     ) {
         return head;
     }
