@@ -4026,9 +4026,10 @@ export const routes: Route[] = [
     // routes are bearerExempt and form their own pair deep
     // inside postToken/postAuthorize, pre-tx, since only the
     // grant can resolve the requester identity. The table
-    // offers POST so the generator advertises the verb;
-    // matchRoute still 404s an unknown path and 405s a
-    // non-POST verb on either pattern.
+    // offers POST so the generator advertises the verb.
+    // matchRoute matches both patterns or returns null;
+    // api.ts answers a null match 404 (401 before auth) and
+    // a matched route without the verb's handler 405.
     route('authentication/token', {
         post: authGrantOffered,
     }),

@@ -1163,11 +1163,12 @@ async function dispatched(
                 // so the generic pair block above never fires
                 // for them. The table offers `post` so the verb
                 // is visible; this arm still intercepts before
-                // `matched.post` runs (matchRoute still matches
-                // both patterns, so an unknown path still 404s
-                // and a non-POST verb still 405s in its own
-                // arm: a GET has no select, and PUT, PATCH, and
-                // DELETE find no handler). The
+                // `matched.post` runs. matchRoute returns null
+                // for an unknown path, which `dispatched` answers
+                // before any arm (401 unauthenticated, else 404);
+                // a non-POST verb 405s in its own arm: a GET has
+                // no select, and PUT, PATCH, and DELETE find no
+                // handler. The
                 // seed carries everything
                 // WriteMessagePairInput needs except the
                 // requester identity and the response — only
