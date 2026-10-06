@@ -1421,7 +1421,12 @@ Off the critical path; each with its oracle.
   empty-name prefix is gone after wipe
 - The cross-party delegation ledger
   (`api/authentication.ts:1199-1204`;
-  `tests/api-authentication-token.test.ts:1028`)
+  `tests/api-authentication-token.test.ts:1028`): how
+  a second party's token travels when one
+  `Authorization` line carries one credential, which
+  the message-plane spec's Decision 4 hands it
+  (`docs/superpowers/specs/`
+  `2026-09-23-message-plane-design.md:165-177`, `:888-889`)
 - Passkey, provider-IdP, and corporate-OIDC ceremonies
   (`api/authentication.ts:1852-1888`;
   `tests/api-authentication-authorize.test.ts:253`)
