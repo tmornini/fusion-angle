@@ -1666,7 +1666,11 @@ Off the critical path; each with its oracle.
   Node"; `tests/drift-states.test.ts` says derive-states
   is unread in production while `api/routes.ts` imports
   it; `api/routes.ts` claims revival dual-write after
-  the states row half is stripped. The run-four
+  the states row half is stripped; `states.postEvent`,
+  defined nowhere now, is named at `api/routes.ts:354`,
+  `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`;
+  and `web-app/app/root-redirect.ts:6-7` says esbuild and
+  `./build` where `deno bundle` and `./bin/build` run. The run-four
   remediation's Evidence
   (`docs/superpowers/specs/`
   `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
