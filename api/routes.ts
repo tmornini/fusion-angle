@@ -2009,11 +2009,12 @@ function deltaFieldValueEntities(
             attribute_id: entry.attribute_id,
             value: entry.value,
         })),
-        ...clear.map((attributeId) => ({
+        ...clear.map((attributeId):
+            TransitionFieldValueEntity => ({
             id: attributeId,
             attribute_id: attributeId,
             cleared: true,
-        } as TransitionFieldValueEntity)),
+        })),
     ].sort(byIdAscending);
 }
 

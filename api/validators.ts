@@ -1614,7 +1614,7 @@ function validateTransitionFieldValueEntity(
         }
         return {
             id, attribute_id: attributeId, cleared: true,
-        } as TransitionFieldValueEntity;
+        };
     }
     return {
         id,
