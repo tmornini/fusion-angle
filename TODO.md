@@ -497,6 +497,22 @@ skew tests, which went with item 8's trio.
    The census of parted reads
    (`tests/parted-reads.test.ts`) emptied with the fifth
    spec.
+   `./test` 112.8 s → 92.7 s (median of three runs, 89.7,
+   92.7 and 136.5 s, on the tip before its rebase onto
+   `e2766e11`; each run covers the parallel pass and the
+   tz pass); seed pairs 2,317 → 1,882, stored bytes
+   6,244,233 → 5,291,206; readyMs per list page,
+   `7d34749` → tip `851adad` (medians of 25,
+   `measurements/history.jsonl`; the row before the
+   rebase, `49e0510`, is kept there and reads within
+   2.8 ms of it on every page listed here): dashboard
+   60.6 → 59.9, ideas 52.5 → 50.6, projects 62.5 →
+   62.5, records 53.7 → 54.3, flows 56.3 → 55.8,
+   workbox 141.5 → 87.2, members 52.1 → 53.5,
+   identities 50.3 → 51.3,
+   organization 49.7 → 49.2; workbox `fetch:active-list`
+   118.0 → 53.9; the workbox detail's fetch 30.2 →
+   31.4 (readyMs 64.0 → 65.5).
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
@@ -3230,6 +3246,21 @@ Off the critical path; each with its oracle.
   with no latch, so a second PUT at a join's name replaces
   what it joins. Oracle: a second PUT at a written join
   name stores nothing and answers 409 or 412.
+- Chain order stops at `projectTransitions`. The browser mints
+  `transitionAt` (`client/work-orders-mutations.ts:339`) and the
+  server checks only that it is a timestamp, never against the
+  head's `transition.at`. Two downstream sorts still order by
+  `at`: the workbox detail presenter's timeline
+  (`web-app/app/presenters/workbox-detail.ts`) and each work
+  order's path in `web-app/app/flow-stats-aggregate.ts`. Under
+  client clock skew a later move can carry an earlier `at`, the
+  timeline's last node can differ from the head's `state`, and
+  flow-stats' "completed" flips with it. Drop both sorts (the
+  inputs already arrive in chain order) with a pin each where a
+  later move carries an earlier `at`, and/or validate
+  `transitionAt` server-side against the head's `transition.at`.
+  Oracle: a chain whose last move carries the earlier `at`
+  reads the same in the detail timeline and in flow-stats.
 
 ## Sequencing
 
