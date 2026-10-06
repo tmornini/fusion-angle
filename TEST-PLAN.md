@@ -4577,7 +4577,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
 
 ### Workbox — Completion
 
-- [ ] **WB14** Transition a work order to the completion
+- [ ] **WB14** Drive WB14 only after WB19a and WB19b
+  have scored lines in the checkpoint: this case
+  archives their subject. If either has no line yet,
+  drive it now, then come back. Transition a work
+  order to the completion
   (Archive) node (its `isArchive` is true) — on Review
   fill Reviewer Notes and click `approve`. PASS: work
   order moves to the Archive tab. It no longer appears in
