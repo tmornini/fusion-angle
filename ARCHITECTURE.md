@@ -372,8 +372,8 @@ and `position` over the head's other keys and records
 no event; a reorder (`putWorkOrderPosition`) reads the
 head and latches it.
 
-History is the version chain: every version's
-`events`, newest first (`historyOf`).
+History is the version chain: every version's `events`,
+read through `versions/` in chain order.
 
 Claim alphabet (`shared/work-order-claims.ts`):
 `claimed` / `claim_released` / `claim_expired`.

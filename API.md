@@ -73,10 +73,7 @@ every request (`incomingContext`), then `dispatched`:
    route either selects heads (`select`,
    `api/head-reads.ts`) and the gate serves them
    through `servedResponse`
-   (`api/served-response.ts`), or answers handler JSON
-   (`get`: the one route
-   `tests/parted-reads.test.ts` names,
-   `organizations/:id/work-orders/:id/history`). A selector
+   (`api/served-response.ts`), or answers 405. A selector
    runs after the fence and throws a document's miss
    (403 for a foreign owner, 404 otherwise); the gate
    then answers a deleted head 410 and serves a live
@@ -165,7 +162,10 @@ The two membership views are that collection:
 through the same function. `versions/` is
 `multipart/mixed` of every PUT pair, oldest first.
 A DELETE pair is not a version. A written document's
-version list is never 204.
+version list is never 204. A work order's history is
+its `organizations/:id/work-orders/:id/versions/`: each
+version holds the `events` it recorded, so the list is
+the history in chain order; `…/history` is a router 404.
 
 Status ladder:
 
@@ -180,7 +180,8 @@ Status ladder:
   live document, and a view or version list that
   selects at least one
 - **201** — a genesis: a landed PUT with no live
-  head, including a PUT after a DELETE; a POST
+  head (not a work order's document PUT, which
+  supersedes only), including a PUT after a DELETE; a POST
   create, with `Location`; an instance create
 - **204** — DELETE success (landed, or already-gone);
   a collection GET that selects none, including a
@@ -194,8 +195,9 @@ Status ladder:
   parameter on a view
 - **404** — authenticated unmatched; DELETE
   never-written; genuine absence, as a GET of a name
-  never written; a tag that names no PUT pair at the
-  document; a membership name whose identity is not
+  never written; a conditional work-order PUT on a work
+  order never created; a tag that names no PUT pair at
+  the document; a membership name whose identity is not
   the path's
 - **405** — no handler, including DELETE on a
   membership; public instance PUT; GET
@@ -389,7 +391,9 @@ bound instance's revision, and its If-Match names both
 heads, the work order's first. A live claim by another
 member and a rebind to another instance are 409 from
 the head. A resent claim, a release with no live claim,
-and the same binding again are no-ops.
+and the same binding again are no-ops. The document PUT
+supersedes only; a work order is born by `POST
+…/work-orders/`. History is `…/work-orders/:id/versions/`.
 
 **Memberships.** One document at `/invitations/`,
 named `<organization-id>:<identity-id>`. Five states:
@@ -481,7 +485,7 @@ HTTP nest. Validators, crypto, hash, and
 
 ## Seed pair formation
 
-Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 2317`, root
+Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1882`, root
 included; bootstrap nine, root included. Pinned by
 `tests/mock-data-pairs.test.ts`. A pair's request holds
 what was received, or nothing. A seeded row was never

@@ -257,8 +257,8 @@ aggregate logic lives in the pure module
 `flow-stats-aggregate.ts` (`buildFlowStats(input) →
 model`); it consumes the universal `TransitionEvent[]`
 shape exported from `adapters/work-orders-queries.ts` —
-derived from work-order history on the message plane
-(`GET work-orders/history` and per-id history). The I/O
+derived from each joined work order's `versions/` in chain
+order (`getWorkOrderVersions`, `workOrderEventsOf`). The I/O
 wrapper is `adapters/flow-stats.ts`'s
 `getFlowStats(ctx, flowId, nowMs)`.
 

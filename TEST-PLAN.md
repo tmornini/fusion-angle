@@ -4444,10 +4444,10 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   the work order's etag alone (without it the POST is
   428); a sibling instance revision pair
   advances the head when the transition was value-bearing.
-  Derived WO history is `(at, id)` DESC (index 0 =
-  current) with one non-claim event per transition
-  (`entity_id` = work-order id, `state` = target node id,
-  `member_id` = actor, `at` = RFC-3339 Zulu). Live form
+  Derived WO history is chain order, oldest first
+  (`versions/`), with one non-claim event per transition
+  (`state` = target node id, `member_id` = actor,
+  `at` = RFC-3339 Zulu). Live form
   values come from the instance head, not a history fold.
   Pin: tests/api-work-order-binding.test.ts 'fresh bind →
        200; detail + list embed; unbound omits keys';
@@ -4467,10 +4467,9 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        tests/api-work-order-transition-instance.test.ts
        'pure move carrying record_type_id → 400' (both
        decide a pure move must omit them);
-       tests/api-work-order-history.test.ts 'GET
-       organizations/:id/work-orders/:id/history returns
-       200 DESC rows; row[0] is current; transition
-       carries field_values; claim rows carry []';
+       tests/api-work-order-versions.test.ts 'a work order
+       lists its versions oldest first, each part the
+       version its tag serves';
        exploratory — the live network-log read itself
 - [ ] **WB12** Click the work order row in the Active
   tab. PASS: work order PUTs `work-orders/:id/claim`
@@ -4495,10 +4494,12 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   PASS: back on the Active tab unclaimed. Click the row a
   third time (reclaim). PASS: claim succeeds again; the
   message plane carries the sequence
-  `claimed` → `claim_released` → `claimed` under the
-  `(at, id)` order for this work order's `entity_id`
-  (inspect via `GET work-orders/:id/history` or the
-  matching operation message pairs).
+  `claimed` → `claim_released` → `claimed` in the work
+  order's version chain, oldest first (inspect via
+  `GET work-orders/:id/versions/` or the matching
+  operation message pairs). On a seeded work order the
+  first claim records `claim_expired` for its creator's
+  lapsed birth claim, then `claimed`.
   Pin: tests/api-work-order-claim.test.ts 'a released
        claim allows a fresh claim' (decides exactly this
        claim→release→reclaim sequence and its event
@@ -4508,19 +4509,21 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   (WB14 archives it later; history is still readable
   after archive). After transitioning a work order
   through at least two states, read the derived history
-  (`GET work-orders/:id/history` or the matching pairs
+  (`GET work-orders/:id/versions/` or the matching pairs
   in `message_pairs`) for this work order's id. PASS:
-  rows are `(at, id)` DESC (index 0 = current); each
-  non-claim event has the immutable shape
-  `{id, entity_id, state, member_id, at, field_values}`,
+  versions are in chain order, oldest first (the last is
+  current); each non-claim event, in the `events` of the
+  version that recorded it, has the immutable shape
+  `{id, state, member_id, at, field_values}`,
   with `state` carrying the target node's identifier.
   Live values live on the instance head; history
   `field_values` may be empty for new-shape transitions.
-  Pin: tests/api-work-order-history.test.ts 'GET
-       organizations/:id/work-orders/:id/history returns
-       200 DESC rows; row[0] is current; transition
-       carries field_values; claim rows carry []';
-       exploratory — that no app code path
+  Pin: tests/api-work-order-versions.test.ts 'a work order
+       lists its versions oldest first, each part the
+       version its tag serves';
+       tests/api-work-order-history.test.ts 'a work order's
+       /history is a router 404' (decides the retired
+       route answers 404); exploratory — that no app code path
        ever mutates an existing pair (an architectural
        invariant, not a single assertion)
 - [ ] **WB19a — Two-tab 412 on the action screen.**
@@ -4634,14 +4637,13 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   — `PUT work-orders/:id/claim` answers 409 `work
   order is already claimed`, and her action screen
   shows the error state carrying that message with
-  Try Again — and the message plane carries one live
-  `'claimed'` event for this work order's
-  `entity_id`, Tony's, under the `(at, id)` reduction
-  (a stale prior claim is superseded by a
-  `'claim_expired'` event, never overwritten in
-  place). Inspect via derived `GET
-  work-orders/:id/history` (DESC; claim rows carry
-  `field_values: []`). Two tabs of one jar are one
+  Try Again — and this work order's version chain
+  carries one live `'claimed'` event, Tony's (a stale
+  prior claim is superseded by a `'claim_expired'`
+  event, never overwritten in place). Inspect via
+  derived `GET work-orders/:id/versions/` (oldest
+  first; claim events carry `field_values: []`). Two
+  tabs of one jar are one
   member: the second opens the holder's editable
   screen and appends no claim (WB23's claim half).
   Pin: tests/api-work-order-claim.test.ts 'a live claim by
