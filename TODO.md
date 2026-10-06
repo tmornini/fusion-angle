@@ -1637,9 +1637,9 @@ Off the critical path; each with its oracle.
   lists provenance, not comments, and the reproductions
   that might have were scratchpad, never committed —
   the pass re-derives its enumeration by reading. The
-  two remaining "remove the comment at … when done"
-  pointers under `## Critical path` are that path's
-  property, not stale
+  "remove the comment … when done" and "revise both
+  comments when done" pointers other entries carry are
+  those entries' property, not this pass's
 - Unpinned but pinnable — TEST-PLAN covenants with no
   test, the 2026-08-29 audit's gap list. Each names the
   lowest layer that could express it. The walk observes
