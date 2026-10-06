@@ -932,7 +932,17 @@ skew tests, which went with item 8's trio.
    (`server/http-server.ts`) while `request_at` is
    minted later in `incomingContext` after the body
    (examination report); latency must be their
-   difference, not a second clock. An alert when
+   difference, not a second clock. Every answer names
+   its request: the edge's 413 and the throttle's 429
+   are bare `jsonResponse`s with no `request-id`
+   (`server/http-server.ts:535-541`, `:589-594`), as is
+   the 500 for a throw that escapes `handleRequest`,
+   whose bare `catch` drops the error itself
+   (`server/http-server.ts:650-653`). The message-plane
+   spec hands this item the two refusals
+   (`docs/superpowers/specs/`
+   `2026-09-23-message-plane-design.md:879-881`).
+   An alert when
    `/status` is not 200 or the error rate rises.
    `TRUSTED_PROXY_HOPS` set to Render's real hop
    count. Consumes item 4. Merged:
@@ -1476,6 +1486,26 @@ Off the critical path; each with its oracle.
   reaches. Oracle: no `?? ''` reads `operation-id` under
   `api/`, `headerFieldsWithOperationId` is gone, and the
   raw verbs take a `string`.
+- A received POST or PATCH names the root, not the head
+  it acted on. Item 0's design had it name the head its
+  `If-Match` named — the state it acted on — and a
+  creating POST the root, so `supersedes` means one thing
+  on every pair. The statement names the head at the
+  pair's own `(path, name)`, or the root
+  (`COALESCE(s.head_id, …)`,
+  `api/ledger-statement-sql.ts:118-119`), and an
+  operation stores at its operation path
+  (`pathAndNameOf`, `api/path-and-name.ts:14-41`), where
+  no PUT or DELETE lands, so every received POST and
+  PATCH names the root whatever its `If-Match` said.
+  SCHEMA.md calls `supersedes` the lineage and the root
+  the predecessor of a genesis (§4) and says nothing of
+  a received pair. Owner call: carry the latch into
+  `supersedes`, or rule that a received pair names its
+  own path's head and say so in SCHEMA.md. Oracle: a
+  received in-order POST's `supersedes` equals its
+  `If-Match`, or SCHEMA.md states the rule and a test
+  pins the root.
 
 ## Later work
 
@@ -2889,9 +2919,14 @@ Off the critical path; each with its oracle.
   variable (`RENDER_GIT_COMMIT`), a name that stays at
   the edge (the naming bullet). How the page bundle
   learns it — embedded at build, or served — is this
-  bullet's to settle. Oracle: a boot without it refuses,
-  as a boot without `FA_POSTGRES_URL` does, and a
-  request log line carries it
+  bullet's to settle. Nothing sends the token yet: the
+  message-plane spec left it out
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:272-274`),
+  and no `user-agent` line appears under `client/`,
+  `api/`, `shared/`, or `server/`. Oracle: a boot without
+  it refuses, as a boot without `FA_POSTGRES_URL` does; a
+  request log line carries it; and every API request the
+  client sends carries `user-agent: fusion-angle/<sha>`
 - JEV joins the list of available AI agents, and that
   list becomes one. `api/provider-models.ts` calls
   `PROVIDER_MODELS` the single source of truth, and the
