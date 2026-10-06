@@ -296,7 +296,7 @@ async function seedRelease(
     );
 }
 
-async function seedBareWorkOrder(
+async function seedReleasedWorkOrder(
     db: MemoryDbAdapter,
     token: string,
     workOrderId: string,
@@ -1185,7 +1185,7 @@ Deno.test(
         const token = await organizationToken();
         const ctx = inPageContext(db, token);
         const woId = generateIdentifier();
-        await seedBareWorkOrder(db, token, woId);
+        await seedReleasedWorkOrder(db, token, woId);
         // Backdate past the graph's lockTimeout, so the
         // claim's expires_at is already behind us.
         const longAgo = new Date(
@@ -1215,7 +1215,7 @@ Deno.test(
         const token = await organizationToken();
         const ctx = inPageContext(db, token);
         const woId = generateIdentifier();
-        await seedBareWorkOrder(db, token, woId);
+        await seedReleasedWorkOrder(db, token, woId);
         await seedClaim(ctx, woId, nowUtc());
         const claim = (await getWorkOrder(ctx, woId)).claim;
         assert(
