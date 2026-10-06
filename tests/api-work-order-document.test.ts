@@ -179,6 +179,40 @@ Deno.test('validateWorkOrderDocumentBody rejects a trio key at the'
     );
 });
 
+Deno.test('validateWorkOrderDocumentBody rejects a non-number'
++ ' position', () => {
+    assertThrows(
+        () => validateWorkOrderDocumentBody({
+            ...documentFields(),
+            position: 'first',
+        }),
+        ValidationError, 'expected finite number for position',
+    );
+});
+
+Deno.test('validateWorkOrderDocumentBody tolerates a legacy'
++ ' flow_graph still carrying flowId', () => {
+    const doc = validateWorkOrderDocumentBody({
+        ...documentFields(),
+        flow_graph: {
+            ...flowGraph(),
+            flowId: generateIdentifier(),
+        },
+    });
+    assertStrictEquals(doc.entity.display_id, 'wo-doc-1');
+});
+
+Deno.test('validateWorkOrderDocumentBody rejects a JSON-encoded'
++ ' flow_graph string', () => {
+    assertThrows(
+        () => validateWorkOrderDocumentBody({
+            ...documentFields(),
+            flow_graph: JSON.stringify(flowGraph()),
+        }),
+        ValidationError, 'expected object for flow_graph',
+    );
+});
+
 // -- 2. postWorkOrderDocumentOp (below-gate, MemoryDbAdapter) --
 
 // Only the POST creates: the op reads the head first, so an
