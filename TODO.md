@@ -913,10 +913,9 @@ Off the critical path; each with its oracle.
   `revokedThroughSeconds`, `api/access-token.ts:224`).
   A device clock behind the server's leaves the token a
   logout meant to end alive; one ahead refuses the
-  identity's next tokens until it catches up. The state
-  by PUT spec named it with primary-organization
-  resolution, the other decision a client-minted stamp
-  drives
+  identity's next tokens until it catches up.
+  Primary-organization resolution is the other decision
+  a client-minted stamp drives
   (`docs/superpowers/specs/2026-09-25-state-by-put-design.md:361-362`).
   The pair's own `response_at` is the one clock, as the
   grant's issue instant already reads it. Oracle: a
@@ -946,11 +945,9 @@ Off the critical path; each with its oracle.
   DELETE against a binding, a default-organization
   PUT against that membership's removal, and two
   grants of one email; each race refuses one writer.
-  The guard lives in the write's own statement: the
-  ledger store took transactions and advisory locks
-  out of the write path (4175b2d5), so the one write
-  transaction and the organization's lock the state by
-  PUT spec named are gone.
+  The guard lives in the write's own statement, since
+  the write path holds no transaction and no advisory
+  lock.
 - The work-order gates check no node and no edge.
   `assertRequiredAttributesAtExit` (`api/routes.ts`) returns
   when the head's `state` names no node in its frozen
@@ -984,15 +981,14 @@ Off the critical path; each with its oracle.
   and `grep -rn "\-feedback'"` finds no read: the confirm path
   (`web-app/ideas/detail.ts:285-300` → `transitionIdea`
   → `postIdeaStateChange`) has no feedback parameter, so
-  whatever a reviewer types is thrown away. Found by
-  reading, not driving, during the 2026-08-29 audit; no
+  whatever a reviewer types is thrown away. No
   TEST-PLAN case claims the feedback survives. Oracle: a
   Layer 1 test asserting the typed feedback reaches the
   transition
 - Claim-on-load with no release-on-leave plus the
   8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
   work-order view into an 8-hour claim
-  (run-six Task 3 renders it; the UX remains) —
+  (the page renders the claim; the UX remains) —
   `web-app/workbox/detail.ts:598-616`,
   `shared/types.ts:1087`
 - A latched write aligned to RFC 9110 §13.1.1. When
@@ -1035,14 +1031,14 @@ Off the critical path; each with its oracle.
   - The widest answers 200 whenever the head holds
     the state. It hides an intervening writer, and it
     answers an invented or foreign latch with 200.
-  After state by PUT the alignment is one branch in the
-  classifier, in both backends, and nothing else moves;
+  The alignment is one branch in the classifier, in
+  both backends, and nothing else moves;
   a create resent after a lost response is a declared
   genesis the narrowest reading would answer 200
   (`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
   §10). The gate checks only a latch's presence and
   form (`preconditionRefusal`, `api/api.ts:236-306`),
-  and the flow PUT no longer re-reads the head to
+  and the flow PUT does not re-read the head to
   refuse its latch (`postFlowDocumentOp`,
   `api/routes.ts:1334-1360`). Both head reads carry
   the head's response and method, all the widest
@@ -1108,10 +1104,10 @@ Off the critical path; each with its oracle.
   transport — a rejection, a stall, a 429 with
   `Retry-After`, a 503, an HTML 502 — asserting the
   attempts, the delays, and that a POST with an unknown
-  outcome is never resent. Head reads hands this bullet
-  the 412 a latched save now answers and the errors that
-  carry their response (`RequestError.response`,
-  `shared/http-errors.ts`): a page that holds a message
+  outcome is never resent. A latched save answers 412,
+  and an error carries its response
+  (`RequestError.response`, `shared/http-errors.ts`),
+  yet a page that holds a message
   and is refused keeps the stale head
   (`web-app/ideas/detail.ts`, `web-app/ideas/index.ts`,
   `web-app/projects/detail.ts`,
@@ -1137,24 +1133,21 @@ Off the critical path; each with its oracle.
   error, since a bell repaint landing mid-gesture has
   already resolved the list and a drop reverts visually,
   but nothing tells the person the gesture did nothing;
-  and two the walk-green plan left: `postInvitationDecline`
-  latches with no 412 recovery
+  `postInvitationDecline` latches with no 412 recovery
   (`client/invitations.ts:317`), and the workbox action
   screen sends every 412 into the instance-conflict
   recovery, a stale work-order tag on a pure move
   included, its `conflictNotice` module state
   outliving a refresh (`web-app/workbox/detail.ts:70`,
-  `:195-206`, `:234`;
-  `docs/superpowers/plans/2026-10-05-walk-green.md:279-288`)
-- Gone for every document. State by PUT retires a
-  record instance's id for good: the never-written latch
+  `:195-206`, `:234`)
+- Gone for every document. A record instance's id is
+  retired for good: the never-written latch
   makes tombstone-wins the statement's rule, and a
   retired instance's read, update, and re-create answer
   410 Gone (RFC 9110 §15.5.11;
   `api/message-pair.ts:843-852`, used at
   `api/routes.ts:3381`). Memberships declare the same
-  latch (`api/invitations-domain.ts:219`, `:696`).
-  Reads are done: every
+  latch (`api/invitations-domain.ts:219`, `:696`). Every
   family's deleted document — a DELETE head, or a
   state-`deleted` head in a lifecycle family — answers
   410 on GET after the fence and is no part of a
@@ -1229,21 +1222,20 @@ Off the critical path; each with its oracle.
   `ensureContainer` appends last in tab order and sets
   `aria-live=polite` (`web-app/app/toast.ts:94-104`);
   each toast is also `role=status` (`:117-119`).
-  Critical-functionality path: accessibility
-  precondition, unmeasured. Pause-on-hover shipped;
-  this did not. Oracle: tab from the last page control
+  An accessibility precondition (the Office of the
+  Interface), unmeasured. Oracle: tab from the last page control
   reaches the live toast's dismiss; one live region,
   not two
 - The auth page's left panel shows invented stats —
   "10K+ Active Users", "98% Satisfaction", "50+
   Integrations" (`web-app/auth/index.ts:118-157`,
-  TEST-PLAN B5). Same sin as the landing mock-up;
-  its own spec.
-- The context is the one source of `operation-id`. The
-  message-plane spec retired the `?? ''` reads, the
-  server's mints, and `headerFieldsWithOperationId`
-  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:534-541`);
-  two of the three stayed. Two handler calls read the raw
+  TEST-PLAN B5): a comfortable lie to every person who
+  signs in. Its own spec.
+- The context is the one source of `operation-id`, by
+  the message-plane spec
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:534-541`),
+  yet the server reads and mints it elsewhere. Two
+  handler calls read the raw
   header with `?? ''` (`api/api.ts:1011-1013`,
   `:1303-1305`) after the gate has required it
   (`:469-484`), and `headerFieldsWithOperationId`
@@ -1264,8 +1256,8 @@ Off the critical path; each with its oracle.
   Oracle: a Layer 2 test that drags a `.baseline-slider`
   to its minimum and reads `.slider-value` as
   `formatSigned(-100)`
-- The run-four remediation's remaining seams — R6 and
-  R7. R6 holds in a stronger form: no picker renders for
+- R6 and R7 against the constraint editor. R6 holds in
+  a stronger form: no picker renders for
   `select`. R7's primary clause is false: `regex` is
   always offered and a second pick adds a second row
   (`web-app/app/presenters/record-detail.ts:838-871,
@@ -1274,15 +1266,13 @@ Off the critical path; each with its oracle.
   `:2754-2770`, `:2876-2890`). The walk decides whether
   that is a defect; the pins
   (`tests/presenter-record-detail.test.ts:122`, R7;
-  `:141`, R6) make any
-  rewrite honest. G9's staleness was the corrupted test
-  name, restored by the small-items sweep
+  `:141`, R6) make any rewrite honest
 - A received POST or PATCH names the root, not the head
-  it acted on. Item 0's design, which landed and left
-  this file, had it name the head its
-  `If-Match` named — the state it acted on — and a
-  creating POST the root, so `supersedes` means one thing
-  on every pair. The statement names the head at the
+  it acted on. By design a received POST or PATCH
+  names the head its `If-Match` named — the state it
+  acted on — and a creating POST the root, so
+  `supersedes` means one thing on every pair. The
+  statement instead names the head at the
   pair's own `(path, name)`, or the root
   (`COALESCE(s.head_id, …)`,
   `api/ledger-statement-sql.ts:118-119`), and an
