@@ -713,13 +713,6 @@ Off the critical path; each with its oracle.
   Oracle: a rejected `getIdea` leaves none of its reads
   in flight, pinned as `tests/adapters-flow-stats.test.ts`
   pins `getFlowStats`, and the yield at `:195` is gone
-- An inner pair of a composed operation skipped while the
-  top-level pair landed answers 201;
-  `appendMessagePairOnce` returns void and the gate never
-  holds inner hashes (`api/message-pair.ts:718-729`).
-  Product-path item 0 removes that dedupe, and this closes
-  with it. Oracle: a composed create whose inner hash
-  collides with an earlier pair
 - The run-four remediation's remaining seams — R6 and
   R7. R6 holds in a stronger form: no picker renders for
   `select`. R7's primary clause is false: `regex` is
