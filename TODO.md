@@ -3143,6 +3143,13 @@ Off the critical path; each with its oracle.
   `2026-10-05-walk-green.md:281-284`). Oracle: after a
   refused accept the bell's count matches the pending
   list, and V10's row still shows
+- The Add-Member dialog keeps its AI model across a
+  reopen: `clearAddMemberFields` resets every field but
+  `#ai-model` (`web-app/members/index.ts:406-415`; the
+  walk-green plan's deferral, `docs/superpowers/plans/`
+  `2026-10-05-walk-green.md:296-297`). Oracle: reopening
+  the dialog after an AI create shows the Model picker
+  at its placeholder
 
 ## Sequencing
 
