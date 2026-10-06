@@ -996,21 +996,23 @@ skew tests, which went with item 8's trio.
    jobs inside it (`bin/postgres-seed:168-171`,
    `bin/postgres-wipe:127-130`). Item 2 refuses a foreign
    login — one that belongs to none of our roles — and
-   this keeps the port out of its reach. Request and
-   error logs as one JSON object per line —
-   `api/api.ts:346-352` and `:2062-2068` print a label, an
+   this keeps the port out of its reach. Error logs as
+   one JSON object per line, as the request log already
+   is (`server/http-server.ts:471-510`):
+   `api/api.ts:322-329` ('fence read failed') and
+   `:1406-1413` ('request failed') print a label, an
    object, and an
    error as three values (the Office of Structured
    Observability wants one document with level, message,
    and request identity, and never a credential line:
-   item 0's hoist is the store's rule, and the log is a
-   second writer). One request clock, read once
-   at arrival and carried in the context: the request
-   log stamps `Date.now()` at accept
-   (`server/http-server.ts`) while `request_at` is
-   minted later in `incomingContext` after the body
-   (examination report); latency must be their
-   difference, not a second clock. Every answer names
+   the credential hoist is the store's rule, and the log
+   is a second writer). One request clock, read once
+   at arrival and carried in the context: the edge
+   stamps `performance.now()` at accept
+   (`server/http-server.ts:530`) while the api reads its
+   own after the body and mints `requestAt` there
+   (`api/request-context.ts:85-96`); latency must be
+   their difference, not a second clock. Every answer names
    its request: the edge's 413 and the throttle's 429
    are bare `jsonResponse`s with no `request-id`
    (`server/http-server.ts:535-541`, `:589-594`), as is
