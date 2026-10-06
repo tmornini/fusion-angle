@@ -51,15 +51,12 @@ every request (`incomingContext`), then `dispatched`:
    conditional** (`preconditionRefusal`): its
    presence and form, per route and verb, with no
    head read. See Conditional classes.
-6. **Region B + write authorizer.** Self-only token
+6. **Region B.** Self-only token
    routes (`SELF_ONLY_TOKEN_ROUTES`): the
    token-revocations PUT and the jti rotation and
    revocation POSTs. A member acts only on its own
    chain; an admin may name any identity. Any other
    caller is 403 by form, before any read.
-   `writeAuthorizerFor` on
-   org-scoped PUT/DELETE: owner-null is genesis;
-   foreign 403 before pair crypto.
 7. **Pair plane.** Wired writes form the received
    pair before any transaction
    (`formWriteMessagePair`). A DELETE that is not an

@@ -53,10 +53,6 @@ import {
     resolveGlobalOwner,
 } from './derive-states.ts';
 import {
-    writeAuthorizerFor,
-    assertWritableInOrganization,
-} from './write-authorizer.ts';
-import {
     postToken,
     postAuthorize,
     refreshClearCookie,
@@ -858,34 +854,6 @@ async function dispatched(
         || method === 'DELETE' || method === 'PATCH';
 
     try {
-        // Pre-write ownership authorizer for the 9 org-scoped
-        // families' existing-id PUT/DELETE. Pair-plane
-        // owner-null → genesis proceeds; foreign →
-        // ForeignOrganizationError (HTTP 403). Runs BEFORE
-        // formWriteMessagePair so a forged foreign id never
-        // pays crypto or stores a pair.
-        if (
-            isWrite
-            && hasWriteHandler
-            && !bearerExempt
-            && organization !== undefined
-        ) {
-            const writeAuthorizer = writeAuthorizerFor(
-                routePattern, method,
-            );
-            if (writeAuthorizer !== undefined) {
-                const entityId =
-                    params[writeAuthorizer.idParamIndex];
-                if (entityId !== undefined && entityId !== '') {
-                    await assertWritableInOrganization(
-                        effective,
-                        entityId,
-                        organization,
-                        writeAuthorizer.table,
-                    );
-                }
-            }
-        }
         // The shadow-ledger pair: formed pre-tx (all crypto and
         // document resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
