@@ -185,10 +185,14 @@ export async function liveGlobalDocumentIds(
     return new Set(live.map(liveHeadId));
 }
 
-// Organization-nested miss path: probe global existence so a
-// foreign id 403s and a genuine absence 404s. Global-plane
-// families (members, identities, …) stay EntityNotFoundError
-// only — they must not probe.
+// Organization-nested miss path: probe the bound
+// organization's own collection (missedReadError). A
+// foreign id is absent there, so it 404s like a genuine
+// absence; no path through here reaches missedReadError's
+// 403, which only a global-plane table (organizations,
+// invitations, role grants) could. Global-plane families
+// (members, identities, …) stay EntityNotFoundError only
+// — they must not probe.
 export async function throwDocumentMiss(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
@@ -209,7 +213,7 @@ export async function throwDocumentMiss(
 // The generic per-id read: the live PUT head at this
 // document. No head is a miss. For a 'state' family a head
 // whose body says `deleted` is a miss too. Both take the
-// throwDocumentMiss ladder, so 403 and 404 are unchanged.
+// throwDocumentMiss ladder, so the 404 is unchanged.
 async function derivedDocumentEntity(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
@@ -284,8 +288,10 @@ export function documentGetHandler(
 
 // A family's document head (spec §5, rungs 1–2): the
 // gate's fence has run; no head is this family's miss,
-// 403 for a foreign id and 404 otherwise. Whether the
-// head is deleted is the gate's to judge.
+// 404 for a foreign id and for a genuine absence alike
+// (the probe reads the bound organization's own
+// collection). Whether the head is deleted is the gate's
+// to judge.
 export function documentSelect(
     wiring: DocumentFamilyWiring,
 ): SelectHandler {
@@ -341,7 +347,7 @@ const PUT_METHOD = 'PUT';
 // Versions ride the head's ladder. The whole reader is
 // the family's: only a credential or an instance
 // projects. The miss is the family's own, so a foreign
-// id stays 403 and a name never written stays 404.
+// id and a name never written both stay 404.
 export function documentVersionsSelectRoute(
     wiring: DocumentFamilyWiring,
 ): Route {

@@ -100,8 +100,9 @@ export async function deriveFlowRecord(
     );
     const document = documents.get(joinId);
     if (document === undefined) {
-        // Probe the parent flow: a foreign flow's join 403s;
-        // a genuine miss on an own/absent flow stays 404.
+        // Probe the parent flow in the bound organization's
+        // own collection: a foreign flow is absent there,
+        // so its join 404s, as does a miss on an own flow.
         throw await missedReadError(
             db, joinId, organization, FLOW_RECORDS_TABLE,
             flowId,

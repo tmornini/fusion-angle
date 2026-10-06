@@ -16,8 +16,9 @@ import { generateIdentifier } from
 
 // Family-history ownership fence. Own-org history is 200
 // with the document genesis; a miss at this document
-// is 404. 403 only when this document has a live PUT the
-// caller may not have. Full per-family coverage lives in
+// is 404, and so is a foreign organization's id: the
+// probe reads the bound organization's own collection.
+// Full per-family coverage lives in
 // api-entity-history-routes.test.ts. Write-authorizer
 // pins live in api-write-authorizer. Unknown-route 404
 // lives in api.test.ts.
