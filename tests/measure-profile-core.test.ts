@@ -42,9 +42,9 @@ Deno.test('canonicalizeResource collapses long id segments', () => {
     );
     assertStrictEquals(
         canonicalizeResource(
-            `work-orders/${id}/history`,
+            `work-orders/${id}/versions/`,
         ),
-        'work-orders/:id/history',
+        'work-orders/:id/versions/',
     );
     assertStrictEquals(
         canonicalizeResource('states'),
