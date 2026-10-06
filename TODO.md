@@ -1156,6 +1156,27 @@ Off the critical path; each with its oracle.
   received in-order POST's `supersedes` equals its
   `If-Match`, or SCHEMA.md states the rule and a test
   pins the root.
+- A revocation's cutoff is the client's clock. The
+  token-revocation PUT carries `at` from the browser's
+  `nowUtc()` (`client/identity-token-revocations.ts:17`),
+  the gate checks it only as a timestamp
+  (`validateIdentityTokenRevocationEntity`,
+  `api/validators.ts:617-632`), and every access token
+  with `iat <= revokedThrough` is refused
+  (`tokenRevocationReason`, `api/authentication.ts:685`;
+  `revokedThroughSeconds`, `api/access-token.ts:224`).
+  A device clock behind the server's leaves the token a
+  logout meant to end alive; one ahead refuses the
+  identity's next tokens until it catches up. The state
+  by PUT spec named it with primary-organization
+  resolution, the other decision a client-minted stamp
+  drives
+  (`docs/superpowers/specs/2026-09-25-state-by-put-design.md:361-362`).
+  The pair's own `response_at` is the one clock, as the
+  grant's issue instant already reads it. Oracle: a
+  revocation stamped by a skewed client still refuses
+  every token issued before the server received it, and
+  none issued after.
 
 ## Later work
 
