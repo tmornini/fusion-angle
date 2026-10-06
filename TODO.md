@@ -751,30 +751,39 @@ Off the critical path; each with its oracle.
   or rule the pre-import blank container a product gap.
   Oracle: TEST-PLAN I21's probe step and its
   `### Driving notes` twin
-- A panel closed outside `withPanelOpen` keeps the
-  viewBox it saved on open, so the next empty-canvas
-  click or delete restores a stale camera — F29's
-  defect through four more doors. In
-  `web-app/flows/detail.ts`, `handleAddNodeAtPosition`
-  writes `isPanelOpen: false` by hand, and
-  `refreshFlowFromServer` drops the panel when a
-  cross-tab edit removes its selection. Undo and redo
-  commit `applyServerGraph`
-  (`web-app/app/flow-operations.ts`), which writes
-  `isPanelOpen: false` by hand when the selection is
-  gone, and `handleUndo` / `handleRedo` leave
-  `panelStateRef.open` true. `withAutoFitToggled`
-  keeps the save, and `applyPanelTransition` returns
-  null under Auto Fit, so a panel opened with Auto Fit
-  off and closed with it on hands the save to the
-  next click once Auto Fit is off again. Oracle: one
-  Layer 2 test per door in
+- The panel doors a937df40 closed are unpinned. A panel
+  closed outside `withPanelOpen` kept the viewBox it
+  saved on open, so the next empty-canvas click or
+  delete restored a stale camera — F29's defect through
+  four more doors: `handleAddNodeAtPosition` writing
+  `isPanelOpen: false` by hand
+  (`web-app/flows/detail.ts:608`),
+  `refreshFlowFromServer` dropping the panel when a
+  cross-tab edit removes its selection (`:1966-1970`),
+  undo and redo committing `applyServerGraph`
+  (`web-app/app/flow-operations.ts:707-709`), and a
+  close under Auto Fit, where `applyPanelTransition`
+  returns null (`web-app/app/flow-designer-actions.ts:474`).
+  a937df40 keys the transitions on the snapshot's own
+  previous open flag (`wasOpen`,
+  `web-app/app/presenters/flow-designer.ts:416`), so a
+  close the snapshot already holds restores nothing and
+  the next open recaptures the camera — read, not
+  driven. Two loose ends stay: `handleUndo` and
+  `handleRedo` leave `panelStateRef.open` true
+  (`web-app/flows/detail.ts:357`, `:373`), and the
+  inline close sites still bypass `closePanel()`
+  (`:1414`, `:2157`), the f29 plan's own deferral
+  (`docs/superpowers/plans/`
+  `2026-09-29-f29-zoomed-viewbox.md:984-986`). Oracle:
+  one Layer 2 test per door in
   `tests/browser/canvas-pan.test.ts` — with Auto Fit
-  off, open a node's panel; then port-drag a new
-  node, undo the open node's creation, or close the
-  panel under Auto Fit and switch it back off; zoom
-  in once and click empty canvas — each red today,
-  green once its door resets the save
+  off, open a node's panel; then port-drag a new node,
+  apply a cross-tab edit that removes the selection,
+  undo the open node's creation, or close the panel
+  under Auto Fit and switch it back off; zoom in once
+  and click empty canvas — each keeping the zoomed
+  camera
 - API retries, unified — the client resends by two
   unrelated mechanisms spread across its files, and leaves
   the commonest failures unhandled. Contention: flow PUT
