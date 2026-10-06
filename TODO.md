@@ -928,9 +928,15 @@ skew tests, which went with item 8's trio.
    is the whole set today) and becomes the one path
    outside authentication an anonymous caller can confirm
    exists: every other `/api/*` path answers 401 before
-   the no-match 404, by design (`api/api.ts:437-467`). A
-   probe sends no ids; the server mints its `request-id`
-   (item 0). Decide: what `postgres: true` proves (a
+   the no-match 404, by design (the route match at
+   `api/api.ts:495`, the exemption at `:534-535`, the 401
+   at `:537-541`, the 404 at `:544-551`). A probe sends
+   no ids, and the gate answers 400 to a request with no
+   `operation-id` before it routes or authenticates
+   (`api/api.ts:469-484`), so the exemption comes ahead
+   of that gate, as the message-plane spec planned; the
+   server mints the probe's `request-id`, as it does
+   every request's. Decide: what `postgres: true` proves (a
    `SELECT 1` on a pooled connection under its own short
    timeout, not the 30 s statement timeout); that a read
    stores no pair; whether the throttle counts it and
