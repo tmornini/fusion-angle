@@ -4663,7 +4663,8 @@ per-user visibility filter.
 - [ ] **WB22** Inspect
   `web-app/app/presenters/workbox-inbox.ts`. PASS:
   `buildInboxItems` takes
-  `(workOrders, transitions, claims, memberMap, mode)`
+  `(workOrders, transitionsByWo, activeClaimsByWo,
+  memberMap, mode)`
   with no scope parameter. The presenter exports nothing
   related to per-user visibility — the workbox shows all
   work orders to all users by construction.
