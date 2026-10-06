@@ -2281,7 +2281,7 @@ Off the critical path; each with its oracle.
   still sets `btn.disabled` — two forms, one
   directory, opposite validation voices
   (`web-app/ideas/create.ts:124`,
-  `web-app/ideas/convert.ts:356`). A design call, not
+  `web-app/ideas/convert.ts:359`). A design call, not
   a defect: TEST-PLAN D6/D7 pin the toast, and the
   2026-08-26 D6 stub files the voice question as its
   separate finding
@@ -2289,9 +2289,9 @@ Off the critical path; each with its oracle.
 - Attribute drag-reorder (TEST-PLAN R8)
 - A flow loaded with Auto Fit OFF no longer fits on
   first paint. `withCanvasSize`
-  (`web-app/app/presenters/flow-designer.ts:1020-1041`)
+  (`web-app/app/presenters/flow-designer.ts:974-995`)
   fits only under `isAutoFit`, and the load-time block
-  (`web-app/flows/detail.ts:1684-1695`) is the only
+  (`web-app/flows/detail.ts:1798-1813`) is the only
   load-time fit — its `reconcileFitFromDom()` returns
   early for the same reason. RECORDED, behavior
   unchanged. The sentence it falsifies is "onFlowLoaded
@@ -2330,13 +2330,13 @@ Off the critical path; each with its oracle.
   shipped; on the static server `HEAD` reports the same
   `Content-Length` as GET. The API serves no `HEAD`: its
   method switch has no case for it
-  (`api/api.ts:1471-2014`), so it answers 405, and that
-  405 carries no `Allow` (`api/api.ts:2004-2013`) —
+  (`api/api.ts:964-1349`), so it answers 405, and that
+  405 carries no `Allow` (`api/api.ts:1340-1348`) —
   RFC 9110 §9.1 requires GET and HEAD of a
   general-purpose server and §15.5.6 requires `Allow` on
   a 405 — while the gate requires `operation-id` on
   every request, a method never served included
-  (`api/api.ts:403-417`). Add
+  (`api/api.ts:469-484`). Add
   `HEAD` to the API: now that a document GET serves the
   stored response with three substitutions and three
   additions (`servedResponse`,
@@ -2390,8 +2390,8 @@ Off the critical path; each with its oracle.
   the processor; measured first
   (`./bin/measure --profile`). Merged: the deferred
   content-coding seams
-  (`shared/http-message/body.ts:76-79` and
-  `shared/http-message/content-coding.ts:5-7` —
+  (`shared/http-message/body.ts:77-80` and
+  `shared/http-message/content-coding.ts:3-8` —
   revise both comments when done). Oracle: a
   `./bin/measure --profile` run placing parse/stringify
   above the budgets' noise — the item activates on that
@@ -2401,11 +2401,11 @@ Off the critical path; each with its oracle.
   `FA_LATENCY` is a millisecond count,
   both present and non-empty, every API request
   takes the existing log-normal sampler
-  (`api/latency.ts:18-40`) with
+  (`api/latency.ts:17-54`) with
   `mu = ln(FA_LATENCY)`; otherwise the
   no-op. Merged: the shim's "both presets pass a
   no-op today" (`api/latency.ts:1-5`,
-  `api/db-backed.ts:31-32` — revise both comments when
+  `api/db-backed.ts:31-35` — revise both comments when
   done). Oracle:
   `FA_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
@@ -2421,7 +2421,7 @@ Off the critical path; each with its oracle.
   Oracle: `./test browser` green on two machines
 - `schema-svg.ts`'s `parseStores` still carries a dead
   `StateStore`-matching branch
-  (`web-app/app/schema-svg.ts:156-162`): it can never
+  (`web-app/app/schema-svg.ts:163-169`): it can never
   match now that `DbStores` holds only `messagePairs`,
   so it has drawn nothing since that field left.
   Oracle: `./test schema` green with the dead branch
@@ -2594,7 +2594,7 @@ Off the critical path; each with its oracle.
   (`server/postgres-gate.ts:101-121`) prints a message
   only if a set names it, else `seed failed` (seed,
   `server/seed.ts:41`), or boot's and wipe's fallback
-  (`postgres-gate.ts:126`, `server/postgres-wipe.ts:37`),
+  (`postgres-gate.ts:126`, `server/postgres-wipe.ts:38`),
   so a fault the seed's own code raises — a rehearsed row
   that does not land, a row on another predecessor —
   reaches the operator as `seed failed` and a code, the
@@ -2838,7 +2838,7 @@ Off the critical path; each with its oracle.
   is PUT, POST, PATCH, or DELETE at the HTTP layer and
   INSERT at the store, never "create", "update", "upsert",
   or "write" standing in for one of them. The case that
-  surfaced it is `postRecordWriteOp` (`api/routes.ts:921`,
+  surfaced it is `postRecordWriteOp` (`api/routes.ts:872`,
   the seed's record-type POST bundle) and its family:
   `RecordWriteBody`, `RecordWriteCreateBody`,
   `RecordWriteEditBody`, `RecordWriteMessagePairs`,
@@ -2877,7 +2877,7 @@ Off the critical path; each with its oracle.
   `0000-root` and the digest under a named key, with
   `content-type: application/json` and the
   `content-length` that follows. Both backends read the
-  root (`api/backend-memory.ts:248`,
+  root (`hasRoot`, `api/backend-memory.ts:255-259`,
   `api/backend-postgres.ts:117`); every deployment seeds
   fresh, so nothing stored migrates. Oracle: the root
   head's response parses as a JSON object whose `id` is
@@ -2927,7 +2927,7 @@ Off the critical path; each with its oracle.
   name stores nothing and answers 409 or 412.
 - Test-only list oracles. `documentCollectionGetHandler` and
   `documentGetHandler` (`api/document-family.ts`) and the
-  `GetHandler` type (`api/routes.ts`) serve no route; fifteen
+  `GetHandler` type (`api/routes.ts`) serve no route; sixteen
   test files read families through them below the gate. Move
   those reads onto the live read path, each moved assertion
   at least as strong, then delete all three. Oracle: `git
