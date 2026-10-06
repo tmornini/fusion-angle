@@ -6,9 +6,10 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import {
-    workOrderLifecycleStatesFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { RequestError } from '../api/api.ts';
 import { GET, POST, PUT } from './in-page-facade.ts';
 import {
@@ -113,8 +114,9 @@ const SEEDED_EVENTS = 4;
 async function eventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string; at: string }[]> {
-    const all = await workOrderLifecycleStatesFor(
-        db, 'AjdvjuECVZEgZoFajaIEkg', 'yNSSnbrpacodQTzUEcdEVA',
+    const all = await getWorkOrderEvents(
+        db, DEV_TOKEN, 'AjdvjuECVZEgZoFajaIEkg',
+        'yNSSnbrpacodQTzUEcdEVA',
     );
     assertEquals(
         all.slice(0, SEEDED_EVENTS).map((event) => event.state),

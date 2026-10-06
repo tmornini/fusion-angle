@@ -6,8 +6,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { workOrderLifecycleStatesFor } from
-    '../api/derive-states.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -85,8 +83,11 @@ import type {
     GraphNode,
     GraphEdge,
     StoredGraph,
-    StateEntity,
+    WorkOrderEventEntity,
 } from '../shared/types.ts';
+import {
+    getWorkOrderEvents,
+} from './fixtures/work-order-events.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -346,12 +347,14 @@ Deno.test(
         // is residual pin.
 
         const events =
-            await workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , woId);
+            await getWorkOrderEvents(
+                db, await organizationToken(),
+                'AjdvjuECVZEgZoFajaIEkg', woId,
+            );
         // start node, post-start, claimed
         assertStrictEquals(events.length, 3);
         const nonClaim = events.filter(
-            (e: StateEntity) =>
+            (e: WorkOrderEventEntity) =>
                 e.state !== 'claimed',
         );
         assertStrictEquals(nonClaim.length, 2);
@@ -362,7 +365,7 @@ Deno.test(
             nonClaim[1]!.state, MIDDLE_NODE,
         );
         const claims = events.filter(
-            (e: StateEntity) =>
+            (e: WorkOrderEventEntity) =>
                 e.state === 'claimed',
         );
         assertStrictEquals(claims.length, 1);
@@ -1030,10 +1033,12 @@ Deno.test(
             ctx, await getWorkOrder(ctx, woId),
         );
         const events =
-            await workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , woId);
+            await getWorkOrderEvents(
+                db, await organizationToken(),
+                'AjdvjuECVZEgZoFajaIEkg', woId,
+            );
         const claimed = events.filter(
-            (e: StateEntity) =>
+            (e: WorkOrderEventEntity) =>
                 e.state === 'claimed',
         );
         // Initial creation claim plus ONE per explicit
@@ -1271,14 +1276,16 @@ Deno.test(
         });
 
         const allEvents =
-            await workOrderLifecycleStatesFor(db, 'AjdvjuECVZEgZoFajaIEkg'
-                , woId);
+            await getWorkOrderEvents(
+                db, await organizationToken(),
+                'AjdvjuECVZEgZoFajaIEkg', woId,
+            );
         const transitionEvt = allEvents.find(
-            (e: StateEntity) =>
+            (e: WorkOrderEventEntity) =>
                 e.state === FINISH_NODE,
         );
         const releaseEvt = allEvents.find(
-            (e: StateEntity) =>
+            (e: WorkOrderEventEntity) =>
                 e.state === 'claim_released',
         );
         assert(

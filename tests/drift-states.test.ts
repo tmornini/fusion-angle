@@ -13,7 +13,6 @@ import {
 } from '../shared/types.ts';
 import {
     deriveInvitationStates,
-    workOrderLifecycleStatesFor,
     workOrderHistoryFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
@@ -30,7 +29,13 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
-import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
+import {
+    buildWorkOrderStateEvents,
+    buildWorkOrders,
+} from '../api/mock-data/work-orders.ts';
+import {
+    workOrderClaimEventId,
+} from '../api/mock-data/seed-message-pairs.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
@@ -142,41 +147,26 @@ Deno.test.afterEach(() => {
     resetClock();
 });
 
-// Per-entity history across family sources — production
-// deriveStatesFor / deriveFlowGraphStates retired (C2/C3).
-// Local oracle for mixed-family drift cases only. Graph
-// node/edge events are NOT here — pin message-plane sidecars
-// in case 5a directly.
-async function entityHistory(
-    db: DbAdapter, organization: Id, entityId: Id,
+// An invitation's history, derived from the message plane —
+// the local oracle for the invitation drift legs. Work-order
+// legs read getWorkOrderEvents and flow legs read
+// deriveFlowStateHistory directly.
+async function invitationHistory(
+    db: DbAdapter, entityId: Id,
 ): Promise<StateEntity[]> {
-    const [flowRows, workOrderRows, invitationRows] =
-        await Promise.all([
-            deriveFlowStateHistory(db, organization, entityId),
-            workOrderLifecycleStatesFor(
-                db, organization, entityId,
-            ),
-            deriveInvitationStates(db).then((rows) =>
-                rows.filter((r) => r.entity_id === entityId)),
-        ]);
-    return [...flowRows, ...workOrderRows, ...invitationRows]
+    return (await deriveInvitationStates(db))
+        .filter((row) => row.entity_id === entityId)
         .sort((a, b) =>
             a.at < b.at ? -1 : a.at > b.at ? 1
                 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-// Phase Final Task 2: states ROW half stripped — both helpers
-// pin the message plane only (row plane is empty).
+// Phase Final Task 2: states ROW half stripped — the helper
+// pins the message plane only (row plane is empty).
 async function assertHistoryParity(
-    db: DbAdapter, organization: Id, entityId: Id,
+    db: DbAdapter, _organization: Id, entityId: Id,
 ): Promise<StateEntity[]> {
-    return entityHistory(db, organization, entityId);
-}
-
-async function assertDerivedHistory(
-    db: DbAdapter, organization: Id, entityId: Id,
-): Promise<StateEntity[]> {
-    return entityHistory(db, organization, entityId);
+    return invitationHistory(db, entityId);
 }
 
 function ideaDocument(
@@ -400,7 +390,7 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
 ];
 
 Deno.test('case 2: flow parts match deriveFlowStateHistory;'
-+ ' work-order events equal the derive in (at, id) order',
++ ' work-order events are the seed trace in chain order',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -409,24 +399,40 @@ async () => {
     for (const { family, routeFamily, id }
         of CASE_2_FAMILY_ENTITY_IDS
     ) {
-        const derived = await entityHistory(
-            db, STARK_ORGANIZATION, id,
-        );
         if (family === 'work-order') {
-            // An event names no work order (the path does),
-            // so parity is the lifecycle core: id, state,
-            // at, member_id.
+            // The seed's trace in chain order, with the
+            // creator's claim born at the second event's
+            // moment; an event names no work order (the path
+            // does), so each is compared on id, state,
+            // member_id and at.
+            const trace = buildWorkOrderStateEvents().filter(
+                (event) => event.entity_id === id,
+            );
+            const expected = [
+                trace[0]!,
+                trace[1]!,
+                {
+                    id: workOrderClaimEventId(id),
+                    state: 'claimed',
+                    member_id: trace[0]!.member_id,
+                    at: trace[1]!.at,
+                },
+                ...trace.slice(2),
+            ];
             const events = await getWorkOrderEvents(
                 db, token, STARK_ORGANIZATION, id,
             );
             assertStrictEquals(
-                events.length, derived.length, family,
+                events.length, expected.length, family,
             );
-            for (let i = 0; i < derived.length; i++) {
-                const e = derived[i]!;
+            for (let i = 0; i < expected.length; i++) {
+                const e = expected[i]!;
                 const w = events[i]!;
                 assertStrictEquals(
                     w.id, e.id, family + ' id@' + i,
+                );
+                assertStrictEquals(
+                    w.state, e.state, family + ' state@' + i,
                 );
                 assertStrictEquals(
                     w.member_id, e.member_id,
@@ -434,9 +440,6 @@ async () => {
                 );
                 assertStrictEquals(
                     w.at, e.at, family + ' at@' + i,
-                );
-                assertStrictEquals(
-                    w.state, e.state, family + ' state@' + i,
                 );
             }
             continue;
@@ -480,8 +483,8 @@ async () => {
         (e) => e.family === 'work-order',
     )!;
     assertStrictEquals(
-        (await workOrderLifecycleStatesFor(
-            db, STARK_ORGANIZATION, workOrderEntry.id,
+        (await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, workOrderEntry.id,
         )).length,
         5,
     );
@@ -602,22 +605,26 @@ async () => {
 
 Deno.test('case 4a: a SEEDED work order\'s births ride the'
 + ' transition-op source (states-document retirement) —'
-+ ' workOrderLifecycleStatesFor contributes the trace events'
-+ ' and reproduces history',
++ ' the versions read contributes the trace events and'
++ ' reproduces history',
 async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+    );
     // WO02 (buildWorkOrders()[1]) — a DIFFERENT seeded work order
     // than case 2's own WO01, so this leg stays orthogonal.
     const seededWorkOrderId = buildWorkOrders()[1]!.id;
-    const lifecycle = await workOrderLifecycleStatesFor(
-        db, STARK_ORGANIZATION, seededWorkOrderId,
+    const lifecycle = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, seededWorkOrderId,
     );
     assert(
         lifecycle.length > 0,
         'seeded traces must derive from transition ops',
     );
-    await assertHistoryParity(
-        db, STARK_ORGANIZATION, seededWorkOrderId,
+    // The versions read answers 200 for the seeded work order.
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, seededWorkOrderId,
     );
 });
 
@@ -654,7 +661,10 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
         ),
     ));
     assertStrictEquals(created.status, 201);
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    // The versions read answers 200 at each step below.
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     const transition1 = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -669,7 +679,9 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
     ));
     assertStrictEquals(transition1.status, 200);
     await transition1.body?.cancel();
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     const transition2At = nowUtc();
     const releaseAt = nowUtc();
@@ -690,7 +702,9 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
     ));
     assertStrictEquals(transition2.status, 200);
     await transition2.body?.cancel();
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     // The MOVING lock_timeout case: an entity PUT shrinks
     // lock_timeout mid-history — every claim below must source it
@@ -706,7 +720,9 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
         await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(entityPut.status, 200);
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     const freshClaimAt = nowUtc();
     const freshClaim = await handleRequest(db, req(
@@ -721,14 +737,16 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
         await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(freshClaim.status, 200);
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     // An idempotent re-claim: the SAME actor resends its
     // claim, milliseconds later — 0 events, well within the
     // (now tiny) lock_timeout.
     const beforeRepeat = (
-        await workOrderLifecycleStatesFor(
-            db, STARK_ORGANIZATION, workOrderId,
+        await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, workOrderId,
         )
     ).length;
     const repeatClaim = await handleRequest(db, req(
@@ -743,8 +761,8 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
         await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(repeatClaim.status, 200);
-    const afterRepeat = await assertHistoryParity(
-        db, STARK_ORGANIZATION, workOrderId,
+    const afterRepeat = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
     );
     assertStrictEquals(afterRepeat.length, beforeRepeat);
 
@@ -770,8 +788,8 @@ Deno.test('case 4b: work-order live-write chain — birth-claimed'
         await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(takeover.status, 200);
-    const finalHistory = await assertHistoryParity(
-        db, STARK_ORGANIZATION, workOrderId,
+    const finalHistory = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
     );
     assertEquals(
         finalHistory.slice(-2).map((row) => row.state),
@@ -821,12 +839,13 @@ async () => {
     assertStrictEquals(claim.status, 200);
     await claim.body?.cancel();
 
-    const derived = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, workOrderId,
+    const derived = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
     );
     // Three births, the release, the live claim.
-    // The three births share one `at`, so history orders them
-    // by id; the release and the claim follow in time.
+    // The three births share one `at` and come back in chain
+    // order, so they compare as a sorted set; the release and
+    // the claim follow in time.
     const states = derived.map((row) => row.state);
     assertEquals(
         states.slice(0, 3).sort(),
@@ -883,7 +902,10 @@ async () => {
         ),
     ));
     assertStrictEquals(created.status, 201);
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    // The versions read answers 200 at each step below.
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -898,7 +920,9 @@ async () => {
         await headTag(db, token, workOrderId),
     ));
     assertStrictEquals(claim.status, 200);
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
+    );
 
     // The named release: DELETE organizations/:id/work-orders/:id/claim.
     const released = await handleRequest(db, req(
@@ -911,8 +935,8 @@ async () => {
     ));
     assertStrictEquals(released.status, 200);
     await released.body?.cancel();
-    const afterRelease = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, workOrderId,
+    const afterRelease = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
     );
     assertEquals(
         afterRelease.map((row) => row.state),
@@ -942,8 +966,8 @@ async () => {
     assertStrictEquals(reclaimed.status, 200);
     await reclaimed.body?.cancel();
 
-    const derived = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, workOrderId,
+    const derived = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
     );
     // The expiry-interaction pin: the fresh claim lands as a
     // PLAIN 'claimed' event, never preceded by a synthetic
@@ -1226,9 +1250,13 @@ Deno.test('case 6: the state_field_values JOIN — WO01\'s derived'
 + ' history resolves field values on the message plane; seed'
 + ' leaf pairs total 7', async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+    );
     const workOrderId = buildWorkOrders()[0]!.id;
-    await assertHistoryParity(
-        db, STARK_ORGANIZATION, workOrderId,
+    // The versions read answers 200 for the seeded work order.
+    await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, workOrderId,
     );
 
     const history = await workOrderHistoryFor(

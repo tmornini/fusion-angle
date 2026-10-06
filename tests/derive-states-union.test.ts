@@ -9,13 +9,14 @@ import {
     organizationToken,
 } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
     DEFAULT_LOCK_TIMEOUT, nowUtc, SYSTEM_MEMBER_ID,
 } from '../shared/types.ts';
 import {
     deriveInvitationStates,
-    workOrderLifecycleStatesFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import {
@@ -765,8 +766,10 @@ async () => {
     const agentBody = await agent.json() as { id: string };
     assertStrictEquals(agentBody.id, fx.aiMemberId);
     assertEquals(
-        (await workOrderLifecycleStatesFor(
-            fx.db, fx.organizationA, fx.workOrderId,
+        (await getWorkOrderEvents(
+            fx.db,
+            await organizationToken(fx.adminA, fx.organizationA),
+            fx.organizationA, fx.workOrderId,
         )).map((row) => row.id),
         [...fx.workOrderEventIds],
     );

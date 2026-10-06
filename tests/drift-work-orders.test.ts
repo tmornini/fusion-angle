@@ -39,7 +39,6 @@ import { deriveFlowWorkOrders } from
 import {
     missedReadError,
     workOrderHeadFor,
-    workOrderLifecycleStatesFor,
 } from '../api/derive-states.ts';
 import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import {
@@ -58,6 +57,8 @@ import {
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
@@ -698,10 +699,10 @@ async () => {
     // The full chain: create(3) + transition1(1) +
     // transition2(2) + entity PUT(0) + fresh claim(1) +
     // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
-    // Release is message-plane-only — pin via lifecycle derive.
+    // Release is message-plane-only — pin via the versions read.
     assertStrictEquals(
-        (await workOrderLifecycleStatesFor(
-            db, STARK_ORGANIZATION, workOrderId,
+        (await getWorkOrderEvents(
+            db, tokenA, STARK_ORGANIZATION, workOrderId,
         )).length,
         8,
     );
@@ -780,8 +781,8 @@ Deno.test('duplicate-create: two creates, same work-order id, fresh'
     // Phase Final Stage B: work_orders table retired.
 
     assertStrictEquals(
-        (await workOrderLifecycleStatesFor(
-            db, STARK_ORGANIZATION, workOrderId,
+        (await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, workOrderId,
         )).length,
         3,
     );

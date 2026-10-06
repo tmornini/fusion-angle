@@ -25,8 +25,8 @@ import {
 const OTHER = generateIdentifier();
 const FLOW_ID = generateIdentifier();
 const N_CREATE = generateIdentifier();
-import { workOrderLifecycleStatesFor } from
-    '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import { operationIdHeader } from
@@ -131,8 +131,8 @@ async function claimEventsFor(
     member_id: string;
     at: string;
 }[]> {
-    const all = await workOrderLifecycleStatesFor(
-        db, STARK_ORGANIZATION, WO_ID,
+    const all = await getWorkOrderEvents(
+        db, DEV_TOKEN, STARK_ORGANIZATION, WO_ID,
     );
     assertEquals(
         all.slice(0, SEEDED_EVENTS).map((event) => event.state),

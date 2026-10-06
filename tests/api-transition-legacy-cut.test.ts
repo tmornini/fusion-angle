@@ -24,8 +24,8 @@ import {
 } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-import { workOrderLifecycleStatesFor } from
-    '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -171,8 +171,8 @@ async () => {
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
     assertStrictEquals(err.error, RETIRED_MESSAGE);
-    const events = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION, WO_ID,
+    const events = await getWorkOrderEvents(
+        db, DEV_TOKEN, ORGANIZATION, WO_ID,
     );
     // The three births and the release; the 400 adds none.
     assertStrictEquals(events.length, 4);

@@ -10,9 +10,8 @@ import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../shared/types.ts';
-import {
-    workOrderLifecycleStatesFor,
-} from '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -43,7 +42,7 @@ const WORKORDERID_TE1 = generateIdentifier();
 const WORKORDERID_TE2 = generateIdentifier();
 const WORKORDERID_REL1 = generateIdentifier();
 
-// The work-order lifecycle derivation — the version chain's
+// The work-order history — the version chain's
 // own events, oldest first: create, claim, transition, and
 // release each land a version (§5).
 
@@ -206,8 +205,8 @@ Deno.test('a live create births exactly the three initial state'
     ));
     assertStrictEquals(created.status, 201);
 
-    const derived = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION_A, workOrderId,
+    const derived = await getWorkOrderEvents(
+        db, token, ORGANIZATION_A, workOrderId,
     );
     // Phase Final Task 2: states ROW half stripped.
     assertStrictEquals(derived.length, 3);
@@ -237,8 +236,8 @@ Deno.test('a created work order whose birth claim is released'
     });
 
     assertEquals(
-        (await workOrderLifecycleStatesFor(
-            db, ORGANIZATION_A, workOrderId,
+        (await getWorkOrderEvents(
+            db, token, ORGANIZATION_A, workOrderId,
         )).map((row) => row.state),
         SEEDED_STATES,
     );
@@ -315,8 +314,8 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
     ));
     assertStrictEquals(claim2.status, 200);
 
-    const derived = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION_A, workOrderId,
+    const derived = await getWorkOrderEvents(
+        db, token, ORGANIZATION_A, workOrderId,
     );
     assert(derived.length >= 0); // Phase Final Task 2: row plane empty
     assertEquals(
@@ -350,7 +349,7 @@ Deno.test('claim → release → reclaim derives claimed,'
     });
 
     // A release with no live claim answers the head and
-    // stores nothing; derive holds only the seeded events.
+    // stores nothing; the versions hold only the seeded events.
     const bareRelease = await handleRequest(db, req(
         'DELETE',
         workOrderPath(workOrderId, '/claim'),
@@ -361,8 +360,8 @@ Deno.test('claim → release → reclaim derives claimed,'
     assertStrictEquals(bareRelease.status, 200);
     await bareRelease.body?.cancel();
     assertEquals(
-        (await workOrderLifecycleStatesFor(
-            db, ORGANIZATION_A, workOrderId,
+        (await getWorkOrderEvents(
+            db, token, ORGANIZATION_A, workOrderId,
         )).map((row) => row.state),
         SEEDED_STATES,
     );
@@ -407,8 +406,8 @@ Deno.test('claim → release → reclaim derives claimed,'
     assertStrictEquals(claim2.status, 200);
     await claim2.body?.cancel();
 
-    const derived = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION_A, workOrderId,
+    const derived = await getWorkOrderEvents(
+        db, token, ORGANIZATION_A, workOrderId,
     );
     assertEquals(
         derived.map((row) => row.state),
@@ -483,8 +482,8 @@ Deno.test('a transition, then a transition with release ends the'
     assertStrictEquals(transition2.status, 200);
     await transition2.body?.cancel();
 
-    const derived = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION_A, workOrderId,
+    const derived = await getWorkOrderEvents(
+        db, token, ORGANIZATION_A, workOrderId,
     );
     // Phase Final Task 2: states ROW half stripped.
     // 3 births + transition1 (1, no release) + transition2
@@ -495,8 +494,8 @@ Deno.test('a transition, then a transition with release ends the'
 // -- 6. created work order + live claim --------------------------
 
 Deno.test('a created work order (three births and a release)'
-+ ' plus a live claim — every event rides the lifecycle'
-+ ' reader, in order, with distinct ids', async () => {
++ ' plus a live claim — every event rides the versions'
++ ' read, in order, with distinct ids', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
     const workOrderId = generateIdentifier();
@@ -531,8 +530,8 @@ Deno.test('a created work order (three births and a release)'
     assertStrictEquals(claim.status, 200);
     await claim.body?.cancel();
 
-    const ours = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION_A, workOrderId,
+    const ours = await getWorkOrderEvents(
+        db, token, ORGANIZATION_A, workOrderId,
     );
     // Three births, the release, the live claim.
     assertEquals(

@@ -4,9 +4,6 @@ import {
     assertMatch,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    workOrderLifecycleStatesFor,
-} from '../api/derive-states.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postBootstrap } from '../api/mock-data.ts';
 import { handleRequest } from '../api/api.ts';
@@ -19,6 +16,8 @@ import {
     apiRequest, messageOfResponse,
 } from './http-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     seededMockDb, sharedMockDb, testHashPassword,
 } from './mock-seed.ts';
@@ -701,7 +700,7 @@ Deno.test('a seeded work order\'s first trace event rides its'
 });
 
 Deno.test('a seeded transition pair\'s stored request'
-+ ' requester_identity_id matches its derived event\'s'
++ ' requester_identity_id matches its recorded event\'s'
 + ' member_id (the role-grant precedent: fingerprints hash'
 + ' ids only, so a wrong-but-real member_id is otherwise'
 + ' fingerprint-invisible)', async () => {
@@ -712,11 +711,14 @@ Deno.test('a seeded transition pair\'s stored request'
         requests, firstTrace.id,
     );
     assert(row, 'no request row for the seeded transition');
-    const lifecycle = await workOrderLifecycleStatesFor(
-        db, STARK_ORGANIZATION, firstTrace.entity_id,
+    const token = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-    const written = lifecycle.find(s => s.id === firstTrace.id)!;
-    assert(written, 'derived state missing');
+    const events = await getWorkOrderEvents(
+        db, token, STARK_ORGANIZATION, firstTrace.entity_id,
+    );
+    const written = events.find(s => s.id === firstTrace.id)!;
+    assert(written, 'no versions event for the seeded transition');
     assertStrictEquals(row!.requester_identity_id, written.member_id);
     // Index 0 rides its work order's create, requested by
     // the trace's first member; index 2 is the same work
@@ -730,11 +732,12 @@ Deno.test('a seeded transition pair\'s stored request'
         divergingRow,
         'no request row for the diverging transition',
     );
-    const divergingLifecycle =
-        await workOrderLifecycleStatesFor(
-            db, STARK_ORGANIZATION, divergingTrace.entity_id,
+    const divergingEvents =
+        await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION,
+            divergingTrace.entity_id,
         );
-    const divergingWritten = divergingLifecycle.find(
+    const divergingWritten = divergingEvents.find(
         s => s.id === divergingTrace.id,
     )!;
     assertStrictEquals(

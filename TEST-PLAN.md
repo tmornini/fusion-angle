@@ -4520,10 +4520,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        organizations/:id/work-orders/:id/history returns
        200 DESC rows; row[0] is current; transition
        carries field_values; claim rows carry []';
-       tests/derive-work-order-lifecycle-for.test.ts
-       'workOrderHistoryFor: folds field_values onto
-       transition events, [] on claim/birth/release, DESC
-       current-first'; exploratory — that no app code path
+       exploratory — that no app code path
        ever mutates an existing pair (an architectural
        invariant, not a single assertion)
 - [ ] **WB19a — Two-tab 412 on the action screen.**

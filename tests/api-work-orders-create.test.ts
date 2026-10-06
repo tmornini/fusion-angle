@@ -1,6 +1,6 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
-import { workOrderLifecycleStatesFor } from
-    '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { handleRequest } from '../api/api.ts';
 import { GET, GETCollection, POST } from './in-page-facade.ts';
 import { apiRequest, pairIdOf } from './http-fixtures.ts';
@@ -15,7 +15,6 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
 import type {
-    StateEntity,
     WorkOrderFlowGraph,
 } from '../shared/types.ts';
 import { generateIdentifier } from
@@ -163,8 +162,9 @@ Deno.test(
         assertStrictEquals(links[0]!.flow_id, 'ZOousbbnzpqlxJExVAruYQ');
         assertStrictEquals(links[0]!.work_order_id, WO_ID);
 
-        const events = await workOrderLifecycleStatesFor(db
-            , 'AjdvjuECVZEgZoFajaIEkg', WO_ID);
+        const events = await getWorkOrderEvents(
+            db, DEV_TOKEN, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,
+        );
         // Phase Final Stage B: states table retired.
         assertStrictEquals(events.length, 3);
         // The three events land IN ORDER: start, post-start,
@@ -175,7 +175,7 @@ Deno.test(
         assertStrictEquals(byId.get(EV_3)!.state, 'claimed');
         // Every event is authored by the verified caller, never
         // the body.
-        for (const ev of events as StateEntity[]) {
+        for (const ev of events) {
             assertStrictEquals(ev.member_id, 'XXZruirZyAOoRpNxaDnpSA');
         }
     },
@@ -191,13 +191,12 @@ Deno.test(
             DEV_TOKEN,
             operationIdHeader());
 
-        const events = await workOrderLifecycleStatesFor(db
-            , 'AjdvjuECVZEgZoFajaIEkg', WO_ID);
+        const events = await getWorkOrderEvents(
+            db, DEV_TOKEN, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,
+        );
         // Phase Final Stage B: states table retired.
         assertStrictEquals(events.length, 3);
-        const byId = new Map(
-            (events as StateEntity[]).map(e => [e.id, e]),
-        );
+        const byId = new Map(events.map(e => [e.id, e]));
         // Each event must carry the exact caller-supplied at,
         // not a server-stamped value.
         assertStrictEquals(
@@ -233,8 +232,8 @@ Deno.test(
                 + WO_ID, DEV_TOKEN,
                 operationIdHeader())).body().toValue();
         assertStrictEquals(wo.id, WO_ID);
-        const woEvents = await workOrderLifecycleStatesFor(
-            db, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,
+        const woEvents = await getWorkOrderEvents(
+            db, DEV_TOKEN, 'AjdvjuECVZEgZoFajaIEkg', WO_ID,
         );
         assertStrictEquals(woEvents.length, 3);
     },

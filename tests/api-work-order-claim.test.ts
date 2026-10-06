@@ -18,7 +18,7 @@ import {
     nowUtc,
     resetClock,
     setClockForTest,
-    type StateEntity,
+    type WorkOrderEventEntity,
 } from '../shared/types.ts';
 import {
     apiRequest,
@@ -32,8 +32,8 @@ const OTHER = generateIdentifier();
 const PRIOR_HOLDER = generateIdentifier();
 const FLOW_ID = generateIdentifier();
 const N_CREATE = generateIdentifier();
-import { workOrderLifecycleStatesFor } from
-    '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import { operationIdHeader } from
@@ -136,9 +136,9 @@ const SEEDED_EVENTS = 4;
 // DELETE organizations/:id/work-orders/:id/claim.
 async function claimEventsFor(
     db: MemoryDbAdapter,
-): Promise<StateEntity[]> {
-    const all = await workOrderLifecycleStatesFor(
-        db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
+): Promise<WorkOrderEventEntity[]> {
+    const all = await getWorkOrderEvents(
+        db, DEV_TOKEN, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
     );
     assertEquals(
         all.slice(0, SEEDED_EVENTS).map((event) => event.state),
