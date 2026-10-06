@@ -3388,23 +3388,6 @@ async function postInstanceCreateOp(
     });
 }
 
-// Gone only after the owner check passes: a foreign
-// organization's retired instance answers as its live one
-// does, so a 410 never reveals that it existed.
-async function retiredInstanceError(
-    db: DbAdapter,
-    instanceId: Id,
-    organization: Id,
-): Promise<RetiredEntityError | ForeignOrganizationError> {
-    const missed = await missedReadError(
-        db, instanceId, organization, 'record_instances',
-    );
-    if (missed instanceof ForeignOrganizationError) {
-        return missed;
-    }
-    return new RetiredEntityError('record_instances', instanceId);
-}
-
 // Instance update: PATCH with If-Match (§1 C). The handler
 // reads the head to merge; the statement judges the tag.
 export async function postInstancePatchOp(
@@ -3444,7 +3427,9 @@ export async function postInstancePatchOp(
         head === undefined
         && await documentHeadAt(db, prefix, instanceId) !== null
     ) {
-        throw await retiredInstanceError(db, instanceId, org);
+        throw new RetiredEntityError(
+            'record_instances', instanceId,
+        );
     }
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
@@ -4823,9 +4808,7 @@ export const routes: Route[] = [
     // Nested instance versions. Each stored PUT is served
     // as the detail GET serves the head, projected by the
     // reader's current attribute schema, oldest first.
-    // Parent type miss first. A tombstone is Gone only
-    // after the owner probe, so a foreign retired
-    // instance stays 403.
+    // Parent type miss first. A tombstone is Gone.
     route(INSTANCE_VERSIONS_PATTERN, {
         select: async (
             db, p, _actor, organization, roles,
@@ -4857,15 +4840,12 @@ export const routes: Route[] = [
                     );
                 },
             );
-            // The gate's own 410 would skip the owner
-            // probe, and a foreign retired instance must
-            // answer 403.
             if (
                 selection.kind !== 'collection'
                 && selection.head.method === 'DELETE'
             ) {
-                throw await retiredInstanceError(
-                    db, instanceId, organizationId,
+                throw new RetiredEntityError(
+                    'record_instances', instanceId,
                 );
             }
             return selection;
@@ -4904,15 +4884,12 @@ export const routes: Route[] = [
                     );
                 },
             );
-            // The gate's own 410 would skip the owner
-            // probe, and a foreign retired instance must
-            // answer 403.
             if (
                 selection.kind !== 'collection'
                 && selection.head.method === 'DELETE'
             ) {
-                throw await retiredInstanceError(
-                    db, instanceId, organizationId,
+                throw new RetiredEntityError(
+                    'record_instances', instanceId,
                 );
             }
             return selection;
@@ -4961,11 +4938,9 @@ export const routes: Route[] = [
                     'record_instances',
                 );
             }
-            // The gate's own 410 would skip the owner probe,
-            // and a foreign retired instance must answer 403.
             if (head.method === 'DELETE') {
-                throw await retiredInstanceError(
-                    db, instanceId, organizationId,
+                throw new RetiredEntityError(
+                    'record_instances', instanceId,
                 );
             }
             return {
