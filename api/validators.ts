@@ -3586,15 +3586,14 @@ const WORK_ORDER_CREATE_KEYS: readonly string[] = [
     'stateEventIds', 'stateEventAts', 'states',
 ];
 
-// The HTTP-body gate for POST /work-orders: the work_orders
-// row, its flow_work_orders join row, and THREE initial state
-// events (start, post-start, claimed), written atomically. The
-// facet fields are NOT fully validated here — the work_orders
-// store stamps organization_id from the verified token and
-// re-validates through validateWorkOrderEntity AFTER the stamp
-// (so the body OMITS organization_id), and the flow_work_orders
-// store re-validates the join through validateFlowWorkOrderEntity
-// when the composing POST puts it. The three event ids and
+// The HTTP-body gate for POST /work-orders: the work order,
+// its flow_work_orders join, and THREE initial state events
+// (start, post-start, claimed), written atomically. The
+// facet fields are NOT validated here: the route gates
+// them through validateWorkOrderDocumentBody and stamps
+// organization_id from the verified token (so the body
+// OMITS organization_id), and gates the join through
+// validateFlowWorkOrderEntity. The three event ids and
 // states ride parallel arrays, applied IN ORDER; authorship of
 // every event is stamped from the verified caller in the route,
 // never the body. The arrays must be equal length and exactly
