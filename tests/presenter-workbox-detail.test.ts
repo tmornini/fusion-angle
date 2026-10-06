@@ -15,13 +15,15 @@ import {
     type AttributeType,
     type Id,
     type Member,
+    type WorkOrderEventEntity,
 } from '../shared/types.ts';
-import type {
-    CreationTransition,
-    StepTransition,
-    TransitionEvent,
-    StateFieldValue,
-    WorkOrder,
+import {
+    fieldValuesByEventFromHistory,
+    type CreationTransition,
+    type StepTransition,
+    type TransitionEvent,
+    type StateFieldValue,
+    type WorkOrder,
 } from
 '../client/work-orders-queries.ts';
 import type {
@@ -865,6 +867,47 @@ Deno.test(
         assert(
             out.indexOf('Bo Park')
             < out.indexOf('Ada Park'),
+        );
+    },
+);
+
+Deno.test(
+    'buildPage history shows a cleared field value'
+    + ' as cleared',
+    () => {
+        const notesAttr = makeAttribute({
+            id: 'a-notes', name: 'Notes',
+        });
+        const graph = makeFlowGraph({
+            nodes: [
+                makeNode({ id: 'n-1', name: 'Triage' }),
+            ],
+        });
+        const events: WorkOrderEventEntity[] = [{
+            id: 't-1',
+            state: 'n-1',
+            member_id: 'pjQzgITAPDQVyvCVpzpIfQ',
+            at: '2026-04-01T12:00:00.000000Z',
+            field_values: [{
+                id: 'fv-1',
+                attribute_id: 'a-notes',
+                cleared: true,
+            }],
+        }];
+        const presenter = makePresenter({
+            graph,
+            transitions: [makeCreation()],
+            fieldValues:
+                fieldValuesByEventFromHistory(events),
+            attributes: [notesAttr],
+        });
+        const out = presenter.buildPage().toString();
+        assertMatch(
+            out,
+            new RegExp(
+                '>Notes</span>\\s*<span class="text-muted'
+                + ' italic">cleared</span>',
+            ),
         );
     },
 );

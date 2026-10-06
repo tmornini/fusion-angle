@@ -435,17 +435,17 @@ export interface StateEntity {
 // carries id). Distinct from StateFieldValueEntity,
 // which still carries state_event_id for the transition-body
 // validator and the seed's legacy trace bags.
-export interface TransitionFieldValueEntity {
-    id: Id;
-    attribute_id: Id;
-    // Present on set rows (legacy + new-shape). New-shape
-    // clear rows omit the key at runtime (cleared: true);
-    // typed required so legacy consumers stay string-narrow.
-    value: string;
-    // New-shape clear marker only; legacy rows never carry it
-    // so their wire bytes stay unchanged (JSON omits absent).
-    readonly cleared?: true;
-}
+export type TransitionFieldValueEntity =
+    | {
+        id: Id;
+        attribute_id: Id;
+        value: string;
+    }
+    | {
+        id: Id;
+        attribute_id: Id;
+        readonly cleared: true;
+    };
 
 // One event a work-order version recorded (spec §4): a
 // move into a node, or a claim's birth, release, or

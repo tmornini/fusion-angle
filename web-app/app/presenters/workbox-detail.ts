@@ -644,7 +644,9 @@ export class WorkboxDetailPresenter {
                     <span
                         class="text-muted"
                     >${fv.fieldName}</span>
-                    <span>${fv.value}</span>`,
+                    ${'cleared' in fv
+                        ? html`<span class="text-muted italic">cleared</span>`
+                        : html`<span>${fv.value}</span>`}`,
                 )}
             </div>`
             : html``;
@@ -801,10 +803,17 @@ function buildHistory(
                         + row.attributeId,
                 );
             }
-            fieldValues.push({
-                fieldName: attribute.name,
-                value: row.value,
-            });
+            fieldValues.push(
+                'cleared' in row
+                    ? {
+                        fieldName: attribute.name,
+                        cleared: true,
+                    }
+                    : {
+                        fieldName: attribute.name,
+                        value: row.value,
+                    },
+            );
         }
         return {
             fromNodeName:
