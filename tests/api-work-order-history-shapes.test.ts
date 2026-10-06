@@ -317,7 +317,7 @@ async () => {
     assert(other !== undefined);
     assert(row !== undefined);
     assertEquals(other!.field_values, []);
-    assertEquals<unknown>(row!.field_values, [
+    assertEquals(row!.field_values, [
         { id: 'UQTJZvCoKlFjEoDlDUwekw'
             , attribute_id: 'UQTJZvCoKlFjEoDlDUwekw', value: 'y' },
         { id: 'UZgNCkZlSJcSaAmAJuSkcw'
@@ -397,7 +397,7 @@ async () => {
         Object.hasOwn(legacy!.field_values[0]!, 'cleared'),
         false,
     );
-    assertEquals<unknown>(neu!.field_values, [
+    assertEquals(neu!.field_values, [
         { id: ATTR_B0!, attribute_id: ATTR_B0!, cleared: true },
         { id: ATTR_B1!, attribute_id: ATTR_B1!, value: 'q' },
         { id: ATTR_B2!, attribute_id: ATTR_B2!, value: 'p' },
