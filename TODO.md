@@ -3254,6 +3254,27 @@ Off the critical path; each with its oracle.
   at least as strong, then delete all three. Oracle: `git
   grep -nw` finds none of the three names under `api/` or
   `tests/`.
+- The work-order gates check no node and no edge.
+  `assertRequiredAttributesAtExit` (`api/routes.ts`) returns
+  when the head's `state` names no node in its frozen
+  `flow_graph`, so the required-at-exit check is skipped
+  silently for that head. No gate would stop it:
+  `validateWorkOrderCreateBody` checks `states` only as
+  non-empty strings, and `validateWorkOrderInstanceTransitionBody`
+  and `postWorkOrderTransitionOp` (`api/validators.ts`,
+  `api/routes.ts`) check `targetState` only as non-empty, with
+  no edge from the head's `state`, and `postWorkOrderDocumentOp`
+  (`api/routes.ts`) lays a PUT's `flow_graph` over the head
+  without checking that `state` still names a node. Nothing
+  compares the browser-minted `transitionAt` with the head's
+  `transition.at` either. The inbox's static degraded row for an unplaced head
+  contains the gap; it does not close it. Plan gate validation
+  (node, edge, and `transitionAt`; real graphs in fixtures) as
+  its own spec; it decides whether a skewed `transitionAt` is
+  refused or clamped. Oracle: a create or transition naming a
+  node absent from the graph, a transition with no edge from
+  the head's `state`, or a PUT whose `flow_graph` drops the
+  head's `state`, is refused at the gate.
 
 ## Sequencing
 
