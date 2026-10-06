@@ -3124,6 +3124,17 @@ Off the critical path; each with its oracle.
   identity did not accept reads pending until it does,
   or the owner rules the direct seat a deliberate power
   and TEST-PLAN.md says so
+- Flow stats read every work order's `versions/`, one
+  collection read per work order
+  (`web-app/app/flow-stats.ts:59`), to chart whole
+  timelines; work-order events left a collection-wide
+  read as its own question (`docs/superpowers/specs/`
+  `2026-10-04-work-order-events-design.md:193-195`).
+  Measured first: a flow with many work orders under
+  `./bin/measure`. Oracle: the stats page's reads grow
+  with the flow, not with its work orders, or the
+  measurement says the fan-out costs nothing a person
+  sees
 
 ## Sequencing
 
