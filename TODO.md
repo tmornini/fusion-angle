@@ -2616,7 +2616,7 @@ Off the critical path; each with its oracle.
   password in the URL and finds the password in no
   message
 - One rehearsal per test process, if measurement earns
-  it. `tests/` calls `seededMockDb()` at 59 sites, and
+  it. `tests/` calls `seededMockDb()` at 96 sites, and
   `sharedMockDb()` seeds once per worker that uses it;
   each builds the identical dataset from nothing: hash,
   form, rehearse, land. A landing onto an absent table
