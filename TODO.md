@@ -994,29 +994,54 @@ Off the critical path; each with its oracle.
   foreign organization's retired document answers what
   its live one does; history and past versions answer
   410 with the document.
-- Admins act within their organization. The gate's
-  self-or-admin guard (`api/api.ts` Region B,
-  `SELF_ONLY_TOKEN_ROUTES`: the token revocation
-  document's PUT and the rotation and revocation POSTs)
-  lets a member name only its own identity but lets an
-  admin name any identity, whether or not it holds an
-  accepted membership in the admin's organization:
-  `callerIsAdmin` is the organization-scoped `admin`
-  role from the verified claim, and nothing compares
-  the path identity's memberships to that
-  organization. An organization's admin can so
-  rotate or revoke the token chain of an identity
-  outside it. Scope the admin arm to identities with
-  an accepted membership in the claim's organization,
-  keeping the root operator's reach only where its
-  own role says so, and sweep every other
-  admin-reachable `identities/:id/…` write for the
-  same reach. Oracle: on each guarded route, an
-  organization admin naming an identity with no
-  accepted membership in its organization is 403
-  before any read; naming one that holds one is
-  unchanged; the root operator's cross-organization
-  reach, where kept, is pinned by name.
+- Admins act within their organization. Any
+  organization's admin can write a password credential
+  for an identity in another organization and sign in
+  as it. `ROUTE_POLICY` grants `admin` every verb at
+  `/` (`api/authorization.ts:180-184`); `identities/…`
+  is the global plane, which the organization fence
+  never sees; and the credential PUT checks nothing —
+  `postIdentityCredentialDocumentOp`
+  (`api/routes.ts:2610`) ignores the path identity and
+  the actor and lands the body, whose `secret` the gate
+  checks only as a string (`api/validators.ts:587`) —
+  while sign-in reads that identity's own credentials
+  (`deriveCredentialsFor`, `api/authentication.ts:1729`).
+  Found by reading the code; no test drives either
+  answer. The same unscoped arm reaches the token chain:
+  the gate's self-or-admin guard
+  (`SELF_ONLY_TOKEN_ROUTES`, `api/api.ts:430-434`,
+  checked at `:807-845`) lets an admin name any
+  identity, `callerIsAdmin` being the claim
+  organization's `admin` role (`:701-702`), so an
+  organization's admin can rotate or revoke the token
+  chain of an identity outside it. The sweep covers
+  every other admin-reachable `identities/:id/…` write
+  — the identity PUT (`api/routes.ts:3595`), PII PUT and
+  DELETE (`:3690-3694`; `authorizeIdentityPii`,
+  `api/request-auth.ts:160-176`, admits any admin),
+  credentials (`:3793`), registration (`:3826`,
+  `:3833`), tokens (`:3911`), and providers (`:4019`) —
+  and `GET identities/`, which serves the stored heads
+  at the global prefix whatever the caller's
+  organization (`api/routes.ts:3509-3514`). The reads of
+  PII and credentials carry a membership fence
+  (`:3659-3686`, `:3774-3785`) that admits an identity
+  with no membership. No root operator exists: the `/`
+  tier every organization admin holds is the only
+  cross-organization reach (`api/authorization.ts:172-186`).
+  Scope the admin arm to identities with an accepted
+  membership in the claim's organization; member
+  creation lands the identity before its membership
+  (`postHumanMemberCreation`, `client/members.ts:276`),
+  so the brainstorm orders that, and decides whether a
+  cross-organization operator should exist at all.
+  Oracle: a red test first plants a credential across
+  organizations and signs in with it; then, on each
+  route above, an organization admin naming an identity
+  with no accepted membership in its organization is
+  403 before any read or write, and naming one that
+  holds one is unchanged.
 - Instances and bound work orders name the record-type
   version they were written against. An instance's state
   is `{ id, organization_id, record_type_id, values }`
