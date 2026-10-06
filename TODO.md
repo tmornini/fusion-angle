@@ -1205,10 +1205,13 @@ Off the critical path; each with its oracle.
   numbers in the sweep's JSON and a backup-size line item 6
   can plan against.
 - Request statistics in `./bin/measure`, with
-  visualizations. `handleRequest` (`api/api.ts`) is the one
-  seam: the in-page transport and `server/http-server.ts`
-  both route through it, and `simulateLatency()` runs before
-  it, so a timer there measures the handler alone. Record
+  visualizations. `handleRequest` (`api/api.ts:446`) is
+  the one seam: `server/http-server.ts:681` routes the
+  product through it, and the tests' in-process
+  transport (`inProcessFetch`,
+  `tests/in-page-facade.ts:31-56`) does too, after
+  `simulateLatency()`, its only caller, so a timer there
+  measures the handler alone. Record
   per request: method, route family (ids folded to `:id`),
   status, handler ms, wall stamp. A throwaway probe on
   `packageable-client` (`ffa73bf4`, memory suite,
