@@ -1233,16 +1233,6 @@ Off the critical path; each with its oracle.
   Oracle: a Layer 1 case that an unauthenticated page
   script cannot mint a live access token from the
   cookie alone
-- Layer 2 on the exact-read landing. `./test browser`
-  has not run on master `66457197`; AGENTS.md makes it
-  the gate before `./bin/build`, a deploy, or a walk.
-  Interpretation (A) of the plan changed one visible
-  thing only Layer 2/3 can see: a successor's `parent:`
-  line on the Tokens page shows while the successor is
-  live and disappears once the successor is itself
-  rotated (TEST-PLAN.md G25 carries the caveat). The
-  `3aaee31` history row is a measure, not this gate.
-  Oracle: `./test browser` green on `66457197` or later
 - `render.yaml` Blueprint as a second source of
   truth for the dashboard service. Oracle: a
   committed `render.yaml` that matches the live
