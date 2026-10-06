@@ -266,12 +266,24 @@ De-membership, demotion, and revocation bite at next
 mint, refresh, or exchange, or access TTL (≤ 15 min).
 See [ARCHITECTURE.md](ARCHITECTURE.md) `## Tenancy`.
 
-### Write authorizer 403s before genesis
+### Foreign ids 404; foreign paths 403
 
-Org-scoped PUT / DELETE hit `writeAuthorizerFor` so a
-foreign id 403s rather than genesis-ing in the caller's
-namespace. Genuine absence still 404s. See
-`api/write-authorizer.ts`.
+The same id at two organizations is two documents.
+Under the caller's own path another organization's
+document does not exist. Where a PUT may create, a
+foreign-id PUT is the caller's own genesis (201, under
+the route's create precondition); where only a POST
+creates (a work order), a conditional PUT on a foreign
+id is 404. A foreign-id DELETE, claim, release, bind,
+or transition is 404 (RFC 9110 §15.5.4 lets a server
+hide existence, so no cross-tenant oracle). A foreign
+PATH is 403 at the organization fence in `api/api.ts`,
+and so is a membership name whose organization half is
+not the path's. Global-plane reads disclose an owner: a
+GET on a real organization the caller is no member of
+is 403 (an absent one 404), and so is a GET of a
+foreign identity's PII or credentials. The fence is the
+gate.
 
 ### HTTP only
 

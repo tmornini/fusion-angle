@@ -151,9 +151,11 @@ next mint/refresh/exchange or access-token expiry
 (`ACCESS_TTL_SECONDS`, 15 min in `api/authentication.ts`),
 not on the very next request.
 
-`writeAuthorizerFor` (`api/write-authorizer.ts`) 403s a
-foreign-id PUT/DELETE/PATCH before genesis in the caller's
-namespace. Read isolation: foreign 403, absent 404. Path
+A foreign id under the caller's own organization path
+is absent there: a write geneses or 404s, a read 404s.
+Global-plane reads (an organization document, an
+identity's PII or credentials) answer a foreign owner
+403, an absent one 404. Path
 `:organization-id` on an org-nested route must equal the
 claim org else 403. A membership name's organization
 half must equal the path's (403). Its identity half
