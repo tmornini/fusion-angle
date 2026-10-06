@@ -5139,12 +5139,6 @@ export const routes: Route[] = [
             );
         },
     }),
-    // GET is FLIPPED (Task 8): derived via
-    // documentCollectionGetHandler — wire-identical to the
-    // hand-written db.memberships.getAll() dispatch it replaces
-    // (memberships is organizationNested:true, so the derived
-    // prefix fences to the caller's org exactly as the
-    // org-scoped adapter already did for the hand-written read).
     // Invitation send nest. POST grants pending. PUT
     // revokes. Storage prefix stays /invitations/.
     route('organizations/:id/invitations/', {
