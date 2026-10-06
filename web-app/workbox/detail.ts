@@ -260,15 +260,13 @@ function initUnclaimButton(
         '#unclaim-btn', container,
     );
     if (!btn) return;
-    const claim = detail.claimStatus();
-    if (claim.kind !== 'claimed') return;
     btn.addEventListener(
         'click',
         async () => {
             const ctx = sessionContext();
             try {
-                await deleteWorkOrderClaim(
-                    ctx, detail.workOrder(),
+                await deleteWorkOrderClaimAtHead(
+                    ctx, detail.idValue(),
                 );
             } catch (err) {
                 reportFault(
@@ -284,6 +282,19 @@ function initUnclaimButton(
             );
             navigateTo('workbox');
         },
+    );
+}
+
+// A release judges the work order as it stands at the
+// click, not as this tab last painted it: a claim that
+// another tab already released answers 200 and stores
+// nothing.
+async function deleteWorkOrderClaimAtHead(
+    ctx: RequestContext,
+    workOrderId: string,
+): Promise<void> {
+    await deleteWorkOrderClaim(
+        ctx, await getWorkOrder(ctx, workOrderId),
     );
 }
 

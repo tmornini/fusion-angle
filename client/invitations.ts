@@ -14,6 +14,7 @@ import {
     RequestError,
     HTTP_NOT_FOUND,
     HTTP_CONFLICT,
+    HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -100,6 +101,17 @@ function invitationPath(ctx: RequestContext, id: Id): string {
     return 'identities/' + ctx.identity.id + '/invitations/' + id;
 }
 
+// One invitation as the invitee sees it now — the head
+// a refused answer is judged against.
+async function getInvitation(
+    ctx: RequestContext,
+    id: Id,
+): Promise<InvitationView> {
+    return inviteeViewOf(await ctx.GET<MembershipEntity>(
+        invitationPath(ctx, id),
+    ));
+}
+
 // The active organization's invitations in one state.
 // The organization box passes the selector's state.
 export async function getSentInvitations(
@@ -164,6 +176,22 @@ export class SessionRemintFailedError extends Error {
     }
 }
 
+// An answer latched on a head that has since moved. The
+// server stored nothing; `current` is the invitation as
+// it stands, for the page to hold in place of the row
+// it answered.
+export class InvitationChangedError extends Error {
+    readonly current: InvitationView;
+
+    constructor(current: InvitationView) {
+        super(
+            'the invitation changed before the answer'
+            + ' landed; it is now ' + current.state,
+        );
+        this.current = current;
+    }
+}
+
 // Accept an invitation — the server writes the membership in
 // the invitation's org (type:"member") and appends 'accepted'
 // in one atomic batch. Then remint via the refresh grant so
@@ -175,11 +203,26 @@ export async function postInvitationAcceptance(
 ): Promise<void> {
     const organizationId = invitation.message
         .body().toValue().organization_id;
-    await ctx.PUT(
-        invitationPath(ctx, invitation.id),
-        { state: 'accepted', at: nowUtc() },
-        [invitation.message],
-    );
+    try {
+        await ctx.PUT(
+            invitationPath(ctx, invitation.id),
+            { state: 'accepted', at: nowUtc() },
+            [invitation.message],
+        );
+    } catch (err) {
+        // A 412 names a head past the held one: read it
+        // and raise it as the refusal. Any other fault
+        // is its own.
+        if (
+            !(err instanceof RequestError)
+            || err.status !== HTTP_PRECONDITION_FAILED
+        ) {
+            throw err;
+        }
+        throw new InvitationChangedError(
+            await getInvitation(ctx, invitation.id),
+        );
+    }
     try {
         await remintSessionClaims(ctx, organizationId);
     } finally {

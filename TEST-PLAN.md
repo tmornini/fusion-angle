@@ -1207,7 +1207,12 @@ the second organization.
        mechanics); tests/browser/canvas-gestures.test.ts
        'Shift-drag adds an edge and Review accepts
        two attribute refs (AA32/AA33/AA34)';
-       exploratory — the live
+       tests/browser/canvas-gestures.test.ts 'a port
+       press under an open panel holds the camera
+       (AA32)' (decides the camera holds from
+       pointer-down to pointer-up with the panel open
+       on another selection, so the release lands on
+       the node aimed at); exploratory — the live
        dashed-orange vs. solid-blue preview rendering
 - [ ] **AA33** In the flow header, set the "Record:"
   dropdown to "Customer Profile" (Stark's seeded record
@@ -2933,7 +2938,12 @@ opens and renders.)
        persists it'; tests/browser/canvas-gestures.test.ts
        'a shift drag from a port onto a node commits an
        edge' (decides the same through a real compositor
-       drag: one more edge, no new node); exploratory — the
+       drag: one more edge, no new node);
+       tests/browser/canvas-gestures.test.ts 'a port
+       press after Auto Layout toggles holds the camera
+       (F19)' (decides the press after F18's toggles
+       moves no camera and the release lands on
+       Triage); exploratory — the
        grey-line-to-bezier preview transition
 - [ ] **F20** Shift-drag forward (earlier node →
   later node). PASS: the curved preview is solid
@@ -4663,25 +4673,40 @@ per-user visibility filter.
        signature is not something a `node:test` assertion
        decides
 - [ ] **WB23** Claim, release, and transition a work
-  order in two tabs: act in the first tab, then act on
-  the same work order in the second without reloading
-  it. PASS: each action reads the work order's head
-  when it is taken and latches that fresh tag, so the
-  second tab's action is judged against the first
-  tab's result rather than refused: a second claim
-  renews the holder's claim, a second release is a
-  200 no-op that stores nothing, and a second
-  transition lands on the fresh head. A value-bearing
-  transition also latches the instance tag the tab
-  loaded, so one sent over a changed instance shows
-  the 412 refusal. A reload shows the result.
-  Pin: tests/api-work-order-transition-instance.test.ts
+  order in two tabs of one cookie jar: act in the
+  first tab, then act on the same work order in the
+  second without reloading it. PASS: the second tab's
+  action is judged against the first tab's result
+  rather than refused. Claim: the second tab, opened
+  on the holder's live claim, shows the holder's
+  editable screen and appends no second claim (the
+  action screen claims on open only when the caller
+  holds no live claim). Release: after the first tab
+  releases, the second tab has repainted (a write
+  rings the same-origin bus); its Release reads the
+  work order's head at the click and DELETEs
+  `work-orders/:id/claim` latched on it — a 200 no-op
+  that stores nothing — then toasts "Work order
+  released" and lands on the inbox. Transition: after
+  the first tab transitions, the second tab has
+  repainted at the new state, and its transition
+  latches that head and lands. A value-bearing
+  transition sent over a changed instance shows the
+  412 refusal (WB19a's recovery). A reload shows the
+  result.
+  Pin: tests/browser/workbox-transition.test.ts 'a
+       second tab releases after the first released
+       (WB23)' (decides the second tab's Release sends
+       the DELETE, toasts, and lands on the inbox);
+       tests/api-work-order-release.test.ts 'a release
+       with no live claim answers the head' (decides
+       the 200 no-op stores nothing);
+       tests/api-work-order-transition-instance.test.ts
        'racing value-bearing transitions land once'
        (decides that of two transitions latched on one
        head, one lands and the other answers 412 with
        nothing stored); exploratory — the claim and
-       release races, the second tab's rendered
-       refusal, and the reload
+       transition halves, and the reload
 
 ---
 
@@ -5404,12 +5429,24 @@ FSM, unlike `flows/detail`).
   second cookie jar, open `invitations/index.html`.
   Revoke the pending invitation in the first tab, then
   click Accept on it in the second without reloading. PASS: the
-  accept refuses; the list shows it revoked.
+  accept refuses (PUT 412); the page re-reads the
+  invitation and repaints its row in place with the
+  Revoked badge and no Accept or Decline, and a
+  warning toast reads "This invitation changed — your
+  answer did not land". The list asks for pending
+  invitations only, so a reload drops the row.
   Pin: tests/api-invitation-document.test.ts 'a stale
        invitation tag is 412' (decides that an accept
        latched on the head before a revoke answers 412
-       and stores nothing); exploratory — the rendered
-       refusal and the revoked state on reload
+       and stores nothing);
+       tests/adapters-invitations.test.ts 'a stale
+       accept refuses with the invitation as it stands'
+       (decides the refusal carries the re-read revoked
+       invitation at its fresh tag);
+       tests/browser/invitations.test.ts 'an accept
+       over a revoke paints the row revoked (V10)'
+       (decides the repaint and the toast);
+       exploratory — the two-jar drive itself
 
 ### Member detail — Human (`members/detail.html?memberId=<hw_*>`)
 

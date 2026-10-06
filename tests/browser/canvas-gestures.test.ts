@@ -1,6 +1,7 @@
 import { assert, assertNotEquals, assertStrictEquals } from '@std/assert';
 import {
     SHIFT, useBrowser, withAdminPage, type Page,
+    type Point,
 } from './fixtures.ts';
 import {
     CANVAS, EDGE, NODE, ONBOARDING, LAYOUT_TEST,
@@ -10,6 +11,23 @@ import {
 } from './canvas.ts';
 
 const browser = useBrowser();
+
+const PANEL = '.flow-props-panel';
+const VIEWBOX =
+    `document.querySelector('${CANVAS}')`
+    + `.getAttribute('viewBox')`;
+
+// The properties panel covers the canvas's left edge;
+// a point under it lands on the panel, not the node.
+async function assertClearOfPanel(
+    page: Page, pt: Point,
+): Promise<void> {
+    const panel = await page.rect(PANEL);
+    assert(
+        pt.x > panel.x + panel.width,
+        `x ${pt.x} sits under the properties panel`,
+    );
+}
 
 Deno.test('a port drag onto empty canvas adds a node and its edge',
 async () => {
@@ -429,3 +447,111 @@ Deno.test(
         );
     },
 );
+
+Deno.test('a node click under an open panel centers it'
++ ' on release (F13)', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await openFlow(page, origin, ONBOARDING);
+        const review = await nodeIdNamed(page, 'Review');
+        const capture = await nodeIdNamed(
+            page, 'Data Capture',
+        );
+        await doubleClick(page, nodeSelector(review));
+        await page.waitFor(PANEL);
+        const before = await page.evaluate<string>(VIEWBOX);
+        const body = await page.center(
+            nodeSelector(capture),
+        );
+        await assertClearOfPanel(page, body);
+        await page.press(body);
+        await page.release(body);
+        await page.until(
+            `${VIEWBOX} !== ${JSON.stringify(before)}`,
+            'camera centred on Data Capture',
+        );
+    });
+});
+
+Deno.test('a port press under an open panel holds the'
++ ' camera (AA32)', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await openFlow(page, origin, ONBOARDING);
+        const nodes = await nodeCount(page);
+        const edges = await edgeCount(page);
+        const review = await nodeIdNamed(page, 'Review');
+        const capture = await nodeIdNamed(
+            page, 'Data Capture',
+        );
+        const archive = await nodeIdNamed(page, 'Archive');
+        // The panel opens on Review; the press then moves
+        // the selection to Data Capture, as AA31 → AA32.
+        await doubleClick(page, nodeSelector(review));
+        await page.waitFor(PANEL);
+        const before = await page.evaluate<string>(VIEWBOX);
+        // Aimed before the press, as a person aims.
+        const port = await page.center(
+            portSelector(capture),
+        );
+        const target = await page.center(
+            nodeSelector(archive),
+        );
+        await assertClearOfPanel(page, port);
+        await assertClearOfPanel(page, target);
+        await page.keyDown('Shift');
+        await page.press(port, SHIFT);
+        assertStrictEquals(
+            await page.evaluate<string>(VIEWBOX), before,
+        );
+        await page.move({
+            x: (port.x + target.x) / 2,
+            y: (port.y + target.y) / 2,
+        }, SHIFT);
+        await page.move(target, SHIFT);
+        await page.release(target, SHIFT);
+        await page.keyUp('Shift');
+        await page.until(
+            `document.querySelectorAll('${EDGE}').length`
+            + ` === ${edges + 1}`,
+            'one more edge',
+        );
+        assertStrictEquals(await nodeCount(page), nodes);
+    });
+});
+
+Deno.test('a port press after Auto Layout toggles holds'
++ ' the camera (F19)', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await openFlow(page, origin, LAYOUT_TEST);
+        // F18: off, then on — the second leaves the
+        // provisional node-bounds fit.
+        await page.click('#flow-auto-layout-switch');
+        await page.click('#flow-auto-layout-switch');
+        const nodes = await nodeCount(page);
+        const edges = await edgeCount(page);
+        const draft = await nodeIdNamed(page, 'Draft');
+        const triage = await nodeIdNamed(page, 'Triage');
+        const before = await page.evaluate<string>(VIEWBOX);
+        const port = await page.center(portSelector(draft));
+        const target = await page.center(
+            nodeSelector(triage),
+        );
+        await page.keyDown('Shift');
+        await page.press(port, SHIFT);
+        assertStrictEquals(
+            await page.evaluate<string>(VIEWBOX), before,
+        );
+        await page.move({
+            x: (port.x + target.x) / 2,
+            y: (port.y + target.y) / 2,
+        }, SHIFT);
+        await page.move(target, SHIFT);
+        await page.release(target, SHIFT);
+        await page.keyUp('Shift');
+        await page.until(
+            `document.querySelectorAll('${EDGE}').length`
+            + ` === ${edges + 1}`,
+            'one more edge',
+        );
+        assertStrictEquals(await nodeCount(page), nodes);
+    });
+});

@@ -115,3 +115,67 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'a second tab releases after the first released'
+    + ' (WB23)',
+    async () => {
+        await withAdminPage(
+            browser.get(),
+            async (page, origin) => {
+                await createOnboardingWorkOrder(
+                    page, origin.baseUrl,
+                );
+                const id = await page.evaluate<string>(
+                    `new URLSearchParams(location.search)`
+                    + `.get('id')`,
+                );
+                // Same browser context, same cookie jar,
+                // same member: disposed with the page.
+                const other = await browser.get()
+                    .newPageIn(page.contextId);
+                await other.navigate(registryUrl(
+                    origin.baseUrl, 'workbox-detail',
+                    'id=' + id,
+                ));
+                await other.ready('workbox-detail');
+                await other.waitFor('#unclaim-btn');
+                await other.evaluate(
+                    `document.querySelector(`
+                    + `'#unclaim-btn').dataset.stale`
+                    + ` = 'true'`,
+                );
+                await page.click('#unclaim-btn');
+                await page.until(
+                    `location.pathname.endsWith(`
+                    + `'/workbox/index.html')`,
+                    'first tab in the inbox',
+                );
+                // The release rings the same-origin bus;
+                // the second tab repaints with no live
+                // claim, so its button is a fresh node.
+                await other.until(
+                    `document.querySelector(`
+                    + `'#unclaim-btn')?.dataset.stale`
+                    + ` === undefined`,
+                    'second tab repainted',
+                );
+                await other.click('#unclaim-btn');
+                await other.until(
+                    `location.pathname.endsWith(`
+                    + `'/workbox/index.html')`,
+                    'second tab in the inbox',
+                );
+                assert(
+                    await other.until<boolean>(
+                        `[...document.querySelectorAll(`
+                        + `'.toast')].some(t =>`
+                        + ` t.textContent.includes(`
+                        + `'Work order released'))`,
+                        'Work order released toast',
+                    ),
+                );
+            },
+        );
+    },
+);

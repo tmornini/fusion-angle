@@ -98,13 +98,21 @@ Explicit auto-layout fires only via
 the `withNodesMoved` chain — never via `withFitToBox`
 or `withSelectionCentered`.
 
-The detail-page `request-update` callback runs
-`reconcileFitFromDom` after `withInteractionState` so
-the auto-fit viewBox is the final state, not stomped by
-the FSM's frozen viewBox; on selection change while the
-panel is open, it then runs `withSelectionCentered` to
-pan the newly selected node to the visible canvas center
-(zoom unchanged).
+The detail-page `request-update` callback MUST NOT move
+the camera from pointer-down to pointer-up: a release
+hit-tests the node under the pointer, so a camera moved
+under an in-flight gesture misses the node the user
+aimed at. At gesture start it commits
+`withInteractionState` and nothing else, and keeps the
+selection the gesture started from. Every other update,
+gesture end included, runs `reconcileFitFromDom` after
+`withInteractionState` so the auto-fit viewBox is the
+final state, not stomped by the FSM's frozen viewBox;
+when the selection differs from the one before the
+update (at gesture end, the one the gesture started
+from) while the panel is open, it then runs
+`withSelectionCentered` to pan the newly selected node
+to the visible canvas center (zoom unchanged).
 
 ## Special nodes
 

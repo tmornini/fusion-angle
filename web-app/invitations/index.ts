@@ -8,6 +8,7 @@ import {
 import { log } from '../app/logger.ts';
 import {
     getInvitations,
+    InvitationChangedError,
     postInvitationAcceptance,
     postInvitationDecline,
     subscribeInvitationChanges,
@@ -20,8 +21,11 @@ import {
 
 const { signal } = createPageAbort();
 
+const INVITATION_CHANGED_NOTICE =
+    'This invitation changed — your answer did not land';
+
 let listEl: HTMLElement | null = null;
-let pending: InvitationView[] = [];
+let invitations: InvitationView[] = [];
 
 export async function init(): Promise<void> {
     const container = $required(
@@ -36,7 +40,7 @@ export async function init(): Promise<void> {
         ),
         retry: init,
         onData: loaded => {
-            pending = loaded;
+            invitations = loaded;
             rerender();
             container.addEventListener(
                 'click', onListClick, { signal });
@@ -49,12 +53,12 @@ export async function init(): Promise<void> {
 
 function rerender(): void {
     if (!listEl) return;
-    new InvitationListPresenter(pending).render(listEl);
+    new InvitationListPresenter(invitations).render(listEl);
 }
 
 async function refresh(): Promise<void> {
     if (!listEl) return;
-    pending = await getInvitations(
+    invitations = await getInvitations(
         sessionContext(), 'pending',
     );
     rerender();
@@ -70,7 +74,7 @@ async function onListClick(e: MouseEvent): Promise<void> {
         .closest('[data-invitation-id]')
         ?.getAttribute('data-invitation-id');
     if (!id) return;
-    const invitation = pending.find(
+    const invitation = invitations.find(
         inv => inv.id === id,
     );
     if (invitation === undefined) return;
@@ -89,6 +93,10 @@ async function onListClick(e: MouseEvent): Promise<void> {
             return;
         }
     } catch (err) {
+        if (err instanceof InvitationChangedError) {
+            repaintChanged(err.current);
+            return;
+        }
         log.error(
             'invitation action failed', 'invitations', err);
         showToast(
@@ -96,4 +104,16 @@ async function onListClick(e: MouseEvent): Promise<void> {
     }
     // The list re-renders via the change subscription the post*
     // adapters notify — no explicit refresh, no double read.
+}
+
+// A refused answer repaints its row as it now stands —
+// revoked, declined, or pending at a fresh tag — in
+// place. The pending-only list drops it on the next
+// read.
+function repaintChanged(current: InvitationView): void {
+    invitations = invitations.map(
+        inv => inv.id === current.id ? current : inv,
+    );
+    rerender();
+    showToast(INVITATION_CHANGED_NOTICE, 'warning');
 }
