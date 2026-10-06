@@ -2927,11 +2927,16 @@ Off the critical path; each with its oracle.
   for display names and search text.
 - The default-organization client still says the PUT
   must name a live seat
-  (`client/identity-default-organization.ts:9`).
-  Say an accepted membership. A seated removed head
-  is 400, and an accepted membership with no seat is
-  201. Left on `7bfb1702`. Oracle: that comment does
-  not say "live seat".
+  (`client/identity-default-organization.ts:9`), and a
+  test comment says the seat remains
+  (`tests/api-identity-default-organization.test.ts:162-164`,
+  beside the `seedSeat` fixture,
+  `tests/root-admin-fixture.ts:110`), though 3636aa0f
+  retired the seat documents. Say an accepted
+  membership: a removed membership head is 400, and an
+  accepted membership is 201
+  (`api/organization-requests.ts:120-129`). Oracle:
+  neither comment names a seat document.
 - Immutable document types. A family declares itself
   immutable where it declares its conditional; every
   write is a genesis under the never-written latch, so a
