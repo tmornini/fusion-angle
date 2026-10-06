@@ -61,6 +61,7 @@ import {
     postInvitationRevocation,
     getInvitations,
     getSentInvitations,
+    InvitationChangedError,
     subscribeInvitationChanges,
     SessionRemintFailedError,
     type InvitationView,
@@ -743,6 +744,40 @@ Deno.test('accept after revoke is rejected, no membership',
     assertStrictEquals(wayne.length, 0);
 }));
 
+Deno.test('a stale accept refuses with the invitation'
++ ' as it stands',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+        , WAYNE);
+    const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , WAYNE);
+    await postInvitationGrant(tony, 'sarah@x.com');
+    const inv = await invitationOf(db, WAYNE, SARAH);
+    const sarah = await ctxOn(db, SARAH
+        , 'AjdvjuECVZEgZoFajaIEkg');
+    // Held before the revoke, as the invitee's open
+    // page holds it.
+    const stale = await heldInvitee(sarah, inv.id);
+    await postInvitationRevocation(
+        tony, await heldSent(tony, inv.id),
+    );
+    const err = await assertRejects(
+        () => postInvitationAcceptance(sarah, stale),
+        InvitationChangedError,
+    );
+    assertStrictEquals(err.current.id, inv.id);
+    assertStrictEquals(err.current.state, 'revoked');
+    assert(
+        err.current.message.query('header.etag').toText()
+        !== stale.message.query('header.etag').toText(),
+        'the refusal carries the fresh head',
+    );
+    const wayne = (await deriveMembershipsAll(db))
+        .filter(m => m.identity_id === SARAH
+            && m.organization_id === WAYNE);
+    assertStrictEquals(wayne.length, 0);
+}));
+
 Deno.test('accept after decline is rejected',
 () => withLocalStorageAsync(freshStorage(), async () => {
     const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
@@ -1384,8 +1419,8 @@ Deno.test('two re-minted tokens without the seat surface a'
 }));
 
 // Another tab revoked the invitation this tab still holds.
-// The accept names that part, so the stale tag is 412 and
-// the revoked head stays the head.
+// The accept names that part as the invitation now stands,
+// and the revoked head stays the head.
 Deno.test('a stale held invitation answers 412'
     + ' and stores nothing',
 () => withLocalStorageAsync(freshStorage(), async () => {
@@ -1404,9 +1439,9 @@ Deno.test('a stale held invitation answers 412'
     const before = (await db.messagePairs.getAll()).length;
     const err = await assertRejects(
         async () => postInvitationAcceptance(sarah, pending),
-    ) as RequestError;
-    assertInstanceOf(err, RequestError);
-    assertStrictEquals(err.status, HTTP_PRECONDITION_FAILED);
+        InvitationChangedError,
+    );
+    assertStrictEquals(err.current.state, 'revoked');
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );
