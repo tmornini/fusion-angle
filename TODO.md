@@ -2740,35 +2740,37 @@ Off the critical path; each with its oracle.
 - Comments name absent code. `appendMessagePairOnce`
   and `appendMessagePairAlways` left with the store's
   one statement, and the comments citing them stayed:
-  five in `api/` (`api/api.ts:1356`,
-  `api/derive-documents.ts:31`,
-  `api/message-pair.ts:80`, `api/routes.ts:755`,
-  `:2740`), two explaining stamp order by
+  five in `api/` (`api/api.ts:1245`,
+  `api/derive-documents.ts:33`,
+  `api/message-pair.ts:94`, `api/routes.ts:707`,
+  `:2636`), two explaining stamp order by
   "appendMessagePairOnce's nowUtc()"; three in `tests/`
   (`tests/api-shadow-ledger-auth.test.ts:297`,
   `tests/derive-documents.test.ts:19`,
-  `tests/document-family.test.ts:273`). TEST-PLAN V4
+  `tests/document-family.test.ts:283`). TEST-PLAN V4
   no longer names `appendMessagePairOnce`. The state by
   PUT spec found more: `sendWriteResponse`
   (`tests/pair-write-coverage.test.ts:55`);
-  `MEMBERS_WIRING` (`api/routes.ts:495`,
-  `api/validators.ts:534-535`, `:840-841`,
-  `:933-934`); and the replay fast path, which no
+  `MEMBERS_WIRING` (`api/routes.ts:476`,
+  `api/validators.ts:535-536`, `:841-842`,
+  `:934-935`); and the replay fast path, which no
   longer exists — nothing at the gate reads a request
   to serve a stored response — yet is described at
-  `client/flow-mutations.ts:541-542`, and in `tests/`
-  at `tests/api-identity-document.test.ts:175`,
-  `tests/api-member-documents.test.ts:402`,
-  `tests/api-membership-document.test.ts:125`,
-  `tests/api-shadow-ledger-tokens.test.ts:273-274`, and
-  `tests/drift-roster.test.ts:789`. Reword each to the
+  `client/flow-mutations.ts:559-560`, its "fast" and
+  "path" a line apart, and in `tests/`
+  at `tests/api-identity-document.test.ts:176`,
+  `tests/api-member-documents.test.ts:403`,
+  `tests/api-shadow-ledger-tokens.test.ts:286-288`, and
+  `tests/drift-roster.test.ts:638`. Reword each to the
   code that runs today, or delete it where the code now
   says it. Oracle:
   `git grep -nE 'appendMessagePair|sendWriteResponse'`
   and `git grep -nE 'MEMBERS_WIRING'` find nothing
   under `api/`, `client/`, `tests/`, or TEST-PLAN.md,
-  and every `git grep -niE 'fast[- ]path'` hit there
-  names code that runs
+  and every fast-path hit there, read across line
+  breaks, names code that runs, as
+  `tests/backend-postgres.test.ts:12-13`'s driver
+  Buffer path does
 - DELETE cascade. No one policy says what a delete does
   to the documents that name the deleted one. Four
   references refuse the delete today (the last
