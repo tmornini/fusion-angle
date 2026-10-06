@@ -333,6 +333,26 @@ not repeat the note in every case.
   DEFERRED on SV6; two tabs of one jar is SV8b,
   not SV7. SV10's stale-until-navigation residual
   is PASS, not FAIL.
+- Native `<select>` (AA7a, G14a, G24b — the AI Model
+  pulldown, `#ai-model`): on macOS its open menu is
+  an OS menu the compositor neither paints nor
+  drives, so arrow keys sent to it move nothing.
+  Never click the select and never send ArrowUp or
+  ArrowDown to it. Focus it by selector
+  (`.focus()`), then send one printable key as CDP
+  `Input.dispatchKeyEvent` `keyDown` with `key` and
+  `text` set, then `keyUp`: typeahead on a closed
+  select commits the first option whose label starts
+  with that letter and fires `input` and `change`.
+  `g` selects GPT-5.5 (`EurcZoFcUOmQiKURwJQvJQ`) from
+  the placeholder and from Claude Sonnet 4.6. Read
+  `#ai-model`'s `value` to confirm. If it did not
+  change, set it with `js()` — `value` to the id,
+  then dispatch a bubbling `change` — which is not
+  an API fetch. If a menu is already open, click
+  outside it; never send Escape, which cancels the
+  edit on member detail and closes the Add Member
+  dialog.
 
 ### Scoring
 
@@ -4577,7 +4597,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
 
 ### Workbox — Completion
 
-- [ ] **WB14** Transition a work order to the completion
+- [ ] **WB14** Drive WB14 only after WB19a and WB19b
+  have scored lines in the checkpoint: this case
+  archives their subject. If either has no line yet,
+  drive it now, then come back. Transition a work
+  order to the completion
   (Archive) node (its `isArchive` is true) — on Review
   fill Reviewer Notes and click `approve`. PASS: work
   order moves to the Archive tab. It no longer appears in
@@ -4604,29 +4628,39 @@ gesture pans instead of dragging, marquee-ing, or connecting.
 
 ### Workbox — Concurrency & Integrity
 
-- [ ] **WB18** Open the same unclaimed work order in two
-  browser tabs. In tab 1, click the row to claim it. In
-  tab 2, attempt the same. PASS: tab 2 either navigates to
-  a read-only/already-claimed view or the claim is
-  rejected — and the message plane carries at most one
-  live `'claimed'` event for this work order's `entity_id`
-  under the `(at, id)` reduction (a stale prior claim is
-  superseded by a `'claim_expired'` event, never
-  overwritten in place). Inspect via `message_pairs` or
-  derived `GET work-orders/:id/history` (DESC; claim rows
-  carry `field_values: []`).
+- [ ] **WB18** Open the same unclaimed work order as
+  two members in two cookie jars: Tony Stark in the
+  walk's tab, and Sarah Chen in a second jar minted
+  as SV6 does (Driving notes, SV6/SV7/SV10). In
+  Tony's tab, click the row to claim it. In Sarah's,
+  open the same row. PASS: Sarah's claim is rejected
+  — `PUT work-orders/:id/claim` answers 409 `work
+  order is already claimed`, and her action screen
+  shows the error state carrying that message with
+  Try Again — and the message plane carries one live
+  `'claimed'` event for this work order's
+  `entity_id`, Tony's, under the `(at, id)` reduction
+  (a stale prior claim is superseded by a
+  `'claim_expired'` event, never overwritten in
+  place). Inspect via derived `GET
+  work-orders/:id/history` (DESC; claim rows carry
+  `field_values: []`). Two tabs of one jar are one
+  member: the second opens the holder's editable
+  screen and appends no claim (WB23's claim half).
   Pin: tests/api-work-order-claim.test.ts 'a live claim by
        another member is a 409';
+       tests/api-work-order-claim.test.ts 'a foreign
+       live claim is 409 from the head' (decides the
+       409 body and that nothing is stored);
        tests/api-work-order-claim.test.ts 'two-actor
-       contention: exactly one claimed event lands and
-       exactly one request gets the byte-exact 409 body —
-       never which actor wins';
+       contention: the second claim on a stale tag is
+       412 and exactly one claimed event lands';
        tests/api-work-order-claim.test.ts 'an expired claim
        is superseded atomically' (the general
        never-overwritten-in-place invariant, though this
-       specific live two-tab drive is unlikely to trigger
-       an actual expiry); exploratory — tab 2's rendered
-       read-only/already-claimed view specifically
+       specific live drive is unlikely to trigger an
+       actual expiry); exploratory — Sarah's rendered
+       refusal
 
 ### Workbox — All-See-All Visibility
 
@@ -4663,7 +4697,8 @@ per-user visibility filter.
 - [ ] **WB22** Inspect
   `web-app/app/presenters/workbox-inbox.ts`. PASS:
   `buildInboxItems` takes
-  `(workOrders, transitions, claims, memberMap, mode)`
+  `(workOrders, transitionsByWo, activeClaimsByWo,
+  memberMap, mode)`
   with no scope parameter. The presenter exports nothing
   related to per-user visibility — the workbox shows all
   work orders to all users by construction.
@@ -5105,7 +5140,8 @@ FSM, unlike `flows/detail`).
 - [ ] **G14a** With Kind=AI selected, leave the Model
   pulldown on its placeholder and click Create. PASS: a
   toast "Model is required" fires and no POST happens.
-  Pick a Model, fill the other AI fields, click Create.
+  Pick a Model (Driving notes: native `<select>`),
+  fill the other AI fields, click Create.
   PASS: toast confirms and the AI is written as a
   message-plane AI agent document (`PUT /ai-agents/:id`);
   it appears in the AIs group (agents are global, not
@@ -5569,7 +5605,8 @@ FSM, unlike `flows/detail`).
        read-mode return, and the Description reload
        persistence
 - [ ] **G24b** Click Edit again, pick a different Model
-  from the pulldown, click Save. PASS: toast "AI member
+  from the pulldown (Driving notes: native `<select>`;
+  `g` picks GPT-5.5), click Save. PASS: toast "AI member
   saved"; the page returns to read mode showing the new
   model; reload and it persists as
   "{name} — {provider}".
@@ -7295,12 +7332,17 @@ Do not file **SV10** as a regression.
   `http://localhost` and `http://127.0.0.1`);
   `localStorage` has no `fusion-angle:authorization`
   key and no `refresh_token`; the sign-in token
-  response JSON has `access_token` and no
-  `refresh_token`. Access is memory-only; refresh
-  is the cookie.
+  response JSON carries `token_type` and
+  `expires_in` and neither `access_token` nor
+  `refresh_token`; the access token rides the
+  `Authentication-Info` response header as
+  `access_token="…"`. Access is memory-only;
+  refresh is the cookie.
   Pin: tests/api-authentication-token.test.ts 'token
        JSON has no refresh_token; Set-Cookie is
-       HttpOnly'; exploratory — the `Secure`
+       HttpOnly' (also decides the JSON carries no
+       `access_token` and `Authentication-Info`
+       does); exploratory — the `Secure`
        attribute over plain `http://`, and the
        DevTools `localStorage` inspection
 - [ ] **SV4** On the signed-in dashboard, reload
