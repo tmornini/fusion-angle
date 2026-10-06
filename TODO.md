@@ -3089,6 +3089,15 @@ Off the critical path; each with its oracle.
   Oracle: a seeded write pair's secrets hold the line
   its requester would have sent, or SCHEMA.md names the
   seed as the axiom's one exception
+- The memory backend copies its whole table for every
+  bare statement (`const copy = [...this.#rows]`,
+  `api/backend-memory.ts:144`), a cost every test write
+  outside a transaction pays; the rehearsal spec left
+  it unmeasured (`docs/superpowers/specs/`
+  `2026-09-24-rehearsal-transaction-design.md:189-191`).
+  Oracle: `./test` measured before and after a copy
+  only a failing statement pays, and the change lands
+  only if that number earns it
 
 ## Sequencing
 
