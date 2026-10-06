@@ -640,7 +640,12 @@ skew tests, which went with item 8's trio.
    `organization_name`, `invited_by_name`, and
    `invitee_email`. Restoring the three names is a
    read scoped to the relationship. That read does
-   not exist. The
+   not exist. A membership's organization rides its
+   name, `<organization-id>:<identity-id>`, as well as
+   its path, and any rule this item writes by
+   organization reads both (`docs/superpowers/specs/`
+   `2026-10-01-membership-and-versions-design.md:785-788`).
+   The
    reduction takes back what Postgres grants every role.
    `fa_owner` revokes CONNECT and TEMPORARY on the
    database and every right on the schema from PUBLIC and
