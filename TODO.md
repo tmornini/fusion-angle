@@ -2598,9 +2598,8 @@ Off the critical path; each with its oracle.
   truth for the dashboard service. Oracle: a
   committed `render.yaml` that matches the live
   service without a dashboard PATCH.
-- The client hands the app three shapes. Head reads
-  made each raw row a message: a verb that read a wire
-  row answers `HttpMessage<Row>`, or an array of them
+- The client hands the app three shapes. A verb that
+  reads a wire row answers `HttpMessage<Row>`, or an array of them
   for a collection's parts. The five named values
   (`Idea`, `Project`, `RecordModel`, `WorkOrder`,
   `RecordInstance`) and the values a write latches
@@ -2655,8 +2654,8 @@ Off the critical path; each with its oracle.
   is an HTTP application on a SQL database: a state change
   is PUT, POST, PATCH, or DELETE at the HTTP layer and
   INSERT at the store, never "create", "update", "upsert",
-  or "write" standing in for one of them. The case that
-  surfaced it is `postRecordWriteOp` (`api/routes.ts:872`,
+  or "write" standing in for one of them. The case at
+  hand is `postRecordWriteOp` (`api/routes.ts:872`,
   the seed's record-type POST bundle) and its family:
   `RecordWriteBody`, `RecordWriteCreateBody`,
   `RecordWriteEditBody`, `RecordWriteMessagePairs`,
@@ -2683,7 +2682,7 @@ Off the critical path; each with its oracle.
   identifiers contain a capitalized Create, Update, or
   Upsert and 35 contain Write, comments and strings
   aside. Some stay: the DOM's `createElement` and
-  constructors such as `createHttpFacade`. The audit rules
+  constructors such as `createHttpFacade`. An audit rules
   on each of the rest, naming by the HTTP-verb convention
   (`getNoun`, `putNoun`, `deleteNoun`,
   `postNounOperation`) at the HTTP layer and INSERT at the
@@ -2719,9 +2718,9 @@ Off the critical path; each with its oracle.
   no model name is spelled outside
   `api/provider-models.ts` but in test fixtures;
   TEST-PLAN.md prose counts as a spelling
-- Cachability — hashed names and gzip sidecars have
-  shipped; on the static server `HEAD` reports the same
-  `Content-Length` as GET. The API serves no `HEAD`: its
+- Cachability — the static server serves hashed names
+  and gzip sidecars, and its `HEAD` reports GET's
+  `Content-Length`. The API serves no `HEAD`: its
   method switch has no case for it
   (`api/api.ts:964-1349`), so it answers 405, and that
   405 carries no `Allow` (`api/api.ts:1340-1348`) —
@@ -2730,10 +2729,10 @@ Off the critical path; each with its oracle.
   a 405 — while the gate requires `operation-id` on
   every request, a method never served included
   (`api/api.ts:469-484`). Add
-  `HEAD` to the API: now that a document GET serves the
+  `HEAD` to the API: a document GET serves the
   stored response with three substitutions and three
   additions (`servedResponse`,
-  `api/served-response.ts:74`; no route stays parted),
+  `api/served-response.ts:74`; no route is parted), so
   `HEAD` is that function without the body.
   `last-modified` makes `If-Modified-Since` possible.
   No handler reads it. Conditional
@@ -2762,15 +2761,15 @@ Off the critical path; each with its oracle.
   test comment says the seat remains
   (`tests/api-identity-default-organization.test.ts:162-164`,
   beside the `seedSeat` fixture,
-  `tests/root-admin-fixture.ts:110`), though 3636aa0f
-  retired the seat documents. Say an accepted
+  `tests/root-admin-fixture.ts:110`), though no seat
+  document exists. Say an accepted
   membership: a removed membership head is 400, and an
   accepted membership is 201
   (`api/organization-requests.ts:120-129`). Oracle:
   neither comment names a seat document.
-- Comments name absent code. `appendMessagePairOnce`
-  and `appendMessagePairAlways` left with the store's
-  one statement, and the comments citing them stayed:
+- Comments name absent code. Comments cite
+  `appendMessagePairOnce` and `appendMessagePairAlways`,
+  which do not exist:
   five in `api/` (`api/api.ts:1245`,
   `api/derive-documents.ts:33`,
   `api/message-pair.ts:94`, `api/routes.ts:707`,
@@ -2778,9 +2777,8 @@ Off the critical path; each with its oracle.
   "appendMessagePairOnce's nowUtc()"; three in `tests/`
   (`tests/api-shadow-ledger-auth.test.ts:297`,
   `tests/derive-documents.test.ts:19`,
-  `tests/document-family.test.ts:283`). TEST-PLAN V4
-  no longer names `appendMessagePairOnce`. The state by
-  PUT spec found more: `sendWriteResponse`
+  `tests/document-family.test.ts:283`). More:
+  `sendWriteResponse`
   (`tests/pair-write-coverage.test.ts:55`);
   `MEMBERS_WIRING` (`api/routes.ts:476`,
   `api/validators.ts:535-536`, `:841-842`,
@@ -2792,25 +2790,24 @@ Off the critical path; each with its oracle.
   at `tests/api-identity-document.test.ts:176`,
   `tests/api-member-documents.test.ts:403`,
   `tests/api-shadow-ledger-tokens.test.ts:286-288`, and
-  `tests/drift-roster.test.ts:638`. The `/members/`
-  parent now resolves from heads
-  (`resolveViaMembershipPairPlane`,
-  `api/derive-states.ts:211-234`; 6eee335c), yet two C4
-  tombstone comments still narrate its retired
-  document-trio history (`api/derive-states.ts:38-41`,
-  `:504-505`). The packageable client left seven
-  comments naming moved paths (`api/flow-graph-diff.ts:15`,
+  `tests/drift-roster.test.ts:638`. Two C4 tombstone
+  comments narrate a `/members/` document-trio history
+  the code does not have — the parent resolves from
+  heads (`resolveViaMembershipPairPlane`,
+  `api/derive-states.ts:211-234`) — at
+  `api/derive-states.ts:38-41` and `:504-505`. Seven
+  comments name moved paths (`api/flow-graph-diff.ts:15`,
   `tests/presenter-project-detail-impact.test.ts:16`,
   `tests/presenter-identity-detail.test.ts:16`,
   `tests/presenter-project-patch.test.ts:10`,
   `tests/api-facade-write-preconditions.test.ts:26`,
-  `web-app/app/flow-operations.ts:720`, `:875`); the
-  store left `api/request-context.ts:42-45` keeping
-  `requestAt` in a requests row,
+  `web-app/app/flow-operations.ts:720`, `:875`);
+  `api/request-context.ts:42-45` keeps `requestAt` in
+  a requests row,
   `api/postgres-client.ts:2-3` taking advisory locks
   inside `begin`, and ARCHITECTURE.md:230-235 calling
-  reads an open write-gate transaction's; and 960f2ce8
-  wrote one comment twice (`api/mock-data.ts:179-183`,
+  reads an open write-gate transaction's; and one
+  comment appears twice (`api/mock-data.ts:179-183`,
   `:190-194`). Reword each to the
   code that runs today, or delete it where the code now
   says it. Oracle:
@@ -2829,16 +2826,11 @@ Off the critical path; each with its oracle.
   is unread in production while `api/routes.ts` imports
   it; `api/routes.ts` claims revival dual-write after
   the states row half is stripped; `states.postEvent`,
-  defined nowhere now, is named at `api/routes.ts:354`,
+  defined nowhere, is named at `api/routes.ts:354`,
   `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`;
   and `web-app/app/root-redirect.ts:6-7` says esbuild and
-  `./build` where `deno bundle` and `./bin/build` run. The run-four
-  remediation's Evidence
-  (`docs/superpowers/specs/`
-  `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
-  lists provenance, not comments, and the reproductions
-  that might have were scratchpad, never committed —
-  the pass re-derives its enumeration by reading. The
+  `./build` where `deno bundle` and `./bin/build` run.
+  The pass derives its list by reading. The
   "remove the comment … when done" and "revise both
   comments when done" pointers other entries carry are
   those entries' property, not this pass's
@@ -2858,8 +2850,8 @@ Off the critical path; each with its oracle.
 - `./bin/measure --record` writes the literal `'unknown'` as
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
-  count — and the `sysctl` workaround was rejected as
-  unverifiable and macOS-only. Ten of the fourteen rows
+  count — and a `sysctl` read is unverifiable and
+  macOS-only. Ten of the fourteen rows
   in `measurements/history.jsonl`, `c50e849` on, store
   `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
@@ -2871,7 +2863,7 @@ Off the critical path; each with its oracle.
 - TEST-PLAN.md's Pin lines lag their pins. R4's says
   `RecordDetailEditPresenter` carries no CLI test
   (`:6979`) and R6's omits 'a select attribute renders
-  no constraint picker', both stale since 97d21f5d;
+  no constraint picker', both stale;
   AA4's says `bindAddMemberDialog` has no browser test
   (`:602`), though `tests/browser/member-create.test.ts`
   and `tests/browser/dialogs.test.ts` drive it; V8's
@@ -2882,16 +2874,12 @@ Off the critical path; each with its oracle.
   Pin line names its test, and each named claim matches
   the code
 - The small bipolar gauge's `display` text has no
-  legend or caption (the K17 plan's deferral,
-  `docs/superpowers/plans/`
-  `2026-09-29-k17-signed-objective-score.md:656-657`).
-  Oracle: the gauge names what its number is, for the
+  legend or caption. Oracle: the gauge names what its number is, for the
   eye and for a screen reader
 - `schema-svg.ts`'s `parseStores` still carries a dead
   `StateStore`-matching branch
-  (`web-app/app/schema-svg.ts:163-169`): it can never
-  match now that `DbStores` holds only `messagePairs`,
-  so it has drawn nothing since that field left.
+  (`web-app/app/schema-svg.ts:163-169`): it cannot
+  match, since `DbStores` holds only `messagePairs`.
   Oracle: `./test schema` green with the dead branch
   gone, and `SCHEMA.svg` byte-identical.
 - `documentLifecycleEvents`
@@ -2913,10 +2901,8 @@ Off the critical path; each with its oracle.
   `web-app/app/` — `measure.ts`,
   `generate-api-documentation.ts`, `compose.ts`,
   `generate-schema-svg.ts`, `cdp-client.ts`,
-  `measure-viz.ts`, and `hash-static.ts` (e7ce7969,
-  `Deno.readDir`). The browser
-  tsconfig `exclude` that listed them is gone with that
-  file. Moving them to a top-level tools directory
+  `measure-viz.ts`, and `hash-static.ts`
+  (`Deno.readDir`). Moving them to a top-level tools directory
   would make browser membership by rule and is the
   exclusion the `Deno.*` fence still needs. Oracle:
   those seven files are not under `web-app/app/`
@@ -2924,13 +2910,10 @@ Off the critical path; each with its oracle.
   for byte, all under `web-app/app/` — `compose.ts`,
   `generate-api-documentation.ts`, `measure-viz.ts`,
   `cdp-client.ts`, `measure.ts`. Commandment IX's
-  threshold is three. Each copy was sanctioned
-  deliberately: extracting a shared module from any one
-  Deno porting task would have reached into four other
-  tasks' files. Oracle: one definition, five importers,
+  threshold is three. Oracle: one definition, five importers,
   `./test validate` green.
 - Genericity — DRY, even once (the indulgence); spec
-  away every nit. Merged: `putRecordInstance` PATCHes
+  away every nit. Includes: `putRecordInstance` PATCHes
   (name lie —
   `tests/adapters-record-instances.test.ts`,
   `tests/api-instances-create.test.ts`); member
@@ -2979,7 +2962,7 @@ Off the critical path; each with its oracle.
   takes the existing log-normal sampler
   (`api/latency.ts:17-54`) with
   `mu = ln(FA_LATENCY)`; otherwise the
-  no-op. Merged: the shim's "both presets pass a
+  no-op. Includes: the shim's "both presets pass a
   no-op today" (`api/latency.ts:1-5`,
   `api/db-backed.ts:31-35` — revise both comments when
   done). Oracle:
@@ -2996,17 +2979,13 @@ Off the critical path; each with its oracle.
   once per process and land that one rehearsal into each
   new backend (a memory landing measured 130 ms). This is
   a test-only cache, and the product seed never keeps
-  its rehearsal. The rehearsal now runs as one
-  transaction on its scratch, measured at `2790a9a5`
-  and after (`measurements/probes/seed/rehearsal.ts`,
-  medians): the rehearsal's replay 1,055 ms to 153 ms,
-  the rehearsal 1,276 ms to 707 ms, a memory seed
-  1,396 ms to 851 ms (692 ms before the ledger seed),
-  a Postgres seed 1,431 ms to 866 ms, and `./test`
-  61.0 s to 44.2 s over three runs each. The memory
-  seed misses the closed bullet's oracle, at or under
-  692 ms, by 159 ms. Whether the per-seed rehearsal is
-  still a cost worth a cache is the operator's decision.
+  its rehearsal. Medians
+  (`measurements/probes/seed/rehearsal.ts`): the
+  rehearsal's replay 153 ms, the rehearsal 707 ms, a
+  memory seed 851 ms against a 692 ms bar, a Postgres
+  seed 866 ms, and `./test` 44.2 s over three runs.
+  Whether the per-seed rehearsal is a cost worth a
+  cache is the operator's decision.
   Oracle: `./test` measured before and after this change
   alone, three runs each, and every test that mutates
   its seeded database still gets its own backend
@@ -3063,13 +3042,10 @@ Off the critical path; each with its oracle.
   measures the handler alone. Record
   per request: method, route family (ids folded to `:id`),
   status, handler ms, wall stamp. A throwaway probe on
-  `packageable-client` (`ffa73bf4`, memory suite,
-  `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
-  peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
-  p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
-  `work-orders/:id/history` (since retired)
-  clusters at 100-102 ms (p90 100.7, max 102.3),
-  unexplained. The probe's synchronous
+  the memory suite (`--parallel`) saw 7,318 requests
+  over a 36 s span (~200/s, peak 1,845 in one second);
+  handler ms p50 0.57, p90 4.5, p99 100, max 244;
+  6,255 2xx, 1,057 4xx, 6 5xx. The probe's synchronous
   per-request append cost ~1.3 s on a 45 s suite. Suite
   throughput through the memory backend is not a load test;
   the Postgres origin (`--base-url`) is where a rate means
@@ -3093,15 +3069,10 @@ Off the critical path; each with its oracle.
   names, or the read says it scans
 - Collections page, and their order is the caller's to
   ask. A collection read answers all its parts in one
-  response, in the order the server keeps; head reads
-  left pagination and whether a collection's order
-  should be the client's to ask for
-  (`docs/superpowers/specs/`
-  `2026-09-30-head-reads-design.md:346-347`,
-  `:1086-1089`), and membership and versions and
-  work-order events left pagination again
-  (`2026-10-01-membership-and-versions-design.md:272`,
-  `2026-10-04-work-order-events-design.md:199-201`).
+  response, in the order the server keeps; whether a
+  collection's order should be the client's to ask for
+  is this bullet's to settle (`docs/superpowers/specs/`
+  `2026-09-30-head-reads-design.md:1086-1089`).
   Measured first: the ledger sweep says where a list
   outgrows one response. Oracle: a collection read
   returns a bounded page and a way to the next, in a
@@ -3109,9 +3080,7 @@ Off the critical path; each with its oracle.
 - Flow stats read every work order's `versions/`, one
   collection read per work order
   (`web-app/app/flow-stats.ts:59`), to chart whole
-  timelines; work-order events left a collection-wide
-  read as its own question (`docs/superpowers/specs/`
-  `2026-10-04-work-order-events-design.md:193-195`).
+  timelines; a collection-wide read is the question.
   Measured first: a flow with many work orders under
   `./bin/measure`. Oracle: the stats page's reads grow
   with the flow, not with its work orders, or the
@@ -3177,7 +3146,7 @@ Off the critical path; each with its oracle.
 - Fewer JSON parse/stringify — byte-stream header
   setting, mechanical sympathy and simplicity for
   the processor; measured first
-  (`./bin/measure --profile`). Merged: the deferred
+  (`./bin/measure --profile`). Includes: the
   content-coding seams
   (`shared/http-message/body.ts:77-80` and
   `shared/http-message/content-coding.ts:3-8` —
@@ -3185,16 +3154,14 @@ Off the critical path; each with its oracle.
   `./bin/measure --profile` run placing parse/stringify
   above the budgets' noise — the item activates on that
   number, not before.
-- Spec 6 did not run — replacing `npm:postgres@3.4.9`
-  with `jsr:@db/postgres` behind `api/postgres-client.ts`.
-  Spec:
-  `docs/superpowers/specs/2026-08-21-deno-postgres-driver-design.md`.
-  Task 56 ruled NO-GO: `@db/postgres` is 0.19.5, pre-1.0,
-  a bet on someone else's trajectory under the product's
-  only datastore, while the insulation above `SqlClient`
-  is one adapter file, so keeping `postgres.js` costs one
-  specifier and one file. Reopen at `@db/postgres` 1.0,
-  or on measured `./bin/measure` headroom. Oracle: `grep -rn
+- Replace `npm:postgres@3.4.9` with `jsr:@db/postgres`
+  behind `api/postgres-client.ts` (spec:
+  `docs/superpowers/specs/2026-08-21-deno-postgres-driver-design.md`),
+  at `@db/postgres` 1.0 or on measured `./bin/measure`
+  headroom: at 0.19.5 it is a bet on someone else's
+  trajectory under the product's only datastore, while
+  keeping `postgres.js` costs one specifier and one
+  adapter file above `SqlClient`. Oracle: `grep -rn
   'npm:' deno.json deno.lock` prints nothing;
   `./test postgres` green; `./bin/measure --check` green
   against the committed budgets.
