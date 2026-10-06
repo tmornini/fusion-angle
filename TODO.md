@@ -861,9 +861,11 @@ Off the critical path; each with its oracle.
   compatible change by another agent. Otherwise it
   answers 412. The statement decides stale before
   matched, row by row
-  (`shared/ledger-statement.ts:215-250`,
-  `api/ledger-statement-sql.ts:139-171`), pinned at
-  `tests/ledger-store.test.ts:286-328`. Only a PUT or
+  (`rawOutcome`, `shared/ledger-statement.ts:198-230`;
+  `api/ledger-statement-sql.ts:148-180`), pinned by
+  'stale still beats matched and land'
+  (`tests/ledger-store.test.ts:1154`,
+  `tests/pg-ledger-store.test.ts:1546`). Only a PUT or
   DELETE row can match its head. A stale row refuses
   the statement; otherwise a matched row is skipped and
   the rest land, unless no document row — a row that
@@ -871,8 +873,9 @@ Off the critical path; each with its oracle.
   stores nothing, the received pair included. A
   statement of blind rows has no document row, so it
   stays all-or-nothing
-  (`shared/ledger-statement.ts:252-275`,
-  `api/ledger-statement-sql.ts:172-193`). The
+  (`reportedOutcome` and `isDocumentRow`,
+  `shared/ledger-statement.ts:235-256`;
+  `api/ledger-statement-sql.ts:184-202`). The
   message-plane spec keeps stale before matched
   (Decision 2,
   `docs/superpowers/specs/2026-09-23-message-plane-design.md`),
@@ -897,14 +900,15 @@ Off the critical path; each with its oracle.
   genesis the narrowest reading would answer 200
   (`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
   §10). The gate checks only a latch's presence and
-  form (`api/api.ts:254-324`), and the flow PUT no
-  longer re-reads the head to refuse its latch
-  (`api/routes.ts:1395-1422`). Both head reads carry
+  form (`preconditionRefusal`, `api/api.ts:236-306`),
+  and the flow PUT no longer re-reads the head to
+  refuse its latch (`postFlowDocumentOp`,
+  `api/routes.ts:1334-1360`). Both head reads carry
   the head's response and method, all the widest
   reading compares: `headed`
-  (`api/ledger-statement-sql.ts:68-84`) and the memory
-  `Head` (`shared/ledger-statement.ts:66-73`, filled by
-  `headsOf`, `api/backend-memory.ts:310-354`). The
+  (`api/ledger-statement-sql.ts:68-87`) and the memory
+  `Head` (`shared/ledger-statement.ts:73-81`, filled by
+  `headsOf`, `api/backend-memory.ts:315-362`). The
   narrowest also compares the head's `supersedes`,
   which neither selects today. The statement keeps its
   fifteen parameters. Lands no later than the retries
