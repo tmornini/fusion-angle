@@ -1693,23 +1693,20 @@ Off the critical path; each with its oracle.
 - The top-bar bell keeps its invitation count after a
   refused accept until the next navigation: notifying
   would re-run the page's pending-only refresh and drop
-  the row V10 must show (the walk-green plan's
-  deferral, `docs/superpowers/plans/`
-  `2026-10-05-walk-green.md:281-284`). Oracle: after a
+  the row V10 must show. Oracle: after a
   refused accept the bell's count matches the pending
   list, and V10's row still shows
 - The Add-Member dialog keeps its AI model across a
   reopen: `clearAddMemberFields` resets every field but
-  `#ai-model` (`web-app/members/index.ts:406-415`; the
-  walk-green plan's deferral, `docs/superpowers/plans/`
-  `2026-10-05-walk-green.md:296-297`). Oracle: reopening
+  `#ai-model` (`web-app/members/index.ts:406-415`).
+  Oracle: reopening
   the dialog after an AI create shows the Model picker
   at its placeholder
 - Unpinned but pinnable — TEST-PLAN covenants with no
-  test, or no test for the part a sub-bullet names: the
-  2026-08-29 audit's gap list, in TEST-PLAN order. Each
-  names the lowest layer that could express it. The
-  walk observes these; nothing else proves them. TEST-PLAN.md's "see
+  test, or no test for the part a sub-bullet names, in
+  TEST-PLAN order. Each names the lowest layer that
+  could express it. The walk observes these; nothing
+  else proves them. TEST-PLAN.md's "see
   Unpinned but pinnable" references land here.
   - A real `./bin/build` run — its exit code, the ZIP it
     writes, and that ZIP surviving the walk, plus the
@@ -2162,7 +2159,7 @@ Off the critical path; each with its oracle.
   - The second-hop `IdentityPiiIntakeFailedError` toast
     and the error class itself (G44) — Layer 1; `grep -rn
     IdentityPiiIntakeFailedError tests/` is empty, though
-    the torn-state mechanism it wraps is now pinned
+    the torn-state mechanism it wraps is pinned
   - The Erase PII button present for a person and absent
     for a service (G45) — Layer 1; neither
     `presenter-identity-detail.test.ts` fixture asserts
@@ -2369,8 +2366,8 @@ Off the critical path; each with its oracle.
   store holds the table's DDL final, and item 0h ships
   everything a change to the fence needs. Activates on the
   first change to the table once a tenant's data exists
-  and a wipe is no longer possible. The pieces already
-  stand (item 0h, measured): a migration is the genesis of
+  and a wipe is no longer possible. Item 0h builds the
+  pieces (measured): a migration is the genesis of
   its own document in `/migrations/`, named for what it
   does behind a four-digit order after the root,
   landed by `migrate` with its SQL the `request` and
@@ -2448,11 +2445,8 @@ Off the critical path; each with its oracle.
 - Roster map mints `{ erased: true }` before the PII
   fill. `buildHumanMemberMap` plants a tombstone on
   every seat (`client/members.ts:125`);
-  `getHumanMemberMap` then overwrites it. Spec
-  2026-09-04 critical-functionality-path named this
-  the same sentinel sin as the shipped
-  `emptyPersonProfile` and said to put it in Later
-  work. A fill that throws leaves seats looking
+  `getHumanMemberMap` then overwrites it: a sentinel
+  standing in for absence. A fill that throws leaves seats looking
   erased. Oracle: `buildHumanMemberMap` carries no
   PII placeholder; a row is filled or absent
 - `./bin/measure` harvests error-page timings;
@@ -2477,9 +2471,9 @@ Off the critical path; each with its oracle.
   geometry under that fixture, asserting the box top
   never rises above the whisker top, red today.
 - I21's walk probe reads the page at the first paused
-  `/api/organizations/*` request, and on 29 Sep that
-  request was not the page's. The five GETs the walk
-  held are all the top-bar strip's — organization, its
+  `/api/organizations/*` request, and that request need
+  not be the page's. The first GETs a walk holds are
+  the top-bar strip's — organization, its
   seat read on `organizations/{id}/members/`, ideas,
   projects, flows (`web-app/app/header-info.ts:11-26`, sent
   from `bootApp`'s sidebar branch). The members page's
@@ -2488,10 +2482,9 @@ Off the critical path; each with its oracle.
   strip's organization GET the page branch may still be
   importing its code-split chunk, so no page code has
   run. `tests/members-pending-skeleton.test.ts` shows
-  the skeleton painted once `init` runs. I21 has scored
-  PASS on every walk since (`a6af68a6`, `2acbc87a`,
-  `ed1fac5c`), the first paused GET already showing the
-  skeleton, so the race is latent. Owner call: have I21
+  the skeleton painted once `init` runs. I21 scores
+  PASS — the first paused GET already shows the
+  skeleton — so the race is latent. Owner call: have I21
   poll for the skeleton while the pause holds, rule the
   pre-import blank container a product gap, or retire
   this bullet.
@@ -2500,12 +2493,11 @@ Off the critical path; each with its oracle.
 - The advisory-lock module outlived its locks.
   `api/advisory-lock.ts` holds the notify channel, its
   payload, and `POOL_MAX`; its `advisoryKey` and
-  `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have had no
-  product caller since 4175b2d5, and 'two first-writers:
-  one 201, not a double insert'
-  (`tests/pg-races.test.ts:241-258`) still holds a lock
-  the product no longer takes, so its hold no longer
-  bites. Oracle: the module's name says what it holds,
+  `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have no
+  product caller, and 'two first-writers: one 201, not
+  a double insert' (`tests/pg-races.test.ts:241-258`)
+  holds a lock the product never takes, so its hold
+  bites nothing. Oracle: the module's name says what it holds,
   `advisoryKey` leaves with its tests, and the race test
   holds only what the product holds
 - The ledger root's body is JSON. `/migrations/0000-root`
@@ -2522,25 +2514,21 @@ Off the critical path; each with its oracle.
   fresh, so nothing stored migrates. Oracle: the root
   head's response parses as a JSON object whose `id` is
   `0000-root`, in both backends.
-- Test ids are identifiers, post-ship. Every id a
+- Test ids are identifiers. Every id a
   test stores or sends — an identity, an
   organization, a document, an etag — is a canonical
   identifier, the 22-character encoding of a UUID
   (`isIdentifier` and `identifierOfUuidText` in
-  `shared/identifier.ts`). A short label is not one.
-  Witness: `the token sub is the caller identity`
-  (`tests/api-actor-from-token.test.ts`) seeded
-  `alice`, and `membershipsOfIdentity` rejected the
-  mirrored membership with "identity_id must be a
-  22-character identifier". That test now encodes
-  `6f0b9c1e-4a27-4d5b-8e31-7c9a2f10b6d4`. The suite
-  still mints tokens for `anonymous`
+  `shared/identifier.ts`). A short label is not one:
+  `membershipsOfIdentity` refuses a membership whose
+  identity is a label ("identity_id must be a
+  22-character identifier"). The suite mints tokens
+  for `anonymous`
   (`tests/adapters-authentication.test.ts`,
   `tests/adapters-identity-providers.test.ts`) and
   `agent-7`
   (`tests/api-authentication-token.test.ts`).
-  Display names and search text stay words. It waited
-  on membership and versions, which has landed. Oracle:
+  Display names and search text stay words. Oracle:
   one test
   walks the ids the suite stores and fails when
   `isIdentifier` rejects one, with named exceptions
