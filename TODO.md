@@ -1161,7 +1161,7 @@ Off the critical path; each with its oracle.
 
 - The auth page's left panel shows invented stats —
   "10K+ Active Users", "98% Satisfaction", "50+
-  Integrations" (`web-app/auth/index.ts:141-169`,
+  Integrations" (`web-app/auth/index.ts:118-157`,
   TEST-PLAN B5). Same sin as the landing mock-up;
   its own spec.
 - One gate for the write. Ninety-six `appendMessagePairOnce`
@@ -1254,7 +1254,7 @@ Off the critical path; each with its oracle.
 - The memory backend's sort coerces `response_at`
   with `?? ''` on a NOT NULL column
   (`byResponseAtThenId`, `api/backend-buffer-tx.ts:
-  37-38`; examination report). Oracle: the sort
+  35-36`; examination report). Oracle: the sort
   helper takes the same string the keyed path does;
   a missing stamp throws
 - Wipe and reseed live databases onto the exact-read
@@ -1282,22 +1282,22 @@ Off the critical path; each with its oracle.
   (`BODY_INDEXED_PATH`, `api/schema-postgres.ts:194`).
   Objectives record a transition in the body
   (`lifecycle: 'state'`, `OBJECTIVES_WIRING`,
-  `api/routes.ts:459-467`) and serve versions per
+  `api/routes.ts:454-462`) and serve versions per
   objective (`documentVersionsSelectRoute`,
-  `api/routes.ts:5334`). They have no collection-wide
+  `api/routes.ts:5265`). They have no collection-wide
   versions view. Oracle: a body field on another
   collection selects through an index the statement
   names, or the read says it scans
 - XSS can use the refresh cookie from the page. The
   cookie is HttpOnly, SameSite=Strict, Path=
   `/api/authentication`, Secure
-  (`api/authentication.ts:160-174`; pin
+  (`api/authentication.ts:175-191`; pin
   `tests/api-authentication-token.test.ts` 'token JSON
   has no refresh_token; Set-Cookie is HttpOnly'), so a
   page script cannot read it — a same-origin `fetch` to
   `/api/authentication/token` still sends it and the
   JSON returns a live access token. CSP `script-src
-  'self'` (`server/http-server.ts:41-47`) narrows
+  'self'` (`server/http-server.ts:43-49`) narrows
   injection; it does not close cookie-use. Closes KNOWN
   seam "XSS can use the refresh cookie from the page".
   Oracle: a Layer 1 case that an unauthenticated page
@@ -1354,7 +1354,7 @@ Off the critical path; each with its oracle.
   split. Exact-read spec Defers: the SET document is
   still a collection-shaped path with empty name (`path
   = /identities/<id>/default-organization/`, `name =
-  ''` — `api/derive-default-organization.ts:11-17`),
+  ''` — `api/derive-default-organization.ts:11-18`),
   while PII is `path = /identities/<id>/`, `name = pii`.
   HTTP can stay `identities/:id/default-organization`;
   only the stored split changes. Oracle:
@@ -1364,24 +1364,24 @@ Off the critical path; each with its oracle.
 - Split `client_registration` the way PII split.
   Registration is still the pre-PII shape: `path =
   /identities/<id>/registration/`, `name = ''`
-  (`api/derive-identity-spine.ts:425-466`;
+  (`api/derive-identity-spine.ts:366-419`;
   WRITE_RESPONSE_SPECS `name: ''` at
-  `api/routes.ts:3243`). HTTP can stay
+  `api/routes.ts:3027`). HTTP can stay
   `identities/:id/registration`; only the stored
   split changes. Oracle:
   `getDocumentHistory('/identities/<id>/',
   'registration')` is the SET document, and the
   empty-name prefix is gone after wipe
 - The cross-party delegation ledger
-  (`api/authentication.ts:871-879`;
-  `tests/api-authentication-token.test.ts:687`)
+  (`api/authentication.ts:1199-1204`;
+  `tests/api-authentication-token.test.ts:1028`)
 - Passkey, provider-IdP, and corporate-OIDC ceremonies
-  (`api/authentication.ts:1575-1595`;
-  `tests/api-authentication-authorize.test.ts:225`)
+  (`api/authentication.ts:1852-1888`;
+  `tests/api-authentication-authorize.test.ts:253`)
 - Per-client multi-audience, DPoP `cnf`, jti reuse
-  detection (`api/types.ts:508-510`;
+  detection (`shared/types.ts:527-529`;
   `shared/access-token-decode.ts:30-31`)
-- SP-6 sign-up (`web-app/auth/index.ts:655-663`)
+- SP-6 sign-up (`web-app/auth/index.ts:641-651`)
 - Cryptographically signed ledger — brainstorm signing
   of stored pairs. The ledger store hashes both
   messages where they are stored
@@ -1422,31 +1422,32 @@ Off the critical path; each with its oracle.
   flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
   retry branch, a work order both claimed and completed,
   and the archived-genesis walk
-  (`web-app/app/adapters/objectives.ts:150-151`)
+  (`client/objectives.ts:102-142`)
 - `./bin/measure` harvests error-page timings;
   `page:ready` carries no status —
-  `web-app/app/measure.ts`
+  `web-app/app/page-performance.ts:27`, harvested by
+  `harvestReady` (`web-app/app/browser-drive.ts:45-60`)
 - Claim-on-load with no release-on-leave plus the
   8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
   work-order view into an 8-hour claim
   (run-six Task 3 renders it; the UX remains) —
-  `web-app/workbox/detail.ts:583-593`,
-  `api/types.ts:1007`
+  `web-app/workbox/detail.ts:598-616`,
+  `shared/types.ts:1087`
 - `subscribeOnce` guarantees "never two" live subscriptions,
   not "always one": a bell arriving between teardown and
   re-arm is dropped, leaving an empty list page blank — the
   symptom run-six Task 9 fixes. Needs two bells inside one
   fetch window; a pending flag would close it but
   reintroduces the shared state the design avoids —
-  `web-app/app/channels.ts:138-154`
+  `client/channels.ts:214-225`
 - A `fusion-angle:data` bell during `./test` re-enters
   the ideas list `init` on a document that has no
   `#ideas-list`. `subscribeOnce`
-  (`web-app/app/channels.ts:149`) calls `init`
-  (`web-app/ideas/index.ts:43`), `$required` throws,
+  (`client/channels.ts:219-223`) calls `init`
+  (`web-app/ideas/index.ts:47`), `$required` throws,
   and `handlePageLoadError` logs `page failed to init`
   with `Required element not found: #ideas-list`
-  (`web-app/app/page-loader.ts:49`). Witnessed
+  (`web-app/app/page-loader.ts:50`). Witnessed
   2026-10-03 on `a6af68a6` as post-test output between
   `identity-tokens-reduce` and `drift-states`; the
   suite still reported 0 failed, so the gate stays
@@ -1471,8 +1472,10 @@ Off the critical path; each with its oracle.
   the server can invert them and throw, so the History
   modal fails to open with an error toast instead of
   rendering —
-  `web-app/app/adapters/objectives.ts:311`,
-  `web-app/projects/detail.ts:986`
+  `client/objectives.ts:268`, `:302` (the revision's
+  `nowUtc()`), `web-app/projects/detail.ts:925-986`,
+  and the throw at
+  `web-app/app/presenters/project-score-history.ts:206-211`
 - Node-only modules still live under `web-app/app/` —
   `measure.ts`, `generate-api-documentation.ts`,
   `compose.ts`, `generate-schema-svg.ts`,
@@ -1497,7 +1500,7 @@ Off the critical path; each with its oracle.
   Send Back dialog, and `grep -rn
   "approval-send-back-feedback" web-app/ api/ shared/
   tests/ server/` returns zero reads: the confirm path
-  (`web-app/ideas/detail.ts:289-296` → `transitionIdea`
+  (`web-app/ideas/detail.ts:285-300` → `transitionIdea`
   → `postIdeaStateChange`) has no feedback parameter, so
   whatever a reviewer types is thrown away. Found by
   reading, not driving, during the 2026-08-29 audit; no
@@ -1506,7 +1509,7 @@ Off the critical path; each with its oracle.
   transition
 - Roster map mints `{ erased: true }` before the PII
   fill. `buildHumanMemberMap` plants a tombstone on
-  every seat (`web-app/app/adapters/members.ts:96`);
+  every seat (`client/members.ts:125`);
   `getHumanMemberMap` then overwrites it. Spec
   2026-09-04 critical-functionality-path named this
   the same sentinel sin as the shipped
@@ -1552,7 +1555,7 @@ Off the critical path; each with its oracle.
   `process` half: that invocation in `./test validate`, red
   on a `process` reference under `web-app/`.
 - `./bin/measure --record` writes the literal `'unknown'` as
-  `cpuModel` (`web-app/app/measure.ts:946`). Deno exposes
+  `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and the `sysctl` workaround was rejected as
   unverifiable and macOS-only. Sixteen rows in
@@ -1560,8 +1563,8 @@ Off the critical path; each with its oracle.
   `3aaee31`) already store `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
   which needs `measure-core.ts`'s field type and
-  `shapeHistoryLine` (:36, :264) together with
-  `measure-viz.ts:986`, whose `|| ''` is itself the
+  `shapeHistoryLine` (:49, :284) together with
+  `measure-viz.ts:1052`, whose `|| ''` is itself the
   default-value sin. Oracle: a row with no `cpuModel`
   key renders without the separator.
 - The measure visualizer's client mirrors have no test
