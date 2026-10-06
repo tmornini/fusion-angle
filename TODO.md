@@ -2489,18 +2489,22 @@ Off the critical path; each with its oracle.
 - The code's word `erased` becomes `deleted`: this is an
   HTTP application, and the state it names is a DELETE
   head at `identities/:id/pii`. Its own change: the PII
-  union's discriminant (`api/types.ts:627-636`) and the
-  stem `eras`, any case: 76 occurrences in 17 product
-  files, 80 in 14
-  test files. It is a field, never a column, and touches
-  no stored byte — the client builds the flag from a 404
-  or 403 (`web-app/app/adapters/identities.ts:150-152`) —
-  so it has
+  union's discriminant (`shared/types.ts:647-656`) and
+  the stem `eras`, any case: 78 occurrences in 16
+  product files under `api/`, `client/`, `server/`,
+  `shared/`, and `web-app/`, and 83 in 15 test files,
+  type-erasure words among them (`erasable`,
+  `api/document-family.ts:34`, `:155`,
+  `api/routes.ts:338`), so the sweep works from a word
+  list, never the bare stem. It is a field, never a
+  column, and touches no stored byte — the client
+  builds the flag from a 404, 410, or 403
+  (`client/identities.ts:140-146`) — so it has
   no deadline. The page keeps "removed" (product-path
   item 2) until the eraser ships; the code speaks HTTP.
-  Oracle: the stem appears in `api/`, `server/`,
-  `shared/`, and `web-app/` only where the eraser
-  bullet's own words do.
+  Oracle: the word list's terms appear in `api/`,
+  `client/`, `server/`, `shared/`, and `web-app/` only
+  where the eraser bullet's own words do.
 - The reporter — `fa_reporter`, named in product-path
   item 2 only as an example of its principle: a role
   created with its first worker, never before. Nothing
