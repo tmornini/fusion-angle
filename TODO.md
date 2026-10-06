@@ -1641,24 +1641,27 @@ Off the critical path; each with its oracle.
   comments when done" pointers other entries carry are
   those entries' property, not this pass's
 - Unpinned but pinnable — TEST-PLAN covenants with no
-  test, the 2026-08-29 audit's gap list. Each names the
-  lowest layer that could express it. The walk observes
-  these; nothing proves them. TEST-PLAN.md's "see
+  test, or no test for the part a sub-bullet names: the
+  2026-08-29 audit's gap list, in TEST-PLAN order. Each
+  names the lowest layer that could express it. The
+  walk observes these; nothing else proves them. TEST-PLAN.md's "see
   Unpinned but pinnable" references land here.
-  - A real `./build` run — its exit code, the ZIP it
+  - A real `./bin/build` run — its exit code, the ZIP it
     writes, and that ZIP surviving the walk, plus the
     artifact's contents: the 29 `PAGE_REGISTRY` files
     (the eight A2 names, `api-documentation/index.html`
-    among them), the `fusion-angle` executable,
-    `site/assets/app.js`, `site/assets/styles.css`, the
-    woff2 fonts, the 18 page directories, and the
-    verb/status rooms generated
+    among them), the `fusion-angle` executable, the
+    content-hashed `assets/app.<hash>.js`,
+    `styles.<hash>.css`, and `pages-*.<hash>.css`,
+    `site/asset-manifest.json`, the woff2 fonts, the 18
+    page directories, and the verb/status rooms generated
     separately from `PAGE_REGISTRY` (A1, A2, J3) — Layer
     1, an integration test in the shape of
-    `tests/crank-cli.test.ts` that spawns `./build
-    --no-zip` into a temp dir; today
-    `tests/server-zip-metafile.test.ts` only regex-checks
-    the build script's source text
+    `tests/deploy-cli.test.ts` that spawns `./bin/build
+    --no-zip` into a temp dir; today the 29 is pinned in
+    the registry alone (`tests/page-registry.test.ts`), and
+    `tests/server-zip-metafile.test.ts` regex-checks the
+    build scripts and walks one `deno info` graph
   - The mock-data reveal's 12 printed lines carry
     `demo@example.com` and `sarah.chen@company.com` by
     name, not merely a count of 12 (A3) — Layer 1,
