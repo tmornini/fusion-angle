@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -12,8 +12,6 @@ import {
     apiRequest,
     framedRequest,
 } from './http-fixtures.ts';
-import { writeAuthorizerFor } from
-    '../api/write-authorizer.ts';
 import {
     IF_MATCH_HEADER,
     requestHeaderFields,
@@ -22,8 +20,7 @@ import {
 // Task 10: PATCH joins the platform verb alphabet. No route
 // carries a patch handler yet — admin probes on handler-less
 // routes answer 405; members still 403 at policy; unauth 401;
-// unknown path 404. writeAuthorizerFor must include PATCH so
-// a future flat PATCH cannot bypass the ownership fence.
+// unknown path 404.
 
 function req(
     method: string,
@@ -98,22 +95,6 @@ Deno.test('PATCH unauthenticated → 401', async () => {
             + 'gVvtDIaqhnkXZQcxZeSuiw', undefined, {},
     ));
     assertStrictEquals(res.status, 401);
-});
-
-Deno.test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
-() => {
-    const put = writeAuthorizerFor('organizations/:id/ideas/:id', 'PUT');
-    const patch = writeAuthorizerFor(
-        'organizations/:id/ideas/:id', 'PATCH',
-    );
-    const post = writeAuthorizerFor(
-        'organizations/:id/ideas/:id', 'POST',
-    );
-    assertEquals(put, {
-        table: 'ideas', idParamIndex: 1,
-    });
-    assertEquals(patch, put);
-    assertStrictEquals(post, undefined);
 });
 
 Deno.test('IF_MATCH_HEADER is if-match and is hoisted',

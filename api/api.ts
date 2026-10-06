@@ -53,10 +53,6 @@ import {
     resolveGlobalOwner,
 } from './derive-states.ts';
 import {
-    writeAuthorizerFor,
-    assertWritableInOrganization,
-} from './write-authorizer.ts';
-import {
     postToken,
     postAuthorize,
     refreshClearCookie,
@@ -310,8 +306,7 @@ function preconditionRefusal(
 
 // The one catch shared by both pre-dispatch ownership regions
 // (handleRequest, below) so their redaction discipline cannot
-// diverge: fenceRequest membership/role reads, and the write
-// authorizer's owner resolve. A thrown read is storage-
+// diverge. A thrown fenceRequest membership/role read is storage-
 // corruption territory, not a domain outcome — it gets the SAME
 // fixed 500 body the domain-boundary catch (below, ~:938)
 // already gives every other unmapped fault, console-logged with
@@ -809,15 +804,9 @@ async function dispatched(
         }
     }
 
-    // Region B of the pre-dispatch write authorizer (Phase 12
-    // Task 1, joined by WP8's self-only token-chain guard
-    // below):
-    // the one UNCONDITIONAL write guard below runs after body-
-    // parse regardless of bearerExempt, mirroring Region A above.
-    // The states/:id ownership authorizer RETIRED with the route
-    // (states-document retirement Task 13); field-values leaf
-    // write authorizer RETIRED with the leaf routes (Phase 15
-    // Task 7).
+    // Region B of the pre-dispatch ownership fence: WP8's
+    // self-only token-chain guard. It runs after body-parse
+    // regardless of bearerExempt, mirroring Region A above.
     try {
         // WP8 self-only token-chain guard. MEMBER_VERBS widens
         // the token revocation document's PUT and both token
@@ -858,34 +847,6 @@ async function dispatched(
         || method === 'DELETE' || method === 'PATCH';
 
     try {
-        // Pre-write ownership authorizer for the 9 org-scoped
-        // families' existing-id PUT/DELETE. Pair-plane
-        // owner-null → genesis proceeds; foreign →
-        // ForeignOrganizationError (HTTP 403). Runs BEFORE
-        // formWriteMessagePair so a forged foreign id never
-        // pays crypto or stores a pair.
-        if (
-            isWrite
-            && hasWriteHandler
-            && !bearerExempt
-            && organization !== undefined
-        ) {
-            const writeAuthorizer = writeAuthorizerFor(
-                routePattern, method,
-            );
-            if (writeAuthorizer !== undefined) {
-                const entityId =
-                    params[writeAuthorizer.idParamIndex];
-                if (entityId !== undefined && entityId !== '') {
-                    await assertWritableInOrganization(
-                        effective,
-                        entityId,
-                        organization,
-                        writeAuthorizer.table,
-                    );
-                }
-            }
-        }
         // The shadow-ledger pair: formed pre-tx (all crypto and
         // document resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in

@@ -36,7 +36,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested record-types WRITE surface (Task 3): admin PUT
 // (blind or conditional, state document), admin DELETE with type
-// RESTRICT, write authorizer, and byte-identical DELETE
+// RESTRICT, foreign-id genesis, and byte-identical DELETE
 // replay. Composed POST create-with-attributes is Task 9.
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -203,8 +203,7 @@ async () => {
     assertStrictEquals(put.status, 403);
 });
 
-Deno.test('PUT foreign type id under own org path geneses '
-+ '(write authorizer)',
+Deno.test('PUT foreign type id under own org path geneses',
 async () => {
     const { db, adminToken } = await adminDb();
     const organizationB = generateIdentifier();
