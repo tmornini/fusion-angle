@@ -1309,8 +1309,8 @@ Off the critical path; each with its oracle.
 - An admin seats an identity without its consent. The
   direct seat — an admin's membership PUT naming an
   identity — lands a membership the identity never
-  accepted; membership and versions kept today's power
-  and left the question (`docs/superpowers/specs/`
+  accepted, a power the membership spec keeps open
+  (`docs/superpowers/specs/`
   `2026-10-01-membership-and-versions-design.md:269-270`).
   It lands beside item 0d, which bounds
   whom an admin may name at all. Oracle: a seat the
@@ -1333,7 +1333,7 @@ Off the critical path; each with its oracle.
   becomes unreachable by construction, not by fixture
 - A DOM-free server universe — `deno.json` is the only
   project and its `lib` includes `dom`, so a `document`
-  in `api/` or `server/` type-checks. Re-measured: a
+  in `api/` or `server/` type-checks. Measured: a
   temp `document.body` under `api/` passed `deno check
   --frozen api`. WebCrypto/Fetch names the server needs
   (`crypto.subtle` in `api/client-assertion.ts:174`,
@@ -1400,8 +1400,7 @@ Off the critical path; each with its oracle.
   succession still has a head, and the erasure pair names
   every predecessor the tombstone's `supersedes` chain
   lost. A received request's body can hold PII the
-  hiding rule never reaches — the invitation's email,
-  which the message-plane spec handed item 0f
+  hiding rule never reaches — the invitation's email
   (`docs/superpowers/specs/`
   `2026-09-23-message-plane-design.md:871-875`) — so
   the brainstorm settles whether erasure reaches it.
@@ -1419,10 +1418,10 @@ Off the critical path; each with its oracle.
   (`api/authentication.ts:1199-1204`;
   `tests/api-authentication-token.test.ts:1028`): how
   a second party's token travels when one
-  `Authorization` line carries one credential, which
-  the message-plane spec's Decision 4 hands it
-  (`docs/superpowers/specs/`
-  `2026-09-23-message-plane-design.md:165-177`, `:888-889`)
+  `Authorization` line carries one credential (the
+  message-plane spec's Decision 4,
+  `docs/superpowers/specs/`
+  `2026-09-23-message-plane-design.md:165-177`)
 - Passkey, provider-IdP, and corporate-OIDC ceremonies
   (`api/authentication.ts:1852-1888`;
   `tests/api-authentication-authorize.test.ts:253`)
@@ -1437,9 +1436,9 @@ Off the critical path; each with its oracle.
   on the memory backend's write path alone
   (`shared/ledger-statement.ts:337`), and only tests
   verify ('stored messages verify against their
-  hashes'). The dropped `version` column hashed on write
-  and was never checked on read —
-  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`.
+  hashes'), and a hash nothing recomputes proves
+  nothing
+  (`docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`).
   Item 0h's full check is the first reader; signing is
   what remains after it.
 - A pure-TypeScript scrypt would retire the last
@@ -1472,8 +1471,8 @@ Off the critical path; each with its oracle.
   `web-app/app/presenters/project-score-history.ts:206-211`
 - `subscribeOnce` guarantees "never two" live subscriptions,
   not "always one": a bell arriving between teardown and
-  re-arm is dropped, leaving an empty list page blank — the
-  symptom run-six Task 9 fixes. Needs two bells inside one
+  re-arm is dropped, leaving an empty list page blank.
+  Needs two bells inside one
   fetch window; a pending flag would close it but
   reintroduces the shared state the design avoids —
   `client/channels.ts:214-225`
@@ -1493,17 +1492,14 @@ Off the critical path; each with its oracle.
   (`web-app/ideas/index.ts:47`), `$required` throws,
   and `handlePageLoadError` logs `page failed to init`
   with `Required element not found: #ideas-list`
-  (`web-app/app/page-loader.ts:50`). Witnessed
-  2026-10-03 on `a6af68a6` as post-test output between
-  `identity-tokens-reduce` and `drift-states`; the
-  suite still reported 0 failed, so the gate stays
-  green. `BroadcastChannel` was process-global then;
-  since 3d808c92 each test worker prefixes its channel
-  and lock names (`tests/worker-name-prefix.ts`), so a
-  peer file's bell no longer reaches the page, and a
-  bell inside the ideas file's own worker after its
-  document is gone stays possible. Re-witness before
-  working it. Oracle: `./test` prints neither `page failed to
+  (`web-app/app/page-loader.ts:50`), as post-test
+  output with the suite green. Each test worker
+  prefixes its channel and lock names
+  (`tests/worker-name-prefix.ts`), so a peer file's
+  bell cannot reach the page; a bell inside the ideas
+  file's own worker after its document is gone still
+  can. Re-witness before working it. Oracle: `./test`
+  prints neither `page failed to
   init` nor `Required element not found: #ideas-list`;
   `tests/ideas-empty-subscribe.test.ts` stays green;
   a bell after the ideas document is gone does not
@@ -1544,21 +1540,20 @@ Off the critical path; each with its oracle.
   the caller while its siblings still run, and
   `tests/adapters-ideas.test.ts:195` (`getIdea throws on
   missing submission`, `:182`) waits one macrotask turn
-  for them (`11cd89f8`). It was never seen to flake, but
-  one turn proves only that the abandoned reads were
-  fast: `getFlowStats` had the same shape, and with every
-  memory-backend entry delayed by up to 20 ms its twin
-  yield failed the ops sanitizer ("A timer was started in
-  this test, but never completed") until its fan-out
-  settled every read before rejecting.
+  for them, which proves only that the abandoned reads
+  were fast: the same shape with every memory-backend
+  entry delayed by up to 20 ms fails the ops sanitizer
+  ("A timer was started in this test, but never
+  completed") until the fan-out settles every read
+  before rejecting, as `getFlowStats` does
+  (`web-app/app/flow-stats.ts:22-48`).
   Oracle: a rejected `getIdea` leaves none of its reads
   in flight, pinned as `tests/adapters-flow-stats.test.ts`
   pins `getFlowStats`, and the yield at `:195` is gone
-- The panel doors a937df40 closed are unpinned. A panel
-  closed outside `withPanelOpen` kept the viewBox it
-  saved on open, so the next empty-canvas click or
-  delete restored a stale camera — F29's defect through
-  four more doors: `handleAddNodeAtPosition` writing
+- Four panel doors are unpinned. A panel closed
+  outside `withPanelOpen` must not hand the next
+  empty-canvas click or delete the viewBox it saved on
+  open, at four doors: `handleAddNodeAtPosition` writing
   `isPanelOpen: false` by hand
   (`web-app/flows/detail.ts:608`),
   `refreshFlowFromServer` dropping the panel when a
@@ -1567,18 +1562,16 @@ Off the critical path; each with its oracle.
   (`web-app/app/flow-operations.ts:707-709`), and a
   close under Auto Fit, where `applyPanelTransition`
   returns null (`web-app/app/flow-designer-actions.ts:474`).
-  a937df40 keys the transitions on the snapshot's own
-  previous open flag (`wasOpen`,
+  The transitions key on the snapshot's own previous
+  open flag (`wasOpen`,
   `web-app/app/presenters/flow-designer.ts:416`), so a
   close the snapshot already holds restores nothing and
-  the next open recaptures the camera — read, not
-  driven. Two loose ends stay: `handleUndo` and
+  the next open recaptures the camera — by reading, not
+  by test. Two loose ends: `handleUndo` and
   `handleRedo` leave `panelStateRef.open` true
   (`web-app/flows/detail.ts:357`, `:373`), and the
   inline close sites still bypass `closePanel()`
-  (`:1414`, `:2157`), the f29 plan's own deferral
-  (`docs/superpowers/plans/`
-  `2026-09-29-f29-zoomed-viewbox.md:984-986`). Oracle:
+  (`:1414`, `:2157`). Oracle:
   one Layer 2 test per door in
   `tests/browser/canvas-pan.test.ts` — with Auto Fit
   off, open a node's panel; then port-drag a new node,
@@ -1587,16 +1580,17 @@ Off the critical path; each with its oracle.
   under Auto Fit and switch it back off; zoom in once
   and click empty canvas — each keeping the zoomed
   camera
-- A flow loaded with Auto Fit OFF no longer fits on
+- A flow loaded with Auto Fit off does not fit on
   first paint. `withCanvasSize`
   (`web-app/app/presenters/flow-designer.ts:974-995`)
   fits only under `isAutoFit`, and the load-time block
   (`web-app/flows/detail.ts:1798-1813`) is the only
   load-time fit — its `reconcileFitFromDom()` returns
-  early for the same reason. RECORDED, behavior
-  unchanged. The sentence it falsifies is "onFlowLoaded
-  keeps its explicit first fit" — the run-four
-  remediation design spec, second-commit paragraph
+  early for the same reason, though the run-four
+  remediation spec promises "onFlowLoaded keeps its
+  explicit first fit". Oracle: a flow loaded with Auto
+  Fit off fits on first paint, or the spec says it
+  does not
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is
@@ -1606,9 +1600,8 @@ Off the critical path; each with its oracle.
   (I11, I14, I15), landing `.navbar-logo` (B2, B3), and
   a C5 miss of `.sidebar-nav-item`. Drive those by
   selector, not screenshot-xy. Then click the intended
-  control once. Named by the 2026-08-29 three-layers
-  audit and carried as a driving note in TEST-PLAN.md's
-  `## The walk`. Oracle:
+  control once, as TEST-PLAN.md's `## The walk` notes.
+  Oracle:
   `tests/test-plan-apple-menu.test.ts` (the document
   names the selectors). A Layer 2 test under
   `tests/browser/` asserting one click after reload
@@ -1617,7 +1610,7 @@ Off the critical path; each with its oracle.
   Node globals unlock per `deno check` invocation: one
   `node:` specifier anywhere in the checked graph gives
   `process` to every file in it. `web-app` carries none
-  of its own since the Deno port, but the gate checks it
+  of its own, but the gate checks it
   in one invocation with `client`, `server`, and `tests`
   (`test:64`), and
   either alone suffices — `server/scrypt-hash.ts`'s
@@ -1626,7 +1619,7 @@ Off the critical path; each with its oracle.
   fenced at all, via `deno.ns`.
   `tests/browser-fence.test.ts` checks an isolated file,
   so it passes while the property is false. Restoring
-  the `process` half now costs one line:
+  the `process` half costs one line:
   `deno check --frozen web-app` alone is green on the
   tree today and rejects a `process` reference under
   `web-app/` with TS2591. The `Deno.*` half is a much
@@ -1651,27 +1644,25 @@ Off the critical path; each with its oracle.
   `pageCandle`, `systemCandle`, `trendAxisMax`, and
   their siblings — because the page is one file that
   opens from disk and imports nothing (measure-candles
-  design § Pure core). Each pair was verified by reading
-  at review; nothing turns red when a core body changes
+  design § Pure core). Each pair matches by reading
+  alone; nothing turns red when a core body changes
   and its mirror does not. One `Deno.test` that
   evaluates the template string in a `Function` scope
   and runs every mirrored function against the core on
   shared fixtures closes it, codebase-wide. Oracle: a
   one-character change to any mirrored body in
   `vizClientScript()` turns that test red.
-- Untested by design after run-six: the records/projects/
+- Untested by design: the records/projects/
   flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
   retry branch, a work order both claimed and completed,
   and the archived-genesis walk
   (`client/objectives.ts:102-142`)
 - GPU flag in the Layer 2 launcher — `launchChrome`
-  no longer passes `--disable-gpu` (cargo cult under
-  `--headless=new`; it was required only by old
-  headless on Windows). Its one real effect was
-  forcing software compositing, which made runs more
-  alike across machines. Dropped UNVERIFIED —
-  `./test browser` has run green on one machine
-  (2026-08-28). Restore it if two machines disagree.
+  passes no `--disable-gpu`, which `--headless=new`
+  does not need; its one effect would be software
+  compositing, which makes runs more alike across
+  machines, and `./test browser` has been green on one
+  machine only. Restore it if two machines disagree.
   Oracle: `./test browser` green on two machines
 - No error-message allowlist. `safeErrorMessage`
   (`server/postgres-gate.ts:101-121`) prints a message
