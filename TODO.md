@@ -642,7 +642,13 @@ trio's retirement
     answers the head and stores nothing
     (`api/routes.ts:1363-1366`), which TEST-PLAN
     F36/F45 call PASS — the brainstorm decides whether
-    that stays); rotation only on the
+    that stays); the Auto Layout switch committing
+    without `commitAndFit` (`web-app/flows/detail.ts:946-956`),
+    the resize path with no gesture guard
+    (`web-app/app/adapters/resize-observer.ts`), and the
+    panel callback re-fitting at a double-click's second
+    press (`docs/superpowers/plans/`
+    `2026-10-05-walk-green.md:289-293`); rotation only on the
     toggle path (`web-app/app/flow-layout.ts:1032-1037`);
     the mirror trigger; and the canvas entries of the
     genericity bullet (two zoom
