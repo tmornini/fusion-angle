@@ -1292,7 +1292,7 @@ export interface WorkOrderEntity extends WorkOrderFieldsEntity {
         member_id: Id;
         at: string;
     };
-    events: WorkOrderEventEntity[];
+    readonly events: readonly WorkOrderEventEntity[];
     // GET embed when bound (absent when unbound).
     instance_id?: Id;
     record_type_id?: Id;
