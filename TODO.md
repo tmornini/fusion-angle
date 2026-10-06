@@ -29,6 +29,113 @@ out of the document body, closed the other way with the
 trio's retirement
 (`docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`).
 
+- **14.** Admins act within their organization. Any
+  organization's admin can write a password credential
+  for an identity in another organization and sign in
+  as it. `ROUTE_POLICY` grants `admin` every verb at
+  `/` (`api/authorization.ts:180-184`); `identities/…`
+  is the global plane, which the organization fence
+  never sees; and the credential PUT checks nothing —
+  `postIdentityCredentialDocumentOp`
+  (`api/routes.ts:2610`) ignores the path identity and
+  the actor and lands the body, whose `secret` the gate
+  checks only as a string (`api/validators.ts:587`) —
+  while sign-in reads that identity's own credentials
+  (`deriveCredentialsFor`, `api/authentication.ts:1729`).
+  Found by reading the code; no test drives either
+  answer. The same unscoped arm reaches the token chain:
+  the gate's self-or-admin guard
+  (`SELF_ONLY_TOKEN_ROUTES`, `api/api.ts:430-434`,
+  checked at `:807-845`) lets an admin name any
+  identity, `callerIsAdmin` being the claim
+  organization's `admin` role (`:701-702`), so an
+  organization's admin can rotate or revoke the token
+  chain of an identity outside it. The sweep covers
+  every other admin-reachable `identities/:id/…` write
+  — the identity PUT (`api/routes.ts:3595`), PII PUT and
+  DELETE (`:3690-3694`; `authorizeIdentityPii`,
+  `api/request-auth.ts:160-176`, admits any admin),
+  credentials (`:3793`), registration (`:3826`,
+  `:3833`), tokens (`:3911`), and providers (`:4019`) —
+  and `GET identities/`, which serves the stored heads
+  at the global prefix whatever the caller's
+  organization (`api/routes.ts:3509-3514`). The reads of
+  PII and credentials carry a membership fence
+  (`:3659-3686`, `:3774-3785`) that admits an identity
+  with no membership. No root operator exists: the `/`
+  tier every organization admin holds is the only
+  cross-organization reach (`api/authorization.ts:172-186`).
+  Scope the admin arm to identities with an accepted
+  membership in the claim's organization; member
+  creation lands the identity before its membership
+  (`postHumanMemberCreation`, `client/members.ts:276`),
+  so the brainstorm orders that, and decides whether a
+  cross-organization operator should exist at all.
+  Oracle: a red test first plants a credential across
+  organizations and signs in with it; then, on each
+  route above, an organization admin naming an identity
+  with no accepted membership in its organization is
+  403 before any read or write, and naming one that
+  holds one is unchanged.
+- **15.** Everything we own, named `fa_` — so that operating the
+  system makes what is ours trivial to find:
+  `env | grep FA_` lists every variable the system needs.
+  Every environment variable the system reads becomes
+  `FA_*`, and every Postgres role, login, table, index,
+  and view `fa_*` (the ledger store named the table,
+  its indexes, and its functions so; item 2 creates its
+  roles and views under the
+  prefix). Product code reads
+  six names of its own — `POSTGRES_URL`,
+  `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
+  (`server/boot.ts:60-73`; the URL again at
+  `server/postgres-seed.ts:69` and
+  `server/postgres-wipe.ts:61`; the key again at
+  `api/access-token.ts:36`, through the `process` global a
+  search for `Deno.env` misses), and the tooling's
+  `MEASURE_PASSWORD` (`web-app/app/measure.ts:368-370`,
+  with the URL and the key again at `:430-432`) and
+  `CHROME` (`web-app/app/cdp-client.ts:39`) — so the app
+  reads
+  `FA_POSTGRES_URL` directly and nothing translates. Names
+  others dictate stay at two edges: the Postgres image's
+  `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD`,
+  which `compose.yaml` fills from `FA_` values, and the
+  Render CLI's `RENDER_API_KEY`, which `deploy:178`,
+  `bin/postgres-seed:154`, and `bin/postgres-wipe:113`
+  fill from their own argument; a
+  dependency that ever dictates a name gets its adapter.
+  One dictates today: postgres.js reads sixteen `PG*`
+  names as option defaults — `PGPORT`, `PGSSL`,
+  `PGIDLE_TIMEOUT`, and their kin — and `bin/build:100-104`
+  grants the binary exactly those, so not every reader is
+  ours until `api/postgres-client.ts` passes every option
+  and the grants go, or `PG*` is named a third edge — the
+  brainstorm settles which.
+  Today's role and database are both `fusion`
+  (`compose.yaml:2,8-9,22,24`; `mint_compose_env`,
+  `bin/compose-lib:14-15`). Owned names the prefix has
+  not reached: the notify channel `fusion_events`
+  (`api/advisory-lock.ts:11`,
+  `api/ledger-statement-sql.ts:229`), the test schema
+  `fusion_test_…` and compose project
+  `fusion-test-postgres-$$` (`bin/test-postgres:22`,
+  `:17`), and `schema_marker`, which item 3 retires.
+  Ships no later than the deploy
+  of items 0–3, which already changes what operators
+  configure, so they rename once. The brainstorm settles
+  how far "infrastructure" reaches: the database name,
+  compose's service and container names, the hosted
+  service names, the test-only `CHROME` and
+  `CHROME_DEBUG_URL`, and the scripts' and tests'
+  `FUSION_ANGLE_STATIC_ROOT` (`bin/test-browser:38`,
+  `tests/browser/fixtures.ts:58`),
+  `MOST_RECENTLY_VALIDATED_SHA_PATH`, and
+  `WORKING_TREE_PORCELAIN` (`test:242`, `:246`), which
+  the oracle reaches. Oracle: `env | grep FA_` lists
+  everything the system needs, and a test finds every
+  environment read in product code and scripts and fails
+  on a name without the prefix outside the two edges
 - **2.** The ledger fenced — roles, grants, and row policies, on
   the table items 0 and 1 finished (landed: the
   2026-09-23 ledger-store, message-plane, and ledger-seed
@@ -261,6 +368,26 @@ trio's retirement
   `tests/api-shadow-ledger-auth.test.ts` 'live secrets
   land in the auth-flow ledger rows'). Follows items 0
   and 1, which landed.
+- **16.** `FA_GIT_SHA` — the commit that built the running
+  binary, supplied by the environment as every `FA_`
+  value is and never defaulted, read once at boot and
+  carried in the context so every log line names the
+  build (the Office of Structured Observability), and
+  the one source of the `<sha>` in the `user-agent`
+  token the client and item 3 send. `./deploy` fills it from
+  `git rev-parse HEAD`, exact because the build refuses
+  a dirty tree; on Render from the host's commit
+  variable (`RENDER_GIT_COMMIT`), a name that stays at
+  the edge (item 15). How the page bundle
+  learns it — embedded at build, or served — is this
+  bullet's to settle. Nothing sends the token yet: the
+  message-plane spec left it out
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:272-274`),
+  and no `user-agent` line appears under `client/`,
+  `api/`, `shared/`, or `server/`. Oracle: a boot without
+  it refuses, as a boot without `FA_POSTGRES_URL` does; a
+  request log line carries it; and every API request the
+  client sends carries `user-agent: fusion-angle/<sha>`
 - **3.** Retire `schema_marker` for migrations the ledger
   holds — the marker (`api/schema-postgres.ts:46-49`)
   proves only that a seed once finished; it cannot tell
@@ -435,6 +562,26 @@ trio's retirement
   ARCHITECTURE.md:43-44, and the comments that name it
   (`server/boot.ts:1-3`, `api/ledger-seed.ts:321-322`,
   `api/db.ts:217`, `:231`). Follows item 2.
+- **17.** Wipe and reseed every live database onto the ledger
+  store's table at the deploy of items 0–3. Nothing
+  alters a database in place: the seed refuses one
+  whose `fa_message_pairs` exists
+  (`server/seed.ts:101-128`), and a master-era database
+  — `message_pairs` and its `schema_marker` row — boots
+  this binary and fails every read, while the seed
+  meets its marker and rolls back (item 3). So every
+  live ledger takes `./bin/postgres-wipe` then
+  `./bin/postgres-seed`, or the Render equivalents
+  through `./deploy`, and with it arrive the exact-read
+  shapes (Spec Decision 8: invitation `state` on the
+  head, PII at `('/identities/<id>/', 'pii')`, token
+  `name = jti`, no `/identity-tokens/`), which
+  production derives never dual-read, the membership
+  documents, `fa_message_body_json`, and the partial
+  index `fa_message_pairs_body`
+  (`WHERE path = '/invitations/'`). Oracle: every live
+  database has been wiped and reseeded after the ledger
+  store's landing, and holds `/migrations/0000-root`
 - **4.** `/status` — `{ up: boolean, components: { postgres:
   boolean } }`, 200 when every component is up and 503
   when any is not, built for more components.
@@ -715,96 +862,162 @@ trio's retirement
 
 Off the critical path; each with its oracle.
 
-- `getIdea` (`client/ideas.ts:166`) fans three reads out
-  through `Promise.all` at `:172`, so a rejection settles
-  the caller while its siblings still run, and
-  `tests/adapters-ideas.test.ts:195` (`getIdea throws on
-  missing submission`, `:182`) waits one macrotask turn
-  for them (`11cd89f8`). It was never seen to flake, but
-  one turn proves only that the abandoned reads were
-  fast: `getFlowStats` had the same shape, and with every
-  memory-backend entry delayed by up to 20 ms its twin
-  yield failed the ops sanitizer ("A timer was started in
-  this test, but never completed") until its fan-out
-  settled every read before rejecting.
-  Oracle: a rejected `getIdea` leaves none of its reads
-  in flight, pinned as `tests/adapters-flow-stats.test.ts`
-  pins `getFlowStats`, and the yield at `:195` is gone
-- The run-four remediation's remaining seams — R6 and
-  R7. R6 holds in a stronger form: no picker renders for
-  `select`. R7's primary clause is false: `regex` is
-  always offered and a second pick adds a second row
-  (`web-app/app/presenters/record-detail.ts:838-871,
-  901-909`), and the three constraint maps accept
-  duplicates (`api/validators.ts:2649-2665`,
-  `:2754-2770`, `:2876-2890`). The walk decides whether
-  that is a defect; the pins
-  (`tests/presenter-record-detail.test.ts:122`, R7;
-  `:141`, R6) make any
-  rewrite honest. G9's staleness was the corrupted test
-  name, restored by the small-items sweep
-- A dragged objective slider's readout speaks a second
-  voice: `web-app/projects/detail.ts`'s input handler
-  writes `sign + String(v)` (ASCII `-100`) where the
-  presenter paints `formatSigned`'s U+2212 `−100`, so
-  K13's row reads `-100` until the save re-renders it.
-  Oracle: a Layer 2 test that drags a `.baseline-slider`
-  to its minimum and reads `.slider-value` as
-  `formatSigned(-100)`
-- I21's walk probe reads the page at the first paused
-  `/api/organizations/*` request, and on 29 Sep that
-  request was not the page's. The five GETs the walk
-  held are all the top-bar strip's — organization, its
-  seat read on `organizations/{id}/members/`, ideas,
-  projects, flows (`web-app/app/header-info.ts:11-26`, sent
-  from `bootApp`'s sidebar branch). The members page's
-  own roster read, which `loadInto` sends only after it
-  has painted the skeleton, is not among them. At the
-  strip's organization GET the page branch may still be
-  importing its code-split chunk, so no page code has
-  run. `tests/members-pending-skeleton.test.ts` shows
-  the skeleton painted once `init` runs. I21 has scored
-  PASS on every walk since (`a6af68a6`, `2acbc87a`,
-  `ed1fac5c`), the first paused GET already showing the
-  skeleton, so the race is latent. Owner call: have I21
-  poll for the skeleton while the pause holds, rule the
-  pre-import blank container a product gap, or retire
-  this bullet.
-  Oracle: TEST-PLAN I21's probe step and its
-  `### Driving notes` twin
-- The panel doors a937df40 closed are unpinned. A panel
-  closed outside `withPanelOpen` kept the viewBox it
-  saved on open, so the next empty-canvas click or
-  delete restored a stale camera — F29's defect through
-  four more doors: `handleAddNodeAtPosition` writing
-  `isPanelOpen: false` by hand
-  (`web-app/flows/detail.ts:608`),
-  `refreshFlowFromServer` dropping the panel when a
-  cross-tab edit removes its selection (`:1966-1970`),
-  undo and redo committing `applyServerGraph`
-  (`web-app/app/flow-operations.ts:707-709`), and a
-  close under Auto Fit, where `applyPanelTransition`
-  returns null (`web-app/app/flow-designer-actions.ts:474`).
-  a937df40 keys the transitions on the snapshot's own
-  previous open flag (`wasOpen`,
-  `web-app/app/presenters/flow-designer.ts:416`), so a
-  close the snapshot already holds restores nothing and
-  the next open recaptures the camera — read, not
-  driven. Two loose ends stay: `handleUndo` and
-  `handleRedo` leave `panelStateRef.open` true
-  (`web-app/flows/detail.ts:357`, `:373`), and the
-  inline close sites still bypass `closePanel()`
-  (`:1414`, `:2157`), the f29 plan's own deferral
-  (`docs/superpowers/plans/`
-  `2026-09-29-f29-zoomed-viewbox.md:984-986`). Oracle:
-  one Layer 2 test per door in
-  `tests/browser/canvas-pan.test.ts` — with Auto Fit
-  off, open a node's panel; then port-drag a new node,
-  apply a cross-tab edit that removes the selection,
-  undo the open node's creation, or close the panel
-  under Auto Fit and switch it back off; zoom in once
-  and click empty canvas — each keeping the zoomed
-  camera
+- A revocation's cutoff is the client's clock. The
+  token-revocation PUT carries `at` from the browser's
+  `nowUtc()` (`client/identity-token-revocations.ts:17`),
+  the gate checks it only as a timestamp
+  (`validateIdentityTokenRevocationEntity`,
+  `api/validators.ts:617-632`), and every access token
+  with `iat <= revokedThrough` is refused
+  (`tokenRevocationReason`, `api/authentication.ts:685`;
+  `revokedThroughSeconds`, `api/access-token.ts:224`).
+  A device clock behind the server's leaves the token a
+  logout meant to end alive; one ahead refuses the
+  identity's next tokens until it catches up. The state
+  by PUT spec named it with primary-organization
+  resolution, the other decision a client-minted stamp
+  drives
+  (`docs/superpowers/specs/2026-09-25-state-by-put-design.md:361-362`).
+  The pair's own `response_at` is the one clock, as the
+  grant's issue instant already reads it. Oracle: a
+  revocation stamped by a skewed client still refuses
+  every token issued before the server received it, and
+  none issued after.
+- The four counting checks close before their
+  statement: the last accepted admin
+  (`refuseLastAdmin`, `api/invitations-domain.ts:335-355`),
+  the record-type RESTRICT (`api/routes.ts:4610-4620`),
+  the attribute RESTRICT (`api/routes.ts:977-990`, and
+  again in `deleteRecordAttributeSafe` at `:4764-4768`),
+  and the instance placement RESTRICT
+  (`api/routes.ts:3198-3224`) each verify in a read
+  transaction that closes before the write. The
+  default-organization write reads an accepted
+  membership (`membershipOf`,
+  `api/organization-requests.ts:120-129`) and then
+  writes. A grant reads the membership head
+  (`postOrganizationInvitationGrant`,
+  `api/invitations-domain.ts:588`) and then lands
+  (`:607`). Two grants of one email name one
+  document, `<organization-id>:<identity-id>`.
+  Oracle: two writers race the last accepted admin,
+  a record-type DELETE against an instance create, an
+  attribute DELETE against a flow PUT, an instance
+  DELETE against a binding, a default-organization
+  PUT against that membership's removal, and two
+  grants of one email; each race refuses one writer.
+  The guard lives in the write's own statement: the
+  ledger store took transactions and advisory locks
+  out of the write path (4175b2d5), so the one write
+  transaction and the organization's lock the state by
+  PUT spec named are gone.
+- The work-order gates check no node and no edge.
+  `assertRequiredAttributesAtExit` (`api/routes.ts`) returns
+  when the head's `state` names no node in its frozen
+  `flow_graph`, so the required-at-exit check is skipped
+  silently for that head. No gate would stop it:
+  `validateWorkOrderCreateBody` checks `states` only as
+  non-empty strings, never `states[2]` as `'claimed'`
+  (`docs/superpowers/specs/`
+  `2026-10-04-work-order-events-design.md:199-200`), and
+  `validateWorkOrderInstanceTransitionBody`
+  and `postWorkOrderTransitionOp` (`api/validators.ts`,
+  `api/routes.ts`) check `targetState` only as non-empty, with
+  no edge from the head's `state`, and `postWorkOrderDocumentOp`
+  (`api/routes.ts`) lays a PUT's `flow_graph` over the head
+  without checking that `state` still names a node. Nothing
+  compares the browser-minted `transitionAt` with the head's
+  `transition.at` either. The inbox's static degraded row for an unplaced head
+  contains the gap; it does not close it. Plan gate validation
+  (node, edge, and `transitionAt`; real graphs in fixtures) as
+  its own spec; it decides whether a skewed `transitionAt` is
+  refused or clamped. Oracle: a create or transition naming a
+  node absent from the graph, a transition with no edge from
+  the head's `state`, or a PUT whose `flow_graph` drops the
+  head's `state`, is refused at the gate.
+- The Send Back feedback textarea is discarded.
+  `web-app/app/presenters/idea.ts:410-425` renders
+  `<textarea id="approval-send-back-feedback">` in the
+  Send Back dialog — its id split across a
+  concatenation (`'approval-send-back' + '-feedback'`),
+  so a grep for the whole id finds not even the render,
+  and `grep -rn "\-feedback'"` finds no read: the confirm path
+  (`web-app/ideas/detail.ts:285-300` → `transitionIdea`
+  → `postIdeaStateChange`) has no feedback parameter, so
+  whatever a reviewer types is thrown away. Found by
+  reading, not driving, during the 2026-08-29 audit; no
+  TEST-PLAN case claims the feedback survives. Oracle: a
+  Layer 1 test asserting the typed feedback reaches the
+  transition
+- Claim-on-load with no release-on-leave plus the
+  8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
+  work-order view into an 8-hour claim
+  (run-six Task 3 renders it; the UX remains) —
+  `web-app/workbox/detail.ts:598-616`,
+  `shared/types.ts:1087`
+- A latched write aligned to RFC 9110 §13.1.1. When
+  its `If-Match` fails, the RFC lets the origin answer
+  2xx if it can verify that the requested state change
+  has already succeeded: a lost response, or a
+  compatible change by another agent. Otherwise it
+  answers 412. The statement decides stale before
+  matched, row by row
+  (`rawOutcome`, `shared/ledger-statement.ts:198-230`;
+  `api/ledger-statement-sql.ts:148-180`), pinned by
+  'stale still beats matched and land'
+  (`tests/ledger-store.test.ts:1154`,
+  `tests/pg-ledger-store.test.ts:1546`). Only a PUT or
+  DELETE row can match its head. A stale row refuses
+  the statement; otherwise a matched row is skipped and
+  the rest land, unless no document row — a row that
+  carries a latch — lands, and then the statement
+  stores nothing, the received pair included. A
+  statement of blind rows has no document row, so it
+  stays all-or-nothing
+  (`reportedOutcome` and `isDocumentRow`,
+  `shared/ledger-statement.ts:235-256`;
+  `api/ledger-statement-sql.ts:184-202`). The
+  message-plane spec keeps stale before matched
+  (Decision 2,
+  `docs/superpowers/specs/2026-09-23-message-plane-design.md`),
+  so a resent in-order PUT whose latch names the
+  head's predecessor answers 412 even when that head
+  is its own first attempt and holds its state. No
+  client sends one today: the 412 loops read a fresh
+  head and latch, and no `fetch` times out. The
+  retries bullet above makes it reachable, because a
+  PUT resent after an unknown outcome would answer
+  412 to its own success. How far to align is this
+  bullet's brainstorm to decide.
+  - The narrowest reading answers 200 with the head's
+    response when the head supersedes the latch and
+    holds the request's state.
+  - The widest answers 200 whenever the head holds
+    the state. It hides an intervening writer, and it
+    answers an invented or foreign latch with 200.
+  After state by PUT the alignment is one branch in the
+  classifier, in both backends, and nothing else moves;
+  a create resent after a lost response is a declared
+  genesis the narrowest reading would answer 200
+  (`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
+  §10). The gate checks only a latch's presence and
+  form (`preconditionRefusal`, `api/api.ts:236-306`),
+  and the flow PUT no longer re-reads the head to
+  refuse its latch (`postFlowDocumentOp`,
+  `api/routes.ts:1334-1360`). Both head reads carry
+  the head's response and method, all the widest
+  reading compares: `headed`
+  (`api/ledger-statement-sql.ts:68-87`) and the memory
+  `Head` (`shared/ledger-statement.ts:73-81`, filled by
+  `headsOf`, `api/backend-memory.ts:315-362`). The
+  narrowest also compares the head's `supersedes`,
+  which neither selects today. The statement keeps its
+  fifteen parameters. Lands no later than the retries
+  bullet.
+  Oracle: a Layer 1 test resends a landed in-order
+  PUT with its original `If-Match` and gets 200 with
+  the landed pair's `etag`, and `./test postgres`
+  pins the same on the table
 - API retries, unified — the client resends by two
   unrelated mechanisms spread across its files, and leaves
   the commonest failures unhandled. Contention: flow PUT
@@ -893,128 +1106,6 @@ Off the critical path; each with its oracle.
   outliving a refresh (`web-app/workbox/detail.ts:70`,
   `:195-206`, `:234`;
   `docs/superpowers/plans/2026-10-05-walk-green.md:279-288`)
-- A latched write aligned to RFC 9110 §13.1.1. When
-  its `If-Match` fails, the RFC lets the origin answer
-  2xx if it can verify that the requested state change
-  has already succeeded: a lost response, or a
-  compatible change by another agent. Otherwise it
-  answers 412. The statement decides stale before
-  matched, row by row
-  (`rawOutcome`, `shared/ledger-statement.ts:198-230`;
-  `api/ledger-statement-sql.ts:148-180`), pinned by
-  'stale still beats matched and land'
-  (`tests/ledger-store.test.ts:1154`,
-  `tests/pg-ledger-store.test.ts:1546`). Only a PUT or
-  DELETE row can match its head. A stale row refuses
-  the statement; otherwise a matched row is skipped and
-  the rest land, unless no document row — a row that
-  carries a latch — lands, and then the statement
-  stores nothing, the received pair included. A
-  statement of blind rows has no document row, so it
-  stays all-or-nothing
-  (`reportedOutcome` and `isDocumentRow`,
-  `shared/ledger-statement.ts:235-256`;
-  `api/ledger-statement-sql.ts:184-202`). The
-  message-plane spec keeps stale before matched
-  (Decision 2,
-  `docs/superpowers/specs/2026-09-23-message-plane-design.md`),
-  so a resent in-order PUT whose latch names the
-  head's predecessor answers 412 even when that head
-  is its own first attempt and holds its state. No
-  client sends one today: the 412 loops read a fresh
-  head and latch, and no `fetch` times out. The
-  retries bullet above makes it reachable, because a
-  PUT resent after an unknown outcome would answer
-  412 to its own success. How far to align is this
-  bullet's brainstorm to decide.
-  - The narrowest reading answers 200 with the head's
-    response when the head supersedes the latch and
-    holds the request's state.
-  - The widest answers 200 whenever the head holds
-    the state. It hides an intervening writer, and it
-    answers an invented or foreign latch with 200.
-  After state by PUT the alignment is one branch in the
-  classifier, in both backends, and nothing else moves;
-  a create resent after a lost response is a declared
-  genesis the narrowest reading would answer 200
-  (`docs/superpowers/specs/2026-09-25-state-by-put-design.md`
-  §10). The gate checks only a latch's presence and
-  form (`preconditionRefusal`, `api/api.ts:236-306`),
-  and the flow PUT no longer re-reads the head to
-  refuse its latch (`postFlowDocumentOp`,
-  `api/routes.ts:1334-1360`). Both head reads carry
-  the head's response and method, all the widest
-  reading compares: `headed`
-  (`api/ledger-statement-sql.ts:68-87`) and the memory
-  `Head` (`shared/ledger-statement.ts:73-81`, filled by
-  `headsOf`, `api/backend-memory.ts:315-362`). The
-  narrowest also compares the head's `supersedes`,
-  which neither selects today. The statement keeps its
-  fifteen parameters. Lands no later than the retries
-  bullet.
-  Oracle: a Layer 1 test resends a landed in-order
-  PUT with its original `If-Match` and gets 200 with
-  the landed pair's `etag`, and `./test postgres`
-  pins the same on the table
-- **15.** Everything we own, named `fa_` — so that operating the
-  system makes what is ours trivial to find:
-  `env | grep FA_` lists every variable the system needs.
-  Every environment variable the system reads becomes
-  `FA_*`, and every Postgres role, login, table, index,
-  and view `fa_*` (the ledger store named the table,
-  its indexes, and its functions so; item 2 creates its
-  roles and views under the
-  prefix). Product code reads
-  six names of its own — `POSTGRES_URL`,
-  `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
-  (`server/boot.ts:60-73`; the URL again at
-  `server/postgres-seed.ts:69` and
-  `server/postgres-wipe.ts:61`; the key again at
-  `api/access-token.ts:36`, through the `process` global a
-  search for `Deno.env` misses), and the tooling's
-  `MEASURE_PASSWORD` (`web-app/app/measure.ts:368-370`,
-  with the URL and the key again at `:430-432`) and
-  `CHROME` (`web-app/app/cdp-client.ts:39`) — so the app
-  reads
-  `FA_POSTGRES_URL` directly and nothing translates. Names
-  others dictate stay at two edges: the Postgres image's
-  `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD`,
-  which `compose.yaml` fills from `FA_` values, and the
-  Render CLI's `RENDER_API_KEY`, which `deploy:178`,
-  `bin/postgres-seed:154`, and `bin/postgres-wipe:113`
-  fill from their own argument; a
-  dependency that ever dictates a name gets its adapter.
-  One dictates today: postgres.js reads sixteen `PG*`
-  names as option defaults — `PGPORT`, `PGSSL`,
-  `PGIDLE_TIMEOUT`, and their kin — and `bin/build:100-104`
-  grants the binary exactly those, so not every reader is
-  ours until `api/postgres-client.ts` passes every option
-  and the grants go, or `PG*` is named a third edge — the
-  brainstorm settles which.
-  Today's role and database are both `fusion`
-  (`compose.yaml:2,8-9,22,24`; `mint_compose_env`,
-  `bin/compose-lib:14-15`). Owned names the prefix has
-  not reached: the notify channel `fusion_events`
-  (`api/advisory-lock.ts:11`,
-  `api/ledger-statement-sql.ts:229`), the test schema
-  `fusion_test_…` and compose project
-  `fusion-test-postgres-$$` (`bin/test-postgres:22`,
-  `:17`), and `schema_marker`, which item 3 retires.
-  Ships no later than the deploy
-  of items 0–3, which already changes what operators
-  configure, so they rename once. The brainstorm settles
-  how far "infrastructure" reaches: the database name,
-  compose's service and container names, the hosted
-  service names, the test-only `CHROME` and
-  `CHROME_DEBUG_URL`, and the scripts' and tests'
-  `FUSION_ANGLE_STATIC_ROOT` (`bin/test-browser:38`,
-  `tests/browser/fixtures.ts:58`),
-  `MOST_RECENTLY_VALIDATED_SHA_PATH`, and
-  `WORKING_TREE_PORCELAIN` (`test:242`, `:246`), which
-  the oracle reaches. Oracle: `env | grep FA_` lists
-  everything the system needs, and a test finds every
-  environment read in product code and scripts and fails
-  on a name without the prefix outside the two edges
 - Gone for every document. State by PUT retires a
   record instance's id for good: the never-written latch
   makes tombstone-wins the statement's rule, and a
@@ -1055,70 +1146,6 @@ Off the critical path; each with its oracle.
   foreign organization's retired document answers what
   its live one does; history and past versions answer
   410 with the document.
-- **14.** Admins act within their organization. Any
-  organization's admin can write a password credential
-  for an identity in another organization and sign in
-  as it. `ROUTE_POLICY` grants `admin` every verb at
-  `/` (`api/authorization.ts:180-184`); `identities/…`
-  is the global plane, which the organization fence
-  never sees; and the credential PUT checks nothing —
-  `postIdentityCredentialDocumentOp`
-  (`api/routes.ts:2610`) ignores the path identity and
-  the actor and lands the body, whose `secret` the gate
-  checks only as a string (`api/validators.ts:587`) —
-  while sign-in reads that identity's own credentials
-  (`deriveCredentialsFor`, `api/authentication.ts:1729`).
-  Found by reading the code; no test drives either
-  answer. The same unscoped arm reaches the token chain:
-  the gate's self-or-admin guard
-  (`SELF_ONLY_TOKEN_ROUTES`, `api/api.ts:430-434`,
-  checked at `:807-845`) lets an admin name any
-  identity, `callerIsAdmin` being the claim
-  organization's `admin` role (`:701-702`), so an
-  organization's admin can rotate or revoke the token
-  chain of an identity outside it. The sweep covers
-  every other admin-reachable `identities/:id/…` write
-  — the identity PUT (`api/routes.ts:3595`), PII PUT and
-  DELETE (`:3690-3694`; `authorizeIdentityPii`,
-  `api/request-auth.ts:160-176`, admits any admin),
-  credentials (`:3793`), registration (`:3826`,
-  `:3833`), tokens (`:3911`), and providers (`:4019`) —
-  and `GET identities/`, which serves the stored heads
-  at the global prefix whatever the caller's
-  organization (`api/routes.ts:3509-3514`). The reads of
-  PII and credentials carry a membership fence
-  (`:3659-3686`, `:3774-3785`) that admits an identity
-  with no membership. No root operator exists: the `/`
-  tier every organization admin holds is the only
-  cross-organization reach (`api/authorization.ts:172-186`).
-  Scope the admin arm to identities with an accepted
-  membership in the claim's organization; member
-  creation lands the identity before its membership
-  (`postHumanMemberCreation`, `client/members.ts:276`),
-  so the brainstorm orders that, and decides whether a
-  cross-organization operator should exist at all.
-  Oracle: a red test first plants a credential across
-  organizations and signs in with it; then, on each
-  route above, an organization admin naming an identity
-  with no accepted membership in its organization is
-  403 before any read or write, and naming one that
-  holds one is unchanged.
-- Instances and bound work orders name the record-type
-  version they were written against. An instance's state
-  is `{ id, organization_id, record_type_id, values }`
-  (`instanceStateOf`, `api/routes.ts:3291-3302`); it gains
-  `record_type_etag`, the type's head etag when the
-  instance's version landed, beside `record_type_id`,
-  which stays, so the body keeps every id in its path. A
-  bound work order's version carries `instance_id` and
-  `record_type_id` (`api/work-order-version.ts:39`,
-  `:70-76`, `boundVersion` at `:289-311`); it gains
-  `record_type_etag`
-  beside `record_type_id`. Oracle: an instance's GET and a
-  bound work order's GET each carry `record_type_etag`
-  equal to the record type's ETag at the write that
-  produced that version, and a later type write leaves
-  the older version's `record_type_etag` unchanged.
 - An idea converts whatever its state. The conversion
   (`api/routes.ts:4059-4167`) latches the idea on the client's
   tag and runs one statement: the idea in order, the
@@ -1142,6 +1169,36 @@ Off the critical path; each with its oracle.
   `approved` (promoted, deleted, or any other state)
   answers 409 naming the idea and stores nothing; an
   approved idea converts as today.
+- Instances and bound work orders name the record-type
+  version they were written against. An instance's state
+  is `{ id, organization_id, record_type_id, values }`
+  (`instanceStateOf`, `api/routes.ts:3291-3302`); it gains
+  `record_type_etag`, the type's head etag when the
+  instance's version landed, beside `record_type_id`,
+  which stays, so the body keeps every id in its path. A
+  bound work order's version carries `instance_id` and
+  `record_type_id` (`api/work-order-version.ts:39`,
+  `:70-76`, `boundVersion` at `:289-311`); it gains
+  `record_type_etag`
+  beside `record_type_id`. Oracle: an instance's GET and a
+  bound work order's GET each carry `record_type_etag`
+  equal to the record type's ETag at the write that
+  produced that version, and a later type write leaves
+  the older version's `record_type_etag` unchanged.
+- Toast doubled live region and tab order.
+  `ensureContainer` appends last in tab order and sets
+  `aria-live=polite` (`web-app/app/toast.ts:94-104`);
+  each toast is also `role=status` (`:117-119`).
+  Critical-functionality path: accessibility
+  precondition, unmeasured. Pause-on-hover shipped;
+  this did not. Oracle: tab from the last page control
+  reaches the live toast's dismiss; one live region,
+  not two
+- The auth page's left panel shows invented stats —
+  "10K+ Active Users", "98% Satisfaction", "50+
+  Integrations" (`web-app/auth/index.ts:118-157`,
+  TEST-PLAN B5). Same sin as the landing mock-up;
+  its own spec.
 - The context is the one source of `operation-id`. The
   message-plane spec retired the `?? ''` reads, the
   server's mints, and `headerFieldsWithOperationId`
@@ -1159,6 +1216,27 @@ Off the critical path; each with its oracle.
   reaches. Oracle: no `?? ''` reads `operation-id` under
   `api/`, `headerFieldsWithOperationId` is gone, and the
   raw verbs take a `string`.
+- A dragged objective slider's readout speaks a second
+  voice: `web-app/projects/detail.ts`'s input handler
+  writes `sign + String(v)` (ASCII `-100`) where the
+  presenter paints `formatSigned`'s U+2212 `−100`, so
+  K13's row reads `-100` until the save re-renders it.
+  Oracle: a Layer 2 test that drags a `.baseline-slider`
+  to its minimum and reads `.slider-value` as
+  `formatSigned(-100)`
+- The run-four remediation's remaining seams — R6 and
+  R7. R6 holds in a stronger form: no picker renders for
+  `select`. R7's primary clause is false: `regex` is
+  always offered and a second pick adds a second row
+  (`web-app/app/presenters/record-detail.ts:838-871,
+  901-909`), and the three constraint maps accept
+  duplicates (`api/validators.ts:2649-2665`,
+  `:2754-2770`, `:2876-2890`). The walk decides whether
+  that is a defect; the pins
+  (`tests/presenter-record-detail.test.ts:122`, R7;
+  `:141`, R6) make any
+  rewrite honest. G9's staleness was the corrupted test
+  name, restored by the small-items sweep
 - A received POST or PATCH names the root, not the head
   it acted on. Item 0's design, which landed and left
   this file, had it name the head its
@@ -1180,101 +1258,226 @@ Off the critical path; each with its oracle.
   received in-order POST's `supersedes` equals its
   `If-Match`, or SCHEMA.md states the rule and a test
   pins the root.
-- A revocation's cutoff is the client's clock. The
-  token-revocation PUT carries `at` from the browser's
-  `nowUtc()` (`client/identity-token-revocations.ts:17`),
-  the gate checks it only as a timestamp
-  (`validateIdentityTokenRevocationEntity`,
-  `api/validators.ts:617-632`), and every access token
-  with `iat <= revokedThrough` is refused
-  (`tokenRevocationReason`, `api/authentication.ts:685`;
-  `revokedThroughSeconds`, `api/access-token.ts:224`).
-  A device clock behind the server's leaves the token a
-  logout meant to end alive; one ahead refuses the
-  identity's next tokens until it catches up. The state
-  by PUT spec named it with primary-organization
-  resolution, the other decision a client-minted stamp
-  drives
-  (`docs/superpowers/specs/2026-09-25-state-by-put-design.md:361-362`).
-  The pair's own `response_at` is the one clock, as the
-  grant's issue instant already reads it. Oracle: a
-  revocation stamped by a skewed client still refuses
-  every token issued before the server received it, and
-  none issued after.
 
 ## Later work
 
-- The auth page's left panel shows invented stats —
-  "10K+ Active Users", "98% Satisfaction", "50+
-  Integrations" (`web-app/auth/index.ts:118-157`,
-  TEST-PLAN B5). Same sin as the landing mock-up;
-  its own spec.
-- One gate for the write. Every write is one ledger
-  statement now (`runLedgerStatement`,
-  `api/ledger-statement.ts:48`), but each handler still
-  lands its own: `runWrite` at 40 sites, 37 of them in
-  `api/routes.ts`, `runStateWrite` at 17, 13 there, and
-  `landStateWrite` twice in `api/authentication.ts`,
-  because each handler owns its own storage instead of
-  returning its pairs for one place to store. A handler
-  returns `MessagePair[]`; the gate lands them once, with
-  one notification. Lands beside item 11, which
-  rewrites the largest handlers. Oracle: one `runWrite`
-  site in `api/api.ts`, and no `runWrite` or
-  `runStateWrite` in `api/routes.ts`.
-- The ledger sweep, built into `./bin/measure` the way
-  `./deploy` grew modes. A ledger mode that subsumes a
-  generator and a loader: the mock seed as the base, a modeled
-  year of growth on top, every model constant a CLI argument
-  (seats, working days, logins and refreshes and document
-  writes per seat-day, revision share, neighbor size); base
-  through `postMockDataLoad`, growth in batches of 1000 through
-  the seam's `append` with modeled stamps, formed by the real
-  pair formers. A decade sweep at 10k, 100k, and 1M pairs.
-  `EXPLAIN (ANALYZE, BUFFERS)` per statement with parameters
-  chosen by query, and the size at which any statement crosses
-  30 ms. Two hundred real writes through the gate per size;
-  per-index bytes, rebuild time, and the write sample with each
-  index dropped. A neighbor run at 100k this tenant and 900k
-  neighbor. Statistics discipline: snapshot
-  `pg_stat_user_tables`, then `VACUUM (ANALYZE)`, re-ANALYZE
-  after every rebuild, stats recorded per measurement. Local
-  compose Postgres 18 on tmpfs, Render v18; timings are lower
-  bounds. Loopback-only URL guard; a private schema per size;
-  JSON under `measurements/ledger/`. Oracle: committed JSON per
-  size and a report section per statement naming its 30 ms
-  crossing or "beyond 1M".
-- Growth: bytes per pair with two wire messages stored, heap
-  against index bytes, `pg_dump` size at 1M, and autovacuum's
-  insert-threshold behavior on the insert-only table. Oracle:
-  numbers in the sweep's JSON and a backup-size line item 6
-  can plan against.
-- Request statistics in `./bin/measure`, with
-  visualizations. `handleRequest` (`api/api.ts:446`) is
-  the one seam: `server/http-server.ts:681` routes the
-  product through it, and the tests' in-process
-  transport (`inProcessFetch`,
-  `tests/in-page-facade.ts:31-56`) does too, after
-  `simulateLatency()`, its only caller, so a timer there
-  measures the handler alone. Record
-  per request: method, route family (ids folded to `:id`),
-  status, handler ms, wall stamp. A throwaway probe on
-  `packageable-client` (`ffa73bf4`, memory suite,
-  `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
-  peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
-  p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
-  `work-orders/:id/history` (since retired)
-  clusters at 100-102 ms (p90 100.7, max 102.3),
-  unexplained. The probe's synchronous
-  per-request append cost ~1.3 s on a 45 s suite. Suite
-  throughput through the memory backend is not a load test;
-  the Postgres origin (`--base-url`) is where a rate means
-  something. Visualize beside readyMs in `measure-viz`: a
-  log-bucket latency histogram, per-route p50/p90/p99, and a
-  requests-per-second timeline. Oracle: `--record` writes the
-  per-route figures to `measurements/`; `--visualize` draws
-  the three charts; `--check` gates per-route p90 against
-  `measurements/budgets.json`.
+- XSS can use the refresh cookie from the page. The
+  cookie is HttpOnly, SameSite=Strict, Path=
+  `/api/authentication`, Secure
+  (`api/authentication.ts:175-191`; pin
+  `tests/api-authentication-token.test.ts` 'token JSON
+  has no refresh_token; Set-Cookie is HttpOnly'), so a
+  page script cannot read it — a same-origin `fetch` to
+  `/api/authentication/token` still sends it and the
+  JSON returns a live access token. CSP `script-src
+  'self'` (`server/http-server.ts:43-49`) narrows
+  injection; it does not close cookie-use. Closes KNOWN
+  seam "XSS can use the refresh cookie from the page".
+  Oracle: a Layer 1 case that an unauthenticated page
+  script cannot mint a live access token from the
+  cookie alone
+- An admin seats an identity without its consent. The
+  direct seat — an admin's membership PUT naming an
+  identity — lands a membership the identity never
+  accepted; membership and versions kept today's power
+  and left the question (`docs/superpowers/specs/`
+  `2026-10-01-membership-and-versions-design.md:269-270`).
+  It lands beside item 14, which bounds
+  whom an admin may name at all. Oracle: a seat the
+  identity did not accept reads pending until it does,
+  or the owner rules the direct seat a deliberate power
+  and TEST-PLAN.md says so
+- Gate the PII PUT on a live identity document.
+  `PUT identities/:id/pii` writes the slot at
+  `('/identities/<id>/', 'pii')` with no check that
+  `identities/:id` has a live head, and
+  `deriveIdentityPii` needs none either — so a future
+  write can mint an orphan slot that `GET` answers 200
+  for while `deriveIdentityPiiRows` (login by email,
+  grant by email, the roster views) cannot see it. Spec
+  2026-09-15 exact-read folds § 3 covers existing data
+  by wipe (Decision 8), not future writes. A validator
+  at the gate, not a downstream check. Oracle: a PUT
+  with no identity document 404s, and
+  `tests/drift-identities.test.ts`'s orphan-slot pin
+  becomes unreachable by construction, not by fixture
+- A DOM-free server universe — `deno.json` is the only
+  project and its `lib` includes `dom`, so a `document`
+  in `api/` or `server/` type-checks. Re-measured: a
+  temp `document.body` under `api/` passed `deno check
+  --frozen api`. WebCrypto/Fetch names the server needs
+  (`crypto.subtle` in `api/client-assertion.ts:174`,
+  `:184`) live on `lib.webworker` without `document`.
+  Oracle: a
+  `document` reference in `api/` fails `./test validate`
+- An RFC 7009 revocation endpoint for OAuth clients.
+  Revocation today is
+  `identities/:id/tokens/:jti/revocation`: the identity
+  names its own token by `jti`, revokes the whole chain,
+  and an unknown jti answers 404, which reveals nothing
+  the identity cannot already list. A third-party client
+  holding only a token string has no standard way to
+  revoke it. Add `POST authentication/revocation`
+  (`application/x-www-form-urlencoded`: `token`, and the
+  optional `token_type_hint`), which authenticates the
+  client as `authentication/token` does, checks the token
+  was issued to that client, and revokes through the same
+  chain revocation. It answers 200 for a revoked or an
+  unknown token (RFC 7009 §2.2), so a guessed string
+  learns nothing; `unsupported_token_type` for a kind it
+  does not revoke; and 503 with `Retry-After` while
+  revocation is unavailable. Oracle: a client revokes its
+  refresh token and every jti in that chain then reads
+  revoked; an unknown or already-revoked token answers
+  200 and stores nothing; a token issued to another
+  client is refused; a real and a guessed token of the
+  same length answer byte-identical responses.
+- Physical PII erasure — deferred by decision:
+  product-path item 2 hides removed PII, it does not
+  delete it. Activates on a tenant contract or a
+  jurisdiction that requires physical deletion. The pairs
+  item 2's policy hides are the pairs to delete, and
+  `fa_eraser` deletes them through a view of exactly those
+  pairs: it holds DELETE on that view and SELECT on the id
+  and the hash alone, sees no bytes, and cannot log in
+  (item 2's principle). Measured on Postgres 18.6: through
+  such a view a live pair and a DELETE head each delete
+  zero rows, the hidden pairs delete and come back named,
+  and the table itself is refused; `fa_owner` owns the
+  view, so item 2's policy hides nothing from it. An
+  erasure pair names the removed ids and hashes so every
+  absence is accounted for — the ledger store left
+  `supersedes`
+  unenforced for this — and writing it is an INSERT, which
+  a delete-only view cannot make: the brainstorm settles
+  whether the eraser also inserts through a view of its
+  own, held to erasure pairs by a check option (measured:
+  such a view refuses a row at another path), or another
+  role writes the record. Until it ships the page says
+  "removed", never "erased" (item 2). `DELETE` is logical
+  until `VACUUM`, and WAL and point-in-time backups hold
+  the bytes until the host's retention expires — state the
+  window. The brainstorm also settles two questions this
+  bullet inherits. Cascade: erasing a document's pairs
+  follows the DELETE cascade policy (its bullet below),
+  because a dependent that copied the erased values into
+  its own state — a revision, an operation's response —
+  still holds them, so erasure walks the same reference
+  table the cascade does. Tombstones: the suspicion is that an erased
+  document keeps exactly one version, its tombstone — the
+  DELETE head the view already refuses to delete — so its
+  id still reads retired (the Gone bullet), its
+  succession still has a head, and the erasure pair names
+  every predecessor the tombstone's `supersedes` chain
+  lost. A received request's body can hold PII the
+  hiding rule never reaches — the invitation's email,
+  which the message-plane spec handed item 2
+  (`docs/superpowers/specs/`
+  `2026-09-23-message-plane-design.md:871-875`) — so
+  the brainstorm settles whether erasure reaches it.
+  Oracle: `tests/api-pii-tombstone.test.ts`
+  'erased PII remains in superseded pairs; login is 401'
+  inverted for the erased pairs, and each erased
+  document's one remaining pair is its tombstone.
+- The reporter — `fa_reporter`, named in product-path
+  item 2 only as an example of its principle: a role
+  created with its first worker, never before. Nothing
+  about it is defined yet — its view, its grants, and
+  whether it sees hidden pairs are its own brainstorm's.
+  Activates with the first worker that needs reports.
+- The cross-party delegation ledger
+  (`api/authentication.ts:1199-1204`;
+  `tests/api-authentication-token.test.ts:1028`): how
+  a second party's token travels when one
+  `Authorization` line carries one credential, which
+  the message-plane spec's Decision 4 hands it
+  (`docs/superpowers/specs/`
+  `2026-09-23-message-plane-design.md:165-177`, `:888-889`)
+- Passkey, provider-IdP, and corporate-OIDC ceremonies
+  (`api/authentication.ts:1852-1888`;
+  `tests/api-authentication-authorize.test.ts:253`)
+- Per-client multi-audience, DPoP `cnf`, jti reuse
+  detection (`shared/types.ts:527-529`;
+  `shared/access-token-decode.ts:30-31`)
+- Cryptographically signed ledger — brainstorm signing
+  of stored pairs. The ledger store hashes both
+  messages where they are stored
+  (`api/ledger-statement-sql.ts:122-146`), and no
+  product reader recomputes a hash: `pairRootHex` runs
+  on the memory backend's write path alone
+  (`shared/ledger-statement.ts:337`), and only tests
+  verify ('stored messages verify against their
+  hashes'). The dropped `version` column hashed on write
+  and was never checked on read —
+  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`.
+  Item 3's full check is the first reader; signing is
+  what remains after it.
+- A pure-TypeScript scrypt would retire the last
+  product-process `node:` import
+  (`server/scrypt-hash.ts`). Measured at
+  this repo's `ln=17,r=8,p=1,dkLen=32`,
+  `jsr:@noble/hashes@2.4.0/scrypt.js` medians 224 ms
+  against `node:crypto` scryptSync's 192 ms (the product
+  calls the async `scrypt`, `server/scrypt-hash.ts:5`) —
+  17% slower,
+  digests byte-identical, so stored `$scrypt$` credentials
+  verify unchanged, and `deno compile` embeds it with no
+  native dependency. Its audit status, maintenance
+  cadence, and supply-chain posture are UNVERIFIED; for a
+  credential path that is the decisive question, and it
+  settles before the benchmark means anything. The cost is
+  a third-party package where the Article prefers a
+  platform primitive. `@denorg/scrypt` and
+  `@wildboar/scrypt-0` also exist on JSR, unexamined.
+  Oracle: byte-identical digests for the stored parameters.
+- Objective lifecycle history compares two clocks:
+  `revision.at` is client-minted while the lifecycle `at`
+  is the server-stamped pair fact. A browser clock ahead of
+  the server can invert them and throw, so the History
+  modal fails to open with an error toast instead of
+  rendering —
+  `client/objectives.ts:268`, `:302` (the revision's
+  `nowUtc()`), `web-app/projects/detail.ts:925-986`,
+  and the throw at
+  `web-app/app/presenters/project-score-history.ts:206-211`
+- `subscribeOnce` guarantees "never two" live subscriptions,
+  not "always one": a bell arriving between teardown and
+  re-arm is dropped, leaving an empty list page blank — the
+  symptom run-six Task 9 fixes. Needs two bells inside one
+  fetch window; a pending flag would close it but
+  reintroduces the shared state the design avoids —
+  `client/channels.ts:214-225`
+- The records list's steady-state subscribe is still
+  fire-and-forget. `subscribeRecordChanges(async () => {
+  … await getRecords … })` (`web-app/records/index.ts:
+  118-127`) has no error handler. Critical-functionality
+  path fenced `subscribeOnce`'s four `onEmpty` inits and
+  excluded this sibling. Oracle: a failing re-GET on
+  the records list renders Try Again, zero unhandled
+  rejection — the same pin shape as
+  `tests/ideas-empty-subscribe.test.ts`
+- A `fusion-angle:data` bell during `./test` re-enters
+  the ideas list `init` on a document that has no
+  `#ideas-list`. `subscribeOnce`
+  (`client/channels.ts:219-223`) calls `init`
+  (`web-app/ideas/index.ts:47`), `$required` throws,
+  and `handlePageLoadError` logs `page failed to init`
+  with `Required element not found: #ideas-list`
+  (`web-app/app/page-loader.ts:50`). Witnessed
+  2026-10-03 on `a6af68a6` as post-test output between
+  `identity-tokens-reduce` and `drift-states`; the
+  suite still reported 0 failed, so the gate stays
+  green. `BroadcastChannel` was process-global then;
+  since 3d808c92 each test worker prefixes its channel
+  and lock names (`tests/worker-name-prefix.ts`), so a
+  peer file's bell no longer reaches the page, and a
+  bell inside the ideas file's own worker after its
+  document is gone stays possible. Re-witness before
+  working it. Oracle: `./test` prints neither `page failed to
+  init` nor `Required element not found: #ideas-list`;
+  `tests/ideas-empty-subscribe.test.ts` stays green;
+  a bell after the ideas document is gone does not
+  log and does not paint the error state
 - The refresh lock `fusion-refresh`, the peer channel
   `fusion-angle:refresh`
   (`client/session-refresh-mutex.ts:8-9`), and the
@@ -1306,297 +1509,80 @@ Off the critical path; each with its oracle.
   the round trip itself. Oracle: a Postgres test
   executes a stamp write twice and reads six digits
   back both times
-- The memory backend's sort coerces `response_at`
-  with `?? ''` on a NOT NULL column
-  (`byResponseAtThenId`, `api/backend-buffer-tx.ts:
-  35-36`; examination report). Oracle: the sort
-  helper takes the same string the keyed path does;
-  a missing stamp throws
-- **17.** Wipe and reseed every live database onto the ledger
-  store's table at the deploy of items 0–3. Nothing
-  alters a database in place: the seed refuses one
-  whose `fa_message_pairs` exists
-  (`server/seed.ts:101-128`), and a master-era database
-  — `message_pairs` and its `schema_marker` row — boots
-  this binary and fails every read, while the seed
-  meets its marker and rolls back (item 3). So every
-  live ledger takes `./bin/postgres-wipe` then
-  `./bin/postgres-seed`, or the Render equivalents
-  through `./deploy`, and with it arrive the exact-read
-  shapes (Spec Decision 8: invitation `state` on the
-  head, PII at `('/identities/<id>/', 'pii')`, token
-  `name = jti`, no `/identity-tokens/`), which
-  production derives never dual-read, the membership
-  documents, `fa_message_body_json`, and the partial
-  index `fa_message_pairs_body`
-  (`WHERE path = '/invitations/'`). Oracle: every live
-  database has been wiped and reseeded after the ledger
-  store's landing, and holds `/migrations/0000-root`
-- Filtering other collections by a body field. The
-  partial index `fa_message_pairs_body` reaches
-  `path = '/invitations/'` only
-  (`BODY_INDEXED_PATH`, `api/schema-postgres.ts:194`).
-  Objectives record a transition in the body
-  (`lifecycle: 'state'`, `OBJECTIVES_WIRING`,
-  `api/routes.ts:454-462`) and serve versions per
-  objective (`documentVersionsSelectRoute`,
-  `api/routes.ts:5265`). They have no collection-wide
-  versions view. Oracle: a body field on another
-  collection selects through an index the statement
-  names, or the read says it scans
-- XSS can use the refresh cookie from the page. The
-  cookie is HttpOnly, SameSite=Strict, Path=
-  `/api/authentication`, Secure
-  (`api/authentication.ts:175-191`; pin
-  `tests/api-authentication-token.test.ts` 'token JSON
-  has no refresh_token; Set-Cookie is HttpOnly'), so a
-  page script cannot read it — a same-origin `fetch` to
-  `/api/authentication/token` still sends it and the
-  JSON returns a live access token. CSP `script-src
-  'self'` (`server/http-server.ts:43-49`) narrows
-  injection; it does not close cookie-use. Closes KNOWN
-  seam "XSS can use the refresh cookie from the page".
-  Oracle: a Layer 1 case that an unauthenticated page
-  script cannot mint a live access token from the
-  cookie alone
-- `render.yaml` Blueprint as a second source of
-  truth for the dashboard service. Oracle: a
-  committed `render.yaml` that matches the live
-  service without a dashboard PATCH.
-- Dependency-warm Docker layer. `COPY . .` busts
-  later layers; `deno compile` fetches `denort`.
-  Cold-build reliability is not the problem.
-  Oracle: a measured cold Render Docker build,
-  then a layer that caches `deno.json` /
-  `deno.lock` / `denort` only if that number is
-  the bottleneck.
-- The `exists()` helper is duplicated five times, byte
-  for byte, all under `web-app/app/` — `compose.ts`,
-  `generate-api-documentation.ts`, `measure-viz.ts`,
-  `cdp-client.ts`, `measure.ts`. Commandment IX's
-  threshold is three. Each copy was sanctioned
-  deliberately: extracting a shared module from any one
-  Deno porting task would have reached into four other
-  tasks' files. Oracle: one definition, five importers,
-  `./test validate` green.
-- Reword the exact-read plan's regex constraint.
-  `docs/superpowers/plans/2026-09-15-exact-read-folds.md`
-  Global Constraints say "No regex over the ledger's
-  paths anywhere under `api/`", which over-claims:
-  `ORGANIZATION_NESTED_URI_PREFIX.exec(path)` in
-  `api/derive-states.ts` (`ownerFromPath`) parses the
-  path of one pair already fetched by an exact document
-  read to extract its organization segment — a parse of
-  a known pair, not a read by pattern. The spec's axiom
-  (a read is an exact `path`, or an exact `path` and
-  `name`) holds. Say "no read discovers pairs by
-  pattern" instead. Oracle: the reworded line, and the
-  one `.exec` named as the sanctioned parse
-- Gate the PII PUT on a live identity document.
-  `PUT identities/:id/pii` writes the slot at
-  `('/identities/<id>/', 'pii')` with no check that
-  `identities/:id` has a live head, and
-  `deriveIdentityPii` needs none either — so a future
-  write can mint an orphan slot that `GET` answers 200
-  for while `deriveIdentityPiiRows` (login by email,
-  grant by email, the roster views) cannot see it. Spec
-  2026-09-15 exact-read folds § 3 covers existing data
-  by wipe (Decision 8), not future writes. A validator
-  at the gate, not a downstream check. Oracle: a PUT
-  with no identity document 404s, and
-  `tests/drift-identities.test.ts`'s orphan-slot pin
-  becomes unreachable by construction, not by fixture
-- Split the `default-organization` singleton the way PII
-  split. Exact-read spec Defers: the SET document is
-  still a collection-shaped path with empty name (`path
-  = /identities/<id>/default-organization/`, `name =
-  ''` — `api/derive-default-organization.ts:11-18`),
-  while PII is `path = /identities/<id>/`, `name = pii`.
-  HTTP can stay `identities/:id/default-organization`;
-  only the stored split changes. Oracle:
-  `getDocumentHistory('/identities/<id>/',
-  'default-organization')` is the SET document, and the
-  empty-name prefix is gone after wipe
-- Split `client_registration` the way PII split.
-  Registration is still the pre-PII shape: `path =
-  /identities/<id>/registration/`, `name = ''`
-  (`api/derive-identity-spine.ts:366-419`;
-  WRITE_RESPONSE_SPECS `name: ''` at
-  `api/routes.ts:3027`). HTTP can stay
-  `identities/:id/registration`; only the stored
-  split changes. Oracle:
-  `getDocumentHistory('/identities/<id>/',
-  'registration')` is the SET document, and the
-  empty-name prefix is gone after wipe
-- The cross-party delegation ledger
-  (`api/authentication.ts:1199-1204`;
-  `tests/api-authentication-token.test.ts:1028`): how
-  a second party's token travels when one
-  `Authorization` line carries one credential, which
-  the message-plane spec's Decision 4 hands it
-  (`docs/superpowers/specs/`
-  `2026-09-23-message-plane-design.md:165-177`, `:888-889`)
-- Passkey, provider-IdP, and corporate-OIDC ceremonies
-  (`api/authentication.ts:1852-1888`;
-  `tests/api-authentication-authorize.test.ts:253`)
-- Per-client multi-audience, DPoP `cnf`, jti reuse
-  detection (`shared/types.ts:527-529`;
-  `shared/access-token-decode.ts:30-31`)
-- SP-6 sign-up (`web-app/auth/index.ts:641-651`)
-- Cryptographically signed ledger — brainstorm signing
-  of stored pairs. The ledger store hashes both
-  messages where they are stored
-  (`api/ledger-statement-sql.ts:122-146`), and no
-  product reader recomputes a hash: `pairRootHex` runs
-  on the memory backend's write path alone
-  (`shared/ledger-statement.ts:337`), and only tests
-  verify ('stored messages verify against their
-  hashes'). The dropped `version` column hashed on write
-  and was never checked on read —
-  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`.
-  Item 3's full check is the first reader; signing is
-  what remains after it.
-- ACL-editing UI for record attributes (`read_roles` /
-  `write_roles`) — R21's restricted branches are
-  seed-produced today; setting an ACL is
-  `PUT …/attributes/:id` only, and no page reaches it.
-  Oracle: an admin edits an ACL through the UI and a
-  member-perspective New-instance form flips live;
-  TEST-PLAN R21 gains the write path as a user gesture
-- A pure-TypeScript scrypt would retire the last
-  product-process `node:` import
-  (`server/scrypt-hash.ts`). Measured at
-  this repo's `ln=17,r=8,p=1,dkLen=32`,
-  `jsr:@noble/hashes@2.4.0/scrypt.js` medians 224 ms
-  against `node:crypto` scryptSync's 192 ms (the product
-  calls the async `scrypt`, `server/scrypt-hash.ts:5`) —
-  17% slower,
-  digests byte-identical, so stored `$scrypt$` credentials
-  verify unchanged, and `deno compile` embeds it with no
-  native dependency. Its audit status, maintenance
-  cadence, and supply-chain posture are UNVERIFIED; for a
-  credential path that is the decisive question, and it
-  settles before the benchmark means anything. The cost is
-  a third-party package where the Article prefers a
-  platform primitive. `@denorg/scrypt` and
-  `@wildboar/scrypt-0` also exist on JSR, unexamined.
-  Oracle: byte-identical digests for the stored parameters.
-- Untested by design after run-six: the records/projects/
-  flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
-  retry branch, a work order both claimed and completed,
-  and the archived-genesis walk
-  (`client/objectives.ts:102-142`)
-- `./bin/measure` harvests error-page timings;
-  `page:ready` carries no status —
-  `web-app/app/page-performance.ts:27`, harvested by
-  `harvestReady` (`web-app/app/browser-drive.ts:45-60`)
-- Claim-on-load with no release-on-leave plus the
-  8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
-  work-order view into an 8-hour claim
-  (run-six Task 3 renders it; the UX remains) —
-  `web-app/workbox/detail.ts:598-616`,
-  `shared/types.ts:1087`
-- `subscribeOnce` guarantees "never two" live subscriptions,
-  not "always one": a bell arriving between teardown and
-  re-arm is dropped, leaving an empty list page blank — the
-  symptom run-six Task 9 fixes. Needs two bells inside one
-  fetch window; a pending flag would close it but
-  reintroduces the shared state the design avoids —
-  `client/channels.ts:214-225`
-- A `fusion-angle:data` bell during `./test` re-enters
-  the ideas list `init` on a document that has no
-  `#ideas-list`. `subscribeOnce`
-  (`client/channels.ts:219-223`) calls `init`
-  (`web-app/ideas/index.ts:47`), `$required` throws,
-  and `handlePageLoadError` logs `page failed to init`
-  with `Required element not found: #ideas-list`
-  (`web-app/app/page-loader.ts:50`). Witnessed
-  2026-10-03 on `a6af68a6` as post-test output between
-  `identity-tokens-reduce` and `drift-states`; the
-  suite still reported 0 failed, so the gate stays
-  green. `BroadcastChannel` was process-global then;
-  since 3d808c92 each test worker prefixes its channel
-  and lock names (`tests/worker-name-prefix.ts`), so a
-  peer file's bell no longer reaches the page, and a
-  bell inside the ideas file's own worker after its
-  document is gone stays possible. Re-witness before
-  working it. Oracle: `./test` prints neither `page failed to
-  init` nor `Required element not found: #ideas-list`;
-  `tests/ideas-empty-subscribe.test.ts` stays green;
-  a bell after the ideas document is gone does not
-  log and does not paint the error state
-- The records list's steady-state subscribe is still
-  fire-and-forget. `subscribeRecordChanges(async () => {
-  … await getRecords … })` (`web-app/records/index.ts:
-  118-127`) has no error handler. Critical-functionality
-  path fenced `subscribeOnce`'s four `onEmpty` inits and
-  excluded this sibling. Oracle: a failing re-GET on
-  the records list renders Try Again, zero unhandled
-  rejection — the same pin shape as
-  `tests/ideas-empty-subscribe.test.ts`
-- Objective lifecycle history compares two clocks:
-  `revision.at` is client-minted while the lifecycle `at`
-  is the server-stamped pair fact. A browser clock ahead of
-  the server can invert them and throw, so the History
-  modal fails to open with an error toast instead of
-  rendering —
-  `client/objectives.ts:268`, `:302` (the revision's
-  `nowUtc()`), `web-app/projects/detail.ts:925-986`,
-  and the throw at
-  `web-app/app/presenters/project-score-history.ts:206-211`
-- Deno-only tooling modules still live under
-  `web-app/app/` — `measure.ts`,
-  `generate-api-documentation.ts`, `compose.ts`,
-  `generate-schema-svg.ts`, `cdp-client.ts`,
-  `measure-viz.ts`, and `hash-static.ts` (e7ce7969,
-  `Deno.readDir`). The browser
-  tsconfig `exclude` that listed them is gone with that
-  file. Moving them to a top-level tools directory
-  would make browser membership by rule and is the
-  exclusion the `Deno.*` fence still needs. Oracle:
-  those seven files are not under `web-app/app/`
-- A DOM-free server universe — `deno.json` is the only
-  project and its `lib` includes `dom`, so a `document`
-  in `api/` or `server/` type-checks. Re-measured: a
-  temp `document.body` under `api/` passed `deno check
-  --frozen api`. WebCrypto/Fetch names the server needs
-  (`crypto.subtle` in `api/client-assertion.ts:174`,
-  `:184`) live on `lib.webworker` without `document`.
-  Oracle: a
-  `document` reference in `api/` fails `./test validate`
-- The Send Back feedback textarea is discarded.
-  `web-app/app/presenters/idea.ts:410-425` renders
-  `<textarea id="approval-send-back-feedback">` in the
-  Send Back dialog — its id split across a
-  concatenation (`'approval-send-back' + '-feedback'`),
-  so a grep for the whole id finds not even the render,
-  and `grep -rn "\-feedback'"` finds no read: the confirm path
-  (`web-app/ideas/detail.ts:285-300` → `transitionIdea`
-  → `postIdeaStateChange`) has no feedback parameter, so
-  whatever a reviewer types is thrown away. Found by
-  reading, not driving, during the 2026-08-29 audit; no
-  TEST-PLAN case claims the feedback survives. Oracle: a
-  Layer 1 test asserting the typed feedback reaches the
-  transition
-- Roster map mints `{ erased: true }` before the PII
-  fill. `buildHumanMemberMap` plants a tombstone on
-  every seat (`client/members.ts:125`);
-  `getHumanMemberMap` then overwrites it. Spec
-  2026-09-04 critical-functionality-path named this
-  the same sentinel sin as the shipped
-  `emptyPersonProfile` and said to put it in Later
-  work. A fill that throws leaves seats looking
-  erased. Oracle: `buildHumanMemberMap` carries no
-  PII placeholder; a row is filled or absent
-- Toast doubled live region and tab order.
-  `ensureContainer` appends last in tab order and sets
-  `aria-live=polite` (`web-app/app/toast.ts:94-104`);
-  each toast is also `role=status` (`:117-119`).
-  Critical-functionality path: accessibility
-  precondition, unmeasured. Pause-on-hover shipped;
-  this did not. Oracle: tab from the last page control
-  reaches the live toast's dismiss; one live region,
-  not two
+- `getIdea` (`client/ideas.ts:166`) fans three reads out
+  through `Promise.all` at `:172`, so a rejection settles
+  the caller while its siblings still run, and
+  `tests/adapters-ideas.test.ts:195` (`getIdea throws on
+  missing submission`, `:182`) waits one macrotask turn
+  for them (`11cd89f8`). It was never seen to flake, but
+  one turn proves only that the abandoned reads were
+  fast: `getFlowStats` had the same shape, and with every
+  memory-backend entry delayed by up to 20 ms its twin
+  yield failed the ops sanitizer ("A timer was started in
+  this test, but never completed") until its fan-out
+  settled every read before rejecting.
+  Oracle: a rejected `getIdea` leaves none of its reads
+  in flight, pinned as `tests/adapters-flow-stats.test.ts`
+  pins `getFlowStats`, and the yield at `:195` is gone
+- The panel doors a937df40 closed are unpinned. A panel
+  closed outside `withPanelOpen` kept the viewBox it
+  saved on open, so the next empty-canvas click or
+  delete restored a stale camera — F29's defect through
+  four more doors: `handleAddNodeAtPosition` writing
+  `isPanelOpen: false` by hand
+  (`web-app/flows/detail.ts:608`),
+  `refreshFlowFromServer` dropping the panel when a
+  cross-tab edit removes its selection (`:1966-1970`),
+  undo and redo committing `applyServerGraph`
+  (`web-app/app/flow-operations.ts:707-709`), and a
+  close under Auto Fit, where `applyPanelTransition`
+  returns null (`web-app/app/flow-designer-actions.ts:474`).
+  a937df40 keys the transitions on the snapshot's own
+  previous open flag (`wasOpen`,
+  `web-app/app/presenters/flow-designer.ts:416`), so a
+  close the snapshot already holds restores nothing and
+  the next open recaptures the camera — read, not
+  driven. Two loose ends stay: `handleUndo` and
+  `handleRedo` leave `panelStateRef.open` true
+  (`web-app/flows/detail.ts:357`, `:373`), and the
+  inline close sites still bypass `closePanel()`
+  (`:1414`, `:2157`), the f29 plan's own deferral
+  (`docs/superpowers/plans/`
+  `2026-09-29-f29-zoomed-viewbox.md:984-986`). Oracle:
+  one Layer 2 test per door in
+  `tests/browser/canvas-pan.test.ts` — with Auto Fit
+  off, open a node's panel; then port-drag a new node,
+  apply a cross-tab edit that removes the selection,
+  undo the open node's creation, or close the panel
+  under Auto Fit and switch it back off; zoom in once
+  and click empty canvas — each keeping the zoomed
+  camera
+- A flow loaded with Auto Fit OFF no longer fits on
+  first paint. `withCanvasSize`
+  (`web-app/app/presenters/flow-designer.ts:974-995`)
+  fits only under `isAutoFit`, and the load-time block
+  (`web-app/flows/detail.ts:1798-1813`) is the only
+  load-time fit — its `reconcileFitFromDom()` returns
+  early for the same reason. RECORDED, behavior
+  unchanged. The sentence it falsifies is "onFlowLoaded
+  keeps its explicit first fit" — the run-four
+  remediation design spec, second-commit paragraph
+- The first click after a page reload only focuses the window
+  — the focusing click is the viewport center, never the
+  top-left brand (that is the Apple menu when Chrome is
+  fullscreen or flush with the menu bar; the next click
+  opens About This Mac). The same corner is
+  `#sidebar-toggle` (I7, I9, I28), `#mobile-sidebar-open`
+  (I11, I14, I15), landing `.navbar-logo` (B2, B3), and
+  a C5 miss of `.sidebar-nav-item`. Drive those by
+  selector, not screenshot-xy. Then click the intended
+  control once. Named by the 2026-08-29 three-layers
+  audit and carried as a driving note in TEST-PLAN.md's
+  `## The walk`. Oracle:
+  `tests/test-plan-apple-menu.test.ts` (the document
+  names the selectors). A Layer 2 test under
+  `tests/browser/` asserting one click after reload
+  reaches the element is still unwritten.
 - The browser type fence is gone, not weakened. Ambient
   Node globals unlock per `deno check` invocation: one
   `node:` specifier anywhere in the checked graph gives
@@ -1627,19 +1613,6 @@ Off the critical path; each with its oracle.
   registry the `process` half escaped. Oracle for the
   `process` half: that invocation in `./test validate`, red
   on a `process` reference under `web-app/`.
-- `./bin/measure --record` writes the literal `'unknown'` as
-  `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
-  no CPU-model API — `navigator.hardwareConcurrency` is a
-  count — and the `sysctl` workaround was rejected as
-  unverifiable and macOS-only. Ten of the fourteen rows
-  in `measurements/history.jsonl`, `c50e849` on, store
-  `"unknown"`. The truthful
-  shape omits the field rather than storing a sentinel,
-  which needs `measure-core.ts`'s field type and
-  `shapeHistoryLine` (:49, :284) together with
-  `measure-viz.ts:1052`, whose `|| ''` is itself the
-  default-value sin. Oracle: a row with no `cpuModel`
-  key renders without the separator.
 - The measure visualizer's client mirrors have no test
   binding them to the core. `vizClientScript()`
   (`web-app/app/measure-viz.ts`) hand-transcribes
@@ -1656,44 +1629,61 @@ Off the critical path; each with its oracle.
   shared fixtures closes it, codebase-wide. Oracle: a
   one-character change to any mirrored body in
   `vizClientScript()` turns that test red.
-- A trend candle's box can overtop its whisker.
-  `trendAxisMax` (`web-app/app/measure-viz-core.ts`)
-  takes each point's median, its candle's max, and the
-  budget, never mean + σ (measure-candles plan,
-  Interpretation E), so a left-skewed trimmed set —
-  `[1, 10, 10, 10, 10]`: mean 8.2, sample σ ≈ 4.0,
-  mean + σ ≈ 12.2 > max 10 — puts the box top above the
-  plot's top pad, where the SVG clips it. The plan's
-  reasoning that nineteen trimmed samples keep the box
-  inside the whiskers is not true in general; page
-  loads are right-skewed, so it is rare, and it is
-  cosmetic. The fix is a spec amendment, not a client
-  patch: `trendAxisMax` also takes mean + σ and the
-  axis grows, or the box clamps to the whisker and the
-  mark says less. Oracle: a `Deno.test` on the box
-  geometry under that fixture, asserting the box top
-  never rises above the whisker top, red today.
-- Stale-history comment cleanup as one pass — comments
-  still describe a past state as present. Sampled:
-  `web-app/app/measure-cli.ts` names a Node harness;
-  `web-app/app/page-request-profile.ts` says "No-op in
-  Node"; `tests/drift-states.test.ts` says derive-states
-  is unread in production while `api/routes.ts` imports
-  it; `api/routes.ts` claims revival dual-write after
-  the states row half is stripped; `states.postEvent`,
-  defined nowhere now, is named at `api/routes.ts:354`,
-  `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`;
-  and `web-app/app/root-redirect.ts:6-7` says esbuild and
-  `./build` where `deno bundle` and `./bin/build` run. The run-four
-  remediation's Evidence
-  (`docs/superpowers/specs/`
-  `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
-  lists provenance, not comments, and the reproductions
-  that might have were scratchpad, never committed —
-  the pass re-derives its enumeration by reading. The
-  "remove the comment … when done" and "revise both
-  comments when done" pointers other entries carry are
-  those entries' property, not this pass's
+- Untested by design after run-six: the records/projects/
+  flows `onEmpty` arms (only ideas is pinned), `loadInto`'s
+  retry branch, a work order both claimed and completed,
+  and the archived-genesis walk
+  (`client/objectives.ts:102-142`)
+- GPU flag in the Layer 2 launcher — `launchChrome`
+  no longer passes `--disable-gpu` (cargo cult under
+  `--headless=new`; it was required only by old
+  headless on Windows). Its one real effect was
+  forcing software compositing, which made runs more
+  alike across machines. Dropped UNVERIFIED —
+  `./test browser` has run green on one machine
+  (2026-08-28). Restore it if two machines disagree.
+  Oracle: `./test browser` green on two machines
+- No error-message allowlist. `safeErrorMessage`
+  (`server/postgres-gate.ts:101-121`) prints a message
+  only if a set names it, else `seed failed` (seed,
+  `server/seed.ts:41`), or boot's and wipe's fallback
+  (`postgres-gate.ts:126`, `server/postgres-wipe.ts:38`),
+  so a fault the seed's own code raises — a rehearsed row
+  that does not land, a row on another predecessor —
+  reaches the operator as `seed failed` and a code, the
+  evidence destroyed. Two classes replace it. A
+  precondition refusal names itself: the database is
+  not empty, a required env is missing, Postgres is
+  unreachable, a concurrent seed won, the flags are
+  wrong. Everything else is a bug and crashes with its
+  message and stack. The allowlist kept secrets off
+  stderr; that duty moves to the gate: no secret enters
+  an error message, and the Postgres adapter enriches a
+  driver fault without the URL or password. First check
+  what the driver's own messages carry (connection,
+  authentication, and constraint errors); a secret found
+  there is fixed at the adapter, not filtered at print.
+  Oracle: the allowlist and its fallback are gone; each
+  named refusal prints its own message; a forced
+  rehearsal fault prints its message; and a pin feeds
+  the adapter each driver fault class with a known
+  password in the URL and finds the password in no
+  message
+- The top-bar bell keeps its invitation count after a
+  refused accept until the next navigation: notifying
+  would re-run the page's pending-only refresh and drop
+  the row V10 must show (the walk-green plan's
+  deferral, `docs/superpowers/plans/`
+  `2026-10-05-walk-green.md:281-284`). Oracle: after a
+  refused accept the bell's count matches the pending
+  list, and V10's row still shows
+- The Add-Member dialog keeps its AI model across a
+  reopen: `clearAddMemberFields` resets every field but
+  `#ai-model` (`web-app/members/index.ts:406-415`; the
+  walk-green plan's deferral, `docs/superpowers/plans/`
+  `2026-10-05-walk-green.md:296-297`). Oracle: reopening
+  the dialog after an AI create shows the Model picker
+  at its placeholder
 - Unpinned but pinnable — TEST-PLAN covenants with no
   test, or no test for the part a sub-bullet names: the
   2026-08-29 audit's gap list, in TEST-PLAN order. Each
@@ -2352,9 +2342,241 @@ Off the critical path; each with its oracle.
     a third test in `tests/browser/two-jars.test.ts`: B
     sits on `ideas/`, A writes, B's DOM is unchanged
     until B navigates
-- Profile as its own document,
-  `identities/:id/profile`, 404 = no profile — closes
-  whole-or-none — `tests/api-identity-document.test.ts`
+- SP-6 sign-up (`web-app/auth/index.ts:641-651`)
+- Billing (`web-app/billing/`)
+- Table migrations — deferred by decision: the ledger
+  store holds the table's DDL final, and item 3 ships
+  everything a change to the fence needs. Activates on the
+  first change to the table once a tenant's data exists
+  and a wipe is no longer possible. The pieces already
+  stand (item 3, measured): a migration is the genesis of
+  its own document in `/migrations/`, named for what it
+  does behind a four-digit order after the root,
+  landed by `migrate` with its SQL the `request` and
+  its digest the `response`; names order migrations and
+  the succession index refuses a second runner, with no lock
+  and no migrations table of its own; and the DDL and the
+  genesis commit or roll back together. What is missing
+  is only the table steps themselves, and whether a
+  rollback lands as the migration's DELETE head or as a
+  migration of its own — never a rewind. Named limits: a
+  large index
+  cannot ride the one-transaction step and needs two,
+  build then record; boot's strict equality needs a
+  declared set of digests once item 13 runs two processes;
+  and pairs are hashed and never rewritten, so a new
+  envelope column sits outside every old `pair_hash`.
+  Never a route that executes a body's SQL (item 3). The
+  scripture names this gap among its unwritten scrolls.
+  Oracle: a Postgres test starts two runners on one
+  migration and finds one document, one set of changes,
+  and the loser's DDL gone; a second applies a table step
+  to a database seeded from an older binary, and the new
+  binary boots.
+- Seed pairs present no credentials. A seed row's
+  secrets columns hold zero bytes where a live write
+  stores its `authorization` line, and a seed pair
+  carries no `request-id` line: the ledger-seed spec's
+  Decision 3, a named departure from the axiom that a
+  pair stores what was received
+  (`docs/superpowers/specs/2026-09-23-ledger-seed-design.md:135-143`,
+  `:627-629`). A pair identical to the app's needs a
+  bearer per requester, minted by a simulated login
+  whose own pairs land too, and the seed runs without
+  the signing key (`tests/pg-seed.test.ts:433`).
+  Oracle: a seeded write pair's secrets hold the line
+  its requester would have sent, or SCHEMA.md names the
+  seed as the axiom's one exception
+- Immutable document types. A family declares itself
+  immutable where it declares its conditional; every
+  write is a genesis under the never-written latch, so a
+  second write at a written name stores nothing (412 for
+  a client's declaration, 409 for a handler's) and a
+  retired name answers 410; DELETE answers 405; only
+  erasure removes pairs (the physical-erasure bullet).
+  Their consumers are the join documents:
+  `postFlowWorkOrderDocumentOp` and
+  `postFlowRecordDocumentOp` (`api/routes.ts`) land a PUT
+  with no latch, so a second PUT at a join's name replaces
+  what it joins. Oracle: a second PUT at a written join
+  name stores nothing and answers 409 or 412.
+- DELETE cascade. No one policy says what a delete does
+  to the documents that name the deleted one. Four
+  references refuse the delete today (the last
+  accepted admin membership, the record-type and
+  attribute RESTRICTs, and the
+  instance placement RESTRICT under a work-order
+  binding), each checked in a read that closes before
+  the write; no audit lists the rest. Consider one
+  policy per reference, named in one place: RESTRICT
+  (refuse while referenced), CASCADE (tombstone the
+  dependents in the same statement as the parent), or
+  ORPHAN (leave the reference, which then reads 410 or
+  404). Oracle: a table of every cross-document
+  reference with its policy; each CASCADE lands parent
+  and dependents in one statement and a GET of each
+  dependent reads it gone; each RESTRICT refuses a
+  racing delete under one statement; no reference is
+  unlisted.
+- The memory backend's sort coerces `response_at`
+  with `?? ''` on a NOT NULL column
+  (`byResponseAtThenId`, `api/backend-buffer-tx.ts:
+  35-36`; examination report). Oracle: the sort
+  helper takes the same string the keyed path does;
+  a missing stamp throws
+- Roster map mints `{ erased: true }` before the PII
+  fill. `buildHumanMemberMap` plants a tombstone on
+  every seat (`client/members.ts:125`);
+  `getHumanMemberMap` then overwrites it. Spec
+  2026-09-04 critical-functionality-path named this
+  the same sentinel sin as the shipped
+  `emptyPersonProfile` and said to put it in Later
+  work. A fill that throws leaves seats looking
+  erased. Oracle: `buildHumanMemberMap` carries no
+  PII placeholder; a row is filled or absent
+- `./bin/measure` harvests error-page timings;
+  `page:ready` carries no status —
+  `web-app/app/page-performance.ts:27`, harvested by
+  `harvestReady` (`web-app/app/browser-drive.ts:45-60`)
+- A trend candle's box can overtop its whisker.
+  `trendAxisMax` (`web-app/app/measure-viz-core.ts`)
+  takes each point's median, its candle's max, and the
+  budget, never mean + σ (measure-candles plan,
+  Interpretation E), so a left-skewed trimmed set —
+  `[1, 10, 10, 10, 10]`: mean 8.2, sample σ ≈ 4.0,
+  mean + σ ≈ 12.2 > max 10 — puts the box top above the
+  plot's top pad, where the SVG clips it. The plan's
+  reasoning that nineteen trimmed samples keep the box
+  inside the whiskers is not true in general; page
+  loads are right-skewed, so it is rare, and it is
+  cosmetic. The fix is a spec amendment, not a client
+  patch: `trendAxisMax` also takes mean + σ and the
+  axis grows, or the box clamps to the whisker and the
+  mark says less. Oracle: a `Deno.test` on the box
+  geometry under that fixture, asserting the box top
+  never rises above the whisker top, red today.
+- I21's walk probe reads the page at the first paused
+  `/api/organizations/*` request, and on 29 Sep that
+  request was not the page's. The five GETs the walk
+  held are all the top-bar strip's — organization, its
+  seat read on `organizations/{id}/members/`, ideas,
+  projects, flows (`web-app/app/header-info.ts:11-26`, sent
+  from `bootApp`'s sidebar branch). The members page's
+  own roster read, which `loadInto` sends only after it
+  has painted the skeleton, is not among them. At the
+  strip's organization GET the page branch may still be
+  importing its code-split chunk, so no page code has
+  run. `tests/members-pending-skeleton.test.ts` shows
+  the skeleton painted once `init` runs. I21 has scored
+  PASS on every walk since (`a6af68a6`, `2acbc87a`,
+  `ed1fac5c`), the first paused GET already showing the
+  skeleton, so the race is latent. Owner call: have I21
+  poll for the skeleton while the pause holds, rule the
+  pre-import blank container a product gap, or retire
+  this bullet.
+  Oracle: TEST-PLAN I21's probe step and its
+  `### Driving notes` twin
+- The advisory-lock module outlived its locks.
+  `api/advisory-lock.ts` holds the notify channel, its
+  payload, and `POOL_MAX`; its `advisoryKey` and
+  `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have had no
+  product caller since 4175b2d5, and 'two first-writers:
+  one 201, not a double insert'
+  (`tests/pg-races.test.ts:241-258`) still holds a lock
+  the product no longer takes, so its hold no longer
+  bites. Oracle: the module's name says what it holds,
+  `advisoryKey` leaves with its tests, and the race test
+  holds only what the product holds
+- The ledger root's body is JSON. `/migrations/0000-root`
+  (`api/ledger-root.ts:16-17`) is the one head whose
+  response body is not a JSON object: 64 hex characters of
+  the empty string's sha256, with no `content-type`, so it
+  carries none of its path's ids. Every other document
+  body carries its id. Form it as a JSON object with `id`
+  `0000-root` and the digest under a named key, with
+  `content-type: application/json` and the
+  `content-length` that follows. Both backends read the
+  root (`hasRoot`, `api/backend-memory.ts:255-259`,
+  `api/backend-postgres.ts:117`); every deployment seeds
+  fresh, so nothing stored migrates. Oracle: the root
+  head's response parses as a JSON object whose `id` is
+  `0000-root`, in both backends.
+- Test ids are identifiers, post-ship. Every id a
+  test stores or sends — an identity, an
+  organization, a document, an etag — is a canonical
+  identifier, the 22-character encoding of a UUID
+  (`isIdentifier` and `identifierOfUuidText` in
+  `shared/identifier.ts`). A short label is not one.
+  Witness: `the token sub is the caller identity`
+  (`tests/api-actor-from-token.test.ts`) seeded
+  `alice`, and `membershipsOfIdentity` rejected the
+  mirrored membership with "identity_id must be a
+  22-character identifier". That test now encodes
+  `6f0b9c1e-4a27-4d5b-8e31-7c9a2f10b6d4`. The suite
+  still mints tokens for `anonymous`
+  (`tests/adapters-authentication.test.ts`,
+  `tests/adapters-identity-providers.test.ts`) and
+  `agent-7`
+  (`tests/api-authentication-token.test.ts`).
+  Display names and search text stay words. It waited
+  on membership and versions, which has landed. Oracle:
+  one test
+  walks the ids the suite stores and fails when
+  `isIdentifier` rejects one, with named exceptions
+  for display names and search text.
+- The code's word `erased` becomes `deleted`: this is an
+  HTTP application, and the state it names is a DELETE
+  head at `identities/:id/pii`. Its own change: the PII
+  union's discriminant (`shared/types.ts:647-656`) and
+  the stem `eras`, any case: 78 occurrences in 16
+  product files under `api/`, `client/`, `server/`,
+  `shared/`, and `web-app/`, and 83 in 15 test files,
+  type-erasure words among them (`erasable`,
+  `api/document-family.ts:34`, `:155`,
+  `api/routes.ts:338`), so the sweep works from a word
+  list, never the bare stem. It is a field, never a
+  column, and touches no stored byte — the client
+  builds the flag from a 404, 410, or 403
+  (`client/identities.ts:140-146`) — so it has
+  no deadline. The page keeps "removed" (product-path
+  item 2) until the eraser ships; the code speaks HTTP.
+  Oracle: the word list's terms appear in `api/`,
+  `client/`, `server/`, `shared/`, and `web-app/` only
+  where the eraser bullet's own words do.
+- Collection reads call
+  `db.messagePairs.getCollectionHeadPairs` directly —
+  `api/derive-identity-tokens.ts:121`,
+  `api/head-reads.ts:123`,
+  `api/organization-requests.ts:56`,
+  `api/routes.ts:926`, `:3724`, and the test-only
+  `documentCollectionGetHandler`
+  (`api/document-family.ts:434`) — while per-id reads go
+  through `messageStore(db).getDocumentHead`.
+  `MessageStore` (`api/message-store.ts:15-25`) offers
+  `getCollection`, which decides no tombstone, and no
+  `getCollectionHeads`; that seam would put the
+  tombstone decision in one layer. Oracle: every
+  collection read goes through the store seam,
+  `./test validate` and `./test postgres` green.
+- The app still reads the server after the packageable
+  client. With the contract in `shared/`, four modules
+  outside the client import `api/`: the documentation
+  generator (`web-app/app/generate-api-documentation.ts`)
+  reads the route table and its surface
+  (`api/routes.ts`, `api/route-surface.ts`,
+  `api/http-status-documents.ts`, `api/request-auth.ts`,
+  `api/document-family.ts`, `api/path-segments.ts`) under
+  `deno run`, never in a page; two presenters
+  (`web-app/app/presenters/ai-member-detail.ts:22`,
+  `presenters/member.ts:25`) read the provider-model
+  catalog (`api/provider-models.ts`); and the records
+  detail page (`web-app/records/detail.ts:62`) derives
+  claim roles (`api/authorization.ts`) — the two `api/`
+  modules the page graph reaches today. The catalog and
+  the claim-role derivation are both sides' and belong
+  in `shared/`; the generator is a tool and may read
+  the server. Oracle: an import-graph walk from every
+  `PAGE_REGISTRY` entry finds no module under `api/`
 - Idea-create toasts an incomplete submit; convert
   still sets `btn.disabled` — two forms, one
   directory, opposite validation voices
@@ -2363,47 +2585,131 @@ Off the critical path; each with its oracle.
   a defect: TEST-PLAN D6/D7 pin the toast, and the
   2026-08-26 D6 stub files the voice question as its
   separate finding
-- Billing (`web-app/billing/`)
-- Attribute drag-reorder (TEST-PLAN R8)
-- A flow loaded with Auto Fit OFF no longer fits on
-  first paint. `withCanvasSize`
-  (`web-app/app/presenters/flow-designer.ts:974-995`)
-  fits only under `isAutoFit`, and the load-time block
-  (`web-app/flows/detail.ts:1798-1813`) is the only
-  load-time fit — its `reconcileFitFromDom()` returns
-  early for the same reason. RECORDED, behavior
-  unchanged. The sentence it falsifies is "onFlowLoaded
-  keeps its explicit first fit" — the run-four
-  remediation design spec, second-commit paragraph
-- The first click after a page reload only focuses the window
-  — the focusing click is the viewport center, never the
-  top-left brand (that is the Apple menu when Chrome is
-  fullscreen or flush with the menu bar; the next click
-  opens About This Mac). The same corner is
-  `#sidebar-toggle` (I7, I9, I28), `#mobile-sidebar-open`
-  (I11, I14, I15), landing `.navbar-logo` (B2, B3), and
-  a C5 miss of `.sidebar-nav-item`. Drive those by
-  selector, not screenshot-xy. Then click the intended
-  control once. Named by the 2026-08-29 three-layers
-  audit and carried as a driving note in TEST-PLAN.md's
-  `## The walk`. Oracle:
-  `tests/test-plan-apple-menu.test.ts` (the document
-  names the selectors). A Layer 2 test under
-  `tests/browser/` asserting one click after reload
-  reaches the element is still unwritten.
-- Spec 6 did not run — replacing `npm:postgres@3.4.9`
-  with `jsr:@db/postgres` behind `api/postgres-client.ts`.
-  Spec:
-  `docs/superpowers/specs/2026-08-21-deno-postgres-driver-design.md`.
-  Task 56 ruled NO-GO: `@db/postgres` is 0.19.5, pre-1.0,
-  a bet on someone else's trajectory under the product's
-  only datastore, while the insulation above `SqlClient`
-  is one adapter file, so keeping `postgres.js` costs one
-  specifier and one file. Reopen at `@db/postgres` 1.0,
-  or on measured `./bin/measure` headroom. Oracle: `grep -rn
-  'npm:' deno.json deno.lock` prints nothing;
-  `./test postgres` green; `./bin/measure --check` green
-  against the committed budgets.
+- `render.yaml` Blueprint as a second source of
+  truth for the dashboard service. Oracle: a
+  committed `render.yaml` that matches the live
+  service without a dashboard PATCH.
+- The client hands the app three shapes. Head reads
+  made each raw row a message: a verb that read a wire
+  row answers `HttpMessage<Row>`, or an array of them
+  for a collection's parts. The five named values
+  (`Idea`, `Project`, `RecordModel`, `WorkOrder`,
+  `RecordInstance`) and the values a write latches
+  through (`HumanMember` by its membership, `MemberPii`
+  present, `ClientRegistration` registered, the app's
+  `Organization`, and `FlowGraph`) keep the message
+  they were built from. The aggregates and the
+  camelCase values nothing writes through — `AIMember`,
+  `Identity`, the roster, `RecordAttribute`,
+  `ObjectiveScore`, `ObjectiveRevision`,
+  `ProviderEvent`, `TokenChain`, the credential state,
+  `FlowSummary`, `FlowListItem`, `BoundFlowSummary`,
+  and the transition and claim projections — keep
+  their shapes and drop the responses they were built
+  from. `putHumanMember` (`client/members.ts`) answers
+  void: its two heads, the identity's and the PII's,
+  have no holder — the members page re-reads after a
+  save (`web-app/members/detail.ts:563`) — and the one
+  head a write verb owes is a composite shape for this
+  bullet to name. `postObjectiveCreation` and
+  `postObjectiveRevision` (`client/objectives.ts:261`,
+  `:296`) answer void too. Oracle: every client read verb returns a
+  message, an array of messages, or a value whose
+  `message` members name every response it was built
+  from
+- Profile as its own document,
+  `identities/:id/profile`, 404 = no profile — closes
+  whole-or-none — `tests/api-identity-document.test.ts`
+- Split the `default-organization` singleton the way PII
+  split. Exact-read spec Defers: the SET document is
+  still a collection-shaped path with empty name (`path
+  = /identities/<id>/default-organization/`, `name =
+  ''` — `api/derive-default-organization.ts:11-18`),
+  while PII is `path = /identities/<id>/`, `name = pii`.
+  HTTP can stay `identities/:id/default-organization`;
+  only the stored split changes. Oracle:
+  `getDocumentHistory('/identities/<id>/',
+  'default-organization')` is the SET document, and the
+  empty-name prefix is gone after wipe
+- Split `client_registration` the way PII split.
+  Registration is still the pre-PII shape: `path =
+  /identities/<id>/registration/`, `name = ''`
+  (`api/derive-identity-spine.ts:366-419`;
+  WRITE_RESPONSE_SPECS `name: ''` at
+  `api/routes.ts:3027`). HTTP can stay
+  `identities/:id/registration`; only the stored
+  split changes. Oracle:
+  `getDocumentHistory('/identities/<id>/',
+  'registration')` is the SET document, and the
+  empty-name prefix is gone after wipe
+- CRUD verbs out of names, comments, and test titles. This
+  is an HTTP application on a SQL database: a state change
+  is PUT, POST, PATCH, or DELETE at the HTTP layer and
+  INSERT at the store, never "create", "update", "upsert",
+  or "write" standing in for one of them. The case that
+  surfaced it is `postRecordWriteOp` (`api/routes.ts:872`,
+  the seed's record-type POST bundle) and its family:
+  `RecordWriteBody`, `RecordWriteCreateBody`,
+  `RecordWriteEditBody`, `RecordWriteMessagePairs`,
+  `validateRecordWriteBody`,
+  `validateRecordWriteAttribute`, and
+  `tests/api-records-write.test.ts`. The former's names are
+  ruled, one rename-only commit, the store's `'land'`
+  outcome unchanged:
+  `StateWrite` → `NextStates`,
+  `FormedStateWrite` → `FormedStatement`,
+  `WriteAnswer` → a name still to rule, since
+  `StatementAnswer` already names the per-row answer it
+  holds (`shared/ledger-statement.ts:45`;
+  `api/message-pair.ts:705`),
+  `formStateWrite` → `formedStatement`,
+  `landStateWrite` → `landedStatement`,
+  `runStateWrite` → `landedStates`,
+  `runWrite` → `landedRows`,
+  `runStatement` → `executeStatement`,
+  `StatementRun` → `StatementExecution`,
+  `runLedgerStatement` → `executeLedgerStatement`.
+  Across `api/`, `client/`, `shared/`, `web-app/`, and
+  `server/`, 52 distinct
+  identifiers contain a capitalized Create, Update, or
+  Upsert and 35 contain Write, comments and strings
+  aside. Some stay: the DOM's `createElement` and
+  constructors such as `createHttpFacade`. The audit rules
+  on each of the rest, naming by the HTTP-verb convention
+  (`getNoun`, `putNoun`, `deleteNoun`,
+  `postNounOperation`) at the HTTP layer and INSERT at the
+  store. Each rename is its own commit. Oracle: a test
+  sweeps identifiers for the four verbs and fails on any
+  that is not in its named-exception list.
+- JEV joins the list of available AI agents, and that
+  list becomes one. `api/provider-models.ts` calls
+  `PROVIDER_MODELS` the single source of truth, and the
+  AI-member gate checks `model` against it, but it is not
+  yet the only list: the seeded roster
+  (`api/mock-data/ai-members.ts`) spells four of its names
+  again as agent names, and TEST-PLAN.md spells catalog
+  names in prose: AA7a lists the four and picks "Claude
+  Haiku 4.5" (`:647-656`), AA8a's example names "Claude
+  Sonnet 4.6" (`:683`), two pin notes quote a
+  fixture's 'Claude Opus 4.8' (`:694`, `:5588`), and the
+  native-select driving note and G24b spell GPT-5.5 and
+  "Claude Sonnet 4.6" (`:346-348`, `:5618`). Make the
+  catalog the one list first: the roster takes each
+  agent's name from its `model` id, and TEST-PLAN.md
+  names models by their place in the catalog (the
+  seeded AIs, an Anthropic model not seeded), never by
+  spelling. Then JEV
+  lands as one entry there: `provider` `TypeSafe AI`,
+  `name` `JEV` (no catalog name carries its provider;
+  "Claude", "GPT", and "Grok" are families, and the
+  provider rides its own field), and `api_name`
+  supplied, never invented. Wherever an AI model's
+  provider name is stored, JEV's is `TypeSafe AI`.
+  Oracle: JEV appears in `PROVIDER_MODELS` under
+  `TypeSafe AI` and in the AI form's Model picker, and
+  no model name is spelled outside
+  `api/provider-models.ts` but in test fixtures;
+  TEST-PLAN.md prose counts as a spelling
 - Cachability — hashed names and gzip sidecars have
   shipped; on the static server `HEAD` reports the same
   `Content-Length` as GET. The API serves no `HEAD`: its
@@ -2433,6 +2739,203 @@ Off the critical path; each with its oracle.
   `HASHED_CACHE_CONTROL`; an API `HEAD` answers its GET's
   status and headers with no body, and a 405 carries
   `Allow`.
+- ACL-editing UI for record attributes (`read_roles` /
+  `write_roles`) — R21's restricted branches are
+  seed-produced today; setting an ACL is
+  `PUT …/attributes/:id` only, and no page reaches it.
+  Oracle: an admin edits an ACL through the UI and a
+  member-perspective New-instance form flips live;
+  TEST-PLAN R21 gains the write path as a user gesture
+- Attribute drag-reorder (TEST-PLAN R8)
+- The default-organization client still says the PUT
+  must name a live seat
+  (`client/identity-default-organization.ts:9`), and a
+  test comment says the seat remains
+  (`tests/api-identity-default-organization.test.ts:162-164`,
+  beside the `seedSeat` fixture,
+  `tests/root-admin-fixture.ts:110`), though 3636aa0f
+  retired the seat documents. Say an accepted
+  membership: a removed membership head is 400, and an
+  accepted membership is 201
+  (`api/organization-requests.ts:120-129`). Oracle:
+  neither comment names a seat document.
+- Comments name absent code. `appendMessagePairOnce`
+  and `appendMessagePairAlways` left with the store's
+  one statement, and the comments citing them stayed:
+  five in `api/` (`api/api.ts:1245`,
+  `api/derive-documents.ts:33`,
+  `api/message-pair.ts:94`, `api/routes.ts:707`,
+  `:2636`), two explaining stamp order by
+  "appendMessagePairOnce's nowUtc()"; three in `tests/`
+  (`tests/api-shadow-ledger-auth.test.ts:297`,
+  `tests/derive-documents.test.ts:19`,
+  `tests/document-family.test.ts:283`). TEST-PLAN V4
+  no longer names `appendMessagePairOnce`. The state by
+  PUT spec found more: `sendWriteResponse`
+  (`tests/pair-write-coverage.test.ts:55`);
+  `MEMBERS_WIRING` (`api/routes.ts:476`,
+  `api/validators.ts:535-536`, `:841-842`,
+  `:934-935`); and the replay fast path, which no
+  longer exists — nothing at the gate reads a request
+  to serve a stored response — yet is described at
+  `client/flow-mutations.ts:559-560`, its "fast" and
+  "path" a line apart, and in `tests/`
+  at `tests/api-identity-document.test.ts:176`,
+  `tests/api-member-documents.test.ts:403`,
+  `tests/api-shadow-ledger-tokens.test.ts:286-288`, and
+  `tests/drift-roster.test.ts:638`. The `/members/`
+  parent now resolves from heads
+  (`resolveViaMembershipPairPlane`,
+  `api/derive-states.ts:211-234`; 6eee335c), yet two C4
+  tombstone comments still narrate its retired
+  document-trio history (`api/derive-states.ts:38-41`,
+  `:504-505`). The packageable client left seven
+  comments naming moved paths (`api/flow-graph-diff.ts:15`,
+  `tests/presenter-project-detail-impact.test.ts:16`,
+  `tests/presenter-identity-detail.test.ts:16`,
+  `tests/presenter-project-patch.test.ts:10`,
+  `tests/api-facade-write-preconditions.test.ts:26`,
+  `web-app/app/flow-operations.ts:720`, `:875`); the
+  store left `api/request-context.ts:42-45` keeping
+  `requestAt` in a requests row,
+  `api/postgres-client.ts:2-3` taking advisory locks
+  inside `begin`, and ARCHITECTURE.md:230-235 calling
+  reads an open write-gate transaction's; and 960f2ce8
+  wrote one comment twice (`api/mock-data.ts:179-183`,
+  `:190-194`). Reword each to the
+  code that runs today, or delete it where the code now
+  says it. Oracle:
+  `git grep -nE 'appendMessagePair|sendWriteResponse'`
+  and `git grep -nE 'MEMBERS_WIRING'` find nothing
+  under `api/`, `client/`, `tests/`, or TEST-PLAN.md,
+  and every fast-path hit there, read across line
+  breaks, names code that runs, as
+  `tests/backend-postgres.test.ts:12-13`'s driver
+  Buffer path does
+- Stale-history comment cleanup as one pass — comments
+  still describe a past state as present. Sampled:
+  `web-app/app/measure-cli.ts` names a Node harness;
+  `web-app/app/page-request-profile.ts` says "No-op in
+  Node"; `tests/drift-states.test.ts` says derive-states
+  is unread in production while `api/routes.ts` imports
+  it; `api/routes.ts` claims revival dual-write after
+  the states row half is stripped; `states.postEvent`,
+  defined nowhere now, is named at `api/routes.ts:354`,
+  `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`;
+  and `web-app/app/root-redirect.ts:6-7` says esbuild and
+  `./build` where `deno bundle` and `./bin/build` run. The run-four
+  remediation's Evidence
+  (`docs/superpowers/specs/`
+  `2026-08-23-test-plan-run-four-remediation-design.md:911-932`)
+  lists provenance, not comments, and the reproductions
+  that might have were scratchpad, never committed —
+  the pass re-derives its enumeration by reading. The
+  "remove the comment … when done" and "revise both
+  comments when done" pointers other entries carry are
+  those entries' property, not this pass's
+- Reword the exact-read plan's regex constraint.
+  `docs/superpowers/plans/2026-09-15-exact-read-folds.md`
+  Global Constraints say "No regex over the ledger's
+  paths anywhere under `api/`", which over-claims:
+  `ORGANIZATION_NESTED_URI_PREFIX.exec(path)` in
+  `api/derive-states.ts` (`ownerFromPath`) parses the
+  path of one pair already fetched by an exact document
+  read to extract its organization segment — a parse of
+  a known pair, not a read by pattern. The spec's axiom
+  (a read is an exact `path`, or an exact `path` and
+  `name`) holds. Say "no read discovers pairs by
+  pattern" instead. Oracle: the reworded line, and the
+  one `.exec` named as the sanctioned parse
+- `./bin/measure --record` writes the literal `'unknown'` as
+  `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
+  no CPU-model API — `navigator.hardwareConcurrency` is a
+  count — and the `sysctl` workaround was rejected as
+  unverifiable and macOS-only. Ten of the fourteen rows
+  in `measurements/history.jsonl`, `c50e849` on, store
+  `"unknown"`. The truthful
+  shape omits the field rather than storing a sentinel,
+  which needs `measure-core.ts`'s field type and
+  `shapeHistoryLine` (:49, :284) together with
+  `measure-viz.ts:1052`, whose `|| ''` is itself the
+  default-value sin. Oracle: a row with no `cpuModel`
+  key renders without the separator.
+- TEST-PLAN.md's Pin lines lag their pins. R4's says
+  `RecordDetailEditPresenter` carries no CLI test
+  (`:6979`) and R6's omits 'a select attribute renders
+  no constraint picker', both stale since 97d21f5d;
+  AA4's says `bindAddMemberDialog` has no browser test
+  (`:602`), though `tests/browser/member-create.test.ts`
+  and `tests/browser/dialogs.test.ts` drive it; V8's
+  says the state badge is claimed by nothing, though
+  Declined and Revoked are, and expects "No outstanding
+  invitations." (`:5381`, `:5400`) where the test asserts
+  "No pending invitations."; and WB22 gives
+  `buildInboxItems` five parameters (`:4704`), where it
+  takes four (`web-app/app/presenters/workbox-inbox.ts:255`).
+  Oracle: each named Pin line names its test, and each
+  named claim matches the code
+- The 4 Oct walk remedies' last tasks never landed:
+  C6's scroll driven by script, I22's fault forced with
+  Fetch, F37a's stale undo from a second jar, R22
+  moored to refuse-and-refresh, and AT2's count after
+  the remedies (Tasks 9–11 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
+  whose AA32, F13, WB18, WB22, and SV3 parts the
+  walk-green plan redid). The 5 Oct walk (`ed1fac5c`)
+  scored C6, F37a, and R22 PASS without them, I22
+  stays BLOCKED by walk-green's ruling, and TEST-PLAN.md
+  still reads AT2's 4 Oct count (`:479`). Owner call:
+  rule them superseded, or run them. Oracle: each task
+  is landed or struck in its plan, and AT2 reads the
+  current count
+- The small bipolar gauge's `display` text has no
+  legend or caption (the K17 plan's deferral,
+  `docs/superpowers/plans/`
+  `2026-09-29-k17-signed-objective-score.md:656-657`).
+  Oracle: the gauge names what its number is, for the
+  eye and for a screen reader
+- `schema-svg.ts`'s `parseStores` still carries a dead
+  `StateStore`-matching branch
+  (`web-app/app/schema-svg.ts:163-169`): it can never
+  match now that `DbStores` holds only `messagePairs`,
+  so it has drawn nothing since that field left.
+  Oracle: `./test schema` green with the dead branch
+  gone, and `SCHEMA.svg` byte-identical.
+- `documentLifecycleEvents`
+  (`api/derive-documents.ts:190`) keeps an
+  `if (messagePair.method === DELETE_METHOD) continue`
+  guard that no live test pins and no flow route can
+  reach — flows' `:id` route has get and put only.
+  Oracle: delete the guard, or pin it with a
+  flow-shaped fixture.
+- Test-only list oracles. `documentCollectionGetHandler` and
+  `documentGetHandler` (`api/document-family.ts`) and the
+  `GetHandler` type (`api/routes.ts`) serve no route; sixteen
+  test files read families through them below the gate. Move
+  those reads onto the live read path, each moved assertion
+  at least as strong, then delete all three. Oracle: `git
+  grep -nw` finds none of the three names under `api/` or
+  `tests/`.
+- Deno-only tooling modules still live under
+  `web-app/app/` — `measure.ts`,
+  `generate-api-documentation.ts`, `compose.ts`,
+  `generate-schema-svg.ts`, `cdp-client.ts`,
+  `measure-viz.ts`, and `hash-static.ts` (e7ce7969,
+  `Deno.readDir`). The browser
+  tsconfig `exclude` that listed them is gone with that
+  file. Moving them to a top-level tools directory
+  would make browser membership by rule and is the
+  exclusion the `Deno.*` fence still needs. Oracle:
+  those seven files are not under `web-app/app/`
+- The `exists()` helper is duplicated five times, byte
+  for byte, all under `web-app/app/` — `compose.ts`,
+  `generate-api-documentation.ts`, `measure-viz.ts`,
+  `cdp-client.ts`, `measure.ts`. Commandment IX's
+  threshold is three. Each copy was sanctioned
+  deliberately: extracting a shared module from any one
+  Deno porting task would have reached into four other
+  tasks' files. Oracle: one definition, five importers,
+  `./test validate` green.
 - Genericity — DRY, even once (the indulgence); spec
   away every nit. Merged: `putRecordInstance` PATCHes
   (name lie —
@@ -2463,17 +2966,19 @@ Off the critical path; each with its oracle.
   named site collapsed to one definition, `./test
   validate` green; the canvas entries retire with
   product-path item 11.
-- Fewer JSON parse/stringify — byte-stream header
-  setting, mechanical sympathy and simplicity for
-  the processor; measured first
-  (`./bin/measure --profile`). Merged: the deferred
-  content-coding seams
-  (`shared/http-message/body.ts:77-80` and
-  `shared/http-message/content-coding.ts:3-8` —
-  revise both comments when done). Oracle: a
-  `./bin/measure --profile` run placing parse/stringify
-  above the budgets' noise — the item activates on that
-  number, not before.
+- One gate for the write. Every write is one ledger
+  statement now (`runLedgerStatement`,
+  `api/ledger-statement.ts:48`), but each handler still
+  lands its own: `runWrite` at 40 sites, 37 of them in
+  `api/routes.ts`, `runStateWrite` at 17, 13 there, and
+  `landStateWrite` twice in `api/authentication.ts`,
+  because each handler owns its own storage instead of
+  returning its pairs for one place to store. A handler
+  returns `MessagePair[]`; the gate lands them once, with
+  one notification. Lands beside item 11, which
+  rewrites the largest handlers. Oracle: one `runWrite`
+  site in `api/api.ts`, and no `runWrite` or
+  `runStateWrite` in `api/routes.ts`.
 - Simulated latency by environment — when
   `FA_ENVIRONMENT` is exactly `local` and
   `FA_LATENCY` is a millisecond count,
@@ -2488,220 +2993,6 @@ Off the critical path; each with its oracle.
   `FA_LATENCY=200` under `local` lifts every
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
-- GPU flag in the Layer 2 launcher — `launchChrome`
-  no longer passes `--disable-gpu` (cargo cult under
-  `--headless=new`; it was required only by old
-  headless on Windows). Its one real effect was
-  forcing software compositing, which made runs more
-  alike across machines. Dropped UNVERIFIED —
-  `./test browser` has run green on one machine
-  (2026-08-28). Restore it if two machines disagree.
-  Oracle: `./test browser` green on two machines
-- `schema-svg.ts`'s `parseStores` still carries a dead
-  `StateStore`-matching branch
-  (`web-app/app/schema-svg.ts:163-169`): it can never
-  match now that `DbStores` holds only `messagePairs`,
-  so it has drawn nothing since that field left.
-  Oracle: `./test schema` green with the dead branch
-  gone, and `SCHEMA.svg` byte-identical.
-- Collection reads call
-  `db.messagePairs.getCollectionHeadPairs` directly —
-  `api/derive-identity-tokens.ts:121`,
-  `api/head-reads.ts:123`,
-  `api/organization-requests.ts:56`,
-  `api/routes.ts:926`, `:3724`, and the test-only
-  `documentCollectionGetHandler`
-  (`api/document-family.ts:434`) — while per-id reads go
-  through `messageStore(db).getDocumentHead`.
-  `MessageStore` (`api/message-store.ts:15-25`) offers
-  `getCollection`, which decides no tombstone, and no
-  `getCollectionHeads`; that seam would put the
-  tombstone decision in one layer. Oracle: every
-  collection read goes through the store seam,
-  `./test validate` and `./test postgres` green.
-- `documentLifecycleEvents`
-  (`api/derive-documents.ts:190`) keeps an
-  `if (messagePair.method === DELETE_METHOD) continue`
-  guard that no live test pins and no flow route can
-  reach — flows' `:id` route has get and put only.
-  Oracle: delete the guard, or pin it with a
-  flow-shaped fixture.
-- Physical PII erasure — deferred by decision:
-  product-path item 2 hides removed PII, it does not
-  delete it. Activates on a tenant contract or a
-  jurisdiction that requires physical deletion. The pairs
-  item 2's policy hides are the pairs to delete, and
-  `fa_eraser` deletes them through a view of exactly those
-  pairs: it holds DELETE on that view and SELECT on the id
-  and the hash alone, sees no bytes, and cannot log in
-  (item 2's principle). Measured on Postgres 18.6: through
-  such a view a live pair and a DELETE head each delete
-  zero rows, the hidden pairs delete and come back named,
-  and the table itself is refused; `fa_owner` owns the
-  view, so item 2's policy hides nothing from it. An
-  erasure pair names the removed ids and hashes so every
-  absence is accounted for — the ledger store left
-  `supersedes`
-  unenforced for this — and writing it is an INSERT, which
-  a delete-only view cannot make: the brainstorm settles
-  whether the eraser also inserts through a view of its
-  own, held to erasure pairs by a check option (measured:
-  such a view refuses a row at another path), or another
-  role writes the record. Until it ships the page says
-  "removed", never "erased" (item 2). `DELETE` is logical
-  until `VACUUM`, and WAL and point-in-time backups hold
-  the bytes until the host's retention expires — state the
-  window. The brainstorm also settles two questions this
-  bullet inherits. Cascade: erasing a document's pairs
-  follows the DELETE cascade policy (its bullet below),
-  because a dependent that copied the erased values into
-  its own state — a revision, an operation's response —
-  still holds them, so erasure walks the same reference
-  table the cascade does. Tombstones: the suspicion is that an erased
-  document keeps exactly one version, its tombstone — the
-  DELETE head the view already refuses to delete — so its
-  id still reads retired (the Gone bullet), its
-  succession still has a head, and the erasure pair names
-  every predecessor the tombstone's `supersedes` chain
-  lost. A received request's body can hold PII the
-  hiding rule never reaches — the invitation's email,
-  which the message-plane spec handed item 2
-  (`docs/superpowers/specs/`
-  `2026-09-23-message-plane-design.md:871-875`) — so
-  the brainstorm settles whether erasure reaches it.
-  Oracle: `tests/api-pii-tombstone.test.ts`
-  'erased PII remains in superseded pairs; login is 401'
-  inverted for the erased pairs, and each erased
-  document's one remaining pair is its tombstone.
-- The code's word `erased` becomes `deleted`: this is an
-  HTTP application, and the state it names is a DELETE
-  head at `identities/:id/pii`. Its own change: the PII
-  union's discriminant (`shared/types.ts:647-656`) and
-  the stem `eras`, any case: 78 occurrences in 16
-  product files under `api/`, `client/`, `server/`,
-  `shared/`, and `web-app/`, and 83 in 15 test files,
-  type-erasure words among them (`erasable`,
-  `api/document-family.ts:34`, `:155`,
-  `api/routes.ts:338`), so the sweep works from a word
-  list, never the bare stem. It is a field, never a
-  column, and touches no stored byte — the client
-  builds the flag from a 404, 410, or 403
-  (`client/identities.ts:140-146`) — so it has
-  no deadline. The page keeps "removed" (product-path
-  item 2) until the eraser ships; the code speaks HTTP.
-  Oracle: the word list's terms appear in `api/`,
-  `client/`, `server/`, `shared/`, and `web-app/` only
-  where the eraser bullet's own words do.
-- The reporter — `fa_reporter`, named in product-path
-  item 2 only as an example of its principle: a role
-  created with its first worker, never before. Nothing
-  about it is defined yet — its view, its grants, and
-  whether it sees hidden pairs are its own brainstorm's.
-  Activates with the first worker that needs reports.
-- Table migrations — deferred by decision: the ledger
-  store holds the table's DDL final, and item 3 ships
-  everything a change to the fence needs. Activates on the
-  first change to the table once a tenant's data exists
-  and a wipe is no longer possible. The pieces already
-  stand (item 3, measured): a migration is the genesis of
-  its own document in `/migrations/`, named for what it
-  does behind a four-digit order after the root,
-  landed by `migrate` with its SQL the `request` and
-  its digest the `response`; names order migrations and
-  the succession index refuses a second runner, with no lock
-  and no migrations table of its own; and the DDL and the
-  genesis commit or roll back together. What is missing
-  is only the table steps themselves, and whether a
-  rollback lands as the migration's DELETE head or as a
-  migration of its own — never a rewind. Named limits: a
-  large index
-  cannot ride the one-transaction step and needs two,
-  build then record; boot's strict equality needs a
-  declared set of digests once item 13 runs two processes;
-  and pairs are hashed and never rewritten, so a new
-  envelope column sits outside every old `pair_hash`.
-  Never a route that executes a body's SQL (item 3). The
-  scripture names this gap among its unwritten scrolls.
-  Oracle: a Postgres test starts two runners on one
-  migration and finds one document, one set of changes,
-  and the loser's DDL gone; a second applies a table step
-  to a database seeded from an older binary, and the new
-  binary boots.
-- **16.** `FA_GIT_SHA` — the commit that built the running
-  binary, supplied by the environment as every `FA_`
-  value is and never defaulted, read once at boot and
-  carried in the context so every log line names the
-  build (the Office of Structured Observability), and
-  the one source of the `<sha>` in the `user-agent`
-  token the client and item 3 send. `./deploy` fills it from
-  `git rev-parse HEAD`, exact because the build refuses
-  a dirty tree; on Render from the host's commit
-  variable (`RENDER_GIT_COMMIT`), a name that stays at
-  the edge (item 15). How the page bundle
-  learns it — embedded at build, or served — is this
-  bullet's to settle. Nothing sends the token yet: the
-  message-plane spec left it out
-  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:272-274`),
-  and no `user-agent` line appears under `client/`,
-  `api/`, `shared/`, or `server/`. Oracle: a boot without
-  it refuses, as a boot without `FA_POSTGRES_URL` does; a
-  request log line carries it; and every API request the
-  client sends carries `user-agent: fusion-angle/<sha>`
-- JEV joins the list of available AI agents, and that
-  list becomes one. `api/provider-models.ts` calls
-  `PROVIDER_MODELS` the single source of truth, and the
-  AI-member gate checks `model` against it, but it is not
-  yet the only list: the seeded roster
-  (`api/mock-data/ai-members.ts`) spells four of its names
-  again as agent names, and TEST-PLAN.md spells catalog
-  names in prose: AA7a lists the four and picks "Claude
-  Haiku 4.5" (`:647-656`), AA8a's example names "Claude
-  Sonnet 4.6" (`:683`), two pin notes quote a
-  fixture's 'Claude Opus 4.8' (`:694`, `:5588`), and the
-  native-select driving note and G24b spell GPT-5.5 and
-  "Claude Sonnet 4.6" (`:346-348`, `:5618`). Make the
-  catalog the one list first: the roster takes each
-  agent's name from its `model` id, and TEST-PLAN.md
-  names models by their place in the catalog (the
-  seeded AIs, an Anthropic model not seeded), never by
-  spelling. Then JEV
-  lands as one entry there: `provider` `TypeSafe AI`,
-  `name` `JEV` (no catalog name carries its provider;
-  "Claude", "GPT", and "Grok" are families, and the
-  provider rides its own field), and `api_name`
-  supplied, never invented. Wherever an AI model's
-  provider name is stored, JEV's is `TypeSafe AI`.
-  Oracle: JEV appears in `PROVIDER_MODELS` under
-  `TypeSafe AI` and in the AI form's Model picker, and
-  no model name is spelled outside
-  `api/provider-models.ts` but in test fixtures;
-  TEST-PLAN.md prose counts as a spelling
-- No error-message allowlist. `safeErrorMessage`
-  (`server/postgres-gate.ts:101-121`) prints a message
-  only if a set names it, else `seed failed` (seed,
-  `server/seed.ts:41`), or boot's and wipe's fallback
-  (`postgres-gate.ts:126`, `server/postgres-wipe.ts:38`),
-  so a fault the seed's own code raises — a rehearsed row
-  that does not land, a row on another predecessor —
-  reaches the operator as `seed failed` and a code, the
-  evidence destroyed. Two classes replace it. A
-  precondition refusal names itself: the database is
-  not empty, a required env is missing, Postgres is
-  unreachable, a concurrent seed won, the flags are
-  wrong. Everything else is a bug and crashes with its
-  message and stack. The allowlist kept secrets off
-  stderr; that duty moves to the gate: no secret enters
-  an error message, and the Postgres adapter enriches a
-  driver fault without the URL or password. First check
-  what the driver's own messages carry (connection,
-  authentication, and constraint errors); a secret found
-  there is fixed at the adapter, not filtered at print.
-  Oracle: the allowlist and its fallback are gone; each
-  named refusal prints its own message; a forced
-  rehearsal fault prints its message; and a pin feeds
-  the adapter each driver fault class with a known
-  password in the URL and finds the password in no
-  message
 - One rehearsal per test process, if measurement earns
   it. `tests/` calls `seededMockDb()` at 96 sites, and
   `sharedMockDb()` seeds once per worker that uses it;
@@ -2726,53 +3017,113 @@ Off the critical path; each with its oracle.
   Oracle: `./test` measured before and after this change
   alone, three runs each, and every test that mutates
   its seeded database still gets its own backend
-- The app still reads the server after the packageable
-  client. With the contract in `shared/`, four modules
-  outside the client import `api/`: the documentation
-  generator (`web-app/app/generate-api-documentation.ts`)
-  reads the route table and its surface
-  (`api/routes.ts`, `api/route-surface.ts`,
-  `api/http-status-documents.ts`, `api/request-auth.ts`,
-  `api/document-family.ts`, `api/path-segments.ts`) under
-  `deno run`, never in a page; two presenters
-  (`web-app/app/presenters/ai-member-detail.ts:22`,
-  `presenters/member.ts:25`) read the provider-model
-  catalog (`api/provider-models.ts`); and the records
-  detail page (`web-app/records/detail.ts:62`) derives
-  claim roles (`api/authorization.ts`) — the two `api/`
-  modules the page graph reaches today. The catalog and
-  the claim-role derivation are both sides' and belong
-  in `shared/`; the generator is a tool and may read
-  the server. Oracle: an import-graph walk from every
-  `PAGE_REGISTRY` entry finds no module under `api/`
-- The client hands the app three shapes. Head reads
-  made each raw row a message: a verb that read a wire
-  row answers `HttpMessage<Row>`, or an array of them
-  for a collection's parts. The five named values
-  (`Idea`, `Project`, `RecordModel`, `WorkOrder`,
-  `RecordInstance`) and the values a write latches
-  through (`HumanMember` by its membership, `MemberPii`
-  present, `ClientRegistration` registered, the app's
-  `Organization`, and `FlowGraph`) keep the message
-  they were built from. The aggregates and the
-  camelCase values nothing writes through — `AIMember`,
-  `Identity`, the roster, `RecordAttribute`,
-  `ObjectiveScore`, `ObjectiveRevision`,
-  `ProviderEvent`, `TokenChain`, the credential state,
-  `FlowSummary`, `FlowListItem`, `BoundFlowSummary`,
-  and the transition and claim projections — keep
-  their shapes and drop the responses they were built
-  from. `putHumanMember` (`client/members.ts`) answers
-  void: its two heads, the identity's and the PII's,
-  have no holder — the members page re-reads after a
-  save (`web-app/members/detail.ts:563`) — and the one
-  head a write verb owes is a composite shape for this
-  bullet to name. `postObjectiveCreation` and
-  `postObjectiveRevision` (`client/objectives.ts:261`,
-  `:296`) answer void too. Oracle: every client read verb returns a
-  message, an array of messages, or a value whose
-  `message` members name every response it was built
-  from
+- The memory backend copies its whole table for every
+  bare statement (`const copy = [...this.#rows]`,
+  `api/backend-memory.ts:144`), a cost every test write
+  outside a transaction pays; the rehearsal spec left
+  it unmeasured (`docs/superpowers/specs/`
+  `2026-09-24-rehearsal-transaction-design.md:189-191`).
+  Oracle: `./test` measured before and after a copy
+  only a failing statement pays, and the change lands
+  only if that number earns it
+- Growth: bytes per pair with two wire messages stored, heap
+  against index bytes, `pg_dump` size at 1M, and autovacuum's
+  insert-threshold behavior on the insert-only table. Oracle:
+  numbers in the sweep's JSON and a backup-size line item 6
+  can plan against.
+- Dependency-warm Docker layer. `COPY . .` busts
+  later layers; `deno compile` fetches `denort`.
+  Cold-build reliability is not the problem.
+  Oracle: a measured cold Render Docker build,
+  then a layer that caches `deno.json` /
+  `deno.lock` / `denort` only if that number is
+  the bottleneck.
+- The ledger sweep, built into `./bin/measure` the way
+  `./deploy` grew modes. A ledger mode that subsumes a
+  generator and a loader: the mock seed as the base, a modeled
+  year of growth on top, every model constant a CLI argument
+  (seats, working days, logins and refreshes and document
+  writes per seat-day, revision share, neighbor size); base
+  through `postMockDataLoad`, growth in batches of 1000 through
+  the seam's `append` with modeled stamps, formed by the real
+  pair formers. A decade sweep at 10k, 100k, and 1M pairs.
+  `EXPLAIN (ANALYZE, BUFFERS)` per statement with parameters
+  chosen by query, and the size at which any statement crosses
+  30 ms. Two hundred real writes through the gate per size;
+  per-index bytes, rebuild time, and the write sample with each
+  index dropped. A neighbor run at 100k this tenant and 900k
+  neighbor. Statistics discipline: snapshot
+  `pg_stat_user_tables`, then `VACUUM (ANALYZE)`, re-ANALYZE
+  after every rebuild, stats recorded per measurement. Local
+  compose Postgres 18 on tmpfs, Render v18; timings are lower
+  bounds. Loopback-only URL guard; a private schema per size;
+  JSON under `measurements/ledger/`. Oracle: committed JSON per
+  size and a report section per statement naming its 30 ms
+  crossing or "beyond 1M".
+- Request statistics in `./bin/measure`, with
+  visualizations. `handleRequest` (`api/api.ts:446`) is
+  the one seam: `server/http-server.ts:681` routes the
+  product through it, and the tests' in-process
+  transport (`inProcessFetch`,
+  `tests/in-page-facade.ts:31-56`) does too, after
+  `simulateLatency()`, its only caller, so a timer there
+  measures the handler alone. Record
+  per request: method, route family (ids folded to `:id`),
+  status, handler ms, wall stamp. A throwaway probe on
+  `packageable-client` (`ffa73bf4`, memory suite,
+  `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
+  peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
+  p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
+  `work-orders/:id/history` (since retired)
+  clusters at 100-102 ms (p90 100.7, max 102.3),
+  unexplained. The probe's synchronous
+  per-request append cost ~1.3 s on a 45 s suite. Suite
+  throughput through the memory backend is not a load test;
+  the Postgres origin (`--base-url`) is where a rate means
+  something. Visualize beside readyMs in `measure-viz`: a
+  log-bucket latency histogram, per-route p50/p90/p99, and a
+  requests-per-second timeline. Oracle: `--record` writes the
+  per-route figures to `measurements/`; `--visualize` draws
+  the three charts; `--check` gates per-route p90 against
+  `measurements/budgets.json`.
+- Filtering other collections by a body field. The
+  partial index `fa_message_pairs_body` reaches
+  `path = '/invitations/'` only
+  (`BODY_INDEXED_PATH`, `api/schema-postgres.ts:194`).
+  Objectives record a transition in the body
+  (`lifecycle: 'state'`, `OBJECTIVES_WIRING`,
+  `api/routes.ts:454-462`) and serve versions per
+  objective (`documentVersionsSelectRoute`,
+  `api/routes.ts:5265`). They have no collection-wide
+  versions view. Oracle: a body field on another
+  collection selects through an index the statement
+  names, or the read says it scans
+- Collections page, and their order is the caller's to
+  ask. A collection read answers all its parts in one
+  response, in the order the server keeps; head reads
+  left pagination and whether a collection's order
+  should be the client's to ask for
+  (`docs/superpowers/specs/`
+  `2026-09-30-head-reads-design.md:346-347`,
+  `:1086-1089`), and membership and versions and
+  work-order events left pagination again
+  (`2026-10-01-membership-and-versions-design.md:272`,
+  `2026-10-04-work-order-events-design.md:199-201`).
+  Measured first: the ledger sweep says where a list
+  outgrows one response. Oracle: a collection read
+  returns a bounded page and a way to the next, in a
+  client-chosen order where the brainstorm allows one
+- Flow stats read every work order's `versions/`, one
+  collection read per work order
+  (`web-app/app/flow-stats.ts:59`), to chart whole
+  timelines; work-order events left a collection-wide
+  read as its own question (`docs/superpowers/specs/`
+  `2026-10-04-work-order-events-design.md:193-195`).
+  Measured first: a flow with many work orders under
+  `./bin/measure`. Oracle: the stats page's reads grow
+  with the flow, not with its work orders, or the
+  measurement says the fan-out costs nothing a person
+  sees
 - Fewer body decodes, after the work-order-events spec,
   the last of item 1's. Head
   reads slowed eight of the nine list pages' readyMs
@@ -2830,381 +3181,30 @@ Off the critical path; each with its oracle.
   projects, and records names
   the cost before any change, and each reduction lands
   with its readyMs before and after
-- Comments name absent code. `appendMessagePairOnce`
-  and `appendMessagePairAlways` left with the store's
-  one statement, and the comments citing them stayed:
-  five in `api/` (`api/api.ts:1245`,
-  `api/derive-documents.ts:33`,
-  `api/message-pair.ts:94`, `api/routes.ts:707`,
-  `:2636`), two explaining stamp order by
-  "appendMessagePairOnce's nowUtc()"; three in `tests/`
-  (`tests/api-shadow-ledger-auth.test.ts:297`,
-  `tests/derive-documents.test.ts:19`,
-  `tests/document-family.test.ts:283`). TEST-PLAN V4
-  no longer names `appendMessagePairOnce`. The state by
-  PUT spec found more: `sendWriteResponse`
-  (`tests/pair-write-coverage.test.ts:55`);
-  `MEMBERS_WIRING` (`api/routes.ts:476`,
-  `api/validators.ts:535-536`, `:841-842`,
-  `:934-935`); and the replay fast path, which no
-  longer exists — nothing at the gate reads a request
-  to serve a stored response — yet is described at
-  `client/flow-mutations.ts:559-560`, its "fast" and
-  "path" a line apart, and in `tests/`
-  at `tests/api-identity-document.test.ts:176`,
-  `tests/api-member-documents.test.ts:403`,
-  `tests/api-shadow-ledger-tokens.test.ts:286-288`, and
-  `tests/drift-roster.test.ts:638`. The `/members/`
-  parent now resolves from heads
-  (`resolveViaMembershipPairPlane`,
-  `api/derive-states.ts:211-234`; 6eee335c), yet two C4
-  tombstone comments still narrate its retired
-  document-trio history (`api/derive-states.ts:38-41`,
-  `:504-505`). The packageable client left seven
-  comments naming moved paths (`api/flow-graph-diff.ts:15`,
-  `tests/presenter-project-detail-impact.test.ts:16`,
-  `tests/presenter-identity-detail.test.ts:16`,
-  `tests/presenter-project-patch.test.ts:10`,
-  `tests/api-facade-write-preconditions.test.ts:26`,
-  `web-app/app/flow-operations.ts:720`, `:875`); the
-  store left `api/request-context.ts:42-45` keeping
-  `requestAt` in a requests row,
-  `api/postgres-client.ts:2-3` taking advisory locks
-  inside `begin`, and ARCHITECTURE.md:230-235 calling
-  reads an open write-gate transaction's; and 960f2ce8
-  wrote one comment twice (`api/mock-data.ts:179-183`,
-  `:190-194`). Reword each to the
-  code that runs today, or delete it where the code now
-  says it. Oracle:
-  `git grep -nE 'appendMessagePair|sendWriteResponse'`
-  and `git grep -nE 'MEMBERS_WIRING'` find nothing
-  under `api/`, `client/`, `tests/`, or TEST-PLAN.md,
-  and every fast-path hit there, read across line
-  breaks, names code that runs, as
-  `tests/backend-postgres.test.ts:12-13`'s driver
-  Buffer path does
-- DELETE cascade. No one policy says what a delete does
-  to the documents that name the deleted one. Four
-  references refuse the delete today (the last
-  accepted admin membership, the record-type and
-  attribute RESTRICTs, and the
-  instance placement RESTRICT under a work-order
-  binding), each checked in a read that closes before
-  the write; no audit lists the rest. Consider one
-  policy per reference, named in one place: RESTRICT
-  (refuse while referenced), CASCADE (tombstone the
-  dependents in the same statement as the parent), or
-  ORPHAN (leave the reference, which then reads 410 or
-  404). Oracle: a table of every cross-document
-  reference with its policy; each CASCADE lands parent
-  and dependents in one statement and a GET of each
-  dependent reads it gone; each RESTRICT refuses a
-  racing delete under one statement; no reference is
-  unlisted.
-- The four counting checks close before their
-  statement: the last accepted admin
-  (`refuseLastAdmin`, `api/invitations-domain.ts:335-355`),
-  the record-type RESTRICT (`api/routes.ts:4610-4620`),
-  the attribute RESTRICT (`api/routes.ts:977-990`, and
-  again in `deleteRecordAttributeSafe` at `:4764-4768`),
-  and the instance placement RESTRICT
-  (`api/routes.ts:3198-3224`) each verify in a read
-  transaction that closes before the write. The
-  default-organization write reads an accepted
-  membership (`membershipOf`,
-  `api/organization-requests.ts:120-129`) and then
-  writes. A grant reads the membership head
-  (`postOrganizationInvitationGrant`,
-  `api/invitations-domain.ts:588`) and then lands
-  (`:607`). Two grants of one email name one
-  document, `<organization-id>:<identity-id>`.
-  Oracle: two writers race the last accepted admin,
-  a record-type DELETE against an instance create, an
-  attribute DELETE against a flow PUT, an instance
-  DELETE against a binding, a default-organization
-  PUT against that membership's removal, and two
-  grants of one email; each race refuses one writer.
-  The guard lives in the write's own statement: the
-  ledger store took transactions and advisory locks
-  out of the write path (4175b2d5), so the one write
-  transaction and the organization's lock the state by
-  PUT spec named are gone.
-- An RFC 7009 revocation endpoint for OAuth clients.
-  Revocation today is
-  `identities/:id/tokens/:jti/revocation`: the identity
-  names its own token by `jti`, revokes the whole chain,
-  and an unknown jti answers 404, which reveals nothing
-  the identity cannot already list. A third-party client
-  holding only a token string has no standard way to
-  revoke it. Add `POST authentication/revocation`
-  (`application/x-www-form-urlencoded`: `token`, and the
-  optional `token_type_hint`), which authenticates the
-  client as `authentication/token` does, checks the token
-  was issued to that client, and revokes through the same
-  chain revocation. It answers 200 for a revoked or an
-  unknown token (RFC 7009 §2.2), so a guessed string
-  learns nothing; `unsupported_token_type` for a kind it
-  does not revoke; and 503 with `Retry-After` while
-  revocation is unavailable. Oracle: a client revokes its
-  refresh token and every jti in that chain then reads
-  revoked; an unknown or already-revoked token answers
-  200 and stores nothing; a token issued to another
-  client is refused; a real and a guessed token of the
-  same length answer byte-identical responses.
-- CRUD verbs out of names, comments, and test titles. This
-  is an HTTP application on a SQL database: a state change
-  is PUT, POST, PATCH, or DELETE at the HTTP layer and
-  INSERT at the store, never "create", "update", "upsert",
-  or "write" standing in for one of them. The case that
-  surfaced it is `postRecordWriteOp` (`api/routes.ts:872`,
-  the seed's record-type POST bundle) and its family:
-  `RecordWriteBody`, `RecordWriteCreateBody`,
-  `RecordWriteEditBody`, `RecordWriteMessagePairs`,
-  `validateRecordWriteBody`,
-  `validateRecordWriteAttribute`, and
-  `tests/api-records-write.test.ts`. The former's names are
-  ruled, one rename-only commit, the store's `'land'`
-  outcome unchanged:
-  `StateWrite` → `NextStates`,
-  `FormedStateWrite` → `FormedStatement`,
-  `WriteAnswer` → a name still to rule, since
-  `StatementAnswer` already names the per-row answer it
-  holds (`shared/ledger-statement.ts:45`;
-  `api/message-pair.ts:705`),
-  `formStateWrite` → `formedStatement`,
-  `landStateWrite` → `landedStatement`,
-  `runStateWrite` → `landedStates`,
-  `runWrite` → `landedRows`,
-  `runStatement` → `executeStatement`,
-  `StatementRun` → `StatementExecution`,
-  `runLedgerStatement` → `executeLedgerStatement`.
-  Across `api/`, `client/`, `shared/`, `web-app/`, and
-  `server/`, 52 distinct
-  identifiers contain a capitalized Create, Update, or
-  Upsert and 35 contain Write, comments and strings
-  aside. Some stay: the DOM's `createElement` and
-  constructors such as `createHttpFacade`. The audit rules
-  on each of the rest, naming by the HTTP-verb convention
-  (`getNoun`, `putNoun`, `deleteNoun`,
-  `postNounOperation`) at the HTTP layer and INSERT at the
-  store. Each rename is its own commit. Oracle: a test
-  sweeps identifiers for the four verbs and fails on any
-  that is not in its named-exception list.
-- The ledger root's body is JSON. `/migrations/0000-root`
-  (`api/ledger-root.ts:16-17`) is the one head whose
-  response body is not a JSON object: 64 hex characters of
-  the empty string's sha256, with no `content-type`, so it
-  carries none of its path's ids. Every other document
-  body carries its id. Form it as a JSON object with `id`
-  `0000-root` and the digest under a named key, with
-  `content-type: application/json` and the
-  `content-length` that follows. Both backends read the
-  root (`hasRoot`, `api/backend-memory.ts:255-259`,
-  `api/backend-postgres.ts:117`); every deployment seeds
-  fresh, so nothing stored migrates. Oracle: the root
-  head's response parses as a JSON object whose `id` is
-  `0000-root`, in both backends.
-- Test ids are identifiers, post-ship. Every id a
-  test stores or sends — an identity, an
-  organization, a document, an etag — is a canonical
-  identifier, the 22-character encoding of a UUID
-  (`isIdentifier` and `identifierOfUuidText` in
-  `shared/identifier.ts`). A short label is not one.
-  Witness: `the token sub is the caller identity`
-  (`tests/api-actor-from-token.test.ts`) seeded
-  `alice`, and `membershipsOfIdentity` rejected the
-  mirrored membership with "identity_id must be a
-  22-character identifier". That test now encodes
-  `6f0b9c1e-4a27-4d5b-8e31-7c9a2f10b6d4`. The suite
-  still mints tokens for `anonymous`
-  (`tests/adapters-authentication.test.ts`,
-  `tests/adapters-identity-providers.test.ts`) and
-  `agent-7`
-  (`tests/api-authentication-token.test.ts`).
-  Display names and search text stay words. It waited
-  on membership and versions, which has landed. Oracle:
-  one test
-  walks the ids the suite stores and fails when
-  `isIdentifier` rejects one, with named exceptions
-  for display names and search text.
-- The default-organization client still says the PUT
-  must name a live seat
-  (`client/identity-default-organization.ts:9`), and a
-  test comment says the seat remains
-  (`tests/api-identity-default-organization.test.ts:162-164`,
-  beside the `seedSeat` fixture,
-  `tests/root-admin-fixture.ts:110`), though 3636aa0f
-  retired the seat documents. Say an accepted
-  membership: a removed membership head is 400, and an
-  accepted membership is 201
-  (`api/organization-requests.ts:120-129`). Oracle:
-  neither comment names a seat document.
-- Immutable document types. A family declares itself
-  immutable where it declares its conditional; every
-  write is a genesis under the never-written latch, so a
-  second write at a written name stores nothing (412 for
-  a client's declaration, 409 for a handler's) and a
-  retired name answers 410; DELETE answers 405; only
-  erasure removes pairs (the physical-erasure bullet).
-  Their consumers are the join documents:
-  `postFlowWorkOrderDocumentOp` and
-  `postFlowRecordDocumentOp` (`api/routes.ts`) land a PUT
-  with no latch, so a second PUT at a join's name replaces
-  what it joins. Oracle: a second PUT at a written join
-  name stores nothing and answers 409 or 412.
-- Test-only list oracles. `documentCollectionGetHandler` and
-  `documentGetHandler` (`api/document-family.ts`) and the
-  `GetHandler` type (`api/routes.ts`) serve no route; sixteen
-  test files read families through them below the gate. Move
-  those reads onto the live read path, each moved assertion
-  at least as strong, then delete all three. Oracle: `git
-  grep -nw` finds none of the three names under `api/` or
-  `tests/`.
-- The work-order gates check no node and no edge.
-  `assertRequiredAttributesAtExit` (`api/routes.ts`) returns
-  when the head's `state` names no node in its frozen
-  `flow_graph`, so the required-at-exit check is skipped
-  silently for that head. No gate would stop it:
-  `validateWorkOrderCreateBody` checks `states` only as
-  non-empty strings, never `states[2]` as `'claimed'`
-  (`docs/superpowers/specs/`
-  `2026-10-04-work-order-events-design.md:199-200`), and
-  `validateWorkOrderInstanceTransitionBody`
-  and `postWorkOrderTransitionOp` (`api/validators.ts`,
-  `api/routes.ts`) check `targetState` only as non-empty, with
-  no edge from the head's `state`, and `postWorkOrderDocumentOp`
-  (`api/routes.ts`) lays a PUT's `flow_graph` over the head
-  without checking that `state` still names a node. Nothing
-  compares the browser-minted `transitionAt` with the head's
-  `transition.at` either. The inbox's static degraded row for an unplaced head
-  contains the gap; it does not close it. Plan gate validation
-  (node, edge, and `transitionAt`; real graphs in fixtures) as
-  its own spec; it decides whether a skewed `transitionAt` is
-  refused or clamped. Oracle: a create or transition naming a
-  node absent from the graph, a transition with no edge from
-  the head's `state`, or a PUT whose `flow_graph` drops the
-  head's `state`, is refused at the gate.
-- Seed pairs present no credentials. A seed row's
-  secrets columns hold zero bytes where a live write
-  stores its `authorization` line, and a seed pair
-  carries no `request-id` line: the ledger-seed spec's
-  Decision 3, a named departure from the axiom that a
-  pair stores what was received
-  (`docs/superpowers/specs/2026-09-23-ledger-seed-design.md:135-143`,
-  `:627-629`). A pair identical to the app's needs a
-  bearer per requester, minted by a simulated login
-  whose own pairs land too, and the seed runs without
-  the signing key (`tests/pg-seed.test.ts:433`).
-  Oracle: a seeded write pair's secrets hold the line
-  its requester would have sent, or SCHEMA.md names the
-  seed as the axiom's one exception
-- The memory backend copies its whole table for every
-  bare statement (`const copy = [...this.#rows]`,
-  `api/backend-memory.ts:144`), a cost every test write
-  outside a transaction pays; the rehearsal spec left
-  it unmeasured (`docs/superpowers/specs/`
-  `2026-09-24-rehearsal-transaction-design.md:189-191`).
-  Oracle: `./test` measured before and after a copy
-  only a failing statement pays, and the change lands
-  only if that number earns it
-- Collections page, and their order is the caller's to
-  ask. A collection read answers all its parts in one
-  response, in the order the server keeps; head reads
-  left pagination and whether a collection's order
-  should be the client's to ask for
-  (`docs/superpowers/specs/`
-  `2026-09-30-head-reads-design.md:346-347`,
-  `:1086-1089`), and membership and versions and
-  work-order events left pagination again
-  (`2026-10-01-membership-and-versions-design.md:272`,
-  `2026-10-04-work-order-events-design.md:199-201`).
-  Measured first: the ledger sweep says where a list
-  outgrows one response. Oracle: a collection read
-  returns a bounded page and a way to the next, in a
-  client-chosen order where the brainstorm allows one
-- An admin seats an identity without its consent. The
-  direct seat — an admin's membership PUT naming an
-  identity — lands a membership the identity never
-  accepted; membership and versions kept today's power
-  and left the question (`docs/superpowers/specs/`
-  `2026-10-01-membership-and-versions-design.md:269-270`).
-  It lands beside item 14, which bounds
-  whom an admin may name at all. Oracle: a seat the
-  identity did not accept reads pending until it does,
-  or the owner rules the direct seat a deliberate power
-  and TEST-PLAN.md says so
-- Flow stats read every work order's `versions/`, one
-  collection read per work order
-  (`web-app/app/flow-stats.ts:59`), to chart whole
-  timelines; work-order events left a collection-wide
-  read as its own question (`docs/superpowers/specs/`
-  `2026-10-04-work-order-events-design.md:193-195`).
-  Measured first: a flow with many work orders under
-  `./bin/measure`. Oracle: the stats page's reads grow
-  with the flow, not with its work orders, or the
-  measurement says the fan-out costs nothing a person
-  sees
-- The top-bar bell keeps its invitation count after a
-  refused accept until the next navigation: notifying
-  would re-run the page's pending-only refresh and drop
-  the row V10 must show (the walk-green plan's
-  deferral, `docs/superpowers/plans/`
-  `2026-10-05-walk-green.md:281-284`). Oracle: after a
-  refused accept the bell's count matches the pending
-  list, and V10's row still shows
-- The Add-Member dialog keeps its AI model across a
-  reopen: `clearAddMemberFields` resets every field but
-  `#ai-model` (`web-app/members/index.ts:406-415`; the
-  walk-green plan's deferral, `docs/superpowers/plans/`
-  `2026-10-05-walk-green.md:296-297`). Oracle: reopening
-  the dialog after an AI create shows the Model picker
-  at its placeholder
-- The small bipolar gauge's `display` text has no
-  legend or caption (the K17 plan's deferral,
-  `docs/superpowers/plans/`
-  `2026-09-29-k17-signed-objective-score.md:656-657`).
-  Oracle: the gauge names what its number is, for the
-  eye and for a screen reader
-- The advisory-lock module outlived its locks.
-  `api/advisory-lock.ts` holds the notify channel, its
-  payload, and `POOL_MAX`; its `advisoryKey` and
-  `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have had no
-  product caller since 4175b2d5, and 'two first-writers:
-  one 201, not a double insert'
-  (`tests/pg-races.test.ts:241-258`) still holds a lock
-  the product no longer takes, so its hold no longer
-  bites. Oracle: the module's name says what it holds,
-  `advisoryKey` leaves with its tests, and the race test
-  holds only what the product holds
-- TEST-PLAN.md's Pin lines lag their pins. R4's says
-  `RecordDetailEditPresenter` carries no CLI test
-  (`:6979`) and R6's omits 'a select attribute renders
-  no constraint picker', both stale since 97d21f5d;
-  AA4's says `bindAddMemberDialog` has no browser test
-  (`:602`), though `tests/browser/member-create.test.ts`
-  and `tests/browser/dialogs.test.ts` drive it; V8's
-  says the state badge is claimed by nothing, though
-  Declined and Revoked are, and expects "No outstanding
-  invitations." (`:5381`, `:5400`) where the test asserts
-  "No pending invitations."; and WB22 gives
-  `buildInboxItems` five parameters (`:4704`), where it
-  takes four (`web-app/app/presenters/workbox-inbox.ts:255`).
-  Oracle: each named Pin line names its test, and each
-  named claim matches the code
-- The 4 Oct walk remedies' last tasks never landed:
-  C6's scroll driven by script, I22's fault forced with
-  Fetch, F37a's stale undo from a second jar, R22
-  moored to refuse-and-refresh, and AT2's count after
-  the remedies (Tasks 9–11 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
-  whose AA32, F13, WB18, WB22, and SV3 parts the
-  walk-green plan redid). The 5 Oct walk (`ed1fac5c`)
-  scored C6, F37a, and R22 PASS without them, I22
-  stays BLOCKED by walk-green's ruling, and TEST-PLAN.md
-  still reads AT2's 4 Oct count (`:479`). Owner call:
-  rule them superseded, or run them. Oracle: each task
-  is landed or struck in its plan, and AT2 reads the
-  current count
+- Fewer JSON parse/stringify — byte-stream header
+  setting, mechanical sympathy and simplicity for
+  the processor; measured first
+  (`./bin/measure --profile`). Merged: the deferred
+  content-coding seams
+  (`shared/http-message/body.ts:77-80` and
+  `shared/http-message/content-coding.ts:3-8` —
+  revise both comments when done). Oracle: a
+  `./bin/measure --profile` run placing parse/stringify
+  above the budgets' noise — the item activates on that
+  number, not before.
+- Spec 6 did not run — replacing `npm:postgres@3.4.9`
+  with `jsr:@db/postgres` behind `api/postgres-client.ts`.
+  Spec:
+  `docs/superpowers/specs/2026-08-21-deno-postgres-driver-design.md`.
+  Task 56 ruled NO-GO: `@db/postgres` is 0.19.5, pre-1.0,
+  a bet on someone else's trajectory under the product's
+  only datastore, while the insulation above `SqlClient`
+  is one adapter file, so keeping `postgres.js` costs one
+  specifier and one file. Reopen at `@db/postgres` 1.0,
+  or on measured `./bin/measure` headroom. Oracle: `grep -rn
+  'npm:' deno.json deno.lock` prints nothing;
+  `./test postgres` green; `./bin/measure --check` green
+  against the committed budgets.
 
 ## Sequencing
 
