@@ -2646,14 +2646,14 @@ Off the critical path; each with its oracle.
   reads the route table and its surface
   (`api/routes.ts`, `api/route-surface.ts`,
   `api/http-status-documents.ts`, `api/request-auth.ts`,
-  `api/family-registry.ts`, `api/document-family.ts`,
-  `api/path-segments.ts`) under
+  `api/document-family.ts`, `api/path-segments.ts`) under
   `deno run`, never in a page; two presenters
-  (`web-app/app/presenters/ai-member-detail.ts`,
-  `presenters/member.ts`) read the provider-model
+  (`web-app/app/presenters/ai-member-detail.ts:22`,
+  `presenters/member.ts:25`) read the provider-model
   catalog (`api/provider-models.ts`); and the records
-  detail page (`web-app/records/detail.ts`) derives
-  claim roles (`api/authorization.ts`). The catalog and
+  detail page (`web-app/records/detail.ts:62`) derives
+  claim roles (`api/authorization.ts`) — the two `api/`
+  modules the page graph reaches today. The catalog and
   the claim-role derivation are both sides' and belong
   in `shared/`; the generator is a tool and may read
   the server. Oracle: an import-graph walk from every
