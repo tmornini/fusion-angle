@@ -1091,7 +1091,12 @@ Off the critical path; each with its oracle.
   200 with the idea's head. An idea whose state is
   `deleted` converts too. A resent conversion with the
   same ids is refused only because the project's name is
-  taken (409). The handler already reads the idea's head
+  taken (409), when it latches the promoted head; one
+  that carries its first `If-Match` meets the stale idea
+  row first and answers 412. No test converts an idea
+  that is not `approved`
+  (`tests/api-idea-conversion.test.ts:108` seeds
+  `approved`). The handler already reads the idea's head
   for its latch, and the latch holds that head through
   the statement, so the refusal can judge the head it
   read. Oracle: converting an idea whose head is not
