@@ -1803,8 +1803,8 @@ Off the critical path; each with its oracle.
   - `resolveOrganizationGate(nonEmpty, <a gated page
     other than invitations>)` returning the list (B28) —
     Layer 1, one more assertion in
-    `tests/boot-organization-gate.test.ts`; a mutation
-    proved the old pin false
+    `tests/boot-organization-gate.test.ts`, whose
+    present pin lets a mutation survive
   - A header landmark and a main-content region rendering
     on `dashboard/` (C1) — Layer 2, extending
     `tests/browser/sidebar.test.ts` or
@@ -2098,8 +2098,8 @@ Off the critical path; each with its oracle.
     of the four nodes" (FS6) — Layer 1, the same
     `sharedMockDb()`-backed `getFlowStats` assertion FS4
     wants, extended to Data Capture. The composed hazard
-    rules are pinned, but the seed shape they rest on was
-    READ, not asserted, and
+    rules are pinned, but the seed shape they rest on is
+    read, not asserted, and
     `tests/mock-flow-readiness.test.ts` pins Customer
     Onboarding READY, which excludes zero-member and
     dead-end nodes but not the one-member `warning` case
@@ -2567,9 +2567,9 @@ Off the critical path; each with its oracle.
   tombstone decision in one layer. Oracle: every
   collection read goes through the store seam,
   `./test validate` and `./test postgres` green.
-- The app still reads the server after the packageable
-  client. With the contract in `shared/`, four modules
-  outside the client import `api/`: the documentation
+- The app reads the server. The contract lives in
+  `shared/`, yet four modules outside the client import
+  `api/`: the documentation
   generator (`web-app/app/generate-api-documentation.ts`)
   reads the route table and its surface
   (`api/routes.ts`, `api/route-surface.ts`,
@@ -2592,7 +2592,7 @@ Off the critical path; each with its oracle.
   (`web-app/ideas/create.ts:124`,
   `web-app/ideas/convert.ts:359`). A design call, not
   a defect: TEST-PLAN D6/D7 pin the toast, and the
-  2026-08-26 D6 stub files the voice question as its
+  D6 mitigation stub files the voice question as its
   separate finding
 - `render.yaml` Blueprint as a second source of
   truth for the dashboard service. Oracle: a
@@ -2851,9 +2851,8 @@ Off the critical path; each with its oracle.
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and a `sysctl` read is unverifiable and
-  macOS-only. Ten of the fourteen rows
-  in `measurements/history.jsonl`, `c50e849` on, store
-  `"unknown"`. The truthful
+  macOS-only. The ten newest of the fourteen rows in
+  `measurements/history.jsonl` store `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
   which needs `measure-core.ts`'s field type and
   `shapeHistoryLine` (:49, :284) together with
@@ -2943,7 +2942,7 @@ Off the critical path; each with its oracle.
   validate` green; the canvas entries retire with
   product-path item 11.
 - One gate for the write. Every write is one ledger
-  statement now (`runLedgerStatement`,
+  statement (`runLedgerStatement`,
   `api/ledger-statement.ts:48`), but each handler still
   lands its own: `runWrite` at 40 sites, 37 of them in
   `api/routes.ts`, `runStateWrite` at 17, 13 there, and
@@ -3086,17 +3085,11 @@ Off the critical path; each with its oracle.
   with the flow, not with its work orders, or the
   measurement says the fan-out costs nothing a person
   sees
-- Fewer body decodes, after the work-order-events spec,
-  the last of item 1's. Head
-  reads slowed eight of the nine list pages' readyMs
-  (`4a540f3` → `9a8396a`, medians of 25,
-  `measurements/history.jsonl`),
-  workbox 122.7 → 142.0 and flows 46.0 → 56.4 the
-  most. After the work-order-events spec three stay
-  slower than that base (`4a540f3` → `851adad`): flows
-  46.0 → 55.8, projects 57.5 → 62.5, records 50.6 →
-  54.3; workbox reads 87.2, under its base. Three
-  suspects, none measured: larger
+- Fewer body decodes. Three list pages read slower
+  than before head reads (readyMs medians of 25,
+  `measurements/history.jsonl`, `4a540f3` → `851adad`):
+  flows 46.0 → 55.8, projects 57.5 → 62.5, records
+  50.6 → 54.3. Three suspects, none measured: larger
   multipart list payloads, each part a whole stored
   response (about 300 header octets plus the full
   document); each part's split and framing; and
