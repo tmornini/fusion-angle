@@ -40,7 +40,8 @@ function relativeTime(iso: string): string {
     return 'just now';
 }
 
-export interface InboxItem {
+interface PlacedInboxItem {
+    kind: 'placed';
     id: string;
     displayId: string;
     flowName: string;
@@ -53,6 +54,21 @@ export interface InboxItem {
     taskInstructions: string;
 }
 
+// A head whose node its flow graph no longer holds: it has
+// no state to name, no completion, and no instructions.
+interface UnplacedInboxItem {
+    kind: 'unplaced';
+    id: string;
+    displayId: string;
+    flowName: string;
+    transitionerName: string | null;
+    claimedByName: string | null;
+    lastTransitionedAt: string | null;
+    position: number;
+}
+
+export type InboxItem = PlacedInboxItem | UnplacedInboxItem;
+
 export type InboxMode = 'active' | 'archived';
 
 // A work order's claim that is live now: the head's claim,
@@ -62,6 +78,56 @@ export type InboxMode = 'active' | 'archived';
 export interface ActiveClaim {
     memberId: Id;
     at: string;
+}
+
+// Static: no data-work-order-card, so the page neither
+// navigates it to a detail page that cannot place it nor
+// drags it; no link and no grip either.
+function buildUnplacedRow(
+    item: UnplacedInboxItem,
+): SafeHtml {
+    const from = item.transitionerName
+        ?? DISPLAY_ABSENT;
+    return html`
+        <div class="card p-4">
+            <div class="flex-fill">
+                <div class="${
+                    'flex items-center'
+                    + ' gap-2 mb-1'
+                }">
+                    <span class="${
+                        'font-semibold'
+                    }">${
+                        item.flowName
+                    }</span>
+                    <span class="${
+                        'text-xs text-muted'
+                    }">#${
+                        item.displayId
+                    }</span>
+                </div>
+                <div class="${
+                    'flex items-center'
+                    + ' gap-2 text-sm'
+                    + ' text-muted'
+                }">
+                    <span
+                        class="badge badge-warning"
+                        >State unknown</span>
+                    <span>from ${
+                        from
+                    }</span>
+                    <span class="ml-auto"
+                        >${
+                            item.lastTransitionedAt
+                                ? relativeTime(
+                                    item.lastTransitionedAt,
+                                )
+                                : DISPLAY_ABSENT
+                        }</span>
+                </div>
+            </div>
+        </div>`;
 }
 
 export class WorkboxInboxPresenter {
@@ -89,6 +155,8 @@ export class WorkboxInboxPresenter {
     #buildRow(
         item: InboxItem,
     ): SafeHtml {
+        if (item.kind === 'unplaced')
+            return buildUnplacedRow(item);
         const titleAttr = item.taskInstructions
             ? trusted(' title="'
                 + escapeForHtml(
@@ -198,26 +266,20 @@ export function buildInboxItems(
         const curNode = fg.nodes.find(
             n => n.id === wo.nodeId,
         );
-        if (!curNode) {
-            throw new Error(
-                'invariant violated: the head of'
-                + ' work order ' + wo.id
-                + ' references unknown node '
-                + wo.nodeId,
-            );
-        }
-        const completed = curNode.isArchive;
+        // A head whose node is gone cannot claim to be
+        // finished, so only the Active tab shows it.
+        const shown = curNode
+            ? itemMatchesMode(mode, curNode.isArchive)
+            : mode === 'active';
+        if (!shown)
+            continue;
 
         const activeClaim =
             activeClaimsByWo.get(wo.id);
-        if (!itemMatchesMode(mode, completed))
-            continue;
-
-        items.push({
+        const row = {
             id: wo.id,
             displayId: wo.displayId,
             flowName: fg.name,
-            stateName: curNode.name,
             transitionerName: memberName(
                 memberMap, wo.transition.memberId,
             ),
@@ -228,11 +290,18 @@ export function buildInboxItems(
                 )
                 : null,
             lastTransitionedAt: wo.transition.at,
-            completed,
             position: wo.position,
-            taskInstructions:
-                curNode.taskInstructions,
-        });
+        };
+        items.push(curNode
+            ? {
+                kind: 'placed',
+                ...row,
+                stateName: curNode.name,
+                completed: curNode.isArchive,
+                taskInstructions:
+                    curNode.taskInstructions,
+            }
+            : { kind: 'unplaced', ...row });
     }
 
     return items.toSorted(
