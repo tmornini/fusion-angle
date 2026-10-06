@@ -3098,6 +3098,21 @@ Off the critical path; each with its oracle.
   Oracle: `./test` measured before and after a copy
   only a failing statement pays, and the change lands
   only if that number earns it
+- Collections page, and their order is the caller's to
+  ask. A collection read answers all its parts in one
+  response, in the order the server keeps; head reads
+  left pagination and whether a collection's order
+  should be the client's to ask for
+  (`docs/superpowers/specs/`
+  `2026-09-30-head-reads-design.md:346-347`,
+  `:1086-1089`), and membership and versions and
+  work-order events left pagination again
+  (`2026-10-01-membership-and-versions-design.md:272`,
+  `2026-10-04-work-order-events-design.md:199-201`).
+  Measured first: the ledger sweep says where a list
+  outgrows one response. Oracle: a collection read
+  returns a bounded page and a way to the next, in a
+  client-chosen order where the brainstorm allows one
 
 ## Sequencing
 
