@@ -1418,7 +1418,9 @@ Off the critical path; each with its oracle.
   (`server/scrypt-hash.ts`). Measured at
   this repo's `ln=17,r=8,p=1,dkLen=32`,
   `jsr:@noble/hashes@2.4.0/scrypt.js` medians 224 ms
-  against `node:crypto` scryptSync's 192 ms — 17% slower,
+  against `node:crypto` scryptSync's 192 ms (the product
+  calls the async `scrypt`, `server/scrypt-hash.ts:5`) —
+  17% slower,
   digests byte-identical, so stored `$scrypt$` credentials
   verify unchanged, and `deno compile` embeds it with no
   native dependency. Its audit status, maintenance
