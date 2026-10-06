@@ -3,6 +3,15 @@
 The single home for later work. An item leaves this
 file by shipping; `## Close protocol` is the exit.
 
+Each section runs from the best ratio of benefit to
+cost down. Benefit is the harm an entry averts, then
+the commandment it serves, in the Church's order:
+reliability, security, uniformity, logic, clarity,
+immutability, idempotency, simplicity, generality,
+atomicity, efficiency, performance. Cost is its size:
+a few commits, one spec, or several. Efficiency and
+performance wait on a measurement that earns them.
+
 ## Critical product path
 
 Eleven items, in this order — each its own brainstorm →
