@@ -19,7 +19,7 @@ import type { SeedHumanMember } from './members.ts';
 // The seed's clock is the start of the current UTC day —
 // day-quantized, so the Honolulu pass and a same-day re-seed
 // agree — and current, so the ninety-day stats window
-// (web-app/app/adapters/flow-stats.ts) always holds the
+// (web-app/app/flow-stats.ts) always holds the
 // seeded sojourns: every seeded instant sits at or before
 // this anchor, and a fixed one clips them all to zero ninety
 // days on. Date-derived seed ids follow the day; nothing
