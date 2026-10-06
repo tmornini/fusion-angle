@@ -21,7 +21,7 @@ import {
 const { signal } = createPageAbort();
 
 let listEl: HTMLElement | null = null;
-let pending: InvitationView[] = [];
+let invitations: InvitationView[] = [];
 
 export async function init(): Promise<void> {
     const container = $required(
@@ -36,7 +36,7 @@ export async function init(): Promise<void> {
         ),
         retry: init,
         onData: loaded => {
-            pending = loaded;
+            invitations = loaded;
             rerender();
             container.addEventListener(
                 'click', onListClick, { signal });
@@ -49,12 +49,12 @@ export async function init(): Promise<void> {
 
 function rerender(): void {
     if (!listEl) return;
-    new InvitationListPresenter(pending).render(listEl);
+    new InvitationListPresenter(invitations).render(listEl);
 }
 
 async function refresh(): Promise<void> {
     if (!listEl) return;
-    pending = await getInvitations(
+    invitations = await getInvitations(
         sessionContext(), 'pending',
     );
     rerender();
@@ -70,7 +70,7 @@ async function onListClick(e: MouseEvent): Promise<void> {
         .closest('[data-invitation-id]')
         ?.getAttribute('data-invitation-id');
     if (!id) return;
-    const invitation = pending.find(
+    const invitation = invitations.find(
         inv => inv.id === id,
     );
     if (invitation === undefined) return;
