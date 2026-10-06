@@ -1464,8 +1464,13 @@ Off the critical path; each with its oracle.
   2026-10-03 on `a6af68a6` as post-test output between
   `identity-tokens-reduce` and `drift-states`; the
   suite still reported 0 failed, so the gate stays
-  green. `BroadcastChannel` is process-global.
-  Oracle: `./test` prints neither `page failed to
+  green. `BroadcastChannel` was process-global then;
+  since 3d808c92 each test worker prefixes its channel
+  and lock names (`tests/worker-name-prefix.ts`), so a
+  peer file's bell no longer reaches the page, and a
+  bell inside the ideas file's own worker after its
+  document is gone stays possible. Re-witness before
+  working it. Oracle: `./test` prints neither `page failed to
   init` nor `Required element not found: #ideas-list`;
   `tests/ideas-empty-subscribe.test.ts` stays green;
   a bell after the ideas document is gone does not
