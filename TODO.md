@@ -746,15 +746,25 @@ skew tests, which went with item 8's trio.
    land in the auth-flow ledger rows'). Follows items 0
    and 1, which landed.
 3. Retire `schema_marker` for migrations the ledger
-   holds — the marker (`api/schema-postgres.ts:26-29`)
+   holds — the marker (`api/schema-postgres.ts:46-49`)
    proves only that a seed once finished; it cannot tell
-   an unwiped database with the old `text` stamp columns
-   from a correct one (SCHEMA.md § Operator tools). Each
+   an unwiped database from a correct one. A master-era
+   database — `message_pairs` and its `schema_marker`
+   row — passes every boot gate, since the legacy check
+   names `pairs`, `requests`, and `responses` alone
+   (`assertNoLegacyMessageTables`,
+   `server/postgres-gate.ts:75`), and the binary serves
+   with no `fa_message_pairs` behind it; the seed calls
+   that database empty, and its marker INSERT meets the
+   old row's key and rolls back
+   (`server/seed.ts:101-128`,
+   `api/backend-postgres.ts:103-106`). Each
    migration becomes a document like any other — the same
    canonical form, hash tree, succession index, and head
-   read (item 0) — in the collection `/migrations/`, named
+   read — in the collection `/migrations/`, named
    for what it does behind a four-digit order,
-   `0000-root` (item 0's root) then `0001-bootstrap`,
+   `0000-root` (landed, `api/ledger-root.ts`) then
+   `0001-bootstrap`,
    that the owner writes and no
    route serves; one document with successors would hold
    the same history under a name that hides it. A
@@ -764,7 +774,7 @@ skew tests, which went with item 8's trio.
    PUT `fa_owner` writes, its requester as the root's,
    whose `user-agent` line names the build that ran
    it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
-   `FA_GIT_SHA` supplies, its bullet in `## Later work`),
+   `FA_GIT_SHA` supplies, its own bullet),
    provenance the owner's `check` can report and
    never the key; and its `response`
    is the digest of its fixed SQL, DDL and DML
@@ -785,16 +795,18 @@ skew tests, which went with item 8's trio.
    `api/schema-postgres.ts:1-2` already rules for the DDL.
    No route ever executes a body's SQL: that would put the
    owner's credential in the serving process and turn
-   every authorization mistake into the owner's SQL. Seed
-   lands the root and `0001-bootstrap`, a genesis, in its
-   one transaction (item 0). A later migration is one
+   every authorization mistake into the owner's SQL. The
+   seed lands the root in its one transaction today
+   (`postSeedLanding`, `api/ledger-seed.ts:325-354`), and
+   `0001-bootstrap`, a genesis, beside it. A later
+   migration is one
    owner transaction — the change, the full check, and
-   the genesis of its own document, in item 0's
-   one-statement shape, landed
+   the genesis of its own document, in the ledger
+   statement's shape, landed
    by `migrate` beneath the adapter, where the
-   seed lands every pair (item 0) — one owner-side writer
+   seed lands every pair — one owner-side writer
    for seed and migration, and `handleRequest`
-   (`api/api.ts:387`) stays the api's. Names order
+   (`api/api.ts:446`) stays the api's. Names order
    migrations, bytewise: the verb applies its binary's
    migrations in name order and refuses one whose
    predecessors lack a head. Item 2's insert
@@ -806,7 +818,9 @@ skew tests, which went with item 8's trio.
    the verb forgoes is the route layer's validation of
    that one PUT; the canonical form and the hash tree
    come from `shared/http-message` and the INSERT, which
-   the seed uses there already. Item 0's index refuses a
+   the seed uses there already. The succession index
+   (`fa_message_pairs_succession`,
+   `api/schema-postgres.ts:266-268`) refuses a
    second genesis
    with no lock and no migrations table of its own: of
    two runners applying one migration, one commits and
@@ -819,11 +833,12 @@ skew tests, which went with item 8's trio.
    with one predicate, so a wire request cannot land
    one, and a table's owner is exempt from its policies
    (measured). After launch the fence is what changes —
-   item 0 holds the table's DDL final — and views,
+   the ledger store holds the table's DDL final — and
+   views,
    policies, and grants hold no data, so a migration
    rebuilds them whole and needs no path from one
    fence to the next. Boot — `serve`, as `fa_api`,
-   where the marker gate runs today (`server/boot.ts:106`)
+   where the marker gate runs today (`server/boot.ts:107`)
    — does two small things. It asks what it holds itself
    through the privilege functions, which answer with
    catalog reads revoked (measured), and refuses to serve
@@ -832,7 +847,7 @@ skew tests, which went with item 8's trio.
    make temporary objects — the rights the owner
    controls; the four superuser revokes it never
    checks. And it reads the
-   `/migrations/` heads — a collection read (item 1) — and
+   `/migrations/` heads — a collection read — and
    compares their names and digests with the migrations
    its binary carries, refusing to serve on any
    difference either way and naming it. The digest is of
@@ -850,7 +865,7 @@ skew tests, which went with item 8's trio.
    compares it to what the binary's migrations, applied
    in name order, declare, and
    names the drift; walks every succession to name a
-   pair stamped before its predecessor (item 0) and a
+   pair stamped before its predecessor and a
    `supersedes` that names no row — none until the
    eraser ships, and each one an erasure pair must name
    after; and recomputes every root and every leaf the
@@ -862,9 +877,9 @@ skew tests, which went with item 8's trio.
    the same transaction, so every seed proves the list
    current. Drift made by hand afterwards is the full
    check's to find, not boot's (measured: the head reads
-   the same after a column is added by hand). `SCHEMA.svg`
-   loses `schema_marker`. A seed is one transaction (item
-   0), so a failed seed leaves nothing and the last-stamp
+   the same after a column is added by hand). A seed is
+   one transaction, so a failed seed leaves nothing and
+   the last-stamp
    trick has no purpose; a seed refuses a database that
    holds our table at all, since one lands it whole or not
    at all. The full check is also a verb of its own,
@@ -875,7 +890,7 @@ skew tests, which went with item 8's trio.
    `migrate`, and `check` — and the drill runs
    it instead of reading
    the marker. Limits, named for the
-   table-migrations bullet in `## Later work`: boot's
+   table-migrations bullet: boot's
    strict equality
    refuses an old binary that restarts after the change,
    which item 13's two processes must plan for; and a
@@ -887,14 +902,23 @@ skew tests, which went with item 8's trio.
    can land as its DELETE head and a later system can
    annotate it without rewriting it — that bullet's to
    settle.
-   Today: boot gates on
+   Today: the root, the seed's one transaction, its
+   refusal of a database that holds our table, and the
+   index that refuses a second genesis have landed;
+   boot gates on
    the marker row (`assertSchemaMarker`,
    `server/postgres-gate.ts:67`, called at
-   `server/boot.ts:106`), and the seed's one transaction
+   `server/boot.ts:107`), and the seed's one transaction
    writes `schema_marker` last
-   (`api/backend-postgres.ts:100-102`); the seed refuses
-   on `fa_message_pairs`' presence, not the marker
-   (`server/seed.ts:104-128`). Follows item 2.
+   (`api/backend-postgres.ts:103-106`). The marker's
+   refusals name retired scripts: `MISSING_MARKER` says
+   `./postgres-seed` and `NO_ARGUMENTS` `server.mjs`
+   (`server/postgres-gate.ts:14-18`). The marker's close
+   also removes SCHEMA.md's decision 7 and its line in
+   the seed's account (SCHEMA.md:67, :191),
+   ARCHITECTURE.md:43-44, and the comments that name it
+   (`server/boot.ts:1-3`, `api/ledger-seed.ts:321-322`,
+   `api/db.ts:217`, `:231`). Follows item 2.
 4. `/status` — `{ up: boolean, components: { postgres:
    boolean } }`, 200 when every component is up and 503
    when any is not, built for more components.
