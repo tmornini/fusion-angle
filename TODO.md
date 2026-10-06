@@ -868,7 +868,16 @@ Off the critical path; each with its oracle.
   (`web-app/organization/index.ts:310`, `:480`) — no
   error, since a bell repaint landing mid-gesture has
   already resolved the list and a drop reverts visually,
-  but nothing tells the person the gesture did nothing
+  but nothing tells the person the gesture did nothing;
+  and two the walk-green plan left: `postInvitationDecline`
+  latches with no 412 recovery
+  (`client/invitations.ts:317`), and the workbox action
+  screen sends every 412 into the instance-conflict
+  recovery, a stale work-order tag on a pure move
+  included, its `conflictNotice` module state
+  outliving a refresh (`web-app/workbox/detail.ts:70`,
+  `:195-206`, `:234`;
+  `docs/superpowers/plans/2026-10-05-walk-green.md:279-288`)
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
