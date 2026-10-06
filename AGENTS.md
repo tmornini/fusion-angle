@@ -303,7 +303,7 @@ conditional PUT on an absent one answers 404, its
 preconditions ignored (§13.2.1), and a PUT with neither
 precondition answers 428 (RFC 6585 §3); and a deleted
 document — a DELETE head, or a state-`deleted` head in a
-lifecycle family — answers 410 Gone (§15.5.11) on a read,
+lifecycle family — answers 410 Gone (RFC 9110 §15.5.11) on a read,
 after the fence; a retired instance also refuses its
 writes with 410.
 
