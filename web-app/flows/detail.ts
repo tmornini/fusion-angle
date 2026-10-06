@@ -167,6 +167,20 @@ class PageState {
         this.#presenter = p;
     }
 
+    // The selection a gesture started from. The
+    // camera holds still until pointer-up, so the
+    // gesture end centres against this, not against
+    // the start commit's own selection.
+    #gestureStartSelected: string | null = null;
+
+    gestureStartSelected(): string | null {
+        return this.#gestureStartSelected;
+    }
+
+    setGestureStartSelected(id: string | null): void {
+        this.#gestureStartSelected = id;
+    }
+
     #container: HTMLElement | null = null;
     #canvasW: number = FALLBACK_W;
     #canvasH: number = FALLBACK_H;
@@ -1045,19 +1059,33 @@ function bindCanvasInteractions(
             // Mid-gesture updates paint narrowly under
             // rAF; gesture boundaries (and everything
             // else) take the full commit path.
-            if (
-                isGestureActive(
-                    pageState.presenter()
-                        .interactionState(),
-                )
-                && isGestureActive(next)
-            ) {
+            const wasActive = isGestureActive(
+                pageState.presenter()
+                    .interactionState(),
+            );
+            if (wasActive && isGestureActive(next)) {
                 scheduleGestureFrame(next);
                 return;
             }
             cancelGestureFrame();
-            const prevSelected = pageState
-                .presenter().selectedNodeId();
+            if (isGestureActive(next)) {
+                // Gesture start: no camera move until
+                // pointer-up — a release hit-tests the
+                // node the user aimed at through this
+                // camera.
+                pageState.setGestureStartSelected(
+                    pageState.presenter()
+                        .selectedNodeId(),
+                );
+                commit(
+                    pageState.presenter()
+                        .withInteractionState(next),
+                );
+                return;
+            }
+            const prevSelected = wasActive
+                ? pageState.gestureStartSelected()
+                : pageState.presenter().selectedNodeId();
             commit(
                 pageState.presenter()
                     .withInteractionState(next),
