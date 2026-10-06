@@ -1207,7 +1207,12 @@ the second organization.
        mechanics); tests/browser/canvas-gestures.test.ts
        'Shift-drag adds an edge and Review accepts
        two attribute refs (AA32/AA33/AA34)';
-       exploratory — the live
+       tests/browser/canvas-gestures.test.ts 'a port
+       press under an open panel holds the camera
+       (AA32)' (decides the camera holds from
+       pointer-down to pointer-up with the panel open
+       on another selection, so the release lands on
+       the node aimed at); exploratory — the live
        dashed-orange vs. solid-blue preview rendering
 - [ ] **AA33** In the flow header, set the "Record:"
   dropdown to "Customer Profile" (Stark's seeded record
@@ -2933,7 +2938,12 @@ opens and renders.)
        persists it'; tests/browser/canvas-gestures.test.ts
        'a shift drag from a port onto a node commits an
        edge' (decides the same through a real compositor
-       drag: one more edge, no new node); exploratory — the
+       drag: one more edge, no new node);
+       tests/browser/canvas-gestures.test.ts 'a port
+       press after Auto Layout toggles holds the camera
+       (F19)' (decides the press after F18's toggles
+       moves no camera and the release lands on
+       Triage); exploratory — the
        grey-line-to-bezier preview transition
 - [ ] **F20** Shift-drag forward (earlier node →
   later node). PASS: the curved preview is solid
