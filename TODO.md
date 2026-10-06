@@ -559,11 +559,21 @@ skew tests, which went with item 8's trio.
    hand its minted `date` back with no view between.
    The column fence is that
    grant: `fa_api` never reads back
-   `request`, the two fenced secrets columns, or the
-   request and secrets salts; it reads the response, the
-   response salt, and all five digests, so it verifies
-   `pair_hash` and the response leaf, and a reader of
-   envelopes alone verifies the root alone.
+   `request`, the two secrets columns, or the request
+   salt (only `request_salt` and `response_salt` exist);
+   it reads the response and the response salt, so it
+   verifies the response leaf. Which digests it reads is
+   this item's first question. The two secrets leaves
+   are bare `sha256` of guessable credential lines, and
+   the ledger-store spec's decision 1 hands this item the
+   consequence: a role that reads them holds a guessing
+   oracle for the lines
+   (`docs/superpowers/specs/2026-09-23-ledger-store-design.md:52-65`,
+   `:660-661`). Salt them — a change of hash form — and
+   `fa_api` reads all five digests, verifies `pair_hash`,
+   and a reader of envelopes alone verifies the root
+   alone; fence them, and the root is the owner's to
+   verify (item 3's full check).
    `requester_identity_id` — the verified token's `sub` —
    stays readable. No read may
    use `SELECT *` (two do, `api/backend-postgres.ts:611`
