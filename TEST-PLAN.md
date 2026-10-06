@@ -4582,7 +4582,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   Reviewer Notes), so do not pre-empt it here. A
   **pure move** (no set/clear, no If-Match) does not
   advance the instance etag; a Save with the held etag is
-  201, not a FAIL.
+  200, not a FAIL.
   Pin: tests/adapters-work-orders.test.ts
        'postWorkOrderTransition 412s when the snapshot etag
        is stale against a concurrent PATCH' (decides the
@@ -4593,7 +4593,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        is 412' (the converse direction);
        tests/api-work-order-transition-instance.test.ts
        'pure move does not advance instance etag; held
-       If-Match PATCH is 201';
+       If-Match PATCH is 200';
        tests/presenter-record-instances.test.ts 'edit form
        surfaces 412 conflict notice' (record detail's own
        conflict-notice render); exploratory — the live
