@@ -1970,10 +1970,6 @@ Off the critical path; each with its oracle.
   - The AI dialog's "Model is required" toast-then-no-POST
     gate (G14, G14a) — Layer 1 or 2; `submitAIForm`
     (`web-app/members/index.ts`) carries no test
-  - The Strengths card's read-to-edit tag-picker swap
-    (G20) — Layer 1, a `.strength-chip` assertion on
-    `HumanMemberDetailEditPresenter`; the cited test
-    proves only that no State select renders
   - A Model-field edit persisting (G24b) — Layer 1;
     `aiDraft()` fixes `model` to `firstProviderModel().id`
     in both the seed and the update, so `'putAIMember
@@ -2004,10 +2000,6 @@ Off the critical path; each with its oracle.
     `presenter-invitation-list.test.ts`; the
     `SentInvitationsPresenter` test asserts id, email, and
     Revoke only
-  - The admin-only 403 on `GET
-    organizations/:id/invitations/` for a non-admin caller
-    (V9) — Layer 1; confirmed live by probe, but no test
-    calls `getSentInvitations` as a non-admin
   - The not-found page's rendered message and link (H2) —
     Layer 2, a CDP test navigating to an unknown route
   - The live dark/light repaint — background, text, CSS
