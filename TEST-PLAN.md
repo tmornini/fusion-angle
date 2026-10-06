@@ -5458,11 +5458,12 @@ FSM, unlike `flows/detail`).
   when the organization pair itself rejects 403
   (`web-app/organization/index.ts`), which this member's
   organization GET does not. (Pairs with V7's grant/revoke 403s.)
-  Pin: exploratory — the admin-only Sent-invitations
-       read and the section staying hidden (no CLI or
-       browser test drives `getOrganizationInvitations`
-       with a non-admin caller; see Unpinned but
-       pinnable)
+  Pin: tests/api-memberships.test.ts 'a member reads
+       accepted and removed, and a pending item is 404'
+       (decides a member's unfiltered, `pending`,
+       `declined`, and `revoked` reads of the sent list
+       answer 403 `MEMBER_VIEW`); exploratory — the
+       section staying hidden
 - [ ] **V10 — Accept an invitation revoked in another
   tab** As the admin, open the Organization page's
   Sent invitations in one tab; as the invitee, in a
@@ -5528,10 +5529,14 @@ FSM, unlike `flows/detail`).
        'HumanMemberDetailEditPresenter renders no State
        select' (decides the edit-mode Save action
        renders and no State field/select or "Active"
-       option appears); exploratory — the live header
-       Edit→Cancel/Save swap, the six Personal
-       Information input types, and the Strengths
-       tag-picker rendering
+       option appears);
+       tests/browser/member-strengths.test.ts 'chip
+       toggles persist on save and reload (AA9)'
+       (decides Edit swaps the Strengths card for the
+       `[data-strength]` tag picker and Save returns it
+       to read mode); exploratory — the live header
+       Edit→Cancel/Save swap and the six Personal
+       Information input types
 - [ ] **G21** On any **seeded** human member's row (not
   Jordan Rivera — AA5's Add-Member form writes
   `strengths: []` with no strengths field on the dialog,
