@@ -3182,6 +3182,20 @@ Off the critical path; each with its oracle.
   takes four (`web-app/app/presenters/workbox-inbox.ts:255`).
   Oracle: each named Pin line names its test, and each
   named claim matches the code
+- The 4 Oct walk remedies' last tasks never landed:
+  C6's scroll driven by script, I22's fault forced with
+  Fetch, F37a's stale undo from a second jar, R22
+  moored to refuse-and-refresh, and AT2's count after
+  the remedies (Tasks 9–11 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
+  whose AA32, F13, WB18, WB22, and SV3 parts the
+  walk-green plan redid). The 5 Oct walk (`ed1fac5c`)
+  scored C6, F37a, and R22 PASS without them, I22
+  stays BLOCKED by walk-green's ruling, and TEST-PLAN.md
+  still reads AT2's 4 Oct count (`:479`). Owner call:
+  rule them superseded, or run them. Oracle: each task
+  is landed or struck in its plan, and AT2 reads the
+  current count
 
 ## Sequencing
 
