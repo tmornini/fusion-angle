@@ -3113,6 +3113,17 @@ Off the critical path; each with its oracle.
   outgrows one response. Oracle: a collection read
   returns a bounded page and a way to the next, in a
   client-chosen order where the brainstorm allows one
+- An admin seats an identity without its consent. The
+  direct seat — an admin's membership PUT naming an
+  identity — lands a membership the identity never
+  accepted; membership and versions kept today's power
+  and left the question (`docs/superpowers/specs/`
+  `2026-10-01-membership-and-versions-design.md:269-270`).
+  It lands beside the admin-reach bullet, which bounds
+  whom an admin may name at all. Oracle: a seat the
+  identity did not accept reads pending until it does,
+  or the owner rules the direct seat a deliberate power
+  and TEST-PLAN.md says so
 
 ## Sequencing
 
