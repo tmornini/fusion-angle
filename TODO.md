@@ -2858,14 +2858,17 @@ Off the critical path; each with its oracle.
   the seed's record-type POST bundle) and its family:
   `RecordWriteBody`, `RecordWriteCreateBody`,
   `RecordWriteEditBody`, `RecordWriteMessagePairs`,
-  `formRecordWriteMessagePairs`, `validateRecordWriteBody`,
+  `validateRecordWriteBody`,
   `validateRecordWriteAttribute`, and
   `tests/api-records-write.test.ts`. The former's names are
   ruled, one rename-only commit, the store's `'land'`
   outcome unchanged:
   `StateWrite` → `NextStates`,
   `FormedStateWrite` → `FormedStatement`,
-  `WriteAnswer` → `StatementAnswer`,
+  `WriteAnswer` → a name still to rule, since
+  `StatementAnswer` already names the per-row answer it
+  holds (`shared/ledger-statement.ts:45`;
+  `api/message-pair.ts:705`),
   `formStateWrite` → `formedStatement`,
   `landStateWrite` → `landedStatement`,
   `runStateWrite` → `landedStates`,
@@ -2874,9 +2877,10 @@ Off the critical path; each with its oracle.
   `StatementRun` → `StatementExecution`,
   `runLedgerStatement` → `executeLedgerStatement`.
   Across `api/`, `client/`, `shared/`, `web-app/`, and
-  `server/`, 53 distinct
-  identifiers contain Create, Update, or Upsert and 41
-  contain Write. Some stay: the DOM's `createElement` and
+  `server/`, 52 distinct
+  identifiers contain a capitalized Create, Update, or
+  Upsert and 35 contain Write, comments and strings
+  aside. Some stay: the DOM's `createElement` and
   constructors such as `createHttpFacade`. The audit rules
   on each of the rest, naming by the HTTP-verb convention
   (`getNoun`, `putNoun`, `deleteNoun`,
