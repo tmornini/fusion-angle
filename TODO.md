@@ -980,21 +980,27 @@ Off the critical path; each with its oracle.
   record instance's id for good: the never-written latch
   makes tombstone-wins the statement's rule, and a
   retired instance's read, update, and re-create answer
-  410 Gone (RFC 9110 §15.5.11). Reads are done: every
+  410 Gone (RFC 9110 §15.5.11;
+  `api/message-pair.ts:843-852`, used at
+  `api/routes.ts:3381`). Memberships declare the same
+  latch (`api/invitations-domain.ts:219`, `:696`).
+  Reads are done: every
   family's deleted document — a DELETE head, or a
   state-`deleted` head in a lifecycle family — answers
   410 on GET after the fence and is no part of a
-  collection. The write half stays open: every other
-  family re-creates over its tombstone (the nil latch
+  collection. The write half stays open: every family
+  but those two re-creates over its tombstone (the nil latch
   lands over a DELETE head), and a singleton's first
   write sends no declaration: `putClientRegistration`
   and `deleteClientRegistration`
-  (`client/identities.ts:252`, `:265`) and the PII hop
-  of `putHumanMember` (`client/members.ts`) send no
+  (`client/identities.ts:237`, `:258`) and the PII hop
+  of `putHumanMember` (`client/members.ts:270`) send no
   conditional when the page read absence, though the
   transport has `'creates'` (`If-None-Match: *`,
-  `client/request-context.ts:106`), used only by the
-  instance create (`client/record-instances.ts:129`), so
+  `client/request-context.ts:106`), used by the
+  instance create (`client/record-instances.ts:117`) and
+  the membership seat of `postHumanMemberCreation`
+  (`client/members.ts:304`), so
   two tabs registering the same client at once overwrite
   each other silently. An id is
   an identity: reusing one lets a stale reference — a
