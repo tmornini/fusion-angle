@@ -3024,7 +3024,10 @@ Off the critical path; each with its oracle.
   `flow_graph`, so the required-at-exit check is skipped
   silently for that head. No gate would stop it:
   `validateWorkOrderCreateBody` checks `states` only as
-  non-empty strings, and `validateWorkOrderInstanceTransitionBody`
+  non-empty strings, never `states[2]` as `'claimed'`
+  (`docs/superpowers/specs/`
+  `2026-10-04-work-order-events-design.md:199-200`), and
+  `validateWorkOrderInstanceTransitionBody`
   and `postWorkOrderTransitionOp` (`api/validators.ts`,
   `api/routes.ts`) check `targetState` only as non-empty, with
   no edge from the head's `state`, and `postWorkOrderDocumentOp`
