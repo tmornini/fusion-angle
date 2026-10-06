@@ -1476,6 +1476,26 @@ Off the critical path; each with its oracle.
   reaches. Oracle: no `?? ''` reads `operation-id` under
   `api/`, `headerFieldsWithOperationId` is gone, and the
   raw verbs take a `string`.
+- A received POST or PATCH names the root, not the head
+  it acted on. Item 0's design had it name the head its
+  `If-Match` named — the state it acted on — and a
+  creating POST the root, so `supersedes` means one thing
+  on every pair. The statement names the head at the
+  pair's own `(path, name)`, or the root
+  (`COALESCE(s.head_id, …)`,
+  `api/ledger-statement-sql.ts:118-119`), and an
+  operation stores at its operation path
+  (`pathAndNameOf`, `api/path-and-name.ts:14-41`), where
+  no PUT or DELETE lands, so every received POST and
+  PATCH names the root whatever its `If-Match` said.
+  SCHEMA.md calls `supersedes` the lineage and the root
+  the predecessor of a genesis (§4) and says nothing of
+  a received pair. Owner call: carry the latch into
+  `supersedes`, or rule that a received pair names its
+  own path's head and say so in SCHEMA.md. Oracle: a
+  received in-order POST's `supersedes` equals its
+  `If-Match`, or SCHEMA.md states the rule and a test
+  pins the root.
 
 ## Later work
 
