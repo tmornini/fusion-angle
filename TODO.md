@@ -741,16 +741,20 @@ Off the critical path; each with its oracle.
   request was not the page's. The five GETs the walk
   held are all the top-bar strip's — organization, its
   seat read on `organizations/{id}/members/`, ideas,
-  projects, flows (`web-app/app/header-info.ts`, sent
+  projects, flows (`web-app/app/header-info.ts:11-26`, sent
   from `bootApp`'s sidebar branch). The members page's
   own roster read, which `loadInto` sends only after it
   has painted the skeleton, is not among them. At the
   strip's organization GET the page branch may still be
   importing its code-split chunk, so no page code has
   run. `tests/members-pending-skeleton.test.ts` shows
-  the skeleton painted once `init` runs. Owner call:
-  have I21 poll for the skeleton while the pause holds,
-  or rule the pre-import blank container a product gap.
+  the skeleton painted once `init` runs. I21 has scored
+  PASS on every walk since (`a6af68a6`, `2acbc87a`,
+  `ed1fac5c`), the first paused GET already showing the
+  skeleton, so the race is latent. Owner call: have I21
+  poll for the skeleton while the pause holds, rule the
+  pre-import blank container a product gap, or retire
+  this bullet.
   Oracle: TEST-PLAN I21's probe step and its
   `### Driving notes` twin
 - The panel doors a937df40 closed are unpinned. A panel
