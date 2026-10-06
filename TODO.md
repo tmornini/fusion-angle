@@ -2433,15 +2433,21 @@ Off the critical path; each with its oracle.
   `api/derive-states.ts:1382-1383` still narrates a
   retired `/members/` document-trio history. Oracle:
   the parent resolves from the head body alone.
-- Collection reads in `api/document-family.ts:575` and
-  `api/derive-record-types.ts:54` call
-  `db.messagePairs.getCollectionHeadPairs` directly,
-  while per-id reads go through
-  `messageStore(db).getDocumentHead`; a
-  `MessageStore.getCollectionHeads` seam would put the
-  tombstone decision in one layer. Oracle: both reads
-  go through the store seam, `./test validate` and
-  `./test postgres` green.
+- Collection reads call
+  `db.messagePairs.getCollectionHeadPairs` directly —
+  `api/derive-identity-tokens.ts:121`,
+  `api/head-reads.ts:123`,
+  `api/organization-requests.ts:56`,
+  `api/routes.ts:926`, `:3724`, and the test-only
+  `documentCollectionGetHandler`
+  (`api/document-family.ts:434`) — while per-id reads go
+  through `messageStore(db).getDocumentHead`.
+  `MessageStore` (`api/message-store.ts:15-25`) offers
+  `getCollection`, which decides no tombstone, and no
+  `getCollectionHeads`; that seam would put the
+  tombstone decision in one layer. Oracle: every
+  collection read goes through the store seam,
+  `./test validate` and `./test postgres` green.
 - `documentLifecycleEvents`
   (`api/derive-documents.ts:190`) keeps an
   `if (messagePair.method === DELETE_METHOD) continue`
