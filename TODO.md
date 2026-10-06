@@ -573,7 +573,21 @@ skew tests, which went with item 8's trio.
    `fa_api` reads all five digests, verifies `pair_hash`,
    and a reader of envelopes alone verifies the root
    alone; fence them, and the root is the owner's to
-   verify (item 3's full check).
+   verify (item 3's full check). A column grant cannot
+   reach a secret a document's state holds, and the
+   state-by-PUT spec hands this item the credential and
+   code bodies (`docs/superpowers/specs/`
+   `2026-09-25-state-by-put-design.md:709-716`, `:1267`).
+   A credential's state keeps its PHC hash in the
+   response body, and its PUT stores the `secret` it is
+   given, checked as a string and never as a PHC hash
+   (`validateIdentityCredentialEntity`,
+   `api/validators.ts:587`;
+   `postIdentityCredentialDocumentOp`,
+   `api/routes.ts:2610`). The key's empty read roles,
+   the one declaration of its kind
+   (`api/family-registry.ts:129-132`), leave when the
+   hash leaves the body.
    `requester_identity_id` — the verified token's `sub` —
    stays readable. No read may
    use `SELECT *` (two do, `api/backend-postgres.ts:611`
