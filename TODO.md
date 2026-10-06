@@ -3261,6 +3261,14 @@ Off the critical path; each with its oracle.
   `transitionAt` server-side against the head's `transition.at`.
   Oracle: a chain whose last move carries the earlier `at`
   reads the same in the detail timeline and in flow-stats.
+- Test-only list oracles. `documentCollectionGetHandler` and
+  `documentGetHandler` (`api/document-family.ts`) and the
+  `GetHandler` type (`api/routes.ts`) serve no route; fifteen
+  test files read families through them below the gate. Move
+  those reads onto the live read path, each moved assertion
+  at least as strong, then delete all three. Oracle: `git
+  grep -nw` finds none of the three names under `api/` or
+  `tests/`.
 
 ## Sequencing
 
