@@ -1838,11 +1838,18 @@ Off the critical path; each with its oracle.
   `shared/access-token-decode.ts:30-31`)
 - SP-6 sign-up (`web-app/auth/index.ts:655-663`)
 - Cryptographically signed ledger — brainstorm signing
-  of stored pairs. Product-path item 0 hashes both
-  messages where they are stored and verifies them;
-  signing is what remains. The dropped `version` column
-  hashed on write and was never checked on read —
-  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`
+  of stored pairs. The ledger store hashes both
+  messages where they are stored
+  (`api/ledger-statement-sql.ts:122-146`), and no
+  product reader recomputes a hash: `pairRootHex` runs
+  on the memory backend's write path alone
+  (`shared/ledger-statement.ts:337`), and only tests
+  verify ('stored messages verify against their
+  hashes'). The dropped `version` column hashed on write
+  and was never checked on read —
+  `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`.
+  Item 3's full check is the first reader; signing is
+  what remains after it.
 - ACL-editing UI for record attributes (`read_roles` /
   `write_roles`) — R21's restricted branches are
   seed-produced today; setting an ACL is
