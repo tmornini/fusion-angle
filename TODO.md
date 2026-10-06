@@ -2551,7 +2551,13 @@ Off the critical path; each with its oracle.
   id still reads retired (the Gone bullet), its
   succession still has a head, and the erasure pair names
   every predecessor the tombstone's `supersedes` chain
-  lost. Oracle: `tests/api-pii-tombstone.test.ts`
+  lost. A received request's body can hold PII the
+  hiding rule never reaches — the invitation's email,
+  which the message-plane spec handed item 2
+  (`docs/superpowers/specs/`
+  `2026-09-23-message-plane-design.md:871-875`) — so
+  the brainstorm settles whether erasure reaches it.
+  Oracle: `tests/api-pii-tombstone.test.ts`
   'erased PII remains in superseded pairs; login is 401'
   inverted for the erased pairs, and each erased
   document's one remaining pair is its tombstone.
