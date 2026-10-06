@@ -3172,8 +3172,7 @@ Off the critical path; each with its oracle.
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
-  fences it); item 0f no longer orders
-  item 6, since a backup carries the table whole
+  fences it)
 - 0a, 0b → 0c: the count follows the remedies
 - 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
