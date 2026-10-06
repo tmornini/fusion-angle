@@ -2701,7 +2701,7 @@ Off the critical path; each with its oracle.
   repeated body decodes. `Body.toValue()` decodes
   afresh on every call (`shared/http-message/body.ts:96`),
   and `HttpMessage.body()` builds a new `Body` on every
-  call (`shared/http-message/http-message.ts:108-112`),
+  call (`shared/http-message/http-message.ts:105-109`),
   so a memo belongs on `HttpMessage` beside `#wire` and
   `#json` (`:85-99`), not on `Body`. A message is
   shared across holders — `flowSaves` sends one head to
