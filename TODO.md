@@ -932,7 +932,17 @@ skew tests, which went with item 8's trio.
    (`server/http-server.ts`) while `request_at` is
    minted later in `incomingContext` after the body
    (examination report); latency must be their
-   difference, not a second clock. An alert when
+   difference, not a second clock. Every answer names
+   its request: the edge's 413 and the throttle's 429
+   are bare `jsonResponse`s with no `request-id`
+   (`server/http-server.ts:535-541`, `:589-594`), as is
+   the 500 for a throw that escapes `handleRequest`,
+   whose bare `catch` drops the error itself
+   (`server/http-server.ts:650-653`). The message-plane
+   spec hands this item the two refusals
+   (`docs/superpowers/specs/`
+   `2026-09-23-message-plane-design.md:879-881`).
+   An alert when
    `/status` is not 200 or the error rate rises.
    `TRUSTED_PROXY_HOPS` set to Render's real hop
    count. Consumes item 4. Merged:
