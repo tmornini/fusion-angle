@@ -8,6 +8,7 @@ import {
 import { log } from '../app/logger.ts';
 import {
     getInvitations,
+    InvitationChangedError,
     postInvitationAcceptance,
     postInvitationDecline,
     subscribeInvitationChanges,
@@ -19,6 +20,9 @@ import {
 } from '../app/presenters/index.ts';
 
 const { signal } = createPageAbort();
+
+const INVITATION_CHANGED_NOTICE =
+    'This invitation changed — your answer did not land';
 
 let listEl: HTMLElement | null = null;
 let invitations: InvitationView[] = [];
@@ -89,6 +93,10 @@ async function onListClick(e: MouseEvent): Promise<void> {
             return;
         }
     } catch (err) {
+        if (err instanceof InvitationChangedError) {
+            repaintChanged(err.current);
+            return;
+        }
         log.error(
             'invitation action failed', 'invitations', err);
         showToast(
@@ -96,4 +104,16 @@ async function onListClick(e: MouseEvent): Promise<void> {
     }
     // The list re-renders via the change subscription the post*
     // adapters notify — no explicit refresh, no double read.
+}
+
+// A refused answer repaints its row as it now stands —
+// revoked, declined, or pending at a fresh tag — in
+// place. The pending-only list drops it on the next
+// read.
+function repaintChanged(current: InvitationView): void {
+    invitations = invitations.map(
+        inv => inv.id === current.id ? current : inv,
+    );
+    rerender();
+    showToast(INVITATION_CHANGED_NOTICE, 'warning');
 }
