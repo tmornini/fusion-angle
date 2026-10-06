@@ -58,7 +58,6 @@ import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
     deriveInvitationStates,
-    workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
@@ -528,25 +527,18 @@ async () => {
 Deno.test('mock-data derived seed SFV pairs pass validator',
 async () => {
     const db = await seededDb();
-    // Seed field values ride transition folds; product reads
-    // fold them on work-order history (C4). Pin non-empty
-    // union over every seeded WO's history.
+    // Seed field values ride the versions' events (C4). Pin
+    // non-empty union over every seeded WO's events.
     const woIds = [
         ...buildWorkOrders().map(w => w.id),
         ...buildLeadToCloseWorkload().workOrders.map(w => w.id),
     ];
+    const token = await organizationToken();
     let total = 0;
     for (const id of woIds) {
-        // Seeded WOs with no lifecycle throw missedRead;
-        // only those with history contribute folds.
-        let history;
-        try {
-            history = await workOrderHistoryFor(
-                db, STARK_ORGANIZATION, id,
-            );
-        } catch {
-            continue;
-        }
+        const history = await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, id,
+        );
         for (const ev of history) {
             total += ev.field_values.length;
             for (const fv of ev.field_values) {

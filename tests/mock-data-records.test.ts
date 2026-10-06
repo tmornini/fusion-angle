@@ -1,7 +1,4 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import {
-    workOrderHistoryFor,
-} from '../api/derive-states.ts';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import { handleRequest } from '../api/api.ts';
@@ -314,8 +311,8 @@ Deno.test(
             + ' edges so the gate is reachable',
         );
 
-        const history = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, woId,
+        const history = await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, woId,
         );
         const values = history.flatMap(
             (row) => row.field_values,

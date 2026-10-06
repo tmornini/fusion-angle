@@ -1,7 +1,6 @@
 import {
     assert,
     assertEquals,
-    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import {
@@ -9,14 +8,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import {
-    EntityNotFoundError,
-    TABLE_NAMES,
-} from '../api/db.ts';
+import { TABLE_NAMES } from '../api/db.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
     workOrderHeadFor,
-    workOrderHistoryFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import {
@@ -1378,12 +1373,20 @@ Deno.test('work-order versions GET: 200/404 two-way for'
     );
 });
 
-// Derive-path (C4): workOrderHistoryFor throws on foreign
-// miss (404) and absent (404); own still returns folded rows.
-Deno.test('workOrderHistoryFor visibility: own field_values,'
-+ ' foreign rejects, absent rejects',
+// The versions read (C4): the work order's events carry the
+// transition fold for the owner; a foreign organization's
+// owner probe is 404 and an absent id is 404, each with the
+// generic route's error body.
+Deno.test('work-order versions events: own field_values,'
++ ' foreign owner probe 404, absent 404',
 async () => {
     const db = await seededDb();
+    const starkToken = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+    );
+    const twoToken = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
+    );
     const workOrderId = generateIdentifier();
     const transitionEventId = WORKORDERID_TE;
     const fieldValueId = WORKORDERID_FV;
@@ -1392,9 +1395,9 @@ async () => {
         fieldValueId, WORKORDERID_ATTR,
     );
 
-    // Own → history returns the transition fold.
-    const ownHistory = await workOrderHistoryFor(
-        db, STARK_ORGANIZATION, workOrderId,
+    // Own → the events carry the transition fold.
+    const ownHistory = await getWorkOrderEvents(
+        db, starkToken, STARK_ORGANIZATION, workOrderId,
     );
     const ownTe = ownHistory.find(
         (row) => row.id === transitionEventId,
@@ -1403,20 +1406,36 @@ async () => {
     assertStrictEquals(ownTe!.field_values.length, 1);
     assertStrictEquals(ownTe!.field_values[0]!.id, fieldValueId);
 
-    // Foreign → work-order ownership rejects.
-    await assertRejects(
-        () => workOrderHistoryFor(
-            db, ORGANIZATION_TWO, workOrderId,
+    // Foreign → the owner probe is 404, the generic text.
+    const foreign = await handleRequest(
+        db,
+        req(
+            'GET',
+            '/organizations/' + ORGANIZATION_TWO
+                + '/work-orders/' + workOrderId + '/versions/',
+            twoToken,
         ),
-        EntityNotFoundError,
+    );
+    assertStrictEquals(foreign.status, 404);
+    assertStrictEquals(
+        (await foreign.json() as { error: string }).error,
+        'Not found: work_orders/' + workOrderId,
     );
 
-    // Absent work order → EntityNotFoundError.
-    await assertRejects(
-        () => workOrderHistoryFor(
-            db, STARK_ORGANIZATION, GHOST_P15_VIS,
+    // Absent work order → 404, the generic text.
+    const absent = await handleRequest(
+        db,
+        req(
+            'GET',
+            '/organizations/' + STARK_ORGANIZATION
+                + '/work-orders/' + GHOST_P15_VIS + '/versions/',
+            starkToken,
         ),
-        EntityNotFoundError,
+    );
+    assertStrictEquals(absent.status, 404);
+    assertStrictEquals(
+        (await absent.json() as { error: string }).error,
+        'Not found: work_orders/' + GHOST_P15_VIS,
     );
 });
 

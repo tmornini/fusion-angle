@@ -5,9 +5,6 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    workOrderHistoryFor,
-} from '../api/derive-states.ts';
 import { getWorkOrderEvents } from
     './fixtures/work-order-events.ts';
 import { RequestError } from '../api/api.ts';
@@ -232,10 +229,11 @@ Deno.test(
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'n-next');
         // Phase Final Task 2: SFV row plane empty; message-plane
-        // transition fold rides work-order history.
+        // transition fold rides the work order's versions.
         // Phase Final Stage B: state_field_values retired.
-        const history = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
+        const history = await getWorkOrderEvents(
+            db, DEV_TOKEN, STARK_ORGANIZATION,
+            'yNSSnbrpacodQTzUEcdEVA',
         );
         const transition = history.find(
             (row) => row.id === TRANSITION_EVENT_ID,
@@ -361,8 +359,9 @@ Deno.test(
         // Failed gate left no ghost event: the history holds
         // the seeded work order's own events, none under the
         // rejected transition's id.
-        const history = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
+        const history = await getWorkOrderEvents(
+            db, DEV_TOKEN, STARK_ORGANIZATION,
+            'yNSSnbrpacodQTzUEcdEVA',
         );
         assertStrictEquals(
             history.find((row) => row.id === 'te1'), undefined,

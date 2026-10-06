@@ -13,7 +13,6 @@ import {
 } from '../shared/types.ts';
 import {
     deriveInvitationStates,
-    workOrderHistoryFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import {
@@ -1245,22 +1244,17 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 // ---- case 6: the state_field_values JOIN (lens 6) ---------------
 
 // Phase Final Task 2: SFV row half stripped — join is
-// message-plane only (work-order history inline fold; C4).
-Deno.test('case 6: the state_field_values JOIN — WO01\'s derived'
-+ ' history resolves field values on the message plane; seed'
-+ ' leaf pairs total 7', async () => {
+// message-plane only (the versions' events carry them; C4).
+Deno.test('case 6: the state_field_values JOIN — WO01\'s'
++ ' versions\' events resolve field values on the message'
++ ' plane; seed leaf pairs total 7', async () => {
     const db = await seededDb();
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
     const workOrderId = buildWorkOrders()[0]!.id;
-    // The versions read answers 200 for the seeded work order.
-    await getWorkOrderEvents(
+    const history = await getWorkOrderEvents(
         db, token, STARK_ORGANIZATION, workOrderId,
-    );
-
-    const history = await workOrderHistoryFor(
-        db, STARK_ORGANIZATION, workOrderId,
     );
     let sawFieldValues = false;
     let totalFieldValues = 0;
@@ -1274,7 +1268,7 @@ Deno.test('case 6: the state_field_values JOIN — WO01\'s derived'
     // genuinely carry field values (the seed's own 7-pair set).
     assertStrictEquals(
         sawFieldValues, true,
-        'no derived event resolved any state_field_values —'
+        'no event in WO01\'s versions carried a field value —'
         + ' the join proof would be vacuous',
     );
     assertStrictEquals(totalFieldValues, 7);

@@ -5,6 +5,8 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { testHashPassword } from './mock-seed.ts';
 import {
     STARK_ORGANIZATION,
@@ -24,7 +26,6 @@ import {
 } from '../api/derive-record-instances.ts';
 import {
     workOrderHeadFor,
-    workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import { validateWorkOrderVersion } from '../api/validators.ts';
 import { responseRecordOf } from '../api/message-pair.ts';
@@ -161,8 +162,9 @@ async () => {
 Deno.test('WO01 history: Review 6 new-shape + Complete 1',
 async () => {
     const db = await seededDb();
-    const history = await workOrderHistoryFor(
-        db, STARK_ORGANIZATION, WO01_ID,
+    const history = await getWorkOrderEvents(
+        db, await organizationToken(), STARK_ORGANIZATION,
+        WO01_ID,
     );
     const byId = new Map(
         history.map((row) => [row.id, row]),

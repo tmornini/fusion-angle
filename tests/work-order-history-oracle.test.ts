@@ -5,11 +5,21 @@ import { testHashPassword } from './mock-seed.ts';
 import {
     workOrderClaimEventId,
 } from '../api/mock-data/seed-message-pairs.ts';
-import { workOrderHistoryFor } from '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { now as seedNow } from '../api/mock-data/seed-kit.ts';
 import { microsOf, stampOfMicros } from '../shared/pair-root.ts';
 import { MS_PER_DAY } from '../shared/types.ts';
-import type { WorkOrderHistoryEventEntity } from '../shared/types.ts';
+import type {
+    Id, WorkOrderEventEntity,
+} from '../shared/types.ts';
+
+// The fixture's row shape: the server's retired newest-first
+// history carried the work order's id on every row.
+type WorkOrderHistoryRow = WorkOrderEventEntity & {
+    readonly entity_id: Id,
+};
 
 // The fixture was captured on captured_on's UTC day; the seed's
 // clock (seedNow) is always today's UTC day start. Both are whole
@@ -21,7 +31,7 @@ const fixture = JSON.parse(Deno.readTextFileSync(
     captured_on: string,
     histories: Record<
         string,
-        ReadonlyArray<WorkOrderHistoryEventEntity>
+        ReadonlyArray<WorkOrderHistoryRow>
     >,
 };
 
@@ -32,42 +42,41 @@ const shiftDays = Math.round(
 const shiftMicros = BigInt(shiftDays) * BigInt(MS_PER_DAY) * 1000n;
 
 function shiftedRow(
-    row: WorkOrderHistoryEventEntity,
-): WorkOrderHistoryEventEntity {
+    row: WorkOrderHistoryRow,
+): WorkOrderHistoryRow {
     return {
         ...row,
         at: stampOfMicros(microsOf(row.at) + shiftMicros),
     };
 }
 
-// The create births three (spec §2): the trace's first two
-// events and its creator's claim at the second's moment.
-// Newest first, the claim sits just above the second.
-function withClaimBirth(
-    rows: ReadonlyArray<WorkOrderHistoryEventEntity>,
-): WorkOrderHistoryEventEntity[] {
-    const start = rows.at(-1)!;
-    const node = rows.at(-2)!;
+// The fixture's rows, newest first, as chain-order events:
+// oldest first, the path naming the work order, and the
+// create's claim birth at the second event's moment (spec §2).
+function expectedEvents(
+    rows: ReadonlyArray<WorkOrderHistoryRow>,
+): WorkOrderEventEntity[] {
+    const events = rows.toReversed().map(
+        ({ entity_id: _path, ...event }) => event,
+    );
+    const [start, node, ...moves] = events;
     return [
-        ...rows.slice(0, -2),
+        start!,
+        node!,
         {
-            id: workOrderClaimEventId(start.entity_id),
-            entity_id: start.entity_id,
+            id: workOrderClaimEventId(rows[0]!.entity_id),
             state: 'claimed',
-            member_id: start.member_id,
-            at: node.at,
+            member_id: start!.member_id,
+            at: node!.at,
             field_values: [],
         },
-        node,
-        start,
+        ...moves,
     ];
 }
 
-const expected = Object.fromEntries(
+const shifted = Object.fromEntries(
     Object.entries(fixture.histories).map(
-        ([key, rows]) => [
-            key, withClaimBirth(rows.map(shiftedRow)),
-        ],
+        ([key, rows]) => [key, rows.map(shiftedRow)],
     ),
 );
 
@@ -77,17 +86,13 @@ Deno.test('every seeded work order keeps its history,'
     await postMockDataLoad(db, {
         hashPassword: testHashPassword,
     });
-    for (const [key, rows] of Object.entries(expected)) {
+    for (const [key, rows] of Object.entries(shifted)) {
         const [organization, workOrder] = key.split('/');
-        const actual = await workOrderHistoryFor(
-            db, organization!, workOrder!,
-        ).catch((error: unknown) => {
-            throw new Error(
-                'the history of ' + key + ' did not derive',
-                { cause: error },
-            );
-        });
-        assertEquals(actual, rows, key);
+        const actual = await getWorkOrderEvents(
+            db, await organizationToken(undefined, organization),
+            organization!, workOrder!,
+        );
+        assertEquals(actual, expectedEvents(rows), key);
     }
 });
 
@@ -97,10 +102,11 @@ Deno.test('every seeded history holds exactly one claimed'
     await postMockDataLoad(db, {
         hashPassword: testHashPassword,
     });
-    for (const [key, rows] of Object.entries(expected)) {
+    for (const [key, rows] of Object.entries(shifted)) {
         const [organization, workOrder] = key.split('/');
-        const actual = await workOrderHistoryFor(
-            db, organization!, workOrder!,
+        const actual = await getWorkOrderEvents(
+            db, await organizationToken(undefined, organization),
+            organization!, workOrder!,
         );
         const births = actual.filter(
             (row) => row.state === 'claimed',
