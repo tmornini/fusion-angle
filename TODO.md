@@ -1164,14 +1164,19 @@ Off the critical path; each with its oracle.
   Integrations" (`web-app/auth/index.ts:118-157`,
   TEST-PLAN B5). Same sin as the landing mock-up;
   its own spec.
-- One gate for the write. Ninety-six `appendMessagePairOnce`
-  sites and six `appendMessagePairAlways` sites, 73 of them in
-  `api/routes.ts`, because each handler owns its own storage
-  instead of returning its pairs for one place to store. A
-  handler returns `MessagePair[]`; the gate appends them once,
-  under one lock order, with one notification. Lands beside
-  item 11, which rewrites the largest handlers. Oracle:
-  one append site in `api/api.ts`, zero in `api/routes.ts`.
+- One gate for the write. Every write is one ledger
+  statement now (`runLedgerStatement`,
+  `api/ledger-statement.ts:48`), but each handler still
+  lands its own: `runWrite` at 40 sites, 37 of them in
+  `api/routes.ts`, `runStateWrite` at 17, 13 there, and
+  `landStateWrite` twice in `api/authentication.ts`,
+  because each handler owns its own storage instead of
+  returning its pairs for one place to store. A handler
+  returns `MessagePair[]`; the gate lands them once, with
+  one notification. Lands beside item 11, which
+  rewrites the largest handlers. Oracle: one `runWrite`
+  site in `api/api.ts`, and no `runWrite` or
+  `runStateWrite` in `api/routes.ts`.
 - The ledger sweep, built into `./bin/measure` the way
   `./deploy` grew modes. A ledger mode that subsumes a
   generator and a loader: the mock seed as the base, a modeled
