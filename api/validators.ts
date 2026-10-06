@@ -1658,7 +1658,7 @@ function validateTransitionFieldValueEntity(
     };
 }
 
-function validateWorkOrderEvent(
+function validateWorkOrderEventEntity(
     value: unknown,
     label: string,
 ): WorkOrderEventEntity {
@@ -1757,7 +1757,7 @@ export function validateWorkOrderVersion(
             : {}),
         events: asArray(
             body['events'], 'WorkOrderVersion.events',
-        ).map((event, i) => validateWorkOrderEvent(
+        ).map((event, i) => validateWorkOrderEventEntity(
             event, 'WorkOrderVersion.events[' + i + ']',
         )),
     };
