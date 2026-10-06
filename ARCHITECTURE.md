@@ -459,7 +459,7 @@ KNOWN.
 - flat member POSTs —
   `tests/api-human-members.test.ts`
 - org-scoped decorator stores —
-  `tests/api-write-authorizer.test.ts`
+  `tests/api-foreign-id-writes.test.ts`
 - token / identity_providers HTTP —
   `tests/api-identity-spine-verb-gaps.test.ts`
 - role grants —
