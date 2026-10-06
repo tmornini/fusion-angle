@@ -945,11 +945,13 @@ skew tests, which went with item 8's trio.
    6's health probe; item 13 answers it per process.
 5. A person's first sign-in — no page mints a human
    credential: the seed does
-   (`api/mock-data/seed-message-pairs.ts:2503`), only
+   (`formSeedCredentialMessagePairs`,
+   `api/mock-data/seed-message-pairs.ts:2421`), only
    services get a secret from the UI
-   (`web-app/app/adapters/identities.ts:293`), and
-   `postHumanMemberCreation`
-   (`web-app/app/adapters/members.ts:212`) creates a
+   (`postIdentityCreation`, `client/identities.ts:314`),
+   and `postHumanMemberCreation`
+   (`client/members.ts:276`) lands the identity, its
+   PII, and a membership, and no credential, for a
    member who cannot sign in. One primitive, two flows:
    a single-use, expiring, emailed link whose holder
    sets a password — sent on invitation grant (whether
@@ -961,7 +963,7 @@ skew tests, which went with item 8's trio.
    service behind an adapter, its key supplied at deploy
    and never logged; the link token is a secret at rest
    under item 2's discipline. Not sign-up: a stranger
-   creating an organization stays in `## Later work`
+   creating an organization stays its own bullet
    (SP-6). Merged: invitation email delivery.
 6. Operable — what a pilot tenant's data needs before it
    exists. A backup the operator has restored once:
