@@ -1522,38 +1522,6 @@ export function validateFlowNodeAttributeEntity(
     };
 }
 
-const WORK_ORDER_BODY_KEYS:
-    readonly string[] = [
-    'organization_id', 'display_id', 'flow_graph',
-    'position',
-];
-
-export function validateWorkOrderEntity(
-    body: Record<string, unknown>,
-): Omit<WorkOrderFieldsEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        WORK_ORDER_BODY_KEYS,
-        'WorkOrderEntity',
-    );
-    const flowGraph = asObject(
-        body['flow_graph'], 'flow_graph',
-    );
-    asWorkOrderFlowGraph(
-        flowGraph, 'WorkOrderEntity.flow_graph',
-    );
-    return {
-        organization_id: pickIdentifier(body, 'organization_id'),
-        display_id: pickString(
-            body, 'display_id',
-        ),
-        flow_graph: flowGraph,
-        position: pickNumber(
-            body, 'position',
-        ),
-    };
-}
-
 const WORK_ORDER_DOCUMENT_BODY_KEYS: readonly string[] = [
     'display_id', 'flow_graph', 'position',
 ];
@@ -1571,10 +1539,7 @@ export interface WorkOrderDocumentBody {
 // state/state_at/state_event_id are absent from BOTH the
 // expected and optional sets: a body carrying any of them 400s
 // here (the stateless covenant is validator-enforced, not
-// caller discipline). Entity fields
-// are picked directly rather than delegated to
-// validateWorkOrderEntity — that function REQUIRES
-// organization_id, which this body never carries.
+// caller discipline).
 export function validateWorkOrderDocumentBody(
     body: Record<string, unknown>,
 ): WorkOrderDocumentBody {
