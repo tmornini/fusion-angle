@@ -2909,9 +2909,14 @@ Off the critical path; each with its oracle.
   variable (`RENDER_GIT_COMMIT`), a name that stays at
   the edge (the naming bullet). How the page bundle
   learns it — embedded at build, or served — is this
-  bullet's to settle. Oracle: a boot without it refuses,
-  as a boot without `FA_POSTGRES_URL` does, and a
-  request log line carries it
+  bullet's to settle. Nothing sends the token yet: the
+  message-plane spec left it out
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:272-274`),
+  and no `user-agent` line appears under `client/`,
+  `api/`, `shared/`, or `server/`. Oracle: a boot without
+  it refuses, as a boot without `FA_POSTGRES_URL` does; a
+  request log line carries it; and every API request the
+  client sends carries `user-agent: fusion-angle/<sha>`
 - JEV joins the list of available AI agents, and that
   list becomes one. `api/provider-models.ts` calls
   `PROVIDER_MODELS` the single source of truth, and the
