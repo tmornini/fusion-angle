@@ -1314,7 +1314,7 @@ Off the critical path; each with its oracle.
   justifies it; and the verb decides what may be resent
   after an unknown outcome (RFC 9110 §9.2.2) — GET, PUT,
   and DELETE may, since a PUT that changes nothing lands
-  nothing (item 0), while a POST or PATCH may only after
+  nothing (the ledger statement), while a POST or PATCH may only after
   an answer that proves nothing landed (401, 412, 429). A
   resend is the same operation and keeps its
   `operation-id`; the throttle sends `Retry-After` and the
@@ -1415,8 +1415,9 @@ Off the critical path; each with its oracle.
   `env | grep FA_` lists every variable the system needs.
   Every environment variable the system reads becomes
   `FA_*`, and every Postgres role, login, table, index,
-  and view `fa_*` (item 0 renames the table and its
-  indexes; item 2 creates its roles and views under the
+  and view `fa_*` (the ledger store named the table,
+  its indexes, and its functions so; item 2 creates its
+  roles and views under the
   prefix). Product code reads
   six names of its own — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
@@ -1568,7 +1569,8 @@ Off the critical path; each with its oracle.
   `api/`, `headerFieldsWithOperationId` is gone, and the
   raw verbs take a `string`.
 - A received POST or PATCH names the root, not the head
-  it acted on. Item 0's design had it name the head its
+  it acted on. Item 0's design, which landed and left
+  this file, had it name the head its
   `If-Match` named — the state it acted on — and a
   creating POST the root, so `supersedes` means one thing
   on every pair. The statement names the head at the
@@ -2912,7 +2914,8 @@ Off the critical path; each with its oracle.
   and the table itself is refused; `fa_owner` owns the
   view, so item 2's policy hides nothing from it. An
   erasure pair names the removed ids and hashes so every
-  absence is accounted for — item 0 left `supersedes`
+  absence is accounted for — the ledger store left
+  `supersedes`
   unenforced for this — and writing it is an INSERT, which
   a delete-only view cannot make: the brainstorm settles
   whether the eraser also inserts through a view of its
@@ -2959,17 +2962,17 @@ Off the critical path; each with its oracle.
   about it is defined yet — its view, its grants, and
   whether it sees hidden pairs are its own brainstorm's.
   Activates with the first worker that needs reports.
-- Table migrations — deferred by decision: product-path
-  item 0 holds the table's DDL final, and item 3 ships
+- Table migrations — deferred by decision: the ledger
+  store holds the table's DDL final, and item 3 ships
   everything a change to the fence needs. Activates on the
   first change to the table once a tenant's data exists
   and a wipe is no longer possible. The pieces already
   stand (item 3, measured): a migration is the genesis of
   its own document in `/migrations/`, named for what it
-  does behind a four-digit order after item 0's root,
+  does behind a four-digit order after the root,
   landed by `migrate` with its SQL the `request` and
   its digest the `response`; names order migrations and
-  item 0's index refuses a second runner, with no lock
+  the succession index refuses a second runner, with no lock
   and no migrations table of its own; and the DDL and the
   genesis commit or roll back together. What is missing
   is only the table steps themselves, and whether a
@@ -2994,7 +2997,7 @@ Off the critical path; each with its oracle.
   carried in the context so every log line names the
   build (the Office of Structured Observability), and
   the one source of the `<sha>` in the `user-agent`
-  token items 0 and 3 send. `./deploy` fills it from
+  token the client and item 3 send. `./deploy` fills it from
   `git rev-parse HEAD`, exact because the build refuses
   a dirty tree; on Render from the host's commit
   variable (`RENDER_GIT_COMMIT`), a name that stays at
@@ -3130,9 +3133,11 @@ Off the critical path; each with its oracle.
   message, an array of messages, or a value whose
   `message` members name every response it was built
   from
-- Fewer body decodes, after item 1's fifth spec. Head
+- Fewer body decodes, after the work-order-events spec,
+  the last of item 1's. Head
   reads slowed eight of the nine list pages' readyMs
-  (item 1's landed line, base → tip, medians of 25),
+  (`4a540f3` → `9a8396a`, medians of 25,
+  `measurements/history.jsonl`),
   workbox 122.7 → 142.0 and flows 46.0 → 56.4 the
   most. Three suspects, none measured: larger
   multipart list payloads, each part a whole stored
@@ -3413,13 +3418,10 @@ Off the critical path; each with its oracle.
 
 - The examination report
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
-  → 0–2, 6, 9, 11, 13 (its findings are their oracles).
-- 0–2 → 5 (its link token is a secret at rest: item 0
-  hoists it, item 2 fences it); item 2 no longer orders
+  → 2, 6, 9, 11, 13 (its findings are their oracles).
+- 2 → 5 (its link token is a secret at rest: item 2
+  fences it); item 2 no longer orders
   item 6, since a backup carries the table whole
-- 0 → 2's advisory-lock revoke, which waits on item 0
-  removing the product's last use
-  (`api/backend-postgres.ts:286`)
 - The naming bullet (`fa_`) lands no later than the
   deploy of items 0–3, so operators rename once
 - 4 → 6 → 13 (the health probe, then per process)
