@@ -14,30 +14,77 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Fifteen items, in this order — each its own brainstorm
+Eighteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
-An item keeps the number it was filed under: specs,
-plans, the probes' README, and code comments cite items
-by it, so the order is the list's and the number the
-item's. Item 14 first: any organization's admin can
-take over an identity in another, so no second tenant
-shares an origin before it ships. Then the ledger's one
-deploy — items 0–3, of which 0 and 1 have landed and
-left this file, with 15 (`fa_` names), 16
-(`FA_GIT_SHA`), and 17 (the wipe and reseed); then what
-a pilot tenant needs next (4–7), the process engine and
-its AI worker on that (9–12), and two processes last
-(13). A "Merged:" clause names bullets absorbed from
-`## Later work`; they keep their oracles. Four former
-items left for `## Later work` (genericity, JSON
-parse/stringify, simulated latency, cachability) and
-the skew tests, which went with the trio; item 8,
-lifecycle out of the document body, closed the other
-way with the trio's retirement
-(`docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`).
+The 0-items finish the release: the walk's remaining
+recipes and moorings and their count (0a–0c); admins
+held to their own organization (0d), since no second
+tenant shares an origin before it ships; then the
+ledger's one deploy — `fa_` names (0e), the fence
+(0f), `FA_GIT_SHA` (0g), migrations (0h), and the wipe
+and reseed that ships them (0i). Then what a pilot
+tenant needs (4–7), the process engine and its AI
+worker on that (9–12), and two processes last (13). An
+item's number is its name, which specs, plans, and
+code comments cite; specs and plans written before the
+0-items were named call 0f and 0h items 2 and 3.
 
-- **14.** Admins act within their organization. Any
+- **0a.** Recipes a hidden, CDP-driven tab can execute
+  for AA32, C6, F13, and I22; Task 9 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
+  holds each case's text. AA32: the port is a 5-unit
+  circle on the node's widest perimeter gap
+  (`web-app/app/flow-graph.ts:220-270`), not its
+  right-middle, and a press that misses it starts a
+  body-drag or a marquee, so the case aims by selector
+  at `[data-connect-port]`'s center, confirmed by
+  `document.elementFromPoint`, and drops on the target
+  node's `> rect`. C6: the window is the scroller —
+  `.main-content` sets no overflow
+  (`web-app/app/styles/layout.css:145-151`) and the
+  sidebar is fixed — and CDP wheel and key input stall
+  on a tab that is not composited, so the case scrolls
+  with `window.scrollTo` through `Runtime.evaluate` and
+  reads the rects. F13: the double-click aims at the
+  node's body (`.flow-node[aria-label="<name>"] > rect`),
+  not its label or group, and the case names its Layer
+  2 pin, 'a node click under an open panel centers it
+  on release (F13)'
+  (`tests/browser/canvas-gestures.test.ts:451`). I22: a
+  CDP `Fetch` pattern answers the ideas collection GET
+  with a 500 — never `/api/authentication/*`, and never
+  a 401, which drives refresh instead — so the error
+  state and its Try Again are driven live. Oracle: the
+  next walk scores each of the four PASS or FAIL, never
+  BLOCKED
+- **0b.** F37a, R22, and WB22 moored to the product;
+  Task 10 of the same plan holds F37a's and R22's text.
+  F37a: one cookie jar cannot reach the 412 — a flow
+  save rings `fusion-angle:data`, and tab B re-reads
+  and latches the new head within one GET — so tab B
+  is a second jar (`Target.createBrowserContext`, as
+  SV6), which keeps the stale head. R22: nothing merges
+  two editors' values — a PATCH merges `set` and
+  `clear` onto the head it latched, a stale tag answers
+  412 (ARCHITECTURE.md:316-322), and the page re-reads
+  and asks the person to re-apply
+  (`INSTANCE_CONFLICT_NOTICE`, `web-app/records/detail.ts`)
+  — so the case reads refuse-and-refresh, not merged
+  values. WB22: `buildInboxItems` takes four
+  parameters, `(workOrders, activeClaimsByWo,
+  memberMap, mode)`
+  (`web-app/app/presenters/workbox-inbox.ts:255`),
+  where the case and its Pin name five. Oracle: each
+  case's text matches the code, and the next walk
+  drives F37a and R22 PASS
+- **0c.** AT2's count, current: after 0a and 0b, run
+  `./test validate browser` and replace AT2's "on 4 Oct
+  `./test` printed `ok | 4124 passed | 0 failed | 11
+  ignored`" (`TEST-PLAN.md:479`) with that run's date
+  and its main suite's line; Task 11 of the same plan.
+  Oracle: AT2 names the latest Layer 2 run's count
+- **0d.** Admins act within their organization. Any
   organization's admin can write a password credential
   for an identity in another organization and sign in
   as it. `ROUTE_POLICY` grants `admin` every verb at
@@ -85,13 +132,13 @@ way with the trio's retirement
   with no accepted membership in its organization is
   403 before any read or write, and naming one that
   holds one is unchanged.
-- **15.** Everything we own, named `fa_` — so that operating the
+- **0e.** Everything we own, named `fa_` — so that operating the
   system makes what is ours trivial to find:
   `env | grep FA_` lists every variable the system needs.
   Every environment variable the system reads becomes
   `FA_*`, and every Postgres role, login, table, index,
   and view `fa_*` (the ledger store named the table,
-  its indexes, and its functions so; item 2 creates its
+  its indexes, and its functions so; item 0f creates its
   roles and views under the
   prefix). Product code reads
   six names of its own — `POSTGRES_URL`,
@@ -128,9 +175,9 @@ way with the trio's retirement
   `api/ledger-statement-sql.ts:229`), the test schema
   `fusion_test_…` and compose project
   `fusion-test-postgres-$$` (`bin/test-postgres:22`,
-  `:17`), and `schema_marker`, which item 3 retires.
+  `:17`), and `schema_marker`, which item 0h retires.
   Ships no later than the deploy
-  of items 0–3, which already changes what operators
+  of the ledger (item 0i), which already changes what operators
   configure, so they rename once. The brainstorm settles
   how far "infrastructure" reaches: the database name,
   compose's service and container names, the hosted
@@ -144,7 +191,7 @@ way with the trio's retirement
   everything the system needs, and a test finds every
   environment read in product code and scripts and fails
   on a name without the prefix outside the two edges
-- **2.** The ledger fenced — roles, grants, and row policies, on
+- **0f.** The ledger fenced — roles, grants, and row policies, on
   the table items 0 and 1 finished (landed: the
   2026-09-23 ledger-store, message-plane, and ledger-seed
   specs, then state by PUT, head reads, membership and
@@ -166,7 +213,7 @@ way with the trio's retirement
   as `fa_owner` — so the DDL is identical on every host
   and only memberships and secrets are the deployment's.
   Every role and login of ours carries the `fa_` prefix
-  (item 15).
+  (item 0e).
   Roles belong to the cluster: they outlive the wipe's
   schema drop, every database in the cluster sees them,
   and creating one twice fails (measured), so what
@@ -204,7 +251,7 @@ way with the trio's retirement
   `fa_api` reads all five digests, verifies `pair_hash`,
   and a reader of envelopes alone verifies the root
   alone; fence them, and the root is the owner's to
-  verify (item 3's full check). A column grant cannot
+  verify (item 0h's full check). A column grant cannot
   reach a secret a document's state holds, and the
   state-by-PUT spec hands this item the credential and
   code bodies (`docs/superpowers/specs/`
@@ -245,7 +292,7 @@ way with the trio's retirement
   rights, the owner is exempt, and the planner still
   inlines it. Row security refuses `fa_api`'s
   inserts until a second policy admits them (measured),
-  and item 3 narrows that policy to keep `/migrations/`
+  and item 0h narrows that policy to keep `/migrations/`
   the owner's. A table's owner is exempt from
   its policies, so views `fa_owner` owns still see
   the hidden pairs the eraser needs. Measured on 262,000
@@ -311,7 +358,7 @@ way with the trio's retirement
   database, which outlives a wipe; where our table
   exists it applies, in name order, each migration its
   binary carries and the database lacks — every one an
-  owner transaction of its change, item 3's full check,
+  owner transaction of its change, item 0h's full check,
   and its document's genesis — and lands nothing where
   the two sets already match; where it does not,
   it says seed is next; and, as `check` does, it
@@ -376,17 +423,17 @@ way with the trio's retirement
   `tests/api-shadow-ledger-auth.test.ts` 'live secrets
   land in the auth-flow ledger rows'). Follows items 0
   and 1, which landed.
-- **16.** `FA_GIT_SHA` — the commit that built the running
+- **0g.** `FA_GIT_SHA` — the commit that built the running
   binary, supplied by the environment as every `FA_`
   value is and never defaulted, read once at boot and
   carried in the context so every log line names the
   build (the Office of Structured Observability), and
   the one source of the `<sha>` in the `user-agent`
-  token the client and item 3 send. `./deploy` fills it from
+  token the client and item 0h send. `./deploy` fills it from
   `git rev-parse HEAD`, exact because the build refuses
   a dirty tree; on Render from the host's commit
   variable (`RENDER_GIT_COMMIT`), a name that stays at
-  the edge (item 15). How the page bundle
+  the edge (item 0e). How the page bundle
   learns it — embedded at build, or served — is this
   bullet's to settle. Nothing sends the token yet: the
   message-plane spec left it out
@@ -396,7 +443,7 @@ way with the trio's retirement
   it refuses, as a boot without `FA_POSTGRES_URL` does; a
   request log line carries it; and every API request the
   client sends carries `user-agent: fusion-angle/<sha>`
-- **3.** Retire `schema_marker` for migrations the ledger
+- **0h.** Retire `schema_marker` for migrations the ledger
   holds — the marker (`api/schema-postgres.ts:46-49`)
   proves only that a seed once finished; it cannot tell
   an unwiped database from a correct one. A master-era
@@ -425,7 +472,7 @@ way with the trio's retirement
   PUT `fa_owner` writes, its requester as the root's,
   whose `user-agent` line names the build that ran
   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
-  `FA_GIT_SHA` supplies, item 16),
+  `FA_GIT_SHA` supplies, item 0g),
   provenance the owner's `check` can report and
   never the key; and its `response`
   is the digest of its fixed SQL, DDL and DML
@@ -437,9 +484,9 @@ way with the trio's retirement
   is the digest of zero bytes —
   the root row's insert and the grants count, and
   a seed's data pairs, which are parameters and vary by
-  mode, do not. Item 2's fence does the rest: `fa_api`
+  mode, do not. Item 0f's fence does the rest: `fa_api`
   reads the digest and is refused the SQL, as it is every
-  `request` (measured), so the catalog reads item 2
+  `request` (measured), so the catalog reads item 0f
   closed stay closed. The stored SQL is a receipt, never
   an input: nothing executes SQL read from the ledger,
   and every step comes from the compiled binary, as
@@ -460,7 +507,7 @@ way with the trio's retirement
   (`api/api.ts:446`) stays the api's. Names order
   migrations, bytewise: the verb applies its binary's
   migrations in name order and refuses one whose
-  predecessors lack a head. Item 2's insert
+  predecessors lack a head. Item 0f's insert
   policy binds `fa_api`, which the adapter's fixed SQL
   runs as, and a table's owner is exempt from its
   policies, so `/migrations/` is refused to the
@@ -480,7 +527,7 @@ way with the trio's retirement
   (both measured, 18.6, on a successor; a genesis is the
   same index's other case). Only the owner writes a
   migration:
-  item 2's insert policy refuses its path to `fa_api`
+  item 0f's insert policy refuses its path to `fa_api`
   with one predicate, so a wire request cannot land
   one, and a table's owner is exempt from its policies
   (measured). After launch the fence is what changes —
@@ -510,7 +557,7 @@ way with the trio's retirement
   never at boot: it reads the live definition from the
   catalog — `information_schema.columns`,
   `pg_get_constraintdef`, `pg_get_indexdef`, the root
-  row, and item 2's objects: the roles, `fa_api`'s
+  row, and item 0f's objects: the roles, `fa_api`'s
   column grants, the helper view, the row
   policies, and what PUBLIC holds —
   compares it to what the binary's migrations, applied
@@ -569,15 +616,15 @@ way with the trio's retirement
   the seed's account (SCHEMA.md:67, :191),
   ARCHITECTURE.md:43-44, and the comments that name it
   (`server/boot.ts:1-3`, `api/ledger-seed.ts:321-322`,
-  `api/db.ts:217`, `:231`). Follows item 2.
-- **17.** Wipe and reseed every live database onto the ledger
-  store's table at the deploy of items 0–3. Nothing
+  `api/db.ts:217`, `:231`). Follows item 0f.
+- **0i.** Wipe and reseed every live database onto the ledger
+  store's table at the ledger's deploy. Nothing
   alters a database in place: the seed refuses one
   whose `fa_message_pairs` exists
   (`server/seed.ts:101-128`), and a master-era database
   — `message_pairs` and its `schema_marker` row — boots
   this binary and fails every read, while the seed
-  meets its marker and rolls back (item 3). So every
+  meets its marker and rolls back (item 0h). So every
   live ledger takes `./bin/postgres-wipe` then
   `./bin/postgres-seed`, or the Render equivalents
   through `./deploy`, and with it arrive the exact-read
@@ -633,15 +680,15 @@ way with the trio's retirement
   authorization to reach it. Email is an external
   service behind an adapter, its key supplied at deploy
   and never logged; the link token is a secret at rest
-  under item 2's discipline. Not sign-up: a stranger
+  under item 0f's discipline. Not sign-up: a stranger
   creating an organization stays its own bullet
   (SP-6). Merged: invitation email delivery.
 - **6.** Operable — what a pilot tenant's data needs before it
   exists. A backup the operator has restored once:
   Render's schedule, a written restore drill, its
-  measured duration, and item 3's full check passing
+  measured duration, and item 0h's full check passing
   afterward. `fa_archiver` adds a backup no host
-  owns (item 2's principle): it holds SELECT on a view
+  owns (item 0f's principle): it holds SELECT on a view
   without the two fenced secrets columns, cannot log in,
   exports through `COPY`, and restores onto any Postgres
   — `pg_dump` cannot serve it, because it locks the table
@@ -665,7 +712,7 @@ way with the trio's retirement
   private network alone. Nothing of ours needs the
   outside door: on Render, seed and wipe already run as
   jobs inside it (`bin/postgres-seed:168-171`,
-  `bin/postgres-wipe:127-130`). Item 2 refuses a foreign
+  `bin/postgres-wipe:127-130`). Item 0f refuses a foreign
   login — one that belongs to none of our roles — and
   this keeps the port out of its reach. Error logs as
   one JSON object per line, as the request log already
@@ -707,7 +754,7 @@ way with the trio's retirement
   there as "contractor": the document shape (keys on
   the membership body, or a nested facet under the
   membership mirroring `identities/:id/pii` — the
-  brainstorm decides, under item 2's rule that a
+  brainstorm decides, under item 0f's rule that a
   profile removable on its own is its own document,
   since keys on the membership body would hide that
   membership's whole history), its validator, derive,
@@ -993,7 +1040,7 @@ Off the critical path; each with its oracle.
   is its own first attempt and holds its state. No
   client sends one today: the 412 loops read a fresh
   head and latch, and no `fetch` times out. The
-  retries bullet above makes it reachable, because a
+  retries bullet below makes it reachable, because a
   PUT resent after an unknown outcome would answer
   412 to its own success. How far to align is this
   bullet's brainstorm to decide.
@@ -1290,7 +1337,7 @@ Off the critical path; each with its oracle.
   accepted; membership and versions kept today's power
   and left the question (`docs/superpowers/specs/`
   `2026-10-01-membership-and-versions-design.md:269-270`).
-  It lands beside item 14, which bounds
+  It lands beside item 0d, which bounds
   whom an admin may name at all. Oracle: a seat the
   identity did not accept reads pending until it does,
   or the owner rules the direct seat a deliberate power
@@ -1341,18 +1388,18 @@ Off the critical path; each with its oracle.
   client is refused; a real and a guessed token of the
   same length answer byte-identical responses.
 - Physical PII erasure — deferred by decision:
-  product-path item 2 hides removed PII, it does not
+  product-path item 0f hides removed PII, it does not
   delete it. Activates on a tenant contract or a
   jurisdiction that requires physical deletion. The pairs
-  item 2's policy hides are the pairs to delete, and
+  item 0f's policy hides are the pairs to delete, and
   `fa_eraser` deletes them through a view of exactly those
   pairs: it holds DELETE on that view and SELECT on the id
   and the hash alone, sees no bytes, and cannot log in
-  (item 2's principle). Measured on Postgres 18.6: through
+  (item 0f's principle). Measured on Postgres 18.6: through
   such a view a live pair and a DELETE head each delete
   zero rows, the hidden pairs delete and come back named,
   and the table itself is refused; `fa_owner` owns the
-  view, so item 2's policy hides nothing from it. An
+  view, so item 0f's policy hides nothing from it. An
   erasure pair names the removed ids and hashes so every
   absence is accounted for — the ledger store left
   `supersedes`
@@ -1362,7 +1409,7 @@ Off the critical path; each with its oracle.
   own, held to erasure pairs by a check option (measured:
   such a view refuses a row at another path), or another
   role writes the record. Until it ships the page says
-  "removed", never "erased" (item 2). `DELETE` is logical
+  "removed", never "erased" (item 0f). `DELETE` is logical
   until `VACUUM`, and WAL and point-in-time backups hold
   the bytes until the host's retention expires — state the
   window. The brainstorm also settles two questions this
@@ -1379,7 +1426,7 @@ Off the critical path; each with its oracle.
   every predecessor the tombstone's `supersedes` chain
   lost. A received request's body can hold PII the
   hiding rule never reaches — the invitation's email,
-  which the message-plane spec handed item 2
+  which the message-plane spec handed item 0f
   (`docs/superpowers/specs/`
   `2026-09-23-message-plane-design.md:871-875`) — so
   the brainstorm settles whether erasure reaches it.
@@ -1388,7 +1435,7 @@ Off the critical path; each with its oracle.
   inverted for the erased pairs, and each erased
   document's one remaining pair is its tombstone.
 - The reporter — `fa_reporter`, named in product-path
-  item 2 only as an example of its principle: a role
+  item 0f only as an example of its principle: a role
   created with its first worker, never before. Nothing
   about it is defined yet — its view, its grants, and
   whether it sees hidden pairs are its own brainstorm's.
@@ -1418,7 +1465,7 @@ Off the critical path; each with its oracle.
   hashes'). The dropped `version` column hashed on write
   and was never checked on read —
   `docs/superpowers/specs/2026-08-24-etag-is-the-pair-id-design.md`.
-  Item 3's full check is the first reader; signing is
+  Item 0h's full check is the first reader; signing is
   what remains after it.
 - A pure-TypeScript scrypt would retire the last
   product-process `node:` import
@@ -2353,11 +2400,11 @@ Off the critical path; each with its oracle.
 - SP-6 sign-up (`web-app/auth/index.ts:641-651`)
 - Billing (`web-app/billing/`)
 - Table migrations — deferred by decision: the ledger
-  store holds the table's DDL final, and item 3 ships
+  store holds the table's DDL final, and item 0h ships
   everything a change to the fence needs. Activates on the
   first change to the table once a tenant's data exists
   and a wipe is no longer possible. The pieces already
-  stand (item 3, measured): a migration is the genesis of
+  stand (item 0h, measured): a migration is the genesis of
   its own document in `/migrations/`, named for what it
   does behind a four-digit order after the root,
   landed by `migrate` with its SQL the `request` and
@@ -2374,7 +2421,7 @@ Off the critical path; each with its oracle.
   declared set of digests once item 13 runs two processes;
   and pairs are hashed and never rewritten, so a new
   envelope column sits outside every old `pair_hash`.
-  Never a route that executes a body's SQL (item 3). The
+  Never a route that executes a body's SQL (item 0h). The
   scripture names this gap among its unwritten scrolls.
   Oracle: a Postgres test starts two runners on one
   migration and finds one document, one set of changes,
@@ -2547,7 +2594,7 @@ Off the critical path; each with its oracle.
   builds the flag from a 404, 410, or 403
   (`client/identities.ts:140-146`) — so it has
   no deadline. The page keeps "removed" (product-path
-  item 2) until the eraser ships; the code speaks HTTP.
+  item 0f) until the eraser ships; the code speaks HTTP.
   Oracle: the word list's terms appear in `api/`,
   `client/`, `server/`, `shared/`, and `web-app/` only
   where the eraser bullet's own words do.
@@ -2877,25 +2924,9 @@ Off the critical path; each with its oracle.
   says the state badge is claimed by nothing, though
   Declined and Revoked are, and expects "No outstanding
   invitations." (`:5381`, `:5400`) where the test asserts
-  "No pending invitations."; and WB22 gives
-  `buildInboxItems` five parameters (`:4704`), where it
-  takes four (`web-app/app/presenters/workbox-inbox.ts:255`).
-  Oracle: each named Pin line names its test, and each
-  named claim matches the code
-- The 4 Oct walk remedies' last tasks never landed:
-  C6's scroll driven by script, I22's fault forced with
-  Fetch, F37a's stale undo from a second jar, R22
-  moored to refuse-and-refresh, and AT2's count after
-  the remedies (Tasks 9–11 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
-  whose AA32, F13, WB18, WB22, and SV3 parts the
-  walk-green plan redid). The 5 Oct walk (`ed1fac5c`)
-  scored C6, F37a, and R22 PASS without them, I22
-  stays BLOCKED by walk-green's ruling, and TEST-PLAN.md
-  still reads AT2's 4 Oct count (`:479`). Owner call:
-  rule them superseded, or run them. Oracle: each task
-  is landed or struck in its plan, and AT2 reads the
-  current count
+  "No pending invitations." instead. Oracle: each named
+  Pin line names its test, and each named claim matches
+  the code
 - The small bipolar gauge's `display` text has no
   legend or caption (the K17 plan's deferral,
   `docs/superpowers/plans/`
@@ -3218,16 +3249,17 @@ Off the critical path; each with its oracle.
 
 - The examination report
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
-  → 2, 6, 9, 11, 13 (its findings are their oracles).
-- 2 → 5 (its link token is a secret at rest: item 2
-  fences it); item 2 no longer orders
+  → 0f, 6, 9, 11, 13 (its findings are their oracles).
+- 0f → 5 (its link token is a secret at rest: item 0f
+  fences it); item 0f no longer orders
   item 6, since a backup carries the table whole
-- 14 → 17: no second tenant shares an origin until an
+- 0a, 0b → 0c: the count follows the remedies
+- 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
-- 15 → 2 → 16 → 3 → 17, one deploy: names first, so
-  operators rename once and item 2's verbs read
+- 0e → 0f → 0g → 0h → 0i, one deploy: names first, so
+  operators rename once and item 0f's verbs read
   `FA_POSTGRES_URL`; the fence; `FA_GIT_SHA`, which
-  item 3's migration documents name in their
+  item 0h's migration documents name in their
   `user-agent`; the migrations; then the wipe and
   reseed that land them together
 - 4 → 6 → 13 (the health probe, then per process)
@@ -3240,7 +3272,7 @@ Off the critical path; each with its oracle.
   erasure bullet "Erased PII persists as superseded
   pairs") — the closer removes the
   ARCHITECTURE.md bullet and this file's line in one
-  commit; item 2 rewords two and closes none
+  commit; item 0f rewords two and closes none
 - Item 7 precedes routing the roster through the
   profile
 - The claim-expiry event, succeeding

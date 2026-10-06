@@ -128,7 +128,7 @@ export const INSTANCE_VERSION_PATTERN =
     INSTANCE_VERSIONS_PATTERN + ':etag';
 // A credential nests under its identity. Its `secret` is
 // read by no role, admin included: the key's read roles
-// are empty (spec §3). Item 2 removes the declaration
+// are empty (spec §3). Item 0f removes the declaration
 // when the hash leaves the body.
 export const CREDENTIALS_COLLECTION_PATTERN =
     'identities/:id/credentials/';
