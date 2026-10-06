@@ -97,8 +97,8 @@ code comments cite; specs and plans written before the
   checks only as a string (`api/validators.ts:587`) —
   while sign-in reads that identity's own credentials
   (`deriveCredentialsFor`, `api/authentication.ts:1729`).
-  Found by reading the code; no test drives either
-  answer. The same unscoped arm reaches the token chain:
+  No test drives either answer yet. The same unscoped
+  arm reaches the token chain:
   the gate's self-or-admin guard
   (`SELF_ONLY_TOKEN_ROUTES`, `api/api.ts:430-434`,
   checked at `:807-845`) lets an admin name any
@@ -137,9 +137,9 @@ code comments cite; specs and plans written before the
   `env | grep FA_` lists every variable the system needs.
   Every environment variable the system reads becomes
   `FA_*`, and every Postgres role, login, table, index,
-  and view `fa_*` (the ledger store named the table,
-  its indexes, and its functions so; item 0f creates its
-  roles and views under the
+  and view `fa_*` (the table, its indexes, and its
+  functions carry it; item 0f creates its roles and
+  views under the
   prefix). Product code reads
   six names of its own — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
@@ -192,11 +192,9 @@ code comments cite; specs and plans written before the
   environment read in product code and scripts and fails
   on a name without the prefix outside the two edges
 - **0f.** The ledger fenced — roles, grants, and row policies, on
-  the table items 0 and 1 finished (landed: the
-  2026-09-23 ledger-store, message-plane, and ledger-seed
-  specs, then state by PUT, head reads, membership and
-  versions, and work-order events, all under
-  `docs/superpowers/specs/`). Designed to stock
+  the ledger store's table
+  (`docs/superpowers/specs/2026-09-23-ledger-store-design.md`).
+  Designed to stock
   Postgres and measured on 18.6, which compose runs; a
   host is measured against the design afterwards, and a
   shortfall is that host's recorded seam or a reason to
@@ -242,19 +240,18 @@ code comments cite; specs and plans written before the
   it reads the response and the response salt, so it
   verifies the response leaf. Which digests it reads is
   this item's first question. The two secrets leaves
-  are bare `sha256` of guessable credential lines, and
-  the ledger-store spec's decision 1 hands this item the
-  consequence: a role that reads them holds a guessing
-  oracle for the lines
+  are bare `sha256` of guessable credential lines, so
+  a role that reads them holds a guessing oracle for
+  the lines, as the ledger-store spec's decision 1 says
   (`docs/superpowers/specs/2026-09-23-ledger-store-design.md:52-65`,
   `:660-661`). Salt them — a change of hash form — and
   `fa_api` reads all five digests, verifies `pair_hash`,
   and a reader of envelopes alone verifies the root
   alone; fence them, and the root is the owner's to
   verify (item 0h's full check). A column grant cannot
-  reach a secret a document's state holds, and the
-  state-by-PUT spec hands this item the credential and
-  code bodies (`docs/superpowers/specs/`
+  reach a secret a document's state holds, so the
+  credential and code bodies are this item's too
+  (`docs/superpowers/specs/`
   `2026-09-25-state-by-put-design.md:709-716`, `:1267`).
   A credential's state keeps its PHC hash in the
   response body, and its PUT stores the `secret` it is
@@ -274,7 +271,7 @@ code comments cite; specs and plans written before the
   secrets columns, which every read selects today
   (`api/backend-postgres.ts:446-665`, mapped by
   `entityOf` at `:352-363`), though nothing derives
-  from `request` since state by PUT. Removing PII
+  from `request`. Removing PII
   stays a tombstone, and the fence
   hides every `identities/:id/pii` pair that precedes a
   DELETE at its document; the DELETE head stays visible,
@@ -336,9 +333,9 @@ code comments cite; specs and plans written before the
   re-grant). Four
   revokes from PUBLIC need a superuser and only warn for
   the owner (measured): `plpgsql`; large-object creation;
-  the 21 advisory-lock functions, which the product no
-  longer calls (4175b2d5; only
-  `tests/pg-races.test.ts` takes one); and catalog reads,
+  the 21 advisory-lock functions, which the product
+  does not call (only `tests/pg-races.test.ts` takes
+  one); and catalog reads,
   returned to `fa_owner`. With catalog reads gone the
   driver's type lookup at connect is refused and its
   unhandled rejection ends the process, and with
@@ -421,8 +418,7 @@ code comments cite; specs and plans written before the
   (`tests/shadow-ledger-invariants.test.ts` 'stored
   secrets carry the live bearer JWT';
   `tests/api-shadow-ledger-auth.test.ts` 'live secrets
-  land in the auth-flow ledger rows'). Follows items 0
-  and 1, which landed.
+  land in the auth-flow ledger rows').
 - **0g.** `FA_GIT_SHA` — the commit that built the running
   binary, supplied by the environment as every `FA_`
   value is and never defaulted, read once at boot and
@@ -435,10 +431,8 @@ code comments cite; specs and plans written before the
   variable (`RENDER_GIT_COMMIT`), a name that stays at
   the edge (item 0e). How the page bundle
   learns it — embedded at build, or served — is this
-  bullet's to settle. Nothing sends the token yet: the
-  message-plane spec left it out
-  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:272-274`),
-  and no `user-agent` line appears under `client/`,
+  bullet's to settle. Nothing sends the token yet: no
+  `user-agent` line appears under `client/`,
   `api/`, `shared/`, or `server/`. Oracle: a boot without
   it refuses, as a boot without `FA_POSTGRES_URL` does; a
   request log line carries it; and every API request the
@@ -461,7 +455,7 @@ code comments cite; specs and plans written before the
   canonical form, hash tree, succession index, and head
   read — in the collection `/migrations/`, named
   for what it does behind a four-digit order,
-  `0000-root` (landed, `api/ledger-root.ts`) then
+  `0000-root` (`api/ledger-root.ts`) then
   `0001-bootstrap`,
   that the owner writes and no
   route serves; one document with successors would hold
@@ -600,10 +594,10 @@ code comments cite; specs and plans written before the
   can land as its DELETE head and a later system can
   annotate it without rewriting it — that bullet's to
   settle.
-  Today: the root, the seed's one transaction, its
+  Today the root, the seed's one transaction, its
   refusal of a database that holds our table, and the
-  index that refuses a second genesis have landed;
-  boot gates on
+  index that refuses a second genesis exist, and boot
+  gates on
   the marker row (`assertSchemaMarker`,
   `server/postgres-gate.ts:67`, called at
   `server/boot.ts:107`), and the seed's one transaction
@@ -652,7 +646,7 @@ code comments cite; specs and plans written before the
   no ids, and the gate answers 400 to a request with no
   `operation-id` before it routes or authenticates
   (`api/api.ts:469-484`), so the exemption comes ahead
-  of that gate, as the message-plane spec planned; the
+  of that gate; the
   server mints the probe's `request-id`, as it does
   every request's. Decide: what `postgres: true` proves (a
   `SELECT 1` on a pooled connection under its own short
@@ -682,7 +676,7 @@ code comments cite; specs and plans written before the
   and never logged; the link token is a secret at rest
   under item 0f's discipline. Not sign-up: a stranger
   creating an organization stays its own bullet
-  (SP-6). Merged: invitation email delivery.
+  (SP-6). Includes: invitation email delivery.
 - **6.** Operable — what a pilot tenant's data needs before it
   exists. A backup the operator has restored once:
   Render's schedule, a written restore drill, its
@@ -736,18 +730,12 @@ code comments cite; specs and plans written before the
   (`server/http-server.ts:535-541`, `:589-594`), as is
   the 500 for a throw that escapes `handleRequest`,
   whose bare `catch` drops the error itself
-  (`server/http-server.ts:650-653`). The message-plane
-  spec hands this item the two refusals
-  (`docs/superpowers/specs/`
-  `2026-09-23-message-plane-design.md:879-881`).
-  An alert when
+  (`server/http-server.ts:650-653`). An alert when
   `/status` is not 200 or the error rate rises.
   `TRUSTED_PROXY_HOPS` set to Render's real hop
-  count. Consumes item 4. Merged:
-  the throttle seam — a global cap if the hops are
-  wrong, refresh and exchange unlimited
-  (`tests/http-throttle.test.ts`); the `ipAllowList`
-  bullet.
+  count. Consumes item 4. Includes: the throttle seam
+  — a global cap if the hops are wrong, refresh and
+  exchange unlimited (`tests/http-throttle.test.ts`).
 - **7.** The membership profile — an organization-side profile
   per membership, so the identity "Tony Stark, CEO"
   holding a contractor membership elsewhere appears
@@ -768,9 +756,7 @@ code comments cite; specs and plans written before the
   two memberships with one title). Lands before
   items 11 and 12, whose designer roster and AI
   memberships read it, and replaces the roster's
-  absent profile with the read. Authored on
-  the `2026-09-04-critical-functionality-path` branch;
-  this is its master copy.
+  absent profile with the read.
 - **9.** The bell reaches the browser — every write already
   `pg_notify`s `fusion_events` with a scoped
   `NotificationEvent` (`shared/notifications.ts`;
@@ -787,7 +773,7 @@ code comments cite; specs and plans written before the
   `fusion-angle:data` refresh so pages change nothing.
   Precedes item 10 (a chat that does not update is not a
   chat) and item 12 (the worker trusts the bell, never
-  polls). Merged: stale-until-navigation (closes KNOWN
+  polls). Includes: stale-until-navigation (closes KNOWN
   seam "Stale-until-navigation (no LISTEN)" —
   `tests/advisory-lock.test.ts` 'postgres notify is
   issued; server never LISTENs').
@@ -822,23 +808,23 @@ code comments cite; specs and plans written before the
   carries a chat (consumes item 10). The brainstorm's
   first questions: what the two nested kinds share,
   and how a cycle across a sub-flow boundary
-  terminates. The trio's retirement left flows their
-  event walk (`documentLifecycleEvents`,
+  terminates. Flows keep an event walk
+  (`documentLifecycleEvents`,
   `api/derive-documents.ts:184`, called at
-  `api/derive-flows.ts:217`, `:250`, `:366`) and their
-  three body fields, `state`, `state_at`, and
+  `api/derive-flows.ts:217`, `:250`, `:366`) and three
+  body fields, `state`, `state_at`, and
   `state_event_id` (`FLOW_DOCUMENT_BODY_KEYS`,
   `api/validators.ts:1308-1311`), with the create
   body's `initialStateEventId`; the rewrite retires
-  them. Merged, the canvas debts the rewrite
+  them. Includes the canvas debts the rewrite
   retires or keeps by decision: READY gate on dangling
   refs (`tests/adapters-flow-publish.test.ts`);
   the flow-tag designer UI (TEST-PLAN "Flow Designer —
   Flow Tags", API-only today); F6's ZIP import not
   rebinding `flow_records` (TEST-PLAN F6); page
   selection writes behind the FSM at four sites in
-  `web-app/flows/detail.ts` (`canvasFocusOf`'s walk is
-  the second instance the remediation added); in-place
+  `web-app/flows/detail.ts` (`canvasFocusOf`'s walk
+  among them); in-place
   `viewBox` mutation at four method sites
   (`web-app/app/presenters/flow-designer.ts:489-490,
   510-513, 990-993, 1020-1021`); `hasUndoHistory` as
@@ -846,8 +832,8 @@ code comments cite; specs and plans written before the
   parts of `…/flows/:id/versions/`
   (`web-app/app/flow-operations.ts:841`, `:915`,
   `client/flow-queries.ts:234` — more than one part
-  is something to undo). The server no longer
-  computes it. The undo route resolves its target
+  is something to undo); the server does not compute
+  it. The undo route resolves its target
   itself (`resolveFlowUndoTarget`,
   `api/derive-flows.ts:291`) and at exhaustion
   answers the head and stores nothing
@@ -858,8 +844,7 @@ code comments cite; specs and plans written before the
   the resize path with no gesture guard
   (`web-app/app/adapters/resize-observer.ts`), and the
   panel callback re-fitting at a double-click's second
-  press (`docs/superpowers/plans/`
-  `2026-10-05-walk-green.md:289-293`); rotation only on the
+  press; rotation only on the
   toggle path (`web-app/app/flow-layout.ts:1032-1037`);
   the mirror trigger; and the canvas entries of the
   genericity bullet (two zoom
@@ -887,7 +872,7 @@ code comments cite; specs and plans written before the
   loop guard and a spend ceiling for a cycle whose
   every node is an AI seat; record content treated as
   data, never as instruction. Consumes items 9, 10, and
-  11. Merged: roster seat naming an AI agent
+  11. Includes: roster seat naming an AI agent
   (`tests/family-registry.test.ts:97-105`);
   FLOW-CANVAS.md's display-only AI checkboxes
   (`## Members and attributes`).
