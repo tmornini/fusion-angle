@@ -5,7 +5,7 @@ file by shipping; `## Close protocol` is the exit.
 
 ## Critical product path
 
-Fourteen items, in this order — each its own brainstorm →
+Thirteen items, in this order — each its own brainstorm →
 spec → plan → ship cycle, implemented sequentially,
 ordered by benefit over cost: the ledger right, then
 fenced (items 0–3, one deploy), what a pilot tenant needs
@@ -14,7 +14,10 @@ processes last. A "Merged:" clause names bullets absorbed
 from `## Later work`; they keep their oracles. Four
 former items left for `## Later work` (genericity, JSON
 parse/stringify, simulated latency, cachability) and the
-skew tests, which went with item 8's trio.
+skew tests, which went with the trio; item 8, lifecycle
+out of the document body, closed the other way with the
+trio's retirement
+(`docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`).
 
 0. The table, right — what a pair stores and what the
    store guarantees, before anything reads it differently.
@@ -1053,19 +1056,6 @@ skew tests, which went with item 8's trio.
    absent profile with the read. Authored on
    the `2026-09-04-critical-functionality-path` branch;
    this is its master copy.
-8. Lifecycle out of the document body — closed the other
-   way by `docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`:
-   state stays in the document body, PUT stores it, GET
-   reads it from the head, and ideas, projects,
-   objectives, and record-types have no lifecycle event
-   pairs. What closed: the server-side history walk over
-   those four families, the `'trio'` discriminant, the
-   two create-body event keys, the seed's per-entity
-   state rows, the client's four `*StateDetail`
-   wrappers, and the clock-skew and authorship-on-resend
-   tests whose fixtures never built the skew they named.
-   Flows keep their event walk and their three body
-   fields until item 11 rewrites them.
 9. The bell reaches the browser — every write already
    `pg_notify`s `fusion_events` with a scoped
    `NotificationEvent` (`api/notifications.ts`;
@@ -1611,7 +1601,7 @@ Off the critical path; each with its oracle.
   instead of returning its pairs for one place to store. A
   handler returns `MessagePair[]`; the gate appends them once,
   under one lock order, with one notification. Lands beside
-  items 8 and 11, which rewrite the largest handlers. Oracle:
+  item 11, which rewrites the largest handlers. Oracle:
   one append site in `api/api.ts`, zero in `api/routes.ts`.
 - The ledger sweep, built into `./bin/measure` the way
   `./deploy` grew modes. A ledger mode that subsumes a
@@ -3435,8 +3425,6 @@ Off the critical path; each with its oracle.
 - 4 → 6 → 13 (the health probe, then per process)
 - 7 → 11, 12 (the designer roster and AI seats read the
   profile)
-- 8 closed; 11 retires flows' event walk with the
-  rewrite
 - 9 → 10 → 11 → 12 (the bell, then chats, then
   processes, then the worker)
 - Items 6, 9, and 13, and the later-work XSS bullet,
