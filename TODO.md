@@ -1494,15 +1494,17 @@ Off the critical path; each with its oracle.
   `nowUtc()`), `web-app/projects/detail.ts:925-986`,
   and the throw at
   `web-app/app/presenters/project-score-history.ts:206-211`
-- Node-only modules still live under `web-app/app/` —
-  `measure.ts`, `generate-api-documentation.ts`,
-  `compose.ts`, `generate-schema-svg.ts`,
-  `cdp-client.ts`, `measure-viz.ts`. The browser
+- Deno-only tooling modules still live under
+  `web-app/app/` — `measure.ts`,
+  `generate-api-documentation.ts`, `compose.ts`,
+  `generate-schema-svg.ts`, `cdp-client.ts`,
+  `measure-viz.ts`, and `hash-static.ts` (e7ce7969,
+  `Deno.readDir`). The browser
   tsconfig `exclude` that listed them is gone with that
   file. Moving them to a top-level tools directory
   would make browser membership by rule and is the
   exclusion the `Deno.*` fence still needs. Oracle:
-  those six files are not under `web-app/app/`
+  those seven files are not under `web-app/app/`
 - A DOM-free server universe — `deno.json` is the only
   project and its `lib` includes `dom`, so a `document`
   in `api/` or `server/` type-checks. Re-measured: a
