@@ -146,11 +146,6 @@ function reconstructRuns(
     const dropped = new Set<string>();
     const runs: WoRun[] = [];
     for (const [woId, ts] of byWo) {
-        ts.sort((a, b) =>
-            a.at.localeCompare(
-                b.at,
-            ),
-        );
         const sojourns: Sojourn[] = [];
         const pathNodeIds: string[] = [];
         let lastNode: GraphNode | undefined;
@@ -170,7 +165,7 @@ function reconstructRuns(
             // Open-ended sojourn uses nowMs as the
             // exit so in-flight WOs contribute heat.
             const exitMs = nextT
-                ? Date.parse(nextT.at)
+                ? Math.max(enterMs, Date.parse(nextT.at))
                 : input.nowMs;
             if (!node.isCreate && !node.isArchive) {
                 sojourns.push({
@@ -181,12 +176,14 @@ function reconstructRuns(
             }
             lastNode = node;
         }
-        // Covenant: a run is completed when the LAST node
-        // of its `at`-ordered path is Archive, not when
-        // any event ever reached Archive. That node is the
-        // head's `state` only while `at` order is chain
-        // order; the browser mints `transitionAt`, so a
-        // skewed clock can break that (see TODO.md).
+        // Covenant: a run is completed when its
+        // chain-last node, the head's `state`, is
+        // Archive, not when any event ever reached
+        // Archive. Transitions arrive in chain order, and
+        // `at` only measures sojourns: the browser mints
+        // `transitionAt` and the server never compares it
+        // with the head's, so a skewed exit is floored at
+        // its entry.
         runs.push({
             workOrderId: woId,
             sojourns,

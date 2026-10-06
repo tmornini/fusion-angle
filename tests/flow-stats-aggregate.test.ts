@@ -857,3 +857,52 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'a run completes by its chain-last node when'
+    + ' the Archive move carries an earlier at',
+    () => {
+        const f = makeFixture();
+        const H = 3600 * 1000;
+        const input: FlowStatsInput = { ...f,
+            transitions: [
+                { id: 't0', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'creation',
+                  toNodeId: 'c', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tBefore(f, 4 * H) },
+                { id: 't1', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'step',
+                  fromNodeId: 'c',
+                  toNodeId: 'a', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tBefore(f, 4 * H) },
+                { id: 't2', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'step',
+                  fromNodeId: 'a',
+                  toNodeId: 'b', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tBefore(f, 1 * H) },
+                { id: 't3', workOrderId: 'xdaJyuuPyHfffCGLhqDrOQ',
+                  kind: 'step',
+                  fromNodeId: 'b',
+                  toNodeId: 'z', memberId: 'pnXmXrxOWayANgDLdCjuBw',
+                  at: tBefore(f, 2 * H) },
+            ],
+        };
+        const m = buildFlowStats(input);
+        const byId = new Map(
+            m.nodes.map(n => [n.id, n]),
+        );
+        assertStrictEquals(m.completedWorkOrderCount, 1);
+        assertStrictEquals(m.incompleteWorkOrderCount, 0);
+        assertStrictEquals(byId.get('b')!.currentlyHere, 0);
+        assertStrictEquals(m.pathEntries.length, 1);
+        const only = m.pathEntries[0]! as
+            { kind: 'path'; path: FlowPath };
+        assertEquals(only.path.nodeIds, ['c','a','b','z']);
+        assertEquals(
+            only.path.edgeIds,
+            ['YiJPbufDpkyrZcZCYbUJpg','e2','e3'],
+        );
+        assertStrictEquals(byId.get('a')!.avgSeconds, 10800);
+        assertStrictEquals(byId.get('b')!.avgSeconds, null);
+    },
+);
