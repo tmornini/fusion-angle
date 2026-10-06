@@ -20,687 +20,687 @@ out of the document body, closed the other way with the
 trio's retirement
 (`docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`).
 
-2. The ledger fenced — roles, grants, and row policies, on
-   the table items 0 and 1 finished (landed: the
-   2026-09-23 ledger-store, message-plane, and ledger-seed
-   specs, then state by PUT, head reads, membership and
-   versions, and work-order events, all under
-   `docs/superpowers/specs/`). Designed to stock
-   Postgres and measured on 18.6, which compose runs; a
-   host is measured against the design afterwards, and a
-   shortfall is that host's recorded seam or a reason to
-   leave it, never a change to the application. Every
-   worker gets its own role, holding only its verbs on
-   the columns it needs — grants and policies bind the
-   role that queries, so the table itself is the place
-   for them, and a view is only ever a device (measured:
-   the whole fence below holds on the table with two
-   roles). Product roles cannot log in and hold every
-   grant; a deployment supplies logins under its own names
-   and joins each to one role — a grant only the role's
-   creator or a superuser may make (measured), so it runs
-   as `fa_owner` — so the DDL is identical on every host
-   and only memberships and secrets are the deployment's.
-   Every role and login of ours carries the `fa_` prefix
-   (the naming bullet on the critical functionality path).
-   Roles belong to the cluster: they outlive the wipe's
-   schema drop, every database in the cluster sees them,
-   and creating one twice fails (measured), so what
-   creates them checks first. `fa_owner` owns the
-   database, the schema, the DDL, the root row,
-   `schema_marker`, seed, and wipe, and holds the right to
-   create roles, so it creates the other `fa_` roles too
-   and no separate admin role exists; a member does not
-   inherit that right, so every owner session first
-   becomes `fa_owner`, which also makes `fa_owner`, not
-   the login, the owner of what it creates (measured).
-   `fa_api` — today's `fusion` split in two with
-   `fa_owner` — holds INSERT on the table and SELECT on
-   its unfenced columns, and no other right on it:
-   Postgres wants SELECT on every column a statement
-   reads back, `RETURNING` included (measured), and a
-   column grant is exactly that, so the ledger
-   statement's head read and final select, which read
-   only unfenced columns
-   (`api/ledger-statement-sql.ts:78-79`, `:234-268`),
-   hand its minted `date` back with no view between.
-   The column fence is that
-   grant: `fa_api` never reads back
-   `request`, the two secrets columns, or the request
-   salt (only `request_salt` and `response_salt` exist);
-   it reads the response and the response salt, so it
-   verifies the response leaf. Which digests it reads is
-   this item's first question. The two secrets leaves
-   are bare `sha256` of guessable credential lines, and
-   the ledger-store spec's decision 1 hands this item the
-   consequence: a role that reads them holds a guessing
-   oracle for the lines
-   (`docs/superpowers/specs/2026-09-23-ledger-store-design.md:52-65`,
-   `:660-661`). Salt them — a change of hash form — and
-   `fa_api` reads all five digests, verifies `pair_hash`,
-   and a reader of envelopes alone verifies the root
-   alone; fence them, and the root is the owner's to
-   verify (item 3's full check). A column grant cannot
-   reach a secret a document's state holds, and the
-   state-by-PUT spec hands this item the credential and
-   code bodies (`docs/superpowers/specs/`
-   `2026-09-25-state-by-put-design.md:709-716`, `:1267`).
-   A credential's state keeps its PHC hash in the
-   response body, and its PUT stores the `secret` it is
-   given, checked as a string and never as a PHC hash
-   (`validateIdentityCredentialEntity`,
-   `api/validators.ts:587`;
-   `postIdentityCredentialDocumentOp`,
-   `api/routes.ts:2610`). The key's empty read roles,
-   the one declaration of its kind
-   (`api/family-registry.ts:129-132`), leave when the
-   hash leaves the body.
-   `requester_identity_id` — the verified token's `sub` —
-   stays readable. No read may
-   use `SELECT *` (two do, `api/backend-postgres.ts:611`
-   and `:651`'s `head.*`), and every read stops
-   selecting `request`, `request_salt`, and the two
-   secrets columns, which every read selects today
-   (`api/backend-postgres.ts:446-665`, mapped by
-   `entityOf` at `:352-363`), though nothing derives
-   from `request` since state by PUT. Removing PII
-   stays a tombstone, and the fence
-   hides every `identities/:id/pii` pair that precedes a
-   DELETE at its document; the DELETE head stays visible,
-   and every other family keeps its deleted history. A
-   hidden pair is never a head, so a blind PUT always
-   finds the head, and an in-order PUT that names a hidden
-   pair selects no head in the ledger statement and
-   answers 412:
-   nothing needs a hidden pair back. The hiding rule is a
-   row policy on the table bound to `fa_api`, and a
-   helper view of the PII DELETE pairs, `fa_pii_deletes`,
-   owned by `fa_owner`, keeps the policy
-   from reading its own table, which Postgres refuses as
-   recursion (measured): the view runs with its owner's
-   rights, the owner is exempt, and the planner still
-   inlines it. Row security refuses `fa_api`'s
-   inserts until a second policy admits them (measured),
-   and item 3 narrows that policy to keep `/migrations/`
-   the owner's. A table's owner is exempt from
-   its policies, so views `fa_owner` owns still see
-   the hidden pairs the eraser needs. Measured on 262,000
-   rows against the owner reading the bare table: at
-   50,000 versions a head read through the policy costs
-   0.062 ms against 0.049 ms (+0.013 ms, +27%), flat from
-   10 versions up; the same rule in a security-barrier
-   view costs 15.375 ms (+15.326 ms) and grows 0.3 µs a
-   version, because a barrier view cannot merge into the
-   outer query and its ORDER BY and LIMIT never reach the
-   index; a plain view is as fast as the policy and does
-   not hold the rule against a session that writes its own
-   SQL (measured). The mock data cannot judge this: 437 of
-   its 579 documents have one version, and the deepest
-   has 13. `EXPLAIN` and
-   `./bin/measure` prove the head read stays on
-   `fa_message_pairs_document`. The memory backend hides
-   the
-   same pairs in TypeScript. Item 7's profile can be
-   removed on its own only as its own document: keys on
-   the membership body would hide that membership's
-   whole history. The membership read omits
-   `organization_name`, `invited_by_name`, and
-   `invitee_email`. Restoring the three names is a
-   read scoped to the relationship. That read does
-   not exist. A membership's organization rides its
-   name, `<organization-id>:<identity-id>`, as well as
-   its path, and any rule this item writes by
-   organization reads both (`docs/superpowers/specs/`
-   `2026-10-01-membership-and-versions-design.md:785-788`).
-   The
-   reduction takes back what Postgres grants every role.
-   `fa_owner` revokes CONNECT and TEMPORARY on the
-   database and every right on the schema from PUBLIC and
-   grants CONNECT and USAGE to `fa_` roles alone, so a
-   foreign login — one that belongs to none of our roles —
-   cannot connect, and `POSTGRES_DROP_SCHEMA`'s
-   `GRANT ALL … TO public` retires
-   (`api/backend-postgres.ts:42-46`;
-   `tests/backend-postgres.test.ts:202-211`, the
-   re-grant). Four
-   revokes from PUBLIC need a superuser and only warn for
-   the owner (measured): `plpgsql`; large-object creation;
-   the 21 advisory-lock functions, which the product no
-   longer calls (4175b2d5; only
-   `tests/pg-races.test.ts` takes one); and catalog reads,
-   returned to `fa_owner`. With catalog reads gone the
-   driver's type lookup at connect is refused and its
-   unhandled rejection ends the process, and with
-   `fetch_types: false` the api's statements work
-   (measured, postgres.js 3.4.9), so
-   `api/postgres-client.ts` sets it; product SQL passes no
-   arrays today. After the reduction a member of `fa_api`
-   connects, uses the schema, inserts into the table,
-   reads its unfenced columns, and may LISTEN and NOTIFY,
-   which are commands and not grants — nothing else. One
-   owner verb, `migrate`, makes a cluster and its database
-   match this
-   build's fence, as `fa_owner`: fixed SQL beside the DDL,
-   no input, safe to run again. It creates the `fa_` roles
-   that are absent — roles belong to the cluster — and
-   revokes CONNECT and TEMPORARY from PUBLIC on the
-   database, which outlives a wipe; where our table
-   exists it applies, in name order, each migration its
-   binary carries and the database lacks — every one an
-   owner transaction of its change, item 3's full check,
-   and its document's genesis — and lands nothing where
-   the two sets already match; where it does not,
-   it says seed is next; and, as `check` does, it
-   verifies the four superuser revokes below and names
-   which PUBLIC still holds — information, never drift,
-   since the owner cannot make them. The schema's
-   objects die with the
-   schema, so seed builds the fence inside its one
-   transaction — one fence function, two callers — and
-   wipe drops it and leaves the roles. Two steps stay with
-   the host's first login:
-   creating `fa_owner`, its login, and the database it
-   owns, and the four superuser revokes; the container
-   image's `POSTGRES_USER` is always a superuser
-   (measured), so compose has such a login, `fa_root`,
-   and `fa_api`
-   must never be it; a host that offers no superuser
-   keeps the four as its recorded seam, since none of
-   them touches what the fence guarantees, and serves.
-   Each verb reads `FA_POSTGRES_URL`
-   from its own environment and only the value differs:
-   `serve` gets a member of `fa_api`; `seed`, `wipe`,
-   `migrate`, and `check` get a member of `fa_owner`. The
-   product never
-   creates a login and never handles a database password.
-   This item creates the roles whose workers exist —
-   `fa_owner` and `fa_api` — and names
-   the next users of the principle, each created by the
-   item that builds its worker: `fa_archiver` (item 6),
-   `fa_eraser` (the physical-erasure bullet), and
-   `fa_reporter` (its bullet in `## Later work`). Until
-   the eraser ships, the page says the personal
-   information is removed from the application, never
-   erased or deleted: today the button
-   (`web-app/app/presenters/identity-detail.ts:286-293`)
-   and the dialog and its sentence
-   (`web-app/identities/detail.html:3-28`) say "Erase",
-   and the code's
-   own word `erased` becomes `deleted`, HTTP's verb for
-   the DELETE head that made the state, in a change of
-   its own. Every
-   byte stays recorded; roles fence live readers only, so
-   a dump or backup carries the table whole, and item 6 no
-   longer orders this item. This item changes no row and
-   no column, and a test says so. Oracle: a Postgres test
-   logs in as a member of `fa_api` and is refused every
-   verb but its two. KNOWN seams "A raw dump still has
-   verbatim auth messages" and "Erased PII persists as
-   superseded pairs" are reworded, not closed: the bytes
-   persist in the owner-only ledger, and `fa_api` reads
-   none of them. Today: one role,
-   `fusion`, owns and reads everything, and compose,
-   `./deploy --local`, `bin/test-postgres`,
-   `./bin/measure`, and the tests all assume that one
-   login (`compose.yaml:2,8-9,22-24`; `mint_compose_env`,
-   `bin/compose-lib:14-15`); and the credential lines
-   every request presents sit in plaintext in
-   `request_secrets` and `response_secrets`, where that
-   login reads them
-   (`tests/shadow-ledger-invariants.test.ts` 'stored
-   secrets carry the live bearer JWT';
-   `tests/api-shadow-ledger-auth.test.ts` 'live secrets
-   land in the auth-flow ledger rows'). Follows items 0
-   and 1, which landed.
-3. Retire `schema_marker` for migrations the ledger
-   holds — the marker (`api/schema-postgres.ts:46-49`)
-   proves only that a seed once finished; it cannot tell
-   an unwiped database from a correct one. A master-era
-   database — `message_pairs` and its `schema_marker`
-   row — passes every boot gate, since the legacy check
-   names `pairs`, `requests`, and `responses` alone
-   (`assertNoLegacyMessageTables`,
-   `server/postgres-gate.ts:75`), and the binary serves
-   with no `fa_message_pairs` behind it; the seed calls
-   that database empty, and its marker INSERT meets the
-   old row's key and rolls back
-   (`server/seed.ts:101-128`,
-   `api/backend-postgres.ts:103-106`). Each
-   migration becomes a document like any other — the same
-   canonical form, hash tree, succession index, and head
-   read — in the collection `/migrations/`, named
-   for what it does behind a four-digit order,
-   `0000-root` (landed, `api/ledger-root.ts`) then
-   `0001-bootstrap`,
-   that the owner writes and no
-   route serves; one document with successors would hold
-   the same history under a name that hides it. A
-   migration's `request` is the SQL that ran —
-   the whole definition for `0001-bootstrap`, the drops
-   and the new fence for a later one — as the body of a
-   PUT `fa_owner` writes, its requester as the root's,
-   whose `user-agent` line names the build that ran
-   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
-   `FA_GIT_SHA` supplies, its own bullet),
-   provenance the owner's `check` can report and
-   never the key; and its `response`
-   is the digest of its fixed SQL, DDL and DML
-   alike — `sha256` over the request body alone, the SQL
-   exactly as the binary holds it, UTF-8, statements in
-   run order joined as the module joins them, no
-   normalization, hex in the response body, so boot
-   digests its own strings the same way and the root's
-   is the digest of zero bytes —
-   the root row's insert and the grants count, and
-   a seed's data pairs, which are parameters and vary by
-   mode, do not. Item 2's fence does the rest: `fa_api`
-   reads the digest and is refused the SQL, as it is every
-   `request` (measured), so the catalog reads item 2
-   closed stay closed. The stored SQL is a receipt, never
-   an input: nothing executes SQL read from the ledger,
-   and every step comes from the compiled binary, as
-   `api/schema-postgres.ts:1-2` already rules for the DDL.
-   No route ever executes a body's SQL: that would put the
-   owner's credential in the serving process and turn
-   every authorization mistake into the owner's SQL. The
-   seed lands the root in its one transaction today
-   (`postSeedLanding`, `api/ledger-seed.ts:325-354`), and
-   `0001-bootstrap`, a genesis, beside it. A later
-   migration is one
-   owner transaction — the change, the full check, and
-   the genesis of its own document, in the ledger
-   statement's shape, landed
-   by `migrate` beneath the adapter, where the
-   seed lands every pair — one owner-side writer
-   for seed and migration, and `handleRequest`
-   (`api/api.ts:446`) stays the api's. Names order
-   migrations, bytewise: the verb applies its binary's
-   migrations in name order and refuses one whose
-   predecessors lack a head. Item 2's insert
-   policy binds `fa_api`, which the adapter's fixed SQL
-   runs as, and a table's owner is exempt from its
-   policies, so `/migrations/` is refused to the
-   api and open to the owner's writer (measured, 18.6).
-   What
-   the verb forgoes is the route layer's validation of
-   that one PUT; the canonical form and the hash tree
-   come from `shared/http-message` and the INSERT, which
-   the seed uses there already. The succession index
-   (`fa_message_pairs_succession`,
-   `api/schema-postgres.ts:266-268`) refuses a
-   second genesis
-   with no lock and no migrations table of its own: of
-   two runners applying one migration, one commits and
-   the other is refused and rolls back, its DDL included,
-   and a failed step leaves the old fence and no document
-   (both measured, 18.6, on a successor; a genesis is the
-   same index's other case). Only the owner writes a
-   migration:
-   item 2's insert policy refuses its path to `fa_api`
-   with one predicate, so a wire request cannot land
-   one, and a table's owner is exempt from its policies
-   (measured). After launch the fence is what changes —
-   the ledger store holds the table's DDL final — and
-   views,
-   policies, and grants hold no data, so a migration
-   rebuilds them whole and needs no path from one
-   fence to the next. Boot — `serve`, as `fa_api`,
-   where the marker gate runs today (`server/boot.ts:107`)
-   — does two small things. It asks what it holds itself
-   through the privilege functions, which answer with
-   catalog reads revoked (measured), and refuses to serve
-   if it can read `request` or the secrets columns,
-   update, delete, or
-   make temporary objects — the rights the owner
-   controls; the four superuser revokes it never
-   checks. And it reads the
-   `/migrations/` heads — a collection read — and
-   compares their names and digests with the migrations
-   its binary carries, refusing to serve on any
-   difference either way and naming it. The digest is of
-   text, so a landed migration's SQL is never edited: the
-   binary carries it verbatim, and a change is the next
-   migration. "The sets are equal" means an owner verb of
-   this exact build verified this database
-   and recorded it. The full check runs as `fa_owner`,
-   never at boot: it reads the live definition from the
-   catalog — `information_schema.columns`,
-   `pg_get_constraintdef`, `pg_get_indexdef`, the root
-   row, and item 2's objects: the roles, `fa_api`'s
-   column grants, the helper view, the row
-   policies, and what PUBLIC holds —
-   compares it to what the binary's migrations, applied
-   in name order, declare, and
-   names the drift; walks every succession to name a
-   pair stamped before its predecessor and a
-   `supersedes` that names no row — none until the
-   eraser ships, and each one an erasure pair must name
-   after; and recomputes every root and every leaf the
-   owner can see, to name a pair whose digests no longer
-   match — a digest no reader recomputes is the dropped
-   `version` column again (the signed-ledger bullet). The
-   expected list lives beside the
-   DDL, and a digest lands only after the check passes, in
-   the same transaction, so every seed proves the list
-   current. Drift made by hand afterwards is the full
-   check's to find, not boot's (measured: the head reads
-   the same after a column is added by hand). A seed is
-   one transaction, so a failed seed leaves nothing and
-   the last-stamp
-   trick has no purpose; a seed refuses a database that
-   holds our table at all, since one lands it whole or not
-   at all. The full check is also a verb of its own,
-   `check`, which
-   changes nothing and exits nonzero on drift, because
-   item 6's restore drill must verify and never repair —
-   one check function with three callers: `seed`,
-   `migrate`, and `check` — and the drill runs
-   it instead of reading
-   the marker. Limits, named for the
-   table-migrations bullet: boot's
-   strict equality
-   refuses an old binary that restarts after the change,
-   which item 13's two processes must plan for; and a
-   large index cannot ride the one-transaction step —
-   built inside it, it holds `ShareLock` on the table
-   until commit, and `CREATE INDEX CONCURRENTLY` is
-   refused inside a transaction (measured). A migration's
-   document has succession like any other, so a rollback
-   can land as its DELETE head and a later system can
-   annotate it without rewriting it — that bullet's to
-   settle.
-   Today: the root, the seed's one transaction, its
-   refusal of a database that holds our table, and the
-   index that refuses a second genesis have landed;
-   boot gates on
-   the marker row (`assertSchemaMarker`,
-   `server/postgres-gate.ts:67`, called at
-   `server/boot.ts:107`), and the seed's one transaction
-   writes `schema_marker` last
-   (`api/backend-postgres.ts:103-106`). The marker's
-   refusals name retired scripts: `MISSING_MARKER` says
-   `./postgres-seed` and `NO_ARGUMENTS` `server.mjs`
-   (`server/postgres-gate.ts:14-18`). The marker's close
-   also removes SCHEMA.md's decision 7 and its line in
-   the seed's account (SCHEMA.md:67, :191),
-   ARCHITECTURE.md:43-44, and the comments that name it
-   (`server/boot.ts:1-3`, `api/ledger-seed.ts:321-322`,
-   `api/db.ts:217`, `:231`). Follows item 2.
-4. `/status` — `{ up: boolean, components: { postgres:
-   boolean } }`, 200 when every component is up and 503
-   when any is not, built for more components.
-   Unauthenticated — Render and compose probe it bare —
-   so it joins the bearer-exempt set
-   (`AUTHENTICATION_ROUTES`, `api/request-auth.ts:39-43`,
-   is the whole set today) and becomes the one path
-   outside authentication an anonymous caller can confirm
-   exists: every other `/api/*` path answers 401 before
-   the no-match 404, by design (the route match at
-   `api/api.ts:495`, the exemption at `:534-535`, the 401
-   at `:537-541`, the 404 at `:544-551`). A probe sends
-   no ids, and the gate answers 400 to a request with no
-   `operation-id` before it routes or authenticates
-   (`api/api.ts:469-484`), so the exemption comes ahead
-   of that gate, as the message-plane spec planned; the
-   server mints the probe's `request-id`, as it does
-   every request's. Decide: what `postgres: true` proves (a
-   `SELECT 1` on a pooled connection under its own short
-   timeout, not the 30 s statement timeout); that a read
-   stores no pair; whether the throttle counts it and
-   whether it logs. Replaces the compose healthcheck's
-   `fetch('/')`, which proves static serving only. Item
-   6's health probe; item 13 answers it per process.
-5. A person's first sign-in — no page mints a human
-   credential: the seed does
-   (`formSeedCredentialMessagePairs`,
-   `api/mock-data/seed-message-pairs.ts:2421`), only
-   services get a secret from the UI
-   (`postIdentityCreation`, `client/identities.ts:314`),
-   and `postHumanMemberCreation`
-   (`client/members.ts:276`) lands the identity, its
-   PII, and a membership, and no credential, for a
-   member who cannot sign in. One primitive, two flows:
-   a single-use, expiring, emailed link whose holder
-   sets a password — sent on invitation grant (whether
-   grant or the link creates the identity is the
-   brainstorm's first question) and on "forgot
-   password". `identities/:id/credentials/:cid` already
-   accepts `kind: 'password'`; the link is the missing
-   authorization to reach it. Email is an external
-   service behind an adapter, its key supplied at deploy
-   and never logged; the link token is a secret at rest
-   under item 2's discipline. Not sign-up: a stranger
-   creating an organization stays its own bullet
-   (SP-6). Merged: invitation email delivery.
-6. Operable — what a pilot tenant's data needs before it
-   exists. A backup the operator has restored once:
-   Render's schedule, a written restore drill, its
-   measured duration, and item 3's full check passing
-   afterward. `fa_archiver` adds a backup no host
-   owns (item 2's principle): it holds SELECT on a view
-   without the two fenced secrets columns, cannot log in,
-   exports through `COPY`, and restores onto any Postgres
-   — `pg_dump` cannot serve it, because it locks the table
-   and dumps a view as a definition with no rows
-   (measured). A restore must fill the secrets columns,
-   which are NOT NULL, and zero bytes is the honest fill:
-   `pair_hash` still verifies on every pair, the secrets
-   leaves no longer do, and the api runs the same, since
-   it reads no credential back. A full copy for a host
-   move stays the owner's `pg_dump`. The brainstorm
-   settles whether the archiver's view also applies item
-   2's hiding rule, so an archive never holds removed PII.
-   Cross-environment blocking, so
-   `./deploy --render TOKEN --postgres mock-data` can
-   never wipe the tenant database from a laptop. No
-   connection reaches the database from outside its
-   host's private network — essential before launch. On
-   Render that is an emptied `ipAllowList`, which holds
-   `0.0.0.0/0` today; the brainstorm confirms an empty
-   list refuses every outside address and leaves the
-   private network alone. Nothing of ours needs the
-   outside door: on Render, seed and wipe already run as
-   jobs inside it (`bin/postgres-seed:168-171`,
-   `bin/postgres-wipe:127-130`). Item 2 refuses a foreign
-   login — one that belongs to none of our roles — and
-   this keeps the port out of its reach. Error logs as
-   one JSON object per line, as the request log already
-   is (`server/http-server.ts:471-510`):
-   `api/api.ts:322-329` ('fence read failed') and
-   `:1406-1413` ('request failed') print a label, an
-   object, and an
-   error as three values (the Office of Structured
-   Observability wants one document with level, message,
-   and request identity, and never a credential line:
-   the credential hoist is the store's rule, and the log
-   is a second writer). One request clock, read once
-   at arrival and carried in the context: the edge
-   stamps `performance.now()` at accept
-   (`server/http-server.ts:530`) while the api reads its
-   own after the body and mints `requestAt` there
-   (`api/request-context.ts:85-96`); latency must be
-   their difference, not a second clock. Every answer names
-   its request: the edge's 413 and the throttle's 429
-   are bare `jsonResponse`s with no `request-id`
-   (`server/http-server.ts:535-541`, `:589-594`), as is
-   the 500 for a throw that escapes `handleRequest`,
-   whose bare `catch` drops the error itself
-   (`server/http-server.ts:650-653`). The message-plane
-   spec hands this item the two refusals
-   (`docs/superpowers/specs/`
-   `2026-09-23-message-plane-design.md:879-881`).
-   An alert when
-   `/status` is not 200 or the error rate rises.
-   `TRUSTED_PROXY_HOPS` set to Render's real hop
-   count. Consumes item 4. Merged:
-   the throttle seam — a global cap if the hops are
-   wrong, refresh and exchange unlimited
-   (`tests/http-throttle.test.ts`); the `ipAllowList`
-   bullet.
-7. The membership profile — an organization-side profile
-   per membership, so the identity "Tony Stark, CEO"
-   holding a contractor membership elsewhere appears
-   there as "contractor": the document shape (keys on
-   the membership body, or a nested facet under the
-   membership mirroring `identities/:id/pii` — the
-   brainstorm decides, under item 2's rule that a
-   profile removable on its own is its own document,
-   since keys on the membership body would hide that
-   membership's whole history), its validator, derive,
-   seed, the roster and detail reads, and the Members
-   page's edit. One profile still rides the identity
-   (`HumanProfile`, `shared/types.ts:710`; `profileOf`,
-   `client/members.ts:88-101`), and the roster reports a
-   seat with none as `{ present: false }`
-   (`client/members.ts:124`). The seed
-   already carries the contradiction (the admin holds
-   two memberships with one title). Lands before
-   items 11 and 12, whose designer roster and AI
-   memberships read it, and replaces the roster's
-   absent profile with the read. Authored on
-   the `2026-09-04-critical-functionality-path` branch;
-   this is its master copy.
-9. The bell reaches the browser — every write already
-   `pg_notify`s `fusion_events` with a scoped
-   `NotificationEvent` (`shared/notifications.ts`;
-   `notifyPayload`, `api/advisory-lock.ts:17-26`, 8000-byte
-   cap with a `full` fallback) and nothing LISTENs, so a
-   second browser is stale until navigation. Ship the
-   other half: one LISTEN connection per process,
-   outside the pool, reconnecting; a per-session stream
-   to the page (SSE is the platform primitive — the
-   brainstorm weighs it against WebSocket and names the
-   drain and the resource-sanitizer cost in `./test
-   browser`), fenced to the session's organization and
-   identity, delivered into the existing
-   `fusion-angle:data` refresh so pages change nothing.
-   Precedes item 10 (a chat that does not update is not a
-   chat) and item 12 (the worker trusts the bell, never
-   polls). Merged: stale-until-navigation (closes KNOWN
-   seam "Stale-until-navigation (no LISTEN)" —
-   `tests/advisory-lock.test.ts` 'postgres notify is
-   issued; server never LISTENs').
-10. Chats — a conversation on any document at
-    `/…/:collection/:id/chat/` with as little ceremony as
-    the plane allows: a message is a POST pair at that
-    document, the chat is that document's history, and
-    derive is `getDocumentHistory`
-    (`api/message-store.ts:20`) filtered to POST — no new
-    family shape unless the brainstorm finds one (edits,
-    deletions, and attachments are its questions).
-    Authorship is `requester_identity_id`, so an AI
-    seat's messages need no extra field. Reads ride the
-    fenced org; updates ride item 9. Consumed by item 11
-    (a chat on every record and work order) and item 12
-    (the channel a person uses to instruct and correct a
-    worker).
-11. Processes — re-implement flows, work orders, and the
-    workbox with a node as a process. Four kinds, each
-    defined by what it waits on and what it emits:
-    record modification (today's node — a member or
-    agent edits the bound instance and transitions);
-    external synchronization (new — the node waits on a
-    system outside the origin: webhook in, request out,
-    or both); sub-flow (the node runs another flow
-    document as a child work order and resumes on its
-    completion); sub-graph (the node holds an inline
-    graph inside the same work order). Both graphs are
-    directed and cyclic. Kept: the pair plane, the graph
-    frozen into the work order at creation, the claim
-    alphabet, all-see-all. Each record and work order
-    carries a chat (consumes item 10). The brainstorm's
-    first questions: what the two nested kinds share,
-    and how a cycle across a sub-flow boundary
-    terminates. The trio's retirement left flows their
-    event walk (`documentLifecycleEvents`,
-    `api/derive-documents.ts:184`, called at
-    `api/derive-flows.ts:217`, `:250`, `:366`) and their
-    three body fields, `state`, `state_at`, and
-    `state_event_id` (`FLOW_DOCUMENT_BODY_KEYS`,
-    `api/validators.ts:1308-1311`), with the create
-    body's `initialStateEventId`; the rewrite retires
-    them. Merged, the canvas debts the rewrite
-    retires or keeps by decision: READY gate on dangling
-    refs (`tests/adapters-flow-publish.test.ts`);
-    the flow-tag designer UI (TEST-PLAN "Flow Designer —
-    Flow Tags", API-only today); F6's ZIP import not
-    rebinding `flow_records` (TEST-PLAN F6); page
-    selection writes behind the FSM at four sites in
-    `web-app/flows/detail.ts` (`canvasFocusOf`'s walk is
-    the second instance the remediation added); in-place
-    `viewBox` mutation at four method sites
-    (`web-app/app/presenters/flow-designer.ts:489-490,
-    510-513, 990-993, 1020-1021`); `hasUndoHistory` as
-    the designer's own `versions.length > 1`, counting
-    parts of `…/flows/:id/versions/`
-    (`web-app/app/flow-operations.ts:841`, `:915`,
-    `client/flow-queries.ts:234` — more than one part
-    is something to undo). The server no longer
-    computes it. The undo route resolves its target
-    itself (`resolveFlowUndoTarget`,
-    `api/derive-flows.ts:291`) and at exhaustion
-    answers the head and stores nothing
-    (`api/routes.ts:1363-1366`), which TEST-PLAN
-    F36/F45 call PASS — the brainstorm decides whether
-    that stays); the Auto Layout switch committing
-    without `commitAndFit` (`web-app/flows/detail.ts:946-956`),
-    the resize path with no gesture guard
-    (`web-app/app/adapters/resize-observer.ts`), and the
-    panel callback re-fitting at a double-click's second
-    press (`docs/superpowers/plans/`
-    `2026-10-05-walk-green.md:289-293`); rotation only on the
-    toggle path (`web-app/app/flow-layout.ts:1032-1037`);
-    the mirror trigger; and the canvas entries of the
-    genericity bullet (two zoom
-    implementations, `#noteMutation`, `handleSpace`,
-    Delete's `preventDefault`).
-12. Headless AI worker — a process that hears item 9's
-    bell for each AI seat's workbox, claims the work
-    order as that seat (the `client_credentials` grant
-    already mints a service identity's token, so every
-    pair it lands names the agent as
-    `requester_identity_id`), assembles the record
-    definition, the attribute values (which — the
-    brainstorm decides), the node instructions
-    (`withNodeTaskInstructions` already stores them),
-    and the chat (item 10), asks the model to follow them
-    precisely, validates the reply at the gate like any
-    other uninstructed voice, and applies it: attribute
-    updates in record-PATCH form and the outgoing edge.
-    API-only; no page. Decide in the brainstorm: an
-    in-process loop or a second verb of the binary (a
-    second process is item 13's precondition, the
-    claim-expiry event, arriving early); the model
-    behind an adapter with its key supplied at deploy
-    and never logged; bounded retries with backoff; a
-    loop guard and a spend ceiling for a cycle whose
-    every node is an AI seat; record content treated as
-    data, never as instruction. Consumes items 9, 10, and
-    11. Merged: roster seat naming an AI agent
-    (`tests/family-registry.test.ts:97-105`);
-    FLOW-CANVAS.md's display-only AI checkboxes
-    (`## Members and attributes`).
-13. Two processes — high availability for the app and
-    for Postgres on Render. The app's precondition is in
-    the tree: a claim decides expiry against its
-    request's stamp (`isClaimUnlapsedAt`,
-    `api/work-order-version.ts:104-109`, called with
-    `received.requestAt` at `api/routes.ts:1776` and
-    `:1807`), and that stamp is the receiving process's
-    `nowUtc()` (`api/request-context.ts:95`), so each
-    replica's clock decides the boundary; record the
-    expiry decision as its own event first. Then two
-    replicas
-    behind Render's balancer, each answering item 4's
-    probe; LISTEN in each (item 9 is per process by
-    construction); the throttle's per-process counters
-    named as a known cost or moved to the store; a
-    Postgres plan with a standby and a rehearsed
-    failover. Closes KNOWN seam
-    "Single mint process" and retires ARCHITECTURE.md's
-    "do not run two replicas". Consumes items 4, 6, 9,
-    and the examination report's lock and growth findings
-    (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`).
+- **2.** The ledger fenced — roles, grants, and row policies, on
+  the table items 0 and 1 finished (landed: the
+  2026-09-23 ledger-store, message-plane, and ledger-seed
+  specs, then state by PUT, head reads, membership and
+  versions, and work-order events, all under
+  `docs/superpowers/specs/`). Designed to stock
+  Postgres and measured on 18.6, which compose runs; a
+  host is measured against the design afterwards, and a
+  shortfall is that host's recorded seam or a reason to
+  leave it, never a change to the application. Every
+  worker gets its own role, holding only its verbs on
+  the columns it needs — grants and policies bind the
+  role that queries, so the table itself is the place
+  for them, and a view is only ever a device (measured:
+  the whole fence below holds on the table with two
+  roles). Product roles cannot log in and hold every
+  grant; a deployment supplies logins under its own names
+  and joins each to one role — a grant only the role's
+  creator or a superuser may make (measured), so it runs
+  as `fa_owner` — so the DDL is identical on every host
+  and only memberships and secrets are the deployment's.
+  Every role and login of ours carries the `fa_` prefix
+  (the naming bullet on the critical functionality path).
+  Roles belong to the cluster: they outlive the wipe's
+  schema drop, every database in the cluster sees them,
+  and creating one twice fails (measured), so what
+  creates them checks first. `fa_owner` owns the
+  database, the schema, the DDL, the root row,
+  `schema_marker`, seed, and wipe, and holds the right to
+  create roles, so it creates the other `fa_` roles too
+  and no separate admin role exists; a member does not
+  inherit that right, so every owner session first
+  becomes `fa_owner`, which also makes `fa_owner`, not
+  the login, the owner of what it creates (measured).
+  `fa_api` — today's `fusion` split in two with
+  `fa_owner` — holds INSERT on the table and SELECT on
+  its unfenced columns, and no other right on it:
+  Postgres wants SELECT on every column a statement
+  reads back, `RETURNING` included (measured), and a
+  column grant is exactly that, so the ledger
+  statement's head read and final select, which read
+  only unfenced columns
+  (`api/ledger-statement-sql.ts:78-79`, `:234-268`),
+  hand its minted `date` back with no view between.
+  The column fence is that
+  grant: `fa_api` never reads back
+  `request`, the two secrets columns, or the request
+  salt (only `request_salt` and `response_salt` exist);
+  it reads the response and the response salt, so it
+  verifies the response leaf. Which digests it reads is
+  this item's first question. The two secrets leaves
+  are bare `sha256` of guessable credential lines, and
+  the ledger-store spec's decision 1 hands this item the
+  consequence: a role that reads them holds a guessing
+  oracle for the lines
+  (`docs/superpowers/specs/2026-09-23-ledger-store-design.md:52-65`,
+  `:660-661`). Salt them — a change of hash form — and
+  `fa_api` reads all five digests, verifies `pair_hash`,
+  and a reader of envelopes alone verifies the root
+  alone; fence them, and the root is the owner's to
+  verify (item 3's full check). A column grant cannot
+  reach a secret a document's state holds, and the
+  state-by-PUT spec hands this item the credential and
+  code bodies (`docs/superpowers/specs/`
+  `2026-09-25-state-by-put-design.md:709-716`, `:1267`).
+  A credential's state keeps its PHC hash in the
+  response body, and its PUT stores the `secret` it is
+  given, checked as a string and never as a PHC hash
+  (`validateIdentityCredentialEntity`,
+  `api/validators.ts:587`;
+  `postIdentityCredentialDocumentOp`,
+  `api/routes.ts:2610`). The key's empty read roles,
+  the one declaration of its kind
+  (`api/family-registry.ts:129-132`), leave when the
+  hash leaves the body.
+  `requester_identity_id` — the verified token's `sub` —
+  stays readable. No read may
+  use `SELECT *` (two do, `api/backend-postgres.ts:611`
+  and `:651`'s `head.*`), and every read stops
+  selecting `request`, `request_salt`, and the two
+  secrets columns, which every read selects today
+  (`api/backend-postgres.ts:446-665`, mapped by
+  `entityOf` at `:352-363`), though nothing derives
+  from `request` since state by PUT. Removing PII
+  stays a tombstone, and the fence
+  hides every `identities/:id/pii` pair that precedes a
+  DELETE at its document; the DELETE head stays visible,
+  and every other family keeps its deleted history. A
+  hidden pair is never a head, so a blind PUT always
+  finds the head, and an in-order PUT that names a hidden
+  pair selects no head in the ledger statement and
+  answers 412:
+  nothing needs a hidden pair back. The hiding rule is a
+  row policy on the table bound to `fa_api`, and a
+  helper view of the PII DELETE pairs, `fa_pii_deletes`,
+  owned by `fa_owner`, keeps the policy
+  from reading its own table, which Postgres refuses as
+  recursion (measured): the view runs with its owner's
+  rights, the owner is exempt, and the planner still
+  inlines it. Row security refuses `fa_api`'s
+  inserts until a second policy admits them (measured),
+  and item 3 narrows that policy to keep `/migrations/`
+  the owner's. A table's owner is exempt from
+  its policies, so views `fa_owner` owns still see
+  the hidden pairs the eraser needs. Measured on 262,000
+  rows against the owner reading the bare table: at
+  50,000 versions a head read through the policy costs
+  0.062 ms against 0.049 ms (+0.013 ms, +27%), flat from
+  10 versions up; the same rule in a security-barrier
+  view costs 15.375 ms (+15.326 ms) and grows 0.3 µs a
+  version, because a barrier view cannot merge into the
+  outer query and its ORDER BY and LIMIT never reach the
+  index; a plain view is as fast as the policy and does
+  not hold the rule against a session that writes its own
+  SQL (measured). The mock data cannot judge this: 437 of
+  its 579 documents have one version, and the deepest
+  has 13. `EXPLAIN` and
+  `./bin/measure` prove the head read stays on
+  `fa_message_pairs_document`. The memory backend hides
+  the
+  same pairs in TypeScript. Item 7's profile can be
+  removed on its own only as its own document: keys on
+  the membership body would hide that membership's
+  whole history. The membership read omits
+  `organization_name`, `invited_by_name`, and
+  `invitee_email`. Restoring the three names is a
+  read scoped to the relationship. That read does
+  not exist. A membership's organization rides its
+  name, `<organization-id>:<identity-id>`, as well as
+  its path, and any rule this item writes by
+  organization reads both (`docs/superpowers/specs/`
+  `2026-10-01-membership-and-versions-design.md:785-788`).
+  The
+  reduction takes back what Postgres grants every role.
+  `fa_owner` revokes CONNECT and TEMPORARY on the
+  database and every right on the schema from PUBLIC and
+  grants CONNECT and USAGE to `fa_` roles alone, so a
+  foreign login — one that belongs to none of our roles —
+  cannot connect, and `POSTGRES_DROP_SCHEMA`'s
+  `GRANT ALL … TO public` retires
+  (`api/backend-postgres.ts:42-46`;
+  `tests/backend-postgres.test.ts:202-211`, the
+  re-grant). Four
+  revokes from PUBLIC need a superuser and only warn for
+  the owner (measured): `plpgsql`; large-object creation;
+  the 21 advisory-lock functions, which the product no
+  longer calls (4175b2d5; only
+  `tests/pg-races.test.ts` takes one); and catalog reads,
+  returned to `fa_owner`. With catalog reads gone the
+  driver's type lookup at connect is refused and its
+  unhandled rejection ends the process, and with
+  `fetch_types: false` the api's statements work
+  (measured, postgres.js 3.4.9), so
+  `api/postgres-client.ts` sets it; product SQL passes no
+  arrays today. After the reduction a member of `fa_api`
+  connects, uses the schema, inserts into the table,
+  reads its unfenced columns, and may LISTEN and NOTIFY,
+  which are commands and not grants — nothing else. One
+  owner verb, `migrate`, makes a cluster and its database
+  match this
+  build's fence, as `fa_owner`: fixed SQL beside the DDL,
+  no input, safe to run again. It creates the `fa_` roles
+  that are absent — roles belong to the cluster — and
+  revokes CONNECT and TEMPORARY from PUBLIC on the
+  database, which outlives a wipe; where our table
+  exists it applies, in name order, each migration its
+  binary carries and the database lacks — every one an
+  owner transaction of its change, item 3's full check,
+  and its document's genesis — and lands nothing where
+  the two sets already match; where it does not,
+  it says seed is next; and, as `check` does, it
+  verifies the four superuser revokes below and names
+  which PUBLIC still holds — information, never drift,
+  since the owner cannot make them. The schema's
+  objects die with the
+  schema, so seed builds the fence inside its one
+  transaction — one fence function, two callers — and
+  wipe drops it and leaves the roles. Two steps stay with
+  the host's first login:
+  creating `fa_owner`, its login, and the database it
+  owns, and the four superuser revokes; the container
+  image's `POSTGRES_USER` is always a superuser
+  (measured), so compose has such a login, `fa_root`,
+  and `fa_api`
+  must never be it; a host that offers no superuser
+  keeps the four as its recorded seam, since none of
+  them touches what the fence guarantees, and serves.
+  Each verb reads `FA_POSTGRES_URL`
+  from its own environment and only the value differs:
+  `serve` gets a member of `fa_api`; `seed`, `wipe`,
+  `migrate`, and `check` get a member of `fa_owner`. The
+  product never
+  creates a login and never handles a database password.
+  This item creates the roles whose workers exist —
+  `fa_owner` and `fa_api` — and names
+  the next users of the principle, each created by the
+  item that builds its worker: `fa_archiver` (item 6),
+  `fa_eraser` (the physical-erasure bullet), and
+  `fa_reporter` (its bullet in `## Later work`). Until
+  the eraser ships, the page says the personal
+  information is removed from the application, never
+  erased or deleted: today the button
+  (`web-app/app/presenters/identity-detail.ts:286-293`)
+  and the dialog and its sentence
+  (`web-app/identities/detail.html:3-28`) say "Erase",
+  and the code's
+  own word `erased` becomes `deleted`, HTTP's verb for
+  the DELETE head that made the state, in a change of
+  its own. Every
+  byte stays recorded; roles fence live readers only, so
+  a dump or backup carries the table whole, and item 6 no
+  longer orders this item. This item changes no row and
+  no column, and a test says so. Oracle: a Postgres test
+  logs in as a member of `fa_api` and is refused every
+  verb but its two. KNOWN seams "A raw dump still has
+  verbatim auth messages" and "Erased PII persists as
+  superseded pairs" are reworded, not closed: the bytes
+  persist in the owner-only ledger, and `fa_api` reads
+  none of them. Today: one role,
+  `fusion`, owns and reads everything, and compose,
+  `./deploy --local`, `bin/test-postgres`,
+  `./bin/measure`, and the tests all assume that one
+  login (`compose.yaml:2,8-9,22-24`; `mint_compose_env`,
+  `bin/compose-lib:14-15`); and the credential lines
+  every request presents sit in plaintext in
+  `request_secrets` and `response_secrets`, where that
+  login reads them
+  (`tests/shadow-ledger-invariants.test.ts` 'stored
+  secrets carry the live bearer JWT';
+  `tests/api-shadow-ledger-auth.test.ts` 'live secrets
+  land in the auth-flow ledger rows'). Follows items 0
+  and 1, which landed.
+- **3.** Retire `schema_marker` for migrations the ledger
+  holds — the marker (`api/schema-postgres.ts:46-49`)
+  proves only that a seed once finished; it cannot tell
+  an unwiped database from a correct one. A master-era
+  database — `message_pairs` and its `schema_marker`
+  row — passes every boot gate, since the legacy check
+  names `pairs`, `requests`, and `responses` alone
+  (`assertNoLegacyMessageTables`,
+  `server/postgres-gate.ts:75`), and the binary serves
+  with no `fa_message_pairs` behind it; the seed calls
+  that database empty, and its marker INSERT meets the
+  old row's key and rolls back
+  (`server/seed.ts:101-128`,
+  `api/backend-postgres.ts:103-106`). Each
+  migration becomes a document like any other — the same
+  canonical form, hash tree, succession index, and head
+  read — in the collection `/migrations/`, named
+  for what it does behind a four-digit order,
+  `0000-root` (landed, `api/ledger-root.ts`) then
+  `0001-bootstrap`,
+  that the owner writes and no
+  route serves; one document with successors would hold
+  the same history under a name that hides it. A
+  migration's `request` is the SQL that ran —
+  the whole definition for `0001-bootstrap`, the drops
+  and the new fence for a later one — as the body of a
+  PUT `fa_owner` writes, its requester as the root's,
+  whose `user-agent` line names the build that ran
+  it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
+  `FA_GIT_SHA` supplies, its own bullet),
+  provenance the owner's `check` can report and
+  never the key; and its `response`
+  is the digest of its fixed SQL, DDL and DML
+  alike — `sha256` over the request body alone, the SQL
+  exactly as the binary holds it, UTF-8, statements in
+  run order joined as the module joins them, no
+  normalization, hex in the response body, so boot
+  digests its own strings the same way and the root's
+  is the digest of zero bytes —
+  the root row's insert and the grants count, and
+  a seed's data pairs, which are parameters and vary by
+  mode, do not. Item 2's fence does the rest: `fa_api`
+  reads the digest and is refused the SQL, as it is every
+  `request` (measured), so the catalog reads item 2
+  closed stay closed. The stored SQL is a receipt, never
+  an input: nothing executes SQL read from the ledger,
+  and every step comes from the compiled binary, as
+  `api/schema-postgres.ts:1-2` already rules for the DDL.
+  No route ever executes a body's SQL: that would put the
+  owner's credential in the serving process and turn
+  every authorization mistake into the owner's SQL. The
+  seed lands the root in its one transaction today
+  (`postSeedLanding`, `api/ledger-seed.ts:325-354`), and
+  `0001-bootstrap`, a genesis, beside it. A later
+  migration is one
+  owner transaction — the change, the full check, and
+  the genesis of its own document, in the ledger
+  statement's shape, landed
+  by `migrate` beneath the adapter, where the
+  seed lands every pair — one owner-side writer
+  for seed and migration, and `handleRequest`
+  (`api/api.ts:446`) stays the api's. Names order
+  migrations, bytewise: the verb applies its binary's
+  migrations in name order and refuses one whose
+  predecessors lack a head. Item 2's insert
+  policy binds `fa_api`, which the adapter's fixed SQL
+  runs as, and a table's owner is exempt from its
+  policies, so `/migrations/` is refused to the
+  api and open to the owner's writer (measured, 18.6).
+  What
+  the verb forgoes is the route layer's validation of
+  that one PUT; the canonical form and the hash tree
+  come from `shared/http-message` and the INSERT, which
+  the seed uses there already. The succession index
+  (`fa_message_pairs_succession`,
+  `api/schema-postgres.ts:266-268`) refuses a
+  second genesis
+  with no lock and no migrations table of its own: of
+  two runners applying one migration, one commits and
+  the other is refused and rolls back, its DDL included,
+  and a failed step leaves the old fence and no document
+  (both measured, 18.6, on a successor; a genesis is the
+  same index's other case). Only the owner writes a
+  migration:
+  item 2's insert policy refuses its path to `fa_api`
+  with one predicate, so a wire request cannot land
+  one, and a table's owner is exempt from its policies
+  (measured). After launch the fence is what changes —
+  the ledger store holds the table's DDL final — and
+  views,
+  policies, and grants hold no data, so a migration
+  rebuilds them whole and needs no path from one
+  fence to the next. Boot — `serve`, as `fa_api`,
+  where the marker gate runs today (`server/boot.ts:107`)
+  — does two small things. It asks what it holds itself
+  through the privilege functions, which answer with
+  catalog reads revoked (measured), and refuses to serve
+  if it can read `request` or the secrets columns,
+  update, delete, or
+  make temporary objects — the rights the owner
+  controls; the four superuser revokes it never
+  checks. And it reads the
+  `/migrations/` heads — a collection read — and
+  compares their names and digests with the migrations
+  its binary carries, refusing to serve on any
+  difference either way and naming it. The digest is of
+  text, so a landed migration's SQL is never edited: the
+  binary carries it verbatim, and a change is the next
+  migration. "The sets are equal" means an owner verb of
+  this exact build verified this database
+  and recorded it. The full check runs as `fa_owner`,
+  never at boot: it reads the live definition from the
+  catalog — `information_schema.columns`,
+  `pg_get_constraintdef`, `pg_get_indexdef`, the root
+  row, and item 2's objects: the roles, `fa_api`'s
+  column grants, the helper view, the row
+  policies, and what PUBLIC holds —
+  compares it to what the binary's migrations, applied
+  in name order, declare, and
+  names the drift; walks every succession to name a
+  pair stamped before its predecessor and a
+  `supersedes` that names no row — none until the
+  eraser ships, and each one an erasure pair must name
+  after; and recomputes every root and every leaf the
+  owner can see, to name a pair whose digests no longer
+  match — a digest no reader recomputes is the dropped
+  `version` column again (the signed-ledger bullet). The
+  expected list lives beside the
+  DDL, and a digest lands only after the check passes, in
+  the same transaction, so every seed proves the list
+  current. Drift made by hand afterwards is the full
+  check's to find, not boot's (measured: the head reads
+  the same after a column is added by hand). A seed is
+  one transaction, so a failed seed leaves nothing and
+  the last-stamp
+  trick has no purpose; a seed refuses a database that
+  holds our table at all, since one lands it whole or not
+  at all. The full check is also a verb of its own,
+  `check`, which
+  changes nothing and exits nonzero on drift, because
+  item 6's restore drill must verify and never repair —
+  one check function with three callers: `seed`,
+  `migrate`, and `check` — and the drill runs
+  it instead of reading
+  the marker. Limits, named for the
+  table-migrations bullet: boot's
+  strict equality
+  refuses an old binary that restarts after the change,
+  which item 13's two processes must plan for; and a
+  large index cannot ride the one-transaction step —
+  built inside it, it holds `ShareLock` on the table
+  until commit, and `CREATE INDEX CONCURRENTLY` is
+  refused inside a transaction (measured). A migration's
+  document has succession like any other, so a rollback
+  can land as its DELETE head and a later system can
+  annotate it without rewriting it — that bullet's to
+  settle.
+  Today: the root, the seed's one transaction, its
+  refusal of a database that holds our table, and the
+  index that refuses a second genesis have landed;
+  boot gates on
+  the marker row (`assertSchemaMarker`,
+  `server/postgres-gate.ts:67`, called at
+  `server/boot.ts:107`), and the seed's one transaction
+  writes `schema_marker` last
+  (`api/backend-postgres.ts:103-106`). The marker's
+  refusals name retired scripts: `MISSING_MARKER` says
+  `./postgres-seed` and `NO_ARGUMENTS` `server.mjs`
+  (`server/postgres-gate.ts:14-18`). The marker's close
+  also removes SCHEMA.md's decision 7 and its line in
+  the seed's account (SCHEMA.md:67, :191),
+  ARCHITECTURE.md:43-44, and the comments that name it
+  (`server/boot.ts:1-3`, `api/ledger-seed.ts:321-322`,
+  `api/db.ts:217`, `:231`). Follows item 2.
+- **4.** `/status` — `{ up: boolean, components: { postgres:
+  boolean } }`, 200 when every component is up and 503
+  when any is not, built for more components.
+  Unauthenticated — Render and compose probe it bare —
+  so it joins the bearer-exempt set
+  (`AUTHENTICATION_ROUTES`, `api/request-auth.ts:39-43`,
+  is the whole set today) and becomes the one path
+  outside authentication an anonymous caller can confirm
+  exists: every other `/api/*` path answers 401 before
+  the no-match 404, by design (the route match at
+  `api/api.ts:495`, the exemption at `:534-535`, the 401
+  at `:537-541`, the 404 at `:544-551`). A probe sends
+  no ids, and the gate answers 400 to a request with no
+  `operation-id` before it routes or authenticates
+  (`api/api.ts:469-484`), so the exemption comes ahead
+  of that gate, as the message-plane spec planned; the
+  server mints the probe's `request-id`, as it does
+  every request's. Decide: what `postgres: true` proves (a
+  `SELECT 1` on a pooled connection under its own short
+  timeout, not the 30 s statement timeout); that a read
+  stores no pair; whether the throttle counts it and
+  whether it logs. Replaces the compose healthcheck's
+  `fetch('/')`, which proves static serving only. Item
+  6's health probe; item 13 answers it per process.
+- **5.** A person's first sign-in — no page mints a human
+  credential: the seed does
+  (`formSeedCredentialMessagePairs`,
+  `api/mock-data/seed-message-pairs.ts:2421`), only
+  services get a secret from the UI
+  (`postIdentityCreation`, `client/identities.ts:314`),
+  and `postHumanMemberCreation`
+  (`client/members.ts:276`) lands the identity, its
+  PII, and a membership, and no credential, for a
+  member who cannot sign in. One primitive, two flows:
+  a single-use, expiring, emailed link whose holder
+  sets a password — sent on invitation grant (whether
+  grant or the link creates the identity is the
+  brainstorm's first question) and on "forgot
+  password". `identities/:id/credentials/:cid` already
+  accepts `kind: 'password'`; the link is the missing
+  authorization to reach it. Email is an external
+  service behind an adapter, its key supplied at deploy
+  and never logged; the link token is a secret at rest
+  under item 2's discipline. Not sign-up: a stranger
+  creating an organization stays its own bullet
+  (SP-6). Merged: invitation email delivery.
+- **6.** Operable — what a pilot tenant's data needs before it
+  exists. A backup the operator has restored once:
+  Render's schedule, a written restore drill, its
+  measured duration, and item 3's full check passing
+  afterward. `fa_archiver` adds a backup no host
+  owns (item 2's principle): it holds SELECT on a view
+  without the two fenced secrets columns, cannot log in,
+  exports through `COPY`, and restores onto any Postgres
+  — `pg_dump` cannot serve it, because it locks the table
+  and dumps a view as a definition with no rows
+  (measured). A restore must fill the secrets columns,
+  which are NOT NULL, and zero bytes is the honest fill:
+  `pair_hash` still verifies on every pair, the secrets
+  leaves no longer do, and the api runs the same, since
+  it reads no credential back. A full copy for a host
+  move stays the owner's `pg_dump`. The brainstorm
+  settles whether the archiver's view also applies item
+  2's hiding rule, so an archive never holds removed PII.
+  Cross-environment blocking, so
+  `./deploy --render TOKEN --postgres mock-data` can
+  never wipe the tenant database from a laptop. No
+  connection reaches the database from outside its
+  host's private network — essential before launch. On
+  Render that is an emptied `ipAllowList`, which holds
+  `0.0.0.0/0` today; the brainstorm confirms an empty
+  list refuses every outside address and leaves the
+  private network alone. Nothing of ours needs the
+  outside door: on Render, seed and wipe already run as
+  jobs inside it (`bin/postgres-seed:168-171`,
+  `bin/postgres-wipe:127-130`). Item 2 refuses a foreign
+  login — one that belongs to none of our roles — and
+  this keeps the port out of its reach. Error logs as
+  one JSON object per line, as the request log already
+  is (`server/http-server.ts:471-510`):
+  `api/api.ts:322-329` ('fence read failed') and
+  `:1406-1413` ('request failed') print a label, an
+  object, and an
+  error as three values (the Office of Structured
+  Observability wants one document with level, message,
+  and request identity, and never a credential line:
+  the credential hoist is the store's rule, and the log
+  is a second writer). One request clock, read once
+  at arrival and carried in the context: the edge
+  stamps `performance.now()` at accept
+  (`server/http-server.ts:530`) while the api reads its
+  own after the body and mints `requestAt` there
+  (`api/request-context.ts:85-96`); latency must be
+  their difference, not a second clock. Every answer names
+  its request: the edge's 413 and the throttle's 429
+  are bare `jsonResponse`s with no `request-id`
+  (`server/http-server.ts:535-541`, `:589-594`), as is
+  the 500 for a throw that escapes `handleRequest`,
+  whose bare `catch` drops the error itself
+  (`server/http-server.ts:650-653`). The message-plane
+  spec hands this item the two refusals
+  (`docs/superpowers/specs/`
+  `2026-09-23-message-plane-design.md:879-881`).
+  An alert when
+  `/status` is not 200 or the error rate rises.
+  `TRUSTED_PROXY_HOPS` set to Render's real hop
+  count. Consumes item 4. Merged:
+  the throttle seam — a global cap if the hops are
+  wrong, refresh and exchange unlimited
+  (`tests/http-throttle.test.ts`); the `ipAllowList`
+  bullet.
+- **7.** The membership profile — an organization-side profile
+  per membership, so the identity "Tony Stark, CEO"
+  holding a contractor membership elsewhere appears
+  there as "contractor": the document shape (keys on
+  the membership body, or a nested facet under the
+  membership mirroring `identities/:id/pii` — the
+  brainstorm decides, under item 2's rule that a
+  profile removable on its own is its own document,
+  since keys on the membership body would hide that
+  membership's whole history), its validator, derive,
+  seed, the roster and detail reads, and the Members
+  page's edit. One profile still rides the identity
+  (`HumanProfile`, `shared/types.ts:710`; `profileOf`,
+  `client/members.ts:88-101`), and the roster reports a
+  seat with none as `{ present: false }`
+  (`client/members.ts:124`). The seed
+  already carries the contradiction (the admin holds
+  two memberships with one title). Lands before
+  items 11 and 12, whose designer roster and AI
+  memberships read it, and replaces the roster's
+  absent profile with the read. Authored on
+  the `2026-09-04-critical-functionality-path` branch;
+  this is its master copy.
+- **9.** The bell reaches the browser — every write already
+  `pg_notify`s `fusion_events` with a scoped
+  `NotificationEvent` (`shared/notifications.ts`;
+  `notifyPayload`, `api/advisory-lock.ts:17-26`, 8000-byte
+  cap with a `full` fallback) and nothing LISTENs, so a
+  second browser is stale until navigation. Ship the
+  other half: one LISTEN connection per process,
+  outside the pool, reconnecting; a per-session stream
+  to the page (SSE is the platform primitive — the
+  brainstorm weighs it against WebSocket and names the
+  drain and the resource-sanitizer cost in `./test
+  browser`), fenced to the session's organization and
+  identity, delivered into the existing
+  `fusion-angle:data` refresh so pages change nothing.
+  Precedes item 10 (a chat that does not update is not a
+  chat) and item 12 (the worker trusts the bell, never
+  polls). Merged: stale-until-navigation (closes KNOWN
+  seam "Stale-until-navigation (no LISTEN)" —
+  `tests/advisory-lock.test.ts` 'postgres notify is
+  issued; server never LISTENs').
+- **10.** Chats — a conversation on any document at
+  `/…/:collection/:id/chat/` with as little ceremony as
+  the plane allows: a message is a POST pair at that
+  document, the chat is that document's history, and
+  derive is `getDocumentHistory`
+  (`api/message-store.ts:20`) filtered to POST — no new
+  family shape unless the brainstorm finds one (edits,
+  deletions, and attachments are its questions).
+  Authorship is `requester_identity_id`, so an AI
+  seat's messages need no extra field. Reads ride the
+  fenced org; updates ride item 9. Consumed by item 11
+  (a chat on every record and work order) and item 12
+  (the channel a person uses to instruct and correct a
+  worker).
+- **11.** Processes — re-implement flows, work orders, and the
+  workbox with a node as a process. Four kinds, each
+  defined by what it waits on and what it emits:
+  record modification (today's node — a member or
+  agent edits the bound instance and transitions);
+  external synchronization (new — the node waits on a
+  system outside the origin: webhook in, request out,
+  or both); sub-flow (the node runs another flow
+  document as a child work order and resumes on its
+  completion); sub-graph (the node holds an inline
+  graph inside the same work order). Both graphs are
+  directed and cyclic. Kept: the pair plane, the graph
+  frozen into the work order at creation, the claim
+  alphabet, all-see-all. Each record and work order
+  carries a chat (consumes item 10). The brainstorm's
+  first questions: what the two nested kinds share,
+  and how a cycle across a sub-flow boundary
+  terminates. The trio's retirement left flows their
+  event walk (`documentLifecycleEvents`,
+  `api/derive-documents.ts:184`, called at
+  `api/derive-flows.ts:217`, `:250`, `:366`) and their
+  three body fields, `state`, `state_at`, and
+  `state_event_id` (`FLOW_DOCUMENT_BODY_KEYS`,
+  `api/validators.ts:1308-1311`), with the create
+  body's `initialStateEventId`; the rewrite retires
+  them. Merged, the canvas debts the rewrite
+  retires or keeps by decision: READY gate on dangling
+  refs (`tests/adapters-flow-publish.test.ts`);
+  the flow-tag designer UI (TEST-PLAN "Flow Designer —
+  Flow Tags", API-only today); F6's ZIP import not
+  rebinding `flow_records` (TEST-PLAN F6); page
+  selection writes behind the FSM at four sites in
+  `web-app/flows/detail.ts` (`canvasFocusOf`'s walk is
+  the second instance the remediation added); in-place
+  `viewBox` mutation at four method sites
+  (`web-app/app/presenters/flow-designer.ts:489-490,
+  510-513, 990-993, 1020-1021`); `hasUndoHistory` as
+  the designer's own `versions.length > 1`, counting
+  parts of `…/flows/:id/versions/`
+  (`web-app/app/flow-operations.ts:841`, `:915`,
+  `client/flow-queries.ts:234` — more than one part
+  is something to undo). The server no longer
+  computes it. The undo route resolves its target
+  itself (`resolveFlowUndoTarget`,
+  `api/derive-flows.ts:291`) and at exhaustion
+  answers the head and stores nothing
+  (`api/routes.ts:1363-1366`), which TEST-PLAN
+  F36/F45 call PASS — the brainstorm decides whether
+  that stays); the Auto Layout switch committing
+  without `commitAndFit` (`web-app/flows/detail.ts:946-956`),
+  the resize path with no gesture guard
+  (`web-app/app/adapters/resize-observer.ts`), and the
+  panel callback re-fitting at a double-click's second
+  press (`docs/superpowers/plans/`
+  `2026-10-05-walk-green.md:289-293`); rotation only on the
+  toggle path (`web-app/app/flow-layout.ts:1032-1037`);
+  the mirror trigger; and the canvas entries of the
+  genericity bullet (two zoom
+  implementations, `#noteMutation`, `handleSpace`,
+  Delete's `preventDefault`).
+- **12.** Headless AI worker — a process that hears item 9's
+  bell for each AI seat's workbox, claims the work
+  order as that seat (the `client_credentials` grant
+  already mints a service identity's token, so every
+  pair it lands names the agent as
+  `requester_identity_id`), assembles the record
+  definition, the attribute values (which — the
+  brainstorm decides), the node instructions
+  (`withNodeTaskInstructions` already stores them),
+  and the chat (item 10), asks the model to follow them
+  precisely, validates the reply at the gate like any
+  other uninstructed voice, and applies it: attribute
+  updates in record-PATCH form and the outgoing edge.
+  API-only; no page. Decide in the brainstorm: an
+  in-process loop or a second verb of the binary (a
+  second process is item 13's precondition, the
+  claim-expiry event, arriving early); the model
+  behind an adapter with its key supplied at deploy
+  and never logged; bounded retries with backoff; a
+  loop guard and a spend ceiling for a cycle whose
+  every node is an AI seat; record content treated as
+  data, never as instruction. Consumes items 9, 10, and
+  11. Merged: roster seat naming an AI agent
+  (`tests/family-registry.test.ts:97-105`);
+  FLOW-CANVAS.md's display-only AI checkboxes
+  (`## Members and attributes`).
+- **13.** Two processes — high availability for the app and
+  for Postgres on Render. The app's precondition is in
+  the tree: a claim decides expiry against its
+  request's stamp (`isClaimUnlapsedAt`,
+  `api/work-order-version.ts:104-109`, called with
+  `received.requestAt` at `api/routes.ts:1776` and
+  `:1807`), and that stamp is the receiving process's
+  `nowUtc()` (`api/request-context.ts:95`), so each
+  replica's clock decides the boundary; record the
+  expiry decision as its own event first. Then two
+  replicas
+  behind Render's balancer, each answering item 4's
+  probe; LISTEN in each (item 9 is per process by
+  construction); the throttle's per-process counters
+  named as a known cost or moved to the store; a
+  Postgres plan with a standby and a rehearsed
+  failover. Closes KNOWN seam
+  "Single mint process" and retires ARCHITECTURE.md's
+  "do not run two replicas". Consumes items 4, 6, 9,
+  and the examination report's lock and growth findings
+  (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`).
 
 ## Critical functionality path
 
