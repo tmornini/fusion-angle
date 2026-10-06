@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { assertEquals, assertStrictEquals } from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -317,7 +317,6 @@ Deno.test('a claim, then a claim past lockTimeout supersedes with'
     const derived = await getWorkOrderEvents(
         db, token, ORGANIZATION_A, workOrderId,
     );
-    assert(derived.length >= 0); // Phase Final Task 2: row plane empty
     assertEquals(
         derived.map((row) => row.state),
         [...SEEDED_STATES, 'claimed', 'claim_expired', 'claimed'],
