@@ -1302,18 +1302,6 @@ Off the critical path; each with its oracle.
   `getDocumentHistory('/identities/<id>/',
   'registration')` is the SET document, and the
   empty-name prefix is gone after wipe
-- Claim and release path vocabulary. Claim is the
-  pre-PII shape: `path =
-  /organizations/<org>/work-orders/<id>/claim/`, `name
-  = ''` (`api/derive-states.ts:1002`; wired
-  `organizations/:id/work-orders/:id/claim` at
-  `api/message-pair.ts:915`). Release, transition,
-  and binding are the same empty-name operations
-  (`api/derive-states.ts:1250-1255`). Item 12 records
-  expiry as an event; it does not rename the path.
-  Oracle: claim/release/binding are document reads
-  at a known `(path, name)`, not empty-name
-  collection prefixes
 - The cross-party delegation ledger
   (`api/authentication.ts:871-879`;
   `tests/api-authentication-token.test.ts:687`)
