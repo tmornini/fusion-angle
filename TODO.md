@@ -1669,8 +1669,10 @@ Off the critical path; each with its oracle.
   - The live root redirect — exactly one transition, and
     a navigated URL that is never `auth/` or `snapshots/`
     (A4) — Layer 2, a CDP test under `tests/browser/`;
-    `tests/root-redirect.test.ts` is a source-text regex
-    a computed destination would evade
+    the computed destination is pinned
+    (`tests/apex-destination.test.ts:53`, `:64`), the
+    live transition is not: `tests/browser/landing.test.ts`
+    opens `/landing/index.html`, never `/`
   - No console error and no 501 during a real
     unauthenticated page load (A5) — Layer 2, a CDP test
     capturing console messages and the network log
@@ -1713,10 +1715,12 @@ Off the critical path; each with its oracle.
     `graph.nodes` by id in
     `tests/adapters-flow-mutations.test.ts`'s `'putFlow
     persists every FlowSaveShape field'`
-  - The Create-node edge group rendering `data-edge-ref`
-    and deliberately no `data-edge-id`, which is what
-    keeps it non-interactive (AA30) — Layer 1, a render
-    test over `web-app/app/flow-graph.ts:869-882`
+  - The Create-node edge group's deliberate lack of a
+    `data-edge-id`, which is what keeps it
+    non-interactive (AA30) — Layer 1, an absence
+    assertion over `web-app/app/flow-graph.ts:872-886`;
+    its `data-edge-ref` is pinned
+    (`tests/flow-graph-xss.test.ts:119`)
   - The auth form's client-side validation messages —
     "Email is required", "Please enter a valid email
     address", "Password must be at least 6 characters"
@@ -1896,12 +1900,14 @@ Off the critical path; each with its oracle.
     arrowhead (F15, F19, F23) — Layer 1,
     `buildConnectPreview` via `buildGraphSvg`
   - Auto Fit's refusal on the zoom BUTTONS (`withZoomedIn`
-    / `withZoomedOut` under `isAutoFit`) and the 0.25
-    `MIN_ZOOM` clamp (F29) — Layer 1,
-    `tests/flow-designer-presenter.test.ts` for the
-    buttons (only the wheel path is covered) and
-    `tests/flow-fsm-reduce.test.ts` or
-    `tests/flow-zoom-to-fit.test.ts` for the clamp
+    / `withZoomedOut` through `#guardAutoFit`,
+    `web-app/app/presenters/flow-designer.ts:877-903`)
+    and the step path's 0.25 floor
+    (`web-app/app/flow-interactions.ts:945-950`) (F29) —
+    Layer 1, `tests/flow-designer-presenter.test.ts` for
+    the buttons (only the wheel path is covered); the fit
+    path's `MIN_ZOOM` clamp is pinned
+    (`tests/flow-zoom-to-fit.test.ts:166`, `:206`, `:251`)
   - The pixel-identical position restore across an undo
     (F34) — Layer 1, asserting `positionX`/`positionY`
     after the undo in `tests/flow-undo-cursor.test.ts`
@@ -1921,13 +1927,15 @@ Off the critical path; each with its oracle.
     clipboard write itself (F41) — Layer 2,
     `tests/browser/toasts.test.ts`
   - The real archive round trip — the four-entry manifest
-    as a set, `flow.json` and `flow.txt` in particular
-    (F42), and members and attribute refs surviving
-    `getFlowZip` → `getBackupFromZip` (F6, F44) — Layer
-    1, `tests/adapters-flow-export.test.ts`; its own
-    tests read back only `flow.mmd` and `sidecar.json`,
-    and the members-and-attributes round trip builds its
-    backup as an in-memory literal
+    as a set and `flow.txt` (F42), and members and
+    attribute refs surviving `getFlowZip` →
+    `getBackupFromZip` (F6, F44) — Layer 1,
+    `tests/adapters-flow-export.test.ts`; `flow.json`'s
+    presence rides 'zip Create New keeps begin edges and
+    sidecar positions with Auto Layout off' (`:457`),
+    whose nodes carry no members or attributes, and the
+    members-and-attributes round trip builds its backup
+    as an in-memory literal
   - The canvas itself changing after each Undo, as
     distinct from the server state (F45, F46) — Layer 2,
     `tests/browser/canvas-*.test.ts`
@@ -1954,12 +1962,13 @@ Off the critical path; each with its oracle.
     test asserts the shell copy
   - `emptyStateFor`'s rendered copy (WB2) — Layer 1; it
     is unexported page glue in `web-app/workbox/index.ts`
-  - The seeded completed-work-order count, 129 of 145
-    across `buildWorkOrders()` and
+  - The seeded completed-work-order count, 129 of the
+    145 across `buildWorkOrders()` and
     `buildLeadToCloseWorkload()` (WB3) — Layer 1, an
     exact-count test in the shape of
     `tests/mock-data-objectives.test.ts`, so a seed drift
-    goes red instead of surprising a live count
+    goes red instead of surprising a live count; the 145
+    is pinned (`tests/mock-data-pairs.test.ts:1056`)
   - The NOT READY row — its subtitle copy and
     `aria-disabled` (Layer 1; the adapter test pins
     `problemCount` and nothing connects that to the page
@@ -2087,10 +2096,11 @@ Off the critical path; each with its oracle.
     `presenter-identity-detail.test.ts` fixture asserts
     `#identity-erase-btn` either way
   - The sent invitation row's "Invited {date}" sub-line
-    and its state badge (V8) — Layer 1,
-    `presenter-invitation-list.test.ts`; the
-    `SentInvitationsPresenter` test asserts id, email, and
-    Revoke only
+    (`buildSentRow`,
+    `web-app/app/presenters/invitation-list.ts:76`) and
+    a pending row's badge (V8) — Layer 1,
+    `presenter-invitation-list.test.ts`, whose declined
+    and revoked badges are pinned (`:152`, `:170`)
   - The not-found page's rendered message and link (H2) —
     Layer 2, a CDP test navigating to an unknown route
   - The live dark/light repaint — background, text, CSS
@@ -2211,10 +2221,12 @@ Off the critical path; each with its oracle.
     description inputs, per-attribute rows, type picker,
     options textarea, constraint editor, add and remove
     attribute, and the absent drag handle (R4–R9) — Layer
-    1; `RecordDetailEditPresenter`, `recordDraftFromView`,
-    `allowedConstraintKinds`, and `formatConstraint`
-    (`web-app/app/presenters/record-detail.ts`) are all
-    exported and all untested
+    1; `recordDraftFromView` and `formatConstraint`
+    (`web-app/app/presenters/record-detail.ts`) are
+    exported and untested, and only the constraint
+    picker's kinds are pinned
+    (`tests/presenter-record-detail.test.ts:104`, `:123`,
+    `:142`)
   - Returning to read mode after Save, and the rendered
     constraint summaries (R10) — Layer 1, a new
     `tests/records-detail-reduce.test.ts` mirroring
