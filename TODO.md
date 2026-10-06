@@ -2413,7 +2413,10 @@ Off the critical path; each with its oracle.
   `HEAD` is that function without the body.
   `last-modified` makes `If-Modified-Since` possible.
   No handler reads it. Conditional
-  requests (`If-None-Match` / `304`) stay open. Start:
+  requests (`If-None-Match` / `304`) stay open, and so
+  does compression at the origin, which head reads left
+  here (`docs/superpowers/specs/`
+  `2026-09-30-head-reads-design.md:346-347`). Start:
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
