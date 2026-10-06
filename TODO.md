@@ -621,8 +621,7 @@ trio's retirement
     body's `initialStateEventId`; the rewrite retires
     them. Merged, the canvas debts the rewrite
     retires or keeps by decision: READY gate on dangling
-    refs (`tests/adapters-flow-publish.test.ts`); locked
-    verbs not executed (`tests/family-registry.test.ts`);
+    refs (`tests/adapters-flow-publish.test.ts`);
     the flow-tag designer UI (TEST-PLAN "Flow Designer —
     Flow Tags", API-only today); F6's ZIP import not
     rebinding `flow_records` (TEST-PLAN F6); page
