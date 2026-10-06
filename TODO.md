@@ -3246,21 +3246,6 @@ Off the critical path; each with its oracle.
   with no latch, so a second PUT at a join's name replaces
   what it joins. Oracle: a second PUT at a written join
   name stores nothing and answers 409 or 412.
-- Chain order stops at `projectTransitions`. The browser mints
-  `transitionAt` (`client/work-orders-mutations.ts:339`) and the
-  server checks only that it is a timestamp, never against the
-  head's `transition.at`. Two downstream sorts still order by
-  `at`: the workbox detail presenter's timeline
-  (`web-app/app/presenters/workbox-detail.ts`) and each work
-  order's path in `web-app/app/flow-stats-aggregate.ts`. Under
-  client clock skew a later move can carry an earlier `at`, the
-  timeline's last node can differ from the head's `state`, and
-  flow-stats' "completed" flips with it. Drop both sorts (the
-  inputs already arrive in chain order) with a pin each where a
-  later move carries an earlier `at`, and/or validate
-  `transitionAt` server-side against the head's `transition.at`.
-  Oracle: a chain whose last move carries the earlier `at`
-  reads the same in the detail timeline and in flow-stats.
 - Test-only list oracles. `documentCollectionGetHandler` and
   `documentGetHandler` (`api/document-family.ts`) and the
   `GetHandler` type (`api/routes.ts`) serve no route; fifteen
