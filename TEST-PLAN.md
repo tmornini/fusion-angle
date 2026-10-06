@@ -5419,12 +5419,24 @@ FSM, unlike `flows/detail`).
   second cookie jar, open `invitations/index.html`.
   Revoke the pending invitation in the first tab, then
   click Accept on it in the second without reloading. PASS: the
-  accept refuses; the list shows it revoked.
+  accept refuses (PUT 412); the page re-reads the
+  invitation and repaints its row in place with the
+  Revoked badge and no Accept or Decline, and a
+  warning toast reads "This invitation changed — your
+  answer did not land". The list asks for pending
+  invitations only, so a reload drops the row.
   Pin: tests/api-invitation-document.test.ts 'a stale
        invitation tag is 412' (decides that an accept
        latched on the head before a revoke answers 412
-       and stores nothing); exploratory — the rendered
-       refusal and the revoked state on reload
+       and stores nothing);
+       tests/adapters-invitations.test.ts 'a stale
+       accept refuses with the invitation as it stands'
+       (decides the refusal carries the re-read revoked
+       invitation at its fresh tag);
+       tests/browser/invitations.test.ts 'an accept
+       over a revoke paints the row revoked (V10)'
+       (decides the repaint and the toast);
+       exploratory — the two-jar drive itself
 
 ### Member detail — Human (`members/detail.html?memberId=<hw_*>`)
 
