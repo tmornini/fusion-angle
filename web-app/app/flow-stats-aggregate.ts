@@ -181,9 +181,12 @@ function reconstructRuns(
             }
             lastNode = node;
         }
-        // Covenant: a run is completed when its CURRENT
-        // node is Archive — as the head's `state` reads
-        // it — not when any event ever reached Archive.
+        // Covenant: a run is completed when the LAST node
+        // of its `at`-ordered path is Archive, not when
+        // any event ever reached Archive. That node is the
+        // head's `state` only while `at` order is chain
+        // order; the browser mints `transitionAt`, so a
+        // skewed clock can break that (see TODO.md).
         runs.push({
             workOrderId: woId,
             sojourns,
