@@ -514,7 +514,11 @@ skew tests, which went with item 8's trio.
    118.0 → 53.9; the workbox detail's fetch 30.2 →
    31.4 (readyMs 64.0 → 65.5).
 2. The ledger fenced — roles, grants, and row policies, on
-   a table items 0 and 1 have finished. Designed to stock
+   the table items 0 and 1 finished (landed: the
+   2026-09-23 ledger-store, message-plane, and ledger-seed
+   specs, then state by PUT, head reads, membership and
+   versions, and work-order events, all under
+   `docs/superpowers/specs/`). Designed to stock
    Postgres and measured on 18.6, which compose runs; a
    host is measured against the design afterwards, and a
    shortfall is that host's recorded seam or a reason to
@@ -546,10 +550,14 @@ skew tests, which went with item 8's trio.
    `fa_api` — today's `fusion` split in two with
    `fa_owner` — holds INSERT on the table and SELECT on
    its unfenced columns, and no other right on it:
-   Postgres wants SELECT on every column `RETURNING`
-   names (measured), and a column grant is exactly that,
-   so item 0's one statement hands its minted `date` back
-   with no view between. The column fence is that
+   Postgres wants SELECT on every column a statement
+   reads back, `RETURNING` included (measured), and a
+   column grant is exactly that, so the ledger
+   statement's head read and final select, which read
+   only unfenced columns
+   (`api/ledger-statement-sql.ts:78-79`, `:234-268`),
+   hand its minted `date` back with no view between.
+   The column fence is that
    grant: `fa_api` never reads back
    `request`, the two fenced secrets columns, or the
    request and secrets salts; it reads the response, the
@@ -558,16 +566,21 @@ skew tests, which went with item 8's trio.
    envelopes alone verifies the root alone.
    `requester_identity_id` — the verified token's `sub` —
    stays readable. No read may
-   use `SELECT *` (one does,
-   `api/backend-postgres.ts:538`), and every read stops
-   selecting `request`, which item 1 made sure nothing
-   needs. Removing PII stays a tombstone, and the fence
+   use `SELECT *` (two do, `api/backend-postgres.ts:611`
+   and `:651`'s `head.*`), and every read stops
+   selecting `request`, `request_salt`, and the two
+   secrets columns, which every read selects today
+   (`api/backend-postgres.ts:446-665`, mapped by
+   `entityOf` at `:352-363`), though nothing derives
+   from `request` since state by PUT. Removing PII
+   stays a tombstone, and the fence
    hides every `identities/:id/pii` pair that precedes a
    DELETE at its document; the DELETE head stays visible,
    and every other family keeps its deleted history. A
    hidden pair is never a head, so a blind PUT always
    finds the head, and an in-order PUT that names a hidden
-   pair is refused by item 0's index and answers 412:
+   pair selects no head in the ledger statement and
+   answers 412:
    nothing needs a hidden pair back. The hiding rule is a
    row policy on the table bound to `fa_api`, and a
    helper view of the PII DELETE pairs, `fa_pii_deletes`,
@@ -590,8 +603,9 @@ skew tests, which went with item 8's trio.
    outer query and its ORDER BY and LIMIT never reach the
    index; a plain view is as fast as the policy and does
    not hold the rule against a session that writes its own
-   SQL (measured). The mock data cannot judge this: 577 of
-   its 578 documents have one version. `EXPLAIN` and
+   SQL (measured). The mock data cannot judge this: 437 of
+   its 579 documents have one version, and the deepest
+   has 13. `EXPLAIN` and
    `./bin/measure` prove the head read stays on
    `fa_message_pairs_document`. The memory backend hides
    the
@@ -610,13 +624,14 @@ skew tests, which went with item 8's trio.
    foreign login — one that belongs to none of our roles —
    cannot connect, and `POSTGRES_DROP_SCHEMA`'s
    `GRANT ALL … TO public` retires
-   (`api/backend-postgres.ts:29-33`,
-   `tests/backend-postgres.test.ts`, the re-grant). Four
+   (`api/backend-postgres.ts:42-46`;
+   `tests/backend-postgres.test.ts:202-211`, the
+   re-grant). Four
    revokes from PUBLIC need a superuser and only warn for
    the owner (measured): `plpgsql`; large-object creation;
-   the 21 advisory-lock functions, only once item 0 has
-   removed the product's last use
-   (`api/backend-postgres.ts:286`); and catalog reads,
+   the 21 advisory-lock functions, which the product no
+   longer calls (4175b2d5; only
+   `tests/pg-races.test.ts` takes one); and catalog reads,
    returned to `fa_owner`. With catalog reads gone the
    driver's type lookup at connect is refused and its
    unhandled rejection ends the process, and with
@@ -671,7 +686,7 @@ skew tests, which went with item 8's trio.
    the eraser ships, the page says the personal
    information is removed from the application, never
    erased or deleted: today the button
-   (`web-app/app/presenters/identity-detail.ts:284-292`)
+   (`web-app/app/presenters/identity-detail.ts:286-293`)
    and the dialog and its sentence
    (`web-app/identities/detail.html:3-28`) say "Erase",
    and the code's
@@ -689,16 +704,18 @@ skew tests, which went with item 8's trio.
    persist in the owner-only ledger, and `fa_api` reads
    none of them. Today: one role,
    `fusion`, owns and reads everything, and compose,
-   `./deploy --local`, `bin/test-postgres`, and the tests
-   all assume that one login (`compose.yaml:2,8`,
-   `deploy:171-172`, `bin/test-postgres:22-23`); every
-   write
-   pair's `request` holds `Authorization:` verbatim
+   `./deploy --local`, `bin/test-postgres`,
+   `./bin/measure`, and the tests all assume that one
+   login (`compose.yaml:2,8-9,22-24`; `mint_compose_env`,
+   `bin/compose-lib:14-15`); and the credential lines
+   every request presents sit in plaintext in
+   `request_secrets` and `response_secrets`, where that
+   login reads them
    (`tests/shadow-ledger-invariants.test.ts` 'stored
-   request messages carry the live bearer JWT';
+   secrets carry the live bearer JWT';
    `tests/api-shadow-ledger-auth.test.ts` 'live secrets
    land in the auth-flow ledger rows'). Follows items 0
-   and 1.
+   and 1, which landed.
 3. Retire `schema_marker` for migrations the ledger
    holds — the marker (`api/schema-postgres.ts:26-29`)
    proves only that a seed once finished; it cannot tell
