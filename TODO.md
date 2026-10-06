@@ -2801,15 +2801,16 @@ Off the critical path; each with its oracle.
   unlisted.
 - The four counting checks close before their
   statement: the last accepted admin
-  (`refuseLastAdmin`, `api/invitations-domain.ts:335-354`),
-  the record-type RESTRICT (`api/routes.ts:4663-4673`),
-  the attribute RESTRICT (`api/routes.ts:981-995`),
+  (`refuseLastAdmin`, `api/invitations-domain.ts:335-355`),
+  the record-type RESTRICT (`api/routes.ts:4610-4620`),
+  the attribute RESTRICT (`api/routes.ts:977-990`, and
+  again in `deleteRecordAttributeSafe` at `:4764-4768`),
   and the instance placement RESTRICT
-  (`api/routes.ts:3221-3247`) each verify in a read
+  (`api/routes.ts:3198-3224`) each verify in a read
   transaction that closes before the write. The
   default-organization write reads an accepted
   membership (`membershipOf`,
-  `api/organization-requests.ts:120-128`) and then
+  `api/organization-requests.ts:120-129`) and then
   writes. A grant reads the membership head
   (`postOrganizationInvitationGrant`,
   `api/invitations-domain.ts:588`) and then lands
@@ -2820,9 +2821,12 @@ Off the critical path; each with its oracle.
   attribute DELETE against a flow PUT, an instance
   DELETE against a binding, a default-organization
   PUT against that membership's removal, and two
-  grants of one email, each under one write
-  transaction and the organization's advisory lock;
-  each race refuses one writer.
+  grants of one email; each race refuses one writer.
+  The guard lives in the write's own statement: the
+  ledger store took transactions and advisory locks
+  out of the write path (4175b2d5), so the one write
+  transaction and the organization's lock the state by
+  PUT spec named are gone.
 - An RFC 7009 revocation endpoint for OAuth clients.
   Revocation today is
   `identities/:id/tokens/:jti/revocation`: the identity
