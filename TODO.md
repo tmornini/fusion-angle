@@ -1267,25 +1267,26 @@ Off the critical path; each with its oracle.
   35-36`; examination report). Oracle: the sort
   helper takes the same string the keyed path does;
   a missing stamp throws
-- Wipe and reseed live databases onto the exact-read
-  shapes. Spec Decision 8: invitation `state` on the
+- Wipe and reseed every live database onto the ledger
+  store's table at the deploy of items 0–3. Nothing
+  alters a database in place: the seed refuses one
+  whose `fa_message_pairs` exists
+  (`server/seed.ts:101-128`), and a master-era database
+  — `message_pairs` and its `schema_marker` row — boots
+  this binary and fails every read, while the seed
+  meets its marker and rolls back (item 3). So every
+  live ledger takes `./bin/postgres-wipe` then
+  `./bin/postgres-seed`, or the Render equivalents
+  through `./deploy`, and with it arrive the exact-read
+  shapes (Spec Decision 8: invitation `state` on the
   head, PII at `('/identities/<id>/', 'pii')`, token
-  `name = jti`, no `/identity-tokens/`. Production
-  derives do not dual-read those old shapes; a live
-  ledger that predates the landing still holds them
-  until `./bin/postgres-wipe` then `./bin/postgres-seed`,
-  or the Render equivalents through `./deploy`. This
-  landing's membership documents, `fa_message_body_json`,
-  and the partial index `fa_message_pairs_body`
-  (`WHERE path = '/invitations/'`) arrive the same
-  way: the seed refuses a database whose
-  `fa_message_pairs` exists, and nothing alters one
-  in place. Decision
-  9's measure witness landed at `3aaee31`
-  (`measurements/history.jsonl`, `boot:auth-gate`
-  recovered vs `c50e849`) and is closed. Oracle: every
-  live database has been wiped and reseeded after
-  `66457197`
+  `name = jti`, no `/identity-tokens/`), which
+  production derives never dual-read, the membership
+  documents, `fa_message_body_json`, and the partial
+  index `fa_message_pairs_body`
+  (`WHERE path = '/invitations/'`). Oracle: every live
+  database has been wiped and reseeded after the ledger
+  store's landing, and holds `/migrations/0000-root`
 - Filtering other collections by a body field. The
   partial index `fa_message_pairs_body` reaches
   `path = '/invitations/'` only
