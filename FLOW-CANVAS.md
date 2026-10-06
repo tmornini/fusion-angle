@@ -256,10 +256,10 @@ stepper bar — itself an eyebrow-labelled widget
 aggregate logic lives in the pure module
 `flow-stats-aggregate.ts` (`buildFlowStats(input) →
 model`); it consumes the universal `TransitionEvent[]`
-shape exported from `adapters/work-orders-queries.ts` —
+shape exported from `client/work-orders-queries.ts` —
 derived from each joined work order's `versions/` in chain
 order (`getWorkOrderVersions`, `workOrderEventsOf`). The I/O
-wrapper is `adapters/flow-stats.ts`'s
+wrapper is `web-app/app/flow-stats.ts`'s
 `getFlowStats(ctx, flowId, nowMs)`.
 
 ## How we got here

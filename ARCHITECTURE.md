@@ -332,13 +332,15 @@ version carries, in the order `ordered` forms it
 (`api/work-order-version.ts`; the store then sorts
 keys on write): `id`,
 `organization_id`, `display_id`, `flow_graph`,
-`position`, then `state` (the current node), the
-binding as `instance_id` and `record_type_id`, `claim`
-as `{ member_id, at, expires_at }`, and `events`.
-`state`, the binding, and `claim` are absent keys when
-unset, never null. `events` holds only the lifecycle
-events that led from the previous version to this one,
-each `{ id, state, member_id, at, field_values }`.
+`position`, then `state` (the current node) and
+`transition` as `{ member_id, at }`, the binding as
+`instance_id` and `record_type_id`, `claim` as
+`{ member_id, at, expires_at }`, and `events`. `state`
+and `transition` are required; the binding and `claim`
+are absent keys when unset, never null. `events`
+holds only the lifecycle events that led from the
+previous version to this one, each
+`{ id, state, member_id, at, field_values }`.
 
 Five operations each land one version through the
 former, answering the work order's state:
@@ -366,10 +368,9 @@ former, answering the work order's state:
 The four after the create are in order: `If-Match`
 names the work order's head, and a value-bearing
 transition names the instance's head too, one
-entity-tag each. The document PUT (If-Match or
-If-None-Match: *) sets `display_id`, `flow_graph`,
-and `position` over the head's other keys and records
-no event; a reorder (`putWorkOrderPosition`) reads the
+entity-tag each. The document PUT (If-Match) sets
+`display_id`, `flow_graph`, and `position` over the
+head's other keys and records no event; a reorder (`putWorkOrderPosition`) reads the
 head and latches it.
 
 History is the version chain: every version's `events`,
@@ -383,8 +384,8 @@ until its `expires_at`, against the request's stamp
 (`isClaimLive`). The client mints the claim's event ids
 and stamps (`putWorkOrderClaim`); the server decides
 whether a prior claim lapsed. The workbox pages read a
-claim's liveness from history against the graph's lock
-timeout (`activeClaimFromHistory`).
+claim's liveness from the head's `claim.expires_at`,
+the page judging the stored claim against the clock.
 
 The workbox shows every active and archived work order
 to every user; there is no per-user visibility filter.

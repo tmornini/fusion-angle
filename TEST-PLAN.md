@@ -4497,14 +4497,18 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   `claimed` → `claim_released` → `claimed` in the work
   order's version chain, oldest first (inspect via
   `GET work-orders/:id/versions/` or the matching
-  operation message pairs). On a seeded work order the
-  first claim records `claim_expired` for its creator's
-  lapsed birth claim, then `claimed`.
+  operation message pairs). On a seeded work order, its
+  first claim (the first open of its action screen)
+  records `claim_expired` for its creator's lapsed birth
+  claim, then `claimed`.
   Pin: tests/api-work-order-claim.test.ts 'a released
        claim allows a fresh claim' (decides exactly this
        claim→release→reclaim sequence and its event
-       ordering); exploratory — the live three-click UI
-       sequence
+       ordering);
+       tests/mock-data-pairs.test.ts 'claiming a seeded
+       work order expires its birth claim' (decides the
+       first claim's `claim_expired`, then `claimed`);
+       exploratory — the live three-click UI sequence
 - [ ] **WB19** Subject: the bound WO from WB11–WB13
   (WB14 archives it later; history is still readable
   after archive). After transitioning a work order
@@ -4515,7 +4519,8 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   current); each non-claim event, in the `events` of the
   version that recorded it, has the immutable shape
   `{id, state, member_id, at, field_values}`,
-  with `state` carrying the target node's identifier.
+  with `state` carrying the target node's identifier;
+  and `GET work-orders/:id/history` answers 404.
   Live values live on the instance head; history
   `field_values` may be empty for new-shape transitions.
   Pin: tests/api-work-order-versions.test.ts 'a work order
