@@ -1522,38 +1522,6 @@ export function validateFlowNodeAttributeEntity(
     };
 }
 
-const WORK_ORDER_BODY_KEYS:
-    readonly string[] = [
-    'organization_id', 'display_id', 'flow_graph',
-    'position',
-];
-
-export function validateWorkOrderEntity(
-    body: Record<string, unknown>,
-): Omit<WorkOrderFieldsEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        WORK_ORDER_BODY_KEYS,
-        'WorkOrderEntity',
-    );
-    const flowGraph = asObject(
-        body['flow_graph'], 'flow_graph',
-    );
-    asWorkOrderFlowGraph(
-        flowGraph, 'WorkOrderEntity.flow_graph',
-    );
-    return {
-        organization_id: pickIdentifier(body, 'organization_id'),
-        display_id: pickString(
-            body, 'display_id',
-        ),
-        flow_graph: flowGraph,
-        position: pickNumber(
-            body, 'position',
-        ),
-    };
-}
-
 const WORK_ORDER_DOCUMENT_BODY_KEYS: readonly string[] = [
     'display_id', 'flow_graph', 'position',
 ];
@@ -1571,10 +1539,7 @@ export interface WorkOrderDocumentBody {
 // state/state_at/state_event_id are absent from BOTH the
 // expected and optional sets: a body carrying any of them 400s
 // here (the stateless covenant is validator-enforced, not
-// caller discipline). Entity fields
-// are picked directly rather than delegated to
-// validateWorkOrderEntity — that function REQUIRES
-// organization_id, which this body never carries.
+// caller discipline).
 export function validateWorkOrderDocumentBody(
     body: Record<string, unknown>,
 ): WorkOrderDocumentBody {
@@ -1649,7 +1614,7 @@ function validateTransitionFieldValueEntity(
         }
         return {
             id, attribute_id: attributeId, cleared: true,
-        } as TransitionFieldValueEntity;
+        };
     }
     return {
         id,
@@ -1658,7 +1623,7 @@ function validateTransitionFieldValueEntity(
     };
 }
 
-function validateWorkOrderEvent(
+function validateWorkOrderEventEntity(
     value: unknown,
     label: string,
 ): WorkOrderEventEntity {
@@ -1757,7 +1722,7 @@ export function validateWorkOrderVersion(
             : {}),
         events: asArray(
             body['events'], 'WorkOrderVersion.events',
-        ).map((event, i) => validateWorkOrderEvent(
+        ).map((event, i) => validateWorkOrderEventEntity(
             event, 'WorkOrderVersion.events[' + i + ']',
         )),
     };
@@ -3586,15 +3551,14 @@ const WORK_ORDER_CREATE_KEYS: readonly string[] = [
     'stateEventIds', 'stateEventAts', 'states',
 ];
 
-// The HTTP-body gate for POST /work-orders: the work_orders
-// row, its flow_work_orders join row, and THREE initial state
-// events (start, post-start, claimed), written atomically. The
-// facet fields are NOT fully validated here — the work_orders
-// store stamps organization_id from the verified token and
-// re-validates through validateWorkOrderEntity AFTER the stamp
-// (so the body OMITS organization_id), and the flow_work_orders
-// store re-validates the join through validateFlowWorkOrderEntity
-// when the composing POST puts it. The three event ids and
+// The HTTP-body gate for POST /work-orders: the work order,
+// its flow_work_orders join, and THREE initial state events
+// (start, post-start, claimed), written atomically. The
+// facet fields are NOT validated here: the route gates
+// them through validateWorkOrderDocumentBody and stamps
+// organization_id from the verified token (so the body
+// OMITS organization_id), and gates the join through
+// validateFlowWorkOrderEntity. The three event ids and
 // states ride parallel arrays, applied IN ORDER; authorship of
 // every event is stamped from the verified caller in the route,
 // never the body. The arrays must be equal length and exactly

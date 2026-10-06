@@ -1081,7 +1081,7 @@ skew tests, which went with item 8's trio.
 13. Two processes — high availability for the app and
     for Postgres on Render. The app's precondition is in
     the tree: a claim decides expiry against its
-    request's stamp (`isClaimLive`,
+    request's stamp (`isClaimUnlapsedAt`,
     `api/work-order-version.ts:107-112`), and the claim
     GET against the reading process's clock
     (`api/routes.ts:4525-4544`, `nowUtc()`), so each
@@ -3246,21 +3246,14 @@ Off the critical path; each with its oracle.
   with no latch, so a second PUT at a join's name replaces
   what it joins. Oracle: a second PUT at a written join
   name stores nothing and answers 409 or 412.
-- Chain order stops at `projectTransitions`. The browser mints
-  `transitionAt` (`client/work-orders-mutations.ts:339`) and the
-  server checks only that it is a timestamp, never against the
-  head's `transition.at`. Two downstream sorts still order by
-  `at`: the workbox detail presenter's timeline
-  (`web-app/app/presenters/workbox-detail.ts`) and each work
-  order's path in `web-app/app/flow-stats-aggregate.ts`. Under
-  client clock skew a later move can carry an earlier `at`, the
-  timeline's last node can differ from the head's `state`, and
-  flow-stats' "completed" flips with it. Drop both sorts (the
-  inputs already arrive in chain order) with a pin each where a
-  later move carries an earlier `at`, and/or validate
-  `transitionAt` server-side against the head's `transition.at`.
-  Oracle: a chain whose last move carries the earlier `at`
-  reads the same in the detail timeline and in flow-stats.
+- Test-only list oracles. `documentCollectionGetHandler` and
+  `documentGetHandler` (`api/document-family.ts`) and the
+  `GetHandler` type (`api/routes.ts`) serve no route; fifteen
+  test files read families through them below the gate. Move
+  those reads onto the live read path, each moved assertion
+  at least as strong, then delete all three. Oracle: `git
+  grep -nw` finds none of the three names under `api/` or
+  `tests/`.
 
 ## Sequencing
 
@@ -3288,7 +3281,7 @@ Off the critical path; each with its oracle.
   commit; item 2 rewords two and closes none
 - Item 7 precedes routing the roster through the
   profile
-- `isClaimLive` (claim-expiry as its own event) lands
+- `isClaimUnlapsedAt` (claim-expiry as its own event) lands
   before any multi-process deployment
   — item 13's first commit, or item 12's if the worker
   is a second process

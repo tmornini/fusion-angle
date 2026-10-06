@@ -542,6 +542,10 @@ async () => {
         for (const ev of history) {
             total += ev.field_values.length;
             for (const fv of ev.field_values) {
+                assert(
+                    !('cleared' in fv),
+                    'a seeded field value is a set row',
+                );
                 validateStateFieldValueEntity({
                     state_event_id: ev.id,
                     attribute_id: fv.attribute_id,

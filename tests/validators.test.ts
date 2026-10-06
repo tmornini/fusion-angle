@@ -5,7 +5,6 @@ import {
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
-    validateWorkOrderEntity,
     validateWorkOrderVersion,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
@@ -31,7 +30,6 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';
 
-const F_LEGACY = generateIdentifier();
 const F_1 = generateIdentifier();
 const WO_1 = generateIdentifier();
 const EVT_1 = generateIdentifier();
@@ -40,7 +38,6 @@ const U_1 = generateIdentifier();
 const AI_1 = generateIdentifier();
 const PERSON_1 = generateIdentifier();
 const R_1 = generateIdentifier();
-const ORGANIZATION_1 = generateIdentifier();
 const NODE_ID = generateIdentifier();
 const MEMBER_SARAH = generateIdentifier();
 const MEMBER_CLAUDE = generateIdentifier();
@@ -476,59 +473,6 @@ Deno.test(
     );
 });
 
-
-// --- WorkOrderEntity ---
-
-const minimalWoGraph = {
-    name: 'WO Flow',
-    lockTimeout: DEFAULT_LOCK_TIMEOUT,
-    nodes: [],
-    edges: [],
-};
-
-const validWorkOrder = {
-    organization_id: 'AjdvjuECVZEgZoFajaIEkg',
-    display_id: 'WO-001',
-    flow_graph: minimalWoGraph,
-    position: 1,
-};
-
-Deno.test(
-    'validateWorkOrderEntity accepts valid payload',
-    () => {
-    const result =
-        validateWorkOrderEntity(validWorkOrder);
-    assertStrictEquals(result.display_id, 'WO-001');
-});
-
-Deno.test(
-    'validateWorkOrderEntity rejects non-number'
-    + ' position',
-    () => {
-    assertThrows(
-        () => validateWorkOrderEntity({
-            ...validWorkOrder,
-            position: 'first',
-        }),
-        Error, 'expected finite number for position',
-    );
-});
-
-Deno.test(
-    'validateWorkOrderEntity tolerates legacy'
-    + ' graphs still carrying flowId',
-    () => {
-    const result = validateWorkOrderEntity({
-        ...validWorkOrder,
-        flow_graph: {
-            flowId: F_LEGACY,
-            name: 'WO Flow',
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            nodes: [], edges: [],
-        },
-    });
-    assertStrictEquals(result.display_id, 'WO-001');
-});
 
 // --- FlowWorkOrderEntity ---
 
@@ -1239,51 +1183,6 @@ Deno.test(
                 revivals: [],
             }),
             Error, 'expected object for FlowDocumentBody.graph',
-        );
-    },
-);
-
-Deno.test(
-    'validateWorkOrderEntity accepts a native'
-    + ' flow_graph object',
-    () => {
-        const entity = validateWorkOrderEntity({
-            organization_id: ORGANIZATION_1,
-            display_id: 'a7c3e1f9',
-            flow_graph: {
-                name: 'Onboarding',
-                lockTimeout: 28800,
-                nodes: [],
-                edges: [],
-            },
-            position: 1,
-        });
-        assertEquals(
-            entity.flow_graph,
-            {
-                name: 'Onboarding',
-                lockTimeout: 28800,
-                nodes: [],
-                edges: [],
-            },
-        );
-    },
-);
-
-Deno.test(
-    'validateWorkOrderEntity rejects a'
-    + ' JSON-encoded flow_graph string',
-    () => {
-        assertThrows(
-            () => validateWorkOrderEntity({
-                organization_id: ORGANIZATION_1,
-                display_id: 'a7c3e1f9',
-                flow_graph:
-                    '{"name":"x","lockTimeout":1,'
-                    + '"nodes":[],"edges":[]}',
-                position: 1,
-            }),
-            Error, 'expected object for flow_graph',
         );
     },
 );

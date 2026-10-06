@@ -20,7 +20,7 @@ import { generateIdentifier } from
 // probe reads the bound organization's own collection.
 // Full per-family coverage lives in
 // api-entity-history-routes.test.ts. Foreign-id write
-// pins live in api-write-authorizer. Unknown-route 404
+// pins live in api-foreign-id-writes. Unknown-route 404
 // lives in api.test.ts.
 
 const AT = '2026-01-01T00:00:00.000000Z';

@@ -416,20 +416,17 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
 // attributes use inline handlers (Task 23 retired flat
 // RECORDS_WIRING / RECORD_ATTRIBUTES_WIRING).
 //
-// The generic GET machinery (documentGetHandler/
-// documentCollectionGetHandler) this entityOf serves
-// flips onto objectives: GET objectives/:id and GET
-// objectives ride it. The wire row is constructed ID
-// FIRST — {id, organization_id, position} — the SAME
-// seven-sibling convention every shipped entityOf
-// follows; picked explicitly (pickNumber) rather than a
-// body spread: the wire body tolerates an organization_id
-// key alongside position, and a spread would let that raw,
-// unstamped key leak into the read path ahead of the
-// fenced `organization` argument — picking only
-// `position` closes that off by construction. Head
-// document → wire ObjectiveEntity. Entity fields and
-// domain `state` alike come from the head body.
+// The wire row is constructed ID FIRST — {id,
+// organization_id, position} — the SAME seven-sibling
+// convention every shipped entityOf follows; picked
+// explicitly (pickNumber) rather than a body spread: the
+// wire body tolerates an organization_id key alongside
+// position, and a spread would let that raw, unstamped
+// key leak into the read path ahead of the fenced
+// `organization` argument — picking only `position`
+// closes that off by construction. Head document → wire
+// ObjectiveEntity. Entity fields and domain `state`
+// alike come from the head body.
 function objectiveDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
@@ -2012,11 +2009,12 @@ function deltaFieldValueEntities(
             attribute_id: entry.attribute_id,
             value: entry.value,
         })),
-        ...clear.map((attributeId) => ({
+        ...clear.map((attributeId):
+            TransitionFieldValueEntity => ({
             id: attributeId,
             attribute_id: attributeId,
             cleared: true,
-        } as TransitionFieldValueEntity)),
+        })),
     ].sort(byIdAscending);
 }
 
@@ -2289,7 +2287,7 @@ export async function postWorkOrderDocumentOp(
 // bytes; the reconstructed return is for below-facade
 // callers and type parity. `messagePair` is optional. The actor
 // parameter is spelled `_actor`: no state event here to author.
-export async function postFlowWorkOrderDocumentOp(
+async function postFlowWorkOrderDocumentOp(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
@@ -3388,23 +3386,6 @@ async function postInstanceCreateOp(
     });
 }
 
-// Gone only after the owner check passes: a foreign
-// organization's retired instance answers as its live one
-// does, so a 410 never reveals that it existed.
-async function retiredInstanceError(
-    db: DbAdapter,
-    instanceId: Id,
-    organization: Id,
-): Promise<RetiredEntityError | ForeignOrganizationError> {
-    const missed = await missedReadError(
-        db, instanceId, organization, 'record_instances',
-    );
-    if (missed instanceof ForeignOrganizationError) {
-        return missed;
-    }
-    return new RetiredEntityError('record_instances', instanceId);
-}
-
 // Instance update: PATCH with If-Match (§1 C). The handler
 // reads the head to merge; the statement judges the tag.
 export async function postInstancePatchOp(
@@ -3444,7 +3425,9 @@ export async function postInstancePatchOp(
         head === undefined
         && await documentHeadAt(db, prefix, instanceId) !== null
     ) {
-        throw await retiredInstanceError(db, instanceId, org);
+        throw new RetiredEntityError(
+            'record_instances', instanceId,
+        );
     }
     const attributesById = await loadAttributeSchemaById(
         db, org, typeId,
@@ -4044,9 +4027,10 @@ export const routes: Route[] = [
     // routes are bearerExempt and form their own pair deep
     // inside postToken/postAuthorize, pre-tx, since only the
     // grant can resolve the requester identity. The table
-    // offers POST so the generator advertises the verb;
-    // matchRoute still 404s an unknown path and 405s a
-    // non-POST verb on either pattern.
+    // offers POST so the generator advertises the verb.
+    // matchRoute matches both patterns or returns null;
+    // api.ts answers a null match 404 (401 before auth) and
+    // a matched route without the verb's handler 405.
     route('authentication/token', {
         post: authGrantOffered,
     }),
@@ -4823,9 +4807,7 @@ export const routes: Route[] = [
     // Nested instance versions. Each stored PUT is served
     // as the detail GET serves the head, projected by the
     // reader's current attribute schema, oldest first.
-    // Parent type miss first. A tombstone is Gone only
-    // after the owner probe, so a foreign retired
-    // instance stays 403.
+    // Parent type miss first. A tombstone is Gone.
     route(INSTANCE_VERSIONS_PATTERN, {
         select: async (
             db, p, _actor, organization, roles,
@@ -4857,15 +4839,12 @@ export const routes: Route[] = [
                     );
                 },
             );
-            // The gate's own 410 would skip the owner
-            // probe, and a foreign retired instance must
-            // answer 403.
             if (
                 selection.kind !== 'collection'
                 && selection.head.method === 'DELETE'
             ) {
-                throw await retiredInstanceError(
-                    db, instanceId, organizationId,
+                throw new RetiredEntityError(
+                    'record_instances', instanceId,
                 );
             }
             return selection;
@@ -4904,15 +4883,12 @@ export const routes: Route[] = [
                     );
                 },
             );
-            // The gate's own 410 would skip the owner
-            // probe, and a foreign retired instance must
-            // answer 403.
             if (
                 selection.kind !== 'collection'
                 && selection.head.method === 'DELETE'
             ) {
-                throw await retiredInstanceError(
-                    db, instanceId, organizationId,
+                throw new RetiredEntityError(
+                    'record_instances', instanceId,
                 );
             }
             return selection;
@@ -4961,11 +4937,9 @@ export const routes: Route[] = [
                     'record_instances',
                 );
             }
-            // The gate's own 410 would skip the owner probe,
-            // and a foreign retired instance must answer 403.
             if (head.method === 'DELETE') {
-                throw await retiredInstanceError(
-                    db, instanceId, organizationId,
+                throw new RetiredEntityError(
+                    'record_instances', instanceId,
                 );
             }
             return {
@@ -5167,12 +5141,6 @@ export const routes: Route[] = [
             );
         },
     }),
-    // GET is FLIPPED (Task 8): derived via
-    // documentCollectionGetHandler — wire-identical to the
-    // hand-written db.memberships.getAll() dispatch it replaces
-    // (memberships is organizationNested:true, so the derived
-    // prefix fences to the caller's org exactly as the
-    // org-scoped adapter already did for the hand-written read).
     // Invitation send nest. POST grants pending. PUT
     // revokes. Storage prefix stays /invitations/.
     route('organizations/:id/invitations/', {

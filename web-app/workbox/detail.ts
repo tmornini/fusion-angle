@@ -41,6 +41,7 @@ import {
     getRecordInstances,
     subscribeWorkOrderChanges,
     RecordTransitionViolations,
+    isClaimedAndUnlapsed,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import type {
@@ -56,8 +57,6 @@ import {
 } from '../../shared/http-errors.ts';
 import type { HttpMessage } from
     '../../shared/http-message/http-message.ts';
-import { isExpiresAtPassed } from
-    '../../shared/work-order-claims.ts';
 
 /* ── Module state ────────── */
 
@@ -387,8 +386,7 @@ async function loadPresenter(
     const fieldValuesByEvent =
         fieldValuesByEventFromHistory(events);
     const activeClaim =
-        workOrder.claim.state === 'claimed'
-        && !isExpiresAtPassed(workOrder.claim.expiresAt)
+        isClaimedAndUnlapsed(workOrder.claim)
             ? {
                 memberId: workOrder.claim.memberId,
                 at: workOrder.claim.at,

@@ -4,7 +4,7 @@ import {
     claimedVersion,
     createdVersion,
     fieldsVersion,
-    isClaimLive,
+    isClaimUnlapsedAt,
     releasedVersion,
     transitionedVersion,
     type WorkOrderVersion,
@@ -171,8 +171,8 @@ Deno.test('a binding is set once; a rebind conflicts', () => {
 
 Deno.test('a claim is live strictly before it expires', () => {
     const claim = created().claim!;
-    assertStrictEquals(isClaimLive(claim, T2), true);
-    assertStrictEquals(isClaimLive(claim, EXPIRES), false);
+    assertStrictEquals(isClaimUnlapsedAt(claim, T2), true);
+    assertStrictEquals(isClaimUnlapsedAt(claim, EXPIRES), false);
 });
 
 Deno.test('a transition records its move, kept or'

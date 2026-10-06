@@ -8,6 +8,7 @@ import type {
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     isClaimState,
+    isExpiresAtPassed,
 } from '../shared/work-order-claims.ts';
 import type { RequestContext } from './request-context.ts';
 import {
@@ -19,10 +20,15 @@ import type { HttpMessage } from
 
 /* ── Types ───────────────── */
 
-export interface HistoryFieldValue {
-    fieldName: string;
-    value: string;
-}
+export type HistoryFieldValue =
+    | {
+        fieldName: string;
+        value: string;
+    }
+    | {
+        fieldName: string;
+        readonly cleared: true;
+    };
 
 export interface HistoryEntry {
     fromNodeName: string;
@@ -75,7 +81,7 @@ export type TransitionEvent =
 
 /* ── Helpers ─────────────── */
 
-export function validateWorkOrderFlowGraph(
+function validateWorkOrderFlowGraph(
     raw: unknown,
 ): WorkOrderFlowGraph {
     return asWorkOrderFlowGraph(
@@ -93,6 +99,17 @@ export type WorkOrderClaim =
         readonly at: string,
         readonly expiresAt: string,
     };
+
+// Judged by this browser's clock; the server judges a
+// held claim by its request stamp (isClaimUnlapsedAt).
+export function isClaimedAndUnlapsed(
+    claim: WorkOrderClaim,
+): claim is Extract<
+    WorkOrderClaim, { state: 'claimed' }
+> {
+    return claim.state === 'claimed'
+        && !isExpiresAtPassed(claim.expiresAt);
+}
 
 // The parsed domain twin of WorkOrderEntity: the
 // adapter is the divorce point, so above the storage
@@ -158,10 +175,15 @@ export function toWorkOrder(
 // written with a transition. The parent event id is
 // the grouping key; attributeId references the record
 // attribute that named the field.
-export interface StateFieldValue {
-    readonly attributeId: Id;
-    readonly value: string;
-}
+export type StateFieldValue =
+    | {
+        readonly attributeId: Id;
+        readonly value: string;
+    }
+    | {
+        readonly attributeId: Id;
+        readonly cleared: true;
+    };
 
 // Group non-empty field_values from history rows by
 // parent event id. An event that wrote no values has
@@ -175,10 +197,16 @@ export function fieldValuesByEventFromHistory(
         if (row.field_values.length === 0) continue;
         byEvent.set(
             row.id,
-            row.field_values.map(fv => ({
-                attributeId: fv.attribute_id,
-                value: fv.value,
-            })),
+            row.field_values.map((fv): StateFieldValue =>
+                'cleared' in fv
+                    ? {
+                        attributeId: fv.attribute_id,
+                        cleared: true,
+                    }
+                    : {
+                        attributeId: fv.attribute_id,
+                        value: fv.value,
+                    }),
         );
     }
     return byEvent;

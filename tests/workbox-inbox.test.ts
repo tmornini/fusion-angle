@@ -3,6 +3,7 @@ import {
     assertEquals,
     assertNotStrictEquals,
     assertStrictEquals,
+    assertStringIncludes,
 } from '@std/assert';
 import {
     memoryDbAdapter,
@@ -32,6 +33,7 @@ import {
 } from '../client/index.ts';
 import {
     buildInboxItems,
+    WorkboxInboxPresenter,
 } from
 '../web-app/app/presenters/workbox-inbox.ts';
 import {
@@ -222,6 +224,7 @@ Deno.test(
         );
         assertStrictEquals(items.length, 1);
         const item = items[0]!;
+        assert(item.kind === 'placed');
         assertStrictEquals(item.flowName, 'Test flow');
         assertStrictEquals(item.stateName, 'Doing work');
         assertStrictEquals(item.completed, false);
@@ -316,6 +319,7 @@ Deno.test(
             workOrders, new Map(), memberMap, 'archived',
         );
         assertStrictEquals(archived.length, 1);
+        assert(archived[0]!.kind === 'placed');
         assertStrictEquals(archived[0]!.completed, true);
     },
 );
@@ -414,6 +418,7 @@ Deno.test(
         const items = buildInboxItems(
             workOrders, new Map(), memberMap, 'active',
         );
+        assert(items[0]!.kind === 'placed');
         assertStrictEquals(
             items[0]!.taskInstructions,
             '# Verify totals',
@@ -433,6 +438,7 @@ Deno.test(
         const items = buildInboxItems(
             workOrders, new Map(), memberMap, 'active',
         );
+        assert(items[0]!.kind === 'placed');
         assertStrictEquals(
             items[0]!.taskInstructions, '',
         );
@@ -596,6 +602,7 @@ Deno.test('an inbox item names the head\'s node and last'
     const node = wo.flowGraph.nodes.find(
         (n) => n.id === wo.nodeId,
     )!;
+    assert(item!.kind === 'placed');
     assertStrictEquals(item!.stateName, node.name);
     assertStrictEquals(
         item!.lastTransitionedAt, wo.transition.at,
@@ -637,4 +644,71 @@ Deno.test('a lapsed claim is not an active claim in the'
         [wo], t.activeClaimsByWo, t.memberMap, 'active',
     );
     assertStrictEquals(item!.claimedByName, null);
+});
+
+// A head whose node is gone from its flow graph cannot be
+// placed. Its row degrades in place, static, so the rest of
+// the inbox still renders and nothing navigates or drags it.
+Deno.test('an unplaced head renders as a degraded row and'
++ ' the inbox still renders', async () => {
+    const { tables, woId } = await setupOneWorkOrder();
+    const t = await tables();
+    const placed = t.workOrders.find((w) => w.id === woId)!;
+    const unplaced = {
+        ...placed,
+        id: generateIdentifier(),
+        displayId: 'unplaced-7',
+        nodeId: generateIdentifier(),
+        position: placed.position + 1,
+    };
+    const items = buildInboxItems(
+        [placed, unplaced], t.activeClaimsByWo, t.memberMap,
+        'active',
+    );
+    assertEquals(
+        items.map((i) => [i.id, i.kind]),
+        [[placed.id, 'placed'], [unplaced.id, 'unplaced']],
+    );
+    assertEquals(
+        buildInboxItems(
+            [unplaced], t.activeClaimsByWo, t.memberMap,
+            'archived',
+        ),
+        [],
+    );
+    let captured = '';
+    const container = {
+        set innerHTML(value: string) {
+            captured = value;
+        },
+    };
+    new WorkboxInboxPresenter(items, true).renderList(
+        container as unknown as HTMLElement,
+    );
+    const [, placedRow, unplacedRow] =
+        captured.split('class="card p-4');
+    assert(placedRow !== undefined);
+    assert(unplacedRow !== undefined);
+    for (const present of [
+        'data-work-order-card="' + placed.id + '"',
+        'href=', 'drag-handle', 'cursor-pointer',
+        'Doing work',
+    ]) {
+        assertStringIncludes(placedRow, present);
+    }
+    for (const present of [
+        'class="badge badge-warning"',
+        'State unknown', 'Test flow', '#unplaced-7',
+        'from Demo Test',
+    ]) {
+        assertStringIncludes(unplacedRow, present);
+    }
+    for (const absent of [
+        'data-work-order-card', 'href=', 'drag-handle',
+        'cursor-pointer',
+    ]) {
+        assertEquals(
+            unplacedRow.includes(absent), false, absent,
+        );
+    }
 });

@@ -11,9 +11,9 @@ import {
 import { asStoredGraph } from '../shared/flow-graph-body.ts';
 import {
     addUtcSeconds,
-    isExpiresAtPassed,
 } from '../shared/work-order-claims.ts';
 import {
+    isClaimedAndUnlapsed,
     toWorkOrder,
     type WorkOrder,
 } from './work-orders-queries.ts';
@@ -327,15 +327,13 @@ export async function postWorkOrderTransition(
     // atomically alongside the transition. The release
     // event is authored server-side by the verified
     // caller (actor).
-    const claim = workOrder.message.body().toValue().claim;
-    const hasLiveClaim = claim !== undefined
-        && !isExpiresAtPassed(claim.expires_at)
-        && claim.member_id === ctx.identity.id;
-    // Mint transitionAt first: the route emits the
-    // transition event before the release event, so
-    // transitionAt < release.at must hold in the
-    // at-ordered ledger (latest at = current state).
-    // Both mints stay await-free before POST.
+    const hasLiveClaim = isClaimedAndUnlapsed(workOrder.claim)
+        && workOrder.claim.memberId === ctx.identity.id;
+    // Mint transitionAt first: the route records the move
+    // and then the release in one version's events, and
+    // nowUtc is strictly monotonic, so the release's `at`
+    // follows the move's. Both mints stay await-free before
+    // the POST.
     const transitionAt = nowUtc();
     const release = hasLiveClaim
         ? {

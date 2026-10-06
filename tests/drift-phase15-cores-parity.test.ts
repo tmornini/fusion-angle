@@ -76,7 +76,6 @@ const P15_FNA_ADD = generateIdentifier();
 const P15_FNA_RM = generateIdentifier();
 const P15_SOFTDEL_FNA = generateIdentifier();
 const P15_SOFTDEL_DEL = generateIdentifier();
-const GHOST_P15_VIS = generateIdentifier();
 const P15_RESTRICT_FNA = generateIdentifier();
 const N_WO = generateIdentifier();
 const P15_RESTRICT_WO = generateIdentifier();
@@ -1370,72 +1369,6 @@ Deno.test('work-order versions GET: 200/404 two-way for'
     assertStrictEquals(
         orphanBody.error,
         'Not found: work_orders/ecupcwyehqSNYeaJpJtNFw',
-    );
-});
-
-// The versions read (C4): the work order's events carry the
-// transition fold for the owner; a foreign organization's
-// owner probe is 404 and an absent id is 404, each with the
-// generic route's error body.
-Deno.test('work-order versions events: own field_values,'
-+ ' foreign owner probe 404, absent 404',
-async () => {
-    const db = await seededDb();
-    const starkToken = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
-    );
-    const twoToken = await organizationToken(
-        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
-    );
-    const workOrderId = generateIdentifier();
-    const transitionEventId = WORKORDERID_TE;
-    const fieldValueId = WORKORDERID_FV;
-    await transitionWithFieldValue(
-        db, workOrderId, transitionEventId,
-        fieldValueId, WORKORDERID_ATTR,
-    );
-
-    // Own → the events carry the transition fold.
-    const ownHistory = await getWorkOrderEvents(
-        db, starkToken, STARK_ORGANIZATION, workOrderId,
-    );
-    const ownTe = ownHistory.find(
-        (row) => row.id === transitionEventId,
-    );
-    assert(ownTe !== undefined);
-    assertStrictEquals(ownTe!.field_values.length, 1);
-    assertStrictEquals(ownTe!.field_values[0]!.id, fieldValueId);
-
-    // Foreign → the owner probe is 404, the generic text.
-    const foreign = await handleRequest(
-        db,
-        req(
-            'GET',
-            '/organizations/' + ORGANIZATION_TWO
-                + '/work-orders/' + workOrderId + '/versions/',
-            twoToken,
-        ),
-    );
-    assertStrictEquals(foreign.status, 404);
-    assertStrictEquals(
-        (await foreign.json() as { error: string }).error,
-        'Not found: work_orders/' + workOrderId,
-    );
-
-    // Absent work order → 404, the generic text.
-    const absent = await handleRequest(
-        db,
-        req(
-            'GET',
-            '/organizations/' + STARK_ORGANIZATION
-                + '/work-orders/' + GHOST_P15_VIS + '/versions/',
-            starkToken,
-        ),
-    );
-    assertStrictEquals(absent.status, 404);
-    assertStrictEquals(
-        (await absent.json() as { error: string }).error,
-        'Not found: work_orders/' + GHOST_P15_VIS,
     );
 });
 
