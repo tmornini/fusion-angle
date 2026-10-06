@@ -52,6 +52,7 @@ import {
     getWorkOrderVersions,
     workOrderEventsOf,
     projectTransitions,
+    isClaimedAndUnlapsed,
 } from
 '../client/work-orders-queries.ts';
 import {
@@ -75,9 +76,6 @@ import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
 } from '../shared/types.ts';
-import {
-    isExpiresAtPassed,
-} from '../shared/work-order-claims.ts';
 import type {
     WorkOrderEntity,
     GraphNode,
@@ -635,10 +633,7 @@ Deno.test(
         assertStrictEquals(beforeNode, MIDDLE_NODE);
         const beforeClaim =
             (await getWorkOrder(ctx, woId)).claim;
-        assert(
-            beforeClaim.state === 'claimed'
-            && !isExpiresAtPassed(beforeClaim.expiresAt),
-        );
+        assert(isClaimedAndUnlapsed(beforeClaim));
 
         await postWorkOrderTransition(ctx, {
             workOrder: await getWorkOrder(ctx, woId),
@@ -652,8 +647,7 @@ Deno.test(
         const afterClaim =
             (await getWorkOrder(ctx, woId)).claim;
         assertStrictEquals(
-            afterClaim.state === 'claimed'
-            && !isExpiresAtPassed(afterClaim.expiresAt),
+            isClaimedAndUnlapsed(afterClaim),
             false,
         );
     },
@@ -1004,10 +998,7 @@ Deno.test(
         );
 
         const claim = (await getWorkOrder(ctx, woId)).claim;
-        assert(
-            claim.state === 'claimed'
-            && !isExpiresAtPassed(claim.expiresAt),
-        );
+        assert(isClaimedAndUnlapsed(claim));
         assertStrictEquals(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
@@ -1196,8 +1187,7 @@ Deno.test(
         await seedClaim(ctx, woId, longAgo);
         const claim = (await getWorkOrder(ctx, woId)).claim;
         assertStrictEquals(
-            claim.state === 'claimed'
-            && !isExpiresAtPassed(claim.expiresAt),
+            isClaimedAndUnlapsed(claim),
             false,
         );
     },
@@ -1218,10 +1208,7 @@ Deno.test(
         await seedReleasedWorkOrder(db, token, woId);
         await seedClaim(ctx, woId, nowUtc());
         const claim = (await getWorkOrder(ctx, woId)).claim;
-        assert(
-            claim.state === 'claimed'
-            && !isExpiresAtPassed(claim.expiresAt),
-        );
+        assert(isClaimedAndUnlapsed(claim));
         assertStrictEquals(claim.memberId, 'XXZruirZyAOoRpNxaDnpSA');
     },
 );
@@ -1264,8 +1251,7 @@ Deno.test(
         const beforeClaim =
             (await getWorkOrder(ctx, woId)).claim;
         assert(
-            beforeClaim.state === 'claimed'
-            && !isExpiresAtPassed(beforeClaim.expiresAt),
+            isClaimedAndUnlapsed(beforeClaim),
             'expected a live claim before transition',
         );
 
