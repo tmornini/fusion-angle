@@ -478,8 +478,7 @@ skew tests, which went with item 8's trio.
    53.8 → 54.1, identities 55.0 → 56.4, organization
    51.2 → 54.1. The fourth spec landed
    (`docs/superpowers/specs/2026-10-01-membership-and-versions-design.md`).
-   The census emptied with the fifth spec. `./test` 104.6 s →
-   112.8 s (medians of three; the base three
+   `./test` 104.6 s → 112.8 s (medians of three; the base three
    invocations: parallel pass, serial lane, and tz; the
    tip two: parallel pass and tz); readyMs per list
    page, `9a8396a` → base → tip (medians of 25; the base
@@ -495,6 +494,9 @@ skew tests, which went with item 8's trio.
    a work order's history is its versions; every GET
    serves a stored response, and the type system says
    so (`ARCHITECTURE.md` § A response is one unit).
+   The census of parted reads
+   (`tests/parted-reads.test.ts`) emptied with the fifth
+   spec.
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
@@ -1495,7 +1497,7 @@ Off the critical path; each with its oracle.
   `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
   peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
   p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
-  `work-orders/:id/history` (the route is since retired)
+  `work-orders/:id/history` (since retired)
   clusters at 100-102 ms (p90 100.7, max 102.3),
   unexplained. The probe's synchronous
   per-request append cost ~1.3 s on a 45 s suite. Suite
@@ -3221,8 +3223,9 @@ Off the critical path; each with its oracle.
   second write at a written name stores nothing (412 for
   a client's declaration, 409 for a handler's) and a
   retired name answers 410; DELETE answers 405; only
-  erasure removes pairs. Its consumer is the join
-  documents: `postFlowWorkOrderDocumentOp` and
+  erasure removes pairs (the physical-erasure bullet).
+  Their consumers are the join documents:
+  `postFlowWorkOrderDocumentOp` and
   `postFlowRecordDocumentOp` (`api/routes.ts`) land a PUT
   with no latch, so a second PUT at a join's name replaces
   what it joins. Oracle: a second PUT at a written join

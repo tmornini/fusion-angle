@@ -180,8 +180,8 @@ Status ladder:
   live document, and a view or version list that
   selects at least one
 - **201** — a genesis: a landed PUT with no live
-  head (not a work order's document PUT, which
-  supersedes only), including a PUT after a DELETE; a POST
+  head, including a PUT after a DELETE (never a work
+  order's document PUT, which supersedes only); a POST
   create, with `Location`; an instance create
 - **204** — DELETE success (landed, or already-gone);
   a collection GET that selects none, including a

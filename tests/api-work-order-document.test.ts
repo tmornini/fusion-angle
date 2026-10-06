@@ -529,8 +529,8 @@ for (const [label, headers] of [
     });
 }
 
-Deno.test('a work-order PUT on a foreign work order is'
-+ ' 403', async () => {
+Deno.test('another organization\'s path answers 403 to a'
++ ' work-order PUT (the fence)', async () => {
     const db = await freshDb();
     const id = generateIdentifier();
     await seedCreatedWorkOrder(db, {
@@ -554,6 +554,39 @@ Deno.test('a work-order PUT on a foreign work order is'
     }));
     assertStrictEquals(res.status, 403);
     await res.body?.cancel();
+});
+
+Deno.test('a work-order PUT for a foreign id under the'
++ ' caller\'s own path is 404 (the owner probe)', async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    await seedCreatedWorkOrder(db, {
+        organization: 'AjdvjuECVZEgZoFajaIEkg', id,
+        fields: documentFields(),
+        flowId: generateIdentifier(),
+        births: [NODE_START, NODE_FINISH],
+        at: nowUtc(),
+        token: DEV_TOKEN,
+        claim: 'kept',
+    });
+    const before = (await db.messagePairs.getAll()).length;
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/BBjWJsjYIDkTRKIIPrzWRw'
+            + '/work-orders/' + id,
+        token: await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA',
+            'BBjWJsjYIDkTRKIIPrzWRw',
+        ),
+        headers: { 'If-Match': '"' + generateIdentifier()
+            + '"' },
+        body: documentFields(),
+    }));
+    assertStrictEquals(res.status, 404);
+    await res.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 Deno.test('If-None-Match: * on a work order that exists is'
