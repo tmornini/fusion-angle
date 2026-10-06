@@ -2423,16 +2423,6 @@ Off the critical path; each with its oracle.
   so it has drawn nothing since that field left.
   Oracle: `./test schema` green with the dead branch
   gone, and `SCHEMA.svg` byte-identical.
-- `/members/` parents on the document plane are still
-  resolved by a full-history reduction,
-  `resolveViaMembershipPairPlane`
-  (`api/derive-states.ts:225-248`), which walks
-  `getDocumentHistory` and reduces it through
-  `deriveDocumentsAt` rather than reading the head
-  alone; a C4 tombstone comment at
-  `api/derive-states.ts:1382-1383` still narrates a
-  retired `/members/` document-trio history. Oracle:
-  the parent resolves from the head body alone.
 - Collection reads call
   `db.messagePairs.getCollectionHeadPairs` directly —
   `api/derive-identity-tokens.ts:121`,
@@ -2764,7 +2754,13 @@ Off the critical path; each with its oracle.
   at `tests/api-identity-document.test.ts:176`,
   `tests/api-member-documents.test.ts:403`,
   `tests/api-shadow-ledger-tokens.test.ts:286-288`, and
-  `tests/drift-roster.test.ts:638`. Reword each to the
+  `tests/drift-roster.test.ts:638`. The `/members/`
+  parent now resolves from heads
+  (`resolveViaMembershipPairPlane`,
+  `api/derive-states.ts:211-234`; 6eee335c), yet two C4
+  tombstone comments still narrate its retired
+  document-trio history (`api/derive-states.ts:38-41`,
+  `:504-505`). Reword each to the
   code that runs today, or delete it where the code now
   says it. Oracle:
   `git grep -nE 'appendMessagePair|sendWriteResponse'`
