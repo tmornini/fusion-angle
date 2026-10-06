@@ -255,8 +255,9 @@ foreign path 403 (the path fence, `api/api.ts`, before
 the handler), and a foreign id under the caller's own
 path 404 (the owner probe). A present one lands
 `fieldsVersion(head, fields)` under today's latch
-rules, unchanged — no `If-Match` becomes required; a client's
-`If-None-Match: *` on it is the statement's 412.
+rules, unchanged — no `If-Match` becomes required; a
+client's `If-None-Match: *` on it is the statement's
+412.
 `fieldsVersion` loses its no-head branch.
 
 **Preconditions on an absent work order are
@@ -267,9 +268,10 @@ at the gate (the route's class is `required`), before
 any handler runs. A PUT with `If-Match` or
 `If-None-Match: *` reaches the head read, where a work
 order never created is 404, so both preconditions are
-ignored and the answer is 404 — as `workOrderOperation` already
-answers claim, release, bind, and transition
-(`api/routes.ts:1703-1710`). AGENTS.md's "even for an
+ignored and the answer is 404 — as `workOrderOperation`
+already answers claim, release, and bind (the
+transition runs through `landWorkOrderTransition`).
+AGENTS.md's "even for an
 id never written" holds where a PUT can create; it
 gains that qualifier.
 
@@ -426,10 +428,11 @@ written join name stores nothing and answers 409 or
 | 200 | a work order, its `versions/`, a version; a fields PUT that lands, and one equal to the head (which stores nothing) |
 | 201 | a create |
 | 403 | the fence (a foreign path on any route) |
-| 404 | a document PUT, claim, bind, or transition on a work order never created, whatever its preconditions (RFC 9110 §13.2.1); a tag naming no PUT; `…/history` |
+| 404 | a conditional document PUT (`If-Match` or `If-None-Match: *`) on a work order never created, its preconditions ignored (RFC 9110 §13.2.1); a claim, bind, or transition on one never created; a tag naming no PUT; `…/history` |
 | 405 | a GET on a route that selects nothing |
 | 409 | a resent create |
 | 412 | a latched write whose head has moved; `If-None-Match: *` on a work order that exists |
+| 428 | a PUT, claim, bind, or transition with no precondition |
 
 Every 2xx read carries the envelope's three lines.
 Refusals keep today's `{ error }` body. No work order
@@ -503,8 +506,10 @@ plan names each file.
   pin (§5).
 - AGENTS.md `### Follow the RFCs`: an `If-Match` on a
   never-written id is 412 where a PUT can create it;
-  where only a POST creates, the unconditional 404
-  stands (RFC 9110 §13.2.1, §1).
+  where only a POST creates, a conditional PUT on an
+  absent work order answers 404, its preconditions
+  ignored, and a PUT with neither precondition answers
+  428 (RFC 9110 §13.2.1, §1).
 - API.md: step 8 (`:73-85`) — a GET selects or is
   405; the work-order routes and the status table.
 - The generated API documentation, through its
