@@ -14,19 +14,27 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Eleven items, in this order — each its own brainstorm →
-spec → plan → ship cycle, implemented sequentially,
-ordered by benefit over cost: the ledger right, then
-fenced (items 0–3, one deploy; items 0 and 1 have
-landed and left this file), what a pilot tenant needs
-next, the process engine and its AI worker on that, two
-processes last. A "Merged:" clause names bullets absorbed
-from `## Later work`; they keep their oracles. Four
-former items left for `## Later work` (genericity, JSON
-parse/stringify, simulated latency, cachability) and the
-skew tests, which went with the trio; item 8, lifecycle
-out of the document body, closed the other way with the
-trio's retirement
+Fifteen items, in this order — each its own brainstorm
+→ spec → plan → ship cycle, implemented sequentially, a
+dependency (`## Sequencing`) ahead of benefit over cost.
+An item keeps the number it was filed under: specs,
+plans, the probes' README, and code comments cite items
+by it, so the order is the list's and the number the
+item's. Item 14 first: any organization's admin can
+take over an identity in another, so no second tenant
+shares an origin before it ships. Then the ledger's one
+deploy — items 0–3, of which 0 and 1 have landed and
+left this file, with 15 (`fa_` names), 16
+(`FA_GIT_SHA`), and 17 (the wipe and reseed); then what
+a pilot tenant needs next (4–7), the process engine and
+its AI worker on that (9–12), and two processes last
+(13). A "Merged:" clause names bullets absorbed from
+`## Later work`; they keep their oracles. Four former
+items left for `## Later work` (genericity, JSON
+parse/stringify, simulated latency, cachability) and
+the skew tests, which went with the trio; item 8,
+lifecycle out of the document body, closed the other
+way with the trio's retirement
 (`docs/superpowers/specs/2026-09-15-retire-the-trio-design.md`).
 
 - **14.** Admins act within their organization. Any
