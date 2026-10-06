@@ -3135,6 +3135,14 @@ Off the critical path; each with its oracle.
   with the flow, not with its work orders, or the
   measurement says the fan-out costs nothing a person
   sees
+- The top-bar bell keeps its invitation count after a
+  refused accept until the next navigation: notifying
+  would re-run the page's pending-only refresh and drop
+  the row V10 must show (the walk-green plan's
+  deferral, `docs/superpowers/plans/`
+  `2026-10-05-walk-green.md:281-284`). Oracle: after a
+  refused accept the bell's count matches the pending
+  list, and V10's row still shows
 
 ## Sequencing
 
