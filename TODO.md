@@ -2690,39 +2690,43 @@ Off the critical path; each with its oracle.
   (`4a540f3` → `9a8396a`, medians of 25,
   `measurements/history.jsonl`),
   workbox 122.7 → 142.0 and flows 46.0 → 56.4 the
-  most. Three suspects, none measured: larger
+  most. After the work-order-events spec three stay
+  slower than that base (`4a540f3` → `851adad`): flows
+  46.0 → 55.8, projects 57.5 → 62.5, records 50.6 →
+  54.3; workbox reads 87.2, under its base. Three
+  suspects, none measured: larger
   multipart list payloads, each part a whole stored
   response (about 300 header octets plus the full
   document); each part's split and framing; and
   repeated body decodes. `Body.toValue()` decodes
   afresh on every call (`shared/http-message/body.ts:96`),
   and `HttpMessage.body()` builds a new `Body` on every
-  call (`shared/http-message/http-message.ts:105-109`),
+  call (`shared/http-message/http-message.ts:108-112`),
   so a memo belongs on `HttpMessage` beside `#wire` and
   `#json` (`:85-99`), not on `Body`. A message is
   shared across holders — `flowSaves` sends one head to
   every subscriber (`client/flow-mutations.ts:598`,
   `:73`), a page holds messages in its state
-  (`web-app/organization/index.ts:171`), and values keep
+  (`web-app/organization/index.ts:181`), and values keep
   theirs in `message` fields
   (`client/flow-queries.ts:26`,
-  `client/work-orders-queries.ts:99`) — and no caller
+  `client/work-orders-queries.ts:121`) — and no caller
   mutates a decoded value today, so a memo hands every
   holder one shared object: freeze it, or rule the memo
   out. The quick reductions come first, before any
   memo: decode once before sorting rather than inside
   the comparator (`client/admin.ts:46`,
-  `client/members.ts:86-90`,
+  `client/members.ts:80-81`,
   `client/organizations.ts:22`, and
   `client/objectives.ts:52-55`, whose four callers are
-  `client/objectives.ts:249`,
+  `client/objectives.ts:244`,
   `client/project-scoring.ts:206`,
   `web-app/dashboard/index.ts:50`, and
-  `web-app/organization/index.ts:150`); `flowSaves`
+  `web-app/organization/index.ts:160`); `flowSaves`
   subscribers each decode a whole flow to read its `id`
   (`client/flow-mutations.ts:74`); the flows binding
   render decodes each record twice
-  (`web-app/flows/detail.ts:1503`, after
+  (`web-app/flows/detail.ts:1528-1530`, after
   `bindableRecords` at
   `web-app/app/presenters/flow-designer-view.ts:457`);
   presenters decode per render
@@ -2732,8 +2736,9 @@ Off the critical path; each with its oracle.
   `idea-conversion.ts:105` and `:640`, and
   `web-app/ideas/convert.ts:244`); and the organization
   page decodes each objective again per pass
-  (`web-app/organization/index.ts:150-158`, `:178`,
-  `:187`). Oracle: a profile of workbox and flows names
+  (`web-app/organization/index.ts:162`, `:168`,
+  `:187-188`, `:195-197`). Oracle: a profile of flows,
+  projects, and records names
   the cost before any change, and each reduction lands
   with its readyMs before and after
 - Comments name absent code. `appendMessagePairOnce`
