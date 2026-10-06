@@ -2202,8 +2202,6 @@ Off the critical path; each with its oracle.
   a defect: TEST-PLAN D6/D7 pin the toast, and the
   2026-08-26 D6 stub files the voice question as its
   separate finding
-- A full TEST-PLAN.md walk using serial subagents, so
-  session context stays short — TEST-PLAN.md `## The walk`
 - Billing (`web-app/billing/`)
 - Attribute drag-reorder (TEST-PLAN R8)
 - A flow loaded with Auto Fit OFF no longer fits on
