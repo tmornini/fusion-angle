@@ -562,8 +562,8 @@ trio's retirement
    this is its master copy.
 9. The bell reaches the browser — every write already
    `pg_notify`s `fusion_events` with a scoped
-   `NotificationEvent` (`api/notifications.ts`;
-   `notifyPayload` in `api/advisory-lock.ts`, 8000-byte
+   `NotificationEvent` (`shared/notifications.ts`;
+   `notifyPayload`, `api/advisory-lock.ts:17-26`, 8000-byte
    cap with a `full` fallback) and nothing LISTENs, so a
    second browser is stale until navigation. Ship the
    other half: one LISTEN connection per process,
@@ -578,12 +578,14 @@ trio's retirement
    chat) and item 12 (the worker trusts the bell, never
    polls). Merged: stale-until-navigation (closes KNOWN
    seam "Stale-until-navigation (no LISTEN)" —
-   `tests/advisory-lock.test.ts`).
+   `tests/advisory-lock.test.ts` 'postgres notify is
+   issued; server never LISTENs').
 10. Chats — a conversation on any document at
     `/…/:collection/:id/chat/` with as little ceremony as
     the plane allows: a message is a POST pair at that
     document, the chat is that document's history, and
-    derive is `getMessagePairs` filtered to POST — no new
+    derive is `getDocumentHistory`
+    (`api/message-store.ts:20`) filtered to POST — no new
     family shape unless the brainstorm finds one (edits,
     deletions, and attachments are its questions).
     Authorship is `requester_identity_id`, so an AI
@@ -628,23 +630,23 @@ trio's retirement
     `web-app/flows/detail.ts` (`canvasFocusOf`'s walk is
     the second instance the remediation added); in-place
     `viewBox` mutation at four method sites
-    (`web-app/app/presenters/flow-designer.ts:537-538,
-    556-559, 1036-1039, 1066-1067`); `hasUndoHistory` as
+    (`web-app/app/presenters/flow-designer.ts:489-490,
+    510-513, 990-993, 1020-1021`); `hasUndoHistory` as
     the designer's own `versions.length > 1`, counting
     parts of `…/flows/:id/versions/`
-    (`web-app/app/flow-operations.ts:841`,
+    (`web-app/app/flow-operations.ts:841`, `:915`,
     `client/flow-queries.ts:234` — more than one part
     is something to undo). The server no longer
     computes it. The undo route resolves its target
     itself (`resolveFlowUndoTarget`,
     `api/derive-flows.ts:291`) and at exhaustion
     answers the head and stores nothing
-    (`api/routes.ts:1367-1370`), which TEST-PLAN
+    (`api/routes.ts:1363-1366`), which TEST-PLAN
     F36/F45 call PASS — the brainstorm decides whether
     that stays); rotation only on the
     toggle path (`web-app/app/flow-layout.ts:1032-1037`);
     the mirror trigger; and the canvas entries of the
-    genericity bullet in `## Later work` (two zoom
+    genericity bullet (two zoom
     implementations, `#noteMutation`, `handleSpace`,
     Delete's `preventDefault`).
 12. Headless AI worker — a process that hears item 9's
@@ -670,7 +672,7 @@ trio's retirement
     every node is an AI seat; record content treated as
     data, never as instruction. Consumes items 9, 10, and
     11. Merged: roster seat naming an AI agent
-    (`tests/family-registry.test.ts:111-119`);
+    (`tests/family-registry.test.ts:97-105`);
     FLOW-CANVAS.md's display-only AI checkboxes
     (`## Members and attributes`).
 13. Two processes — high availability for the app and
