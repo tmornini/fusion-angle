@@ -2919,9 +2919,9 @@ Off the critical path; each with its oracle.
   `tests/adapters-identity-providers.test.ts`) and
   `agent-7`
   (`tests/api-authentication-token.test.ts`).
-  Display names and search text stay words. This
-  waits until membership-and-versions has shipped.
-  It is not a pin inside that plan. Oracle: one test
+  Display names and search text stay words. It waited
+  on membership and versions, which has landed. Oracle:
+  one test
   walks the ids the suite stores and fails when
   `isIdentifier` rejects one, with named exceptions
   for display names and search text.
