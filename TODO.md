@@ -1581,9 +1581,9 @@ Off the critical path; each with its oracle.
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and the `sysctl` workaround was rejected as
-  unverifiable and macOS-only. Sixteen rows in
-  `measurements/history.jsonl`; the last two (`c50e849`,
-  `3aaee31`) already store `"unknown"`. The truthful
+  unverifiable and macOS-only. Ten of the fourteen rows
+  in `measurements/history.jsonl`, `c50e849` on, store
+  `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
   which needs `measure-core.ts`'s field type and
   `shapeHistoryLine` (:49, :284) together with
