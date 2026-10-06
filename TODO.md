@@ -3150,6 +3150,12 @@ Off the critical path; each with its oracle.
   `2026-10-05-walk-green.md:296-297`). Oracle: reopening
   the dialog after an AI create shows the Model picker
   at its placeholder
+- The small bipolar gauge's `display` text has no
+  legend or caption (the K17 plan's deferral,
+  `docs/superpowers/plans/`
+  `2026-09-29-k17-signed-objective-score.md:656-657`).
+  Oracle: the gauge names what its number is, for the
+  eye and for a screen reader
 
 ## Sequencing
 
