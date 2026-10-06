@@ -427,12 +427,13 @@ written join name stores nothing and answers 409 or
 |---|---|
 | 200 | a work order, its `versions/`, a version; a fields PUT that lands, and one equal to the head (which stores nothing) |
 | 201 | a create |
+| 400 | a malformed body; `If-None-Match` on claim, release, bind, or transition (in-order routes take only `If-Match`) |
 | 403 | the fence (a foreign path on any route) |
-| 404 | a conditional document PUT (`If-Match` or `If-None-Match: *`) on a work order never created, its preconditions ignored (RFC 9110 §13.2.1); a claim, bind, or transition on one never created; a tag naming no PUT; `…/history` |
+| 404 | a conditional document PUT (`If-Match` or `If-None-Match: *`) on a work order never created, its preconditions ignored (RFC 9110 §13.2.1); a claim, release (DELETE …/claim), bind, or transition on one never created; a tag naming no PUT; `…/history` |
 | 405 | a GET on a route that selects nothing |
 | 409 | a resent create |
-| 412 | a latched write whose head has moved; `If-None-Match: *` on a work order that exists |
-| 428 | a PUT, claim, bind, or transition with no precondition |
+| 412 | a latched write whose head has moved; `If-None-Match: *` on a work-order document PUT whose work order exists |
+| 428 | a PUT, claim, release, bind, or transition with no precondition |
 
 Every 2xx read carries the envelope's three lines.
 Refusals keep today's `{ error }` body. No work order

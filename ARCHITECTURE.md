@@ -372,8 +372,8 @@ names the work order's head, and a value-bearing
 transition names the instance's head too, one
 entity-tag each. The document PUT (If-Match) sets
 `display_id`, `flow_graph`, and `position` over the
-head's other keys and records no event; a reorder (`putWorkOrderPosition`) reads the
-head and latches it.
+head's other keys and records no event; a reorder
+(`putWorkOrderPosition`) reads the head and latches it.
 
 History is the version chain: every version's `events`,
 read through `versions/` in chain order.
