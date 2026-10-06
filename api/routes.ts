@@ -3819,8 +3819,8 @@ export const routes: Route[] = [
     // pii/credentials precedent; documentGet/PutHandler only
     // serve 2-segment family/:id patterns. ADMIN-ONLY via
     // deny-by-default (/identities has no MEMBER_VERBS
-    // entry); GLOBAL plane (no org nesting, no
-    // write authorizer). DELETE is a marked tombstone =
+    // entry); GLOBAL plane (no org nesting). DELETE is a
+    // marked tombstone =
     // deregistration; the gate forms the 204 pair, the
     // handler appends it — idempotent by construction.
     route('identities/:id/registration', {
@@ -4713,8 +4713,8 @@ export const routes: Route[] = [
     }),
     // Nested attribute detail (Task 7): member GET, admin
     // PUT (create vs replace by head presence), admin DELETE
-    // with four-leg RESTRICT. No WRITE_AUTHORIZERS (deep
-    // sub-family — parent type 404 + path org gate).
+    // with four-leg RESTRICT. A deep sub-family: parent
+    // type 404 + path org gate.
     route(ATTRIBUTE_DETAIL_PATTERN, {
         // A missing or deleted parent type stays 404; the
         // stored body already carries the path keys the PUT
@@ -4936,7 +4936,7 @@ export const routes: Route[] = [
     // Ladder DELETE: parent type 404 → document spent
     // (any pair, including tombstone) else missedReadError;
     // in-tx re-probe + append tombstone (R4 ledger-
-    // complete). No WRITE_AUTHORIZERS (deep sub-family).
+    // complete).
     // DELETE takes its conditional from the spec's delete
     // slot and forms no response body.
     route(INSTANCE_DETAIL_PATTERN, {

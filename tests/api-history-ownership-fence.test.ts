@@ -19,7 +19,7 @@ import { generateIdentifier } from
 // is 404, and so is a foreign organization's id: the
 // probe reads the bound organization's own collection.
 // Full per-family coverage lives in
-// api-entity-history-routes.test.ts. Write-authorizer
+// api-entity-history-routes.test.ts. Foreign-id write
 // pins live in api-write-authorizer. Unknown-route 404
 // lives in api.test.ts.
 

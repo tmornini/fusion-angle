@@ -16,10 +16,10 @@ import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-// Pre-write authorizer: probe this document. Same id at two
-// collections is two documents. Foreign-id PUT geneses here;
-// foreign-id DELETE never-written here is 404; genesis
-// (owner-null) is unaffected.
+// Foreign ids under the caller's own path: the same id at
+// two organizations is two documents. A foreign-id PUT
+// geneses here; a foreign-id DELETE never written here is
+// 404.
 
 const ORGANIZATION_A = 'AjdvjuECVZEgZoFajaIEkg';
 
