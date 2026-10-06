@@ -2289,7 +2289,7 @@ export async function postWorkOrderDocumentOp(
 // bytes; the reconstructed return is for below-facade
 // callers and type parity. `messagePair` is optional. The actor
 // parameter is spelled `_actor`: no state event here to author.
-export async function postFlowWorkOrderDocumentOp(
+async function postFlowWorkOrderDocumentOp(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
