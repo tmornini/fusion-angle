@@ -311,12 +311,3 @@ export function boundVersion(
     }
     return { kind: 'rebound', to: head.instance_id };
 }
-
-// History is the version chain, oldest version first in,
-// every event newest first out.
-export function historyOf(
-    versions: readonly WorkOrderVersion[],
-): WorkOrderEventEntity[] {
-    return versions.flatMap((version) => version.events)
-        .reverse();
-}

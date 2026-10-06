@@ -3699,8 +3699,8 @@ export interface WorkOrderTransitionRelease {
 // gate cut): the LIVE gate rejects the fieldValues key in
 // the dispatch arrow. This validator still accepts BOTH
 // shapes for the below-facade / stored-data tier (seed
-// pure-moves, history fold of stored pairs). Discriminated
-// on the presence of the `fieldValues` key.
+// pure-moves). Discriminated on the presence of the
+// `fieldValues` key.
 export interface WorkOrderLegacyTransitionBody {
     readonly kind: 'legacy';
     readonly transitionEventId: string;

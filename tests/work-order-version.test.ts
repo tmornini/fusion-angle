@@ -4,7 +4,6 @@ import {
     claimedVersion,
     createdVersion,
     fieldsVersion,
-    historyOf,
     isClaimLive,
     releasedVersion,
     transitionedVersion,
@@ -167,18 +166,6 @@ Deno.test('a binding is set once; a rebind conflicts', () => {
     assertEquals(
         boundVersion(bound.version, 'i2', 'rt1'),
         { kind: 'rebound', to: 'i1' },
-    );
-});
-
-Deno.test('history is every version\'s events, newest first',
-() => {
-    const first = created();
-    const second = releasedVersion(first, {
-        eventId: 'r1', member: ALICE, at: T2, now: T2,
-    });
-    assertEquals(
-        historyOf([first, second]).map((e) => e.id),
-        ['r1', 'e2', 'e1', 'e0'],
     );
 });
 

@@ -2159,7 +2159,7 @@ export async function postWorkOrderTransitionOp(
 // check, and no instance read. No client sends the seed a
 // tag, so the handler latches the head it read
 // (Interpretation N). A legacy body's values are recorded
-// on its own event, as the history fold assigned them.
+// on its own event.
 export async function postSeedWorkOrderTransitionOp(
     db: DbAdapter,
     organization: Id,

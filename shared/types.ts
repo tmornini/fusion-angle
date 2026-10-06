@@ -424,16 +424,15 @@ export interface StateEntity {
     state: string;
     member_id: Id;
     at: string;
-    // Work-order history rows, the only reader still
-    // shaped like a /versions index, may carry it.
-    // Value is that revision's pair id.
+    // A document lifecycle row may carry it. Value is that
+    // revision's pair id.
     etag?: string;
 }
 
-// Nested field-value shape on work-order history events
-// (GET work-orders/:id/versions/). Folded from transition pair
-// bodies — no state_event_id on the wire (the parent event
-// already carries id). Distinct from StateFieldValueEntity,
+// Nested field-value shape on work-order events (GET
+// work-orders/:id/versions/), from transition pair bodies —
+// no state_event_id on the wire (the parent event already
+// carries id). Distinct from StateFieldValueEntity,
 // which still carries state_event_id for the transition-body
 // validator and the seed's legacy trace bags.
 export interface TransitionFieldValueEntity {
@@ -446,14 +445,6 @@ export interface TransitionFieldValueEntity {
     // New-shape clear marker only; legacy rows never carry it
     // so their wire bytes stay unchanged (JSON omits absent).
     readonly cleared?: true;
-}
-
-// Work-order history row: a lifecycle StateEntity plus the
-// transition field values whose state_event_id === id. Claim/
-// birth/release rows carry field_values: [].
-export interface WorkOrderHistoryEventEntity
-    extends StateEntity {
-    field_values: TransitionFieldValueEntity[];
 }
 
 // One event a work-order version recorded (spec §4): a
