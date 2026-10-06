@@ -780,7 +780,7 @@ function nodeNameById(
 }
 
 function buildHistory(
-    sortedTransitions:
+    transitions:
         readonly TransitionEvent[],
     fieldValuesByEvent:
         ReadonlyMap<
@@ -793,7 +793,7 @@ function buildHistory(
         string, RecordAttribute
     >,
 ): HistoryEntry[] {
-    return sortedTransitions.map(t => {
+    return transitions.map(t => {
         const rows =
             fieldValuesByEvent.get(t.id) ?? [];
         const fieldValues:
