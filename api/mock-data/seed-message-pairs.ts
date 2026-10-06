@@ -1,117 +1,19 @@
-// Pre-tx pair formation for both seed paths (postMockDataLoad,
-// postBootstrap in ../mock-data.ts). formWriteMessagePair's hashing is
-// async crypto and cannot run inside the seed's one big
-// TABLE_NAMES transaction. Formed pre-tx — crypto, hashing,
-// and timers never run inside an open transaction
-// (AGENTS.md § Transaction bodies await only row ops). So
-// the seed becomes two
-// passes: every op-invocation's pair is formed HERE, before any
-// transaction opens (pass 1); the seed's existing single
-// transaction then executes row ops only, passing each op its
-// pre-formed pair (pass 2).
+// Seed message pairs for both seed paths (postMockDataLoad
+// and postBootstrap in ../mock-data.ts). Forming a pair is
+// async crypto, which a transaction body never awaits
+// (AGENTS.md § Transaction bodies await only row ops), so
+// a seed runs in two passes. Pass 1 forms the pairs here,
+// before any transaction opens. Pass 2 rehearses the live
+// ops on a scratch backend, passing each op its pre-formed
+// pair, and postSeedLanding lands the rehearsed statements
+// in one transaction. The pairs that latch a head the
+// rehearsal itself writes (formInstanceBindingSeedPair,
+// formInstanceTransitionSeedPair) form inside it instead:
+// the rehearsal is AGENTS.md's named exception.
 //
-// Every body-builder below is the ONE construction its family
-// uses for BOTH forming the pair (this file) and performing the
-// actual write (mock-data.ts) — never two independently written
-// literals that merely happen to agree, so a stored pair can
-// never drift from what was actually written.
-//
-// The seed op-invocation families that accept a `pair?`
-// parameter are covered here (traced against every
-// postXxxCreationOp / postRecordWriteOp call site in
-// mock-data.ts): human-members, ideas, idea-submissions,
-// projects, flows, work-orders, flow-work-orders, ai-members,
-// records, objectives, flow-records, baseline-scores,
-// actual-scores, memberships, members. The work-order deferral
-// NARROWS this phase to its historical traces alone (states
-// events + state_field_values, still direct — a NAMED carve-out
-// now bound to the states-consumers flip, not "the work-orders
-// phase"); the entity and join rows leave the deferral list
-// this phase, closed through postWorkOrderDocumentOp /
-// postFlowWorkOrderDocumentOp. A further, previously-unlisted
-// direct write — seed-flow-org2 — is ALSO covered here, closed
-// through postFlowDocumentOp (Task 6). The 3 seeded flow_records
-// join rows are the ONE genuine seed gap this phase closes last
-// (Task 5): they formed zero message pairs before, now closed
-// through postFlowRecordDocumentOp. Objectives' own create-time
-// bundle grows from one pair to three (Phase 7 Task 3): the
-// existing operation invocation stays, and the SAME per-pair-key
-// discipline flows/records already established adds a document
-// and a revision invocation per seeded objective. The scores
-// deferral closes (Task 5 of Phase 7), landing WHOLE: baselines
-// AND actuals (broader than "baselines" alone — the handoff's
-// own phrasing) — one document message pair per seeded row,
-// closed through postBaselineScoreDocumentOp /
-// postActualScoreDocumentOp.
-// The human-members/ai-members create-time bundle grows from one
-// pair to three (Phase 8 Task 4, the objectives-family
-// precedent generalized to the roster): the existing operation
-// invocation stays, and the SAME per-pair-key discipline adds
-// an identity-document invocation and a detail-document
-// invocation (identities/:id, then PII) per seeded
-// member. Bootstrap's lone 'XXZruirZyAOoRpNxaDnpSA' human-member create forms
-// this SAME identity path via formBootstrapMessagePair. Memberships
-// closed the LAST whole-slice seed deferral (Phase 8 Task 5):
-// each seeded membership row (twelve — 11 humans, the
-// current identity counted twice for its two-organization
-// membership) folds in its OWN document message pair,
-// a membership PUT. AI agents are not memberships.
-// Leftover members/:id parent documents are gone from the
-// seed.
-// Bootstrap's membership forms this SAME pair via
-// formBootstrapMessagePair. NO whole-slice seed
-// deferral remains; the work-order historical traces stay the
-// one NAMED direct-write carve-out above. The human-member
-// create-time bundle widens once more, human-only (Phase 10 Task
-// 5): a fourth invocation forms the identities/:id document
-// message pair — a human member's own identity row, which an
-// AI member never has (finding 10), so the ai-members loop
-// below stays a triple.
-// Bootstrap's lone 'XXZruirZyAOoRpNxaDnpSA' human-member create forms this
-// SAME
-// quadruple via formBootstrapMessagePair. Phase 10 Task 6 closes
-// the identity spine's remaining raw writes: each seeded AI
-// member and the system member ALSO form their OWN identities/:id
-// document message pair (a standalone invocation — neither
-// create-time bundle above ever carried one, so this widens
-// no triple/quadruple), and each seeded role grant forms its
-// OWN role-grants/:id document message pair. Every invocation
-// here (as always) forms through the SAME formSeedMessagePair
-// pipeline, UNTOUCHED — formSeedMessagePair is genesis
-// by construction. The 13 identity-credential document
-// message pairs (12 human passwords + the system client
-// secret) are the ONE exception: a credential's body
-// embeds its hashed secret, so each seed path hashes
-// first, in hashSeedCredentials (api/mock-data.ts),
-// before pass 1, and forms those 13 pairs through
-// formSeedCredentialMessagePairs (below), which calls
-// formSeedMessagePair directly rather than riding
-// buildMockDataInvocations / formBootstrapMessagePair.
-//
-// Phase 11 Task 3 closed the historical-trace carve-out
-// itself (the work-order deferral's last piece, named above):
-// every trace event formed its own message pair through the
-// SAME formSeedMessagePair pipeline every family above already rides.
-// States-document retirement Task 12 reshapes those 861 traces
-// (212 hand-authored + 649 generated) 1:1 into
-// work-orders/:id/transition op-shaped pairs (op: true) from
-// each third event, the first two riding the work order's
-// create, folding the 7 mockStateFieldValues into the parent
-// transition bodies' fieldValues — no bare states/:id or
-// states/:id/field-values/:fvid seed pairs remain. Leftover
-// members/:id genesis pairs are gone from the seed.
-//
-// Phase 12 Task 3 onboards a NEW family — organizations, the
-// THIRTEENTH and last unflipped in-scope one
-// (api/derive-organizations.ts), registered ahead of this task
-// (family-registry.ts, Task 2). Its two seeded organizations
-// (Stark Industries, Wayne Enterprises) form their OWN
-// organizations/:id document message pair, the SAME
-// per-family onboarding playbook every prior family already
-// rode. Phase Final Task 2 strips the organizations ROW half
-// — pairs alone remain. Bootstrap's own lone
-// STARK_ORGANIZATION pair mirrors this via
-// formBootstrapMessagePair below.
+// A body-builder here is the one construction its family
+// uses both to form the pair and to perform the write, so
+// that stored pair cannot drift from what was written.
 
 import type {
     Id,
