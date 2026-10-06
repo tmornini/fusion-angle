@@ -8,6 +8,7 @@ import type {
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
     isClaimState,
+    isExpiresAtPassed,
 } from '../shared/work-order-claims.ts';
 import type { RequestContext } from './request-context.ts';
 import {
@@ -98,6 +99,17 @@ export type WorkOrderClaim =
         readonly at: string,
         readonly expiresAt: string,
     };
+
+// Judged by this browser's clock; the server judges a
+// held claim by its request stamp (isClaimUnlapsedAt).
+export function isClaimedAndUnlapsed(
+    claim: WorkOrderClaim,
+): claim is Extract<
+    WorkOrderClaim, { state: 'claimed' }
+> {
+    return claim.state === 'claimed'
+        && !isExpiresAtPassed(claim.expiresAt);
+}
 
 // The parsed domain twin of WorkOrderEntity: the
 // adapter is the divorce point, so above the storage

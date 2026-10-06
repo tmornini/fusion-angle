@@ -1,11 +1,10 @@
 import {
     getWorkOrders,
     getMemberMap,
+    isClaimedAndUnlapsed,
     type RequestContext,
     type WorkOrder,
 } from '../../client/index.ts';
-import { isExpiresAtPassed } from
-    '../../shared/work-order-claims.ts';
 import { type Member } from '../../shared/types.ts';
 import type { Id } from '../../shared/types.ts';
 import type { ActiveClaim } from
@@ -29,10 +28,7 @@ export async function getInboxRows(
     ]);
     const activeClaimsByWo = new Map<Id, ActiveClaim>();
     for (const wo of workOrders) {
-        if (
-            wo.claim.state === 'claimed'
-            && !isExpiresAtPassed(wo.claim.expiresAt)
-        ) {
+        if (isClaimedAndUnlapsed(wo.claim)) {
             activeClaimsByWo.set(wo.id, {
                 memberId: wo.claim.memberId,
                 at: wo.claim.at,
