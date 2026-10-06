@@ -1115,7 +1115,15 @@ skew tests, which went with item 8's trio.
     carries a chat (consumes item 10). The brainstorm's
     first questions: what the two nested kinds share,
     and how a cycle across a sub-flow boundary
-    terminates. Merged, the canvas debts the rewrite
+    terminates. The trio's retirement left flows their
+    event walk (`documentLifecycleEvents`,
+    `api/derive-documents.ts:184`, called at
+    `api/derive-flows.ts:217`, `:250`, `:366`) and their
+    three body fields, `state`, `state_at`, and
+    `state_event_id` (`FLOW_DOCUMENT_BODY_KEYS`,
+    `api/validators.ts:1308-1311`), with the create
+    body's `initialStateEventId`; the rewrite retires
+    them. Merged, the canvas debts the rewrite
     retires or keeps by decision: READY gate on dangling
     refs (`tests/adapters-flow-publish.test.ts`); locked
     verbs not executed (`tests/family-registry.test.ts`);
