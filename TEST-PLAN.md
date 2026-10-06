@@ -4604,29 +4604,39 @@ gesture pans instead of dragging, marquee-ing, or connecting.
 
 ### Workbox — Concurrency & Integrity
 
-- [ ] **WB18** Open the same unclaimed work order in two
-  browser tabs. In tab 1, click the row to claim it. In
-  tab 2, attempt the same. PASS: tab 2 either navigates to
-  a read-only/already-claimed view or the claim is
-  rejected — and the message plane carries at most one
-  live `'claimed'` event for this work order's `entity_id`
-  under the `(at, id)` reduction (a stale prior claim is
-  superseded by a `'claim_expired'` event, never
-  overwritten in place). Inspect via `message_pairs` or
-  derived `GET work-orders/:id/history` (DESC; claim rows
-  carry `field_values: []`).
+- [ ] **WB18** Open the same unclaimed work order as
+  two members in two cookie jars: Tony Stark in the
+  walk's tab, and Sarah Chen in a second jar minted
+  as SV6 does (Driving notes, SV6/SV7/SV10). In
+  Tony's tab, click the row to claim it. In Sarah's,
+  open the same row. PASS: Sarah's claim is rejected
+  — `PUT work-orders/:id/claim` answers 409 `work
+  order is already claimed`, and her action screen
+  shows the error state carrying that message with
+  Try Again — and the message plane carries one live
+  `'claimed'` event for this work order's
+  `entity_id`, Tony's, under the `(at, id)` reduction
+  (a stale prior claim is superseded by a
+  `'claim_expired'` event, never overwritten in
+  place). Inspect via derived `GET
+  work-orders/:id/history` (DESC; claim rows carry
+  `field_values: []`). Two tabs of one jar are one
+  member: the second opens the holder's editable
+  screen and appends no claim (WB23's claim half).
   Pin: tests/api-work-order-claim.test.ts 'a live claim by
        another member is a 409';
+       tests/api-work-order-claim.test.ts 'a foreign
+       live claim is 409 from the head' (decides the
+       409 body and that nothing is stored);
        tests/api-work-order-claim.test.ts 'two-actor
-       contention: exactly one claimed event lands and
-       exactly one request gets the byte-exact 409 body —
-       never which actor wins';
+       contention: the second claim on a stale tag is
+       412 and exactly one claimed event lands';
        tests/api-work-order-claim.test.ts 'an expired claim
        is superseded atomically' (the general
        never-overwritten-in-place invariant, though this
-       specific live two-tab drive is unlikely to trigger
-       an actual expiry); exploratory — tab 2's rendered
-       read-only/already-claimed view specifically
+       specific live drive is unlikely to trigger an
+       actual expiry); exploratory — Sarah's rendered
+       refusal
 
 ### Workbox — All-See-All Visibility
 
