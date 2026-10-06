@@ -42,7 +42,7 @@ trio's retirement
   as `fa_owner` — so the DDL is identical on every host
   and only memberships and secrets are the deployment's.
   Every role and login of ours carries the `fa_` prefix
-  (the naming bullet on the critical functionality path).
+  (item 15).
   Roles belong to the cluster: they outlive the wipe's
   schema drop, every database in the cluster sees them,
   and creating one twice fails (measured), so what
@@ -281,7 +281,7 @@ trio's retirement
   PUT `fa_owner` writes, its requester as the root's,
   whose `user-agent` line names the build that ran
   it, `fusion-angle/<sha>` (RFC 9110 §10.1.5; the SHA
-  `FA_GIT_SHA` supplies, its own bullet),
+  `FA_GIT_SHA` supplies, item 16),
   provenance the owner's `check` can report and
   never the key; and its `response`
   is the digest of its fixed SQL, DDL and DML
@@ -947,7 +947,7 @@ Off the critical path; each with its oracle.
   PUT with its original `If-Match` and gets 200 with
   the landed pair's `etag`, and `./test postgres`
   pins the same on the table
-- Everything we own, named `fa_` — so that operating the
+- **15.** Everything we own, named `fa_` — so that operating the
   system makes what is ours trivial to find:
   `env | grep FA_` lists every variable the system needs.
   Every environment variable the system reads becomes
@@ -1046,7 +1046,7 @@ Off the critical path; each with its oracle.
   foreign organization's retired document answers what
   its live one does; history and past versions answer
   410 with the document.
-- Admins act within their organization. Any
+- **14.** Admins act within their organization. Any
   organization's admin can write a password credential
   for an identity in another organization and sign in
   as it. `ROUTE_POLICY` grants `admin` every verb at
@@ -1303,7 +1303,7 @@ Off the critical path; each with its oracle.
   35-36`; examination report). Oracle: the sort
   helper takes the same string the keyed path does;
   a missing stamp throws
-- Wipe and reseed every live database onto the ledger
+- **17.** Wipe and reseed every live database onto the ledger
   store's table at the deploy of items 0–3. Nothing
   alters a database in place: the seed refuses one
   whose `fa_message_pairs` exists
@@ -2618,7 +2618,7 @@ Off the critical path; each with its oracle.
   and the loser's DDL gone; a second applies a table step
   to a database seeded from an older binary, and the new
   binary boots.
-- `FA_GIT_SHA` — the commit that built the running
+- **16.** `FA_GIT_SHA` — the commit that built the running
   binary, supplied by the environment as every `FA_`
   value is and never defaulted, read once at boot and
   carried in the context so every log line names the
@@ -2628,7 +2628,7 @@ Off the critical path; each with its oracle.
   `git rev-parse HEAD`, exact because the build refuses
   a dirty tree; on Render from the host's commit
   variable (`RENDER_GIT_COMMIT`), a name that stays at
-  the edge (the naming bullet). How the page bundle
+  the edge (item 15). How the page bundle
   learns it — embedded at build, or served — is this
   bullet's to settle. Nothing sends the token yet: the
   message-plane spec left it out
@@ -3119,7 +3119,7 @@ Off the critical path; each with its oracle.
   accepted; membership and versions kept today's power
   and left the question (`docs/superpowers/specs/`
   `2026-10-01-membership-and-versions-design.md:269-270`).
-  It lands beside the admin-reach bullet, which bounds
+  It lands beside item 14, which bounds
   whom an admin may name at all. Oracle: a seat the
   identity did not accept reads pending until it does,
   or the owner rules the direct seat a deliberate power
