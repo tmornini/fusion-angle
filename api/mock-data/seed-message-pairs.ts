@@ -911,7 +911,7 @@ export function flowOrg2SeedBody(): Record<string, unknown> {
 // the fence would hand it (Interpretation R). Generated rows
 // carry organization_id (STARK_ORGANIZATION, set by
 // generateFlowWorkload), so it is dropped here with the id.
-export function workOrderDocumentSeedBody(
+function workOrderDocumentSeedBody(
     row: Omit<WorkOrderFieldsEntity, 'organization_id'>
         & { readonly organization_id?: string },
 ): Record<string, unknown> {
@@ -973,7 +973,7 @@ export function workOrderCreateSeedBody(
 // join fields, no `id` (the create carries it at its top
 // level as flowWorkOrderId) — the three keys (flow_id,
 // work_order_id, at) validateFlowWorkOrderEntity accepts.
-export function flowWorkOrderJoinSeedBody(
+function flowWorkOrderJoinSeedBody(
     row: FlowWorkOrderEntity,
 ): Record<string, unknown> {
     const { id: _id, ...fields } = row;
