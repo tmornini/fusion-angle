@@ -993,7 +993,7 @@ Off the critical path; each with its oracle.
   is its own first attempt and holds its state. No
   client sends one today: the 412 loops read a fresh
   head and latch, and no `fetch` times out. The
-  retries bullet above makes it reachable, because a
+  retries bullet below makes it reachable, because a
   PUT resent after an unknown outcome would answer
   412 to its own success. How far to align is this
   bullet's brainstorm to decide.
