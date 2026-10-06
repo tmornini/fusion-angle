@@ -1,5 +1,5 @@
 import type {
-    WorkOrderEntity,
+    WorkOrderFieldsEntity,
     FlowWorkOrderEntity,
     StateEntity,
 } from '../../shared/types.ts';
@@ -102,7 +102,7 @@ const prcNodeArchive =
     'EaERqxsxebTdSPoZvihWjg';
 
 export function buildWorkOrders():
-    Omit<WorkOrderEntity, 'organization_id'>[] {
+    Omit<WorkOrderFieldsEntity, 'organization_id'>[] {
     return [
         {
             id: woId,

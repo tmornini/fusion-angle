@@ -1,12 +1,10 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import {
-    workOrderLifecycleStatesFor,
-    workOrderHistoryFor,
-} from '../api/derive-states.ts';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     documentCollectionGetHandler,
     type DocumentFamilyWiring,
@@ -275,8 +273,9 @@ Deno.test(
                 'wo.flow_graph',
             );
 
-        const events = await workOrderLifecycleStatesFor(db
-            , 'AjdvjuECVZEgZoFajaIEkg', woId);
+        const events = await getWorkOrderEvents(
+            db, token, 'AjdvjuECVZEgZoFajaIEkg', woId,
+        );
         const transitions = events.filter(
             e => e.state !== 'claimed'
                 && e.state !== 'claim_released'
@@ -312,8 +311,8 @@ Deno.test(
             + ' edges so the gate is reachable',
         );
 
-        const history = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, woId,
+        const history = await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, woId,
         );
         const values = history.flatMap(
             (row) => row.field_values,

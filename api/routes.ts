@@ -38,7 +38,6 @@ import type {
     RecordAttributeEntity,
     MembershipEntity,
     IdentityProviderEntity,
-    WorkOrderFlowGraph,
     MessagePairEntity,
     TransitionFieldValueEntity,
     MemberEntity,
@@ -254,7 +253,6 @@ import {
 } from './derive-identity-spine.ts';
 import {
     workOrderHeadFor,
-    workOrderHistoryFor,
 } from './derive-states.ts';
 import {
     boundVersion,
@@ -550,7 +548,10 @@ registerDocumentFamilyWiring(AI_AGENTS_WIRING);
 // alias.
 // GetHandler trails organization + roles (the fenced claim
 // projection). Existing handlers may ignore trailing args —
-// fewer-parameter closures are assignable.
+// fewer-parameter closures are assignable. No Route slot takes
+// one: a GET selects (SelectHandler) or is 405, so GetHandler
+// serves only documentGetHandler and
+// documentCollectionGetHandler.
 export type GetHandler = (
     adapter: DbAdapter,
     params: string[],
@@ -647,7 +648,6 @@ type PostHandler = (
 
 export interface Route {
     segments: string[];
-    get?: GetHandler;
     select?: SelectHandler;
     put?: PutHandler;
     patch?: PatchHandler;
@@ -661,7 +661,6 @@ export interface Route {
 export function route(
     pattern: string,
     handlers: {
-        get?: GetHandler;
         select?: SelectHandler;
         put?: PutHandler;
         patch?: PatchHandler;
@@ -1613,7 +1612,7 @@ function requirePair(
 // the flow join, in one statement. Both declare their
 // genesis, so a resent create answers 409 and stores
 // nothing. Every event is authored by the verified caller.
-async function postWorkOrderCreationOp(
+export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     actor: Id,
@@ -1814,22 +1813,6 @@ export async function deleteWorkOrderClaimOp(
     );
 }
 
-// The node a work order sits at: its version's state, or
-// its graph's create node before any event sets one;
-// undefined only for a graph with neither.
-function currentNodeIdFor(
-    version: WorkOrderVersion,
-    graph: WorkOrderFlowGraph,
-): string | undefined {
-    if (version.state !== undefined) {
-        return version.state;
-    }
-    const create = graph.nodes.find(
-        (node) => node.isCreate,
-    );
-    return create?.id;
-}
-
 // W10 required-at-exit: every gate-tier leave of a node
 // with isRequired refs validates MERGED state (head +
 // this delta). Unbound → 400 naming the bind (A3).
@@ -1856,10 +1839,7 @@ async function assertRequiredAttributesAtExit(
     const graph = asWorkOrderFlowGraph(
         version.flow_graph, 'work_orders.flow_graph',
     );
-    const nodeId = currentNodeIdFor(version, graph);
-    if (nodeId === undefined) {
-        return;
-    }
+    const nodeId = version.state;
     const node = graph.nodes.find(
         (candidate) => candidate.id === nodeId,
     );
@@ -2179,7 +2159,7 @@ export async function postWorkOrderTransitionOp(
 // check, and no instance read. No client sends the seed a
 // tag, so the handler latches the head it read
 // (Interpretation N). A legacy body's values are recorded
-// on its own event, as the history fold assigned them.
+// on its own event.
 export async function postSeedWorkOrderTransitionOp(
     db: DbAdapter,
     organization: Id,
@@ -2275,10 +2255,14 @@ export async function postWorkOrderBindingOp(
     );
 }
 
-// Work-order document PUT (§5): the received PUT is the
-// version, the request's fields over the head's facets
-// with no event of its own. Its own tag, or If-None-Match:
-// *, latches it; the statement judges it.
+// Work-order document PUT (§1): the request's fields over
+// the head's facets, with no event of its own. Only the
+// POST creates, so a conditional PUT on an absent work
+// order is the head read's miss, 404, whichever
+// conditional it carries (RFC 9110 §13.2.1); a foreign
+// path is the fence's 403 before this runs. Its own tag
+// latches it; If-None-Match: * on a work order that
+// exists is the statement's 412.
 export async function postWorkOrderDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -2291,16 +2275,11 @@ export async function postWorkOrderDocumentOp(
     const fields = validateWorkOrderDocumentBody(
         withoutId(body),
     ).entity;
-    const head = await workOrderHeadFor(db, org, id);
+    const head = await requireWorkOrderHead(db, org, id);
     await runStateWrite(db, {
         kind: 'own',
         received: requirePair(messagePair),
-        state: fieldsVersion(
-            head === null
-                ? { id, organization_id: org }
-                : head.version,
-            fields,
-        ),
+        state: fieldsVersion(head.version, fields),
     });
 }
 
@@ -3255,8 +3234,7 @@ export async function postInstanceDeleteOp(
 // frozen flow_graph. Entity-scoped in-tx reads only
 // (collectAttributeReferrers shape): ONE collection-prefix
 // read names the work orders; each head version carries
-// its binding and its node. A WO with no transition yet
-// sits at its graph's isCreate node. Terminal = no
+// its binding and its node. Terminal = no
 // outgoing edge.
 async function inFlightPlacementBlockersFor(
     view: DbAdapter,
@@ -3287,12 +3265,7 @@ async function inFlightPlacementBlockersFor(
             head.version.flow_graph,
             'work_orders.flow_graph',
         );
-        const nodeId = currentNodeIdFor(
-            head.version, graph,
-        );
-        if (nodeId === undefined) {
-            continue;
-        }
+        const nodeId = head.version.state;
         const inFlight = graph.edges.some(
             (edge) => edge.fromNodeId === nodeId,
         );
@@ -4435,6 +4408,11 @@ export const routes: Route[] = [
         select: documentSelect(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
     }),
+    // A work order's history is its versions (spec §3):
+    // every PUT, oldest first, each as stored; the
+    // create's received POST is not a version.
+    documentVersionsSelectRoute(WORK_ORDERS_WIRING),
+    documentVersionSelectRoute(WORK_ORDERS_WIRING),
     // PUT claims and DELETE releases: operations on the work
     // order, answering its state. Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.
@@ -4484,21 +4462,6 @@ export const routes: Route[] = [
                 requireOrganization(organization), messagePair,
             ),
     }),
-    // GET work-orders/:id/history (states-URI elimination A1):
-    // the version chain's events, newest first.
-    // Miss posture lives inside workOrderHistoryFor (empty →
-    // missedReadError). No api.ts pre-dispatch guard — the
-    // derive reads only this org's paths.
-    // Member-tier GET via matchesOnSegmentBoundary on
-    // '/work-orders'.
-    route('organizations/:id/work-orders/:id/history', {
-        get: (db, p, _actor, organization) =>
-            workOrderHistoryFor(
-                db,
-                requireOrganization(organization),
-                param(p, 1),
-            ),
-    }),
     // Flow work-order joins nest under their parent flow:
     // param 0 is the path org, param 1 is the flow, so the
     // SERVER filters the collection to that flow. The leaf
@@ -4524,8 +4487,8 @@ export const routes: Route[] = [
             ),
     }),
     // GET states/:id/field-values RETIRED (states-URI
-    // elimination C4): field values fold inline on
-    // GET organizations/:id/work-orders/:id/history.
+    // elimination C4): field values ride the events of
+    // GET organizations/:id/work-orders/:id/versions/.
     // PUT/DELETE states/:id/field-values/:fvid RETIRED
     // (Phase 15 Task 7): live writes ride the transition
     // fold only. WRITE_RESPONSE_SPECS entry + seed document
@@ -5439,10 +5402,9 @@ export const routes: Route[] = [
     }),
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3): the five-source union is gone.
-    // Per-entity history lives on GET <family>/:id/history
-    // (work-orders stay /history; every other family stays
-    // /versions/). Nested field-values collection retired
-    // with C4 (inline fold on WO history). bare states/:id
+    // Per-entity history lives on GET <family>/:id/versions/.
+    // Nested field-values collection retired with C4
+    // (events carry them). bare states/:id
     // is already a router 404 (states-document retirement
     // Task 13). Per-entity history alias retired with C2.
 ];

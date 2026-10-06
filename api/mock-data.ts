@@ -16,12 +16,11 @@ import {
     postProjectDocumentOp,
     postFlowCreationOp,
     postFlowDocumentOp,
-    postWorkOrderDocumentOp,
+    postWorkOrderCreationOp,
     postWorkOrderTransitionOp,
     postSeedWorkOrderTransitionOp,
     postWorkOrderBindingOp,
     postInstancePatchOp,
-    postFlowWorkOrderDocumentOp,
     postFlowRecordDocumentOp,
     postRecordWriteOp,
     postObjectiveCreationOp,
@@ -117,9 +116,9 @@ import {
     buildScoreSeedProjects,
     flowSeedBody,
     flowOrg2SeedBody,
-    workOrderDocumentSeedBody,
+    workOrderCreateSeedBody,
+    seedWorkOrderTraces,
     transitionSeedBody,
-    flowWorkOrderJoinSeedBody,
     flowRecordJoinSeedBody,
     recordSeedBody,
     objectiveSeedBody,
@@ -155,8 +154,6 @@ import type {
 import { instancesUriPrefix } from
     './derive-record-instances.ts';
 import { workOrderHeadFor } from './derive-states.ts';
-import { byAtThenIdAscending } from
-    '../shared/identifier.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
@@ -545,22 +542,22 @@ async function postValueBearingTransitionIn(
 // Each work order's trace is one chain in (at, id) order: a
 // transition lands a version, so no wave holds two writers
 // of one document (Interpretation R). Chains run
-// concurrently. WO01 binds before its first value-bearing
-// move, and those moves ride the live op.
+// concurrently, from each trace's third event: the create
+// carries the first two. WO01 binds before its first
+// value-bearing move, and those moves ride the live op.
 async function postWorkOrderChainsIn(
     adapter: DbAdapter,
     messagePairs: ReadonlyMap<string, MessagePair>,
     chain: InstanceChainSeedInput,
     requestAt: string,
-    events: readonly StateEntity[],
+    traces: ReadonlyMap<Id, readonly StateEntity[]>,
 ): Promise<void> {
-    const traces = Map.groupBy(events, (event) => event.entity_id);
     const valueBearing = new Map([
         [chain.review.event.id, chain.review],
         [chain.complete.event.id, chain.complete],
     ]);
     await Promise.all([...traces.values()].map(async (trace) => {
-        const ordered = trace.toSorted(byAtThenIdAscending);
+        const ordered = trace.slice(2);
         const firstValueBearing = ordered.find(
             (event) => valueBearing.has(event.id),
         );
@@ -965,6 +962,14 @@ async function postMockDataLoadIn(
 
     const aiMembers = buildAiMembers();
 
+    const workOrderTraces = seedWorkOrderTraces([
+        ...mockStateEvents, ...leadToCloseData.stateEvents,
+    ]);
+    const joinByWorkOrder = new Map([
+        ...mockFlowWorkOrders,
+        ...leadToCloseData.flowWorkOrders,
+    ].map((join) => [join.work_order_id, join]));
+
     await Promise.all([
         ...ideaSubmissions.map(r =>
             postIdeaSubmissionOp(
@@ -977,35 +982,24 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        ...mockWorkOrders.map(r =>
-            postWorkOrderDocumentOp(
+        ...[
+            ...mockWorkOrders,
+            ...leadToCloseData.workOrders,
+        ].map((wo) => {
+            const trace = workOrderTraces.get(wo.id)!;
+            return postWorkOrderCreationOp(
                 adapter,
-                r.id,
-                workOrderDocumentSeedBody(r),
-                SYSTEM_MEMBER_ID,
+                workOrderCreateSeedBody(
+                    wo, joinByWorkOrder.get(wo.id)!, trace,
+                ),
+                trace[0]!.member_id,
                 requireMessagePair(
                     messagePairs,
-                    seedMessagePairKey(
-                        'work-orders/:id', r.id,
-                    ),
+                    seedMessagePairKey('work-orders', wo.id),
                 ),
                 STARK_ORGANIZATION,
-            ),
-        ),
-        ...mockFlowWorkOrders.map(r =>
-            postFlowWorkOrderDocumentOp(
-                adapter,
-                r.id,
-                flowWorkOrderJoinSeedBody(r),
-                SYSTEM_MEMBER_ID,
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'flows/:id/work-orders/:woid', r.id,
-                    ),
-                ),
-            ),
-        ),
+            );
+        }),
         ...aiMembers.map(m => {
             const { id: _id, ...fields } = m;
             return postAiAgentDocumentOp(
@@ -1018,35 +1012,6 @@ async function postMockDataLoadIn(
                 ),
             );
         }),
-        ...leadToCloseData.workOrders.map(r =>
-            postWorkOrderDocumentOp(
-                adapter,
-                r.id,
-                workOrderDocumentSeedBody(r),
-                SYSTEM_MEMBER_ID,
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'work-orders/:id', r.id,
-                    ),
-                ),
-                STARK_ORGANIZATION,
-            ),
-        ),
-        ...leadToCloseData.flowWorkOrders.map(r =>
-            postFlowWorkOrderDocumentOp(
-                adapter,
-                r.id,
-                flowWorkOrderJoinSeedBody(r),
-                SYSTEM_MEMBER_ID,
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'flows/:id/work-orders/:woid', r.id,
-                    ),
-                ),
-            ),
-        ),
         ...mockRecords.map((r, i) => {
             const genesis = recordGenesisById.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -1120,7 +1085,7 @@ async function postMockDataLoadIn(
         messagePairs,
         input.instanceChain,
         input.requestAt,
-        [...mockStateEvents, ...leadToCloseData.stateEvents],
+        workOrderTraces,
     );
 
     // A score or revision author is always a member of the

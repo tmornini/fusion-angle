@@ -1538,9 +1538,9 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/organizations/id/work-orders/id/history',
+        hash: 'get/organizations/id/work-orders/id/versions',
         verb: 'GET',
-        uri: '/api/organizations/:id/work-orders/:id/history',
+        uri: '/api/organizations/:id/work-orders/:id/versions/',
         body: 'none',
         headers:
         [
@@ -1555,6 +1555,32 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+            '410',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/work-orders/id/versions/etag',
+        verb: 'GET',
+        uri: '/api/organizations/:id/work-orders/:id/versions/:etag',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+            '410',
         ],
     },
     {

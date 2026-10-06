@@ -5,7 +5,6 @@ import {
 } from './db.ts';
 import type {
     Id, MessagePairEntity, StateEntity,
-    WorkOrderHistoryEventEntity,
 } from '../shared/types.ts';
 import {
     pickString,
@@ -27,31 +26,24 @@ import {
     membershipOf,
     membershipsOfIdentity,
 } from './memberships.ts';
-import {
-    historyOf,
-    type WorkOrderVersion,
-} from './work-order-version.ts';
+import type { WorkOrderVersion } from './work-order-version.ts';
 
 // Message-plane lifecycle derives and ownership resolution
 // (Phase 11
 // onward; bulk lifecycle collection retired — states-URI
 // elimination C3). Per-entity history rides GET
-// <family>/:id/history (work-orders) or /versions/
-// (every other family). Surviving derives in this module:
+// <family>/:id/versions/. Surviving derives in this module:
 //   (a) flows — the per-id derive*StateHistory reader lives
 //       in its own family module; write paths use flows'
 //       own currentDocumentState / row-stamped trio.
 //   (b) deriveMemberStates RETIRED (C4) — leftover
 //       /members/ document-trio history; nothing reads
 //       that collection.
-//   (c) workOrderLifecycleStatesFor / workOrderHistoryFor — the
-//       work order's version chain: each version records only
-//       its own events.
-//   (d) flow-graph node/edge sidecars — live on the flow
+//   (c) flow-graph node/edge sidecars — live on the flow
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
 //       No bulk derive remains (C3).
-//   (e) deriveInvitationStates — the invitation
+//   (d) deriveInvitationStates — the invitation
 //       documents' own PUT history: the
 //       grant's 'pending' and the later terminal PUT (spec
 //       2026-09-15 § 2). The answering ops (acceptance /
@@ -470,7 +462,7 @@ export async function missedReadError(
 // collection history routes fence via
 // resolveOwningOrganization / missedReadError directly.
 
-// ---- the work-order head and its version chain (§5) ------
+// ---- the work-order head (§5) -------------------------------------
 
 // The work order's head version, from its stored response
 // (§5). Null when it was never written or is gone.
@@ -500,69 +492,6 @@ function versionOf(pair: MessagePairEntity): WorkOrderVersion {
         );
     }
     return validateWorkOrderVersion(body);
-}
-
-// Every version the work order's PUTs stored, oldest first.
-// The create's received POST shares the document's name and
-// echoes its version, so only the PUT rows are versions.
-async function workOrderVersionsFor(
-    db: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<WorkOrderVersion[]> {
-    const pairs = await db.messagePairs.getDocumentHistory(
-        canonicalPath(organization, '/work-orders/'),
-        workOrderId,
-    );
-    return pairs
-        .filter((pair) => pair.method === 'PUT')
-        .map(versionOf);
-}
-
-// The lifecycle, oldest first: each version's own events in
-// chain order.
-export async function workOrderLifecycleStatesFor(
-    db: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<StateEntity[]> {
-    const versions = await workOrderVersionsFor(
-        db, organization, workOrderId,
-    );
-    return historyOf(versions).toReversed().map((event) => ({
-        id: event.id,
-        entity_id: workOrderId,
-        state: event.state,
-        member_id: event.member_id,
-        at: event.at,
-    }));
-}
-
-// GET work-orders/:id/history: the version chain's events,
-// newest first, each naming its work order. No event is a
-// miss (403 foreign, 404 absent).
-export async function workOrderHistoryFor(
-    db: DbAdapter,
-    organization: Id,
-    workOrderId: Id,
-): Promise<WorkOrderHistoryEventEntity[]> {
-    const versions = await workOrderVersionsFor(
-        db, organization, workOrderId,
-    );
-    const events = historyOf(versions);
-    if (events.length === 0) {
-        throw await missedReadError(
-            db, workOrderId, organization, 'work_orders',
-        );
-    }
-    return events.map((event) => ({
-        id: event.id,
-        entity_id: workOrderId,
-        state: event.state,
-        member_id: event.member_id,
-        at: event.at,
-        field_values: [...event.field_values],
-    }));
 }
 
 // deriveMemberStates / MEMBERS_DOCUMENT_PREFIX RETIRED
@@ -618,6 +547,6 @@ export async function deriveInvitationStates(
 // unionById / sameStateEntity RETIRED with the bulk lifecycle
 // collection (states-URI elimination C3). documentStateHeadFor
 // RETIRED with C5 (write paths use family currentDocumentState).
-// Per-entity history lives on GET <family>/:id/history and
-// family-scoped derives (derive*StateHistory,
-// workOrderLifecycleStatesFor, invitation sources).
+// Per-entity history lives on GET <family>/:id/versions/ and
+// family-scoped derives (derive*StateHistory, invitation
+// sources).

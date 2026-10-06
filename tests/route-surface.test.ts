@@ -40,7 +40,12 @@ Deno.test('a fake sixth function key throws', () => {
 Deno.test('uriOf keeps the collection slash', () => {
     assertStrictEquals(
         uriOf(route('identities/', {
-            get: async () => ({}),
+            select: async () => ({
+                kind: 'collection',
+                heads: [],
+                lifecycle: 'stateless',
+                reader: { sees: 'whole' },
+            }),
         })),
         '/identities/',
     );
@@ -49,7 +54,12 @@ Deno.test('uriOf keeps the collection slash', () => {
 Deno.test('uriOf names an item with its param', () => {
     assertStrictEquals(
         uriOf(route('identities/:id', {
-            get: async () => ({}),
+            select: async () => ({
+                kind: 'collection',
+                heads: [],
+                lifecycle: 'stateless',
+                reader: { sees: 'whole' },
+            }),
         })),
         '/identities/:id',
     );

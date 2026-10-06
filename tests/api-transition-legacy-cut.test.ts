@@ -3,7 +3,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { fromFileUrl, join, relative } from '@std/path';
 import { handleRequest } from '../api/api.ts';
-import { GET, PUT } from './in-page-facade.ts';
+import { GET } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -24,25 +24,29 @@ import {
 } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-import { workOrderLifecycleStatesFor } from
-    '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 
 // Task 8 CUT — hard-cut at the gate for the legacy
 // fieldValues transition wire. Spec W2 / plan Task 8:
 // POST with the fieldValues key → 400; the below-facade
 // postSeedWorkOrderTransitionOp stays dual-tolerant for the
-// seed's ~859 pure-moves.
+// seed's 569 pure moves.
 // Gate-path rejection lives ONLY in the dispatch arrow.
 
 const ORGANIZATION = STARK_ORGANIZATION;
 const WO_ID = generateIdentifier();
 const NODE_NEXT = generateIdentifier();
+const FLOW_ID = generateIdentifier();
+const CREATE_NODE = generateIdentifier();
 const FIELD_VALUE_ID = generateIdentifier();
 const INSTANCE_ID = generateIdentifier();
 const TRANSITION_EVENT_ID = generateIdentifier();
@@ -111,14 +115,20 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    await PUT(
-        db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION,
+        id: WO_ID,
+        fields: {
             display_id: 'cut1',
             flow_graph: graphJson(),
             position: 1,
         },
-        DEV_TOKEN,
-        operationIdHeader([['If-None-Match', '*']]));
+        flowId: FLOW_ID,
+        births: [CREATE_NODE, CREATE_NODE],
+        at: nowUtc(),
+        token: DEV_TOKEN,
+        claim: 'released',
+    });
     return db;
 }
 
@@ -161,10 +171,11 @@ async () => {
     assertStrictEquals(res.status, 400);
     const err = await res.json() as { error: string };
     assertStrictEquals(err.error, RETIRED_MESSAGE);
-    const events = await workOrderLifecycleStatesFor(
-        db, ORGANIZATION, WO_ID,
+    const events = await getWorkOrderEvents(
+        db, DEV_TOKEN, ORGANIZATION, WO_ID,
     );
-    assertStrictEquals(events.length, 0);
+    // The three births and the release; the 400 adds none.
+    assertStrictEquals(events.length, 4);
 });
 
 Deno.test('gate POST with fieldValues bag AND set → 400',

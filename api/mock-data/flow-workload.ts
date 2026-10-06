@@ -1,5 +1,5 @@
 import type {
-    WorkOrderEntity,
+    WorkOrderFieldsEntity,
     FlowWorkOrderEntity,
     StateEntity,
     GraphNode,
@@ -59,7 +59,7 @@ export interface MemberSkill {
 
 export interface GeneratedFlowData {
     readonly workOrders:
-        readonly WorkOrderEntity[];
+        readonly WorkOrderFieldsEntity[];
     readonly flowWorkOrders:
         readonly FlowWorkOrderEntity[];
     readonly stateEvents:
@@ -99,7 +99,7 @@ export function generateFlowWorkload(args: {
         edges: flow.edges,
     };
 
-    const workOrders: WorkOrderEntity[] = [];
+    const workOrders: WorkOrderFieldsEntity[] = [];
     const flowWorkOrders:
         FlowWorkOrderEntity[] = [];
     const stateEvents: StateEntity[] = [];

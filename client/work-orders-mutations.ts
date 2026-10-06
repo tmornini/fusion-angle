@@ -14,7 +14,6 @@ import {
     isExpiresAtPassed,
 } from '../shared/work-order-claims.ts';
 import {
-    getWorkOrderHistory,
     toWorkOrder,
     type WorkOrder,
 } from './work-orders-queries.ts';
@@ -245,13 +244,10 @@ export async function postWorkOrderTransition(
         workOrder, edgeId, values, instance: heldInstance,
     } = input;
     const workOrderId = workOrder.id;
-    // Wave 1: history + record binding (both keyed by
-    // workOrderId); the work order itself is held.
-    const [history, recordId] =
-        await Promise.all([
-            getWorkOrderHistory(ctx, workOrderId),
-            getRecordForWorkOrder(ctx, workOrderId),
-        ]);
+    // Wave 1: record binding; the work order itself is
+    // held, and its head names the node it sits at.
+    const recordId =
+        await getRecordForWorkOrder(ctx, workOrderId);
     const fg = workOrder.flowGraph;
 
     const edge = fg.edges.find(
@@ -302,9 +298,8 @@ export async function postWorkOrderTransition(
     // match the node the operator is leaving.
     const violations =
         recordTransitionViolationsFrom(
-            workOrderId,
             fg,
-            history,
+            workOrder.nodeId,
             attributes,
             pendingValues,
             storedValues,

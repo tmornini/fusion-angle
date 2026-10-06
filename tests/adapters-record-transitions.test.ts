@@ -10,7 +10,10 @@ import {
 import {
     type RequestContext,
 } from '../client/request-context.ts';
-import { inPageContext } from './in-page-facade.ts';
+import {
+    inPageContext,
+    recordedContext,
+} from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -36,6 +39,8 @@ import {
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 const CREATE_NODE = generateIdentifier();
 const STEP_NODE = generateIdentifier();
@@ -96,44 +101,30 @@ function buildFlowGraph(
     };
 }
 
-// NAMED re-pin (Task 7): validateRecordTransition reads
-// organizations/:id/work-orders/:id through the flipped GET (this commit), so
-// the fixture must land through the SAME wire-reachable PUT
-// the live route serves — a raw db.workOrders.put leaves no
-// message pair at this document. The genesis transition ALSO
-// re-pins here (finding 15's fixture budget): getWorkOrder
-// TransitionEvents reads family /history, which is flipped
-// too — a raw db.states.put left no pair at that document
-// either.
+// validateRecordTransition reads organizations/:id/work-orders/:id
+// through the GET, and the work order's versions carry its
+// events: the work order lands through the live create,
+// its three births carrying the node it sits at.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
     id: string,
     flowGraph: WorkOrderFlowGraph,
     currentNodeId: string,
 ): Promise<void> {
-    const ctx = inPageContext(db, await organizationToken());
-    await ctx.PUT(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
-        {
+    await seedCreatedWorkOrder(db, {
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
+        id,
+        fields: {
             display_id: 'WO-1',
             flow_graph: storedWorkOrderFlowGraph(flowGraph),
             position: 0,
         },
-        'creates',
-    );
-    const read = await ctx.GET(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id,
-    );
-    // Genesis transition via the named op (states/:id
-    // retired). pure-move instance shape; no claim release.
-    await ctx.POST(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + id
-        + '/transition', {
-        transitionEventId: 't-create-' + id,
-        targetState: currentNodeId,
-        release: null,
-        transitionAt: AT_CREATED,
-    }, [read]);
+        flowId: generateIdentifier(),
+        births: [CREATE_NODE, currentNodeId],
+        at: AT_CREATED,
+        token: await organizationToken(),
+        claim: 'released',
+    });
 }
 
 // The binding PUT and the attribute PUT (below) both need
@@ -294,6 +285,33 @@ Deno.test(
         assertEquals(out, []);
     },
 );
+
+Deno.test('validateRecordTransition reads the head, no'
++ ' history', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedSystemMember(db);
+    const flowGraph = buildFlowGraph(
+        [
+            buildNode(CREATE_NODE, [], { isCreate: true }),
+            buildNode(TARGET_NODE),
+        ],
+        [buildEdge(EDGE_1, CREATE_NODE, TARGET_NODE)],
+    );
+    await seedWorkOrder(db, WO_ID, flowGraph, CREATE_NODE);
+    const { ctx, sent } = recordedContext(
+        db, await organizationToken(),
+    );
+    const out = await validateRecordTransition(
+        ctx, WO_ID, new Map(), new Map(),
+    );
+    assertEquals(out, []);
+    assertEquals(
+        sent.filter((r) => r.path.endsWith('/history')
+            || r.path.includes('/versions/')),
+        [],
+    );
+});
 
 Deno.test(
     'validateRecordTransition returns a required'

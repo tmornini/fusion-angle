@@ -42,6 +42,8 @@ import {
     apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // POST organizations/:id/work-orders/:id/transition — instance-head shape
 // (Task 4 dual-accept; Task 8 gate cut). Value-bearing
@@ -61,8 +63,7 @@ const ATTR_LOCKED = generateIdentifier();
 const ATTR_NUM = generateIdentifier();
 const INSTANCE_ID = generateIdentifier();
 const FR_ID = generateIdentifier();
-const FWO_ID = generateIdentifier();
-const FWO_UNBOUND = generateIdentifier();
+const NODE_CREATE = generateIdentifier();
 const NODE_NEXT = generateIdentifier();
 const INSTANCE_OTHER = generateIdentifier();
 
@@ -298,30 +299,21 @@ async function seedWorkOrder(
     db: MemoryDbAdapter,
     token: string,
     woId: string,
-    fwoId: string,
 ): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-            , token, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION,
+        id: woId,
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        { [IF_NONE_MATCH_HEADER]: '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    const join = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
-            + '/work-orders/' + fwoId,
+        flowId: FLOW_ID,
+        births: [NODE_CREATE, NODE_CREATE],
+        at: AT,
         token,
-        {
-            flow_id: FLOW_ID,
-            work_order_id: woId,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(join.status, 201);
+        claim: 'released',
+    });
 }
 
 async function seedLiveType(
@@ -448,12 +440,8 @@ async function seededBound(): Promise<{
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_B,
     );
     await seedFlow(db, adminToken);
-    await seedWorkOrder(
-        db, adminToken, WO_ID, FWO_ID,
-    );
-    await seedWorkOrder(
-        db, adminToken, WO_UNBOUND, FWO_UNBOUND,
-    );
+    await seedWorkOrder(db, adminToken, WO_ID);
+    await seedWorkOrder(db, adminToken, WO_UNBOUND);
     await seedLiveType(db, adminToken);
     await seedWritableText(db, adminToken);
     const etag = await seedInstance(db, adminToken);

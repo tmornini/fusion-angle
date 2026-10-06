@@ -24,11 +24,9 @@ import { membershipNameOf } from
 // pendingInvitationFor returns the SAME result pre-tx (the
 // plain adapter) and in-tx (an open read-transaction view, as
 // the pre-state-by-PUT transactions read them) — the
-// membershipExistsFor / drift-phase14-cores-parity.test.ts
-// precedent, applied to the write-path function itself
-// rather than the raw Task 1 cores beneath it. "The SAME
-// derivation" is thereby a proven property, not a
-// coincidence.
+// membershipExistsFor precedent, applied to the write-path
+// function itself. "The SAME derivation" is thereby a proven
+// property, not a coincidence.
 //
 // Phase 14 Task 3 ADDS to this proof: acceptInvitation's own
 // `already`-membership check calls membershipExistsFor before

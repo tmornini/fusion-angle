@@ -72,7 +72,6 @@ Deno.test('organization nest offers GET POST on /'
     );
     assert(col);
     assertStrictEquals(typeof col.route.select, 'function');
-    assertStrictEquals(col.route.get, undefined);
     assertStrictEquals(typeof col.route.post, 'function');
     const item = match(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
@@ -80,7 +79,6 @@ Deno.test('organization nest offers GET POST on /'
     );
     assert(item);
     assertStrictEquals(typeof item.route.select, 'function');
-    assertStrictEquals(item.route.get, undefined);
     assertStrictEquals(typeof item.route.put, 'function');
 });
 
@@ -91,7 +89,6 @@ Deno.test('identity nest offers GET on / and'
     );
     assert(col);
     assertStrictEquals(typeof col.route.select, 'function');
-    assertStrictEquals(col.route.get, undefined);
     assertStrictEquals(col.route.post, undefined);
     const item = match(
         '/identities/' + generateIdentifier()
@@ -99,7 +96,6 @@ Deno.test('identity nest offers GET on / and'
     );
     assert(item);
     assertStrictEquals(typeof item.route.select, 'function');
-    assertStrictEquals(item.route.get, undefined);
     assertStrictEquals(typeof item.route.put, 'function');
 });
 

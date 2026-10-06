@@ -21,13 +21,13 @@ import {
 } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-import { workOrderHistoryFor } from
-    '../api/derive-states.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
 
-// Task 3: history fold speaks BOTH transition shapes
+// Task 3: the versions' events speak BOTH transition shapes
 // (A4 shape-disjoint). Transition pairs seeded BELOW the
 // gate so new-shape bodies never hit the still-legacy
 // validator. Legacy path must stay byte-identical to
@@ -196,22 +196,6 @@ async function appendTransitionPair(
     return messagePair.id;
 }
 
-interface HistoryFieldValue {
-    id: string;
-    attribute_id: string;
-    value?: string;
-    cleared?: true;
-}
-
-interface HistoryEvent {
-    id: string;
-    entity_id: string;
-    state: string;
-    member_id: string;
-    at: string;
-    field_values: HistoryFieldValue[];
-}
-
 // Pin 1: legacy-only — the same fv row id in two
 // transitions; each event records its own value (a version
 // carries only its own events, never a later one's).
@@ -263,9 +247,9 @@ async () => {
         nowUtc(),
     );
 
-    const history = await workOrderHistoryFor(
-        db, ORGANIZATION, workOrderId,
-    ) as HistoryEvent[];
+    const history = await getWorkOrderEvents(
+        db, DEV_TOKEN, ORGANIZATION, workOrderId,
+    );
 
     const early = history.find((r) => r.id === teEarly);
     const late = history.find((r) => r.id === teLate);
@@ -324,16 +308,16 @@ async () => {
         nowUtc(),
     );
 
-    const history = await workOrderHistoryFor(
-        db, ORGANIZATION, workOrderId,
-    ) as HistoryEvent[];
+    const history = await getWorkOrderEvents(
+        db, DEV_TOKEN, ORGANIZATION, workOrderId,
+    );
 
     const other = history.find((r) => r.id === teOther);
     const row = history.find((r) => r.id === teNew);
     assert(other !== undefined);
     assert(row !== undefined);
     assertEquals(other!.field_values, []);
-    assertEquals(row!.field_values, [
+    assertEquals<unknown>(row!.field_values, [
         { id: 'UQTJZvCoKlFjEoDlDUwekw'
             , attribute_id: 'UQTJZvCoKlFjEoDlDUwekw', value: 'y' },
         { id: 'UZgNCkZlSJcSaAmAJuSkcw'
@@ -395,9 +379,9 @@ async () => {
         nowUtc(),
     );
 
-    const history = await workOrderHistoryFor(
-        db, ORGANIZATION, workOrderId,
-    ) as HistoryEvent[];
+    const history = await getWorkOrderEvents(
+        db, DEV_TOKEN, ORGANIZATION, workOrderId,
+    );
 
     const legacy = history.find((r) => r.id === teLegacy);
     const neu = history.find((r) => r.id === teNew);
@@ -413,16 +397,16 @@ async () => {
         Object.hasOwn(legacy!.field_values[0]!, 'cleared'),
         false,
     );
-    assertEquals(neu!.field_values, [
+    assertEquals<unknown>(neu!.field_values, [
         { id: ATTR_B0!, attribute_id: ATTR_B0!, cleared: true },
         { id: ATTR_B1!, attribute_id: ATTR_B1!, value: 'q' },
         { id: ATTR_B2!, attribute_id: ATTR_B2!, value: 'p' },
     ]);
 });
 
-// Pin 4: claim rows still field_values: []; DESC order.
-Deno.test('claim rows field_values []; history is (at, id)'
-+ ' DESC',
+// Pin 4: claim rows still field_values: []; chain order.
+Deno.test('claim rows field_values []; history is in chain'
++ ' order',
 async () => {
     const db = await seedBaseDb();
     const workOrderId = generateIdentifier();
@@ -444,9 +428,9 @@ async () => {
         nowUtc(),
     );
 
-    const history = await workOrderHistoryFor(
-        db, ORGANIZATION, workOrderId,
-    ) as HistoryEvent[];
+    const history = await getWorkOrderEvents(
+        db, DEV_TOKEN, ORGANIZATION, workOrderId,
+    );
 
     const claimed = history.find(
         (r) => r.state === 'claimed',
@@ -454,16 +438,12 @@ async () => {
     assert(claimed !== undefined);
     assertEquals(claimed!.field_values, []);
 
-    // Strict DESC on (at, id).
+    // Chain order, oldest first: `at` never precedes the
+    // previous event's, and ties are not broken by id.
     for (let i = 1; i < history.length; i++) {
-        const prev = history[i - 1]!;
-        const cur = history[i]!;
-        const ordered =
-            prev.at > cur.at
-            || (prev.at === cur.at && prev.id > cur.id);
         assert(
-            ordered,
-            'history must be (at, id) DESC',
+            history[i - 1]!.at <= history[i]!.at,
+            'history must be in chain order',
         );
     }
 });

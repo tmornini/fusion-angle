@@ -424,16 +424,15 @@ export interface StateEntity {
     state: string;
     member_id: Id;
     at: string;
-    // Work-order history rows, the only reader still
-    // shaped like a /versions index, may carry it.
-    // Value is that revision's pair id.
+    // A document lifecycle row may carry it. Value is that
+    // revision's pair id.
     etag?: string;
 }
 
-// Nested field-value shape on work-order history events
-// (GET work-orders/:id/history). Folded from transition pair
-// bodies — no state_event_id on the wire (the parent event
-// already carries id). Distinct from StateFieldValueEntity,
+// Nested field-value shape on work-order events (GET
+// work-orders/:id/versions/), from transition pair bodies —
+// no state_event_id on the wire (the parent event already
+// carries id). Distinct from StateFieldValueEntity,
 // which still carries state_event_id for the transition-body
 // validator and the seed's legacy trace bags.
 export interface TransitionFieldValueEntity {
@@ -448,12 +447,16 @@ export interface TransitionFieldValueEntity {
     readonly cleared?: true;
 }
 
-// Work-order history row: a lifecycle StateEntity plus the
-// transition field values whose state_event_id === id. Claim/
-// birth/release rows carry field_values: [].
-export interface WorkOrderHistoryEventEntity
-    extends StateEntity {
-    field_values: TransitionFieldValueEntity[];
+// One event a work-order version recorded (spec §4): a
+// move into a node, or a claim's birth, release, or
+// expiry. The path names its work order.
+export interface WorkOrderEventEntity {
+    readonly id: Id;
+    readonly state: string;
+    readonly member_id: Id;
+    readonly at: string;
+    readonly field_values:
+        readonly TransitionFieldValueEntity[];
 }
 
 export const SYSTEM_MEMBER_ID: Id = NIL_IDENTIFIER;
@@ -1270,12 +1273,26 @@ export function storedWorkOrderFlowGraph(
     };
 }
 
-export interface WorkOrderEntity {
+// A work order's own fields: what the seed authors and a
+// document PUT writes.
+export interface WorkOrderFieldsEntity {
     id: Id;
     organization_id: Id;
     display_id: string;
     flow_graph: Record<string, unknown>;
     position: number;
+}
+
+// A work order's stored version, as a GET serves it.
+export interface WorkOrderEntity extends WorkOrderFieldsEntity {
+    // The node the work order sits at, and who moved it
+    // there, when (spec §1).
+    state: Id;
+    transition: {
+        member_id: Id;
+        at: string;
+    };
+    events: WorkOrderEventEntity[];
     // GET embed when bound (absent when unbound).
     instance_id?: Id;
     record_type_id?: Id;

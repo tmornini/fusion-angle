@@ -57,9 +57,7 @@ import { postWorkOrderDocumentOp } from
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
-    workOrderLifecycleStatesFor,
     deriveInvitationStates,
-    workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
@@ -81,6 +79,9 @@ import {
     type StateEntity,
 } from '../shared/types.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
 // "id" key, so strip the id before validating each row.
@@ -98,9 +99,11 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 }
 
 // Every seeded work order's lifecycle across both seeded
-// organizations, by the entity-scoped derive (the bulk fold
-// is gone — spec 2026-09-15 § 5): one collection read per
-// organization lists the ids, then one scoped read each.
+// organizations, by the versions read (the bulk fold is gone
+// — spec 2026-09-15 § 5): one collection read per
+// organization lists the ids, then one versions read each.
+// An event names no work order (the path does), so each row
+// carries the id the read named, as a StateEntity does.
 async function seededWorkOrderLifecycle(
     db: MemoryDbAdapter,
 ): Promise<StateEntity[]> {
@@ -115,10 +118,20 @@ async function seededWorkOrderLifecycle(
             await db.messagePairs.getCollectionPairs(prefix),
             prefix,
         );
+        const token = await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', organization,
+        );
         for (const workOrderId of heads.keys()) {
-            rows.push(...await workOrderLifecycleStatesFor(
-                db, organization, workOrderId,
-            ));
+            const events = await getWorkOrderEvents(
+                db, token, organization, workOrderId,
+            );
+            rows.push(...events.map((event) => ({
+                id: event.id,
+                entity_id: workOrderId,
+                state: event.state,
+                member_id: event.member_id,
+                at: event.at,
+            })));
         }
     }
     return rows;
@@ -182,9 +195,10 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
 // Phase Final Task 2 / C3: bulk deriveStates retired — the
 // idea/project/objective/record-type legs rode the retired
 // walk (deriveIdeaStateHistory et al., now read through GET
-// above); work-order lifecycle and invitation-state rows are
-// still produced by surviving derives and still owe
-// validateStateEntity a caller.
+// above); the work-order rows are the versions read's events,
+// each carrying the id the read named, and the
+// invitation-state rows come from the surviving derive; both
+// still owe validateStateEntity a caller.
 Deno.test(
     'work-order and invitation state rows validate as'
     + ' StateEntity',
@@ -380,19 +394,20 @@ Deno.test('mock-data derived baseline/actual scores pass'
 const ZULU_6 =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
-// Phase Final Task 2 / C3: pin derived-plane .at via
-// surviving lifecycle derives (message plane is truth).
-Deno.test('mock-data derived lifecycle .at is 6-digit zulu',
+// Phase Final Task 2 / C3: pin the work-order events' .at
+// via the versions read (message plane is truth).
+Deno.test('mock-data work-order versions events .at is'
++ ' 6-digit zulu',
 async () => {
     const db = await seededDb();
     const rows = [
         ...await seededWorkOrderLifecycle(db),
     ];
-    assert(rows.length > 0, 'derived lifecycle empty');
+    assert(rows.length > 0, 'versions events empty');
     for (const row of rows) {
         assertMatch(
             row.at, ZULU_6,
-            'row ' + row.id + ' in derived lifecycle',
+            'row ' + row.id + ' in versions events',
         );
     }
 });
@@ -512,25 +527,18 @@ async () => {
 Deno.test('mock-data derived seed SFV pairs pass validator',
 async () => {
     const db = await seededDb();
-    // Seed field values ride transition folds; product reads
-    // fold them on work-order history (C4). Pin non-empty
-    // union over every seeded WO's history.
+    // Seed field values ride the versions' events (C4). Pin
+    // non-empty union over every seeded WO's events.
     const woIds = [
         ...buildWorkOrders().map(w => w.id),
         ...buildLeadToCloseWorkload().workOrders.map(w => w.id),
     ];
+    const token = await organizationToken();
     let total = 0;
     for (const id of woIds) {
-        // Seeded WOs with no lifecycle throw missedRead;
-        // only those with history contribute folds.
-        let history;
-        try {
-            history = await workOrderHistoryFor(
-                db, STARK_ORGANIZATION, id,
-            );
-        } catch {
-            continue;
-        }
+        const history = await getWorkOrderEvents(
+            db, token, STARK_ORGANIZATION, id,
+        );
         for (const ev of history) {
             total += ev.field_values.length;
             for (const fv of ev.field_values) {
@@ -566,7 +574,7 @@ Deno.test(
             db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, [],
         ) as WorkOrderEntity[];
         // C3: bulk deriveStates retired — WO lifecycle
-        // from the message-plane work-order derive.
+        // from each work order's versions read.
         const states = await seededWorkOrderLifecycle(db);
         // Phase Final Task 2: memberships + members from
         // the message plane.

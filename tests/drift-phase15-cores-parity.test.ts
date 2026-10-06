@@ -1,7 +1,6 @@
 import {
     assert,
     assertEquals,
-    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import {
@@ -9,14 +8,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import {
-    EntityNotFoundError,
-    TABLE_NAMES,
-} from '../api/db.ts';
+import { TABLE_NAMES } from '../api/db.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
     workOrderHeadFor,
-    workOrderHistoryFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import {
@@ -45,9 +40,13 @@ import {
 import { membershipOf, membershipsOfIdentity } from
     '../api/memberships.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { getWorkOrderEvents } from
+    './fixtures/work-order-events.ts';
 import { landMembership } from
     './membership-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import type { DbAdapter } from '../api/db.ts';
 import {
@@ -263,17 +262,20 @@ async () => {
     const graph1 = workOrderFlowGraph(4 * 60 * 60);
     const graph2 = workOrderFlowGraph(12 * 60 * 60);
 
-    const put1 = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, token, {
+    const created = await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: workOrderId,
+        fields: {
             display_id: 'before',
             flow_graph: graph1,
             position: 1,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(put1.status, 201);
-    await put1.body?.cancel();
+        flowId: generateIdentifier(),
+        births: [generateIdentifier(), generateIdentifier()],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const put2 = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -282,7 +284,7 @@ async () => {
             flow_graph: graph2,
             position: 3,
         },
-        { 'If-Match': put1.headers.get('ETag')! },
+        { 'If-Match': created.query('header.etag').toText() },
     ));
     assertStrictEquals(put2.status, 200);
     await put2.body?.cancel();
@@ -305,8 +307,8 @@ async () => {
 // -- claim graph parity (Phase 15 Task 2) ------------------------
 
 // Phase Final Task 2: claim graph is message-plane only.
-// Seed via PUT (document message pair, no birth claim) so the live
-// claim is a real append, not an idempotent re-claim.
+// Seed through the live create, its birth claim released, so
+// the live claim is a real append, not an idempotent re-claim.
 Deno.test('claim graph: pre-tx vs in-tx flow_graph parity and'
 + ' claim-outcome on the message plane',
 async () => {
@@ -316,17 +318,20 @@ async () => {
     const lockTimeoutSeconds = 8 * 60 * 60;
     const graph = workOrderFlowGraph(lockTimeoutSeconds);
 
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + workOrderId, token, {
+    const created = await seedCreatedWorkOrder(db, {
+        organization: STARK_ORGANIZATION,
+        id: workOrderId,
+        fields: {
             display_id: 'p15-cg-' + workOrderId,
             flow_graph: graph,
             position: 2,
         },
-        { 'If-None-Match': '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    await put.body?.cancel();
+        flowId: generateIdentifier(),
+        births: [generateIdentifier(), generateIdentifier()],
+        at: nowUtc(),
+        token,
+        claim: 'released',
+    });
 
     const preTx = await headVersionOf(db, workOrderId);
     const inTx = await db.readTransaction(
@@ -340,8 +345,8 @@ async () => {
     );
     assertStrictEquals(headGraph.lockTimeout, lockTimeoutSeconds);
 
-    // Fresh PUT: the head carries no claim.
-    assertStrictEquals(Object.hasOwn(preTx!, 'claim'), false);
+    // The released head carries no claim.
+    assertStrictEquals(preTx!['claim'], undefined);
 
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
@@ -354,7 +359,7 @@ async () => {
             expireEventId: generateIdentifier(),
             expireAt: nowUtc(),
         },
-        { 'If-Match': put.headers.get('ETag')! },
+        { 'If-Match': created.query('header.etag').toText() },
     ));
     assertStrictEquals(claimResponse.status, 200);
     await claimResponse.body?.cancel();
@@ -1298,12 +1303,11 @@ async function transitionWithFieldValue(
     );
 }
 
-// Wire-shape pin (C4): GET organizations/:id/work-orders/:id/history is
-// 200 / 404 by document (own → rows with field_values;
-// never written here → 404; absent → 404). Field values
-// fold inline; the retired GET states/:id/field-values
-// three-way force lives here.
-Deno.test('work-order history GET: 200/404 two-way for'
+// Wire-shape pin (C4): GET organizations/:id/work-orders/:id/
+// versions/ is 200 / 404 by document (own → the events,
+// transition rows carrying field_values; never written here
+// → 404; absent → 404).
+Deno.test('work-order versions GET: 200/404 two-way for'
 + ' own / foreign-or-absent work orders', async () => {
     const db = await seededDb();
     const starkToken = await organizationToken(
@@ -1320,21 +1324,10 @@ Deno.test('work-order history GET: 200/404 two-way for'
         fieldValueId, WORKORDERID_ATTR,
     );
 
-    // (own) Stark sees the folded row on history.
-    const own = await handleRequest(
-        db,
-        req(
-            'GET',
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                + workOrderId + '/history',
-            starkToken,
-        ),
+    // (own) Stark sees the folded row on its versions.
+    const ownRows = await getWorkOrderEvents(
+        db, starkToken, STARK_ORGANIZATION, workOrderId,
     );
-    assertStrictEquals(own.status, 200);
-    const ownRows = await own.json() as {
-        id: string;
-        field_values: { id: string }[];
-    }[];
     const ownTe = ownRows.find(
         (r) => r.id === transitionEventId,
     );
@@ -1349,7 +1342,7 @@ Deno.test('work-order history GET: 200/404 two-way for'
         req(
             'GET',
             '/organizations/' + ORGANIZATION_TWO
-                + '/work-orders/' + workOrderId + '/history',
+                + '/work-orders/' + workOrderId + '/versions/',
             twoToken,
         ),
     );
@@ -1367,7 +1360,7 @@ Deno.test('work-order history GET: 200/404 two-way for'
         req(
             'GET',
             '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                + 'ecupcwyehqSNYeaJpJtNFw/history',
+                + 'ecupcwyehqSNYeaJpJtNFw/versions/',
             starkToken,
         ),
     );
@@ -1380,12 +1373,20 @@ Deno.test('work-order history GET: 200/404 two-way for'
     );
 });
 
-// Derive-path (C4): workOrderHistoryFor throws on foreign
-// miss (404) and absent (404); own still returns folded rows.
-Deno.test('workOrderHistoryFor visibility: own field_values,'
-+ ' foreign rejects, absent rejects',
+// The versions read (C4): the work order's events carry the
+// transition fold for the owner; a foreign organization's
+// owner probe is 404 and an absent id is 404, each with the
+// generic route's error body.
+Deno.test('work-order versions events: own field_values,'
++ ' foreign owner probe 404, absent 404',
 async () => {
     const db = await seededDb();
+    const starkToken = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
+    );
+    const twoToken = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
+    );
     const workOrderId = generateIdentifier();
     const transitionEventId = WORKORDERID_TE;
     const fieldValueId = WORKORDERID_FV;
@@ -1394,9 +1395,9 @@ async () => {
         fieldValueId, WORKORDERID_ATTR,
     );
 
-    // Own → history returns the transition fold.
-    const ownHistory = await workOrderHistoryFor(
-        db, STARK_ORGANIZATION, workOrderId,
+    // Own → the events carry the transition fold.
+    const ownHistory = await getWorkOrderEvents(
+        db, starkToken, STARK_ORGANIZATION, workOrderId,
     );
     const ownTe = ownHistory.find(
         (row) => row.id === transitionEventId,
@@ -1405,20 +1406,36 @@ async () => {
     assertStrictEquals(ownTe!.field_values.length, 1);
     assertStrictEquals(ownTe!.field_values[0]!.id, fieldValueId);
 
-    // Foreign → work-order ownership rejects.
-    await assertRejects(
-        () => workOrderHistoryFor(
-            db, ORGANIZATION_TWO, workOrderId,
+    // Foreign → the owner probe is 404, the generic text.
+    const foreign = await handleRequest(
+        db,
+        req(
+            'GET',
+            '/organizations/' + ORGANIZATION_TWO
+                + '/work-orders/' + workOrderId + '/versions/',
+            twoToken,
         ),
-        EntityNotFoundError,
+    );
+    assertStrictEquals(foreign.status, 404);
+    assertStrictEquals(
+        (await foreign.json() as { error: string }).error,
+        'Not found: work_orders/' + workOrderId,
     );
 
-    // Absent work order → EntityNotFoundError.
-    await assertRejects(
-        () => workOrderHistoryFor(
-            db, STARK_ORGANIZATION, GHOST_P15_VIS,
+    // Absent work order → 404, the generic text.
+    const absent = await handleRequest(
+        db,
+        req(
+            'GET',
+            '/organizations/' + STARK_ORGANIZATION
+                + '/work-orders/' + GHOST_P15_VIS + '/versions/',
+            starkToken,
         ),
-        EntityNotFoundError,
+    );
+    assertStrictEquals(absent.status, 404);
+    assertStrictEquals(
+        (await absent.json() as { error: string }).error,
+        'Not found: work_orders/' + GHOST_P15_VIS,
     );
 });
 

@@ -2,12 +2,8 @@ import type {
     FlowWorkOrderEntity,
     WorkOrderEntity,
     WorkOrderFlowGraph,
-    WorkOrderHistoryEventEntity,
+    WorkOrderEventEntity,
     Id,
-} from '../shared/types.ts';
-import {
-    msSinceUtc,
-    MS_PER_SECOND,
 } from '../shared/types.ts';
 import { asWorkOrderFlowGraph } from '../shared/flow-graph-body.ts';
 import {
@@ -20,8 +16,6 @@ import {
 } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import { byAtThenIdAscending } from
-    '../shared/identifier.ts';
 
 /* ── Types ───────────────── */
 
@@ -39,9 +33,9 @@ export interface HistoryEntry {
 }
 
 export type ClaimStatus =
-    | { kind: 'unclaimed' }
+    | { state: 'unclaimed' }
     | {
-        kind: 'claimed';
+        state: 'claimed';
         byCurrentMember: boolean;
         at: string;
     };
@@ -89,6 +83,17 @@ export function validateWorkOrderFlowGraph(
     );
 }
 
+// Absence of a claim is named at the adapter, so no
+// reader tests a field for undefined or null.
+export type WorkOrderClaim =
+    | { readonly state: 'unclaimed' }
+    | {
+        readonly state: 'claimed',
+        readonly memberId: Id,
+        readonly at: string,
+        readonly expiresAt: string,
+    };
+
 // The parsed domain twin of WorkOrderEntity: the
 // adapter is the divorce point, so above the storage
 // seam the flow graph is a real WorkOrderFlowGraph,
@@ -102,6 +107,9 @@ export interface WorkOrder {
     displayId: string;
     flowGraph: WorkOrderFlowGraph;
     position: number;
+    nodeId: Id;
+    transition: { readonly memberId: Id; readonly at: string };
+    claim: WorkOrderClaim;
     // Optional bind embed from GET (absent when unbound).
     instanceId?: Id;
     recordTypeId?: Id;
@@ -120,6 +128,19 @@ export function toWorkOrder(
             entity.flow_graph,
         ),
         position: entity.position,
+        nodeId: entity.state,
+        transition: {
+            memberId: entity.transition.member_id,
+            at: entity.transition.at,
+        },
+        claim: entity.claim === undefined
+            ? { state: 'unclaimed' }
+            : {
+                state: 'claimed',
+                memberId: entity.claim.member_id,
+                at: entity.claim.at,
+                expiresAt: entity.claim.expires_at,
+            },
     };
     if (
         entity.instance_id !== undefined
@@ -147,7 +168,7 @@ export interface StateFieldValue {
 // no map entry (Map.get returns undefined — the call
 // site treats that as "no field values").
 export function fieldValuesByEventFromHistory(
-    history: readonly WorkOrderHistoryEventEntity[],
+    history: readonly WorkOrderEventEntity[],
 ): Map<Id, StateFieldValue[]> {
     const byEvent = new Map<Id, StateFieldValue[]>();
     for (const row of history) {
@@ -163,76 +184,19 @@ export function fieldValuesByEventFromHistory(
     return byEvent;
 }
 
-/* ── Per-item history fan-in ────────── */
-
-// Parallel GET work-orders/:id/history for each given
-// work-order. Same Map shape as the retired bulk door.
-export async function getWorkOrderHistories(
-    ctx: RequestContext,
-    orders: readonly { readonly id: Id }[],
-): Promise<Map<Id, WorkOrderHistoryEventEntity[]>> {
-    const pairs = await Promise.all(
-        orders.map(async (row) => {
-            const history = (await ctx.GET<
-                WorkOrderHistoryEventEntity[]
-            >(
-                organizationItem(
-                    ctx, 'work-orders', row.id,
-                ) + '/history',
-            )).body().toValue();
-            return [row.id, history] as const;
-        }),
-    );
-    return new Map(pairs);
-}
-
-// Active claims: fan-in per-item history, then per-WO
-// activeClaimFromHistory against that order's lockTimeout
-// (passed in — timeout lives in the frozen flow_graph the
-// caller already parses). Orders without a timeout entry
-// are skipped (outside the work-order set).
-export async function getActiveClaimsByWorkOrder(
-    ctx: RequestContext,
-    lockTimeoutByWorkOrder: ReadonlyMap<Id, number>,
-): Promise<Map<Id, { memberId: Id; at: string }>> {
-    const histories = await getWorkOrderHistories(
-        ctx,
-        [...lockTimeoutByWorkOrder.keys()].map(
-            id => ({ id }),
-        ),
-    );
-    const out = new Map<
-        Id, { memberId: Id; at: string }
-    >();
-    for (const [entityId, history] of histories) {
-        const lockTimeout =
-            lockTimeoutByWorkOrder.get(entityId);
-        if (lockTimeout === undefined) continue;
-        const claim = activeClaimFromHistory(
-            history, lockTimeout,
-        );
-        if (claim !== null) {
-            out.set(entityId, claim);
-        }
-    }
-    return out;
-}
-
-// Project non-claim history rows into TransitionEvent
-// ASC order for presenters and the transition gate.
+// Project non-claim events into TransitionEvents in the
+// order given, which every caller passes in chain order.
 // Creation is first; each later event is a step from
-// the prior node. Consumers that need DESC (or the
-// raw wire) should read getWorkOrderHistory directly.
+// the prior node.
 export function projectTransitions(
     workOrderId: Id,
-    events: readonly WorkOrderHistoryEventEntity[],
+    events: readonly WorkOrderEventEntity[],
 ): TransitionEvent[] {
-    // ASC by the wire's (at, id) total order — not at alone.
-    // History is DESC; a stable sort on at would reverse
-    // equal-timestamp ties (same second, later id first).
+    // Chain order is the order (spec Decision 8): the
+    // ledger's, oldest first. Two events can share an `at`,
+    // so no sort on `at` or id may reorder them.
     const transitions = events
-        .filter(ev => !isClaimState(ev.state))
-        .toSorted(byAtThenIdAscending);
+        .filter(ev => !isClaimState(ev.state));
     const out: TransitionEvent[] = [];
     let prior: Id | null = null;
     for (const ev of transitions) {
@@ -255,128 +219,30 @@ export function projectTransitions(
     return out;
 }
 
-// Transitions for flow-stats and the workbox inbox:
-// fan-in per-item history, then per-entity projection.
-// Groups with only claim events produce no map entry
-// (empty transition list is not useful to callers).
-export async function getTransitionEventsByWorkOrder(
-    ctx: RequestContext,
-): Promise<Map<Id, TransitionEvent[]>> {
-    const orders = (await ctx.GETCollection<{ id: Id }>(
-        organizationCollection(ctx, 'work-orders'),
-    )).map((m) => m.body().toValue());
-    const histories = await getWorkOrderHistories(
-        ctx, orders,
-    );
-    const out = new Map<Id, TransitionEvent[]>();
-    for (const [entityId, history] of histories) {
-        const events = projectTransitions(
-            entityId, history,
-        );
-        if (events.length === 0) continue;
-        out.set(entityId, events);
-    }
-    return out;
-}
+/* ── Reads ───────────────── */
 
-/* ── Per-id history ──────── */
-
-// GET work-orders/:id/history — lifecycle events with
-// field_values folded inline, (at, id) DESC (index 0
-// is current). Source of truth for every single-WO
-// lifecycle read below.
-export async function getWorkOrderHistory(
+// GET work-orders/:id/versions/: every version the work
+// order stored, oldest first, each the stored response.
+export async function getWorkOrderVersions(
     ctx: RequestContext,
     id: Id,
-): Promise<WorkOrderHistoryEventEntity[]> {
-    return (await ctx.GET<WorkOrderHistoryEventEntity[]>(
+): Promise<HttpMessage<WorkOrderEntity>[]> {
+    return await ctx.GETCollection<WorkOrderEntity>(
         organizationItem(ctx, 'work-orders', id)
-            + '/history',
-    )).body().toValue();
-}
-
-// History is DESC: the first non-claim event is the
-// current node. Null when no transitions exist.
-export function currentNodeIdFromHistory(
-    history: readonly WorkOrderHistoryEventEntity[],
-): Id | null {
-    const latest = history.find(
-        ev => !isClaimState(ev.state),
-    );
-    return latest === undefined ? null : latest.state;
-}
-
-export async function getWorkOrderCurrentNodeId(
-    ctx: RequestContext,
-    workOrderId: Id,
-): Promise<Id | null> {
-    const history = await getWorkOrderHistory(
-        ctx, workOrderId,
-    );
-    return currentNodeIdFromHistory(history);
-}
-
-// History is DESC: the first claim-vocabulary event is
-// the latest claim state. A 'claimed' event older than
-// lockTimeout is implicitly expired.
-export function activeClaimFromHistory(
-    history: readonly WorkOrderHistoryEventEntity[],
-    lockTimeout: number,
-): { memberId: Id; at: string } | null {
-    const latest = history.find(
-        ev => isClaimState(ev.state),
-    );
-    if (
-        latest === undefined
-        || latest.state !== 'claimed'
-    ) {
-        return null;
-    }
-    if (
-        msSinceUtc(latest.at)
-        >= lockTimeout * MS_PER_SECOND
-    ) {
-        return null;
-    }
-    return {
-        memberId: latest.member_id,
-        at: latest.at,
-    };
-}
-
-export async function getWorkOrderActiveClaim(
-    ctx: RequestContext,
-    workOrderId: Id,
-    lockTimeout: number,
-): Promise<{ memberId: Id; at: string } | null> {
-    const history = await getWorkOrderHistory(
-        ctx, workOrderId,
-    );
-    return activeClaimFromHistory(
-        history, lockTimeout,
+            + '/versions/',
     );
 }
 
-export function transitionEventsFromHistory(
-    workOrderId: Id,
-    history: readonly WorkOrderHistoryEventEntity[],
-): TransitionEvent[] {
-    return projectTransitions(workOrderId, history);
-}
-
-export async function getWorkOrderTransitionEvents(
-    ctx: RequestContext,
-    workOrderId: Id,
-): Promise<TransitionEvent[]> {
-    const history = await getWorkOrderHistory(
-        ctx, workOrderId,
-    );
-    return transitionEventsFromHistory(
-        workOrderId, history,
+// A work order's events, in chain order: each version
+// carries the events it recorded, and versions arrive
+// oldest first.
+export function workOrderEventsOf(
+    versions: readonly HttpMessage<WorkOrderEntity>[],
+): WorkOrderEventEntity[] {
+    return versions.flatMap(
+        (version) => version.body().toValue().events,
     );
 }
-
-/* ── Reads ───────────────── */
 
 export async function getWorkOrderEntities(
     ctx: RequestContext,

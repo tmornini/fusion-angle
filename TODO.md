@@ -478,9 +478,7 @@ skew tests, which went with item 8's trio.
    53.8 → 54.1, identities 55.0 → 56.4, organization
    51.2 → 54.1. The fourth spec landed
    (`docs/superpowers/specs/2026-10-01-membership-and-versions-design.md`).
-   The census is one pattern,
-   `organizations/:id/work-orders/:id/history`
-   (`tests/parted-reads.test.ts`). `./test` 104.6 s →
+   The census emptied with the fifth spec. `./test` 104.6 s →
    112.8 s (medians of three; the base three
    invocations: parallel pass, serial lane, and tz; the
    tip two: parallel pass and tz); readyMs per list
@@ -492,69 +490,11 @@ skew tests, which went with item 8's trio.
    → 55.6 → 56.3, workbox 142.0 → 142.3 → 141.5,
    members 54.1 → 55.1 → 52.1, identities 56.4 → 53.5 →
    50.3, organization 54.1 → 54.8 → 49.7.
-   The fifth follows: work-order events, which builds
-   that read once, as a heads read of the work order's
-   event documents. The covenant, and
-   `## A response is one unit`, still land with the
-   fifth, in the commit that empties the census
-   (spec §12, `## For the next brainstorms`). That
-   heading is not in ARCHITECTURE.md yet. Today one
-   GET route answers handler JSON. Its
-   approved wording: "The API, the client, and the
-   application treat a response — status line, headers,
-   and body — as one unit. A stored response is a
-   response message: for a received request, the message
-   handed to the wire; for a sibling PUT, which received
-   nothing and sent nothing, the message a read of it
-   serves before the substitutions below. A read serves
-   those stored bytes with exactly three substitutions —
-   the status line, `date`, and `request-id`, the lines
-   that describe this transmission — and three additions
-   from the pair's envelope — `last-modified` and
-   `response-at` from `response_at`, and
-   `requester-identity-id` from `requester_identity_id`,
-   the lines that describe the write — made by ONE
-   function on the pair it serves;
-   `etag` and `operation-id` stay, naming the state and
-   the write that made it; the body
-   bytes are never touched, except that a document
-   whose fields carry read roles is projected to the
-   fields the reader may see, by that same function,
-   the only place a body is ever transformed. A list is
-   whole responses:
-   `multipart/mixed` of
-   `application/http; msgtype=response` parts, each the
-   unit a document GET serves. Nothing parts a response
-   into a body plus picked headers. The client keeps each
-   response whole, and pages and presenters read from the
-   unit they were given. The application derives from
-   `response` only, never from `request`." The landing
-   commit adds the file references: the one read function
-   and the client's splitter. Follows item 0.
-   Work-order events become a sub-collection of an
-   immutable document type. State by PUT keeps each
-   version's own lifecycle events inside the work-order
-   head (`events`, `api/work-order-version.ts`), a
-   collection embedded in a document. Each event is its
-   own document, written once at
-   `…/work-orders/:id/events/:eventId` by a sibling PUT
-   with a handler genesis in the operation's statement;
-   the work-order head keeps its fields, node, binding,
-   and claim, and history reads the events collection.
-   Immutable document types make that a rule, not a
-   habit: a family declares itself immutable where it
-   declares its conditional, and then every write to it
-   is a genesis landed with the never-written latch, so
-   the statement refuses a second write at a written name
-   (412 for a client's declaration, 409 for a handler's)
-   and at a retired one (410); its DELETE route answers
-   405, and only erasure removes its pairs (the erasure
-   bullet), leaving the tombstone. Oracle: no work-order
-   version carries `events`; every event is a head with
-   exactly one version; a second write at an event's
-   name stores nothing; the history route answers
-   `tests/fixtures/work-order-histories.json`'s rows from
-   the collection, one statement per operation.
+   The fifth landed
+   (`docs/superpowers/specs/2026-10-04-work-order-events-design.md`):
+   a work order's history is its versions; every GET
+   serves a stored response, and the type system says
+   so (`ARCHITECTURE.md` § A response is one unit).
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
@@ -1555,8 +1495,9 @@ Off the critical path; each with its oracle.
   `--parallel`) saw 7,318 requests over a 36 s span (~200/s,
   peak 1,845 in one second); handler ms p50 0.57, p90 4.5,
   p99 100, max 244; 6,255 2xx, 1,057 4xx, 6 5xx. GET
-  `work-orders/:id/history` clusters at 100-102 ms (p90
-  100.7, max 102.3), unexplained. The probe's synchronous
+  `work-orders/:id/history` (the route is since retired)
+  clusters at 100-102 ms (p90 100.7, max 102.3),
+  unexplained. The probe's synchronous
   per-request append cost ~1.3 s on a 45 s suite. Suite
   throughput through the memory backend is not a load test;
   the Postgres origin (`--base-url`) is where a rate means
@@ -1566,17 +1507,6 @@ Off the critical path; each with its oracle.
   per-route figures to `measurements/`; `--visualize` draws
   the three charts; `--check` gates per-route p90 against
   `measurements/budgets.json`.
-- The work-order history list still lacks a slash:
-  `organizations/:id/work-orders/:id/history`
-  (`api/routes.ts:4494`). Its two client reads append
-  `/history` (`client/work-orders-queries.ts:181`,
-  `:294`). Version lists end in a slash, including
-  `identities/:id/invitations/:membership-id/versions/`
-  (`api/routes.ts:3664`) and instance versions
-  (`INSTANCE_VERSIONS_PATTERN`,
-  `api/family-registry.ts:125`). The fifth spec
-  inherits the history route. Oracle: no route in
-  `api/routes.ts` that returns a list lacks the slash.
 - The refresh lock `fusion-refresh`, the peer channel
   `fusion-angle:refresh`
   (`client/session-refresh-mutex.ts:8-9`), and the
@@ -2710,9 +2640,7 @@ Off the critical path; each with its oracle.
   `HEAD` to the API: now that a document GET serves the
   stored response with three substitutions and three
   additions (`servedResponse`,
-  `api/served-response.ts:74`; one route stays parted,
-  `organizations/:id/work-orders/:id/history`,
-  `tests/parted-reads.test.ts`),
+  `api/served-response.ts:74`; no route stays parted),
   `HEAD` is that function without the body.
   `last-modified` makes `If-Modified-Since` possible.
   No handler reads it. Conditional
@@ -3287,6 +3215,18 @@ Off the critical path; each with its oracle.
   is 400, and an accepted membership with no seat is
   201. Left on `7bfb1702`. Oracle: that comment does
   not say "live seat".
+- Immutable document types. A family declares itself
+  immutable where it declares its conditional; every
+  write is a genesis under the never-written latch, so a
+  second write at a written name stores nothing (412 for
+  a client's declaration, 409 for a handler's) and a
+  retired name answers 410; DELETE answers 405; only
+  erasure removes pairs. Its consumer is the join
+  documents: `postFlowWorkOrderDocumentOp` and
+  `postFlowRecordDocumentOp` (`api/routes.ts`) land a PUT
+  with no latch, so a second PUT at a join's name replaces
+  what it joins. Oracle: a second PUT at a written join
+  name stores nothing and answers 409 or 412.
 
 ## Sequencing
 

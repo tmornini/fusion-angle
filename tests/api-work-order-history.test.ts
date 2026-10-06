@@ -1,72 +1,38 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
+import { assertStrictEquals } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { handleRequest } from '../api/api.ts';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
-import { DEV_TOKEN, organizationToken } from
-    './token-fixtures.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { seedCurrentMember } from './member-fixtures.ts';
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
 } from '../shared/types.ts';
-import {
-    ORGANIZATION_TWO,
-    STARK_ORGANIZATION,
-} from '../api/mock-data/seed-constants.ts';
-import { buildWorkOrders } from
-    '../api/mock-data/work-orders.ts';
-import { seededMockDb } from './mock-seed.ts';
-import {
-    postSeedWorkOrderTransitionOp,
-} from '../api/routes.ts';
-import { workOrderHistoryFor } from
-    '../api/derive-states.ts';
-import {
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
-import {
-    apiRequest,
-} from './http-fixtures.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
+import { apiRequest } from './http-fixtures.ts';
 
-// GET organizations/:id/work-orders/:id/history — Phase A1 of states-URI
-// elimination. Lifecycle events DESC (index 0 = current),
-// with transition field_values folded inline; claim/birth/
-// release rows carry []. Miss posture: empty lifecycle →
-// missedReadError → 404 miss at this document / 404 absent.
+// A work order's history is its versions (ARCHITECTURE.md
+// § Do not resurrect): `…/history` is not a route, so the
+// router answers 404 whatever the work order holds.
 
-const WORK_ORDER_ID = generateIdentifier();
 const NODE_START = generateIdentifier();
 const NODE_MIDDLE = generateIdentifier();
 const NODE_FINISH = generateIdentifier();
 const FLOW_ID = generateIdentifier();
 const EDGE_2 = generateIdentifier();
-const ATTR_SEVERITY = generateIdentifier();
-const FIELD_VALUE_ID = generateIdentifier();
-const TRANSITION_EVENT_ID = generateIdentifier();
-const FWO_ID = generateIdentifier();
-const EV_1 = generateIdentifier();
-const EV_2 = generateIdentifier();
-const EV_3 = generateIdentifier();
 
 function req(
     method: string,
     path: string,
     token?: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
 ): Request {
     return apiRequest({
         method,
         path,
         ...(token !== undefined ? { token } : {}),
-        body,
-        ...(headers !== undefined ? { headers } : {}),
     });
 }
 
@@ -111,292 +77,53 @@ function flowGraph(): Record<string, unknown> {
     return graph as unknown as Record<string, unknown>;
 }
 
-function createBody() {
-    // Birth ats must precede later claim/transition/release
-    // pair envelopes (nowUtc at write time) so applyReleasePair
-    // still sees a live prior claim.
-    const t0 = nowUtc();
-    const t1 = nowUtc();
-    const t2 = nowUtc();
-    return {
-        id: WORK_ORDER_ID,
-        workOrder: {
-            display_id: 'hist-1',
+Deno.test('a work order\'s /history is a router 404',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = DEV_TOKEN;
+    const id = generateIdentifier();
+    await seedCreatedWorkOrder(db, {
+        organization: 'AjdvjuECVZEgZoFajaIEkg', id,
+        fields: {
+            display_id: 'WO-H',
             flow_graph: flowGraph(),
             position: 1,
         },
-        flowWorkOrderId: FWO_ID,
-        flowWorkOrder: {
-            flow_id: FLOW_ID,
-            work_order_id: WORK_ORDER_ID,
-            at: nowUtc(),
-        },
-        stateEventIds: [EV_1, EV_2, EV_3],
-        states: [NODE_START, NODE_MIDDLE, 'claimed'],
-        stateEventAts: [t0, t1, t2],
-    };
-}
-
-interface HistoryFieldValue {
-    id: string;
-    attribute_id: string;
-    value: string;
-}
-
-interface HistoryEvent {
-    id: string;
-    entity_id: string;
-    state: string;
-    member_id: string;
-    at: string;
-    field_values: HistoryFieldValue[];
-}
-
-async function seededChainDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    await seedCurrentMember(db);
-
-    const created = await handleRequest(
-        db,
-        req('POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            , DEV_TOKEN, createBody()),
-    );
-    assertStrictEquals(created.status, 201);
-
-    // Task 8 CUT: legacy fieldValues fold is below-gate
-    // stored-data seed (live wire rejects the key).
-    const transitionBody: Record<string, unknown> = {
-        transitionEventId: TRANSITION_EVENT_ID,
-        targetState: NODE_MIDDLE,
-        fieldValues: [
-            {
-                id: FIELD_VALUE_ID,
-                fields: {
-                    state_event_id:
-                        TRANSITION_EVENT_ID,
-                    attribute_id: ATTR_SEVERITY,
-                    value: 'high',
-                },
-            },
-        ],
-        release: null,
-        transitionAt: nowUtc(),
-    };
-    const pathSegments = [
-        'organizations', STARK_ORGANIZATION,
-        'work-orders', WORK_ORDER_ID, 'transition',
-    ];
-    const pattern = 'organizations/:id/work-orders/:id/transition';
-    const messagePair = await formWriteMessagePair({
-        method: 'POST',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: pattern,
-        routeSegments: pattern.split('/'),
-        pathSegments,
-        headerFields: [],
-        body: transitionBody,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: nowUtc(),
-        organization: STARK_ORGANIZATION,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
+        flowId: FLOW_ID,
+        births: [NODE_START, NODE_MIDDLE], at: nowUtc(),
+        token, claim: 'kept',
     });
-    await postSeedWorkOrderTransitionOp(
-        db, STARK_ORGANIZATION, WORK_ORDER_ID, transitionBody,
-        'XXZruirZyAOoRpNxaDnpSA', messagePair,
-    );
+    const res = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/work-orders/' + id + '/history',
+        token,
+    }));
+    assertStrictEquals(res.status, 404);
+    await res.body?.cancel();
+});
 
-    const read = await handleRequest(db, req(
-        'GET',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + WORK_ORDER_ID,
-        DEV_TOKEN,
-    ));
-    await read.body?.cancel();
-    const release = await handleRequest(
-        db,
-        req(
-            'DELETE',
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                + WORK_ORDER_ID + '/claim',
-            DEV_TOKEN,
-            undefined,
-            { 'If-Match': read.headers.get('ETag')! },
-        ),
-    );
-    assertStrictEquals(release.status, 200);
-    await release.body?.cancel();
-
-    return db;
-}
+// Bulk GET work-orders/history is deleted.
 
 Deno.test(
-    'GET organizations/:id/work-orders/:id/history returns 200 DESC rows;'
-    + ' row[0] is current; transition carries field_values;'
-    + ' claim rows carry []',
+    'an unknown work-order id under /work-orders/ is 404,'
+    + ' with and without a stored work order',
     async () => {
-        const db = await seededChainDb();
-        const res = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                    + WORK_ORDER_ID + '/history',
-                DEV_TOKEN,
-            ),
-        );
-        assertStrictEquals(res.status, 200);
-        const rows = await res.json() as HistoryEvent[];
-
-        // birth(3) + transition(1) + release(1) = 5.
-        assertStrictEquals(rows.length, 5);
-
-        // DESC: index 0 is the latest event (release).
-        assertStrictEquals(rows[0]!.state, 'claim_released');
-        assertEquals(rows[0]!.field_values, []);
-
-        // Earliest birth is last.
-        assertStrictEquals(rows[4]!.id, EV_1);
-        assertStrictEquals(rows[4]!.state, NODE_START);
-
-        // Transition row carries folded field values.
-        const transition = rows.find(
-            (row) => row.id === TRANSITION_EVENT_ID,
-        );
-        assert(transition !== undefined);
-        assertStrictEquals(transition!.state, NODE_MIDDLE);
-        assertEquals(transition!.field_values, [
-            {
-                id: FIELD_VALUE_ID,
-                attribute_id: ATTR_SEVERITY,
-                value: 'high',
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: generateIdentifier(),
+            fields: {
+                display_id: 'WO-H',
+                flow_graph: flowGraph(),
+                position: 1,
             },
-        ]);
-
-        // Birth claim row carries [] (no transition fold).
-        const claimed = rows.find(
-            (row) => row.id === EV_3,
-        );
-        assert(claimed !== undefined);
-        assertStrictEquals(claimed!.state, 'claimed');
-        assertEquals(claimed!.field_values, []);
-
-        // Every row names this work order.
-        for (const row of rows) {
-            assertStrictEquals(row.entity_id, WORK_ORDER_ID);
-            assertStrictEquals(row.member_id, 'XXZruirZyAOoRpNxaDnpSA');
-            assert(Array.isArray(row.field_values));
-        }
-
-        // Strict DESC on (at, id).
-        for (let i = 1; i < rows.length; i++) {
-            const prev = rows[i - 1]!;
-            const cur = rows[i]!;
-            const ordered =
-                prev.at > cur.at
-                || (prev.at === cur.at && prev.id > cur.id);
-            assert(
-                ordered,
-                'history must be (at, id) DESC',
-            );
-        }
-    },
-);
-
-// Covenant: concurrent prefix reads must not reorder
-// events. Two consecutive derives on one db equal.
-Deno.test(
-    'workOrderHistoryFor is identical on two consecutive reads',
-    async () => {
-        const db = await seededChainDb();
-        const first = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, WORK_ORDER_ID,
-        );
-        const second = await workOrderHistoryFor(
-            db, STARK_ORGANIZATION, WORK_ORDER_ID,
-        );
-        assertEquals(first, second);
-    },
-);
-
-Deno.test(
-    'foreign work order history → 404 at this document',
-    async () => {
-        const db = await seededMockDb();
-        const foreignId = buildWorkOrders()[0]!.id;
-        const tokenTwo = await organizationToken(
-            'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
-        );
-        const res = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/' + ORGANIZATION_TWO
-                    + '/work-orders/' + foreignId + '/history',
-                tokenTwo,
-            ),
-        );
-        assertStrictEquals(res.status, 404);
-        const body = await res.json() as { error: string };
-        assertStrictEquals(
-            body.error,
-            'Not found: work_orders/' + foreignId,
-        );
-    },
-);
-
-Deno.test(
-    'absent work order history → 404',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        const missingId = 'oYnbiWXzroVnyolOhmkBIQ';
-        const res = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                    + missingId + '/history',
-                DEV_TOKEN,
-            ),
-        );
-        assertStrictEquals(res.status, 404);
-        const body = await res.json() as { error: string };
-        assertStrictEquals(
-            body.error,
-            'Not found: work_orders/' + missingId,
-        );
-    },
-);
-
-Deno.test(
-    'unauthenticated work order history → 401',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        const res = await handleRequest(
-            db,
-            req(
-                'GET',
-                '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-                    + WORK_ORDER_ID + '/history',
-            ),
-        );
-        assertStrictEquals(res.status, 401);
-        const body = await res.json() as { error: string };
-        assertStrictEquals(body.error, 'invalid_token');
-    },
-);
-
-// Bulk GET work-orders/history is deleted. Callers fan-in
-// per-item GET work-orders/:id/history.
-
-Deno.test(
-    'GET organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/history is 404',
-    async () => {
-        const db = await seededChainDb();
+            flowId: FLOW_ID,
+            births: [NODE_START, NODE_MIDDLE], at: nowUtc(),
+            token: DEV_TOKEN, claim: 'kept',
+        });
         const collection = await handleRequest(
             db,
             req(

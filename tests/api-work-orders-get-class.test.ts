@@ -22,12 +22,14 @@ import {
     partsOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // GET work-orders (inbox) and GET
 // organizations/:id/work-orders/:id are Stream: a work
 // order's head is its whole state, binding included (§5).
-// Work-order history is Assemble over the version chain and
-// stays /history, not /versions.
+// Work-order history is its versions: versions/ serves the
+// stored parts; /history is a router 404.
 
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -38,8 +40,6 @@ const TYPE_ID = generateIdentifier();
 const ATTR_ID = generateIdentifier();
 const INSTANCE_ID = generateIdentifier();
 const FR_ID = generateIdentifier();
-const FWO_ID = generateIdentifier();
-const FWO_UNBOUND = generateIdentifier();
 const NODE_START = generateIdentifier();
 const NODE_FINISH = generateIdentifier();
 
@@ -124,30 +124,21 @@ async function seedWorkOrder(
     db: MemoryDbAdapter,
     token: string,
     woId: string,
-    fwoId: string,
 ): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-            , token, {
+    await seedCreatedWorkOrder(db, {
+        organization: ORGANIZATION,
+        id: woId,
+        fields: {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
         },
-        { [IF_NONE_MATCH_HEADER]: '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    const join = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID
-            + '/work-orders/' + fwoId,
+        flowId: FLOW_ID,
+        births: [NODE_START, NODE_START],
+        at: AT,
         token,
-        {
-            flow_id: FLOW_ID,
-            work_order_id: woId,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(join.status, 201);
+        claim: 'released',
+    });
 }
 
 async function seedLiveType(
@@ -235,10 +226,8 @@ async function seededDb(): Promise<{
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION,
     );
     await seedFlow(db, token);
-    await seedWorkOrder(db, token, WO_ID, FWO_ID);
-    await seedWorkOrder(
-        db, token, WO_UNBOUND, FWO_UNBOUND,
-    );
+    await seedWorkOrder(db, token, WO_ID);
+    await seedWorkOrder(db, token, WO_UNBOUND);
     await seedLiveType(db, token);
     await seedAttribute(db, token);
     await seedInstance(db, token);
@@ -366,7 +355,8 @@ function createBody(id: string) {
     };
 }
 
-Deno.test('work-order history stays /history, not /versions',
+Deno.test('work-order versions are stored parts and'
++ ' /history is 404',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -383,14 +373,22 @@ async () => {
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             + '/history', token,
     ));
-    assertStrictEquals(history.status, 200);
-    assert(Array.isArray(await history.json()));
+    assertStrictEquals(history.status, 404);
+    await history.body?.cancel();
 
     const versions = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
+            + '/versions/', token,
+    ));
+    assertStrictEquals(versions.status, 200);
+    assertStrictEquals((await partsOf(versions)).length, 1);
+
+    const slashless = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + WO_ID
             + '/versions', token,
     ));
-    assertStrictEquals(versions.status, 404);
+    assertStrictEquals(slashless.status, 404);
+    await slashless.body?.cancel();
 
     const bulk = await handleRequest(db, req(
         'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'

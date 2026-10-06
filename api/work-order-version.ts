@@ -1,6 +1,6 @@
-// A work order's whole state (§5): its fields, its node,
-// its binding, its claim, and the events this version
-// recorded. History is the chain of versions; no version
+// A work order's whole state (§5): its fields, its node
+// and the move into it, its binding, its claim, and the
+// events this version recorded. History is the chain of versions; no version
 // carries an earlier one's events. Every function here is
 // pure: the handler reads the head and the clock, then
 // asks for the next version.
@@ -8,6 +8,7 @@
 import type {
     Id,
     TransitionFieldValueEntity,
+    WorkOrderEventEntity,
 } from '../shared/types.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { microsOf } from '../shared/pair-root.ts';
@@ -19,12 +20,9 @@ export type WorkOrderClaim = {
     readonly expires_at: string,
 };
 
-export type WorkOrderEvent = {
-    readonly id: Id,
-    readonly state: string,
+export type WorkOrderTransition = {
     readonly member_id: Id,
     readonly at: string,
-    readonly field_values: readonly TransitionFieldValueEntity[],
 };
 
 export type WorkOrderFields = {
@@ -36,11 +34,12 @@ export type WorkOrderFields = {
 export type WorkOrderVersion = WorkOrderFields & {
     readonly id: Id,
     readonly organization_id: Id,
-    readonly state?: string,
+    readonly state: string,
+    readonly transition: WorkOrderTransition,
     readonly instance_id?: Id,
     readonly record_type_id?: Id,
     readonly claim?: WorkOrderClaim,
-    readonly events: readonly WorkOrderEvent[],
+    readonly events: readonly WorkOrderEventEntity[],
 };
 
 export type ClaimChange =
@@ -66,9 +65,8 @@ function ordered(version: WorkOrderVersion): WorkOrderVersion {
         display_id: version.display_id,
         flow_graph: version.flow_graph,
         position: version.position,
-        ...(version.state === undefined
-            ? {}
-            : { state: version.state }),
+        state: version.state,
+        transition: version.transition,
         ...(version.instance_id === undefined
             || version.record_type_id === undefined
             ? {}
@@ -94,7 +92,7 @@ function event(
     member: Id,
     at: string,
     fieldValueEntities: readonly TransitionFieldValueEntity[],
-): WorkOrderEvent {
+): WorkOrderEventEntity {
     return {
         id, state, member_id: member, at,
         field_values: fieldValueEntities,
@@ -130,6 +128,7 @@ export function createdVersion(input: {
         organization_id: input.organization_id,
         ...input.fields,
         state: node.state,
+        transition: { member_id: input.creator, at: node.at },
         claim: {
             member_id: input.creator,
             at: claimed.at,
@@ -156,16 +155,12 @@ function sameFields(
 // The PUT (§5): the request's fields over the head's
 // facets, no event. Fields equal to the head's are the
 // head, so the statement matches and nothing lands
-// (Decision 11). With no head the version is born with no
-// state.
+// (Decision 11).
 export function fieldsVersion(
-    head: WorkOrderVersion | {
-        readonly id: Id,
-        readonly organization_id: Id,
-    },
+    head: WorkOrderVersion,
     fields: WorkOrderFields,
 ): WorkOrderVersion {
-    if ('events' in head && sameFields(head, fields)) {
+    if (sameFields(head, fields)) {
         return head;
     }
     return ordered({ ...head, ...fields, events: [] });
@@ -274,12 +269,14 @@ export function transitionedVersion(
         return ordered({
             ...head,
             state: input.targetState,
+            transition: { member_id: input.member, at: input.at },
             events: [moved],
         });
     }
     return ordered({
         ...withoutClaim(head),
         state: input.targetState,
+        transition: { member_id: input.member, at: input.at },
         events: [
             moved,
             event(
@@ -313,13 +310,4 @@ export function boundVersion(
         return { kind: 'bound', version: head };
     }
     return { kind: 'rebound', to: head.instance_id };
-}
-
-// History is the version chain, oldest version first in,
-// every event newest first out.
-export function historyOf(
-    versions: readonly WorkOrderVersion[],
-): WorkOrderEvent[] {
-    return versions.flatMap((version) => version.events)
-        .reverse();
 }

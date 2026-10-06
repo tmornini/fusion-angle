@@ -26,7 +26,7 @@ import type {
     FlowEdgeEntity,
     FlowNodeMemberEntity,
     FlowNodeAttributeEntity,
-    WorkOrderEntity,
+    WorkOrderFieldsEntity,
     FlowWorkOrderEntity,
     StateFieldValueEntity,
     OrganizationEntity,
@@ -49,10 +49,11 @@ import type {
     MessagePairEntity,
     StateEntity,
     TransitionFieldValueEntity,
+    WorkOrderEventEntity,
 } from '../shared/types.ts';
 import type {
     WorkOrderClaim,
-    WorkOrderEvent,
+    WorkOrderTransition,
     WorkOrderVersion,
 } from './work-order-version.ts';
 import {
@@ -1529,7 +1530,7 @@ const WORK_ORDER_BODY_KEYS:
 
 export function validateWorkOrderEntity(
     body: Record<string, unknown>,
-): Omit<WorkOrderEntity, 'id'> {
+): Omit<WorkOrderFieldsEntity, 'id'> {
     assertOnlyKeys(
         body,
         WORK_ORDER_BODY_KEYS,
@@ -1559,7 +1560,7 @@ const WORK_ORDER_DOCUMENT_BODY_KEYS: readonly string[] = [
 
 export interface WorkOrderDocumentBody {
     readonly entity:
-        Omit<WorkOrderEntity, 'id' | 'organization_id'>;
+        Omit<WorkOrderFieldsEntity, 'id' | 'organization_id'>;
 }
 
 // The HTTP-body gate for PUT /work-orders/:id: UNLIKE every
@@ -1598,13 +1599,17 @@ export function validateWorkOrderDocumentBody(
 
 const WORK_ORDER_VERSION_KEYS: readonly string[] = [
     'id', 'organization_id', 'display_id', 'flow_graph',
-    'position', 'events',
+    'position', 'state', 'transition', 'events',
 ];
 
-// Absent until an event, a binding, or a claim sets them;
-// never null (Interpretation K).
+// Absent until a binding or a claim sets them; never null
+// (Interpretation K).
 const WORK_ORDER_VERSION_OPTIONAL: readonly string[] = [
-    'state', 'instance_id', 'record_type_id', 'claim',
+    'instance_id', 'record_type_id', 'claim',
+];
+
+const WORK_ORDER_TRANSITION_FACT_KEYS: readonly string[] = [
+    'member_id', 'at',
 ];
 
 const WORK_ORDER_CLAIM_FACT_KEYS: readonly string[] = [
@@ -1656,7 +1661,7 @@ function validateTransitionFieldValueEntity(
 function validateWorkOrderEvent(
     value: unknown,
     label: string,
-): WorkOrderEvent {
+): WorkOrderEventEntity {
     const event = asObject(value, label);
     assertOnlyKeys(event, WORK_ORDER_EVENT_KEYS, label);
     // A transition's event id is the caller's string
@@ -1690,6 +1695,20 @@ function validateWorkOrderClaimFact(
     };
 }
 
+function validateWorkOrderTransitionFact(
+    value: unknown,
+): WorkOrderTransition {
+    const label = 'WorkOrderVersion.transition';
+    const transition = asObject(value, label);
+    assertOnlyKeys(
+        transition, WORK_ORDER_TRANSITION_FACT_KEYS, label,
+    );
+    return {
+        member_id: pickIdentifier(transition, 'member_id'),
+        at: validateTimestampField(transition, 'at', label),
+    };
+}
+
 // A stored work-order version (the storage edge, §5), in
 // Interpretation K's key order.
 export function validateWorkOrderVersion(
@@ -1719,9 +1738,10 @@ export function validateWorkOrderVersion(
         display_id: pickString(body, 'display_id'),
         flow_graph: flowGraph,
         position: pickNumber(body, 'position'),
-        ...('state' in body
-            ? { state: pickString(body, 'state') }
-            : {}),
+        state: pickString(body, 'state'),
+        transition: validateWorkOrderTransitionFact(
+            body['transition'],
+        ),
         ...('instance_id' in body
             ? {
                 instance_id: pickIdentifier(
@@ -3679,8 +3699,8 @@ export interface WorkOrderTransitionRelease {
 // gate cut): the LIVE gate rejects the fieldValues key in
 // the dispatch arrow. This validator still accepts BOTH
 // shapes for the below-facade / stored-data tier (seed
-// pure-moves, history fold of stored pairs). Discriminated
-// on the presence of the `fieldValues` key.
+// pure-moves). Discriminated on the presence of the
+// `fieldValues` key.
 export interface WorkOrderLegacyTransitionBody {
     readonly kind: 'legacy';
     readonly transitionEventId: string;

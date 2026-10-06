@@ -807,7 +807,7 @@ Deno.test(
 );
 
 Deno.test(
-    'mock data lands every rehearsed row in fifteen'
+    'mock data lands every rehearsed row in thirteen'
         + ' statements, one per chain depth',
     async () => {
         const backend = new MemoryStorageBackend();
@@ -815,10 +815,10 @@ Deno.test(
             hashPassword: testHashPassword,
         });
         await postSeedLanding(backend, seed.rehearsal);
-        // The deepest chain is a work order's: fifteen
+        // The deepest chain is a work order's: thirteen
         // versions (measurements/probes/seed/shape.ts,
         // maxDepth).
-        assertStrictEquals(backend.statementExecutions(), 15);
+        assertStrictEquals(backend.statementExecutions(), 13);
         const landed = new Map(
             (await adapterOver(backend).messagePairs.getAll())
                 .map((row) => [row.id, row]),
@@ -1002,10 +1002,10 @@ Deno.test(
                 statement.rows.length === 3
                 && statement.rows[0]!.method === 'POST'
                 && statement.rows[0]!.path === transitionPath);
-        // WO01's chain places them fifth and sixth: each
+        // WO01's chain places them third and fourth: each
         // lands the work order's next version.
         assertEquals(
-            latched.map(({ depth }) => depth), [5, 6],
+            latched.map(({ depth }) => depth), [3, 4],
         );
         const create = statements.find((statement) =>
             statement.rows.some((row) =>

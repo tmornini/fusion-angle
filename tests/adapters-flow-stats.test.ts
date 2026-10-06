@@ -38,6 +38,8 @@ import {
 } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedCreatedWorkOrder } from
+    './work-order-fixtures.ts';
 
 // -- Fixture helpers --------------------------
 
@@ -114,9 +116,8 @@ function daysAgo(d: number): string {
 
 // A work-order transition, posted through the SAME
 // wire-reachable POST the live route serves
-// (postWorkOrderTransitionOp) — required for the flipped
-// history derive (Task 7), which
-// getTransitionEventsByWorkOrder reads, to derive it. A raw
+// (postWorkOrderTransitionOp) — required for the versions
+// read getFlowStats charts to find it. A raw
 // db.states.put left no message pair at this document.
 async function transitionWorkOrder(
     ctx: RequestContext,
@@ -182,7 +183,7 @@ function buildTestGraph(): {
 // -- Tests ------------------------------------
 
 Deno.test(
-    'getFlowStats does not GET work-orders/',
+    'getFlowStats reads each joined work order\'s versions',
     async () => {
         const paths: string[] = [];
         const organization = 'AjdvjuECVZEgZoFajaIEkg';
@@ -191,9 +192,6 @@ Deno.test(
             identity: { organization },
             GET: async (path: string) => {
                 paths.push(path);
-                if (path.endsWith('/history')) {
-                    return responseMessage([]);
-                }
                 if (path.endsWith(
                     '/invitations/?state=removed',
                 )) {
@@ -216,7 +214,7 @@ Deno.test(
             // A collection read records its path, then answers
             // the flow's one work-order join, the one work
             // order, and empty members, former members, agents,
-            // and histories; any other collection path is a
+            // and versions; any other collection path is a
             // fault.
             GETCollection: async (path: string) => {
                 paths.push(path);
@@ -234,7 +232,7 @@ Deno.test(
                     return [responseMessage({ id: 'w-coll' })];
                 }
                 if (
-                    path.endsWith('/history')
+                    path.endsWith('/versions/')
                     || path.endsWith(
                         '/invitations/?state=accepted',
                     )
@@ -265,14 +263,14 @@ Deno.test(
         assert(
             paths.some(p =>
                 p.endsWith(
-                    '/work-orders/w-join/history',
+                    '/work-orders/w-join/versions/',
                 ),
             ),
         );
         assertEquals(
             paths.some(p =>
                 p.endsWith(
-                    '/work-orders/w-coll/history',
+                    '/work-orders/w-coll/versions/',
                 ),
             ),
             false,
@@ -300,56 +298,49 @@ Deno.test(
         // Minimal VALID work-order graphs — the gate
         // demands shape, but getFlowStats reads from
         // flow-work-orders and flow transitions,
-        // not from work-order.flow_graph
-        // Phase Final Stage B: work_orders table retired —
-        // seed through the live document PUT.
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
-            display_id: 'WO-1',
-            flow_graph: {
-                name: 'Onboarding',
-                lockTimeout: 0, nodes: [], edges: [],
-            },
-            position: 1,
-        }, 'creates');
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNXXsTEwShOozlQCEWKIIw', {
-            display_id: 'WO-2',
-            flow_graph: {
-                name: 'Onboarding',
-                lockTimeout: 0, nodes: [], edges: [],
-            },
-            position: 2,
-        }, 'creates');
-
-        // yNSSnbrpacodQTzUEcdEVA belongs to ZOousbbnzpqlxJExVAruYQ;
-        // yNXXsTEwShOozlQCEWKIIw belongs to OTHER. NAMED re-pin
-        // (Task 7): getFlowStats reads
-        // organizations/:id/flows/:id/work-orders
-        // through the flipped GET.
+        // not from work-order.flow_graph. Each work order
+        // lands through the live create with its flow join;
+        // yNSSnbrpacodQTzUEcdEVA belongs to ZOousbbnzpqlxJExVAruYQ,
+        // yNXXsTEwShOozlQCEWKIIw to OTHER.
+        const token = await organizationToken();
         const otherFlow = generateIdentifier();
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/'
-            + generateIdentifier(), {
-            flow_id: 'ZOousbbnzpqlxJExVAruYQ',
-            work_order_id: 'yNSSnbrpacodQTzUEcdEVA',
-            at: daysAgo(45),
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: 'yNSSnbrpacodQTzUEcdEVA',
+            fields: {
+                display_id: 'WO-1',
+                flow_graph: {
+                    name: 'Onboarding',
+                    lockTimeout: 0, nodes: [], edges: [],
+                },
+                position: 1,
+            },
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+            births: [f1Graph.createId, f1Graph.createId],
+            at: daysAgo(40),
+            token,
+            claim: 'released',
         });
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + otherFlow + '/work-orders/'
-            + generateIdentifier(), {
-            flow_id: otherFlow,
-            work_order_id: 'yNXXsTEwShOozlQCEWKIIw',
-            at: daysAgo(45),
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: 'yNXXsTEwShOozlQCEWKIIw',
+            fields: {
+                display_id: 'WO-2',
+                flow_graph: {
+                    name: 'Onboarding',
+                    lockTimeout: 0, nodes: [], edges: [],
+                },
+                position: 2,
+            },
+            flowId: otherFlow,
+            births: [f1Graph.createId, f1Graph.createId],
+            at: daysAgo(40),
+            token,
+            claim: 'released',
         });
 
         // yNSSnbrpacodQTzUEcdEVA: '' → create → active → done
         // ~35 days in the active node, within 90-day window
-        await transitionWorkOrder(
-            ctx, 'yNSSnbrpacodQTzUEcdEVA',
-            generateIdentifier(), f1Graph.createId,
-            daysAgo(40),
-        );
         await transitionWorkOrder(
             ctx, 'yNSSnbrpacodQTzUEcdEVA',
             generateIdentifier(), f1Graph.activeId,
@@ -359,13 +350,6 @@ Deno.test(
             ctx, 'yNSSnbrpacodQTzUEcdEVA',
             generateIdentifier(), f1Graph.doneId,
             daysAgo(5),
-        );
-
-        // Other flow: '' → create. Must not affect stats.
-        await transitionWorkOrder(
-            ctx, 'yNXXsTEwShOozlQCEWKIIw',
-            generateIdentifier(), f1Graph.createId,
-            daysAgo(40),
         );
 
         const { model, graph } =
@@ -456,6 +440,73 @@ Deno.test(
     },
 );
 
+Deno.test('a rejected versions read leaves none in flight',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const flowId = generateIdentifier();
+    const built = buildTestGraph();
+    await seedFlow(
+        inPageContext(db, token), flowId, 'Stats',
+        built.graph,
+    );
+    const [failing, other] = [
+        generateIdentifier(), generateIdentifier(),
+    ];
+    for (const [position, id] of [failing, other].entries()) {
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg', id,
+            fields: {
+                display_id: 'WO-' + position,
+                flow_graph: {
+                    name: 'Stats', lockTimeout: 0,
+                    nodes: [], edges: [],
+                },
+                position,
+            },
+            flowId,
+            births: [built.createId, built.activeId],
+            at: daysAgo(1), token, claim: 'kept',
+        });
+    }
+    const inner = inProcessFetch(db);
+    let inFlight = 0;
+    let releaseHeld = (): void => {};
+    const held = new Promise<void>((resolve) => {
+        releaseHeld = resolve;
+    });
+    const fetch: typeof globalThis.fetch = async (
+        input, init,
+    ) => {
+        const path = new URL(new Request(input, init).url)
+            .pathname;
+        inFlight += 1;
+        try {
+            if (path.endsWith(failing + '/versions/')) {
+                throw new TypeError('network down');
+            }
+            if (path.endsWith('/versions/')) await held;
+            return await inner(input, init);
+        } finally {
+            inFlight -= 1;
+            if (path.endsWith(failing + '/versions/')) {
+                releaseHeld();
+            }
+        }
+    };
+    const ctx = createAppClient(
+        createHttpFacade(IN_PROCESS_ORIGIN, fetch),
+    ).requestContext(await organizationToken());
+    const inFlightAtRejection = await getFlowStats(
+        ctx, flowId, Date.now(),
+    ).then(
+        () => { throw new Error('expected a rejection'); },
+        () => inFlight,
+    );
+    assertStrictEquals(inFlightAtRejection, 0);
+});
+
 Deno.test(
     'getFlowStats lays out an auto-layout flow so the'
     + ' returned graph and stat model are not degenerate',
@@ -468,29 +519,23 @@ Deno.test(
         const autoGraph = buildTestGraph();
         await seedFlow(ctx, 'ZOousbbnzpqlxJExVAruYQ', 'AutoLayout'
             , autoGraph.graph);
-        // Phase Final Stage B: work_orders table retired.
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
-            + 'yNSSnbrpacodQTzUEcdEVA', {
-            display_id: 'WO-1',
-            flow_graph: {
-                name: 'AutoLayout',
-                lockTimeout: 0, nodes: [], edges: [],
+        await seedCreatedWorkOrder(db, {
+            organization: 'AjdvjuECVZEgZoFajaIEkg',
+            id: 'yNSSnbrpacodQTzUEcdEVA',
+            fields: {
+                display_id: 'WO-1',
+                flow_graph: {
+                    name: 'AutoLayout',
+                    lockTimeout: 0, nodes: [], edges: [],
+                },
+                position: 1,
             },
-            position: 1,
-        }, 'creates');
-        // NAMED re-pin (Task 7): same reason as above.
-        await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-            + 'ZOousbbnzpqlxJExVAruYQ/work-orders/'
-            + generateIdentifier(), {
-            flow_id: 'ZOousbbnzpqlxJExVAruYQ',
-            work_order_id: 'yNSSnbrpacodQTzUEcdEVA',
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+            births: [autoGraph.createId, autoGraph.createId],
             at: daysAgo(10),
+            token: await organizationToken(),
+            claim: 'released',
         });
-        await transitionWorkOrder(
-            ctx, 'yNSSnbrpacodQTzUEcdEVA',
-            generateIdentifier(), autoGraph.createId,
-            daysAgo(10),
-        );
         const { model, graph } =
             await getFlowStats(ctx, 'ZOousbbnzpqlxJExVAruYQ', Date.now());
         const graphPos = new Set(
