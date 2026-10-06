@@ -3156,6 +3156,17 @@ Off the critical path; each with its oracle.
   `2026-09-29-k17-signed-objective-score.md:656-657`).
   Oracle: the gauge names what its number is, for the
   eye and for a screen reader
+- The advisory-lock module outlived its locks.
+  `api/advisory-lock.ts` holds the notify channel, its
+  payload, and `POOL_MAX`; its `advisoryKey` and
+  `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have had no
+  product caller since 4175b2d5, and 'two first-writers:
+  one 201, not a double insert'
+  (`tests/pg-races.test.ts:241-258`) still holds a lock
+  the product no longer takes, so its hold no longer
+  bites. Oracle: the module's name says what it holds,
+  `advisoryKey` leaves with its tests, and the race test
+  holds only what the product holds
 
 ## Sequencing
 
