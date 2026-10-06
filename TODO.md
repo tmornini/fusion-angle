@@ -1067,20 +1067,21 @@ Off the critical path; each with its oracle.
 - Instances and bound work orders name the record-type
   version they were written against. An instance's state
   is `{ id, organization_id, record_type_id, values }`
-  (`api/derive-record-instances.ts:20-35`); it gains
+  (`instanceStateOf`, `api/routes.ts:3291-3302`); it gains
   `record_type_etag`, the type's head etag when the
   instance's version landed, beside `record_type_id`,
   which stays, so the body keeps every id in its path. A
   bound work order's version carries `instance_id` and
-  `record_type_id` (`api/work-order-version.ts:40`,
-  `:72-76`, `:288-295`); it gains `record_type_etag`
+  `record_type_id` (`api/work-order-version.ts:39`,
+  `:70-76`, `boundVersion` at `:289-311`); it gains
+  `record_type_etag`
   beside `record_type_id`. Oracle: an instance's GET and a
   bound work order's GET each carry `record_type_etag`
   equal to the record type's ETag at the write that
   produced that version, and a later type write leaves
   the older version's `record_type_etag` unchanged.
 - An idea converts whatever its state. The conversion
-  (`api/routes.ts:4265`) latches the idea on the client's
+  (`api/routes.ts:4059-4167`) latches the idea on the client's
   tag and runs one statement: the idea in order, the
   project and each baseline as declared geneses under the
   ids the client minted. Nothing reads the idea's state.
