@@ -416,20 +416,17 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
 // attributes use inline handlers (Task 23 retired flat
 // RECORDS_WIRING / RECORD_ATTRIBUTES_WIRING).
 //
-// The generic GET machinery (documentGetHandler/
-// documentCollectionGetHandler) this entityOf serves
-// flips onto objectives: GET objectives/:id and GET
-// objectives ride it. The wire row is constructed ID
-// FIRST — {id, organization_id, position} — the SAME
-// seven-sibling convention every shipped entityOf
-// follows; picked explicitly (pickNumber) rather than a
-// body spread: the wire body tolerates an organization_id
-// key alongside position, and a spread would let that raw,
-// unstamped key leak into the read path ahead of the
-// fenced `organization` argument — picking only
-// `position` closes that off by construction. Head
-// document → wire ObjectiveEntity. Entity fields and
-// domain `state` alike come from the head body.
+// The wire row is constructed ID FIRST — {id,
+// organization_id, position} — the SAME seven-sibling
+// convention every shipped entityOf follows; picked
+// explicitly (pickNumber) rather than a body spread: the
+// wire body tolerates an organization_id key alongside
+// position, and a spread would let that raw, unstamped
+// key leak into the read path ahead of the fenced
+// `organization` argument — picking only `position`
+// closes that off by construction. Head document → wire
+// ObjectiveEntity. Entity fields and domain `state`
+// alike come from the head body.
 function objectiveDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,

@@ -415,13 +415,11 @@ export function documentVersionSelectRoute(
     };
 }
 
-// The generic per-family list derivation, split out from
-// documentCollectionRoute below (mirroring documentGetHandler/
-// documentEntityRoute's own split) so a caller needing the bare
-// GetHandler value — routes.ts's route('flows', {...}), which
-// pairs this get with its own hand-written post — has one typed
-// exactly `GetHandler`, not `GetHandler | undefined` off a
-// constructed Route's optional field.
+// The generic per-family list derivation: a family's live
+// heads as wire entities, oldest first, a 'state' tombstone
+// omitted. No route serves it (a collection GET selects);
+// the derive, drift, and mock-data tests read a family's
+// entities through it, below the gate.
 export function documentCollectionGetHandler(
     wiring: DocumentFamilyWiring,
 ): GetHandler {
