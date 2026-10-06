@@ -75,7 +75,7 @@ export type TransitionEvent =
 
 /* ── Helpers ─────────────── */
 
-export function validateWorkOrderFlowGraph(
+function validateWorkOrderFlowGraph(
     raw: unknown,
 ): WorkOrderFlowGraph {
     return asWorkOrderFlowGraph(
