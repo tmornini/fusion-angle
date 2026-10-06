@@ -155,7 +155,7 @@ async () => {
     assertStrictEquals(wire.organization_id, organizationB);
 });
 
-Deno.test('foreign-id DELETE nested record-types is 204',
+Deno.test('foreign-id DELETE nested record-types is 404',
 async () => {
     const { db, organizationB } = await twoOrganizationDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA'

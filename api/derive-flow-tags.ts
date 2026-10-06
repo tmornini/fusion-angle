@@ -63,8 +63,9 @@ export async function deriveFlowTag(
         messagePairs, prefix,
     ).get(name);
     if (document === undefined) {
-        // Probe the parent flow: a foreign flow's tag 403s;
-        // a genuine miss on an own/absent flow stays 404.
+        // Probe the parent flow in the bound organization's
+        // own collection: a foreign flow is absent there,
+        // so its tag 404s, as does a miss on an own flow.
         throw await missedReadError(
             db, name, organization, FLOW_TAGS_TABLE, flowId,
         );

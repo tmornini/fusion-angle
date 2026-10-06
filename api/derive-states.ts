@@ -332,8 +332,10 @@ export async function resolveOwningOrganization(
 
 // Document-scoped 403-vs-404 probe. Same id at two
 // collections is two documents. Miss at THIS document is
-// 404. 403 only when this document has a live PUT the
-// caller may not have.
+// 404. The probe reads the bound organization's own
+// collection, so a foreign id in an organization-nested
+// family is a miss there: 404. Only the global plane
+// (organizations, invitations, role grants) can 403.
 const ROLE_GRANTS_URI_PREFIX =
     canonicalPath(undefined, '/role-grants/');
 
@@ -438,7 +440,12 @@ export async function resolveGlobalOwner(
 // Miss-path 403-vs-404 helper for org-scoped reads. Probe
 // THIS route's collection, not any row with this id.
 // owner-null → EntityNotFoundError (404); foreign →
-// ForeignOrganizationError (403). probeId defaults to id;
+// ForeignOrganizationError (403). The probe collection is
+// the bound organization's own (resolveGlobalOwner →
+// ownerProbeCollection), so an organization-nested
+// family's foreign id is owner-null: 404. Only the global
+// plane (organizations, invitations, role grants) can
+// reach 403. probeId defaults to id;
 // pass a parent id when the miss is on a nested child
 // (e.g. flow records probe the parent flow).
 export async function missedReadError(

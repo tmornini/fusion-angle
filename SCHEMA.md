@@ -69,8 +69,7 @@ same rows in an in-process Map keyed by table name.
    the root, and every pair, so a failed seed leaves no
    table (`./bin/postgres-seed`).
 8. **Tenancy rides `path`, and a membership's name.**
-   The store is global. The fence and the write
-   authorizer (`api/write-authorizer.ts`) enforce
+   The store is global. The fence enforces
    organization. A membership's name is
    `<organization-id>:<identity-id>`. On the organization nest,
    `membershipNameRefusal` compares only the organization half
