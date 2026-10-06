@@ -4663,25 +4663,40 @@ per-user visibility filter.
        signature is not something a `node:test` assertion
        decides
 - [ ] **WB23** Claim, release, and transition a work
-  order in two tabs: act in the first tab, then act on
-  the same work order in the second without reloading
-  it. PASS: each action reads the work order's head
-  when it is taken and latches that fresh tag, so the
-  second tab's action is judged against the first
-  tab's result rather than refused: a second claim
-  renews the holder's claim, a second release is a
-  200 no-op that stores nothing, and a second
-  transition lands on the fresh head. A value-bearing
-  transition also latches the instance tag the tab
-  loaded, so one sent over a changed instance shows
-  the 412 refusal. A reload shows the result.
-  Pin: tests/api-work-order-transition-instance.test.ts
+  order in two tabs of one cookie jar: act in the
+  first tab, then act on the same work order in the
+  second without reloading it. PASS: the second tab's
+  action is judged against the first tab's result
+  rather than refused. Claim: the second tab, opened
+  on the holder's live claim, shows the holder's
+  editable screen and appends no second claim (the
+  action screen claims on open only when the caller
+  holds no live claim). Release: after the first tab
+  releases, the second tab has repainted (a write
+  rings the same-origin bus); its Release reads the
+  work order's head at the click and DELETEs
+  `work-orders/:id/claim` latched on it — a 200 no-op
+  that stores nothing — then toasts "Work order
+  released" and lands on the inbox. Transition: after
+  the first tab transitions, the second tab has
+  repainted at the new state, and its transition
+  latches that head and lands. A value-bearing
+  transition sent over a changed instance shows the
+  412 refusal (WB19a's recovery). A reload shows the
+  result.
+  Pin: tests/browser/workbox-transition.test.ts 'a
+       second tab releases after the first released
+       (WB23)' (decides the second tab's Release sends
+       the DELETE, toasts, and lands on the inbox);
+       tests/api-work-order-release.test.ts 'a release
+       with no live claim answers the head' (decides
+       the 200 no-op stores nothing);
+       tests/api-work-order-transition-instance.test.ts
        'racing value-bearing transitions land once'
        (decides that of two transitions latched on one
        head, one lands and the other answers 412 with
        nothing stored); exploratory — the claim and
-       release races, the second tab's rendered
-       refusal, and the reload
+       transition halves, and the reload
 
 ---
 
