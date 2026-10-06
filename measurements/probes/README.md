@@ -2,6 +2,10 @@
 
 The scripts behind the figures TODO.md items 0 to 3 call
 "measured", recovered from the sessions that ran them.
+Items 0 and 1 have landed and left TODO.md; their
+specs run from
+`docs/superpowers/specs/2026-09-23-ledger-store-design.md`
+through `2026-10-04-work-order-events-design.md`.
 Postgres probes ran on Postgres 18.6 in Docker; Deno probes
 on Deno 2.9.6. Each script is as it ran, except that the
 Deno probes' imports now point into this tree instead of a
