@@ -9,6 +9,7 @@ import type {
     Id,
     TransitionFieldValueEntity,
     WorkOrderEventEntity,
+    WorkOrderFieldsEntity,
 } from '../shared/types.ts';
 import { addUtcSeconds } from '../shared/work-order-claims.ts';
 import { microsOf } from '../shared/pair-root.ts';
@@ -25,11 +26,9 @@ export type WorkOrderTransition = {
     readonly at: string,
 };
 
-export type WorkOrderFields = {
-    readonly display_id: string,
-    readonly flow_graph: Record<string, unknown>,
-    readonly position: number,
-};
+export type WorkOrderFields = Readonly<
+    Omit<WorkOrderFieldsEntity, 'id' | 'organization_id'>
+>;
 
 export type WorkOrderVersion = WorkOrderFields & {
     readonly id: Id,
