@@ -214,13 +214,6 @@ export class WorkboxDetailPresenter {
         this.#pickerItems = pickerItems;
         this.#conflictNotice = conflictNotice;
 
-        const sorted = [...transitions]
-            .sort(
-                (a, b) =>
-                    a.at
-                        .localeCompare(b.at),
-            );
-
         const head = this.#flowGraph.nodes.find(
             (n) => n.id === workOrder.nodeId,
         );
@@ -237,7 +230,7 @@ export class WorkboxDetailPresenter {
                     === this.#currentNode.id,
             );
         this.#history = buildHistory(
-            sorted,
+            transitions,
             fieldValuesByEvent,
             this.#flowGraph.nodes,
             memberMap,

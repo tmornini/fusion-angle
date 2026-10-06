@@ -816,6 +816,60 @@ Deno.test(
 );
 
 Deno.test(
+    'buildPage history follows the chain when a'
+    + ' later move carries an earlier clock',
+    () => {
+        const graph = makeFlowGraph({
+            nodes: [
+                makeNode({ id: 'n-1', name: 'Triage' }),
+                makeNode({ id: 'n-2', name: 'Review' }),
+                makeNode({
+                    id: 'n-3', name: 'Done',
+                    isArchive: true,
+                }),
+            ],
+        });
+        const presenter = makePresenter({
+            graph,
+            workOrder: makeWorkOrder(
+                graph, { nodeId: 'n-3' },
+            ),
+            transitions: [
+                makeCreation({
+                    id: 't-1',
+                    toNodeId: 'n-1',
+                    memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
+                    at:
+                        '2026-04-01T12:00:00.000000Z',
+                }),
+                makeStep({
+                    id: 't-2', fromNodeId: 'n-1',
+                    toNodeId: 'n-2',
+                    memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
+                    at:
+                        '2026-04-01T14:00:00.000000Z',
+                }),
+                makeStep({
+                    id: 't-3', fromNodeId: 'n-2',
+                    toNodeId: 'n-3',
+                    memberId: 'pnKMhTzcIZVQQBIoQlyAfw',
+                    at:
+                        '2026-04-01T13:00:00.000000Z',
+                }),
+            ],
+        });
+        const out = presenter.buildPage().toString();
+        // Newest-first in chain order: Bo's move, the
+        // chain's last, leads though its clock is
+        // earlier than Ada's.
+        assert(
+            out.indexOf('Bo Park')
+            < out.indexOf('Ada Park'),
+        );
+    },
+);
+
+Deno.test(
     'an active claim by the current member is'
     + ' reported as claimed with byCurrentMember',
     () => {
