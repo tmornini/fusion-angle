@@ -2744,7 +2744,9 @@ Off the critical path; each with its oracle.
   have no holder — the members page re-reads after a
   save (`web-app/members/detail.ts:563`) — and the one
   head a write verb owes is a composite shape for this
-  bullet to name. Oracle: every client read verb returns a
+  bullet to name. `postObjectiveCreation` and
+  `postObjectiveRevision` (`client/objectives.ts:261`,
+  `:296`) answer void too. Oracle: every client read verb returns a
   message, an array of messages, or a value whose
   `message` members name every response it was built
   from
