@@ -720,10 +720,12 @@ Off the critical path; each with its oracle.
   `select`. R7's primary clause is false: `regex` is
   always offered and a second pick adds a second row
   (`web-app/app/presenters/record-detail.ts:838-871,
-  901-909`; `api/validators.ts:2767-2783` accepts
-  duplicates). The walk decides whether that is a
-  defect; the pin
-  (`tests/presenter-record-detail.test.ts`) makes any
+  901-909`), and the three constraint maps accept
+  duplicates (`api/validators.ts:2649-2665`,
+  `:2754-2770`, `:2876-2890`). The walk decides whether
+  that is a defect; the pins
+  (`tests/presenter-record-detail.test.ts:122`, R7;
+  `:141`, R6) make any
   rewrite honest. G9's staleness was the corrupted test
   name, restored by the small-items sweep
 - A dragged objective slider's readout speaks a second
