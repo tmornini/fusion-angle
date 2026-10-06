@@ -3075,6 +3075,20 @@ Off the critical path; each with its oracle.
   node absent from the graph, a transition with no edge from
   the head's `state`, or a PUT whose `flow_graph` drops the
   head's `state`, is refused at the gate.
+- Seed pairs present no credentials. A seed row's
+  secrets columns hold zero bytes where a live write
+  stores its `authorization` line, and a seed pair
+  carries no `request-id` line: the ledger-seed spec's
+  Decision 3, a named departure from the axiom that a
+  pair stores what was received
+  (`docs/superpowers/specs/2026-09-23-ledger-seed-design.md:135-143`,
+  `:627-629`). A pair identical to the app's needs a
+  bearer per requester, minted by a simulated login
+  whose own pairs land too, and the seed runs without
+  the signing key (`tests/pg-seed.test.ts:433`).
+  Oracle: a seeded write pair's secrets hold the line
+  its requester would have sent, or SCHEMA.md names the
+  seed as the axiom's one exception
 
 ## Sequencing
 
