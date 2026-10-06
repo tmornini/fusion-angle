@@ -928,21 +928,22 @@ Off the critical path; each with its oracle.
   prefix). Product code reads
   six names of its own — `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `PORT`, and `TRUSTED_PROXY_HOPS`
-  (`server/boot.ts:59-72`; the URL again at
-  `server/postgres-seed.ts:68` and
-  `server/postgres-wipe.ts:60`; the key again at
+  (`server/boot.ts:60-73`; the URL again at
+  `server/postgres-seed.ts:69` and
+  `server/postgres-wipe.ts:61`; the key again at
   `api/access-token.ts:36`, through the `process` global a
   search for `Deno.env` misses), and the tooling's
   `MEASURE_PASSWORD` (`web-app/app/measure.ts:368-370`,
-  with the URL and the key again at `:430-433`) and
+  with the URL and the key again at `:430-432`) and
   `CHROME` (`web-app/app/cdp-client.ts:39`) — so the app
   reads
   `FA_POSTGRES_URL` directly and nothing translates. Names
   others dictate stay at two edges: the Postgres image's
   `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD`,
   which `compose.yaml` fills from `FA_` values, and the
-  Render CLI's `RENDER_API_KEY`, which `deploy:191` and
-  `bin/postgres-seed:154` fill from their own argument; a
+  Render CLI's `RENDER_API_KEY`, which `deploy:178`,
+  `bin/postgres-seed:154`, and `bin/postgres-wipe:113`
+  fill from their own argument; a
   dependency that ever dictates a name gets its adapter.
   One dictates today: postgres.js reads sixteen `PG*`
   names as option defaults — `PGPORT`, `PGSSL`,
@@ -952,8 +953,15 @@ Off the critical path; each with its oracle.
   and the grants go, or `PG*` is named a third edge — the
   brainstorm settles which.
   Today's role and database are both `fusion`
-  (`compose.yaml:2,8-9`, `deploy:171-172`,
-  `bin/test-postgres:22-23`). Ships no later than the deploy
+  (`compose.yaml:2,8-9,22,24`; `mint_compose_env`,
+  `bin/compose-lib:14-15`). Owned names the prefix has
+  not reached: the notify channel `fusion_events`
+  (`api/advisory-lock.ts:11`,
+  `api/ledger-statement-sql.ts:229`), the test schema
+  `fusion_test_…` and compose project
+  `fusion-test-postgres-$$` (`bin/test-postgres:22`,
+  `:17`), and `schema_marker`, which item 3 retires.
+  Ships no later than the deploy
   of items 0–3, which already changes what operators
   configure, so they rename once. The brainstorm settles
   how far "infrastructure" reaches: the database name,
@@ -963,7 +971,7 @@ Off the critical path; each with its oracle.
   `FUSION_ANGLE_STATIC_ROOT` (`bin/test-browser:38`,
   `tests/browser/fixtures.ts:58`),
   `MOST_RECENTLY_VALIDATED_SHA_PATH`, and
-  `WORKING_TREE_PORCELAIN` (`test:239`, `:243`), which
+  `WORKING_TREE_PORCELAIN` (`test:242`, `:246`), which
   the oracle reaches. Oracle: `env | grep FA_` lists
   everything the system needs, and a test finds every
   environment read in product code and scripts and fails
