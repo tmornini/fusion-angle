@@ -1552,7 +1552,8 @@ Off the critical path; each with its oracle.
   `node:` specifier anywhere in the checked graph gives
   `process` to every file in it. `web-app` carries none
   of its own since the Deno port, but the gate checks it
-  in one invocation with `server` and `tests`, and
+  in one invocation with `client`, `server`, and `tests`
+  (`test:64`), and
   either alone suffices — `server/scrypt-hash.ts`'s
   `node:crypto` means retiring `node:test` will not
   restore it. `npm:` does not unlock; `Deno.*` never
@@ -1570,7 +1571,8 @@ Off the critical path; each with its oracle.
   `web-app/app/` tooling module (`measure.ts` 49,
   `generate-api-documentation.ts` 14, `compose.ts` 14,
   `generate-schema-svg.ts` 11, `cdp-client.ts` 10,
-  `measure-viz.ts` 6) and none in browser page code. So
+  `measure-viz.ts` 6, before `hash-static.ts` joined
+  them) and none in browser page code. So
   that half needs the lib change PLUS the exclusion
   registry the `process` half escaped. Oracle for the
   `process` half: that invocation in `./test validate`, red
