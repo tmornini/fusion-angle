@@ -333,6 +333,26 @@ not repeat the note in every case.
   DEFERRED on SV6; two tabs of one jar is SV8b,
   not SV7. SV10's stale-until-navigation residual
   is PASS, not FAIL.
+- Native `<select>` (AA7a, G14a, G24b — the AI Model
+  pulldown, `#ai-model`): on macOS its open menu is
+  an OS menu the compositor neither paints nor
+  drives, so arrow keys sent to it move nothing.
+  Never click the select and never send ArrowUp or
+  ArrowDown to it. Focus it by selector
+  (`.focus()`), then send one printable key as CDP
+  `Input.dispatchKeyEvent` `keyDown` with `key` and
+  `text` set, then `keyUp`: typeahead on a closed
+  select commits the first option whose label starts
+  with that letter and fires `input` and `change`.
+  `g` selects GPT-5.5 (`EurcZoFcUOmQiKURwJQvJQ`) from
+  the placeholder and from Claude Sonnet 4.6. Read
+  `#ai-model`'s `value` to confirm. If it did not
+  change, set it with `js()` — `value` to the id,
+  then dispatch a bubbling `change` — which is not
+  an API fetch. If a menu is already open, click
+  outside it; never send Escape, which cancels the
+  edit on member detail and closes the Add Member
+  dialog.
 
 ### Scoring
 
@@ -5120,7 +5140,8 @@ FSM, unlike `flows/detail`).
 - [ ] **G14a** With Kind=AI selected, leave the Model
   pulldown on its placeholder and click Create. PASS: a
   toast "Model is required" fires and no POST happens.
-  Pick a Model, fill the other AI fields, click Create.
+  Pick a Model (Driving notes: native `<select>`),
+  fill the other AI fields, click Create.
   PASS: toast confirms and the AI is written as a
   message-plane AI agent document (`PUT /ai-agents/:id`);
   it appears in the AIs group (agents are global, not
@@ -5584,7 +5605,8 @@ FSM, unlike `flows/detail`).
        read-mode return, and the Description reload
        persistence
 - [ ] **G24b** Click Edit again, pick a different Model
-  from the pulldown, click Save. PASS: toast "AI member
+  from the pulldown (Driving notes: native `<select>`;
+  `g` picks GPT-5.5), click Save. PASS: toast "AI member
   saved"; the page returns to read mode showing the new
   model; reload and it persists as
   "{name} — {provider}".
