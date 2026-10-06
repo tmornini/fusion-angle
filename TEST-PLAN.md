@@ -7296,12 +7296,17 @@ Do not file **SV10** as a regression.
   `http://localhost` and `http://127.0.0.1`);
   `localStorage` has no `fusion-angle:authorization`
   key and no `refresh_token`; the sign-in token
-  response JSON has `access_token` and no
-  `refresh_token`. Access is memory-only; refresh
-  is the cookie.
+  response JSON carries `token_type` and
+  `expires_in` and neither `access_token` nor
+  `refresh_token`; the access token rides the
+  `Authentication-Info` response header as
+  `access_token="…"`. Access is memory-only;
+  refresh is the cookie.
   Pin: tests/api-authentication-token.test.ts 'token
        JSON has no refresh_token; Set-Cookie is
-       HttpOnly'; exploratory — the `Secure`
+       HttpOnly' (also decides the JSON carries no
+       `access_token` and `Authentication-Info`
+       does); exploratory — the `Secure`
        attribute over plain `http://`, and the
        DevTools `localStorage` inspection
 - [ ] **SV4** On the signed-in dashboard, reload
