@@ -1840,11 +1840,6 @@ Off the critical path; each with its oracle.
   - The `if (ke.repeat) return` auto-repeat guard (F50) —
     Layer 1 if it is extracted as a pure predicate beside
     `nextCanvasTabIndex`, Layer 2 otherwise
-  - Space on a focused node leaving pan mode off — the
-    `defaultPrevented` handshake between the
-    document-phase activation listener and the
-    window-phase space handler (F57a) — Layer 2,
-    `tests/browser/canvas-keyboard.test.ts`
   - The node panel's members fieldset — the alphabetical
     ordering of the HUMANS and AIs groups and the
     `<legend>Members</legend>` text (F58) — Layer 1,
