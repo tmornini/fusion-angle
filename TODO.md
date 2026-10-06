@@ -497,6 +497,18 @@ skew tests, which went with item 8's trio.
    The census of parted reads
    (`tests/parted-reads.test.ts`) emptied with the fifth
    spec.
+   `./test` 112.8 s → 92.7 s (median of three runs, 89.7,
+   92.7 and 136.5 s; each run covers the parallel pass
+   and the tz pass); seed pairs 2,317 → 1,882, stored bytes
+   6,244,233 → 5,291,206; readyMs per list page,
+   `7d34749` → tip `49e0510` (medians of 25,
+   `measurements/history.jsonl`): dashboard 60.6 → 60.4,
+   ideas 52.5 → 51.6, projects 62.5 → 61.8, records
+   53.7 → 53.7, flows 56.3 → 55.8, workbox 141.5 →
+   87.6, members 52.1 → 50.7, identities 50.3 → 48.7,
+   organization 49.7 → 49.4; workbox `fetch:active-list`
+   118.0 → 54.7; the workbox detail's fetch 30.2 →
+   31.2 (readyMs 64.0 → 64.7).
 2. The ledger fenced — roles, grants, and row policies, on
    a table items 0 and 1 have finished. Designed to stock
    Postgres and measured on 18.6, which compose runs; a
