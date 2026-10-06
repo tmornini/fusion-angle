@@ -1,7 +1,9 @@
 # Ledger probes
 
-The scripts behind the figures TODO.md items 0 to 3 call
-"measured", recovered from the sessions that ran them.
+The scripts behind the figures TODO.md's ledger items call
+"measured", recovered from the sessions that ran them:
+items 0 and 1, and 0f and 0h, which were items 2 and 3
+when these probes ran.
 Items 0 and 1 have landed and left TODO.md; their
 specs run from
 `docs/superpowers/specs/2026-09-23-ledger-store-design.md`
@@ -23,7 +25,7 @@ PII policy, and an api view; the timing scripts pipe into a
 container named `fa-rethink-probe` as the `postgres`
 superuser.
 
-- `p1.sql` — item 3: the owner writes `/definition/` (now
+- `p1.sql` — item 0h: the owner writes `/definition/` (now
   `/migrations/`) through the table while the policy
   refuses it to the api.
 - `p3-load.sql`, `p3-time.sh` — item 1: 200 documents at
@@ -33,7 +35,7 @@ superuser.
 - `p4-load.sql`, `p4-time.sh` — item 1: the shapes where
   the walk loses, 10,000 documents of one version among
   them, and the break-even.
-- `p5.sql` — item 2: the whole fence on the table itself
+- `p5.sql` — item 0f: the whole fence on the table itself
   with two roles and no api view.
 
 ## fence/ (2026-09-19 to 2026-09-20)
@@ -43,7 +45,7 @@ Roles here are the probe's own (`ledger_owner`,
 drivers expect logins `api_login` and `owner_login` on the
 probe container, members of the roles the SQL creates.
 
-- `probe.sql`, `probe.out` — item 2: `RETURNING` needs
+- `probe.sql`, `probe.out` — item 0f: `RETURNING` needs
   SELECT on the returned columns; a plain view leaks a
   hidden row through a failing cast; column grants against
   a definer function.
@@ -52,23 +54,23 @@ probe container, members of the roles the SQL creates.
   whose head is a CTE, the same PUT landing nothing, a
   stale latch refused by the index.
 - `q2setup.sql`, `q.sql`, `leak2.sql`, `cost.sql`,
-  `variants.sql` — item 2: 262,000 rows; the row policy
+  `variants.sql` — item 0f: 262,000 rows; the row policy
   against the barrier view and the plain view on the head
   read; the leak a plain view allows.
-- `least.sql`, `asapi.sql`, `defaults.sql` — item 2: what a
+- `least.sql`, `asapi.sql`, `defaults.sql` — item 0f: what a
   fresh role can do, and the four revokes only a superuser
   can make.
-- `prefix.sql` — item 2: prefixed roles, a host login joined
+- `prefix.sql` — item 0f: prefixed roles, a host login joined
   by membership, a role created twice, roles surviving the
   schema drop and seen from another database.
 - `roles.sql` — physical erasure: the eraser's delete-only
   view and the archiver's view.
-- `runner.sql`, `refence.sql` — item 3: two runners on one
+- `runner.sql`, `refence.sql` — item 0h: two runners on one
   migration, and a failed step rolling back the fence and
   the document.
 - `seedtx.sql`, `seeddriver.ts` — item 0: the seed as one
   transaction, batched, rolling back its DDL.
-- `driver.ts`, `loads.ts` — item 2: postgres.js with
+- `driver.ts`, `loads.ts` — item 0f: postgres.js with
   `fetch_types: false`.
 
 ## mock-data/ (2026-09-19)
@@ -79,7 +81,7 @@ Run from the repository root under the memory backend.
   a part's cost, the list growth, and the gzipped shapes.
 - `instance-probe.ts` — item 1: instance revisions storing
   `{}` as their response body.
-- `versions.ts` — item 2: the mock ledger's version depth
+- `versions.ts` — item 0f: the mock ledger's version depth
   per document.
 - `head-etag.ts` (2026-09-30) — item 1: whether every PUT
   head's stored `etag` line names its own pair and carries
@@ -204,10 +206,10 @@ has landed; re-measure when the statement exists.
   clock until it catches up. The seed's multi-row helper
   landed 5,000 pairs in ten statements under
   `fetch_types: false`, and a failed batch left no table.
-- item 2: a grant only the creator or a superuser may make;
+- item 0f: a grant only the creator or a superuser may make;
   `fa_owner` owning what a session creates after `SET
   ROLE`; the image's `POSTGRES_USER` as a superuser
-- item 3: the privilege functions under revoked catalog
+- item 0h: the privilege functions under revoked catalog
   reads; a head read after a column added by hand; `CREATE
   INDEX CONCURRENTLY` inside a transaction
 - item 6: `pg_dump` against the archiver's view
