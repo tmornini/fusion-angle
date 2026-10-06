@@ -111,7 +111,9 @@ its history is its versions, served as stored.
    the current node; both keys are required. §1.
 4. **Creation is the POST alone.** The document PUT
    supersedes and never creates; on an absent work
-   order it answers 404, 403 when foreign. §1.
+   order a conditional PUT answers 404 (a bare one is
+   428), 403 on a foreign path, 404 for a foreign id
+   under one's own path. §1.
 5. **The seed creates through the live POST.** Births
    are the trace's first two events and a creator's
    claim, at the trace's own times. §2.
@@ -249,22 +251,23 @@ unchanged.
 **Creation is the POST.** `postWorkOrderDocumentOp`
 reads the head through `requireWorkOrderHead` first:
 an absent work order is `missedReadError`'s 404, a
-foreign one 403 (the write authorizer already fences
-the path). A present one lands `fieldsVersion(head,
-fields)` under today's latch rules, unchanged — no
-`If-Match` becomes required; a client's
+foreign path 403 (the path fence, `api/api.ts`, before
+the handler), and a foreign id under the caller's own
+path 404 (the owner probe). A present one lands
+`fieldsVersion(head, fields)` under today's latch
+rules, unchanged — no `If-Match` becomes required; a client's
 `If-None-Match: *` on it is the statement's 412.
 `fieldsVersion` loses its no-head branch.
 
 **Preconditions on an absent work order are
 ignored.** RFC 9110 §13.2.1: a server MUST ignore
 received preconditions when its response without them
-would not be 2xx or 412. Today an unconditional PUT
-at a never-written id is a 201 genesis, so an
-`If-Match` there is evaluated and fails, 412. Once the
-PUT cannot create, the unconditional answer is 404, so
-`If-Match` and `If-None-Match` are both ignored and
-the answer is 404 — as `workOrderOperation` already
+would not be 2xx or 412. An unconditional PUT is 428
+at the gate (the route's class is `required`), before
+any handler runs. A PUT with `If-Match` or
+`If-None-Match: *` reaches the head read, where a work
+order never created is 404, so both preconditions are
+ignored and the answer is 404 — as `workOrderOperation` already
 answers claim, release, bind, and transition
 (`api/routes.ts:1703-1710`). AGENTS.md's "even for an
 id never written" holds where a PUT can create; it
@@ -420,9 +423,9 @@ written join name stores nothing and answers 409 or
 
 | Status | When |
 |---|---|
-| 200 | a work order, its `versions/`, a version; a fields PUT equal to the head |
-| 201 | a create; a fields PUT that lands |
-| 403 | the fence; a foreign work order on any route |
+| 200 | a work order, its `versions/`, a version; a fields PUT that lands, and one equal to the head (which stores nothing) |
+| 201 | a create |
+| 403 | the fence (a foreign path on any route) |
 | 404 | a document PUT, claim, bind, or transition on a work order never created, whatever its preconditions (RFC 9110 §13.2.1); a tag naming no PUT; `…/history` |
 | 405 | a GET on a route that selects nothing |
 | 409 | a resent create |
@@ -442,8 +445,10 @@ Chrome: the operator runs each and tees it under
 New pins, each red before its change:
 
 - A document PUT on an absent work order is 404 and
-  stores nothing — bare, with `If-Match`, and with
-  `If-None-Match: *` alike; on a foreign one, 403.
+  stores nothing, with `If-Match` and with
+  `If-None-Match: *` alike; bare, 428; on a foreign
+  path, 403; for a foreign id under one's own path,
+  404.
 - `validateWorkOrderVersion` refuses a version
   without `state` or without `transition`, and a
   `transition` with any other key.
@@ -459,7 +464,8 @@ New pins, each red before its change:
   `trace[1].at`, and nothing else changed. The
   fixture file is not regenerated.
 - `…/versions/` and `…/versions/:etag`: stored
-  responses, oldest first; 403 foreign, 404 absent,
+  responses, oldest first; 403 on a foreign path, 404
+  for a foreign id under one's own path, 404 absent,
   404 for a tag naming no PUT
   (`tests/api-versions-etag.test.ts`'s pattern).
 - The inbox issues no `versions/` request
