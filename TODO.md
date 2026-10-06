@@ -678,9 +678,10 @@ trio's retirement
     for Postgres on Render. The app's precondition is in
     the tree: a claim decides expiry against its
     request's stamp (`isClaimUnlapsedAt`,
-    `api/work-order-version.ts:107-112`), and the claim
-    GET against the reading process's clock
-    (`api/routes.ts:4525-4544`, `nowUtc()`), so each
+    `api/work-order-version.ts:104-109`, called with
+    `received.requestAt` at `api/routes.ts:1776` and
+    `:1807`), and that stamp is the receiving process's
+    `nowUtc()` (`api/request-context.ts:95`), so each
     replica's clock decides the boundary; record the
     expiry decision as its own event first. Then two
     replicas
@@ -2881,7 +2882,8 @@ Off the critical path; each with its oracle.
   commit; item 2 rewords two and closes none
 - Item 7 precedes routing the roster through the
   profile
-- `isClaimUnlapsedAt` (claim-expiry as its own event) lands
+- The claim-expiry event, succeeding
+  `isClaimUnlapsedAt`'s request-stamp judgment, lands
   before any multi-process deployment
   — item 13's first commit, or item 12's if the worker
   is a second process
