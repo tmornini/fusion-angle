@@ -1042,7 +1042,10 @@ skew tests, which went with item 8's trio.
    membership's whole history), its validator, derive,
    seed, the roster and detail reads, and the Members
    page's edit. One profile still rides the identity
-   (`HumanProfile`, `shared/types.ts:707`). The seed
+   (`HumanProfile`, `shared/types.ts:710`; `profileOf`,
+   `client/members.ts:88-101`), and the roster reports a
+   seat with none as `{ present: false }`
+   (`client/members.ts:124`). The seed
    already carries the contradiction (the admin holds
    two memberships with one title). Lands before
    items 11 and 12, whose designer roster and AI
