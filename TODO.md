@@ -2356,29 +2356,26 @@ Off the critical path; each with its oracle.
   away every nit. Merged: `putRecordInstance` PATCHes
   (name lie —
   `tests/adapters-record-instances.test.ts`,
-  `tests/api-instances-create.test.ts`); same-body
-  PATCH appends 201
-  (`tests/api-instances-create.test.ts:585-586`);
-  member detail's redundant GET trio
-  (`web-app/members/detail.ts`); two zoom
-  implementations and two constant sets
-  (`web-app/app/flow-fsm-reduce.ts:12-14, 632-656`,
-  `web-app/app/flow-interactions.ts:16-18, 816-850`);
+  `tests/api-instances-create.test.ts`); member
+  detail's redundant reads (`refresh` on every member
+  bell, `web-app/members/detail.ts:225-229`,
+  `:261-271`, beside the save's own re-read at
+  `:563`); two zoom implementations and two constant
+  sets (`web-app/app/flow-fsm-reduce.ts:12-14, 626-675`,
+  `web-app/app/flow-interactions.ts:16-18, 908-966`);
   `#noteMutation` / `history()` beside
   `advanceHistory`
-  (`web-app/app/presenters/flow-designer.ts:221-227`);
+  (`web-app/app/presenters/flow-designer.ts:198-204`);
   the shell's hand-kept copy of the reveal header
-  (`postgres-lib:8` against `server/seed.ts:26-27`,
+  (`bin/postgres-lib:7` against `server/seed.ts:28-29`,
   guarded by no test); the second instance the
   remediation added (`canvasFocusOf`'s walk); the undo
   path's duplicated pure helpers
-  (`api/flow-graph-diff.ts:16-26`); `toRecordAttribute`'s
+  (`api/flow-graph-diff.ts:13-25`); `toRecordAttribute`'s
   `??` ACL default
-  (`web-app/app/adapters/record-attributes.ts:76-79`;
-  its server half is the ACL bullet on the critical
-  functionality path); the nested
-  key-set follow-on (`api/validators.ts:705-713` —
-  remove the comment at `validators.ts:705-713` when
+  (`client/record-attributes.ts:72-75`); the nested
+  key-set follow-on (`api/validators.ts:412-420` —
+  remove the comment at `validators.ts:412-420` when
   done); `handleSpace` dispatching
   `isFormFocused: false` unconditionally; Delete's
   `preventDefault` with nothing selected. Oracle: each
