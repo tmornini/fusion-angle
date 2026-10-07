@@ -233,11 +233,16 @@ not repeat the note in every case.
   only focuses the window (TODO.md); that focusing
   click is the viewport center, then the intended
   control once.
-- Shift-drag (AA32/F19/F23): if the compositor does not
-  deliver Shift on pointer-up, the FSM emits add-node
-  instead of add-edge. Record BLOCKED naming that; do
-  not FAIL. Layer 1 and Layer 2 pins decide add-edge.
-  F23's mid-gesture Shift is the same compositor limit.
+- Shift-drag (AA32/F19/F23): press at the center of
+  the port circle's bounding box (`[data-connect-port]`),
+  never an eyeballed node edge; verify with
+  `elementFromPoint` first. A miss is a body-drag or
+  marquee, not Shift. The camera holds from press to
+  release, so a drop point read before the press stays
+  true. If Shift is not delivered on pointer-up the
+  FSM emits add-node; record BLOCKED naming that.
+  Layer 1 and Layer 2 pins decide add-edge. F23's
+  mid-gesture Shift is the same compositor limit.
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
   "New State" nodes re-flow the graph and a
   double-click misses Data Capture.
@@ -1208,20 +1213,37 @@ the second organization.
        the "submit" edge-rename mechanics — a name
        patch lands on the matching edge only);
        exploratory — the live port-drag
-- [ ] **AA32** Hold Shift and drag from "Review" onto
-  "Data Capture". PASS: during the drag the preview
-  redraws as a dashed-orange curved bezier because a
-  forward path "Data Capture" → "Review" already
-  exists, and the reachability check recognises the
-  release would close a loop. Release to create the
-  cycle edge; rename it "needs revision". Hold Shift
-  and drag from "Review" onto "Archive". PASS: preview
-  is a solid-blue curved bezier (no return path).
-  Release to create the edge; rename it "approve".
-  Drive the shift-drag with compositor mouse. If Shift
-  is not observed (release still port-add-node),
-  record BLOCKED naming that — an honest BLOCKED
-  costs nothing. Do not FAIL the compositor.
+- [ ] **AA32** Hold Shift and drag from "Review"'s port
+  onto "Data Capture". Aim by selector, before the
+  press: the press point is the center of
+  `.flow-node[aria-label="Review"] [data-connect-port]`'s
+  `getBoundingClientRect()`, and
+  `document.elementFromPoint` there must resolve
+  `.closest('[data-connect-port]')`; the drop point is
+  the center of
+  `.flow-node[aria-label="Data Capture"] > rect`.
+  Confirm `document.visibilityState === 'visible'`
+  (the preview paints under `requestAnimationFrame`).
+  Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
+  (code `ShiftLeft`, vk 16, modifiers 8);
+  `mousePressed` at the press point (modifiers 8);
+  eight `mouseMoved` steps to the drop point
+  (`buttons` 1, modifiers 8). PASS: before release,
+  `.flow-connect-preview path` carries
+  `stroke-dasharray` — the dashed-orange curved bezier
+  — because a forward path "Data Capture" → "Review"
+  already exists and the release would close a loop.
+  `mouseReleased` (modifiers 8), then `keyUp` Shift.
+  PASS: `.flow-edge` count +1, `.flow-node` count
+  unchanged. Rename the edge "needs revision". Repeat
+  onto `.flow-node[aria-label="Archive"] > rect`,
+  re-aiming both points. PASS: the preview path has
+  no `stroke-dasharray` (solid blue, no return path);
+  release adds one edge and no node. Rename it
+  "approve". A pre-press `elementFromPoint` miss is
+  re-aimed, not scored. BLOCKED only if Shift is not
+  observed on release (a node is added instead),
+  naming that.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to
        an ancestor is a cycle edge' (decides
        "Review"→"Data Capture" classifies as a cycle
