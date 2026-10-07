@@ -409,9 +409,9 @@ I21 skeleton miss without the Fetch pause:
 BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
 I22 with the 500 fulfilled: a missing error state,
-message, focus, or re-fetch is FAIL of the
-exploratory half. BLOCKED only if `Fetch` itself
-refuses.
+message, focus, re-fetch, or card replacement is
+FAIL of the exploratory half. BLOCKED only if
+`Fetch` itself refuses.
 F13's second press off the node after the first
 release centred it: FAIL, not BLOCKED (TODO.md 0j).
 SV7 when SV6 did not produce a second jar:
@@ -6342,7 +6342,8 @@ layout.
   `*://localhost:*/api/organizations/*/ideas/` — the
   collection GET `getIdeas` makes inside `loadInto`.
   Never `/api/authentication/*`, and never a 401: a
-  401 drives refresh, not the error state. Answer the
+  401 drives refresh, not the error state. Do not
+  `wait_for_load` before answering. Answer the
   `Fetch.requestPaused` with `Fetch.fulfillRequest`:
   `responseCode` 500, `responseHeaders`
   `[{name: 'content-type', value: 'application/json'}]`,
@@ -6353,8 +6354,10 @@ layout.
   `[data-retry-btn]` that is `document.activeElement`.
   Then `Fetch.disable` and click Try Again at its
   box-model center. PASS: a second GET of `…/ideas/`
-  answers 200 and `[data-idea-card]` cards replace
-  the error state. BLOCKED only if `Fetch.enable` or
+  answers 200 (its `responseStatus` in
+  `performance.getEntriesByType('resource')`) and
+  `[data-idea-card]` cards replace the error state.
+  BLOCKED only if `Fetch.enable` or
   `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
        fetch renders the error state and calls
