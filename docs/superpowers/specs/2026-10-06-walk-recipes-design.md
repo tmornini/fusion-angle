@@ -3,7 +3,7 @@
 - Date: 2026-10-06
 - Status: design confirmed by the owner section by
   section, pre-plan; amended since, at the owner's
-  word, by commits 5a, 6a, 8a, 9a, 9g, and 10a
+  word, by commits 5a, 6a, 8a, 9a, 9g, 10a, and 10g
   (`## Sequence`)
 - Item: TODO.md 0a, as filed on `todo-triage` at
   `7c3c4bfc`
@@ -303,7 +303,7 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
   *different* node the way a person does: one point,
   two presses. Auto Fit must be off, as F12 left it
   (turn it off first if it is on): a re-fit at the
-  second press can fail the centering clause. Pick a
+  second press can fail the re-centred clause. Pick a
   regular node: Create and Archive panels have no
   `#prop-node-name`. Aim before the
   first press: read the center of
@@ -316,8 +316,8 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
   pre-press miss is re-aimed at another regular
   node clear of the panel, not scored. Install a
   capture-phase `window` `pointerdown` listener that
-  pushes `Date.now()` onto an array, then send both
-  press/release pairs to that point inside
+  pushes `Date.now()` onto a new, empty array, then
+  send both press/release pairs to that point inside
   `DBLCLICK_MS`, never re-reading it between them.
   After the second release read the array: anything
   but exactly two pushed times, less than
@@ -327,10 +327,11 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
   PASS: after the second press the panel is
   still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it. Query the node `rect`,
-  `.flow-props-panel`, and `svg.flow-canvas` afresh
-  after the second release (every commit replaces
-  them). Once the panel's ~200 ms slide settles, the
+  re-centred on it. Every commit replaces the panel,
+  `#prop-node-name`, the node, and `svg.flow-canvas`,
+  and the new panel replays its ~200 ms slide: wait
+  250 ms after the second release, then query them
+  afresh and read all three clauses. The
   straight-line distance from the node `rect`'s
   client-box center to the center of the part of
   `svg.flow-canvas`'s client box right of
@@ -469,10 +470,12 @@ Replace the Shift-drag bullet in `### Driving notes`
   0 up): the page ignores a key event whose `key` is
   not `Shift`, so a dropped keyUp leaves Shift held
   until a later Shift keyUp or a reload.
-  Layer 1 and Layer 2 pins decide add-edge. An F23
-  ghost-card change that does not happen is FAIL if
-  F23's listener recorded every input it needs (F23
-  names them), and BLOCKED, naming the driver, if not.
+  Layer 1 and Layer 2 pins decide add-edge. F23 starts
+  from a reload, and a preview read of it that is not
+  what its case says is FAIL if its listener's record
+  is exactly the inputs sent, in order, and BLOCKED,
+  naming the driver, if not (F23 names the reads and
+  the record).
 ```
 
 Replace F23's body (`TEST-PLAN.md:3010-3019`), keeping
@@ -480,56 +483,62 @@ its Pin line (`:3020-3032`) unchanged. Its Scoring line
 echoed AA32's cue, and any cue that scores a ghost card
 with Shift held as BLOCKED also excuses F23's own first
 PASS clause. At the owner's word a capture-phase
-listener tells an input the page never saw (BLOCKED)
-from one it saw (a change that does not happen is
-FAIL). It covers the port press and `keyup` as well as
-`keydown`, and a change scores FAIL only when every
-input it needs was recorded: a dropped keyUp, a port
-press the page never got, and a missing Shift press are
-driver faults, and the edge and node halves have their
-own Pins:
+listener tells a Shift the page never saw (BLOCKED)
+from one it saw (FAIL). F23 extends that to the whole
+gesture: it starts from a reload, so no Shift or pan
+mode is left over, and a preview read that is not what
+the case says scores FAIL only when the listener's
+record is exactly the inputs sent, in order; any other
+record is BLOCKED, naming the first difference. A port
+press the page never got, a Shift press or release with
+the wrong `key` or modifiers, an early mouse release,
+and inputs out of order are driver faults, and the edge
+and node halves have their own Pins:
 
 ```
 - [ ] **F23** Begin a plain drag from a port (no
-  Shift). First confirm
+  Shift). Start clean: reload the flow page, make the
+  focusing click (Driving notes), and confirm
   `document.visibilityState === 'visible'` (the preview
-  paints under `requestAnimationFrame`) and, before the
-  port press, install a capture-phase `window` listener
-  on `pointerdown`, `keydown`, and `keyup` that records
-  each event's `type`, `key`, and `shiftKey`, and
-  whether a `pointerdown`'s target is inside
-  `[data-connect-port]`. A recorded port press is a
-  `pointerdown` inside it; a recorded Shift press is a
-  `keydown` with `key` `Shift`; a recorded Shift
-  release is a `keyup` with `key` `Shift` and
-  `shiftKey` false. After each key event read the
-  preview in a `Runtime.evaluate` that awaits one
-  frame before the query. While the mouse remains
-  stationary,
-  press and hold Shift. PASS: without any mouse
+  paints under `requestAnimationFrame`). Then install a
+  capture-phase `window` listener on `pointerdown`,
+  `pointerup`, `keydown`, and `keyup` that records each
+  event's `type`, `key`, and `shiftKey`, and whether a
+  `pointerdown`'s target is inside `[data-connect-port]`.
+  Press at the port (modifiers 0) and read
+  `.flow-connect-preview` in a `Runtime.evaluate` that
+  awaits one `requestAnimationFrame` before the query:
+  it must show the ghost "New State" card. While the
+  mouse remains stationary, press and hold Shift
+  (`rawKeyDown`: `key` `Shift`, code `ShiftLeft`, vk 16,
+  modifiers 8) and read again. PASS: without any mouse
   movement the ghost "New State" card disappears
   and the preview collapses to the grey line (or
   curved bezier if the cursor is already over a
-  target). Release Shift — the ghost card
+  target). Release Shift (`keyUp`, the same fields,
+  modifiers 0) and read again — the ghost card
   returns. Release the mouse with Shift held to
   create an edge, or without Shift to create a
-  node. A ghost-card change that does not happen is
-  FAIL if the listener recorded every input it needs,
-  and BLOCKED, naming the driver and the missing
-  input, if not. The disappearing needs a recorded
-  port press and a recorded Shift press; the return
-  needs those and a recorded Shift release.
+  node. A read that is not what the case says is FAIL
+  if the listener's record up to it is exactly the
+  inputs sent, in order — a `pointerdown` inside
+  `[data-connect-port]` with `shiftKey` false, then a
+  `keydown` with `key` `Shift`, then a `keyup` with
+  `key` `Shift` and `shiftKey` false, and no
+  `pointerup` — and BLOCKED, naming the driver and the
+  first difference, if not.
 ```
 
 `### Scoring`'s F23 line (`TEST-PLAN.md:374-376`)
 becomes:
 
 ```
-Walk-specific: an F23 ghost-card change that does
-not happen scores FAIL if its listener recorded
-every input it needs (F23 names them), and BLOCKED,
-naming the driver, if not. AA33/AA34 score DEFERRED
-on AA32 when stray nodes block targeting.
+Walk-specific: an F23 preview read that is not what
+its case says scores FAIL if its listener's record
+up to it is exactly the inputs sent, in order, and
+BLOCKED, naming the driver and the first difference,
+if not. AA33/AA34 score DEFERRED on AA32 when stray
+nodes block targeting.
 ```
 
 Replace C6's first line (`TEST-PLAN.md:1732`), keeping
@@ -538,11 +547,11 @@ its Pin line (`:1733-1734`) unchanged, with:
 ```
 - [ ] **C6** Scroll the dashboard at 1280×800. PASS:
   the sidebar stays fixed while the main content
-  scrolls beside it. The window is the scroller —
-  `.main-content` sets no overflow and `.sidebar` is
-  `position: fixed` — and CDP wheel and key scrolls
-  stall on a tab that is not composited, so drive
-  with `Runtime.evaluate`: from `scrollY` 0
+  scrolls beside it. The window is the scroller — the
+  `.main-content` wrapper sets no overflow and
+  `.sidebar` is `position: fixed` — and CDP wheel and
+  key scrolls stall on a tab that is not composited,
+  so drive with `Runtime.evaluate`: from `scrollY` 0
   (`window.scrollTo(0, 0)` first), read
   `#main-content`'s `getBoundingClientRect().top`
   as t, then
@@ -554,11 +563,12 @@ its Pin line (`:1733-1734`) unchanged, with:
   is t − d. If d = 0, `#main-content`'s rect `bottom`
   is at most `window.innerHeight`, and its
   `scrollHeight` is at most its `clientHeight`, the
-  page fits the window: lower the window to 400 px
-  high with `Browser.setWindowBounds` and drive again;
-  BLOCKED, not FAIL, naming that, only if it still
-  fits. Restore the 1280×800 bounds if you lowered
-  them, and `window.scrollTo(0, 0)`.
+  page fits the window: set
+  `Emulation.setDeviceMetricsOverride` to 1280×400
+  with `deviceScaleFactor: 1`, as Setup does for
+  1280×800, and drive again; BLOCKED, not FAIL, naming
+  that, only if it still fits. Restore the 1280×800
+  override if you lowered it, and `window.scrollTo(0, 0)`.
 ```
 
 Two departures from Task 9: the scroll goes to the
@@ -676,6 +686,10 @@ One concern per commit, each green at Layer 1:
 | 10d | Name Shift's key events and probe them in F23 | AA32, F23, the Shift-drag bullet, F23's Scoring line |
 | 10e | Guard C6's fit on scrollHeight and name a remedy | C6 |
 | 10f | Align 0j with what F13's Layer 2 test decides | TODO.md |
+| 10g | Amend the 0a spec and plan for the review fixes | this spec, the plan |
+| 10h | Wait out F13's panel slide before it reads | F13 |
+| 10i | Start F23 clean and score it from an exact record | F23, the Shift-drag bullet, F23's Scoring line |
+| 10j | Lower C6's viewport the way Setup sets it | C6 |
 
 Commit 3 precedes commit 5, so F13's pointer to 0j
 never names nothing, and 0j's text holds on both
@@ -711,7 +725,7 @@ word ("Fix the Minor notes"). 9a amends this spec and the
 plan; 9b through 9f land the amended I22, F13, AA32 (with
 the Shift-drag bullet), C6, and TODO.md wording (F13
 excepted: 9h finishes it); §§ 1–4 above carry the text
-as 10b through 10f leave it. Each
+as 10b through 10j leave it. Each
 adds an observation, a probe, a precedence, or an honest
 BLOCKED or re-aim cue; none loosens a PASS clause, a Pin,
 or a selector. Two notes stay as they are: F13's FAIL
@@ -750,9 +764,10 @@ Commits 10a through 10f answer the notes that the 9a
 through 9h reviews and the second whole-branch review
 deferred, at the owner's word of 2026-10-07 (a third
 pass). 10a amends this spec and the plan once; 10b
-through 10f land the text in §§ 1–4 above, one commit
+through 10f land the text 10a prescribed, one commit
 per recipe (10d also carries F23 and the Shift-drag
-bullet). Each adds an observation, a probe, a
+bullet); 10g through 10j later amend F13, F23, and C6.
+Each adds an observation, a probe, a
 precedence, a number, or an honest BLOCKED or remedy
 cue; none loosens a PASS clause, a Pin, or a selector.
 The owner decided F23's scoring: a capture-phase
@@ -765,6 +780,40 @@ last sentence, and Scoring's F23 line. The owner named
 press, the same kind of driver fault, and made a change
 FAIL only when every input it needs was recorded.
 AA32's and F19's ghost-card cue is unchanged.
+
+Commits 10g through 10j answer the quality reviews of
+10c, 10d, and 10e, which each found an Important defect
+in prescribed wording. F13's "once the panel's ~200 ms
+slide settles" never said that every commit replaces
+the panel and replays the slide, so a read right after
+the second release could score 0j fixed as a FAIL about
+144 px off; 10h waits 250 ms after the second release,
+queries everything a commit replaces afresh, starts the
+press array new and empty, and spells "re-centred"
+once. F23's rule, walked five times, kept scoring some
+driver fault wrong, so 10i settles it on one principle:
+FAIL only on proof. F23 starts from a reload, so no
+Shift or pan mode is left over; it installs a
+capture-phase listener on `pointerdown`, `pointerup`,
+`keydown`, and `keyup`, sends the port press, a Shift
+keyDown, and a Shift keyUp, and moves nothing; and a
+preview read that is not what the case says is FAIL
+only when the record is exactly those inputs, in order
+(a `pointerdown` inside `[data-connect-port]` with
+`shiftKey` false, a `keydown` with `key` `Shift`, a
+`keyup` with `key` `Shift` and `shiftKey` false, no
+`pointerup`), and BLOCKED, naming the first
+difference, otherwise. C6's remedy lowered the window
+with `Browser.setWindowBounds`, but Setup fixes the
+viewport with `Emulation.setDeviceMetricsOverride`, so
+`innerHeight` never changed and the case could only end
+BLOCKED; 10j lowers the override the way Setup and
+I10–I15 set it. 10g amends this spec and the plan
+once; 10h, 10i, and 10j land the amended F13, F23
+(with the Shift-drag bullet's last sentence and
+Scoring's F23 line), and C6, which are the text in
+§§ 2 and 3 above. None loosens a PASS clause, a Pin,
+or a selector.
 
 ## Testing
 
