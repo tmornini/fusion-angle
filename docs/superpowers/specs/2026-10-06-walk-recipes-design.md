@@ -307,16 +307,22 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
   `.closest('.flow-node')` to that node. A point under
   `.flow-props-panel` lands on the panel, so a
   pre-press miss is re-aimed at another regular
-  node clear of the panel, not scored. Then send
-  both press/release pairs to that point
-  inside `DBLCLICK_MS`, never re-reading it between
-  them. Record both press times: a longer gap is
-  not a double-click, so it is re-sent, not scored.
+  node clear of the panel, not scored. Install a
+  capture-phase `window` `pointerdown` listener that
+  pushes `Date.now()`, then send both press/release
+  pairs to that point inside `DBLCLICK_MS`, never
+  re-reading it between them. Fewer than two pushed
+  times, or a gap of `DBLCLICK_MS` or more between
+  them, is no double-click: record BLOCKED, naming
+  the driver.
   PASS: after the second press the panel is
   still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it (its `viewBox`, read per the
-  Driving notes). A second press that lands off the
+  re-centred on it: once the panel's ~200 ms slide
+  settles, the node `rect`'s client-box center is
+  within 4 px of the center of the canvas region
+  right of `.flow-props-panel`.
+  A second press that lands off the
   node because the first release moved the camera is
   FAIL, not BLOCKED: the gesture was delivered.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
@@ -571,6 +577,8 @@ One concern per commit, each green at Layer 1:
 | 9d | Tighten AA32's Shift-drag recipe | AA32, the Shift-drag bullet |
 | 9e | Tighten C6's scripted scroll | C6 |
 | 9f | Tidy 0j, the intro, and 0c's pointer | TODO.md |
+| 9g | Amend the 0a spec and plan for F13's timing | this spec, the plan |
+| 9h | Tighten F13's timing rule and centering test | F13 |
 
 Commit 3 precedes commit 5, so F13's pointer to 0j
 never names nothing, and 0j's text holds on both
@@ -621,6 +629,25 @@ and the Scoring line disagree on F23's trigger. Fixing
 either needs a probe, such as a `keydown` listener that
 tells a lost Shift from a broken handler, and that is
 the owner's call.
+
+Commits 9g and 9h answer the quality review of 9c, which
+found two Important defects in the F13 text that 9a
+prescribed. A slow pair was to be "re-sent", but the
+slow pair's first release had already selected and
+centred the target, so the re-send moved nothing and
+F13 could PASS while 0j is live, with no cap and no
+BLOCKED exit; and "re-centred ... (its `viewBox` ...)"
+gave a reader no test to run. A reopen-and-retry fix
+failed review in turn (a reopen that does not take
+leaves the panel closed, and the next fast pair then
+opens it, so 0j hides again), so a slow pair is now
+simply BLOCKED, naming the driver, as the Driving
+notes' compositor-gestures bullet says, with no retry
+to go wrong. 9g amends this spec and the plan once; 9h
+lands the amended F13, which is the text in § 2 above.
+It adds a probe (the page's own press times), a BLOCKED
+exit, and a number; none loosens a PASS clause, a Pin,
+or a selector.
 
 ## Testing
 

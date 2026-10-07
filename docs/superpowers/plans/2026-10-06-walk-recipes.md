@@ -32,7 +32,7 @@
 > 3. Quality review: another fresh agent of type
 >    `planner`.
 >
-> After Task 9f: a fresh agent of type `architect`
+> After Task 9h: a fresh agent of type `architect`
 > reviews `1e0941c5..HEAD` against the spec. Pass no
 > model override to any dispatch.
 >
@@ -49,7 +49,7 @@ recipes for I22, F13, AA32, and C6, with their
 driving-note and Scoring lines; TODO.md files 0j and
 closes 0a.
 
-**Architecture:** Doc-only. Fourteen task commits, each
+**Architecture:** Doc-only. Fifteen task commits, each
 an exact string replacement with the Edit tool on
 `TODO.md` or `TEST-PLAN.md`, each green at Layer 1.
 0j lands before F13's text cites it; 0a closes in Task
@@ -59,8 +59,11 @@ reviewed; commits 5a, 6a, and 8a, which amended this
 plan and the spec, precede them. Tasks 9b through 9f
 tighten the recipes' wording after the whole-branch
 review; commit 9a, which amended this plan and the
-spec, precedes them. With the spec, the plan, and the
-four amendments, the branch carries twenty commits.
+spec, precedes them. Task 9h corrects F13's timing rule
+and centering test after Task 9c's quality review;
+commit 9g, which amended this plan and the spec again,
+precedes it. With the spec, the plan, and the five
+amendments, the branch carries twenty-two commits.
 
 **Tech Stack:** Markdown. Layer 1 (`./test validate`,
 Deno 2.9.6) is the gate, because it lints both files.
@@ -82,8 +85,9 @@ None is edited, except by the owner's word of
 2026-10-07: "apply all" lets each "a" commit (5a, 6a,
 8a, and any later one) amend the spec and this plan
 once to answer an Important review finding, and "Fix the
-Minor notes" lets 9a do so for the Minor ones. If the
-spec is wrong in any other way, STOP and report.
+Minor notes" lets 9a do so for the Minor ones; 9g answers
+Task 9c's two Important findings under "apply all". If
+the spec is wrong in any other way, STOP and report.
 
 ---
 
@@ -131,7 +135,7 @@ export DENO_DIR="$TMPDIR/deno-dir"
   orchestrator substitutes its own, as the owner directed
   on 2026-10-07 (the commits after `5cccaa60` carry
   `session_018uFFAapWhN6H85dJyVj5cm`, and Tasks 5b, 6b,
-  8b, and 9b through 9f print it already). Use exactly
+  8b, 9b through 9f, and 9h print it already). Use exactly
   this shape:
 
 ```bash
@@ -197,7 +201,14 @@ that its task touches.
    Archive) and requires `document.elementFromPoint`
    to resolve the target before the first press; a
    pre-press miss is re-aimed, not scored. Its
-   FAIL-not-BLOCKED sentence and its Pin stay.
+   FAIL-not-BLOCKED sentence and its Pin stay. After
+   Task 9h, a pair with fewer than two page-recorded
+   press times, or two `DBLCLICK_MS` or more apart, is
+   BLOCKED naming the driver (no re-send), and
+   "re-centred" is a number: once the panel's slide
+   settles, the node's client-box center is within 4 px
+   of the center of the canvas region right of the
+   panel.
 9. **AA32 is aimed at both ends and reads Shift before
    release.** After Task 6b, AA32 requires
    `document.elementFromPoint` to resolve the drop
@@ -214,10 +225,10 @@ that its task touches.
     left it, and the intro changes only its last "then"
     to "and" (Task 9f).
 11. **The wording pass loosens nothing.** After Tasks 9b
-    through 9f, every PASS clause, Pin, selector, and
-    count stays as it was; the new sentences only add an
-    observation, a probe, a precedence, or an honest
-    BLOCKED or re-aim cue.
+    through 9f and 9h, every PASS clause, Pin, selector,
+    and count stays as it was; the new sentences only
+    add an observation, a probe, a precedence, or an
+    honest BLOCKED or re-aim cue.
 
 ---
 
@@ -226,10 +237,11 @@ that its task touches.
 Commit 1 (`8fb66783`, the spec) and commit 2 (this
 plan, "Plan the 0a walk recipes") precede execution.
 Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8, 8b,
-9b, 9c, 9d, 9e, 9f. Commits 5a, 6a, 8a, and 9a are not
-tasks: each amended this plan and the spec once, after a
-review (5a before Task 5b, 6a before Task 6b, 8a before
-Task 8b, 9a before Tasks 9b through 9f). Task 3
+9b, 9c, 9d, 9e, 9f, 9h. Commits 5a, 6a, 8a, 9a, and 9g
+are not tasks: each amended this plan and the spec
+once, after a review (5a before Task 5b, 6a before
+Task 6b, 8a before Task 8b, 9a before Tasks 9b through
+9f, 9g before Task 9h). Task 3
 precedes Task 5, so F13's pointer to 0j never names
 nothing. Task 5's Scoring line anchors on Task 4's
 I22 line. Task 5b anchors on Task 5's F13 text.
@@ -240,7 +252,7 @@ text; 9c on Task 5b's and Task 5's F13 text; 9d on
 Task 6's and Task 6b's AA32 and Shift-drag text; 9e on
 Task 7's C6 text; 9f on Task 3's 0j and intro and on
 the 0c line the base carries. The five touch disjoint
-regions.
+regions. Task 9h anchors on Task 9c's F13 text.
 
 Each task's cycle:
 
@@ -818,7 +830,7 @@ line changes), Obscurity.
 
 **Interfaces:**
 - Consumes: Task 5's F13 text, as committed in `93afc52d`.
-- Produces: F13's text, which Task 9c tightens.
+- Produces: F13's text, which Tasks 9c and 9h tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1689,7 +1701,7 @@ Abominations: Test Weakening (F13's FAIL-not-BLOCKED sentence
 - Consumes: Task 5b's F13 text, as committed in `296789da`, and
   the F13 lines Task 5 left standing, as committed in
   `93afc52d`.
-- Produces: nothing later tasks read.
+- Produces: F13's text, which Task 9h tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -2267,6 +2279,114 @@ Expected `--stat`: `TODO.md` only.
 
 ---
 
+## Task 9h: Tighten F13's timing rule and centering test
+
+**Commit subject:** `Tighten F13's timing rule and centering test`
+
+Commandments: Clarity, Logic, Reliability (a slow pair must
+  not be re-sent from a changed state, and the centering
+  test needs a number).
+Abominations: Test Weakening (F13's three PASS clauses, its
+  FAIL-not-BLOCKED sentence, and its Pin stay as written;
+  the new text only adds a probe, a BLOCKED exit, and a
+  number), Unbidden Helper Code (no other case, bullet, or
+  Scoring line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (F13's body only; its Pin and its
+  FAIL-not-BLOCKED sentence kept)
+
+**Interfaces:**
+- Consumes: Task 9c's F13 text, as committed in `1e28e097`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 're-centred on it (its `viewBox`, read per the' TEST-PLAN.md
+```
+
+Expected: `1`.
+
+- [ ] **Step 2: Edit 9h-1 — F13's slow pair is BLOCKED naming the driver and its centering test has a number**
+
+Old text:
+
+```text
+  node clear of the panel, not scored. Then send
+  both press/release pairs to that point
+  inside `DBLCLICK_MS`, never re-reading it between
+  them. Record both press times: a longer gap is
+  not a double-click, so it is re-sent, not scored.
+  PASS: after the second press the panel is
+  still open, `#prop-node-name`'s `value` is the
+  double-clicked node's name, and the canvas has
+  re-centred on it (its `viewBox`, read per the
+  Driving notes). A second press that lands off the
+```
+
+New text:
+
+```text
+  node clear of the panel, not scored. Install a
+  capture-phase `window` `pointerdown` listener that
+  pushes `Date.now()`, then send both press/release
+  pairs to that point inside `DBLCLICK_MS`, never
+  re-reading it between them. Fewer than two pushed
+  times, or a gap of `DBLCLICK_MS` or more between
+  them, is no double-click: record BLOCKED, naming
+  the driver.
+  PASS: after the second press the panel is
+  still open, `#prop-node-name`'s `value` is the
+  double-clicked node's name, and the canvas has
+  re-centred on it: once the panel's ~200 ms slide
+  settles, the node `rect`'s client-box center is
+  within 4 px of the center of the canvas region
+  right of `.flow-props-panel`.
+  A second press that lands off the
+```
+
+- [ ] **Step 3: Check the case, its Pin, and the cites**
+
+```bash
+grep -c '\*\*F13\*\*' TEST-PLAN.md
+grep -n -A1 'the gesture was delivered\.$' TEST-PLAN.md | grep -F 'Pin: tests/flow-fsm-scenarios.test.ts'
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+grep -c 'is no double-click: record BLOCKED, naming' TEST-PLAN.md
+grep -c 'right of `.flow-props-panel`\.$' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; one hit (F13's Pin follows its last line); `0` removed
+Pin lines; `1`; `1`; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Tighten F13's timing rule and centering test
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
 ## Reviews
 
 ### Per-task spec-compliance review (fresh `planner`)
@@ -2287,7 +2407,7 @@ or wipe. Then:
   the plan's old text. Nothing else moved.
 - Each `file:line` cite in the new text holds at
   HEAD (Task 3: `web-app/flows/detail.ts:1099-1108`,
-  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–9f add
+  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–9h add
   none, though 9f's rewritten 0j line keeps the first
   of Task 3's).
 - The Review Focus lines the task touches hold.
@@ -2305,12 +2425,12 @@ no paraphrase crept into TEST-PLAN.md or TODO.md;
 baseline counts. A finding that the spec itself is
 wrong is reported, not fixed.
 
-### Whole-branch review (fresh `architect`, after Task 9f)
+### Whole-branch review (fresh `architect`, after Task 9h)
 
 Same brief. Review `git log --oneline 1e0941c5..HEAD`
 and `git diff 1e0941c5..HEAD` against the spec:
 
-- Twenty commits, in the spec's `## Sequence` order,
+- Twenty-two commits, in the spec's `## Sequence` order,
   each subject exact: "Specify the 0a walk recipes",
   "Plan the 0a walk recipes", "File F13's one-point
   double-click as 0j", "Force I22's fault with
@@ -2326,15 +2446,17 @@ and `git diff 1e0941c5..HEAD` against the spec:
   I22's fault recipe", "Tighten F13's one-point
   recipe", "Tighten AA32's Shift-drag recipe",
   "Tighten C6's scripted scroll", "Tidy 0j, the
-  intro, and 0c's pointer".
+  intro, and 0c's pointer", "Amend the 0a spec and
+  plan for F13's timing", "Tighten F13's timing rule
+  and centering test".
 - Every spec code block lands verbatim, as the
   amendments left it; F11 reads "every later
   double-click in F uses the same drive; F13 names its
   own".
 - All eleven Review Focus lines hold at HEAD.
 - `## Summary` is unchanged by the diff.
-- The spec and this plan changed four times after
-  commit 2, in commits 5a, 6a, 8a, and 9a (`git log
+- The spec and this plan changed five times after
+  commit 2, in commits 5a, 6a, 8a, 9a, and 9g (`git log
   --oneline 5cccaa60..HEAD -- <both paths>` lists only
   them), and
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
@@ -2355,7 +2477,7 @@ git log --oneline 1e0941c5..HEAD
 ./test validate
 ```
 
-Expected: a clean tree; twenty commits; `ok | 4141
+Expected: a clean tree; twenty-two commits; `ok | 4141
 passed | 0 failed | 11 ignored` and timezone
 `ok | 8 passed | 0 failed`.
 
