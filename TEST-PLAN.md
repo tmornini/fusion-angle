@@ -1777,18 +1777,22 @@ the second organization.
   Pin: exploratory — each link's live navigation
 - [ ] **C6** Scroll the dashboard at 1280×800. PASS:
   the sidebar stays fixed while the main content
-  scrolls under it. The window is the scroller —
+  scrolls beside it. The window is the scroller —
   `.main-content` sets no overflow and `.sidebar` is
   `position: fixed` — and CDP wheel and key scrolls
   stall on a tab that is not composited, so drive
-  with `Runtime.evaluate`: read `#main-content`'s
+  with `Runtime.evaluate`: read
+  `<main id="main-content">`'s
   `getBoundingClientRect().top` as t, then
   `window.scrollTo(0, document.documentElement.scrollHeight)`
   and read `window.scrollY` as d. PASS: d > 0;
   neither `html` nor `body` computes `overflow-y:
-  hidden`; `#desktop-sidebar`'s rect `top` is still 0;
-  `#main-content`'s rect `top` is t − d. Restore with
-  `window.scrollTo(0, 0)`.
+  hidden` or `overflow-y: clip`; `#desktop-sidebar`'s
+  rect `top` is still 0; `#main-content`'s rect `top`
+  is t − d. If d = 0 and `<main id="main-content">`'s
+  rect `bottom` is at most `window.innerHeight`, the
+  page fits the window: BLOCKED, not FAIL, naming
+  that. Restore with `window.scrollTo(0, 0)`.
   Pin: exploratory — the sidebar's fixed position
        while the main content scrolls
 - [ ] **C7** Check that seed data populates all 4 dashboard
