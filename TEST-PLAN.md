@@ -2844,20 +2844,24 @@ opens and renders.)
   *different* node the way a person does: one point,
   two presses. Pick a regular node: Create and Archive
   panels have no `#prop-node-name`. Aim before the
-  press: read the center of
+  first press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
   `text` or the `g`, whose box includes the port —
   and `document.elementFromPoint` there must resolve
   `.closest('.flow-node')` to that node. A point under
   `.flow-props-panel` lands on the panel, so a
-  pre-press miss is re-aimed, not scored. Then send
+  pre-press miss is re-aimed at another regular
+  node clear of the panel, not scored. Then send
   both press/release pairs to that point
   inside `DBLCLICK_MS`, never re-reading it between
-  them. PASS: after the second press the panel is
-  still open, `#prop-node-name` reads the
+  them. Record both press times: a longer gap is
+  not a double-click, so it is re-sent, not scored.
+  PASS: after the second press the panel is
+  still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it. A second press that lands off the
+  re-centred on it (its `viewBox`, read per the
+  Driving notes). A second press that lands off the
   node because the first release moved the camera is
   FAIL, not BLOCKED: the gesture was delivered.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
@@ -2875,9 +2879,9 @@ opens and renders.)
        'applyPanToRevealSelected centers a node, else
        null'; tests/browser/canvas-gestures.test.ts 'a
        node click under an open panel centers it on
-       release (F13)' (decides a single click under an
-       open panel centres the clicked node on release —
-       the move a one-point double-click's second press
+       release (F13)' (decides the camera moves when a
+       single click under an open panel releases — the
+       move a one-point double-click's second press
        meets); exploratory — the one-point double-click,
        which TODO.md 0j owns until a red Layer 2 test
        pins it, and the live retarget paint
