@@ -23,7 +23,7 @@ held to their own organization (0d), since no second
 tenant shares an origin before it ships; then the
 ledger's one deploy — `fa_` names (0e), the fence
 (0f), `FA_GIT_SHA` (0g), migrations (0h), and the wipe
-and reseed that ships them (0i); then F13's
+and reseed that ships them (0i); and F13's
 double-click under an open panel (0j). Then what a pilot
 tenant needs (4–7), the process engine and its AI
 worker on that (9–12), and two processes last (13). An
@@ -57,7 +57,8 @@ code comments cite; specs and plans written before the
   `./test validate browser` and replace AT2's "on 4 Oct
   `./test` printed `ok | 4124 passed | 0 failed | 11
   ignored`" (`TEST-PLAN.md:479`) with that run's date
-  and its main suite's line; Task 11 of the same plan.
+  and its main suite's line; Task 11 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
   Oracle: AT2 names the latest Layer 2 run's count
 - **0d.** Admins act within their organization. Any
   organization's admin can write a password credential
@@ -609,8 +610,8 @@ code comments cite; specs and plans written before the
 - **0j.** A double-click under an open panel lands
   where a person aimed. With the properties panel
   open, a click on another node selects it and, on
-  release, centres it (`web-app/flows/detail.ts:1099-1108`;
-  FLOW-CANVAS.md prescribes the centring, and
+  release, centers it (`web-app/flows/detail.ts:1099-1108`;
+  FLOW-CANVAS.md prescribes the centering, and
   `tests/browser/canvas-gestures.test.ts` 'a node
   click under an open panel centers it on release
   (F13)' pins it). A double-click's first release
@@ -621,14 +622,14 @@ code comments cite; specs and plans written before the
   node, which takes the panel. The walk's element-id
   drive re-aims between the presses, which is how F13
   passed on `8e834e76`. The brainstorm decides how a
-  single click still centres while a double-click
+  single click still centers while a double-click
   holds still — the 4 Oct plan refused a timer
   (Cleverness) — and whether item 11's "panel callback
   re-fitting at a double-click's second press" rides
   along. Oracle: a red Layer 2 test — two presses at
   one point on a second node under an open panel
   leave the panel open on it — turns green with the
-  centre-on-release pin still green, and the next walk
+  center-on-release pin still green, and the next walk
   scores F13 PASS
 - **4.** `/status` — `{ up: boolean, components: { postgres:
   boolean } }`, 200 when every component is up and 503
