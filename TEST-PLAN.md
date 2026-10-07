@@ -206,6 +206,9 @@ not repeat the note in every case.
   request and `Fetch.disable`. A miss without the
   pause is BLOCKED. A miss with the pause in
   place is FAIL of the exploratory half.
+  I22 also enables `Fetch` before its navigation, on
+  its own narrower pattern, and answers its one
+  paused GET with a 500 instead of continuing it.
 - Reduced motion is `Emulation.setEmulatedMedia`.
 - Downloads are intercepted at `URL.createObjectURL`;
   uploads are built with `DataTransfer`.
@@ -394,6 +397,10 @@ DEFERRED on WB14. Layer 1 pins decide the 412.
 I21 skeleton miss without the Fetch pause:
 BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
+I22 with the 500 fulfilled: a missing error state,
+message, focus, or re-fetch is FAIL of the
+exploratory half. BLOCKED only if `Fetch` itself
+refuses.
 SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
@@ -6262,13 +6269,32 @@ layout.
        first read settles, and that the settled roster
        replaces it); exploratory — the live Fetch-paused
        skeleton
-- [ ] **I22** If an error occurs inside a `loadInto()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. The explorer has no way to force this fault live; if none occurs naturally, record BLOCKED naming that reason — an honest BLOCKED costs nothing.
+- [ ] **I22** Force a `loadInto()` fault on `ideas/`.
+  Before navigating, `Fetch.enable` with one pattern,
+  `*://localhost:*/api/organizations/*/ideas/` — the
+  collection GET `getIdeas` makes inside `loadInto`.
+  Never `/api/authentication/*`, and never a 401: a
+  401 drives refresh, not the error state. Answer the
+  `Fetch.requestPaused` with `Fetch.fulfillRequest`:
+  `responseCode` 500, `responseHeaders`
+  `[{name: 'content-type', value: 'application/json'}]`,
+  `body` `eyJlcnJvciI6IndhbGstZm9yY2VkIGZhdWx0In0=`
+  (base64 of `{"error":"walk-forced fault"}`). PASS:
+  `#ideas-list` shows "Something went wrong", text
+  containing "walk-forced fault", and a "Try Again"
+  `[data-retry-btn]` that is `document.activeElement`.
+  Then `Fetch.disable` and click Try Again at its
+  box-model center. PASS: a second GET of `…/ideas/`
+  answers 200 and `[data-idea-card]` cards replace
+  the error state. BLOCKED only if `Fetch.enable` or
+  `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
        fetch renders the error state and calls
-       neither hook' (a rejected fetch renders a
-       "Try Again" control and calls neither
+       neither hook' (decides a rejected fetch
+       renders "Try Again" and calls neither
        `onEmpty` nor `onData`); exploratory — the
-       live retry click re-attempting the load
+       live forced fault, the button's focus, and
+       the retry's re-fetch
 
 ### Toasts
 
