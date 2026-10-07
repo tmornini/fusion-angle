@@ -1796,11 +1796,11 @@ the second organization.
   Pin: exploratory — each link's live navigation
 - [ ] **C6** Scroll the dashboard at 1280×800. PASS:
   the sidebar stays fixed while the main content
-  scrolls beside it. The window is the scroller —
-  `.main-content` sets no overflow and `.sidebar` is
-  `position: fixed` — and CDP wheel and key scrolls
-  stall on a tab that is not composited, so drive
-  with `Runtime.evaluate`: from `scrollY` 0
+  scrolls beside it. The window is the scroller — the
+  `.main-content` wrapper sets no overflow and
+  `.sidebar` is `position: fixed` — and CDP wheel and
+  key scrolls stall on a tab that is not composited,
+  so drive with `Runtime.evaluate`: from `scrollY` 0
   (`window.scrollTo(0, 0)` first), read
   `#main-content`'s `getBoundingClientRect().top`
   as t, then
@@ -1812,11 +1812,12 @@ the second organization.
   is t − d. If d = 0, `#main-content`'s rect `bottom`
   is at most `window.innerHeight`, and its
   `scrollHeight` is at most its `clientHeight`, the
-  page fits the window: lower the window to 400 px
-  high with `Browser.setWindowBounds` and drive again;
-  BLOCKED, not FAIL, naming that, only if it still
-  fits. Restore the 1280×800 bounds if you lowered
-  them, and `window.scrollTo(0, 0)`.
+  page fits the window: set
+  `Emulation.setDeviceMetricsOverride` to 1280×400
+  with `deviceScaleFactor: 1`, as Setup does for
+  1280×800, and drive again; BLOCKED, not FAIL, naming
+  that, only if it still fits. Restore the 1280×800
+  override if you lowered it, and `window.scrollTo(0, 0)`.
   Pin: exploratory — the sidebar's fixed position
        while the main content scrolls
 - [ ] **C7** Check that seed data populates all 4 dashboard
