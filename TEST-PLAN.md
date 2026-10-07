@@ -415,7 +415,11 @@ message, focus, or card replacement, or a retry whose
 GET does not answer 200, is FAIL of the exploratory
 half. BLOCKED only if `Fetch` itself refuses.
 F13's second press off the node after the first
-release centred it: FAIL, not BLOCKED (TODO.md 0j).
+release centred it, both presses less than
+`DBLCLICK_MS` apart: FAIL, not BLOCKED (TODO.md 0j).
+Anything but exactly two presses that close is
+BLOCKED, naming the driver, whatever the second
+press hit.
 SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
@@ -2853,8 +2857,11 @@ opens and renders.)
        `PANEL_WIDTH_PX` while the test above passes 0
 - [ ] **F13** While the panel is open, double-click a
   *different* node the way a person does: one point,
-  two presses. Pick a regular node: Create and Archive
-  panels have no `#prop-node-name`. Aim before the
+  two presses. Auto Fit must be off, as F12 left it
+  (turn it off first if it is on): a re-fit at the
+  second press can fail the centering clause. Pick a
+  regular node: Create and Archive panels have no
+  `#prop-node-name`. Aim before the
   first press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
@@ -2865,19 +2872,25 @@ opens and renders.)
   pre-press miss is re-aimed at another regular
   node clear of the panel, not scored. Install a
   capture-phase `window` `pointerdown` listener that
-  pushes `Date.now()`, then send both press/release
-  pairs to that point inside `DBLCLICK_MS`, never
-  re-reading it between them. Fewer than two pushed
-  times, or a gap of `DBLCLICK_MS` or more between
-  them, is no double-click: record BLOCKED, naming
-  the driver.
+  pushes `Date.now()` onto an array, then send both
+  press/release pairs to that point inside
+  `DBLCLICK_MS`, never re-reading it between them.
+  After the second release read the array: anything
+  but exactly two pushed times, less than
+  `DBLCLICK_MS` apart, is no double-click, whatever
+  the second press hit: record BLOCKED, naming the
+  driver.
   PASS: after the second press the panel is
   still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it: once the panel's ~200 ms slide
-  settles, the node `rect`'s client-box center is
-  within 4 px of the center of the canvas region
-  right of `.flow-props-panel`.
+  re-centred on it. Query the node `rect`,
+  `.flow-props-panel`, and `svg.flow-canvas` afresh
+  after the second release (every commit replaces
+  them). Once the panel's ~200 ms slide settles, the
+  straight-line distance from the node `rect`'s
+  client-box center to the center of the part of
+  `svg.flow-canvas`'s client box right of
+  `.flow-props-panel` is at most 4 px.
   A second press that lands off the
   node because the first release moved the camera is
   FAIL, not BLOCKED: the gesture was delivered.
