@@ -614,9 +614,10 @@ code comments cite; specs and plans written before the
   FLOW-CANVAS.md prescribes the centering, and
   `tests/browser/canvas-gestures.test.ts` 'a node
   click under an open panel centers it on release
-  (F13)' pins it). A double-click's first release
-  therefore slides the node from under its second
-  press, which meets empty canvas — `open-panel:
+  (F13)' decides only that the camera moves). A
+  double-click's first release therefore slides the
+  node from under its second press, which meets
+  empty canvas — `open-panel:
   false` closes the panel
   (`web-app/app/flow-fsm-reduce.ts:97`) — or another
   node, which takes the panel. The walk's element-id
