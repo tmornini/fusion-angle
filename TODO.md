@@ -398,8 +398,8 @@ code comments cite; specs and plans written before the
   the DELETE head that made the state, in a change of
   its own. Every
   byte stays recorded; roles fence live readers only, so
-  a dump or backup carries the table whole, and item 6 no
-  longer orders this item. This item changes no row and
+  a dump or backup carries the table whole, and item 6
+  does not order this item. This item changes no row and
   no column, and a test says so. Oracle: a Postgres test
   logs in as a member of `fa_api` and is refused every
   verb but its two. KNOWN seams "A raw dump still has
@@ -988,7 +988,8 @@ Off the critical path; each with its oracle.
 - Claim-on-load with no release-on-leave plus the
   8-hour `DEFAULT_LOCK_TIMEOUT` turns a drive-by
   work-order view into an 8-hour claim
-  (the page renders the claim; the UX remains) —
+  (the page shows the claim; the 8-hour hold is the
+  defect) —
   `web-app/workbox/detail.ts:598-616`,
   `shared/types.ts:1087`
 - A latched write aligned to RFC 9110 §13.1.1. When
@@ -1333,9 +1334,9 @@ Off the critical path; each with its oracle.
   becomes unreachable by construction, not by fixture
 - A DOM-free server universe — `deno.json` is the only
   project and its `lib` includes `dom`, so a `document`
-  in `api/` or `server/` type-checks. Measured: a
-  temp `document.body` under `api/` passed `deno check
-  --frozen api`. WebCrypto/Fetch names the server needs
+  in `api/` or `server/` type-checks: a `document`
+  reference under `api/` passes `deno check --frozen
+  api` (measured). WebCrypto/Fetch names the server needs
   (`crypto.subtle` in `api/client-assertion.ts:174`,
   `:184`) live on `lib.webworker` without `document`.
   Oracle: a
@@ -1362,7 +1363,7 @@ Off the critical path; each with its oracle.
   200 and stores nothing; a token issued to another
   client is refused; a real and a guessed token of the
   same length answer byte-identical responses.
-- Physical PII erasure — deferred by decision:
+- Physical PII erasure — waits on its trigger:
   product-path item 0f hides removed PII, it does not
   delete it. Activates on a tenant contract or a
   jurisdiction that requires physical deletion. The pairs
@@ -1376,9 +1377,9 @@ Off the critical path; each with its oracle.
   and the table itself is refused; `fa_owner` owns the
   view, so item 0f's policy hides nothing from it. An
   erasure pair names the removed ids and hashes so every
-  absence is accounted for — the ledger store left
-  `supersedes`
-  unenforced for this — and writing it is an INSERT, which
+  absence is accounted for — `supersedes` is
+  unenforced so an erasure pair can name absent ids —
+  and writing it is an INSERT, which
   a delete-only view cannot make: the brainstorm settles
   whether the eraser also inserts through a view of its
   own, held to erasure pairs by a check option (measured:
@@ -1476,12 +1477,12 @@ Off the critical path; each with its oracle.
   fetch window; a pending flag would close it but
   reintroduces the shared state the design avoids —
   `client/channels.ts:214-225`
-- The records list's steady-state subscribe is still
+- The records list's steady-state subscribe is
   fire-and-forget. `subscribeRecordChanges(async () => {
   … await getRecords … })` (`web-app/records/index.ts:
-  118-127`) has no error handler. Critical-functionality
-  path fenced `subscribeOnce`'s four `onEmpty` inits and
-  excluded this sibling. Oracle: a failing re-GET on
+  118-127`) has no error handler, where
+  `subscribeOnce`'s four `onEmpty` inits have one.
+  Oracle: a failing re-GET on
   the records list renders Try Again, zero unhandled
   rejection — the same pin shape as
   `tests/ideas-empty-subscribe.test.ts`
@@ -1586,10 +1587,12 @@ Off the critical path; each with its oracle.
   fits only under `isAutoFit`, and the load-time block
   (`web-app/flows/detail.ts:1798-1813`) is the only
   load-time fit — its `reconcileFitFromDom()` returns
-  early for the same reason, though the run-four
-  remediation spec promises "onFlowLoaded keeps its
-  explicit first fit". Oracle: a flow loaded with Auto
-  Fit off fits on first paint, or the spec says it
+  early for the same reason, though the run-four plan
+  promises "onFlowLoaded keeps its explicit first fit"
+  (`docs/superpowers/plans/`
+  `2026-08-23-test-plan-run-four-remediation.md`).
+  Oracle: a flow loaded with Auto Fit off fits on first
+  paint, or the plan says it
   does not
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
@@ -1606,7 +1609,7 @@ Off the critical path; each with its oracle.
   names the selectors). A Layer 2 test under
   `tests/browser/` asserting one click after reload
   reaches the element is still unwritten.
-- The browser type fence is gone, not weakened. Ambient
+- No browser type fence exists. Ambient
   Node globals unlock per `deno check` invocation: one
   `node:` specifier anywhere in the checked graph gives
   `process` to every file in it. `web-app` carries none
@@ -1630,10 +1633,10 @@ Off the critical path; each with its oracle.
   `web-app/app/` tooling module (`measure.ts` 49,
   `generate-api-documentation.ts` 14, `compose.ts` 14,
   `generate-schema-svg.ts` 11, `cdp-client.ts` 10,
-  `measure-viz.ts` 6, before `hash-static.ts` joined
-  them) and none in browser page code. So
-  that half needs the lib change PLUS the exclusion
-  registry the `process` half escaped. Oracle for the
+  `measure-viz.ts` 6, with `hash-static.ts`
+  unmeasured) and none in browser page code. So
+  that half needs the lib change PLUS an exclusion
+  registry the `process` half does not need. Oracle for the
   `process` half: that invocation in `./test validate`, red
   on a `process` reference under `web-app/`.
 - The measure visualizer's client mirrors have no test
@@ -1662,7 +1665,7 @@ Off the critical path; each with its oracle.
   does not need; its one effect would be software
   compositing, which makes runs more alike across
   machines, and `./test browser` has been green on one
-  machine only. Restore it if two machines disagree.
+  machine only. Add it if two machines disagree.
   Oracle: `./test browser` green on two machines
 - No error-message allowlist. `safeErrorMessage`
   (`server/postgres-gate.ts:101-121`) prints a message
@@ -1677,7 +1680,7 @@ Off the critical path; each with its oracle.
   not empty, a required env is missing, Postgres is
   unreachable, a concurrent seed won, the flags are
   wrong. Everything else is a bug and crashes with its
-  message and stack. The allowlist kept secrets off
+  message and stack. The allowlist keeps secrets off
   stderr; that duty moves to the gate: no secret enters
   an error message, and the Postgres adapter enriches a
   driver fault without the URL or password. First check
@@ -1803,8 +1806,8 @@ Off the critical path; each with its oracle.
   - `resolveOrganizationGate(nonEmpty, <a gated page
     other than invitations>)` returning the list (B28) —
     Layer 1, one more assertion in
-    `tests/boot-organization-gate.test.ts`; a mutation
-    proved the old pin false
+    `tests/boot-organization-gate.test.ts`, whose
+    present pin lets a mutation survive
   - A header landmark and a main-content region rendering
     on `dashboard/` (C1) — Layer 2, extending
     `tests/browser/sidebar.test.ts` or
@@ -2098,8 +2101,8 @@ Off the critical path; each with its oracle.
     of the four nodes" (FS6) — Layer 1, the same
     `sharedMockDb()`-backed `getFlowStats` assertion FS4
     wants, extended to Data Capture. The composed hazard
-    rules are pinned, but the seed shape they rest on was
-    READ, not asserted, and
+    rules are pinned, but the seed shape they rest on is
+    read, not asserted, and
     `tests/mock-flow-readiness.test.ts` pins Customer
     Onboarding READY, which excludes zero-member and
     dead-end nodes but not the one-member `warning` case
@@ -2362,7 +2365,7 @@ Off the critical path; each with its oracle.
     until B navigates
 - SP-6 sign-up (`web-app/auth/index.ts:641-651`)
 - Billing (`web-app/billing/`)
-- Table migrations — deferred by decision: the ledger
+- Table migrations — wait on their trigger: the ledger
   store holds the table's DDL final, and item 0h ships
   everything a change to the fence needs. Activates on the
   first change to the table once a tenant's data exists
@@ -2490,7 +2493,8 @@ Off the critical path; each with its oracle.
   this bullet.
   Oracle: TEST-PLAN I21's probe step and its
   `### Driving notes` twin
-- The advisory-lock module outlived its locks.
+- The advisory-lock module holds no lock the product
+  takes.
   `api/advisory-lock.ts` holds the notify channel, its
   payload, and `POOL_MAX`; its `advisoryKey` and
   `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have no
@@ -2567,9 +2571,9 @@ Off the critical path; each with its oracle.
   tombstone decision in one layer. Oracle: every
   collection read goes through the store seam,
   `./test validate` and `./test postgres` green.
-- The app still reads the server after the packageable
-  client. With the contract in `shared/`, four modules
-  outside the client import `api/`: the documentation
+- The app reads the server. The contract lives in
+  `shared/`, yet four modules outside the client import
+  `api/`: the documentation
   generator (`web-app/app/generate-api-documentation.ts`)
   reads the route table and its surface
   (`api/routes.ts`, `api/route-surface.ts`,
@@ -2592,7 +2596,7 @@ Off the critical path; each with its oracle.
   (`web-app/ideas/create.ts:124`,
   `web-app/ideas/convert.ts:359`). A design call, not
   a defect: TEST-PLAN D6/D7 pin the toast, and the
-  2026-08-26 D6 stub files the voice question as its
+  D6 mitigation stub files the voice question as its
   separate finding
 - `render.yaml` Blueprint as a second source of
   truth for the dashboard service. Oracle: a
@@ -2628,9 +2632,9 @@ Off the critical path; each with its oracle.
 - Profile as its own document,
   `identities/:id/profile`, 404 = no profile — closes
   whole-or-none — `tests/api-identity-document.test.ts`
-- Split the `default-organization` singleton the way PII
-  split. Exact-read spec Defers: the SET document is
-  still a collection-shaped path with empty name (`path
+- Store the `default-organization` singleton as PII is
+  stored. The SET document is a collection-shaped
+  path with empty name (`path
   = /identities/<id>/default-organization/`, `name =
   ''` — `api/derive-default-organization.ts:11-18`),
   while PII is `path = /identities/<id>/`, `name = pii`.
@@ -2639,8 +2643,9 @@ Off the critical path; each with its oracle.
   `getDocumentHistory('/identities/<id>/',
   'default-organization')` is the SET document, and the
   empty-name prefix is gone after wipe
-- Split `client_registration` the way PII split.
-  Registration is still the pre-PII shape: `path =
+- Store `client_registration` as PII is stored.
+  Registration is a collection-shaped path with empty
+  name: `path =
   /identities/<id>/registration/`, `name = ''`
   (`api/derive-identity-spine.ts:366-419`;
   WRITE_RESPONSE_SPECS `name: ''` at
@@ -2661,9 +2666,9 @@ Off the critical path; each with its oracle.
   `RecordWriteEditBody`, `RecordWriteMessagePairs`,
   `validateRecordWriteBody`,
   `validateRecordWriteAttribute`, and
-  `tests/api-records-write.test.ts`. The former's names are
-  ruled, one rename-only commit, the store's `'land'`
-  outcome unchanged:
+  `tests/api-records-write.test.ts`. The store's
+  statement names are ruled, for one rename-only commit
+  that keeps the store's `'land'` outcome:
   `StateWrite` → `NextStates`,
   `FormedStateWrite` → `FormedStatement`,
   `WriteAnswer` → a name still to rule, since
@@ -2737,8 +2742,8 @@ Off the critical path; each with its oracle.
   `last-modified` makes `If-Modified-Since` possible.
   No handler reads it. Conditional
   requests (`If-None-Match` / `304`) stay open, and so
-  does compression at the origin, which head reads left
-  here (`docs/superpowers/specs/`
+  does compression at the origin
+  (`docs/superpowers/specs/`
   `2026-09-30-head-reads-design.md:346-347`). Start:
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
@@ -2782,8 +2787,8 @@ Off the critical path; each with its oracle.
   (`tests/pair-write-coverage.test.ts:55`);
   `MEMBERS_WIRING` (`api/routes.ts:476`,
   `api/validators.ts:535-536`, `:841-842`,
-  `:934-935`); and the replay fast path, which no
-  longer exists — nothing at the gate reads a request
+  `:934-935`); and the replay fast path, which the
+  code lacks — nothing at the gate reads a request
   to serve a stored response — yet is described at
   `client/flow-mutations.ts:559-560`, its "fast" and
   "path" a line apart, and in `tests/`
@@ -2824,8 +2829,8 @@ Off the critical path; each with its oracle.
   `web-app/app/page-request-profile.ts` says "No-op in
   Node"; `tests/drift-states.test.ts` says derive-states
   is unread in production while `api/routes.ts` imports
-  it; `api/routes.ts` claims revival dual-write after
-  the states row half is stripped; `states.postEvent`,
+  it; `api/routes.ts` claims a revival dual-write, though
+  no states row half exists; `states.postEvent`,
   defined nowhere, is named at `api/routes.ts:354`,
   `:1066`, `:1102`, `:1143` and `api/mock-data.ts:872`;
   and `web-app/app/root-redirect.ts:6-7` says esbuild and
@@ -2851,9 +2856,8 @@ Off the critical path; each with its oracle.
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and a `sysctl` read is unverifiable and
-  macOS-only. Ten of the fourteen rows
-  in `measurements/history.jsonl`, `c50e849` on, store
-  `"unknown"`. The truthful
+  macOS-only. The ten newest of the fourteen rows in
+  `measurements/history.jsonl` store `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
   which needs `measure-core.ts`'s field type and
   `shapeHistoryLine` (:49, :284) together with
@@ -2928,8 +2932,8 @@ Off the critical path; each with its oracle.
   (`web-app/app/presenters/flow-designer.ts:198-204`);
   the shell's hand-kept copy of the reveal header
   (`bin/postgres-lib:7` against `server/seed.ts:28-29`,
-  guarded by no test); the second instance the
-  remediation added (`canvasFocusOf`'s walk); the undo
+  guarded by no test); the second ancestor walk,
+  `canvasFocusOf` (`web-app/flows/detail.ts:635`); the undo
   path's duplicated pure helpers
   (`api/flow-graph-diff.ts:13-25`); `toRecordAttribute`'s
   `??` ACL default
@@ -2943,7 +2947,7 @@ Off the critical path; each with its oracle.
   validate` green; the canvas entries retire with
   product-path item 11.
 - One gate for the write. Every write is one ledger
-  statement now (`runLedgerStatement`,
+  statement (`runLedgerStatement`,
   `api/ledger-statement.ts:48`), but each handler still
   lands its own: `runWrite` at 40 sites, 37 of them in
   `api/routes.ts`, `runStateWrite` at 17, 13 there, and
@@ -2992,8 +2996,8 @@ Off the critical path; each with its oracle.
 - The memory backend copies its whole table for every
   bare statement (`const copy = [...this.#rows]`,
   `api/backend-memory.ts:144`), a cost every test write
-  outside a transaction pays; the rehearsal spec left
-  it unmeasured (`docs/superpowers/specs/`
+  outside a transaction pays, unmeasured
+  (`docs/superpowers/specs/`
   `2026-09-24-rehearsal-transaction-design.md:189-191`).
   Oracle: `./test` measured before and after a copy
   only a failing statement pays, and the change lands
@@ -3010,8 +3014,8 @@ Off the critical path; each with its oracle.
   then a layer that caches `deno.json` /
   `deno.lock` / `denort` only if that number is
   the bottleneck.
-- The ledger sweep, built into `./bin/measure` the way
-  `./deploy` grew modes. A ledger mode that subsumes a
+- The ledger sweep, a mode of `./bin/measure` as
+  `./deploy` has modes. A ledger mode that subsumes a
   generator and a loader: the mock seed as the base, a modeled
   year of growth on top, every model constant a CLI argument
   (seats, working days, logins and refreshes and document
@@ -3086,17 +3090,12 @@ Off the critical path; each with its oracle.
   with the flow, not with its work orders, or the
   measurement says the fan-out costs nothing a person
   sees
-- Fewer body decodes, after the work-order-events spec,
-  the last of item 1's. Head
-  reads slowed eight of the nine list pages' readyMs
-  (`4a540f3` → `9a8396a`, medians of 25,
-  `measurements/history.jsonl`),
-  workbox 122.7 → 142.0 and flows 46.0 → 56.4 the
-  most. After the work-order-events spec three stay
-  slower than that base (`4a540f3` → `851adad`): flows
-  46.0 → 55.8, projects 57.5 → 62.5, records 50.6 →
-  54.3; workbox reads 87.2, under its base. Three
-  suspects, none measured: larger
+- Fewer body decodes. Three list pages read slower
+  than their baseline (readyMs medians of 25,
+  `measurements/history.jsonl` rows `4a540f3` →
+  `851adad`):
+  flows 46.0 → 55.8, projects 57.5 → 62.5, records
+  50.6 → 54.3. Three suspects, none measured: larger
   multipart list payloads, each part a whole stored
   response (about 300 header octets plus the full
   document); each part's split and framing; and
@@ -3172,8 +3171,7 @@ Off the critical path; each with its oracle.
   (`docs/superpowers/specs/2026-09-15-one-table-examined-report.md`)
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
-  fences it); item 0f no longer orders
-  item 6, since a backup carries the table whole
+  fences it)
 - 0a, 0b → 0c: the count follows the remedies
 - 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
