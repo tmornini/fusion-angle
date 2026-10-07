@@ -2876,7 +2876,7 @@ opens and renders.)
   *different* node the way a person does: one point,
   two presses. Auto Fit must be off, as F12 left it
   (turn it off first if it is on): a re-fit at the
-  second press can fail the centering clause. Pick a
+  second press can fail the re-centred clause. Pick a
   regular node: Create and Archive panels have no
   `#prop-node-name`. Aim before the
   first press: read the center of
@@ -2889,8 +2889,8 @@ opens and renders.)
   pre-press miss is re-aimed at another regular
   node clear of the panel, not scored. Install a
   capture-phase `window` `pointerdown` listener that
-  pushes `Date.now()` onto an array, then send both
-  press/release pairs to that point inside
+  pushes `Date.now()` onto a new, empty array, then
+  send both press/release pairs to that point inside
   `DBLCLICK_MS`, never re-reading it between them.
   After the second release read the array: anything
   but exactly two pushed times, less than
@@ -2900,10 +2900,11 @@ opens and renders.)
   PASS: after the second press the panel is
   still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it. Query the node `rect`,
-  `.flow-props-panel`, and `svg.flow-canvas` afresh
-  after the second release (every commit replaces
-  them). Once the panel's ~200 ms slide settles, the
+  re-centred on it. Every commit replaces the panel,
+  `#prop-node-name`, the node, and `svg.flow-canvas`,
+  and the new panel replays its ~200 ms slide: wait
+  250 ms after the second release, then query them
+  afresh and read all three clauses. The
   straight-line distance from the node `rect`'s
   client-box center to the center of the part of
   `svg.flow-canvas`'s client box right of
