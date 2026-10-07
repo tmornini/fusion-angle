@@ -239,8 +239,10 @@ not repeat the note in every case.
   `elementFromPoint` first. A miss is a body-drag or
   marquee, not Shift. The camera holds from press to
   release, so a drop point read before the press stays
-  true. If Shift is not delivered on pointer-up the
-  FSM emits add-node; record BLOCKED naming that.
+  true. If Shift is not delivered, the preview shows a
+  ghost "New State" card, not a bezier; a release off a
+  node then emits add-node, one over a node adds
+  nothing. Record BLOCKED naming that.
   Layer 1 and Layer 2 pins decide add-edge. F23's
   mid-gesture Shift is the same compositor limit.
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
@@ -1221,7 +1223,9 @@ the second organization.
   `document.elementFromPoint` there must resolve
   `.closest('[data-connect-port]')`; the drop point is
   the center of
-  `.flow-node[aria-label="Data Capture"] > rect`.
+  `.flow-node[aria-label="Data Capture"] > rect`, and
+  `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node.
   Confirm `document.visibilityState === 'visible'`
   (the preview paints under `requestAnimationFrame`).
   Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
@@ -1242,8 +1246,8 @@ the second organization.
   release adds one edge and no node. Rename it
   "approve". A pre-press `elementFromPoint` miss is
   re-aimed, not scored. BLOCKED only if Shift is not
-  observed on release (a node is added instead),
-  naming that.
+  observed: before release the preview shows a ghost
+  "New State" card, not the bezier, naming that.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to
        an ancestor is a cycle edge' (decides
        "Review"→"Data Capture" classifies as a cycle
