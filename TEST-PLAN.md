@@ -191,6 +191,10 @@ not repeat the note in every case.
   fresh before each gesture.
 - There is no `dblclick` listener: send two pointerdowns on
   one element id inside `DBLCLICK_MS` (400).
+  F13 alone sends both presses to one point read
+  before the first, as a person does: under an open
+  panel the first release centres the node, so a
+  re-read would chase it.
 - Chords carry the browser's `key`; Shift uppercases it.
 - `.focus()` selects the way Tab does; `.click()` selects
   nothing.
@@ -401,6 +405,8 @@ I22 with the 500 fulfilled: a missing error state,
 message, focus, or re-fetch is FAIL of the
 exploratory half. BLOCKED only if `Fetch` itself
 refuses.
+F13's second press off the node after the first
+release centred it: FAIL, not BLOCKED (TODO.md 0j).
 SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
@@ -2749,7 +2755,7 @@ opens and renders.)
 - [ ] **F11** Click a node. PASS: the node gets the gold
   glow selection effect. Double-click it — the mechanics
   are in `### Driving notes`, and every later double-click
-  in F uses the same drive. PASS: the
+  in F uses the same drive; F13 names its own. PASS: the
   properties panel appears with the "State Properties"
   title and a close button on the right (regular nodes only
   — Create/Archive show their own kind title), then a
@@ -2796,9 +2802,19 @@ opens and renders.)
        take, `#panToRevealSelected`, passes the real
        `PANEL_WIDTH_PX` while the test above passes 0
 - [ ] **F13** While the panel is open, double-click a
-  *different* node (F11's drive). PASS: panel content
-  retargets to the
-  new node and the canvas re-centres on it.
+  *different* node the way a person does: one point,
+  two presses. Read the center of
+  `.flow-node[aria-label="<name>"] > rect` once —
+  the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
+  `text` or the `g`, whose box includes the port —
+  and send both press/release pairs to that point
+  inside `DBLCLICK_MS`, never re-reading it between
+  them. PASS: after the second press the panel is
+  still open, `#prop-node-name` reads the
+  double-clicked node's name, and the canvas has
+  re-centred on it. A second press that lands off the
+  node because the first release moved the camera is
+  FAIL, not BLOCKED: the gesture was delivered.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
        then double-click n2 retargets panel and selection
        to n2 (F13 retarget)' (decides the selection
@@ -2812,7 +2828,14 @@ opens and renders.)
        literals rather than reading `DBLCLICK_MS`);
        tests/flow-designer-actions.test.ts
        'applyPanToRevealSelected centers a node, else
-       null'; exploratory — the live retarget paint
+       null'; tests/browser/canvas-gestures.test.ts 'a
+       node click under an open panel centers it on
+       release (F13)' (decides a single click under an
+       open panel centres the clicked node on release —
+       the move a one-point double-click's second press
+       meets); exploratory — the one-point double-click,
+       which TODO.md 0j owns until a red Layer 2 test
+       pins it, and the live retarget paint
 - [ ] **F14** Turn Auto Fit on, then double-click a node.
   PASS: the panel opens and the canvas re-fits to the
   panel-aware visible region — no toast, no blocking.
