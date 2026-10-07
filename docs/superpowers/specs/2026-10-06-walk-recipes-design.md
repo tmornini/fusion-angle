@@ -20,7 +20,7 @@
   fault), F13 (a one-point double-click), AA32 (a
   port-aimed Shift-drag), and C6 (a scripted scroll),
   with their driving-note and Scoring lines; TODO.md
-  0j filed; 0a closed; 0b's plan pointer named
+  0j filed; 0a closed; 0b's and 0c's plan pointers named
 - Leaves: F13's product fix (0j); 0b and 0c
 - Supersedes: Task 9 of
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
@@ -244,7 +244,8 @@ Replace I22 (`TEST-PLAN.md:6265-6271`) with:
   `*://localhost:*/api/organizations/*/ideas/` — the
   collection GET `getIdeas` makes inside `loadInto`.
   Never `/api/authentication/*`, and never a 401: a
-  401 drives refresh, not the error state. Answer the
+  401 drives refresh, not the error state. Do not
+  `wait_for_load` before answering. Answer the
   `Fetch.requestPaused` with `Fetch.fulfillRequest`:
   `responseCode` 500, `responseHeaders`
   `[{name: 'content-type', value: 'application/json'}]`,
@@ -255,8 +256,10 @@ Replace I22 (`TEST-PLAN.md:6265-6271`) with:
   `[data-retry-btn]` that is `document.activeElement`.
   Then `Fetch.disable` and click Try Again at its
   box-model center. PASS: a second GET of `…/ideas/`
-  answers 200 and `[data-idea-card]` cards replace
-  the error state. BLOCKED only if `Fetch.enable` or
+  answers 200 (its `responseStatus` in
+  `performance.getEntriesByType('resource')`) and
+  `[data-idea-card]` cards replace the error state.
+  BLOCKED only if `Fetch.enable` or
   `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
        fetch renders the error state and calls
@@ -282,9 +285,9 @@ line (`TEST-PLAN.md:394-396`):
 
 ```
 I22 with the 500 fulfilled: a missing error state,
-message, focus, or re-fetch is FAIL of the
-exploratory half. BLOCKED only if `Fetch` itself
-refuses.
+message, focus, re-fetch, or card replacement is
+FAIL of the exploratory half. BLOCKED only if
+`Fetch` itself refuses.
 ```
 
 ## 2. F13 — one point, two presses
@@ -296,20 +299,24 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
   *different* node the way a person does: one point,
   two presses. Pick a regular node: Create and Archive
   panels have no `#prop-node-name`. Aim before the
-  press: read the center of
+  first press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
   `text` or the `g`, whose box includes the port —
   and `document.elementFromPoint` there must resolve
   `.closest('.flow-node')` to that node. A point under
   `.flow-props-panel` lands on the panel, so a
-  pre-press miss is re-aimed, not scored. Then send
+  pre-press miss is re-aimed at another regular
+  node clear of the panel, not scored. Then send
   both press/release pairs to that point
   inside `DBLCLICK_MS`, never re-reading it between
-  them. PASS: after the second press the panel is
-  still open, `#prop-node-name` reads the
+  them. Record both press times: a longer gap is
+  not a double-click, so it is re-sent, not scored.
+  PASS: after the second press the panel is
+  still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it. A second press that lands off the
+  re-centred on it (its `viewBox`, read per the
+  Driving notes). A second press that lands off the
   node because the first release moved the camera is
   FAIL, not BLOCKED: the gesture was delivered.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
@@ -327,9 +334,9 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
        'applyPanToRevealSelected centers a node, else
        null'; tests/browser/canvas-gestures.test.ts 'a
        node click under an open panel centers it on
-       release (F13)' (decides a single click under an
-       open panel centres the clicked node on release —
-       the move a one-point double-click's second press
+       release (F13)' (decides the camera moves when a
+       single click under an open panel releases — the
+       move a one-point double-click's second press
        meets); exploratory — the one-point double-click,
        which TODO.md 0j owns until a red Layer 2 test
        pins it, and the live retarget paint
@@ -386,27 +393,32 @@ names walk-green's camera-hold pin:
   `document.elementFromPoint` there must resolve
   `.closest('.flow-node')` to that node.
   Confirm `document.visibilityState === 'visible'`
-  (the preview paints under `requestAnimationFrame`).
+  (the preview paints under `requestAnimationFrame`,
+  so read the preview one frame after the last move).
   Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
-  (code `ShiftLeft`, vk 16, modifiers 8);
-  `mousePressed` at the press point (modifiers 8);
-  eight `mouseMoved` steps to the drop point
-  (`buttons` 1, modifiers 8). PASS: before release,
+  (`key` `Shift`, code `ShiftLeft`, vk 16, modifiers 8);
+  `mousePressed` at the press point (`button` `left`,
+  `clickCount` 1, modifiers 8); eight `mouseMoved`
+  steps to the drop point (`buttons` 1, modifiers 8).
+  PASS: before release,
   `.flow-connect-preview path` carries
   `stroke-dasharray` — the dashed-orange curved bezier
   — because a forward path "Data Capture" → "Review"
   already exists and the release would close a loop.
-  `mouseReleased` (modifiers 8), then `keyUp` Shift.
+  `mouseReleased` at the drop point (`button` `left`,
+  modifiers 8), then `keyUp` Shift.
   PASS: `.flow-edge` count +1, `.flow-node` count
   unchanged. Rename the edge "needs revision". Repeat
   onto `.flow-node[aria-label="Archive"] > rect`,
   re-aiming both points. PASS: the preview path has
-  no `stroke-dasharray` (solid blue, no return path);
-  release adds one edge and no node. Rename it
+  no `stroke-dasharray` (solid blue, no return path)
+  and no ghost card; release adds one edge and no
+  node. Rename it
   "approve". A pre-press `elementFromPoint` miss is
-  re-aimed, not scored. BLOCKED only if Shift is not
-  observed: before release the preview shows a ghost
-  "New State" card, not the bezier, naming that.
+  re-aimed, not scored. BLOCKED, not FAIL, only if
+  Shift is not observed: before release the preview
+  layer's text reads "New State" (a ghost card), not
+  the bezier, naming that.
 ```
 
 Replace the Shift-drag bullet in `### Driving notes`
@@ -419,9 +431,11 @@ Replace the Shift-drag bullet in `### Driving notes`
   `elementFromPoint` first. A miss is a body-drag or
   marquee, not Shift. The camera holds from press to
   release, so a drop point read before the press stays
-  true. If Shift is not delivered, the preview shows a
-  ghost "New State" card, not a bezier; a release off a
-  node then emits add-node, one over a node adds
+  true. If Shift is not delivered, the preview layer's
+  text reads "New State" (a ghost card), not the edge
+  bezier; a release off a node, more than 20 canvas
+  units (`MIN_DRAG_DISTANCE`) from the node's right-edge
+  midpoint, then emits add-node, one over a node adds
   nothing. Record BLOCKED naming that.
   Layer 1 and Layer 2 pins decide add-edge. F23's
   mid-gesture Shift is the same compositor limit.
@@ -433,18 +447,22 @@ its Pin line (`:1733-1734`) unchanged, with:
 ```
 - [ ] **C6** Scroll the dashboard at 1280×800. PASS:
   the sidebar stays fixed while the main content
-  scrolls under it. The window is the scroller —
+  scrolls beside it. The window is the scroller —
   `.main-content` sets no overflow and `.sidebar` is
   `position: fixed` — and CDP wheel and key scrolls
   stall on a tab that is not composited, so drive
-  with `Runtime.evaluate`: read `#main-content`'s
+  with `Runtime.evaluate`: read
+  `<main id="main-content">`'s
   `getBoundingClientRect().top` as t, then
   `window.scrollTo(0, document.documentElement.scrollHeight)`
   and read `window.scrollY` as d. PASS: d > 0;
   neither `html` nor `body` computes `overflow-y:
-  hidden`; `#desktop-sidebar`'s rect `top` is still 0;
-  `#main-content`'s rect `top` is t − d. Restore with
-  `window.scrollTo(0, 0)`.
+  hidden` or `overflow-y: clip`; `#desktop-sidebar`'s
+  rect `top` is still 0; `#main-content`'s rect `top`
+  is t − d. If d = 0 and `<main id="main-content">`'s
+  rect `bottom` is at most `window.innerHeight`, the
+  page fits the window: BLOCKED, not FAIL, naming
+  that. Restore with `window.scrollTo(0, 0)`.
 ```
 
 Two departures from Task 9: the scroll goes to the
@@ -461,8 +479,8 @@ File 0j after 0i, before F13's commit cites it:
 - **0j.** A double-click under an open panel lands
   where a person aimed. With the properties panel
   open, a click on another node selects it and, on
-  release, centres it (`web-app/flows/detail.ts:1099-1108`;
-  FLOW-CANVAS.md prescribes the centring, and
+  release, centers it (`web-app/flows/detail.ts:1099-1108`;
+  FLOW-CANVAS.md prescribes the centering, and
   `tests/browser/canvas-gestures.test.ts` 'a node
   click under an open panel centers it on release
   (F13)' pins it). A double-click's first release
@@ -473,21 +491,21 @@ File 0j after 0i, before F13's commit cites it:
   node, which takes the panel. The walk's element-id
   drive re-aims between the presses, which is how F13
   passed on `8e834e76`. The brainstorm decides how a
-  single click still centres while a double-click
+  single click still centers while a double-click
   holds still — the 4 Oct plan refused a timer
   (Cleverness) — and whether item 11's "panel callback
   re-fitting at a double-click's second press" rides
   along. Oracle: a red Layer 2 test — two presses at
   one point on a second node under an open panel
   leave the panel open on it — turns green with the
-  centre-on-release pin still green, and the next walk
+  center-on-release pin still green, and the next walk
   scores F13 PASS
 ```
 
 In the same commit the critical path's intro
 (`TODO.md:17-31`) reads "Nineteen items" and names 0j
 after 0i: "…and the wipe and reseed that ships them
-(0i); then F13's double-click under an open panel
+(0i); and F13's double-click under an open panel
 (0j)."
 
 Close 0a by the Close protocol: remove its bullet
@@ -505,14 +523,26 @@ outlives the item.
 Closing 0a also removes the one place TODO.md names the
 4 Oct plan, which 0b and 0c reach as "the same plan".
 Commit 8b gives 0b, now the head of the list, the
-plan's name, and 0c's "Task 11 of the same plan" reads
-back to it:
+plan's name:
 
 ```
 - **0b.** F37a, R22, and WB22 moored to the product;
   Task 10 of
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
   holds F37a's and R22's text.
+```
+
+Commit 9f gives 0c the path too, so neither bullet
+depends on the other's surviving (0b closes before 0c),
+and tidies two sentences the reviews flagged: 0j's
+spelling (center and centering, as the code and the test
+name write them) and the intro's last "then" (it becomes
+"and F13's"):
+
+```
+  and its main suite's line; Task 11 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
+  Oracle: AT2 names the latest Layer 2 run's count
 ```
 
 ## Sequence
@@ -535,6 +565,12 @@ One concern per commit, each green at Layer 1:
 | 8 | Close 0a's walk recipes | TODO.md |
 | 8a | Amend the 0a spec and plan to name 0b's plan | this spec, the plan |
 | 8b | Name the plan that 0b cites | TODO.md |
+| 9a | Amend the 0a spec and plan for the Minor notes | this spec, the plan |
+| 9b | Tighten I22's fault recipe | I22, I22's Scoring line |
+| 9c | Tighten F13's one-point recipe | F13 |
+| 9d | Tighten AA32's Shift-drag recipe | AA32, the Shift-drag bullet |
+| 9e | Tighten C6's scripted scroll | C6 |
+| 9f | Tidy 0j, the intro, and 0c's pointer | TODO.md |
 
 Commit 3 precedes commit 5, so F13's pointer to 0j
 never names nothing, and 0j's text holds on both
@@ -564,6 +600,28 @@ removed the one place TODO.md names the 4 Oct plan, so
 amends this spec and the plan; 8b names the plan in 0b,
 which is the text in § 4 above.
 
+Commits 9a through 9f answer the Minor notes the task
+reviews and the whole-branch review left, at the owner's
+word ("Fix the Minor notes"). 9a amends this spec and the
+plan; 9b through 9f land the amended I22, F13, AA32 (with
+the Shift-drag bullet), C6, and
+TODO.md wording, which is the text in §§ 1–4 above. Each
+adds an observation, a probe, a precedence, or an honest
+BLOCKED or re-aim cue; none loosens a PASS clause, a Pin,
+or a selector. Three notes stay as they are: F13's FAIL
+depends on where the explorer's node sits (either score
+is honest); the executed tasks' step labels share
+names with the amendment labels (executed text does not
+change); and Scoring's F23 line still echoes AA32's
+retired cue, because any cue that excuses a ghost card
+with Shift held also excuses F23's own first PASS
+clause. The Shift-drag bullet already ends "F23's
+mid-gesture Shift is the same compositor limit", so it
+and the Scoring line disagree on F23's trigger. Fixing
+either needs a probe, such as a `keydown` listener that
+tells a lost Shift from a broken handler, and that is
+the owner's call.
+
 ## Testing
 
 - `./test validate` exits 0 on every commit, Markdown
@@ -589,7 +647,8 @@ which is the text in § 4 above.
   case is added or removed, so `## Summary`'s counts
   hold.
 - TODO.md: 0j filed, 0a removed, the critical path's
-  intro, `## Sequencing`, and 0b's plan pointer.
+  intro, `## Sequencing`, and 0b's and 0c's plan
+  pointers.
 - Unchanged: AGENTS.md, ARCHITECTURE.md (no KNOWN seam
   moves, so AUDIT.md's `m` holds), FLOW-CANVAS.md, and
   the 4 Oct plan.

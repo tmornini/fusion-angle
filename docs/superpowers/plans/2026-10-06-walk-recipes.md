@@ -32,7 +32,7 @@
 > 3. Quality review: another fresh agent of type
 >    `planner`.
 >
-> After Task 8b: a fresh agent of type `architect`
+> After Task 9f: a fresh agent of type `architect`
 > reviews `1e0941c5..HEAD` against the spec. Pass no
 > model override to any dispatch.
 >
@@ -49,14 +49,18 @@ recipes for I22, F13, AA32, and C6, with their
 driving-note and Scoring lines; TODO.md files 0j and
 closes 0a.
 
-**Architecture:** Doc-only. Nine commits, each an
-exact string replacement with the Edit tool on
+**Architecture:** Doc-only. Fourteen task commits, each
+an exact string replacement with the Edit tool on
 `TODO.md` or `TEST-PLAN.md`, each green at Layer 1.
-0j lands before F13's text cites it; 0a closes last.
-Tasks 5b, 6b, and 8b amend F13's aim, AA32's aim, and
+0j lands before F13's text cites it; 0a closes in Task
+8. Tasks 5b, 6b, and 8b amend F13's aim, AA32's aim, and
 0b's plan pointer after Tasks 5, 6, and 8 were
 reviewed; commits 5a, 6a, and 8a, which amended this
-plan and the spec, precede them.
+plan and the spec, precede them. Tasks 9b through 9f
+tighten the recipes' wording after the whole-branch
+review; commit 9a, which amended this plan and the
+spec, precedes them. With the spec, the plan, and the
+four amendments, the branch carries twenty commits.
 
 **Tech Stack:** Markdown. Layer 1 (`./test validate`,
 Deno 2.9.6) is the gate, because it lints both files.
@@ -75,10 +79,11 @@ branch `2026-10-06-walk-recipes`, cut from
 **Out of bounds:** the spec, this plan, and
 `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
 None is edited, except by the owner's word of
-2026-10-07 ("apply all"): each "a" commit (5a, 6a, and
-any later one) amends the spec and this plan once, to
-answer an Important review finding. If the spec is
-wrong in any other way, STOP and report.
+2026-10-07: "apply all" lets each "a" commit (5a, 6a,
+8a, and any later one) amend the spec and this plan
+once to answer an Important review finding, and "Fix the
+Minor notes" lets 9a do so for the Minor ones. If the
+spec is wrong in any other way, STOP and report.
 
 ---
 
@@ -121,7 +126,13 @@ export DENO_DIR="$TMPDIR/deno-dir"
   Co-Authored-By trailer naming the model that wrote
   the commit, then this session's Claude-Session line.
   A `coder` runs Sonnet; if the session says another
-  model, name that one. Use exactly this shape:
+  model, name that one. The commit blocks below print the
+  planning session's Claude-Session line; at execution the
+  orchestrator substitutes its own, as the owner directed
+  on 2026-10-07 (the commits after `5cccaa60` carry
+  `session_018uFFAapWhN6H85dJyVj5cm`, and Tasks 5b, 6b,
+  8b, and 9b through 9f print it already). Use exactly
+  this shape:
 
 ```bash
 git commit -F - <<'EOF'
@@ -168,7 +179,8 @@ that its task touches.
    as it is. I22 fulfills a 500; I21 continues.
 3. **C6 keeps its `overflow-y` clause.** "neither
    `html` nor `body` computes `overflow-y: hidden`"
-   must survive the copy.
+   must survive the copy; after Task 9e the clause also
+   rules out `overflow-y: clip`.
 4. **0j's text cites the walk, not F13's text.** It
    says the element-id drive "is how F13 passed on
    `8e834e76`". It must read true both before and
@@ -196,9 +208,16 @@ that its task touches.
 10. **0b names the plan it cites.** After Task 8b, 0b
     says "Task 10 of
     `docs/superpowers/plans/test-plan-walk-2026-10-04.md`"
-    where it said "the same plan", so 0b and 0c both
-    resolve their plan. 0c, the intro, and
-    `## Sequencing` stay as Task 8 left them.
+    where it said "the same plan"; after Task 9f, 0c
+    names it too, so neither bullet depends on the
+    other's surviving. `## Sequencing` stays as Task 8
+    left it, and the intro changes only its last "then"
+    to "and" (Task 9f).
+11. **The wording pass loosens nothing.** After Tasks 9b
+    through 9f, every PASS clause, Pin, selector, and
+    count stays as it was; the new sentences only add an
+    observation, a probe, a precedence, or an honest
+    BLOCKED or re-aim cue.
 
 ---
 
@@ -206,16 +225,22 @@ that its task touches.
 
 Commit 1 (`8fb66783`, the spec) and commit 2 (this
 plan, "Plan the 0a walk recipes") precede execution.
-Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8, 8b.
-Commits 5a, 6a, and 8a are not tasks: each amended this
-plan and the spec once, after a task's review (5a before
-Task 5b, 6a before Task 6b, 8a before Task 8b). Task 3
+Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8, 8b,
+9b, 9c, 9d, 9e, 9f. Commits 5a, 6a, 8a, and 9a are not
+tasks: each amended this plan and the spec once, after a
+review (5a before Task 5b, 6a before Task 6b, 8a before
+Task 8b, 9a before Tasks 9b through 9f). Task 3
 precedes Task 5, so F13's pointer to 0j never names
 nothing. Task 5's Scoring line anchors on Task 4's
 I22 line. Task 5b anchors on Task 5's F13 text.
 Task 6b anchors on Task 6's AA32 and Shift-drag text.
 Task 8 anchors on Task 3's "Nineteen". Task 8b anchors
-on Task 8's 0b line.
+on Task 8's 0b line. Task 9b anchors on Task 4's I22
+text; 9c on Task 5b's and Task 5's F13 text; 9d on
+Task 6's and Task 6b's AA32 and Shift-drag text; 9e on
+Task 7's C6 text; 9f on Task 3's 0j and intro and on
+the 0c line the base carries. The five touch disjoint
+regions.
 
 Each task's cycle:
 
@@ -245,7 +270,8 @@ other TODO.md edit).
 - Consumes: nothing.
 - Produces: TODO.md item 0j (Task 5's F13 Pin and
   Scoring line cite "TODO.md 0j"); the intro's
-  "Nineteen items" (Task 8's anchor).
+  "Nineteen items" (Task 8's anchor). Task 9f tidies
+  0j's spelling and the intro's last "then".
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -398,7 +424,8 @@ Obscurity, Unbidden Helper Code.
 - Consumes: nothing.
 - Produces: the Scoring line ending "exploratory
   half. BLOCKED only if `Fetch` itself\nrefuses."
-  (Task 5 inserts F13's line after it).
+  (Task 5 inserts F13's line after it). Task 9b
+  tightens I22's case and that line.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -791,7 +818,7 @@ line changes), Obscurity.
 
 **Interfaces:**
 - Consumes: Task 5's F13 text, as committed in `93afc52d`.
-- Produces: nothing later tasks read.
+- Produces: F13's text, which Task 9c tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1062,7 +1089,8 @@ bullet, or Scoring line changes), Obscurity.
 **Interfaces:**
 - Consumes: Task 6's AA32 and Shift-drag text, as committed in
   `20beded1`.
-- Produces: nothing later tasks read.
+- Produces: AA32's body and the Shift-drag bullet,
+  which Task 9d tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1184,7 +1212,7 @@ stays).
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: nothing later tasks read.
+- Produces: C6's text, which Task 9e tightens.
 
 - [ ] **Step 1: Confirm the anchor**
 
@@ -1445,7 +1473,7 @@ them).
 **Interfaces:**
 - Consumes: Task 8's TODO.md, where 0b opens the list, as
   committed in `68ec2560`.
-- Produces: nothing later tasks read.
+- Produces: 0b's plan pointer; Task 9f gives 0c one too.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1515,6 +1543,730 @@ Expected `--stat`: `TODO.md` only.
 
 ---
 
+## Task 9b: Tighten I22's fault recipe
+
+**Commit subject:** `Tighten I22's fault recipe`
+
+Commandments: Clarity, Logic, Reliability (an explorer must
+  not stall on the paused GET, and must know where to read
+  the 200).
+Abominations: Test Weakening (I22's PASS clauses, its narrow
+  BLOCKED, and its Pin stay as written), Unbidden Helper Code
+  (no other case or Scoring line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (I22's body, its Pin kept; I22's line
+  in `### Scoring`)
+
+**Interfaces:**
+- Consumes: Task 4's I22 text and Scoring line, as committed in
+  `eb6304b2`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF '401 drives refresh, not the error state. Answer the' TEST-PLAN.md
+grep -cF 'answers 200 and `[data-idea-card]` cards replace' TEST-PLAN.md
+grep -cF 'message, focus, or re-fetch is FAIL of the' TEST-PLAN.md
+```
+
+Expected: three `1`s.
+
+- [ ] **Step 2: Edit 9b-1 — I22 does not wait for load before answering**
+
+Old text:
+
+```text
+  401 drives refresh, not the error state. Answer the
+  `Fetch.requestPaused` with `Fetch.fulfillRequest`:
+```
+
+New text:
+
+```text
+  401 drives refresh, not the error state. Do not
+  `wait_for_load` before answering. Answer the
+  `Fetch.requestPaused` with `Fetch.fulfillRequest`:
+```
+
+- [ ] **Step 3: Edit 9b-2 — I22 names where the 200 is read**
+
+Old text:
+
+```text
+  box-model center. PASS: a second GET of `…/ideas/`
+  answers 200 and `[data-idea-card]` cards replace
+  the error state. BLOCKED only if `Fetch.enable` or
+  `Fetch.fulfillRequest` itself is refused.
+```
+
+New text:
+
+```text
+  box-model center. PASS: a second GET of `…/ideas/`
+  answers 200 (its `responseStatus` in
+  `performance.getEntriesByType('resource')`) and
+  `[data-idea-card]` cards replace the error state.
+  BLOCKED only if `Fetch.enable` or
+  `Fetch.fulfillRequest` itself is refused.
+```
+
+- [ ] **Step 4: Edit 9b-3 — Scoring's I22 line counts the cards**
+
+Old text:
+
+```text
+I22 with the 500 fulfilled: a missing error state,
+message, focus, or re-fetch is FAIL of the
+exploratory half. BLOCKED only if `Fetch` itself
+refuses.
+```
+
+New text:
+
+```text
+I22 with the 500 fulfilled: a missing error state,
+message, focus, re-fetch, or card replacement is
+FAIL of the exploratory half. BLOCKED only if
+`Fetch` itself refuses.
+```
+
+- [ ] **Step 5: Check the case, its Pin, and the cites**
+
+```bash
+grep -c '\*\*I22\*\*' TEST-PLAN.md
+grep -n -A1 'is refused\.$' TEST-PLAN.md | grep -F "Pin: tests/loading-states.test.ts 'a rejecting"
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; one hit (I22's Pin follows its last line); `0` removed
+Pin lines; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 6: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Tighten I22's fault recipe
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 9c: Tighten F13's one-point recipe
+
+**Commit subject:** `Tighten F13's one-point recipe`
+
+Commandments: Clarity, Logic, Reliability (a late second press
+  or an unread input must not become a false FAIL).
+Abominations: Test Weakening (F13's FAIL-not-BLOCKED sentence
+  and its Pin names stay as written), Unbidden Helper Code (no
+  other case, bullet, or Scoring line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (F13's body; its Pin kept except the last
+  parenthetical of its browser-test name)
+
+**Interfaces:**
+- Consumes: Task 5b's F13 text, as committed in `296789da`, and
+  the F13 lines Task 5 left standing, as committed in
+  `93afc52d`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'panels have no `#prop-node-name`. Aim before the' TEST-PLAN.md
+grep -cF 'pre-press miss is re-aimed, not scored. Then send' TEST-PLAN.md
+grep -cF 'them. PASS: after the second press the panel is' TEST-PLAN.md
+grep -cF 'open panel centres the clicked node on release' TEST-PLAN.md
+```
+
+Expected: four `1`s.
+
+- [ ] **Step 2: Edit 9c-1 — F13 aims before the first press**
+
+Old text:
+
+```text
+  panels have no `#prop-node-name`. Aim before the
+  press: read the center of
+```
+
+New text:
+
+```text
+  panels have no `#prop-node-name`. Aim before the
+  first press: read the center of
+```
+
+- [ ] **Step 3: Edit 9c-2 — F13 says how to re-aim**
+
+Old text:
+
+```text
+  `.flow-props-panel` lands on the panel, so a
+  pre-press miss is re-aimed, not scored. Then send
+```
+
+New text:
+
+```text
+  `.flow-props-panel` lands on the panel, so a
+  pre-press miss is re-aimed at another regular
+  node clear of the panel, not scored. Then send
+```
+
+- [ ] **Step 4: Edit 9c-3 — F13 records press times, reads the input's value, and names how re-centring is seen**
+
+Old text:
+
+```text
+  inside `DBLCLICK_MS`, never re-reading it between
+  them. PASS: after the second press the panel is
+  still open, `#prop-node-name` reads the
+  double-clicked node's name, and the canvas has
+  re-centred on it. A second press that lands off the
+```
+
+New text:
+
+```text
+  inside `DBLCLICK_MS`, never re-reading it between
+  them. Record both press times: a longer gap is
+  not a double-click, so it is re-sent, not scored.
+  PASS: after the second press the panel is
+  still open, `#prop-node-name`'s `value` is the
+  double-clicked node's name, and the canvas has
+  re-centred on it (its `viewBox`, read per the
+  Driving notes). A second press that lands off the
+```
+
+- [ ] **Step 5: Edit 9c-4 — F13's Pin says what the browser test decides**
+
+Old text:
+
+```text
+       release (F13)' (decides a single click under an
+       open panel centres the clicked node on release —
+       the move a one-point double-click's second press
+```
+
+New text:
+
+```text
+       release (F13)' (decides the camera moves when a
+       single click under an open panel releases — the
+       move a one-point double-click's second press
+```
+
+- [ ] **Step 6: Check the case, its Pin, and the cites**
+
+```bash
+grep -c '\*\*F13\*\*' TEST-PLAN.md
+grep -n -A1 'the gesture was delivered\.$' TEST-PLAN.md | grep -F 'Pin: tests/flow-fsm-scenarios.test.ts'
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; one hit (F13's Pin follows its last line); `0` removed
+Pin lines; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 7: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Tighten F13's one-point recipe
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 9d: Tighten AA32's Shift-drag recipe
+
+**Commit subject:** `Tighten AA32's Shift-drag recipe`
+
+Commandments: Clarity, Logic, Reliability (a lost Shift is
+  BLOCKED, never FAIL; a read before the frame paints must not
+  decide), Uniformity ("ghost card" everywhere).
+Abominations: Test Weakening (AA32's PASS clauses and its Pin
+  stay as written; Scoring's F23 line is not touched),
+  Unbidden Helper Code (no other case, bullet, or Scoring
+  line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (AA32's body, its Pin kept; the Shift-drag
+  bullet in `### Driving notes`)
+
+**Interfaces:**
+- Consumes: Task 6's AA32 text, as committed in `20beded1`, and
+  Task 6b's BLOCKED rule and Shift-drag bullet, as
+  committed in `c26d914e`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF '(code `ShiftLeft`, vk 16, modifiers 8);' TEST-PLAN.md
+grep -cF '`mouseReleased` (modifiers 8), then `keyUp` Shift.' TEST-PLAN.md
+grep -cF 'no `stroke-dasharray` (solid blue, no return path);' TEST-PLAN.md
+grep -cF 're-aimed, not scored. BLOCKED only if Shift is not' TEST-PLAN.md
+grep -cF 'ghost "New State" card, not a bezier; a release off a' TEST-PLAN.md
+```
+
+Expected: five `1`s.
+
+- [ ] **Step 2: Edit 9d-1 — AA32 reads one frame after the last move and names the CDP fields**
+
+Old text:
+
+```text
+  Confirm `document.visibilityState === 'visible'`
+  (the preview paints under `requestAnimationFrame`).
+  Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
+  (code `ShiftLeft`, vk 16, modifiers 8);
+  `mousePressed` at the press point (modifiers 8);
+  eight `mouseMoved` steps to the drop point
+  (`buttons` 1, modifiers 8). PASS: before release,
+```
+
+New text:
+
+```text
+  Confirm `document.visibilityState === 'visible'`
+  (the preview paints under `requestAnimationFrame`,
+  so read the preview one frame after the last move).
+  Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
+  (`key` `Shift`, code `ShiftLeft`, vk 16, modifiers 8);
+  `mousePressed` at the press point (`button` `left`,
+  `clickCount` 1, modifiers 8); eight `mouseMoved`
+  steps to the drop point (`buttons` 1, modifiers 8).
+  PASS: before release,
+```
+
+- [ ] **Step 3: Edit 9d-2 — AA32 releases at the drop point**
+
+Old text:
+
+```text
+  `mouseReleased` (modifiers 8), then `keyUp` Shift.
+```
+
+New text:
+
+```text
+  `mouseReleased` at the drop point (`button` `left`,
+  modifiers 8), then `keyUp` Shift.
+```
+
+- [ ] **Step 4: Edit 9d-3 — AA32's Archive leg also rules out the ghost card**
+
+Old text:
+
+```text
+  re-aiming both points. PASS: the preview path has
+  no `stroke-dasharray` (solid blue, no return path);
+  release adds one edge and no node. Rename it
+```
+
+New text:
+
+```text
+  re-aiming both points. PASS: the preview path has
+  no `stroke-dasharray` (solid blue, no return path)
+  and no ghost card; release adds one edge and no
+  node. Rename it
+```
+
+- [ ] **Step 5: Edit 9d-4 — AA32's BLOCKED rule is BLOCKED, not FAIL, and names the probe**
+
+Old text:
+
+```text
+  re-aimed, not scored. BLOCKED only if Shift is not
+  observed: before release the preview shows a ghost
+  "New State" card, not the bezier, naming that.
+```
+
+New text:
+
+```text
+  re-aimed, not scored. BLOCKED, not FAIL, only if
+  Shift is not observed: before release the preview
+  layer's text reads "New State" (a ghost card), not
+  the bezier, naming that.
+```
+
+- [ ] **Step 6: Edit 9d-5 — the Shift-drag bullet names the same probe and the drag minimum**
+
+Old text:
+
+```text
+  true. If Shift is not delivered, the preview shows a
+  ghost "New State" card, not a bezier; a release off a
+  node then emits add-node, one over a node adds
+  nothing. Record BLOCKED naming that.
+```
+
+New text:
+
+```text
+  true. If Shift is not delivered, the preview layer's
+  text reads "New State" (a ghost card), not the edge
+  bezier; a release off a node, more than 20 canvas
+  units (`MIN_DRAG_DISTANCE`) from the node's right-edge
+  midpoint, then emits add-node, one over a node adds
+  nothing. Record BLOCKED naming that.
+```
+
+- [ ] **Step 7: Check the Pin, the case, the cue, and the cites**
+
+```bash
+grep -n -A1 'naming that\.$' TEST-PLAN.md | grep -F "Pin: tests/flow-cycle-edges.test.ts 'a back-edge to"
+grep -c '\*\*AA32\*\*' TEST-PLAN.md
+grep -c 'text reads "New State" (a ghost card)' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep -c 'F23 scores'
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: one hit (AA32's Pin follows its last line); `1`; `2` (the
+case and the bullet); `0` (Scoring's F23 line is not in the
+diff); `0` removed Pin lines; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 8: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Tighten AA32's Shift-drag recipe
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 9e: Tighten C6's scripted scroll
+
+**Commit subject:** `Tighten C6's scripted scroll`
+
+Commandments: Clarity, Logic, Reliability (a page that cannot
+  scroll is BLOCKED, never a false FAIL; `clip` blocks a wheel
+  as `hidden` does).
+Abominations: Test Weakening (the `overflow-y: hidden` clause
+  stays, and `clip` joins it), Unbidden Helper Code (C6's Pin
+  stays), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (C6's first lines; its Pin kept)
+
+**Interfaces:**
+- Consumes: Task 7's C6 text, as committed in `d040ffbc`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'scrolls under it. The window is the scroller —' TEST-PLAN.md
+grep -cF '`getBoundingClientRect().top` as t, then' TEST-PLAN.md
+grep -cF 'neither `html` nor `body` computes `overflow-y:' TEST-PLAN.md
+```
+
+Expected: three `1`s.
+
+- [ ] **Step 2: Edit 9e-1 — C6's content scrolls beside the sidebar**
+
+Old text:
+
+```text
+  scrolls under it. The window is the scroller —
+```
+
+New text:
+
+```text
+  scrolls beside it. The window is the scroller —
+```
+
+- [ ] **Step 3: Edit 9e-2 — C6 names the element, not two near-homonyms**
+
+Old text:
+
+```text
+  with `Runtime.evaluate`: read `#main-content`'s
+  `getBoundingClientRect().top` as t, then
+```
+
+New text:
+
+```text
+  with `Runtime.evaluate`: read
+  `<main id="main-content">`'s
+  `getBoundingClientRect().top` as t, then
+```
+
+- [ ] **Step 4: Edit 9e-3 — C6's overflow guard covers clip, and a page that fits is BLOCKED**
+
+Old text:
+
+```text
+  neither `html` nor `body` computes `overflow-y:
+  hidden`; `#desktop-sidebar`'s rect `top` is still 0;
+  `#main-content`'s rect `top` is t − d. Restore with
+  `window.scrollTo(0, 0)`.
+```
+
+New text:
+
+```text
+  neither `html` nor `body` computes `overflow-y:
+  hidden` or `overflow-y: clip`; `#desktop-sidebar`'s
+  rect `top` is still 0; `#main-content`'s rect `top`
+  is t − d. If d = 0 and `<main id="main-content">`'s
+  rect `bottom` is at most `window.innerHeight`, the
+  page fits the window: BLOCKED, not FAIL, naming
+  that. Restore with `window.scrollTo(0, 0)`.
+```
+
+- [ ] **Step 5: Check the Pin and the clause**
+
+```bash
+grep -n -A2 '`window.scrollTo(0, 0)`\.$' TEST-PLAN.md
+grep -c 'neither `html` nor `body` computes `overflow-y:' TEST-PLAN.md
+grep -c 'overflow-y: clip' TEST-PLAN.md
+grep -c 'rect `bottom` is at most `window.innerHeight`' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: the two lines after the new text are
+`  Pin: exploratory — the sidebar's fixed position` and
+`       while the main content scrolls`; `1`; `1`; `1`; no
+output. Any mismatch: STOP and report.
+
+- [ ] **Step 6: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Tighten C6's scripted scroll
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 9f: Tidy 0j, the intro, and 0c's pointer
+
+**Commit subject:** `Tidy 0j, the intro, and 0c's pointer`
+
+Commandments: Clarity, Uniformity (one spelling inside 0j; each
+  bullet names what it cites).
+Abominations: Unbidden Helper Code (no other TODO.md line
+  changes; 0c's "after 0a and 0b" stays), Obscurity.
+
+**Files:**
+- Modify: `TODO.md` (the critical path's intro; 0c; 0j)
+
+**Interfaces:**
+- Consumes: Task 3's 0j and intro, as committed in `2f1f8558`,
+  and 0c's tail, as the branch base `1e0941c5` carries it.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'double-click under an open panel (0j). Then what a pilot' TODO.md
+grep -cF 'Task 11 of the same plan.' TODO.md
+grep -cF 'FLOW-CANVAS.md prescribes the centring, and' TODO.md
+grep -cF 'single click still centres while a double-click' TODO.md
+grep -cF 'centre-on-release pin still green, and the next walk' TODO.md
+```
+
+Expected: five `1`s.
+
+- [ ] **Step 2: Edit 9f-1 — the intro's last then becomes and**
+
+Old text:
+
+```text
+and reseed that ships them (0i); then F13's
+double-click under an open panel (0j). Then what a pilot
+```
+
+New text:
+
+```text
+and reseed that ships them (0i); and F13's
+double-click under an open panel (0j). Then what a pilot
+```
+
+- [ ] **Step 3: Edit 9f-2 — 0c names its plan**
+
+Old text:
+
+```text
+  and its main suite's line; Task 11 of the same plan.
+  Oracle: AT2 names the latest Layer 2 run's count
+```
+
+New text:
+
+```text
+  and its main suite's line; Task 11 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
+  Oracle: AT2 names the latest Layer 2 run's count
+```
+
+- [ ] **Step 4: Edit 9f-3 — 0j spells center and centering**
+
+Old text:
+
+```text
+  release, centres it (`web-app/flows/detail.ts:1099-1108`;
+  FLOW-CANVAS.md prescribes the centring, and
+```
+
+New text:
+
+```text
+  release, centers it (`web-app/flows/detail.ts:1099-1108`;
+  FLOW-CANVAS.md prescribes the centering, and
+```
+
+- [ ] **Step 5: Edit 9f-4 — 0j spells centers**
+
+Old text:
+
+```text
+  single click still centres while a double-click
+```
+
+New text:
+
+```text
+  single click still centers while a double-click
+```
+
+- [ ] **Step 6: Edit 9f-5 — 0j spells center-on-release**
+
+Old text:
+
+```text
+  centre-on-release pin still green, and the next walk
+```
+
+New text:
+
+```text
+  center-on-release pin still green, and the next walk
+```
+
+- [ ] **Step 7: Check the pointers, the spelling, and the intro**
+
+```bash
+grep -c 'test-plan-walk-2026-10-04' TODO.md
+grep -c 'the same plan' TODO.md
+sed -n '/^- \*\*0j\.\*\*/,/^- \*\*4\.\*\*/p' TODO.md | grep -c -E 'centre|centring'
+grep -n 'items, in this order' TODO.md
+git diff -U0 TODO.md | grep '^[+-]' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `2`; `0`; `0`; "Eighteen items"; exactly two lines from the
+last, the old and the new `release, cent… it` line of 0j,
+each carrying the unchanged cite `web-app/flows/detail.ts:1099-1108`. Any mismatch: STOP and report.
+
+- [ ] **Step 8: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git diff --stat
+git add TODO.md
+git commit -F - <<'EOF'
+Tidy 0j, the intro, and 0c's pointer
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TODO.md` only.
+
+---
+
 ## Reviews
 
 ### Per-task spec-compliance review (fresh `planner`)
@@ -1535,8 +2287,9 @@ or wipe. Then:
   the plan's old text. Nothing else moved.
 - Each `file:line` cite in the new text holds at
   HEAD (Task 3: `web-app/flows/detail.ts:1099-1108`,
-  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–8b add
-  none).
+  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–9f add
+  none, though 9f's rewritten 0j line keeps the first
+  of Task 3's).
 - The Review Focus lines the task touches hold.
 
 ### Per-task quality review (fresh `planner`)
@@ -1552,12 +2305,12 @@ no paraphrase crept into TEST-PLAN.md or TODO.md;
 baseline counts. A finding that the spec itself is
 wrong is reported, not fixed.
 
-### Whole-branch review (fresh `architect`, after Task 8b)
+### Whole-branch review (fresh `architect`, after Task 9f)
 
 Same brief. Review `git log --oneline 1e0941c5..HEAD`
 and `git diff 1e0941c5..HEAD` against the spec:
 
-- Fourteen commits, in the spec's `## Sequence` order,
+- Twenty commits, in the spec's `## Sequence` order,
   each subject exact: "Specify the 0a walk recipes",
   "Plan the 0a walk recipes", "File F13's one-point
   double-click as 0j", "Force I22's fault with
@@ -1568,16 +2321,20 @@ and `git diff 1e0941c5..HEAD` against the spec:
   to aim AA32", "Aim AA32's drop and fix its BLOCKED
   cue", "Drive C6's scroll by script", "Close 0a's
   walk recipes", "Amend the 0a spec and plan to name
-  0b's plan", "Name the plan that 0b cites".
-- Every spec code block lands verbatim, F13's, AA32's
-  (with the Shift-drag bullet), and 0b's head being
-  the amended or added ones; F11 reads "every later
+  0b's plan", "Name the plan that 0b cites", "Amend
+  the 0a spec and plan for the Minor notes", "Tighten
+  I22's fault recipe", "Tighten F13's one-point
+  recipe", "Tighten AA32's Shift-drag recipe",
+  "Tighten C6's scripted scroll", "Tidy 0j, the
+  intro, and 0c's pointer".
+- Every spec code block lands verbatim, as the
+  amendments left it; F11 reads "every later
   double-click in F uses the same drive; F13 names its
   own".
-- All ten Review Focus lines hold at HEAD.
+- All eleven Review Focus lines hold at HEAD.
 - `## Summary` is unchanged by the diff.
-- The spec and this plan changed three times after
-  commit 2, in commits 5a, 6a, and 8a (`git log
+- The spec and this plan changed four times after
+  commit 2, in commits 5a, 6a, 8a, and 9a (`git log
   --oneline 5cccaa60..HEAD -- <both paths>` lists only
   them), and
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
@@ -1598,7 +2355,7 @@ git log --oneline 1e0941c5..HEAD
 ./test validate
 ```
 
-Expected: a clean tree; fourteen commits; `ok | 4141
+Expected: a clean tree; twenty commits; `ok | 4141
 passed | 0 failed | 11 ignored` and timezone
 `ok | 8 passed | 0 failed`.
 
