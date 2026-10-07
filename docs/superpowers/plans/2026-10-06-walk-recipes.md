@@ -49,13 +49,13 @@ recipes for I22, F13, AA32, and C6, with their
 driving-note and Scoring lines; TODO.md files 0j and
 closes 0a.
 
-**Architecture:** Doc-only. Seven commits, each an
+**Architecture:** Doc-only. Eight commits, each an
 exact string replacement with the Edit tool on
 `TODO.md` or `TEST-PLAN.md`, each green at Layer 1.
 0j lands before F13's text cites it; 0a closes last.
-Task 5b amends F13's aim after Task 5's review; commit
-5a, which amended this plan and the spec once, precedes
-it.
+Tasks 5b and 6b amend F13's and AA32's aim after
+Tasks 5 and 6 were reviewed; commits 5a and 6a, which
+amended this plan and the spec, precede them.
 
 **Tech Stack:** Markdown. Layer 1 (`./test validate`,
 Deno 2.9.6) is the gate, because it lints both files.
@@ -73,9 +73,11 @@ branch `2026-10-06-walk-recipes`, cut from
 
 **Out of bounds:** the spec, this plan, and
 `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
-None is edited, except that commit 5a (the owner's
-word, 2026-10-07) amended the spec and this plan once.
-If the spec is wrong, STOP and report.
+None is edited, except by the owner's word of
+2026-10-07 ("apply all"): each "a" commit (5a, 6a, and
+any later one) amends the spec and this plan once, to
+answer an Important review finding. If the spec is
+wrong in any other way, STOP and report.
 
 ---
 
@@ -183,6 +185,13 @@ that its task touches.
    to resolve the target before the first press; a
    pre-press miss is re-aimed, not scored. Its
    FAIL-not-BLOCKED sentence and its Pin stay.
+9. **AA32 is aimed at both ends and reads Shift before
+   release.** After Task 6b, AA32 requires
+   `document.elementFromPoint` to resolve the drop
+   target as well as the press point, and its BLOCKED
+   clause is the ghost "New State" card in the preview
+   (Shift lost), not "a node is added instead". Its PASS
+   clauses and its Pin stay.
 
 ---
 
@@ -190,12 +199,14 @@ that its task touches.
 
 Commit 1 (`8fb66783`, the spec) and commit 2 (this
 plan, "Plan the 0a walk recipes") precede execution.
-Tasks run strictly in order 3, 4, 5, 5b, 6, 7, 8,
-after commit 5a (not a task: it amended this plan and
-the spec once, after Task 5's review). Task 3
+Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8.
+Commits 5a and 6a are not tasks: each amended this plan
+and the spec once, after a task's review (5a before
+Task 5b, 6a before Task 6b). Task 3
 precedes Task 5, so F13's pointer to 0j never names
 nothing. Task 5's Scoring line anchors on Task 4's
 I22 line. Task 5b anchors on Task 5's F13 text.
+Task 6b anchors on Task 6's AA32 and Shift-drag text.
 Task 8 anchors on Task 3's "Nineteen".
 
 Each task's cycle:
@@ -886,7 +897,8 @@ Pin stays byte-for-byte; F19 and F23 are untouched).
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: nothing later tasks read.
+- Produces: AA32's body and the Shift-drag bullet,
+  which Task 6b amends.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1017,6 +1029,130 @@ Aim AA32's Shift-drag at the port
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_014jFgSaA7ABoNqEDzB6WGmu
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 6b: Aim AA32's drop and fix its BLOCKED cue
+
+**Commit subject:** `Aim AA32's drop and fix its BLOCKED cue`
+
+Commandments: Reliability (a mis-aimed drop or a lost Shift
+cannot score FAIL), Clarity, Logic, Uniformity (F13's aim
+wording; F19's and F23's "ghost card").
+Abominations: Test Weakening (AA32's PASS clauses and its Pin
+stay as written), Unbidden Helper Code (no other case,
+bullet, or Scoring line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (AA32's body, its Pin kept; the
+  Shift-drag bullet in `### Driving notes`)
+
+**Interfaces:**
+- Consumes: Task 6's AA32 and Shift-drag text, as committed in
+  `20beded1`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF '  `.flow-node[aria-label="Data Capture"] > rect`.' TEST-PLAN.md
+grep -cF '  observed on release (a node is added instead),' TEST-PLAN.md
+grep -cF '  true. If Shift is not delivered on pointer-up the' TEST-PLAN.md
+```
+
+Expected: `1`, `1`, `1`.
+
+- [ ] **Step 2: Edit 6b-1 — AA32's drop point is aim-checked**
+
+Old text:
+
+```text
+  `.flow-node[aria-label="Data Capture"] > rect`.
+  Confirm `document.visibilityState === 'visible'`
+```
+
+New text:
+
+```text
+  `.flow-node[aria-label="Data Capture"] > rect`, and
+  `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node.
+  Confirm `document.visibilityState === 'visible'`
+```
+
+- [ ] **Step 3: Edit 6b-2 — AA32's BLOCKED cue is the ghost card**
+
+Old text:
+
+```text
+  observed on release (a node is added instead),
+  naming that.
+```
+
+New text:
+
+```text
+  observed: before release the preview shows a ghost
+  "New State" card, not the bezier, naming that.
+```
+
+- [ ] **Step 4: Edit 6b-3 — the Shift-drag bullet names the same cue**
+
+Old text:
+
+```text
+  true. If Shift is not delivered on pointer-up the
+  FSM emits add-node; record BLOCKED naming that.
+```
+
+New text:
+
+```text
+  true. If Shift is not delivered, the preview shows a
+  ghost "New State" card, not a bezier; a release off a
+  node then emits add-node, one over a node adds
+  nothing. Record BLOCKED naming that.
+```
+
+- [ ] **Step 5: Check the Pin, the case, the cue, and the cites**
+
+```bash
+grep -n -A1 'naming that\.$' TEST-PLAN.md | grep -F "Pin: tests/flow-cycle-edges.test.ts 'a back-edge to"
+grep -c '\*\*AA32\*\*' TEST-PLAN.md
+grep -nF 'New State</text>' web-app/app/flow-graph.ts
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: one hit (AA32's Pin follows its new last line); `1`;
+one hit, the ghost node's `New State</text>` in `flow-graph.ts`;
+`0` removed Pin lines; no output from the last. Any mismatch:
+STOP and report.
+
+- [ ] **Step 6: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Aim AA32's drop and fix its BLOCKED cue
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
 EOF
 ```
 
@@ -1326,24 +1462,26 @@ wrong is reported, not fixed.
 Same brief. Review `git log --oneline 1e0941c5..HEAD`
 and `git diff 1e0941c5..HEAD` against the spec:
 
-- Ten commits, in the spec's `## Sequence` order,
+- Twelve commits, in the spec's `## Sequence` order,
   each subject exact: "Specify the 0a walk recipes",
   "Plan the 0a walk recipes", "File F13's one-point
   double-click as 0j", "Force I22's fault with
   Fetch", "Drive F13 at one point as a person does",
   "Amend the 0a spec and plan to aim F13", "Aim F13
   clear of the properties panel", "Aim AA32's
-  Shift-drag at the port", "Drive C6's scroll by
-  script", "Close 0a's walk recipes".
-- Every spec code block lands verbatim, F13's being
-  the amended one; F11 reads "every later
-  double-click in F uses the same drive; F13 names
-  its own".
-- All eight Review Focus lines hold at HEAD.
+  Shift-drag at the port", "Amend the 0a spec and plan
+  to aim AA32", "Aim AA32's drop and fix its BLOCKED
+  cue", "Drive C6's scroll by script", "Close 0a's
+  walk recipes".
+- Every spec code block lands verbatim, F13's and
+  AA32's (with the Shift-drag bullet) being the
+  amended ones; F11 reads "every later double-click
+  in F uses the same drive; F13 names its own".
+- All nine Review Focus lines hold at HEAD.
 - `## Summary` is unchanged by the diff.
-- The spec and this plan changed once after commit 2,
-  in commit 5a (`git log --oneline 5cccaa60..HEAD --
-  <both paths>` lists only it), and
+- The spec and this plan changed twice after commit 2,
+  in commits 5a and 6a (`git log --oneline
+  5cccaa60..HEAD -- <both paths>` lists only them), and
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
   is unchanged since `8fb66783`
   (`git diff 8fb66783..HEAD -- <it>` is empty).
@@ -1362,7 +1500,7 @@ git log --oneline 1e0941c5..HEAD
 ./test validate
 ```
 
-Expected: a clean tree; ten commits; `ok | 4141
+Expected: a clean tree; twelve commits; `ok | 4141
 passed | 0 failed | 11 ignored` and timezone
 `ok | 8 passed | 0 failed`.
 

@@ -382,7 +382,9 @@ names walk-green's camera-hold pin:
   `document.elementFromPoint` there must resolve
   `.closest('[data-connect-port]')`; the drop point is
   the center of
-  `.flow-node[aria-label="Data Capture"] > rect`.
+  `.flow-node[aria-label="Data Capture"] > rect`, and
+  `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node.
   Confirm `document.visibilityState === 'visible'`
   (the preview paints under `requestAnimationFrame`).
   Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
@@ -403,8 +405,8 @@ names walk-green's camera-hold pin:
   release adds one edge and no node. Rename it
   "approve". A pre-press `elementFromPoint` miss is
   re-aimed, not scored. BLOCKED only if Shift is not
-  observed on release (a node is added instead),
-  naming that.
+  observed: before release the preview shows a ghost
+  "New State" card, not the bezier, naming that.
 ```
 
 Replace the Shift-drag bullet in `### Driving notes`
@@ -417,8 +419,10 @@ Replace the Shift-drag bullet in `### Driving notes`
   `elementFromPoint` first. A miss is a body-drag or
   marquee, not Shift. The camera holds from press to
   release, so a drop point read before the press stays
-  true. If Shift is not delivered on pointer-up the
-  FSM emits add-node; record BLOCKED naming that.
+  true. If Shift is not delivered, the preview shows a
+  ghost "New State" card, not a bezier; a release off a
+  node then emits add-node, one over a node adds
+  nothing. Record BLOCKED naming that.
   Layer 1 and Layer 2 pins decide add-edge. F23's
   mid-gesture Shift is the same compositor limit.
 ```
@@ -512,6 +516,8 @@ One concern per commit, each green at Layer 1:
 | 5a | Amend the 0a spec and plan to aim F13 | this spec, the plan |
 | 5b | Aim F13 clear of the properties panel | F13 |
 | 6 | Aim AA32's Shift-drag at the port | AA32, the Shift-drag bullet |
+| 6a | Amend the 0a spec and plan to aim AA32 | this spec, the plan |
+| 6b | Aim AA32's drop and fix its BLOCKED cue | AA32, the Shift-drag bullet |
 | 7 | Drive C6's scroll by script | C6 |
 | 8 | Close 0a's walk recipes | TODO.md |
 
@@ -528,6 +534,14 @@ Create and Archive panels have no `#prop-node-name`,
 so a mis-aim would score FAIL and point at 0j. 5a
 amends this spec and the plan once; 5b lands the
 amended F13, which is the text in § 2 above.
+
+Commits 6a and 6b answer Task 6's review the same way.
+AA32's recipe aim-checked only its press point, and its
+BLOCKED clause named a symptom ("a node is added
+instead") that a Shift-less release over the target
+cannot produce: it adds nothing. 6a amends this spec and
+the plan; 6b lands the amended AA32 and Shift-drag
+bullet, which are the text in § 3 above.
 
 ## Testing
 
