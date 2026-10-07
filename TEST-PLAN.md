@@ -1797,18 +1797,23 @@ the second organization.
   `.main-content` sets no overflow and `.sidebar` is
   `position: fixed` — and CDP wheel and key scrolls
   stall on a tab that is not composited, so drive
-  with `Runtime.evaluate`: read
-  `<main id="main-content">`'s
-  `getBoundingClientRect().top` as t, then
+  with `Runtime.evaluate`: from `scrollY` 0
+  (`window.scrollTo(0, 0)` first), read
+  `#main-content`'s `getBoundingClientRect().top`
+  as t, then
   `window.scrollTo(0, document.documentElement.scrollHeight)`
   and read `window.scrollY` as d. PASS: d > 0;
   neither `html` nor `body` computes `overflow-y:
   hidden` or `overflow-y: clip`; `#desktop-sidebar`'s
   rect `top` is still 0; `#main-content`'s rect `top`
-  is t − d. If d = 0 and `<main id="main-content">`'s
-  rect `bottom` is at most `window.innerHeight`, the
-  page fits the window: BLOCKED, not FAIL, naming
-  that. Restore with `window.scrollTo(0, 0)`.
+  is t − d. If d = 0, `#main-content`'s rect `bottom`
+  is at most `window.innerHeight`, and its
+  `scrollHeight` is at most its `clientHeight`, the
+  page fits the window: lower the window to 400 px
+  high with `Browser.setWindowBounds` and drive again;
+  BLOCKED, not FAIL, naming that, only if it still
+  fits. Restore the 1280×800 bounds if you lowered
+  them, and `window.scrollTo(0, 0)`.
   Pin: exploratory — the sidebar's fixed position
        while the main content scrolls
 - [ ] **C7** Check that seed data populates all 4 dashboard
