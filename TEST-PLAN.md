@@ -2803,11 +2803,17 @@ opens and renders.)
        `PANEL_WIDTH_PX` while the test above passes 0
 - [ ] **F13** While the panel is open, double-click a
   *different* node the way a person does: one point,
-  two presses. Read the center of
+  two presses. Pick a regular node: Create and Archive
+  panels have no `#prop-node-name`. Aim before the
+  press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
   `text` or the `g`, whose box includes the port —
-  and send both press/release pairs to that point
+  and `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node. A point under
+  `.flow-props-panel` lands on the panel, so a
+  pre-press miss is re-aimed, not scored. Then send
+  both press/release pairs to that point
   inside `DBLCLICK_MS`, never re-reading it between
   them. PASS: after the second press the panel is
   still open, `#prop-node-name` reads the
