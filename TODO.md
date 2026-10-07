@@ -14,11 +14,11 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Nineteen items, in this order — each its own brainstorm
+Eighteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
 The 0-items finish the release: the walk's remaining
-recipes and moorings and their count (0a–0c); admins
+moorings and their count (0b–0c); admins
 held to their own organization (0d), since no second
 tenant shares an origin before it ships; then the
 ledger's one deploy — `fa_` names (0e), the fence
@@ -31,34 +31,6 @@ item's number is its name, which specs, plans, and
 code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
 
-- **0a.** Recipes a hidden, CDP-driven tab can execute
-  for AA32, C6, F13, and I22; Task 9 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
-  holds each case's text. AA32: the port is a 5-unit
-  circle on the node's widest perimeter gap
-  (`web-app/app/flow-graph.ts:220-270`), not its
-  right-middle, and a press that misses it starts a
-  body-drag or a marquee, so the case aims by selector
-  at `[data-connect-port]`'s center, confirmed by
-  `document.elementFromPoint`, and drops on the target
-  node's `> rect`. C6: the window is the scroller —
-  `.main-content` sets no overflow
-  (`web-app/app/styles/layout.css:145-151`) and the
-  sidebar is fixed — and CDP wheel and key input stall
-  on a tab that is not composited, so the case scrolls
-  with `window.scrollTo` through `Runtime.evaluate` and
-  reads the rects. F13: the double-click aims at the
-  node's body (`.flow-node[aria-label="<name>"] > rect`),
-  not its label or group, and the case names its Layer
-  2 pin, 'a node click under an open panel centers it
-  on release (F13)'
-  (`tests/browser/canvas-gestures.test.ts:451`). I22: a
-  CDP `Fetch` pattern answers the ideas collection GET
-  with a 500 — never `/api/authentication/*`, and never
-  a 401, which drives refresh instead — so the error
-  state and its Try Again are driven live. Oracle: the
-  next walk scores each of the four PASS or FAIL, never
-  BLOCKED
 - **0b.** F37a, R22, and WB22 moored to the product;
   Task 10 of the same plan holds F37a's and R22's text.
   F37a: one cookie jar cannot reach the 412 — a flow
@@ -3197,7 +3169,7 @@ Off the critical path; each with its oracle.
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
   fences it)
-- 0a, 0b → 0c: the count follows the remedies
+- 0b → 0c: the count follows the moorings
 - 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
 - 0e → 0f → 0g → 0h → 0i, one deploy: names first, so
