@@ -1,75 +1,75 @@
 {
     "api-documentation": {
-        "readyMs": 51
+        "readyMs": 57
     },
     "auth": {
-        "readyMs": 35
+        "readyMs": 38
     },
     "billing": {
         "readyMs": 50
     },
     "dashboard": {
-        "readyMs": 63
+        "readyMs": 64
     },
     "design-system": {
         "readyMs": 58
     },
     "flow-detail": {
-        "readyMs": 64
+        "readyMs": 61
     },
     "flow-stats": {
-        "readyMs": 77
+        "readyMs": 80
     },
     "flows": {
-        "readyMs": 59
+        "readyMs": 62
     },
     "idea-convert": {
-        "readyMs": 57
+        "readyMs": 59
     },
     "idea-create": {
         "readyMs": 50
     },
     "idea-detail": {
-        "readyMs": 59
+        "readyMs": 56
     },
     "ideas": {
-        "readyMs": 60
+        "readyMs": 58
     },
     "identities": {
-        "readyMs": 61
+        "readyMs": 56
     },
     "identity-detail": {
         "readyMs": 49
     },
     "identity-providers": {
-        "readyMs": 51
+        "readyMs": 48
     },
     "identity-tokens": {
-        "readyMs": 50
+        "readyMs": 49
     },
     "invitations": {
-        "readyMs": 50
+        "readyMs": 49
     },
     "landing": {
-        "readyMs": 36
+        "readyMs": 34
     },
     "member-detail": {
         "readyMs": 54
     },
     "members": {
-        "readyMs": 58
+        "readyMs": 55
     },
     "not-found": {
-        "readyMs": 36
+        "readyMs": 34
     },
     "organization": {
-        "readyMs": 57
+        "readyMs": 53
     },
     "project-detail": {
         "readyMs": 57
     },
     "projects": {
-        "readyMs": 66
+        "readyMs": 65
     },
     "record-create": {
         "readyMs": 50
@@ -81,9 +81,9 @@
         "readyMs": 58
     },
     "workbox": {
-        "readyMs": 145
+        "readyMs": 91
     },
     "workbox-detail": {
-        "readyMs": 72
+        "readyMs": 68
     }
 }
