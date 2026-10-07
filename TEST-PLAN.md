@@ -411,9 +411,9 @@ I21 skeleton miss without the Fetch pause:
 BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
 I22 with the 500 fulfilled: a missing error state,
-message, focus, re-fetch, or card replacement is
-FAIL of the exploratory half. BLOCKED only if
-`Fetch` itself refuses.
+message, focus, or card replacement, or a retry whose
+GET does not answer 200, is FAIL of the exploratory
+half. BLOCKED only if `Fetch` itself refuses.
 F13's second press off the node after the first
 release centred it: FAIL, not BLOCKED (TODO.md 0j).
 SV7 when SV6 did not produce a second jar:
@@ -6375,9 +6375,10 @@ layout.
   `[data-retry-btn]` that is `document.activeElement`.
   Then `Fetch.disable` and click Try Again at its
   box-model center. PASS: a second GET of `…/ideas/`
-  answers 200 (its `responseStatus` in
-  `performance.getEntriesByType('resource')`) and
-  `[data-idea-card]` cards replace the error state.
+  answers 200 (the last
+  `performance.getEntriesByType('resource')` entry
+  whose name ends `/ideas/` has `responseStatus` 200)
+  and `[data-idea-card]` cards replace the error state.
   BLOCKED only if `Fetch.enable` or
   `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
