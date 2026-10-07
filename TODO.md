@@ -32,7 +32,9 @@ code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
 
 - **0b.** F37a, R22, and WB22 moored to the product;
-  Task 10 of the same plan holds F37a's and R22's text.
+  Task 10 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
+  holds F37a's and R22's text.
   F37a: one cookie jar cannot reach the 412 — a flow
   save rings `fusion-angle:data`, and tab B re-reads
   and latches the new head within one GET — so tab B
