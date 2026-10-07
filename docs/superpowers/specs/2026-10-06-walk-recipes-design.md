@@ -294,11 +294,17 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
 ```
 - [ ] **F13** While the panel is open, double-click a
   *different* node the way a person does: one point,
-  two presses. Read the center of
+  two presses. Pick a regular node: Create and Archive
+  panels have no `#prop-node-name`. Aim before the
+  press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
   `text` or the `g`, whose box includes the port —
-  and send both press/release pairs to that point
+  and `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node. A point under
+  `.flow-props-panel` lands on the panel, so a
+  pre-press miss is re-aimed, not scored. Then send
+  both press/release pairs to that point
   inside `DBLCLICK_MS`, never re-reading it between
   them. PASS: after the second press the panel is
   still open, `#prop-node-name` reads the
@@ -503,6 +509,8 @@ One concern per commit, each green at Layer 1:
 | 3 | File F13's one-point double-click as 0j | TODO.md |
 | 4 | Force I22's fault with Fetch | I22, I21's bullet, Scoring |
 | 5 | Drive F13 at one point as a person does | F13, the double-click bullet, F11, Scoring |
+| 5a | Amend the 0a spec and plan to aim F13 | this spec, the plan |
+| 5b | Aim F13 clear of the properties panel | F13 |
 | 6 | Aim AA32's Shift-drag at the port | AA32, the Shift-drag bullet |
 | 7 | Drive C6's scroll by script | C6 |
 | 8 | Close 0a's walk recipes | TODO.md |
@@ -512,6 +520,14 @@ never names nothing, and 0j's text holds on both
 sides of commit 5: it cites the walk that passed F13,
 not F13's text. Commit 5's Scoring line lands after
 commit 4's I22 line.
+
+Commits 5a and 5b answer Task 5's review. F13's
+one-point drive did not say where to aim: a press
+under the properties panel lands on the panel, and
+Create and Archive panels have no `#prop-node-name`,
+so a mis-aim would score FAIL and point at 0j. 5a
+amends this spec and the plan once; 5b lands the
+amended F13, which is the text in § 2 above.
 
 ## Testing
 

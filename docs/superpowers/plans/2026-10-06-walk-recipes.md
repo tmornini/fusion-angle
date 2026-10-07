@@ -49,10 +49,13 @@ recipes for I22, F13, AA32, and C6, with their
 driving-note and Scoring lines; TODO.md files 0j and
 closes 0a.
 
-**Architecture:** Doc-only. Six commits, each an
+**Architecture:** Doc-only. Seven commits, each an
 exact string replacement with the Edit tool on
 `TODO.md` or `TEST-PLAN.md`, each green at Layer 1.
 0j lands before F13's text cites it; 0a closes last.
+Task 5b amends F13's aim after Task 5's review; commit
+5a, which amended this plan and the spec once, precedes
+it.
 
 **Tech Stack:** Markdown. Layer 1 (`./test validate`,
 Deno 2.9.6) is the gate, because it lints both files.
@@ -68,10 +71,11 @@ not edit addresses.
 branch `2026-10-06-walk-recipes`, cut from
 `todo-triage`'s `1e0941c5`; spec at `8fb66783`.
 
-**Out of bounds:** the spec, and
+**Out of bounds:** the spec, this plan, and
 `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
-Neither is edited. If the spec is wrong, STOP and
-report.
+None is edited, except that commit 5a (the owner's
+word, 2026-10-07) amended the spec and this plan once.
+If the spec is wrong, STOP and report.
 
 ---
 
@@ -173,6 +177,12 @@ that its task touches.
 7. **`## Summary`'s counts do not change.** No case
    is added or removed: the table still totals 404,
    I is 30, F is 80, AA is 46, C is 7.
+8. **F13 is aimed before it is pressed.** After Task
+   5b, F13 names a regular node (never Create or
+   Archive) and requires `document.elementFromPoint`
+   to resolve the target before the first press; a
+   pre-press miss is re-aimed, not scored. Its
+   FAIL-not-BLOCKED sentence and its Pin stay.
 
 ---
 
@@ -180,10 +190,13 @@ that its task touches.
 
 Commit 1 (`8fb66783`, the spec) and commit 2 (this
 plan, "Plan the 0a walk recipes") precede execution.
-Tasks run strictly in order 3, 4, 5, 6, 7, 8. Task 3
+Tasks run strictly in order 3, 4, 5, 5b, 6, 7, 8,
+after commit 5a (not a task: it amended this plan and
+the spec once, after Task 5's review). Task 3
 precedes Task 5, so F13's pointer to 0j never names
 nothing. Task 5's Scoring line anchors on Task 4's
-I22 line. Task 8 anchors on Task 3's "Nineteen".
+I22 line. Task 5b anchors on Task 5's F13 text.
+Task 8 anchors on Task 3's "Nineteen".
 
 Each task's cycle:
 
@@ -540,7 +553,7 @@ double-click case changes), Obscurity.
 **Interfaces:**
 - Consumes: TODO.md 0j (Task 3); Task 4's I22 Scoring
   line.
-- Produces: nothing later tasks read.
+- Produces: F13's text, which Task 5b amends.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -737,6 +750,121 @@ Drive F13 at one point as a person does
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_014jFgSaA7ABoNqEDzB6WGmu
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 5b: Aim F13 clear of the properties panel
+
+**Commit subject:** `Aim F13 clear of the properties panel`
+
+Commandments: Reliability (a mis-aimed press cannot score FAIL), Clarity,
+Logic, Uniformity (AA32's aim wording).
+Abominations: Test Weakening (F13's FAIL-not-BLOCKED sentence and its Pin
+stay as written), Unbidden Helper Code (no other case, bullet, or Scoring
+line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (F13's body; its Pin kept)
+
+**Interfaces:**
+- Consumes: Task 5's F13 text, as committed in `93afc52d`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF -e '- [ ] **F13** While the panel is open, double-click a' TEST-PLAN.md
+grep -cF -e '  two presses. Read the center of' TEST-PLAN.md
+grep -cF -e 'FAIL, not BLOCKED: the gesture was delivered.' TEST-PLAN.md
+```
+
+Expected: `1`, `1`, `1`. The `-e` is needed: the first pattern begins with
+`-`, which grep otherwise reads as an option.
+
+- [ ] **Step 2: Edit 5b — F13's body**
+
+Old text (F13's body; its Pin follows and stays):
+
+```text
+- [ ] **F13** While the panel is open, double-click a
+  *different* node the way a person does: one point,
+  two presses. Read the center of
+  `.flow-node[aria-label="<name>"] > rect` once —
+  the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
+  `text` or the `g`, whose box includes the port —
+  and send both press/release pairs to that point
+  inside `DBLCLICK_MS`, never re-reading it between
+  them. PASS: after the second press the panel is
+  still open, `#prop-node-name` reads the
+  double-clicked node's name, and the canvas has
+  re-centred on it. A second press that lands off the
+  node because the first release moved the camera is
+  FAIL, not BLOCKED: the gesture was delivered.
+```
+
+New text:
+
+```text
+- [ ] **F13** While the panel is open, double-click a
+  *different* node the way a person does: one point,
+  two presses. Pick a regular node: Create and Archive
+  panels have no `#prop-node-name`. Aim before the
+  press: read the center of
+  `.flow-node[aria-label="<name>"] > rect` once —
+  the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
+  `text` or the `g`, whose box includes the port —
+  and `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node. A point under
+  `.flow-props-panel` lands on the panel, so a
+  pre-press miss is re-aimed, not scored. Then send
+  both press/release pairs to that point
+  inside `DBLCLICK_MS`, never re-reading it between
+  them. PASS: after the second press the panel is
+  still open, `#prop-node-name` reads the
+  double-clicked node's name, and the canvas has
+  re-centred on it. A second press that lands off the
+  node because the first release moved the camera is
+  FAIL, not BLOCKED: the gesture was delivered.
+```
+
+- [ ] **Step 3: Check the case, the class, and the cites**
+
+```bash
+grep -c '\*\*F13\*\*' TEST-PLAN.md
+grep -n 'flow-props-panel' web-app/app/styles/pages-flow-detail.css | head -1
+grep -n 'const PANEL' tests/browser/canvas-gestures.test.ts
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; the class's rule in `pages-flow-detail.css`;
+`const PANEL = '.flow-props-panel';`; `0` removed Pin lines; no output
+from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Aim F13 clear of the properties panel
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
 EOF
 ```
 
@@ -1198,23 +1326,27 @@ wrong is reported, not fixed.
 Same brief. Review `git log --oneline 1e0941c5..HEAD`
 and `git diff 1e0941c5..HEAD` against the spec:
 
-- Eight commits, in the spec's `## Sequence` order,
+- Ten commits, in the spec's `## Sequence` order,
   each subject exact: "Specify the 0a walk recipes",
   "Plan the 0a walk recipes", "File F13's one-point
   double-click as 0j", "Force I22's fault with
   Fetch", "Drive F13 at one point as a person does",
-  "Aim AA32's Shift-drag at the port", "Drive C6's
-  scroll by script", "Close 0a's walk recipes".
-- Every spec code block lands verbatim; F11 reads
-  "every later double-click in F uses the same
-  drive; F13 names its own".
-- All seven Review Focus lines hold at HEAD.
+  "Amend the 0a spec and plan to aim F13", "Aim F13
+  clear of the properties panel", "Aim AA32's
+  Shift-drag at the port", "Drive C6's scroll by
+  script", "Close 0a's walk recipes".
+- Every spec code block lands verbatim, F13's being
+  the amended one; F11 reads "every later
+  double-click in F uses the same drive; F13 names
+  its own".
+- All eight Review Focus lines hold at HEAD.
 - `## Summary` is unchanged by the diff.
-- The spec and
+- The spec and this plan changed once after commit 2,
+  in commit 5a (`git log --oneline 5cccaa60..HEAD --
+  <both paths>` lists only it), and
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
-  are unchanged since `8fb66783`
-  (`git diff 8fb66783..HEAD -- <both paths>` is
-  empty).
+  is unchanged since `8fb66783`
+  (`git diff 8fb66783..HEAD -- <it>` is empty).
 - `./test validate` at HEAD gives the baseline lines.
 
 ---
@@ -1230,7 +1362,7 @@ git log --oneline 1e0941c5..HEAD
 ./test validate
 ```
 
-Expected: a clean tree; eight commits; `ok | 4141
+Expected: a clean tree; ten commits; `ok | 4141
 passed | 0 failed | 11 ignored` and timezone
 `ok | 8 passed | 0 failed`.
 
