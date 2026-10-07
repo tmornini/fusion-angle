@@ -242,11 +242,18 @@ not repeat the note in every case.
   true. If Shift is not delivered, the preview layer's
   text reads "New State" (a ghost card), not the edge
   bezier; a release off a node, more than 20 canvas
-  units (`MIN_DRAG_DISTANCE`) from the node's right-edge
-  midpoint, then emits add-node, one over a node adds
-  nothing. Record BLOCKED naming that.
-  Layer 1 and Layer 2 pins decide add-edge. F23's
-  mid-gesture Shift is the same compositor limit.
+  units (`MIN_DRAG_DISTANCE`) from the source node's
+  right-edge midpoint, then emits add-node, one over a
+  node adds nothing. Record BLOCKED naming that.
+  Every Shift key event, down and up, carries `key`
+  `Shift`, code `ShiftLeft`, vk 16 (modifiers 8 down,
+  0 up): the page ignores a key event whose `key` is
+  not `Shift`, so a dropped keyUp leaves Shift held
+  until a later Shift keyUp or a reload.
+  Layer 1 and Layer 2 pins decide add-edge. An F23
+  ghost-card change that does not happen is FAIL if
+  F23's listener recorded every input it needs (F23
+  names them), and BLOCKED, naming the driver, if not.
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
   "New State" nodes re-flow the graph and a
   double-click misses Data Capture.
@@ -387,9 +394,11 @@ the explorer actually drove, or for a pin that is
 itself red. The walk still gates nothing; this rule
 exists so FAIL can reach zero without lying.
 
-Walk-specific: F23 scores BLOCKED like AA32 when
-Shift is missing on pointer-up. AA33/AA34 score
-DEFERRED on AA32 when stray nodes block targeting.
+Walk-specific: an F23 ghost-card change that does
+not happen scores FAIL if its listener recorded
+every input it needs (F23 names them), and BLOCKED,
+naming the driver, if not. AA33/AA34 score DEFERRED
+on AA32 when stray nodes block targeting.
 F12's double-click miss after a pan-drag, F17
 off-canvas body-drag, F37b port-drag (hidden tab
 or otherwise), D36/D37/K6 list-drag, K13–K15
@@ -1234,7 +1243,9 @@ the second organization.
   `.closest('.flow-node')` to that node.
   Confirm `document.visibilityState === 'visible'`
   (the preview paints under `requestAnimationFrame`,
-  so read the preview one frame after the last move).
+  so after the last move read the preview in a
+  `Runtime.evaluate` that awaits one
+  `requestAnimationFrame` before the query).
   Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
   (`key` `Shift`, code `ShiftLeft`, vk 16, modifiers 8);
   `mousePressed` at the press point (`button` `left`,
@@ -1246,7 +1257,8 @@ the second organization.
   — because a forward path "Data Capture" → "Review"
   already exists and the release would close a loop.
   `mouseReleased` at the drop point (`button` `left`,
-  modifiers 8), then `keyUp` Shift.
+  modifiers 8), then `keyUp` Shift (`key` `Shift`,
+  code `ShiftLeft`, vk 16, modifiers 0).
   PASS: `.flow-edge` count +1, `.flow-node` count
   unchanged. Rename the edge "needs revision". Repeat
   onto `.flow-node[aria-label="Archive"] > rect`,
@@ -3117,7 +3129,21 @@ opens and renders.)
        add-node actions and returns connect to idle);
        exploratory — the preview vanishing
 - [ ] **F23** Begin a plain drag from a port (no
-  Shift). While the mouse remains stationary,
+  Shift). First confirm
+  `document.visibilityState === 'visible'` (the preview
+  paints under `requestAnimationFrame`) and, before the
+  port press, install a capture-phase `window` listener
+  on `pointerdown`, `keydown`, and `keyup` that records
+  each event's `type`, `key`, and `shiftKey`, and
+  whether a `pointerdown`'s target is inside
+  `[data-connect-port]`. A recorded port press is a
+  `pointerdown` inside it; a recorded Shift press is a
+  `keydown` with `key` `Shift`; a recorded Shift
+  release is a `keyup` with `key` `Shift` and
+  `shiftKey` false. After each key event read the
+  preview in a `Runtime.evaluate` that awaits one
+  frame before the query. While the mouse remains
+  stationary,
   press and hold Shift. PASS: without any mouse
   movement the ghost "New State" card disappears
   and the preview collapses to the grey line (or
@@ -3125,7 +3151,12 @@ opens and renders.)
   target). Release Shift — the ghost card
   returns. Release the mouse with Shift held to
   create an edge, or without Shift to create a
-  node.
+  node. A ghost-card change that does not happen is
+  FAIL if the listener recorded every input it needs,
+  and BLOCKED, naming the driver and the missing
+  input, if not. The disappearing needs a recorded
+  port press and a recorded Shift press; the return
+  needs those and a recorded Shift release.
   Pin: tests/flow-fsm-scenarios.test.ts 'plain port-drag
        then shift-key toggles connect.isShift (F23)'
        (decides a bare shift-key input flips the in-flight
