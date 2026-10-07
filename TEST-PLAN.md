@@ -2863,16 +2863,22 @@ opens and renders.)
   `.closest('.flow-node')` to that node. A point under
   `.flow-props-panel` lands on the panel, so a
   pre-press miss is re-aimed at another regular
-  node clear of the panel, not scored. Then send
-  both press/release pairs to that point
-  inside `DBLCLICK_MS`, never re-reading it between
-  them. Record both press times: a longer gap is
-  not a double-click, so it is re-sent, not scored.
+  node clear of the panel, not scored. Install a
+  capture-phase `window` `pointerdown` listener that
+  pushes `Date.now()`, then send both press/release
+  pairs to that point inside `DBLCLICK_MS`, never
+  re-reading it between them. Fewer than two pushed
+  times, or a gap of `DBLCLICK_MS` or more between
+  them, is no double-click: record BLOCKED, naming
+  the driver.
   PASS: after the second press the panel is
   still open, `#prop-node-name`'s `value` is the
   double-clicked node's name, and the canvas has
-  re-centred on it (its `viewBox`, read per the
-  Driving notes). A second press that lands off the
+  re-centred on it: once the panel's ~200 ms slide
+  settles, the node `rect`'s client-box center is
+  within 4 px of the center of the canvas region
+  right of `.flow-props-panel`.
+  A second press that lands off the
   node because the first release moved the camera is
   FAIL, not BLOCKED: the gesture was delivered.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
