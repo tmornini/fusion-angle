@@ -239,9 +239,11 @@ not repeat the note in every case.
   `elementFromPoint` first. A miss is a body-drag or
   marquee, not Shift. The camera holds from press to
   release, so a drop point read before the press stays
-  true. If Shift is not delivered, the preview shows a
-  ghost "New State" card, not a bezier; a release off a
-  node then emits add-node, one over a node adds
+  true. If Shift is not delivered, the preview layer's
+  text reads "New State" (a ghost card), not the edge
+  bezier; a release off a node, more than 20 canvas
+  units (`MIN_DRAG_DISTANCE`) from the node's right-edge
+  midpoint, then emits add-node, one over a node adds
   nothing. Record BLOCKED naming that.
   Layer 1 and Layer 2 pins decide add-edge. F23's
   mid-gesture Shift is the same compositor limit.
@@ -1227,27 +1229,32 @@ the second organization.
   `document.elementFromPoint` there must resolve
   `.closest('.flow-node')` to that node.
   Confirm `document.visibilityState === 'visible'`
-  (the preview paints under `requestAnimationFrame`).
+  (the preview paints under `requestAnimationFrame`,
+  so read the preview one frame after the last move).
   Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
-  (code `ShiftLeft`, vk 16, modifiers 8);
-  `mousePressed` at the press point (modifiers 8);
-  eight `mouseMoved` steps to the drop point
-  (`buttons` 1, modifiers 8). PASS: before release,
+  (`key` `Shift`, code `ShiftLeft`, vk 16, modifiers 8);
+  `mousePressed` at the press point (`button` `left`,
+  `clickCount` 1, modifiers 8); eight `mouseMoved`
+  steps to the drop point (`buttons` 1, modifiers 8).
+  PASS: before release,
   `.flow-connect-preview path` carries
   `stroke-dasharray` — the dashed-orange curved bezier
   — because a forward path "Data Capture" → "Review"
   already exists and the release would close a loop.
-  `mouseReleased` (modifiers 8), then `keyUp` Shift.
+  `mouseReleased` at the drop point (`button` `left`,
+  modifiers 8), then `keyUp` Shift.
   PASS: `.flow-edge` count +1, `.flow-node` count
   unchanged. Rename the edge "needs revision". Repeat
   onto `.flow-node[aria-label="Archive"] > rect`,
   re-aiming both points. PASS: the preview path has
-  no `stroke-dasharray` (solid blue, no return path);
-  release adds one edge and no node. Rename it
+  no `stroke-dasharray` (solid blue, no return path)
+  and no ghost card; release adds one edge and no
+  node. Rename it
   "approve". A pre-press `elementFromPoint` miss is
-  re-aimed, not scored. BLOCKED only if Shift is not
-  observed: before release the preview shows a ghost
-  "New State" card, not the bezier, naming that.
+  re-aimed, not scored. BLOCKED, not FAIL, only if
+  Shift is not observed: before release the preview
+  layer's text reads "New State" (a ghost card), not
+  the bezier, naming that.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to
        an ancestor is a cycle edge' (decides
        "Review"→"Data Capture" classifies as a cycle
