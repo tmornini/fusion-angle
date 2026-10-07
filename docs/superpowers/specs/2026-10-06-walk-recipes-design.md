@@ -20,7 +20,7 @@
   fault), F13 (a one-point double-click), AA32 (a
   port-aimed Shift-drag), and C6 (a scripted scroll),
   with their driving-note and Scoring lines; TODO.md
-  0j filed; 0a closed
+  0j filed; 0a closed; 0b's plan pointer named
 - Leaves: F13's product fix (0j); 0b and 0c
 - Supersedes: Task 9 of
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
@@ -502,6 +502,19 @@ the count follows the moorings". 0c's "after 0a and
 0b" stays: an item's number is its name, and it
 outlives the item.
 
+Closing 0a also removes the one place TODO.md names the
+4 Oct plan, which 0b and 0c reach as "the same plan".
+Commit 8b gives 0b, now the head of the list, the
+plan's name, and 0c's "Task 11 of the same plan" reads
+back to it:
+
+```
+- **0b.** F37a, R22, and WB22 moored to the product;
+  Task 10 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
+  holds F37a's and R22's text.
+```
+
 ## Sequence
 
 One concern per commit, each green at Layer 1:
@@ -520,6 +533,8 @@ One concern per commit, each green at Layer 1:
 | 6b | Aim AA32's drop and fix its BLOCKED cue | AA32, the Shift-drag bullet |
 | 7 | Drive C6's scroll by script | C6 |
 | 8 | Close 0a's walk recipes | TODO.md |
+| 8a | Amend the 0a spec and plan to name 0b's plan | this spec, the plan |
+| 8b | Name the plan that 0b cites | TODO.md |
 
 Commit 3 precedes commit 5, so F13's pointer to 0j
 never names nothing, and 0j's text holds on both
@@ -542,6 +557,12 @@ instead") that a Shift-less release over the target
 cannot produce: it adds nothing. 6a amends this spec and
 the plan; 6b lands the amended AA32 and Shift-drag
 bullet, which are the text in § 3 above.
+
+Commits 8a and 8b answer Task 8's review. Closing 0a
+removed the one place TODO.md names the 4 Oct plan, so
+0b's and 0c's "the same plan" pointed at nothing. 8a
+amends this spec and the plan; 8b names the plan in 0b,
+which is the text in § 4 above.
 
 ## Testing
 
@@ -568,7 +589,7 @@ bullet, which are the text in § 3 above.
   case is added or removed, so `## Summary`'s counts
   hold.
 - TODO.md: 0j filed, 0a removed, the critical path's
-  intro, and `## Sequencing`.
+  intro, `## Sequencing`, and 0b's plan pointer.
 - Unchanged: AGENTS.md, ARCHITECTURE.md (no KNOWN seam
   moves, so AUDIT.md's `m` holds), FLOW-CANVAS.md, and
   the 4 Oct plan.

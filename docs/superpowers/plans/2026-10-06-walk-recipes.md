@@ -32,7 +32,7 @@
 > 3. Quality review: another fresh agent of type
 >    `planner`.
 >
-> After Task 8: a fresh agent of type `architect`
+> After Task 8b: a fresh agent of type `architect`
 > reviews `1e0941c5..HEAD` against the spec. Pass no
 > model override to any dispatch.
 >
@@ -49,13 +49,14 @@ recipes for I22, F13, AA32, and C6, with their
 driving-note and Scoring lines; TODO.md files 0j and
 closes 0a.
 
-**Architecture:** Doc-only. Eight commits, each an
+**Architecture:** Doc-only. Nine commits, each an
 exact string replacement with the Edit tool on
 `TODO.md` or `TEST-PLAN.md`, each green at Layer 1.
 0j lands before F13's text cites it; 0a closes last.
-Tasks 5b and 6b amend F13's and AA32's aim after
-Tasks 5 and 6 were reviewed; commits 5a and 6a, which
-amended this plan and the spec, precede them.
+Tasks 5b, 6b, and 8b amend F13's aim, AA32's aim, and
+0b's plan pointer after Tasks 5, 6, and 8 were
+reviewed; commits 5a, 6a, and 8a, which amended this
+plan and the spec, precede them.
 
 **Tech Stack:** Markdown. Layer 1 (`./test validate`,
 Deno 2.9.6) is the gate, because it lints both files.
@@ -192,6 +193,12 @@ that its task touches.
    clause is the ghost "New State" card in the preview
    (Shift lost), not "a node is added instead". Its PASS
    clauses and its Pin stay.
+10. **0b names the plan it cites.** After Task 8b, 0b
+    says "Task 10 of
+    `docs/superpowers/plans/test-plan-walk-2026-10-04.md`"
+    where it said "the same plan", so 0b and 0c both
+    resolve their plan. 0c, the intro, and
+    `## Sequencing` stay as Task 8 left them.
 
 ---
 
@@ -199,15 +206,16 @@ that its task touches.
 
 Commit 1 (`8fb66783`, the spec) and commit 2 (this
 plan, "Plan the 0a walk recipes") precede execution.
-Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8.
-Commits 5a and 6a are not tasks: each amended this plan
-and the spec once, after a task's review (5a before
-Task 5b, 6a before Task 6b). Task 3
+Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8, 8b.
+Commits 5a, 6a, and 8a are not tasks: each amended this
+plan and the spec once, after a task's review (5a before
+Task 5b, 6a before Task 6b, 8a before Task 8b). Task 3
 precedes Task 5, so F13's pointer to 0j never names
 nothing. Task 5's Scoring line anchors on Task 4's
 I22 line. Task 5b anchors on Task 5's F13 text.
 Task 6b anchors on Task 6's AA32 and Shift-drag text.
-Task 8 anchors on Task 3's "Nineteen".
+Task 8 anchors on Task 3's "Nineteen". Task 8b anchors
+on Task 8's 0b line.
 
 Each task's cycle:
 
@@ -1272,7 +1280,8 @@ so ARCHITECTURE.md and AUDIT.md's `m` hold.
 
 **Interfaces:**
 - Consumes: Task 3's "Nineteen items".
-- Produces: nothing.
+- Produces: the head of the list (0b), whose plan
+  pointer Task 8b names.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1420,6 +1429,92 @@ Expected `--stat`: `TODO.md` only.
 
 ---
 
+## Task 8b: Name the plan that 0b cites
+
+**Commit subject:** `Name the plan that 0b cites`
+
+Commandments: Clarity, Uniformity.
+Abominations: Obscurity (a pointer to nothing was the
+defect), Unbidden Helper Code (0c, the intro, `##
+Sequencing`, and every other line stay as Task 8 left
+them).
+
+**Files:**
+- Modify: `TODO.md` (0b's second line)
+
+**Interfaces:**
+- Consumes: Task 8's TODO.md, where 0b opens the list, as
+  committed in `68ec2560`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF '  Task 10 of the same plan holds' TODO.md
+grep -cF 'Task 11 of the same plan.' TODO.md
+grep -cF 'test-plan-walk-2026-10-04' TODO.md
+```
+
+Expected: `1`, `1`, `0`.
+
+- [ ] **Step 2: Edit 8b-1 — 0b names its plan**
+
+Old text:
+
+```text
+- **0b.** F37a, R22, and WB22 moored to the product;
+  Task 10 of the same plan holds F37a's and R22's text.
+```
+
+New text:
+
+```text
+- **0b.** F37a, R22, and WB22 moored to the product;
+  Task 10 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
+  holds F37a's and R22's text.
+```
+
+- [ ] **Step 3: Check the plan exists and 0c still reads back**
+
+```bash
+grep -cF 'test-plan-walk-2026-10-04' TODO.md
+grep -nE '^### Task (10|11):' docs/superpowers/plans/test-plan-walk-2026-10-04.md
+grep -cF 'Task 11 of the same plan.' TODO.md
+git diff -U0 TODO.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; the two headings, `### Task 10: Moor F37a,
+WB18, WB22, R22, SV3` and `### Task 11: Gates and AT2`;
+`1`; no output. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TODO.md
+git commit -F - <<'EOF'
+Name the plan that 0b cites
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018uFFAapWhN6H85dJyVj5cm
+EOF
+```
+
+Expected `--stat`: `TODO.md` only.
+
+---
+
 ## Reviews
 
 ### Per-task spec-compliance review (fresh `planner`)
@@ -1440,7 +1535,7 @@ or wipe. Then:
   the plan's old text. Nothing else moved.
 - Each `file:line` cite in the new text holds at
   HEAD (Task 3: `web-app/flows/detail.ts:1099-1108`,
-  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–8 add
+  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–8b add
   none).
 - The Review Focus lines the task touches hold.
 
@@ -1457,12 +1552,12 @@ no paraphrase crept into TEST-PLAN.md or TODO.md;
 baseline counts. A finding that the spec itself is
 wrong is reported, not fixed.
 
-### Whole-branch review (fresh `architect`, after Task 8)
+### Whole-branch review (fresh `architect`, after Task 8b)
 
 Same brief. Review `git log --oneline 1e0941c5..HEAD`
 and `git diff 1e0941c5..HEAD` against the spec:
 
-- Twelve commits, in the spec's `## Sequence` order,
+- Fourteen commits, in the spec's `## Sequence` order,
   each subject exact: "Specify the 0a walk recipes",
   "Plan the 0a walk recipes", "File F13's one-point
   double-click as 0j", "Force I22's fault with
@@ -1472,16 +1567,19 @@ and `git diff 1e0941c5..HEAD` against the spec:
   Shift-drag at the port", "Amend the 0a spec and plan
   to aim AA32", "Aim AA32's drop and fix its BLOCKED
   cue", "Drive C6's scroll by script", "Close 0a's
-  walk recipes".
-- Every spec code block lands verbatim, F13's and
-  AA32's (with the Shift-drag bullet) being the
-  amended ones; F11 reads "every later double-click
-  in F uses the same drive; F13 names its own".
-- All nine Review Focus lines hold at HEAD.
+  walk recipes", "Amend the 0a spec and plan to name
+  0b's plan", "Name the plan that 0b cites".
+- Every spec code block lands verbatim, F13's, AA32's
+  (with the Shift-drag bullet), and 0b's head being
+  the amended or added ones; F11 reads "every later
+  double-click in F uses the same drive; F13 names its
+  own".
+- All ten Review Focus lines hold at HEAD.
 - `## Summary` is unchanged by the diff.
-- The spec and this plan changed twice after commit 2,
-  in commits 5a and 6a (`git log --oneline
-  5cccaa60..HEAD -- <both paths>` lists only them), and
+- The spec and this plan changed three times after
+  commit 2, in commits 5a, 6a, and 8a (`git log
+  --oneline 5cccaa60..HEAD -- <both paths>` lists only
+  them), and
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
   is unchanged since `8fb66783`
   (`git diff 8fb66783..HEAD -- <it>` is empty).
@@ -1500,7 +1598,7 @@ git log --oneline 1e0941c5..HEAD
 ./test validate
 ```
 
-Expected: a clean tree; twelve commits; `ok | 4141
+Expected: a clean tree; fourteen commits; `ok | 4141
 passed | 0 failed | 11 ignored` and timezone
 `ok | 8 passed | 0 failed`.
 
