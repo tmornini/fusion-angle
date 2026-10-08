@@ -114,7 +114,8 @@ to Claude-in-Chrome or chrome-devtools MCP.
 Setup, once: clear this origin's cookies with
 `Storage.clearDataForOrigin` (`storageTypes: 'cookies'`);
 set `Emulation.setDeviceMetricsOverride` to 1280×800 with
-`deviceScaleFactor: 1` (I10–I15 set ≤767 and restore);
+`deviceScaleFactor: 1` and `mobile: false` (I10–I15 set
+≤767 wide and C6 sets 400 high; each restores);
 open one tab and `activate_tab` it. That tab stays
 visible for the whole walk. Leave Chrome out of
 fullscreen: `Browser.getWindowForTarget` then
@@ -340,13 +341,9 @@ not repeat the note in every case.
   remains readable after archive. The instance
   `Edit` (`[data-action="edit-instance"]`) sits
   below the fold at 1280×800. `scrollIntoView` it
-  (`block: "center"`) or raise
-  `Browser.setWindowBounds` height until the
-  Instances section is on-screen, then click that
-  button — never the record-type header Edit,
-  which opens the type form. A targeting miss is
-  BLOCKED, not FAIL. Restore the 1280×800 bounds
-  after the click if you raised them.
+  (`block: "center"`), then click that button —
+  never the record-type header Edit, which opens
+  the type form. A targeting miss is BLOCKED, not FAIL.
 - SV6/SV7/SV10: a second cookie jar is
   `Target.createBrowserContext` then
   `Target.createTarget` with that
@@ -4717,11 +4714,9 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   Instances section sits below the fold at
   1280×800 — `scrollIntoView` the row's
   `[data-action="edit-instance"]` (`block:
-  "center"`) or raise `Browser.setWindowBounds`
-  height until that button is on-screen, then
-  click it. Do not click the record-type header
-  Edit (that opens the type form). Change an
-  instance value and Save so the head etag
+  "center"`), then click it. Do not click the
+  record-type header Edit (that opens the type form).
+  Change an instance value and Save so the head etag
   advances (or drive a second transition). In tab
   1, edit a value and transition. PASS: tab 1
   receives 412, re-GETs the instance, re-presents
@@ -4730,8 +4725,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   underneath you — values refreshed; re-apply your
   edit"), and does **not** auto-retry the
   transition. A targeting miss on header Edit is
-  BLOCKED, not FAIL. Restore 1280×800 bounds
-  after if you raised them.
+  BLOCKED, not FAIL.
   Pin: tests/api-work-order-transition-instance.test.ts
        'value-bearing stale If-Match → 412' (decides the
        server 412 when a transition's held etag is
