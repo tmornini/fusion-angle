@@ -236,7 +236,7 @@ code comments cite; specs and plans written before the
   `postIdentityCredentialDocumentOp`,
   `api/routes.ts:2610`). The key's empty read roles,
   the one declaration of its kind
-  (`api/family-registry.ts:129-132`), leave when the
+  (`api/family-registry.ts:137-138`), leave when the
   hash leaves the body.
   `requester_identity_id` — the verified token's `sub` —
   stays readable. No read may
@@ -245,7 +245,7 @@ code comments cite; specs and plans written before the
   selecting `request`, `request_salt`, and the two
   secrets columns, which every read selects today
   (`api/backend-postgres.ts:446-665`, mapped by
-  `entityOf` at `:352-363`), though nothing derives
+  `entityOf` at `:340-368`), though nothing derives
   from `request`. Removing PII
   stays a tombstone, and the fence
   hides every `identities/:id/pii` pair that precedes a
