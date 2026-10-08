@@ -2894,6 +2894,30 @@ Off the critical path; each with its oracle.
   reach — flows' `:id` route has get and put only.
   Oracle: delete the guard, or pin it with a
   flow-shaped fixture.
+- TODO.md and TEST-PLAN.md still spell British.
+  TODO.md's "Unpinned but pinnable" bullet says
+  "colour" in three of its sub-bullets (F8/F40/AA26,
+  FS3, K28) and "centred" in one ("the centred
+  special label"); TEST-PLAN.md spells centre, colour,
+  labelled, neighbouring, honoured, and recognises in
+  23 lines. The 0a branch's 9f already made 0j say
+  "center". Say "color", "center" (and its forms),
+  "labeled", "neighboring", "honored", and
+  "recognizes", leaving `grey` alone (the CSS spells
+  both). Oracle: `grep -n -i -e centre -e colour -e
+  labelled -e neighbour -e honour -e recognis TODO.md
+  TEST-PLAN.md` prints nothing once this entry is gone
+- The Critical product path intro lost a cue. Its last
+  "then" before 0j became "and" in the 0a branch's 9f,
+  as the spec required, so "...(0i); and F13's
+  double-click under an open panel (0j)" reads as
+  though 0j rides the ledger's one deploy. "Eighteen
+  items, in this order" and `## Sequencing` still hold
+  the order (nothing there names 0j), so nothing
+  breaks; closing 0j removes the clause and this entry
+  with it. Restore "then". Oracle: the intro reads
+  "...(0i); then F13's double-click under an open panel
+  (0j)." or no longer names 0j
 - Test-only list oracles. `documentCollectionGetHandler` and
   `documentGetHandler` (`api/document-family.ts`) and the
   `GetHandler` type (`api/routes.ts`) serve no route; sixteen
