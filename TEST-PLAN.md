@@ -1271,7 +1271,12 @@ the second organization.
   and no ghost card; release adds one edge and no
   node. Rename it
   "approve". A pre-press `elementFromPoint` miss is
-  re-aimed, not scored. BLOCKED, not FAIL, only if
+  re-aimed, not scored: aim at another point inside
+  the same box (the port circle's box for the press,
+  the node's `rect` for the drop), and if none
+  resolves, record BLOCKED before that press, naming
+  what covers it; a FAIL already scored stands.
+  BLOCKED, not FAIL, only if
   Shift is not observed: before release the preview
   layer's text reads "New State" (a ghost card), not
   the bezier, naming that.
