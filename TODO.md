@@ -52,10 +52,10 @@ code comments cite; specs and plans written before the
   where the case and its Pin name five. Oracle: each
   case's text matches the code, and the next walk
   drives F37a and R22 PASS
-- **0c.** AT2's count, current: after 0a and 0b, run
+- **0c.** AT2's count, current: after 0b, run
   `./test validate browser` and replace AT2's "on 4 Oct
   `./test` printed `ok | 4124 passed | 0 failed | 11
-  ignored`" (`TEST-PLAN.md:479`) with that run's date
+  ignored`" (`TEST-PLAN.md:516`) with that run's date
   and its main suite's line; Task 11 of
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
   Oracle: AT2 names the latest Layer 2 run's count
