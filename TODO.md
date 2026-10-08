@@ -2009,6 +2009,20 @@ Off the critical path; each with its oracle.
     `<title>` copy (F10) — Layer 1, `buildGraphSvg` with
     a wired and an unwired Create node, locked and
     unlocked
+  - A second press that lands on a node centering slid
+    under the first press's point (F13) — Layer 2,
+    `tests/browser/canvas-gestures.test.ts`, beside the
+    empty-canvas pair there: the pair keeps the panel on
+    the first node. A `mousedown` focuses the pressed
+    node, and its `focusin` dispatches `canvas-focus`
+    (`web-app/app/flow-interactions.ts:785-798`), which
+    selects it and re-centers; the page replaces the
+    pressed node inside the `pointerdown` listener, so
+    Chrome's focus default should find it gone — by
+    reading, not by test. The Layer 1 scenario 'a press
+    on a node slid under the first press point neither
+    selects nor drags it (F13)' pins the pointer path
+    alone
   - The connect preview's markup — the "New State" ghost
     card, the grey straight line, and the bezier with its
     arrowhead (F15, F19, F23) — Layer 1,
