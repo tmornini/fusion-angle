@@ -1707,6 +1707,25 @@ Off the critical path; each with its oracle.
   clicks one node twice, a second apart, with
   `Date.now` set back an hour between the clicks, and
   finds the panel closed
+- A Meta double-click opens the panel with nothing
+  selected. A Meta press toggles its node in the
+  selection (`nextSelectionForNodeClick`,
+  `web-app/app/flow-fsm-reduce.ts:350-363`), so the
+  first press of a pair on an unselected node selects
+  it, and the second, inside `DBLCLICK_MS`, takes the
+  same-element path (`:184-197`): it removes the node,
+  still emits `open-panel: true`, and starts a drag
+  over an empty selection (run: selection `none`;
+  actions `open-panel`, `capture-pointer`,
+  `request-update`). The adapter counts Ctrl as Meta
+  (`web-app/app/flow-interactions.ts:610-612`). It
+  predates the point rule; the tree before it behaves
+  the same (run). Whether the pair should keep the
+  node, or a Meta press should never count as a
+  double-click, is the brainstorm's. Oracle: a Layer 1
+  scenario in `tests/flow-fsm-scenarios.test.ts` — a
+  Meta pair on one node never ends with `open-panel:
+  true` beside an empty selection
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is
