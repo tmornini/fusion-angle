@@ -1529,12 +1529,11 @@ Off the critical path; each with its oracle.
   camera's pan. With Auto Fit off and the flow
   unlocked, the second press on the selected node's
   body emits `open-panel: true`, `capture-pointer`, and
-  the gesture-start `request-update`, in that order.
-  The panel callback
-  (`web-app/flows/detail.ts:1110-1117`) runs first:
-  `withPanelOpen(true)` pans the camera to center the
-  node — from a closed panel, and from an open one when
-  the camera has left the node off center
+  the gesture-start `request-update`, in that order. The
+  panel callback (`web-app/flows/detail.ts:1110-1117`)
+  runs first: `withPanelOpen(true)` pans the camera to
+  center the node — from a closed panel, and from an
+  open one when the camera has left the node off center
   (`web-app/app/flow-designer-actions.ts:475-486`,
   `:502-507`) — writing `x` and `y` into the `viewBox`
   object in place
@@ -1561,9 +1560,9 @@ Off the critical path; each with its oracle.
   off — click a node away from the visible center,
   press it again inside the window, move the pointer
   1 px, and release; then the same with the panel open
-  and the camera panned off the node — finds the node's
-  stored position moved by the pointer's travel in
-  canvas units (1 px over the zoom), not by the
+  on that node and the camera panned off it — finds the
+  node's stored position moved by the pointer's travel
+  in canvas units (1 px over the zoom), not by the
   camera's pan
 - Four panel doors are unpinned. A panel closed
   outside `withPanelOpen` must not hand the next
