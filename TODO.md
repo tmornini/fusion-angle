@@ -14,7 +14,7 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Eighteen items, in this order — each its own brainstorm
+Seventeen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
 The 0-items finish the release: the walk's remaining
@@ -23,8 +23,7 @@ held to their own organization (0d), since no second
 tenant shares an origin before it ships; then the
 ledger's one deploy — `fa_` names (0e), the fence
 (0f), `FA_GIT_SHA` (0g), migrations (0h), and the wipe
-and reseed that ships them (0i); and F13's
-double-click under an open panel (0j). Then what a pilot
+and reseed that ships them (0i). Then what a pilot
 tenant needs (4–7), the process engine and its AI
 worker on that (9–12), and two processes last (13). An
 item's number is its name, which specs, plans, and
@@ -607,30 +606,6 @@ code comments cite; specs and plans written before the
   (`WHERE path = '/invitations/'`). Oracle: every live
   database has been wiped and reseeded after the ledger
   store's landing, and holds `/migrations/0000-root`
-- **0j.** A double-click under an open panel lands
-  where a person aimed. With the properties panel
-  open, a click on another node selects it and, on
-  release, centers it (`web-app/flows/detail.ts:1099-1108`;
-  FLOW-CANVAS.md prescribes the centering, and
-  `tests/browser/canvas-gestures.test.ts` 'a node
-  click under an open panel centers it on release
-  (F13)' decides only that the camera moves). A
-  double-click's first release therefore slides the
-  node from under its second press, which meets
-  empty canvas — `open-panel: false` closes the panel
-  (`web-app/app/flow-fsm-reduce.ts:97`) — or another
-  node, which takes the panel. The walk's element-id
-  drive re-aims between the presses, which is how F13
-  passed on `8e834e76`. The brainstorm decides how a
-  single click still centers while a double-click
-  holds still — the 4 Oct plan refused a timer
-  (Cleverness) — and whether item 11's "panel callback
-  re-fitting at a double-click's second press" rides
-  along. Oracle: a red Layer 2 test — two presses at
-  one point on a second node under an open panel
-  leave the panel open on it — turns green with the
-  center-on-release pin still green, and the next walk
-  scores F13 PASS
 - **4.** `/status` — `{ up: boolean, components: { postgres:
   boolean } }`, 200 when every component is up and 503
   when any is not, built for more components.
@@ -2920,24 +2895,12 @@ Off the critical path; each with its oracle.
   FS3, K28) and "centred" in one ("the centred
   special label"); TEST-PLAN.md spells centre, colour,
   labelled, neighbouring, honoured, and recognises in
-  23 lines. The 0a branch's 9f already made 0j say
-  "center". Say "color", "center" (and its forms),
+  22 lines. Say "color", "center" (and its forms),
   "labeled", "neighboring", "honored", and
   "recognizes", leaving `grey` alone (the CSS spells
   both). Oracle: `grep -n -i -e centre -e colour -e
   labelled -e neighbour -e honour -e recognis TODO.md
   TEST-PLAN.md` prints nothing once this entry is gone
-- The Critical product path intro lost a cue. Its last
-  "then" before 0j became "and" in the 0a branch's 9f,
-  as the spec required, so "...(0i); and F13's
-  double-click under an open panel (0j)" reads as
-  though 0j rides the ledger's one deploy. "Eighteen
-  items, in this order" and `## Sequencing` still hold
-  the order (nothing there names 0j), so nothing
-  breaks; closing 0j removes the clause and this entry
-  with it. Restore "then". Oracle: the intro reads
-  "...(0i); then F13's double-click under an open panel
-  (0j)." or no longer names 0j
 - Test-only list oracles. `documentCollectionGetHandler` and
   `documentGetHandler` (`api/document-family.ts`) and the
   `GetHandler` type (`api/routes.ts`) serve no route; sixteen
