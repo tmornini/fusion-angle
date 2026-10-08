@@ -2877,7 +2877,8 @@ Off the critical path; each with its oracle.
   `api/provider-models.ts` but in test fixtures;
   TEST-PLAN.md prose counts as a spelling
 - Cachability — the static server serves hashed names
-  and gzip sidecars, and its `HEAD` reports GET's
+  under `HASHED_CACHE_CONTROL` and gzip sidecars, and
+  its `HEAD` reports GET's
   `Content-Length`. The API serves no `HEAD`: its
   method switch has no case for it
   (`api/api.ts:964-1349`), so it answers 405, and that
@@ -2901,8 +2902,7 @@ Off the critical path; each with its oracle.
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
-  that earned it; hashed assets carry
-  `HASHED_CACHE_CONTROL`; an API `HEAD` answers its GET's
+  that earned it; an API `HEAD` answers its GET's
   status and headers with no body, and a 405 carries
   `Allow`.
 - ACL-editing UI for record attributes (`read_roles` /
