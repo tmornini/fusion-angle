@@ -7473,16 +7473,31 @@ K30 only describes.
        to the camelCase domain shape'; exploratory —
        the live four-way comparison across the two
        record types and the two sign-ins
-- [ ] **R22** Save a new instance, then open it in
-  two tabs and edit it in both: save the first tab,
-  then the second. PASS: the stale save refuses; the fresh
-  one shows the merged values.
-  Pin: tests/api-instances-create.test.ts 'a declared
-       create over a live instance is 412' (decides that
-       a create declares itself with `If-None-Match: *`
-       and a second create of the same id refuses);
-       exploratory — the two-tab edit race, the refusal
-       notice, and the merged values on screen
+- [ ] **R22** Save a new instance, then open it in two
+  tabs and edit it in both: change one field in the
+  first tab and save, then change a different field
+  in the second and save. PASS: the first save
+  answers 200 and the list shows its edit over the
+  stored values; the second tab, still in edit (the
+  cross-tab bell reloads only a reading page), saves
+  to 412, stays in edit, and refreshes every field to
+  the stored values with the "This instance changed
+  underneath you — values refreshed; re-apply your
+  edit" notice and a warning toast. The second tab's
+  edit is not merged in: the form sends every
+  non-empty writable value, and a stale tag never
+  rebases onto a newer head.
+  Pin: tests/api-instances-patch.test.ts 'two
+       writers, same If-Match → first 200, second
+       412'; tests/api-instances-patch.test.ts 'R9:
+       stale formed pair after head advance → 412 (no
+       silent rebase onto newer head)';
+       tests/api-instances-patch.test.ts 'PATCH stale
+       If-Match → 412; re-GET + retry → 200';
+       tests/presenter-record-instances.test.ts 'edit
+       form surfaces 412 conflict notice';
+       exploratory — the two live tabs, the re-GET
+       repaint, and the toast
 
 ## J. Teardown
 
