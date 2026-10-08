@@ -3019,14 +3019,14 @@ Off the critical path; each with its oracle.
   key renders without the separator.
 - TEST-PLAN.md's Pin lines lag their pins. R4's says
   `RecordDetailEditPresenter` carries no CLI test
-  (`:6979`) and R6's omits 'a select attribute renders
+  (`:7185`) and R6's omits 'a select attribute renders
   no constraint picker', both stale;
   AA4's says `bindAddMemberDialog` has no browser test
-  (`:602`), though `tests/browser/member-create.test.ts`
+  (`:639`), though `tests/browser/member-create.test.ts`
   and `tests/browser/dialogs.test.ts` drive it; V8's
   says the state badge is claimed by nothing, though
   Declined and Revoked are, and expects "No outstanding
-  invitations." (`:5381`, `:5400`) where the test asserts
+  invitations." (`:5560`, `:5579`) where the test asserts
   "No pending invitations." instead. Oracle: each named
   Pin line names its test, and each named claim matches
   the code
