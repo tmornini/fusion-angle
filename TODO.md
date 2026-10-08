@@ -1683,7 +1683,7 @@ Off the critical path; each with its oracle.
   first paint. `withCanvasSize`
   (`web-app/app/presenters/flow-designer.ts:974-995`)
   fits only under `isAutoFit`, and the load-time block
-  (`web-app/flows/detail.ts:1798-1813`) is the only
+  (`web-app/flows/detail.ts:1797-1813`) is the only
   load-time fit — its `reconcileFitFromDom()` returns
   early for the same reason, though the run-four plan
   promises "onFlowLoaded keeps its explicit first fit"
