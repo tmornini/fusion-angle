@@ -2941,15 +2941,17 @@ Off the critical path; each with its oracle.
   press on the same element keeps its own path), calls
   the re-fit "against the Camera rules" (the section
   disagrees with itself), and scores a delivered
-  double-click "that misses" BLOCKED (the Layer 2 pin
-  decides: the panel closed, or naming another node);
+  double-click "that misses" BLOCKED (the shipped text
+  defers to the Layer 2 pin, which fails when the panel
+  is closed or does not name that node);
   `## Sequence` lists the close before the TEST-PLAN
   pin, which the branch swapped; and § 3's "more than
   4 px apart" reads against its scenarios 2, 3, and 8,
   which put another element at the first press point on
-  purpose. The plan's Tasks 5, 6, and 7 carry the first
-  texts, and Task 8's Check names TODO.md line numbers
-  that the shipped entry moved. Oracle: the spec and
+  purpose. The plan's Tasks 5, 6, and 7 and its Review
+  Focus items 3 and 9 carry the first texts, and Task
+  8's Check names TODO.md line numbers that the shipped
+  entry moved. Oracle: the spec and
   plan quote the shipped texts and order, and the 4 px
   sentence says it speaks of accidental proximity
 - `./bin/measure --record` writes the literal `'unknown'` as
