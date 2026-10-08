@@ -2297,9 +2297,11 @@ Off the critical path; each with its oracle.
     updates the agent document'` never changes it
   - An event's `jti`, `parentJti`, `action`, and `at`
     reaching the presenter through one real adapter call
-    (G25) — Layer 1; the adapter test asserts chain
-    grouping and event counts only, and the presenter
-    test that renders `parentJti` hand-builds its fixture
+    (G25) — Layer 1; the adapter tests assert each
+    event's `jti` and `parentJti` and their order by
+    `at`, never an event's `action` or `at` value, and
+    the presenter test that renders `parentJti`
+    hand-builds its fixture
   - A `linked` provider badge distinct from `unlinked`
     (G26) — Layer 1, a scoped assertion in
     `presenter-identity-providers.test.ts`; `/linked/` is
