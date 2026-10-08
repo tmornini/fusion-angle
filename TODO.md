@@ -876,6 +876,53 @@ code comments cite; specs and plans written before the
 
 Off the critical path; each with its oracle.
 
+- `./bin/measure api` — the API's speed, in one run,
+  on the chart. Nothing records how fast the API
+  answers: `--profile` counts each page's API requests
+  and times none
+  (`web-app/app/measure-profile-core.ts:122-162`). The
+  spawned server already times every request — one
+  JSON line each with `method`, `path`, `status`, and
+  `latencyMs`, dispatch to response construction
+  (`server/http-server.ts:477-496`; µs kept,
+  `tests/http-server.test.ts:216`, run) — and
+  `web-app/app/measure.ts:632` spawns it with
+  `stdout: 'null'`, so every sweep discards them. Pipe
+  stdout and drain it as stderr is drained
+  (`measure.ts:639-656`), keep the `/api/` lines, and
+  give each local `--record` row an `api` block shaped
+  like a page's: `latencyMs` (trimmed median),
+  `spread`, `requests`, and per route a `count` and
+  median `latencyMs`, ids folded by
+  `canonicalizeResource`, extended to fold an
+  `<id>:<id>` segment, which it leaves whole today
+  (run). `parseHistoryJsonl` validates the block when
+  present, as it does `spread`. A 5xx line fails the
+  run before `--record` writes; whether a sweep logs
+  one today is unmeasured. `api` is a mode word, as
+  `./test postgres` is:
+  `--runs 1 --record --visualize` over the full
+  registry (that preset parses today, run), taking
+  `--runs N` and refusing every other flag
+  (`--base-url` has no log to read). The report prints
+  the per-route table. The system trend, the mean of
+  page medians (`#sys-trend`), gains the API line on a
+  right axis: both axes from zero, each titled and
+  ticked in its line's color, API points square, the
+  tooltip naming the three slowest routes; rows before
+  the block draw no API point. Both lines take classes
+  colored from DESIGN-SYSTEM.md, readyMs `--primary`
+  and API `--accent`, retiring the hex at
+  `measure-viz.ts:1299` and `:1311`; the viz's own
+  `--accent` is blue (`:139`), and `padR = 16`, the
+  right margin a right axis must outgrow, is written
+  thrice (`:1202`, `:1395`, `:1420`). Oracle:
+  `./bin/measure api` on a clean tree appends one
+  `runs: 1` row carrying an `api` block whose
+  `requests` is above zero, the visualizer draws both
+  lines on two zero-based axes, and a `Deno.test`
+  feeding the harvester a log with one 5xx line
+  asserts the refusal
 - A revocation's cutoff is the client's clock. The
   token-revocation PUT carries `at` from the browser's
   `nowUtc()` (`client/identity-token-revocations.ts:17`),
