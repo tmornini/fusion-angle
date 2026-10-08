@@ -3017,6 +3017,14 @@ Off the critical path; each with its oracle.
   `name`) holds. Say "no read discovers pairs by
   pattern" instead. Oracle: the reworded line, and the
   one `.exec` named as the sanctioned parse
+- The message-plane spec cites a TODO.md line. Its
+  token section sends readers to "The cross-party
+  delegation bullet (`TODO.md:1580`)"
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:177`);
+  that bullet has moved, and every edit above it moves
+  it again. Oracle: the spec names the
+  bullet by its title, "The cross-party delegation
+  ledger", and no line number
 - `./bin/measure --record` writes the literal `'unknown'` as
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
