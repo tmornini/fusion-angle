@@ -126,6 +126,8 @@ function onNodePointerDown(
         kind: 'clicked' as const,
         id: input.nodeId,
         time: input.now,
+        clientX: input.clientX,
+        clientY: input.clientY,
     };
     if (shouldStartConnection(input.isPort, input.isDraggable)) {
         const next: FsmState = {
@@ -316,6 +318,8 @@ function onEdgePointerDown(
             kind: 'clicked',
             id: input.edgeId,
             time: input.now,
+            clientX: input.clientX,
+            clientY: input.clientY,
         },
     };
     return {

@@ -125,6 +125,8 @@ export type LastClick =
         kind: 'clicked';
         id: string;
         time: number;
+        clientX: number;
+        clientY: number;
     };
 
 // The marquee's drawable rectangle, normalized from the
@@ -573,6 +575,7 @@ export function bindInteractions(
                     svgY: svgPt.y,
                     clientX: e.clientX,
                     clientY: e.clientY,
+                    now: Date.now(),
                 });
                 return;
             }
@@ -611,6 +614,8 @@ export function bindInteractions(
                         context.isLocked,
                     svgX: svgPt.x,
                     svgY: svgPt.y,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
                     now: Date.now(),
                     selectedPositions:
                         positions,
@@ -627,6 +632,8 @@ export function bindInteractions(
                         'pointer-down-on-edge',
                     edgeId,
                     now: Date.now(),
+                    clientX: e.clientX,
+                    clientY: e.clientY,
                 });
                 return;
             }
@@ -638,6 +645,7 @@ export function bindInteractions(
                 svgY: svgPt.y,
                 clientX: e.clientX,
                 clientY: e.clientY,
+                now: Date.now(),
             });
         },
         { signal },

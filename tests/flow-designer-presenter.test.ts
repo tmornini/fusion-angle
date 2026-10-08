@@ -63,6 +63,8 @@ Deno.test(
                 kind: 'clicked',
                 id: 'n1',
                 time: 1000,
+                clientX: 0,
+                clientY: 0,
             },
             drag: { kind: 'idle' },
             connect: { kind: 'idle' },

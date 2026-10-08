@@ -82,6 +82,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 160, svgY: 32,
+                clientX: 160, clientY: 32,
                 now: 1000,
                 selectedPositions: new Map(),
             },
@@ -136,6 +137,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 160, svgY: 32,
+                clientX: 160, clientY: 32,
                 now: 1000,
                 selectedPositions: new Map(),
             },
@@ -187,6 +189,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 160, svgY: 32,
+                clientX: 160, clientY: 32,
                 now: 1000,
                 selectedPositions: new Map(),
             },
@@ -238,6 +241,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 160, svgY: 32,
+                clientX: 160, clientY: 32,
                 now: 1000,
                 selectedPositions: new Map(),
             },
@@ -287,6 +291,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 160, svgY: 32,
+                clientX: 160, clientY: 32,
                 now: 1000,
                 selectedPositions: new Map(),
             },
@@ -337,6 +342,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 160, svgY: 32,
+            clientX: 160, clientY: 32,
             now: 1000,
             selectedPositions: new Map(),
         };
@@ -396,6 +402,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 0, svgY: 0,
+            clientX: 0, clientY: 0,
             now: 1000,
             selectedPositions: new Map([
                 ['n1', { x: 0, y: 0 }],
@@ -438,6 +445,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 0, svgY: 0,
+            clientX: 0, clientY: 0,
             now: 1000,
             selectedPositions: new Map([
                 ['n1', { x: 0, y: 0 }],
@@ -483,6 +491,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 0, svgY: 0,
+            clientX: 0, clientY: 0,
             now: 1000,
             selectedPositions: startPositions,
         };
@@ -508,6 +517,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 200, svgY: 0,
+            clientX: 200, clientY: 0,
             now: 2000,
             selectedPositions: startPositions,
         };
@@ -562,6 +572,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 110, svgY: 110,
+                clientX: 110, clientY: 110,
                 now: 1000,
                 selectedPositions: startPositions,
             },
@@ -625,6 +636,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 110, svgY: 110,
+                clientX: 110, clientY: 110,
                 now: 1000,
                 selectedPositions: startPositions,
             },
@@ -671,6 +683,7 @@ Deno.test(
                 isMeta: false,
                 isLocked: false,
                 svgX: 0, svgY: 0,
+                clientX: 0, clientY: 0,
                 now: 1000,
                 selectedPositions: startPositions,
             },
@@ -713,11 +726,13 @@ Deno.test(
         const firstClick: FsmInput = {
             kind: 'pointer-down-on-edge',
             edgeId: 'YiJPbufDpkyrZcZCYbUJpg',
+            clientX: 0, clientY: 0,
             now: 1000,
         };
         const secondClick: FsmInput = {
             kind: 'pointer-down-on-edge',
             edgeId: 'YiJPbufDpkyrZcZCYbUJpg',
+            clientX: 0, clientY: 0,
             now: 1000 + DBLCLICK_WITHIN_MS,
         };
         const r = drive(buildState(), [
@@ -747,6 +762,7 @@ Deno.test(
             {
                 kind: 'pointer-down-on-edge',
                 edgeId: 'YiJPbufDpkyrZcZCYbUJpg',
+                clientX: 0, clientY: 0,
                 now: 1000,
             },
         ]);
@@ -774,6 +790,7 @@ Deno.test(
                 kind: 'pointer-down-on-canvas',
                 svgX: 0, svgY: 0,
                 clientX: 0, clientY: 0,
+                now: 1000,
             },
             {
                 kind: 'pointer-move',
@@ -821,6 +838,7 @@ Deno.test(
                 kind: 'pointer-down-on-canvas',
                 svgX: 0, svgY: 0,
                 clientX: 0, clientY: 0,
+                now: 1000,
             },
             {
                 kind: 'pointer-move',
