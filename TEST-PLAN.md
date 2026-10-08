@@ -127,7 +127,8 @@ top-left of a fullscreen or flush window is the
 Apple menu; the next click opens About This Mac.
 Open a second tab of the same context only where a
 same-jar case needs one (SV8, SV8b, SV9). For a
-second identity (SV6, SV7, SV10) mint a second
+second identity (SV6, SV7, SV10) or a second jar of
+one identity (F37a) mint a second
 cookie jar with `Target.createBrowserContext`
 then `Target.createTarget` (`browserContextId`
 set, `url` `about:blank`) and
@@ -260,7 +261,7 @@ not repeat the note in every case.
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
   "New State" nodes re-flow the graph and a
   double-click misses Data Capture.
-- F37b: after F37a opens a second tab (born hidden),
+- F37b: after F37a opens its second jar (born hidden),
   re-activate tab A and confirm
   `document.visibilityState === 'visible'` before
   the port-drag. Driving the hidden tab is BLOCKED,
@@ -3511,22 +3512,31 @@ that the canvas re-renders after each step.)
        non-empty' (decides the empty stack is what disables
        the button); exploratory — the 800 ms save and the
        live button state
-- [ ] **F37a** Open the same flow in two tabs of the same
-  jar. In tab A, edit
-  a node name and let auto-save complete. In tab B (which
-  still shows the pre-edit head), click Undo immediately.
-  PASS: nothing looks wrong — no error toast, no stuck
-  spinner, no console error surfaces to the user. Under the
-  hood the stale-basis undo collides with tab A's save (HTTP
-  412) and the client silently retries with a freshly
-  resolved target against the new head — the 412-retry is
-  invisible to the tester by design.
-  Pin: tests/flow-undo-cursor.test.ts 'undo cursor: a 412
-       on attempt 1 is absorbed — attempt 2 succeeds with
-       no client-side baseline refetch' (decides the client
-       absorbs the 412 and the second attempt lands without
-       refetching a baseline); exploratory — the two live
-       tabs and the absence of any user-visible error
+- [ ] **F37a** Open the flow in tab A. Mint a second
+  cookie jar (`Target.createBrowserContext`, as SV6),
+  sign in there as the same member, and open the same
+  flow as tab B. In tab A, rename a node and let the
+  `PUT …/flows/:id` land (`SAVE_DELAY_MS` = 800 ms).
+  Tab B still shows the pre-edit name —
+  BroadcastChannel does not cross cookie jars. In tab
+  B, click Undo. PASS: tab B's network log shows
+  `POST …/flows/:id/undo` 412, a `GET …/flows/:id`,
+  then the undo POST 200; tab B repaints with tab A's
+  rename reverted (one step back from the new head);
+  no error toast, stuck spinner, console error, or
+  "Something went wrong". Two tabs of one jar cannot
+  show the 412: `fusion-angle:data` repaints tab B and
+  latches the new head within one GET of tab A's save.
+  Pin: tests/flow-undo-cursor.test.ts 'undo cursor: a
+       412 on attempt 1 is absorbed — attempt 2
+       succeeds with no client-side baseline refetch'
+       (decides the client absorbs the 412 and the
+       second attempt lands);
+       tests/flow-undo-cursor.test.ts 'a stale undo
+       tag is 412 from the statement' (decides the
+       stale latch refuses and stores nothing);
+       exploratory — the second jar's live staleness
+       and the absence of any user-visible error
 - [ ] **F37b** Toggle Auto Layout back on if F34 turned it
   off, then add a node via F15's plain port-drag (no
   Shift). Wait until the node count rises by one, then
