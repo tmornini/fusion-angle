@@ -2963,19 +2963,20 @@ Off the critical path; each with its oracle.
   to guess. FLOW-CANVAS.md `## Camera rules` says a
   press on the same element "keeps its own path"
   without saying what the path does (a node press
-  selects the node and, unless the flow is locked,
-  starts its drag or connect and captures the pointer;
-  an edge press selects the edge and starts nothing;
-  either emits `open-panel: true` inside the window);
-  its third-press sentence's "on the same element"
-  reads as where the third press lands, where it means
-  the double-click stays on the first press's element,
-  and "chains from the second" does not say the window
-  and the slop restart at the second press. TEST-PLAN
-  F13 and Scoring score a panel that "names another
-  node", where the Layer 2 pin decides a panel that
-  does not name that node, so a panel left open on an
-  edge falls between PASS and BLOCKED. Oracle: the
+  applies the click's selection rule — Shift adds the
+  node, Meta toggles it — and, unless the flow is
+  locked, starts its drag or connect and captures the
+  pointer; an edge press selects the edge and starts
+  nothing; either emits `open-panel: true` inside the
+  window); its third-press sentence's "on the same
+  element" reads as where the third press lands, where
+  it means the double-click stays on the first press's
+  element, and "chains from the second" does not say
+  the window and the slop restart at the second press.
+  TEST-PLAN F13 and Scoring score a panel that "names
+  another node", where the Layer 2 pin decides a panel
+  that does not name that node, so a panel left open on
+  an edge falls between PASS and BLOCKED. Oracle: the
   paragraph says what the same-element path does and
   what restarts at the second press, and F13 and
   Scoring say "closed or does not name that node"
