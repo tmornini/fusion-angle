@@ -1526,15 +1526,18 @@ Off the critical path; each with its oracle.
   in flight, pinned as `tests/adapters-flow-stats.test.ts`
   pins `getFlowStats`, and the yield at `:195` is gone
 - A same-node double-click can move the node by the
-  camera's pan. With Auto Fit off, the panel closed, and
-  the flow unlocked, the second press on the selected
-  node's body emits `open-panel: true`,
-  `capture-pointer`, and the gesture-start
-  `request-update`, in that order. The panel callback
+  camera's pan. With Auto Fit off and the flow
+  unlocked, the second press on the selected node's
+  body emits `open-panel: true`, `capture-pointer`, and
+  the gesture-start `request-update`, in that order.
+  The panel callback
   (`web-app/flows/detail.ts:1110-1117`) runs first:
   `withPanelOpen(true)` pans the camera to center the
-  node, writing `x` and `y` into the `viewBox` object
-  in place
+  node — from a closed panel, and from an open one when
+  the camera has left the node off center
+  (`web-app/app/flow-designer-actions.ts:475-486`,
+  `:502-507`) — writing `x` and `y` into the `viewBox`
+  object in place
   (`web-app/app/presenters/flow-designer.ts:489-490`),
   an object the gesture's state shares. The drag's
   start point was mapped through the camera before
@@ -1546,7 +1549,10 @@ Off the critical path; each with its oracle.
   rules` holds the camera still under an in-flight
   gesture for the `request-update` callback only. Read
   from the code, not reproduced. Auto Fit on is not
-  affected: its fit assigns a fresh `viewBox` object
+  affected: `applyPanelTransition` returns null under
+  Auto Fit (`web-app/app/flow-designer-actions.ts:474`),
+  so the panel callback writes nothing in place, and its
+  fit assigns a fresh `viewBox` object
   (`flow-designer.ts:1020-1021`), which the gesture's
   state does not share. Item 11 lists the in-place
   writes among its debts; this is the one that moves a
@@ -1554,8 +1560,11 @@ Off the critical path; each with its oracle.
   `tests/browser/canvas-gestures.test.ts` with Auto Fit
   off — click a node away from the visible center,
   press it again inside the window, move the pointer
-  1 px, and release — finds the node within a pixel's
-  distance of where it started
+  1 px, and release; then the same with the panel open
+  and the camera panned off the node — finds the node's
+  stored position moved by the pointer's travel in
+  canvas units (1 px over the zoom), not by the
+  camera's pan
 - Four panel doors are unpinned. A panel closed
   outside `withPanelOpen` must not hand the next
   empty-canvas click or delete the viewBox it saved on
