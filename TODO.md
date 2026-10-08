@@ -1602,7 +1602,17 @@ Off the critical path; each with its oracle.
   centering; TEST-PLAN F13 requires Auto Fit off because
   of it. F14's re-fit when a double-click opens a closed
   panel comes from both callbacks, so F14 does not need
-  the panel callback's. Oracle: a Layer 2 test in
+  the panel callback's. The `request-update` callback's
+  re-fit lands at the release for a draggable node, and
+  at the press for a locked flow or a press matched by
+  its point, whose release does nothing; a fix that
+  removes press-time re-fits must leave those presses
+  one, or F14 fails for them. The oracle's second node
+  takes the point rule's path; the first node pressed
+  again, when its first release left it under the press
+  point, takes the id rule's path and re-fits at the
+  press and again at the release, so it needs its own
+  case. Oracle: a Layer 2 test in
   `tests/browser/canvas-gestures.test.ts` with Auto Fit
   on (the fixture default) — the `viewBox` after a
   double-click on a second node under an open panel
