@@ -3,7 +3,7 @@
 - Date: 2026-10-06
 - Status: design confirmed by the owner section by
   section, pre-plan; amended since, at the owner's
-  word, by commits 5a, 6a, 8a, 9a, 9g, 10a, and 10g
+  word, by commits 5a, 6a, 8a, 9a, 9g, 10a, 10g, and 11a
   (`## Sequence`)
 - Item: TODO.md 0a, as filed on `todo-triage` at
   `7c3c4bfc`
@@ -21,9 +21,11 @@
 - Ships: TEST-PLAN.md recipes for I22 (a forced
   fault), F13 (a one-point double-click), AA32 (a
   port-aimed Shift-drag), and C6 (a scripted scroll),
-  with their driving-note and Scoring lines, and F23's
-  key-event probe; TODO.md 0j filed; 0a closed; 0b's and
-  0c's plan pointers named
+  with their driving-note and Scoring lines, F23's
+  key-event probe, and one way to set the viewport in
+  Setup, WB19, and WB19a; TODO.md 0j filed, with two
+  Later-work entries; 0a closed; 0b's and 0c's plan
+  pointers named
 - Leaves: F13's product fix (0j); 0b and 0c
 - Supersedes: Task 9 of
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`,
@@ -257,12 +259,16 @@ Replace I22 (`TEST-PLAN.md:6265-6271`) with:
   `#ideas-list` shows "Something went wrong", text
   containing "walk-forced fault", and a "Try Again"
   `[data-retry-btn]` that is `document.activeElement`.
-  Then `Fetch.disable` and click Try Again at its
-  box-model center. PASS: a second GET of `…/ideas/`
-  answers 200 (the last
+  Read `document.activeElement` before any click: the
+  focusing click (Driving notes) blurs the button.
+  Then `Fetch.disable`, make that click on
+  `.page-header`, not at the viewport center, which
+  may land on Try Again, and click Try Again at its
+  box-model center. PASS: `[data-idea-card]` cards
+  replace the error state, and then a second GET of
+  `…/ideas/` answers 200 (the last
   `performance.getEntriesByType('resource')` entry
-  whose name ends `/ideas/` has `responseStatus` 200)
-  and `[data-idea-card]` cards replace the error state.
+  whose name ends `/ideas/` has `responseStatus` 200).
   BLOCKED only if `Fetch.enable` or
   `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
@@ -290,8 +296,9 @@ line (`TEST-PLAN.md:394-396`):
 ```
 I22 with the 500 fulfilled: a missing error state,
 message, focus, or card replacement, or a retry whose
-GET does not answer 200, is FAIL of the exploratory
-half. BLOCKED only if `Fetch` itself refuses.
+GET does not answer 200 (read once the cards replace
+the error state), is FAIL of the exploratory half.
+BLOCKED only if `Fetch` itself refuses.
 ```
 
 ## 2. F13 — one point, two presses
@@ -303,18 +310,28 @@ Replace F13 (`TEST-PLAN.md:2791-2808`) with:
   *different* node the way a person does: one point,
   two presses. Auto Fit must be off, as F12 left it
   (turn it off first if it is on): a re-fit at the
-  second press can fail the re-centred clause. Pick a
-  regular node: Create and Archive panels have no
+  second press can fail the re-centred clause. Confirm
+  `document.visibilityState === 'visible'` (a hidden
+  tab may never replay the panel's slide); else record
+  BLOCKED, naming the driver. Pick a regular node:
+  Create and Archive panels have no
   `#prop-node-name`. Aim before the
   first press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
   `text` or the `g`, whose box includes the port —
   and `document.elementFromPoint` there must resolve
-  `.closest('.flow-node')` to that node. A point under
-  `.flow-props-panel` lands on the panel, so a
-  pre-press miss is re-aimed at another regular
-  node clear of the panel, not scored. Install a
+  `.closest('.flow-node')` to that node. That `rect`
+  must also not contain the center of the part of
+  `svg.flow-canvas`'s client box right of
+  `.flow-props-panel`: a node holding that point moves
+  less than half its size at the first release, so the
+  second press would still land on it and the case
+  could not fail. A point under `.flow-props-panel`
+  lands on the panel, so a pre-press miss is re-aimed
+  at another regular node whose `rect` also misses
+  that center, not scored. If none does, record
+  BLOCKED, naming that. Install a
   capture-phase `window` `pointerdown` listener that
   pushes `Date.now()` onto a new, empty array, then
   send both press/release pairs to that point inside
@@ -443,7 +460,12 @@ names walk-green's camera-hold pin:
   and no ghost card; release adds one edge and no
   node. Rename it
   "approve". A pre-press `elementFromPoint` miss is
-  re-aimed, not scored. BLOCKED, not FAIL, only if
+  re-aimed, not scored: aim at another point inside
+  the same box (the port circle's box for the press,
+  the node's `rect` for the drop), and if none
+  resolves, record BLOCKED before that press, naming
+  what covers it; a FAIL already scored stands.
+  BLOCKED, not FAIL, only if
   Shift is not observed: before release the preview
   layer's text reads "New State" (a ghost card), not
   the bezier, naming that.
@@ -473,9 +495,9 @@ Replace the Shift-drag bullet in `### Driving notes`
   Layer 1 and Layer 2 pins decide add-edge. F23 starts
   from a reload, and a preview read of it that is not
   what its case says is FAIL if its listener's record
-  is exactly the inputs sent, in order, and BLOCKED,
-  naming the driver, if not (F23 names the reads and
-  the record).
+  up to it is exactly the inputs sent, in order, and
+  BLOCKED, naming the driver and the first difference,
+  if not (F23 names the reads and the record).
 ```
 
 Replace F23's body (`TEST-PLAN.md:3010-3019`), keeping
@@ -490,10 +512,13 @@ mode is left over, and a preview read that is not what
 the case says scores FAIL only when the listener's
 record is exactly the inputs sent, in order; any other
 record is BLOCKED, naming the first difference. A port
-press the page never got, a Shift press or release with
-the wrong `key` or modifiers, an early mouse release,
-and inputs out of order are driver faults, and the edge
-and node halves have their own Pins:
+press the page never got, a Shift press with the wrong
+`key`, a Shift release with the wrong `key` or
+modifiers, an early mouse release, and inputs out of
+order are driver faults the record sees; a Shift press
+with the wrong modifiers is not one (`handleShift` sets
+Shift from the event type, so no score goes wrong), and
+the edge and node halves have their own Pins:
 
 ```
 - [ ] **F23** Begin a plain drag from a port (no
@@ -552,23 +577,32 @@ its Pin line (`:1733-1734`) unchanged, with:
   `.sidebar` is `position: fixed` — and CDP wheel and
   key scrolls stall on a tab that is not composited,
   so drive with `Runtime.evaluate`: from `scrollY` 0
-  (`window.scrollTo(0, 0)` first), read
+  (`window.scrollTo({top: 0, behavior: 'instant'})`
+  first; `behavior: 'instant'` keeps a page
+  `scroll-behavior` from animating any of these
+  calls), read
   `#main-content`'s `getBoundingClientRect().top`
   as t, then
-  `window.scrollTo(0, document.documentElement.scrollHeight)`
+  `window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})`
   and read `window.scrollY` as d. PASS: d > 0;
   neither `html` nor `body` computes `overflow-y:
   hidden` or `overflow-y: clip`; `#desktop-sidebar`'s
   rect `top` is still 0; `#main-content`'s rect `top`
-  is t − d. If d = 0, `#main-content`'s rect `bottom`
-  is at most `window.innerHeight`, and its
+  is t − d. A computed `overflow-y: hidden` or `clip`
+  on `html` or `body` is FAIL whether or not the page
+  fits. Otherwise, if d = 0, `#main-content`'s rect
+  `bottom` is at most `window.innerHeight`, and its
   `scrollHeight` is at most its `clientHeight`, the
   page fits the window: set
   `Emulation.setDeviceMetricsOverride` to 1280×400
-  with `deviceScaleFactor: 1`, as Setup does for
-  1280×800, and drive again; BLOCKED, not FAIL, naming
-  that, only if it still fits. Restore the 1280×800
-  override if you lowered it, and `window.scrollTo(0, 0)`.
+  with `deviceScaleFactor: 1` and `mobile: false`, as
+  Setup does for 1280×800, and, once
+  `window.innerHeight` reads 400 (BLOCKED, naming the
+  override, if it has not within a few seconds), drive
+  again; BLOCKED, not FAIL, naming that, only if it
+  still fits. Restore the 1280×800 override if you
+  lowered it, and
+  `window.scrollTo({top: 0, behavior: 'instant'})`.
 ```
 
 Two departures from Task 9: the scroll goes to the
@@ -592,8 +626,7 @@ File 0j after 0i, before F13's commit cites it:
   (F13)' decides only that the camera moves). A
   double-click's first release therefore slides the
   node from under its second press, which meets
-  empty canvas — `open-panel:
-  false` closes the panel
+  empty canvas — `open-panel: false` closes the panel
   (`web-app/app/flow-fsm-reduce.ts:97`) — or another
   node, which takes the panel. The walk's element-id
   drive re-aims between the presses, which is how F13
@@ -652,6 +685,98 @@ name write them) and the intro's last "then" (it becomes
   Oracle: AT2 names the latest Layer 2 run's count
 ```
 
+Commits 11h and 11i answer the fourth pass. 11h files
+two entries in `## Later work`, immediately above
+"Test-only list oracles." (`TODO.md:2896` on the base):
+they rank with the other one-commit hygiene entries, by
+the Church's order when the harm ties (Uniformity, then
+Clarity), and follow the file's shape (the problem, the
+evidence, the fix, and an `Oracle:` clause with no
+closing period). They are filed, not worked: the first
+asks for the spelling sweep over TODO.md and
+TEST-PLAN.md, and the second expires with 0j, because
+closing 0j removes the intro's 0j clause:
+
+```
+- TODO.md and TEST-PLAN.md still spell British.
+  TODO.md's "Unpinned but pinnable" bullet says
+  "colour" in three of its sub-bullets (F8/F40/AA26,
+  FS3, K28) and "centred" in one ("the centred
+  special label"); TEST-PLAN.md spells centre, colour,
+  labelled, neighbouring, honoured, and recognises in
+  23 lines. The 0a branch's 9f already made 0j say
+  "center". Say "color", "center" (and its forms),
+  "labeled", "neighboring", "honored", and
+  "recognizes", leaving `grey` alone (the CSS spells
+  both). Oracle: `grep -n -i -e centre -e colour -e
+  labelled -e neighbour -e honour -e recognis TODO.md
+  TEST-PLAN.md` prints nothing once this entry is gone
+- The Critical product path intro lost a cue. Its last
+  "then" before 0j became "and" in the 0a branch's 9f,
+  as the spec required, so "...(0i); and F13's
+  double-click under an open panel (0j)" reads as
+  though 0j rides the ledger's one deploy. "Eighteen
+  items, in this order" and `## Sequencing` still hold
+  the order (nothing there names 0j), so nothing
+  breaks; closing 0j removes the clause and this entry
+  with it. Restore "then". Oracle: the intro reads
+  "...(0i); then F13's double-click under an open panel
+  (0j)." or no longer names 0j
+```
+
+11i joins 0j's two short lines (`TODO.md:620-621`) into
+one; § 4's 0j block above carries the joined line.
+
+## 5. Setup, WB19, and WB19a
+
+Setup fixes the viewport with
+`Emulation.setDeviceMetricsOverride`, which fixes
+`innerHeight`, so lowering the window with
+`Browser.setWindowBounds` cannot move it (the 10e review
+found this in C6, and 10j fixed it there). The call also
+requires `mobile`, which Setup and C6 left out. At the
+owner's word (the fourth pass), Setup names
+`mobile: false` and lists C6 beside I10–I15 as a case
+that changes the override; WB19 and WB19a drop their
+window-bounds alternative, and WB19a drops the sentence
+restoring bounds it no longer raises; both keep
+`scrollIntoView`, which works under the override.
+
+Setup's viewport line (`TEST-PLAN.md:117`) becomes:
+
+```
+`deviceScaleFactor: 1` and `mobile: false` (I10–I15 set
+≤767 wide and C6 sets 400 high; each restores);
+```
+
+The WB19 bullet in `### Driving notes`
+(`TEST-PLAN.md:318-324`) ends:
+
+```
+  (`block: "center"`), then click that button —
+  never the record-type header Edit, which opens
+  the type form. A targeting miss is BLOCKED, not FAIL.
+```
+
+WB19a's Instances sentence (`TEST-PLAN.md:4541-4547`)
+becomes:
+
+```
+  1280×800 — `scrollIntoView` the row's
+  `[data-action="edit-instance"]` (`block:
+  "center"`), then click it. Do not click the
+  record-type header Edit (that opens the type form).
+  Change an instance value and Save so the head etag
+```
+
+WB19a's closing sentences (`TEST-PLAN.md:4555-4557`)
+become:
+
+```
+  transition. A targeting miss on header Edit is
+  BLOCKED, not FAIL.
+```
+
 ## Sequence
 
 One concern per commit, each green at Layer 1:
@@ -690,6 +815,15 @@ One concern per commit, each green at Layer 1:
 | 10h | Wait out F13's panel slide before it reads | F13 |
 | 10i | Start F23 clean and score it from an exact record | F23, the Shift-drag bullet, F23's Scoring line |
 | 10j | Lower C6's viewport the way Setup sets it | C6 |
+| 11a | Amend the 0a spec and plan for the fourth pass | this spec, the plan |
+| 11b | Read I22's retry after its cards and focus first | I22, I22's Scoring line |
+| 11c | Aim F13 off the center and require a visible tab | F13 |
+| 11d | Name AA32's re-aim path and its BLOCKED exit | AA32 |
+| 11e | Tighten C6's resize wait, order, and scroll | C6 |
+| 11f | Set the viewport one way in Setup, WB19, and WB19a | Setup, the WB19 bullet, WB19a |
+| 11g | Align the Shift-drag bullet's ending with F23's | the Shift-drag bullet |
+| 11h | File two wording cleanups in TODO.md Later work | TODO.md |
+| 11i | Join the two short lines in 0j | TODO.md |
 
 Commit 3 precedes commit 5, so F13's pointer to 0j
 never names nothing, and 0j's text holds on both
@@ -724,15 +858,17 @@ reviews and the whole-branch review left, at the owner's
 word ("Fix the Minor notes"). 9a amends this spec and the
 plan; 9b through 9f land the amended I22, F13, AA32 (with
 the Shift-drag bullet), C6, and TODO.md wording (F13
-excepted: 9h finishes it); §§ 1–4 above carry the text
-as 10b through 10j leave it. Each
+excepted: 9h finishes it); §§ 1–5 above carry the text
+as 10b through 11i leave it. Each
 adds an observation, a probe, a precedence, or an honest
 BLOCKED or re-aim cue; none loosens a PASS clause, a Pin,
 or a selector. Two notes stay as they are: F13's FAIL
-depends on where the explorer's node sits (either score
-is honest); and the executed tasks' step labels share
-names with the amendment labels (executed text does not
-change). A third, Scoring's F23 line, still echoed
+depends on where the explorer's node sits (a PASS on a
+node that holds the canvas center is vacuous; 11c later
+aims F13 off it); and the executed tasks' step labels
+share names with the amendment labels (executed text
+does not change). A third, Scoring's F23 line, still
+echoed
 AA32's retired cue after 9a, because any cue that
 excuses a ghost card with Shift held also excuses F23's
 own first PASS clause. The Shift-drag bullet already
@@ -766,7 +902,8 @@ deferred, at the owner's word of 2026-10-07 (a third
 pass). 10a amends this spec and the plan once; 10b
 through 10f land the text 10a prescribed, one commit
 per recipe (10d also carries F23 and the Shift-drag
-bullet); 10g through 10j later amend F13, F23, and C6.
+bullet); 10g amends this spec and the plan again, and
+10h through 10j later amend F13, F23, and C6.
 Each adds an observation, a probe, a
 precedence, a number, or an honest BLOCKED or remedy
 cue; none loosens a PASS clause, a Pin, or a selector.
@@ -815,6 +952,46 @@ Scoring's F23 line), and C6, which are the text in
 §§ 2 and 3 above. None loosens a PASS clause, a Pin,
 or a selector.
 
+Commits 11a through 11i answer the notes that the
+whole-branch review of 0957f951 and the task reviews of
+10b through 10j deferred, at the owner's word of
+2026-10-07 (a fourth pass). 11a amends this spec and the
+plan once; 11b through 11g land the text in §§ 1–3 and
+5 above, one commit per recipe (11f carries Setup,
+WB19, and WB19a; 11g only the Shift-drag bullet's last
+sentence); 11h and 11i land § 4's two Later-work
+entries and the join of 0j's short lines. I22 reads
+`document.activeElement` before any click, makes its
+focusing click on `.page-header`, and reads the retry's
+entry only after the cards replace the error state. F13
+confirms a visible tab before its first press and aims
+only at a regular node whose `rect` does not hold the
+center of the canvas region right of the panel, because
+a node holding it moves less than half its size at the
+first release, so the second press would still land on
+it and the case could not fail. AA32 re-aims a covered
+point inside the same box, else BLOCKED before that
+press, and a FAIL already scored stands. C6 reads its
+`overflow-y` clause before its fit guard, passes
+`behavior: 'instant'` to every `window.scrollTo`, names
+`mobile: false`, and waits for `innerHeight` to read
+400; its guard still reads only `#main-content`,
+because a scroller inside it sized to the viewport
+would score BLOCKED, never a false PASS or FAIL, and no
+style makes one (a scroller that is `#main-content`
+itself or an ancestor would score FAIL, a DRIFT on
+triage, and no style makes that either). Setup names
+`mobile: false` and lists C6, and WB19 and WB19a drop
+`Browser.setWindowBounds`, which cannot move
+`innerHeight` under Setup's override, and with it the
+bounds WB19a would restore. The owner kept
+AA32's and F19's ghost-card cue, with F23's exact record
+as the walk's sentinel for a delivered Shift the page
+ignores, and left `pointermove` unrecorded: a
+Chrome-synthesized move carries the real modifier
+state, and recording one risks BLOCKED on every run.
+None loosens a PASS clause, a Pin, or a selector.
+
 ## Testing
 
 - `./test validate` exits 0 on every commit, Markdown
@@ -834,14 +1011,14 @@ or a selector.
 
 ## Docs that change when this ships
 
-- TEST-PLAN.md: I22, F13, F11, F23, AA32, and C6; the
-  double-click, skeleton, and Shift-drag bullets in
-  `### Driving notes`; three lines in `### Scoring`. No
-  case is added or removed, so `## Summary`'s counts
-  hold.
+- TEST-PLAN.md: I22, F13, F11, F23, AA32, C6, and WB19a;
+  Setup's viewport line; the double-click, skeleton,
+  Shift-drag, and WB19 bullets in `### Driving notes`;
+  three lines in `### Scoring`. No case is added or
+  removed, so `## Summary`'s counts hold.
 - TODO.md: 0j filed, 0a removed, the critical path's
-  intro, `## Sequencing`, and 0b's and 0c's plan
-  pointers.
+  intro, `## Sequencing`, 0b's and 0c's plan pointers,
+  and two `## Later work` entries.
 - Unchanged: AGENTS.md, ARCHITECTURE.md (no KNOWN seam
   moves, so AUDIT.md's `m` holds), FLOW-CANVAS.md, and
   the 4 Oct plan.

@@ -32,7 +32,7 @@
 > 3. Quality review: another fresh agent of type
 >    `planner`.
 >
-> After Task 10j: a fresh agent of type `architect`
+> After Task 11i: a fresh agent of type `architect`
 > reviews `1e0941c5..HEAD` against the spec. Pass no
 > model override to any dispatch.
 >
@@ -49,7 +49,7 @@ recipes for I22, F13, AA32, and C6, with their
 driving-note and Scoring lines, and F23's key-event
 probe; TODO.md files 0j and closes 0a.
 
-**Architecture:** Doc-only. Twenty-three task commits, each
+**Architecture:** Doc-only. Thirty-one task commits, each
 an exact string replacement with the Edit tool on
 `TODO.md` or `TEST-PLAN.md`, each green at Layer 1.
 0j lands before F13's text cites it; 0a closes in Task
@@ -69,8 +69,17 @@ precedes them. Tasks 10h, 10i, and 10j correct F13's
 panel-slide wait, F23's scoring rule, and C6's remedy
 after the quality reviews of Tasks 10c, 10d, and 10e;
 commit 10g, which amended this plan and the spec once
-more, precedes them. With the spec, the plan, and the
-seven amendments, the branch carries thirty-two commits.
+more, precedes them. Tasks 11b through 11i answer the
+fourth pass: they order I22's retry read, aim F13 off
+the canvas center behind a visibility check, name
+AA32's re-aim path, tighten C6's resize wait, order,
+and scroll, set the viewport one way in Setup, WB19,
+and WB19a, align the Shift-drag bullet with F23, and
+file two Later-work entries and join 0j's short lines
+in TODO.md; commit 11a, which amended this plan and
+the spec once more, precedes them. With the spec, the
+plan, and the eight amendments, the branch carries
+forty-one commits.
 
 **Tech Stack:** Markdown. Layer 1 (`./test validate`,
 Deno 2.9.6) is the gate, because it lints both files.
@@ -98,8 +107,11 @@ answers the deferred notes, and a later "a" commit any
 Important finding on prescribed wording in 10b through
 10f, under the owner's word of the same day that this
 plan and the spec may be amended as needed; 10g is that
-commit for Tasks 10c, 10d, and 10e. If the spec is wrong
-in any other way, STOP and report.
+commit for Tasks 10c, 10d, and 10e. 11a answers the
+fourth pass, and a later "a" commit any Important
+finding on prescribed wording in 11b through 11i, under
+the same word. If the spec is wrong in any other way,
+STOP and report.
 
 ---
 
@@ -150,8 +162,10 @@ export DENO_DIR="$TMPDIR/deno-dir"
   6b, 8b, 9b through 9f, and 9h print it already; 10a
   through 10j carry the third pass's
   `session_012RSmv5yFCncMa8tbQTYHdQ`, which Tasks 10b
-  through 10f and 10h through 10j print). Use exactly
-  this shape:
+  through 10f and 10h through 10j print; 11a through 11i
+  carry the fourth pass's
+  `session_01UTfBty6LdJJcXf1Y8vgKFv`, which Tasks 11b
+  through 11i print). Use exactly this shape:
 
 ```bash
 git commit -F - <<'EOF'
@@ -205,6 +219,13 @@ that its task touches.
    is at most its `clientHeight`, and, after Task 10j,
    the viewport lowered to 1280×400 with
    `Emulation.setDeviceMetricsOverride` still fits.
+   After Task 11e, a computed `overflow-y: hidden` or
+   `clip` on `html` or `body` is FAIL whether or not
+   the page fits, every `window.scrollTo` passes
+   `behavior: 'instant'`, the lowered viewport also
+   names `mobile: false` and is awaited until
+   `window.innerHeight` reads 400, and the guard's
+   scope is unchanged.
 4. **0j's text cites the walk, not F13's text.** It
    says the element-id drive "is how F13 passed on
    `8e834e76`". It must read true both before and
@@ -237,7 +258,12 @@ that its task touches.
    is new and empty, and the PASS reads wait 250 ms
    after the second release (the replaced panel replays
    its slide) and query afresh everything a commit
-   replaces, `#prop-node-name` included.
+   replaces, `#prop-node-name` included. After Task
+   11c, F13 confirms the tab is visible before the first
+   press and aims only at a regular node whose `rect`
+   does not contain the center of the part of
+   `svg.flow-canvas`'s client box right of the panel;
+   both new BLOCKED exits come before any press.
 9. **AA32 is aimed at both ends and reads Shift before
    release.** After Task 6b, AA32 requires
    `document.elementFromPoint` to resolve the drop
@@ -248,7 +274,11 @@ that its task touches.
    `keyUp` Shift names `key` `Shift`, code `ShiftLeft`,
    vk 16, modifiers 0, and its preview read awaits one
    `requestAnimationFrame`; its ghost-card BLOCKED
-   clause is unchanged.
+   clause is unchanged. After Task 11d, a pre-press
+   miss is re-aimed at another point inside the same box
+   (the port circle's box for the press, the node's
+   `rect` for the drop), else BLOCKED before that press,
+   naming what covers it; a FAIL already scored stands.
 10. **0b names the plan it cites.** After Task 8b, 0b
     says "Task 10 of
     `docs/superpowers/plans/test-plan-walk-2026-10-04.md`"
@@ -258,11 +288,11 @@ that its task touches.
     left it, and the intro changes only its last "then"
     to "and" (Task 9f).
 11. **The wording pass loosens nothing.** After Tasks 9b
-    through 9f, 9h, and 10b through 10j, every PASS
-    clause, Pin, selector, and count stays as it was;
-    the new sentences only add an observation, a probe,
-    a precedence, a number, or an honest BLOCKED,
-    re-aim, or remedy cue.
+    through 9f, 9h, 10b through 10j, and 11b through
+    11i, every PASS clause, Pin, selector, and count
+    stays as it was; the new sentences only add an
+    observation, a probe, a precedence, a number, or an
+    honest BLOCKED, re-aim, or remedy cue.
 12. **F23 starts clean and scores FAIL only on proof.**
     After Task 10i, F23, the Shift-drag bullet's closing
     sentence, and Scoring's F23 line agree: F23 reloads
@@ -279,7 +309,27 @@ that its task touches.
     visible and reads `.flow-connect-preview` one
     `requestAnimationFrame` after each input. AA32's and
     F19's ghost-card cue, F19's text, and F23's Pin
-    stay.
+    stay. After Task 11g, the bullet's closing sentence
+    also says "up to it" and "the first difference", as
+    F23 and Scoring's F23 line do.
+13. **I22 reads in order.** After Task 11b, I22 reads
+    `document.activeElement` before any click, makes
+    the focusing click on `.page-header`, and reads the
+    retry's `/ideas/` entry only after the cards
+    replace the error state. The 200 stays required,
+    its narrow BLOCKED stays, and so does its Pin.
+14. **The viewport is set one way.** After Task 11f,
+    Setup names `mobile: false` and lists C6 beside
+    I10–I15; WB19 and WB19a keep `scrollIntoView`, no
+    longer raise `Browser.setWindowBounds`, and no
+    longer restore bounds. Setup's own `windowState`
+    call stays.
+15. **The Later-work entries are filed, not worked.**
+    After Tasks 11h and 11i, `## Later work` carries
+    the spelling entry and the intro-cue entry just
+    above "Test-only list oracles."; 0j's two short
+    lines read as one line. No spelling in TODO.md or
+    TEST-PLAN.md changes.
 
 ---
 
@@ -289,12 +339,14 @@ Commit 1 (`8fb66783`, the spec) and commit 2 (this
 plan, "Plan the 0a walk recipes") precede execution.
 Tasks run strictly in order 3, 4, 5, 5b, 6, 6b, 7, 8, 8b,
 9b, 9c, 9d, 9e, 9f, 9h, 10b, 10c, 10d, 10e, 10f, 10h,
-10i, 10j. Commits 5a, 6a, 8a, 9a, 9g, 10a, and 10g are
-not tasks: each amended this plan and the spec once,
-after a review or at the owner's word (5a before Task
-5b, 6a before Task 6b, 8a before Task 8b, 9a before
-Tasks 9b through 9f, 9g before Task 9h, 10a before Tasks
-10b through 10f, 10g before Tasks 10h through 10j).
+10i, 10j, 11b, 11c, 11d, 11e, 11f, 11g, 11h, 11i.
+Commits 5a, 6a, 8a, 9a, 9g, 10a, 10g, and 11a are not
+tasks: each amended this plan and the spec once, after
+a review or at the owner's word (5a before Task 5b, 6a
+before Task 6b, 8a before Task 8b, 9a before Tasks 9b
+through 9f, 9g before Task 9h, 10a before Tasks 10b
+through 10f, 10g before Tasks 10h through 10j, 11a
+before Tasks 11b through 11i).
 Task 3
 precedes Task 5, so F13's pointer to 0j never names
 nothing. Task 5's Scoring line anchors on Task 4's
@@ -315,6 +367,14 @@ touch disjoint regions. Task 10h anchors on Task 10c's
 F13 text, Task 10i on Task 10d's F23 text, bullet
 sentence, and Scoring line, and Task 10j on Task 10e's
 C6 text and the lines it kept from Tasks 9e and 7.
+Tasks 11b through 11i anchor on the I22 text and
+Scoring line of Tasks 4 and 10b, the F13 text of 10h
+with the lines it kept from 10c, 9c, 9h, and 5b, the
+AA32 text of 9d with Task 6's lines, the C6 text of 10j
+with the lines it kept from 10e and Task 7, 10i's
+Shift-drag bullet sentence, the base's Setup, WB19,
+WB19a, and `## Later work`, and the 0j lines of 10f and
+Task 3; they touch disjoint regions.
 
 Each task's cycle:
 
@@ -346,7 +406,8 @@ other TODO.md edit).
   Scoring line cite "TODO.md 0j"); the intro's
   "Nineteen items" (Task 8's anchor). Task 9f tidies
   0j's spelling and the intro's last "then"; Task 10f
-  aligns 0j with F13's Pin.
+  aligns 0j with F13's Pin; Task 11i joins its two
+  short lines.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -499,8 +560,8 @@ Obscurity, Unbidden Helper Code.
 - Consumes: nothing.
 - Produces: the Scoring line ending "exploratory
   half. BLOCKED only if `Fetch` itself\nrefuses."
-  (Task 5 inserts F13's line after it). Tasks 9b and
-  10b tighten I22's case and that line.
+  (Task 5 inserts F13's line after it). Tasks 9b, 10b,
+  and 11b tighten I22's case and that line.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -674,8 +735,8 @@ double-click case changes), Obscurity.
 **Interfaces:**
 - Consumes: TODO.md 0j (Task 3); Task 4's I22 Scoring
   line.
-- Produces: F13's text, which Task 5b amends, and
-  F13's Scoring line, which Task 10c tightens.
+- Produces: F13's text, which Tasks 5b and 9c amend,
+  and F13's Scoring line, which Task 10c tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -894,8 +955,8 @@ line changes), Obscurity.
 
 **Interfaces:**
 - Consumes: Task 5's F13 text, as committed in `93afc52d`.
-- Produces: F13's text, which Tasks 9c, 9h, and 10c
-  tighten.
+- Produces: F13's text, which Tasks 9c, 9h, 10c, and
+  11c tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1010,7 +1071,7 @@ Pin stays byte-for-byte; F19 and F23 are untouched).
 **Interfaces:**
 - Consumes: nothing.
 - Produces: AA32's body and the Shift-drag bullet,
-  which Tasks 6b and 10d amend.
+  which Tasks 6b, 9d, 10d, and 11d amend.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1289,7 +1350,8 @@ stays).
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: C6's text, which Tasks 9e and 10e tighten.
+- Produces: C6's text, which Tasks 9e, 10e, 10j, and
+  11e tighten.
 
 - [ ] **Step 1: Confirm the anchor**
 
@@ -1767,7 +1829,8 @@ Abominations: Test Weakening (F13's FAIL-not-BLOCKED sentence
 - Consumes: Task 5b's F13 text, as committed in `296789da`, and
   the F13 lines Task 5 left standing, as committed in
   `93afc52d`.
-- Produces: F13's text, which Tasks 9h and 10c tighten.
+- Produces: F13's text, which Tasks 9h, 10c, and 11c
+  tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -1916,7 +1979,7 @@ Abominations: Test Weakening (AA32's PASS clauses and its Pin
   Task 6b's BLOCKED rule and Shift-drag bullet, as
   committed in `c26d914e`.
 - Produces: AA32's body and the Shift-drag bullet,
-  which Task 10d tightens.
+  which Tasks 10d and 11d tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -2091,7 +2154,8 @@ Abominations: Test Weakening (the `overflow-y: hidden` clause
 
 **Interfaces:**
 - Consumes: Task 7's C6 text, as committed in `d040ffbc`.
-- Produces: C6's text, which Task 10e tightens.
+- Produces: C6's text, which Tasks 10e and 10j
+  tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -2365,7 +2429,8 @@ Abominations: Test Weakening (F13's three PASS clauses, its
 
 **Interfaces:**
 - Consumes: Task 9c's F13 text, as committed in `1e28e097`.
-- Produces: F13's text, which Task 10c tightens.
+- Produces: F13's text, which Tasks 10c and 11c
+  tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -2474,7 +2539,8 @@ Abominations: Test Weakening (I22's PASS clauses, its narrow
 - Consumes: Task 9b's I22 text and Scoring line, as committed in
   `884d76f2`, and the lines it kept from Task 4, as committed
   in `eb6304b2`.
-- Produces: nothing later tasks read.
+- Produces: I22's text and Scoring line, which Task 11b
+  tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -2590,7 +2656,8 @@ Abominations: Test Weakening (F13's three PASS clauses, its
   lines it kept from Task 9c (`1e28e097`) and Task 5b
   (`296789da`), and Task 5's F13 Scoring line and kept lines,
   as committed in `93afc52d`.
-- Produces: F13's text, which Task 10h tightens.
+- Produces: F13's text, which Tasks 10h and 11c
+  tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -2984,7 +3051,8 @@ Abominations: Test Weakening (C6's PASS clauses, its
 **Interfaces:**
 - Consumes: Task 9e's C6 text, as committed in `79dea7c7`, and
   the lines it kept from Task 7, as committed in `d040ffbc`.
-- Produces: C6's text, which Task 10j tightens.
+- Produces: C6's text, which Tasks 10j and 11e
+  tighten.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -3102,7 +3170,8 @@ Abominations: Test Weakening (F13's Pin is not touched, and
 **Interfaces:**
 - Consumes: Task 3's 0j text, as committed in `2f1f8558`; Task 9f
   tidied the rest of 0j in `a3e998af`.
-- Produces: nothing later tasks read.
+- Produces: 0j's text, whose two short lines Task 11i
+  joins.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -3191,7 +3260,7 @@ Abominations: Test Weakening (F13's three PASS clauses, its
 
 **Interfaces:**
 - Consumes: Task 10c's F13 text, as committed in `7bc85d13`.
-- Produces: nothing later tasks read.
+- Produces: F13's text, which Task 11c tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -3323,7 +3392,8 @@ Abominations: Test Weakening (F23's PASS clauses and Pin stay as
 - Consumes: Task 10d's F23 text, bullet sentence, and Scoring line,
   as committed in `67bdc90f`, and the lines of F23's body that
   the branch base `1e0941c5` carries.
-- Produces: nothing later tasks read.
+- Produces: the Shift-drag bullet's closing sentence,
+  which Task 11g aligns.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -3512,7 +3582,7 @@ Abominations: Test Weakening (C6's PASS clauses, its `overflow-y`
 **Interfaces:**
 - Consumes: Task 10e's C6 text, as committed in `41c75172`, and the
   lines it kept from Task 9e (`79dea7c7`) and Task 7 (`d040ffbc`).
-- Produces: nothing later tasks read.
+- Produces: C6's text, which Task 11e tightens.
 
 - [ ] **Step 1: Confirm the anchors**
 
@@ -3612,6 +3682,938 @@ Expected `--stat`: `TEST-PLAN.md` only.
 
 ---
 
+## Task 11b: Read I22's retry after its cards and focus first
+
+**Commit subject:** `Read I22's retry after its cards and focus first`
+
+Commandments: Clarity, Logic, Reliability (a read before the
+  cards render and a swallowed first click must not score a
+  correct product FAIL, and the 200 stays required).
+Abominations: Test Weakening (I22's PASS clauses, its narrow
+  BLOCKED, and its Pin stay as written; the retry must still
+  answer 200), Unbidden Helper Code (no other case or Scoring
+  line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (I22's body, its Pin kept; I22's line in
+  `### Scoring`)
+
+**Interfaces:**
+- Consumes: Task 4's I22 text and Scoring line, as committed in
+  `eb6304b2`, and Task 10b's retry entry and Scoring wording, as
+  committed in `becbc96d`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'Then `Fetch.disable` and click Try Again at its' TEST-PLAN.md
+grep -cF 'GET does not answer 200, is FAIL of the exploratory' TEST-PLAN.md
+```
+
+Expected: two `1`s.
+
+- [ ] **Step 2: Edit 11b-1 — I22 reads the focus first, makes the focusing click, and reads the entry after the cards**
+
+Old text:
+
+```text
+  Then `Fetch.disable` and click Try Again at its
+  box-model center. PASS: a second GET of `…/ideas/`
+  answers 200 (the last
+  `performance.getEntriesByType('resource')` entry
+  whose name ends `/ideas/` has `responseStatus` 200)
+  and `[data-idea-card]` cards replace the error state.
+```
+
+New text:
+
+```text
+  Read `document.activeElement` before any click: the
+  focusing click (Driving notes) blurs the button.
+  Then `Fetch.disable`, make that click on
+  `.page-header`, not at the viewport center, which
+  may land on Try Again, and click Try Again at its
+  box-model center. PASS: `[data-idea-card]` cards
+  replace the error state, and then a second GET of
+  `…/ideas/` answers 200 (the last
+  `performance.getEntriesByType('resource')` entry
+  whose name ends `/ideas/` has `responseStatus` 200).
+```
+
+- [ ] **Step 3: Edit 11b-2 — I22's Scoring line follows the case's read order**
+
+Old text:
+
+```text
+I22 with the 500 fulfilled: a missing error state,
+message, focus, or card replacement, or a retry whose
+GET does not answer 200, is FAIL of the exploratory
+half. BLOCKED only if `Fetch` itself refuses.
+```
+
+New text:
+
+```text
+I22 with the 500 fulfilled: a missing error state,
+message, focus, or card replacement, or a retry whose
+GET does not answer 200 (read once the cards replace
+the error state), is FAIL of the exploratory half.
+BLOCKED only if `Fetch` itself refuses.
+```
+
+- [ ] **Step 4: Check the case, its Pin, its Scoring line, and the cites**
+
+```bash
+grep -c '\*\*I22\*\*' TEST-PLAN.md
+grep -n -A1 'is refused\.$' TEST-PLAN.md | grep -F "Pin: tests/loading-states.test.ts 'a rejecting"
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+grep -c '^  Read `document.activeElement` before any click: the$' TEST-PLAN.md
+grep -c '^  `.page-header`, not at the viewport center, which$' TEST-PLAN.md
+grep -c '^  replace the error state, and then a second GET of$' TEST-PLAN.md
+grep -c 'box-model center\. PASS: a second GET' TEST-PLAN.md
+grep -c 'GET does not answer 200 (read once the cards replace$' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; one hit (I22's Pin follows its last line); `0` removed
+Pin lines; `1`; `1`; `1`; `0`; `1`; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 5: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Read I22's retry after its cards and focus first
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 11c: Aim F13 off the center and require a visible tab
+
+**Commit subject:** `Aim F13 off the center and require a visible tab`
+
+Commandments: Reliability (a PASS that could not have failed,
+  and a read in a tab that cannot replay the panel's slide,
+  must not stand as evidence about 0j), Logic, Clarity.
+Abominations: Test Weakening (F13's three PASS clauses, its
+  FAIL-not-BLOCKED sentence, and its Pin stay as written; both
+  new BLOCKED exits come before any press, so a delivered FAIL
+  cannot become BLOCKED), Unbidden Helper Code (no other case,
+  bullet, or Scoring line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (F13's body, its Pin and its
+  FAIL-not-BLOCKED sentence kept)
+
+**Interfaces:**
+- Consumes: Task 10h's F13 text, as committed in `eb340a28`, and
+  the lines it kept from Task 10c (`7bc85d13`), Task 9c
+  (`1e28e097`), Task 9h (`3e76c923`), and Task 5b (`296789da`).
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'second press can fail the re-centred clause. Pick a' TEST-PLAN.md
+grep -cF 'lands on the panel, so a' TEST-PLAN.md
+```
+
+Expected: two `1`s.
+
+- [ ] **Step 2: Edit 11c-1 — F13 confirms a visible tab before its first press**
+
+Old text:
+
+```text
+  second press can fail the re-centred clause. Pick a
+  regular node: Create and Archive panels have no
+```
+
+New text:
+
+```text
+  second press can fail the re-centred clause. Confirm
+  `document.visibilityState === 'visible'` (a hidden
+  tab may never replay the panel's slide); else record
+  BLOCKED, naming the driver. Pick a regular node:
+  Create and Archive panels have no
+```
+
+- [ ] **Step 3: Edit 11c-2 — F13 aims at a node whose rect misses the canvas region's center**
+
+Old text:
+
+```text
+  `.closest('.flow-node')` to that node. A point under
+  `.flow-props-panel` lands on the panel, so a
+  pre-press miss is re-aimed at another regular
+  node clear of the panel, not scored. Install a
+```
+
+New text:
+
+```text
+  `.closest('.flow-node')` to that node. That `rect`
+  must also not contain the center of the part of
+  `svg.flow-canvas`'s client box right of
+  `.flow-props-panel`: a node holding that point moves
+  less than half its size at the first release, so the
+  second press would still land on it and the case
+  could not fail. A point under `.flow-props-panel`
+  lands on the panel, so a pre-press miss is re-aimed
+  at another regular node whose `rect` also misses
+  that center, not scored. If none does, record
+  BLOCKED, naming that. Install a
+```
+
+- [ ] **Step 4: Check the case, its Pin, and the cites**
+
+```bash
+grep -c '\*\*F13\*\*' TEST-PLAN.md
+grep -n -A1 'the gesture was delivered\.$' TEST-PLAN.md | grep -F 'Pin: tests/flow-fsm-scenarios.test.ts'
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+grep -c 'tab may never replay the panel' TEST-PLAN.md
+grep -c '^  must also not contain the center of the part of$' TEST-PLAN.md
+grep -c 'at another regular node whose `rect` also misses$' TEST-PLAN.md
+grep -c 'node clear of the panel, not scored' TEST-PLAN.md
+grep -c '^  BLOCKED, naming that\. Install a$' TEST-PLAN.md
+sed -n '/\*\*F13\*\*/,/^  Pin:/p' TEST-PLAN.md | grep -c 'is at most 4 px\.$'
+grep -c 'FAIL, not BLOCKED: the gesture was delivered\.' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; one hit (F13's Pin follows its last line); `0` removed
+Pin lines; `1`; `1`; `1`; `0`; `1`; `1`; `1`; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 5: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Aim F13 off the center and require a visible tab
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 11d: Name AA32's re-aim path and its BLOCKED exit
+
+**Commit subject:** `Name AA32's re-aim path and its BLOCKED exit`
+
+Commandments: Clarity, Logic, Reliability (a covered named point
+  has a defined re-aim, and a working product never scores
+  BLOCKED for want of one).
+Abominations: Test Weakening (AA32's PASS clauses, its
+  ghost-card BLOCKED clause, and its Pin stay as written; the
+  new BLOCKED comes before any press), Unbidden Helper Code (no
+  other case, bullet, or Scoring line changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (AA32's body, its Pin kept)
+
+**Interfaces:**
+- Consumes: Task 9d's AA32 text, as committed in `f94dca29`, and
+  the lines it kept from Task 6, as committed in `20beded1`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 're-aimed, not scored. BLOCKED, not FAIL, only if' TEST-PLAN.md
+```
+
+Expected: `1`.
+
+- [ ] **Step 2: Edit 11d-1 — AA32 re-aims inside the same box, else BLOCKED before that press**
+
+Old text:
+
+```text
+  "approve". A pre-press `elementFromPoint` miss is
+  re-aimed, not scored. BLOCKED, not FAIL, only if
+```
+
+New text:
+
+```text
+  "approve". A pre-press `elementFromPoint` miss is
+  re-aimed, not scored: aim at another point inside
+  the same box (the port circle's box for the press,
+  the node's `rect` for the drop), and if none
+  resolves, record BLOCKED before that press, naming
+  what covers it; a FAIL already scored stands.
+  BLOCKED, not FAIL, only if
+```
+
+- [ ] **Step 3: Check the case, its Pin, and the cites**
+
+```bash
+grep -c '\*\*AA32\*\*' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+grep -c 're-aimed, not scored: aim at another point inside$' TEST-PLAN.md
+grep -c '^  what covers it; a FAIL already scored stands\.$' TEST-PLAN.md
+grep -c '^  BLOCKED, not FAIL, only if$' TEST-PLAN.md
+grep -c 're-aimed, not scored\. BLOCKED' TEST-PLAN.md
+grep -c '^  Shift is not observed: before release the preview$' TEST-PLAN.md
+grep -n -A1 'the bezier, naming that\.$' TEST-PLAN.md | grep -F 'Pin: tests/flow-cycle-edges.test.ts'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; `0` removed Pin lines; `1`; `1`; `1`; `0`; `1`; one hit (AA32's
+Pin follows its last line); no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Name AA32's re-aim path and its BLOCKED exit
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 11e: Tighten C6's resize wait, order, and scroll
+
+**Commit subject:** `Tighten C6's resize wait, order, and scroll`
+
+Commandments: Reliability (a smooth scroll must not read as
+  d = 0, a computed overflow clip must stay FAIL, and an early
+  read must not score BLOCKED), Logic, Uniformity (the viewport
+  is set the way Setup sets it, `mobile: false` included),
+  Clarity.
+Abominations: Test Weakening (C6's PASS clauses, its
+  `overflow-y` clause, its fit guard, and its Pin stay as
+  written; the guard's scope is not widened), Unbidden Helper
+  Code (Setup and WB19 are not touched), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (C6's body, its Pin kept)
+
+**Interfaces:**
+- Consumes: Task 10j's C6 text, as committed in `0957f951`, and
+  the lines it kept from Task 10e (`41c75172`) and Task 7
+  (`d040ffbc`).
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF '(`window.scrollTo(0, 0)` first), read' TEST-PLAN.md
+grep -cF '`window.scrollTo(0, document.documentElement.scrollHeight)`' TEST-PLAN.md
+grep -cF 'is t − d. If d = 0,' TEST-PLAN.md
+```
+
+Expected: three `1`s.
+
+- [ ] **Step 2: Edit 11e-1 — C6's first scroll is instant**
+
+Old text:
+
+```text
+  (`window.scrollTo(0, 0)` first), read
+```
+
+New text:
+
+```text
+  (`window.scrollTo({top: 0, behavior: 'instant'})`
+  first; `behavior: 'instant'` keeps a page
+  `scroll-behavior` from animating any of these
+  calls), read
+```
+
+- [ ] **Step 3: Edit 11e-2 — C6's scroll to the bottom is instant**
+
+Old text:
+
+```text
+  `window.scrollTo(0, document.documentElement.scrollHeight)`
+```
+
+New text:
+
+```text
+  `window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})`
+```
+
+- [ ] **Step 4: Edit 11e-3 — C6 reads the overflow clause first, awaits the resize, and names mobile**
+
+Old text:
+
+```text
+  is t − d. If d = 0, `#main-content`'s rect `bottom`
+  is at most `window.innerHeight`, and its
+  `scrollHeight` is at most its `clientHeight`, the
+  page fits the window: set
+  `Emulation.setDeviceMetricsOverride` to 1280×400
+  with `deviceScaleFactor: 1`, as Setup does for
+  1280×800, and drive again; BLOCKED, not FAIL, naming
+  that, only if it still fits. Restore the 1280×800
+  override if you lowered it, and `window.scrollTo(0, 0)`.
+```
+
+New text:
+
+```text
+  is t − d. A computed `overflow-y: hidden` or `clip`
+  on `html` or `body` is FAIL whether or not the page
+  fits. Otherwise, if d = 0, `#main-content`'s rect
+  `bottom` is at most `window.innerHeight`, and its
+  `scrollHeight` is at most its `clientHeight`, the
+  page fits the window: set
+  `Emulation.setDeviceMetricsOverride` to 1280×400
+  with `deviceScaleFactor: 1` and `mobile: false`, as
+  Setup does for 1280×800, and, once
+  `window.innerHeight` reads 400 (BLOCKED, naming the
+  override, if it has not within a few seconds), drive
+  again; BLOCKED, not FAIL, naming that, only if it
+  still fits. Restore the 1280×800 override if you
+  lowered it, and
+  `window.scrollTo({top: 0, behavior: 'instant'})`.
+```
+
+- [ ] **Step 5: Check the case, its Pin, and the cites**
+
+```bash
+grep -c '\*\*C6\*\*' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+sed -n '/\*\*C6\*\*/,/^  Pin:/p' TEST-PLAN.md | grep -c "behavior: 'instant'"
+sed -n '/\*\*C6\*\*/,/^  Pin:/p' TEST-PLAN.md | grep -c 'scrollTo(0'
+sed -n '/\*\*C6\*\*/,/^  Pin:/p' TEST-PLAN.md | grep -c 'mobile: false'
+sed -n '/\*\*C6\*\*/,/^  Pin:/p' TEST-PLAN.md | grep -c 'innerHeight` reads 400'
+sed -n '/\*\*C6\*\*/,/^  Pin:/p' TEST-PLAN.md | grep -c 'is FAIL whether or not the page$'
+grep -c 'neither `html` nor `body` computes `overflow-y:$' TEST-PLAN.md
+grep -n -A2 "behavior: 'instant'})\`\.\$" TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; `0` removed Pin lines; `4`; `0`; `1`; `1`; `1`; `1`; the two
+lines after the new text are
+`  Pin: exploratory — the sidebar's fixed position` and
+`       while the main content scrolls`; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 6: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Tighten C6's resize wait, order, and scroll
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 11f: Set the viewport one way in Setup, WB19, and WB19a
+
+**Commit subject:** `Set the viewport one way in Setup, WB19, and WB19a`
+
+Commandments: Uniformity (one way to set the viewport), Clarity,
+  Logic (a window resize cannot move `innerHeight` under
+  Setup's override).
+Abominations: Test Weakening (WB19's and WB19a's
+  `scrollIntoView`, their BLOCKED-not-FAIL targeting rule, and
+  WB19a's Pin stay as written), Unbidden Helper Code (I10-I15
+  and Setup's `windowState` call are not touched), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (Setup's viewport line; the WB19 bullet in
+  `### Driving notes`; WB19a's body, its Pin kept)
+
+**Interfaces:**
+- Consumes: Setup's viewport line, the WB19 bullet, and WB19a, as
+  the branch base `1e0941c5` carries them.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF '`deviceScaleFactor: 1` (I10–I15 set ≤767 and restore);' TEST-PLAN.md
+grep -cF '(`block: "center"`) or raise' TEST-PLAN.md
+grep -cF '"center"`) or raise `Browser.setWindowBounds`' TEST-PLAN.md
+grep -cF 'BLOCKED, not FAIL. Restore 1280×800 bounds' TEST-PLAN.md
+```
+
+Expected: four `1`s.
+
+- [ ] **Step 2: Edit 11f-1 — Setup names mobile and lists every case that changes the override**
+
+Old text:
+
+```text
+`deviceScaleFactor: 1` (I10–I15 set ≤767 and restore);
+```
+
+New text:
+
+```text
+`deviceScaleFactor: 1` and `mobile: false` (I10–I15 set
+≤767 wide and C6 sets 400 high; each restores);
+```
+
+- [ ] **Step 3: Edit 11f-2 — The WB19 bullet scrolls the button into view and no longer resizes the window**
+
+Old text:
+
+```text
+  (`block: "center"`) or raise
+  `Browser.setWindowBounds` height until the
+  Instances section is on-screen, then click that
+  button — never the record-type header Edit,
+  which opens the type form. A targeting miss is
+  BLOCKED, not FAIL. Restore the 1280×800 bounds
+  after the click if you raised them.
+```
+
+New text:
+
+```text
+  (`block: "center"`), then click that button —
+  never the record-type header Edit, which opens
+  the type form. A targeting miss is BLOCKED, not FAIL.
+```
+
+- [ ] **Step 4: Edit 11f-3 — WB19a scrolls the button into view and no longer resizes the window**
+
+Old text:
+
+```text
+  1280×800 — `scrollIntoView` the row's
+  `[data-action="edit-instance"]` (`block:
+  "center"`) or raise `Browser.setWindowBounds`
+  height until that button is on-screen, then
+  click it. Do not click the record-type header
+  Edit (that opens the type form). Change an
+  instance value and Save so the head etag
+```
+
+New text:
+
+```text
+  1280×800 — `scrollIntoView` the row's
+  `[data-action="edit-instance"]` (`block:
+  "center"`), then click it. Do not click the
+  record-type header Edit (that opens the type form).
+  Change an instance value and Save so the head etag
+```
+
+- [ ] **Step 5: Edit 11f-4 — WB19a no longer restores bounds it never raises**
+
+Old text:
+
+```text
+  transition. A targeting miss on header Edit is
+  BLOCKED, not FAIL. Restore 1280×800 bounds
+  after if you raised them.
+```
+
+New text:
+
+```text
+  transition. A targeting miss on header Edit is
+  BLOCKED, not FAIL.
+```
+
+- [ ] **Step 6: Check Setup, the bullet, WB19a, and the cites**
+
+```bash
+grep -c 'setWindowBounds' TEST-PLAN.md
+grep -c 'Browser.setWindowBounds` with `windowState`$' TEST-PLAN.md
+grep -c '^`deviceScaleFactor: 1` and `mobile: false` (I10–I15 set$' TEST-PLAN.md
+grep -c '^≤767 wide and C6 sets 400 high; each restores);$' TEST-PLAN.md
+grep -c 'Restore the 1280×800 bounds' TEST-PLAN.md
+grep -c 'Restore 1280×800 bounds' TEST-PLAN.md
+grep -c 'if you raised them' TEST-PLAN.md
+grep -cF '(`block: "center"`), then click that button —' TEST-PLAN.md
+grep -cF '"center"`), then click it. Do not click the' TEST-PLAN.md
+grep -n -A1 'advances (or drive a second transition)\.' TEST-PLAN.md
+grep -n -A1 'transition\. A targeting miss on header Edit is$' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^-' | grep -c 'Pin:'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1` (Setup's own `windowState` call); `1`; `1`; `1`; `0`; `0`; `0`;
+`1`; `1`; two lines (WB19a's "advances (or drive a second
+transition). In tab" and the line after it); two lines (WB19a's
+"transition. A targeting miss on header Edit is" and "BLOCKED, not
+FAIL."); `0` removed Pin lines; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 7: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Set the viewport one way in Setup, WB19, and WB19a
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 11g: Align the Shift-drag bullet's ending with F23's
+
+**Commit subject:** `Align the Shift-drag bullet's ending with F23's`
+
+Commandments: Uniformity (the bullet, F23, and Scoring's F23
+  line say one thing), Clarity.
+Abominations: Test Weakening (F23's body, its Pin, and
+  Scoring's F23 line are not touched), Unbidden Helper Code (no
+  other bullet or case changes), Obscurity.
+
+**Files:**
+- Modify: `TEST-PLAN.md` (the Shift-drag bullet in `### Driving notes`)
+
+**Interfaces:**
+- Consumes: Task 10i's Shift-drag bullet closing sentence, as
+  committed in `3f2b56fc`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'is exactly the inputs sent, in order, and BLOCKED,' TEST-PLAN.md
+```
+
+Expected: `1`.
+
+- [ ] **Step 2: Edit 11g-1 — The Shift-drag bullet's closing sentence says what F23 and Scoring say**
+
+Old text:
+
+```text
+  from a reload, and a preview read of it that is not
+  what its case says is FAIL if its listener's record
+  is exactly the inputs sent, in order, and BLOCKED,
+  naming the driver, if not (F23 names the reads and
+  the record).
+```
+
+New text:
+
+```text
+  from a reload, and a preview read of it that is not
+  what its case says is FAIL if its listener's record
+  up to it is exactly the inputs sent, in order, and
+  BLOCKED, naming the driver and the first difference,
+  if not (F23 names the reads and the record).
+```
+
+- [ ] **Step 3: Check the bullet, F23, and Scoring**
+
+```bash
+grep -c '^  up to it is exactly the inputs sent, in order, and$' TEST-PLAN.md
+grep -c '^  BLOCKED, naming the driver and the first difference,$' TEST-PLAN.md
+grep -c 'is exactly the inputs sent, in order, and BLOCKED,$' TEST-PLAN.md
+grep -c 'naming the driver, if not (F23 names the reads and$' TEST-PLAN.md
+grep -c '^  if not (F23 names the reads and the record)\.$' TEST-PLAN.md
+git diff -U0 TEST-PLAN.md | grep '^[-+]' | grep -vc '^\(---\|+++\)'
+git diff -U0 TEST-PLAN.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; `1`; `0`; `0`; `1`; `6` changed lines (three out, three in); no
+output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TEST-PLAN.md
+git commit -F - <<'EOF'
+Align the Shift-drag bullet's ending with F23's
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TEST-PLAN.md` only.
+
+---
+
+## Task 11h: File two wording cleanups in TODO.md Later work
+
+**Commit subject:** `File two wording cleanups in TODO.md Later work`
+
+Commandments: Clarity, Uniformity (the entries follow the file's
+  shape and its ranking rule: the problem, the evidence, the
+  fix, and an Oracle clause with no closing period).
+Abominations: Unbidden Helper Code (the entries are filed, not
+  worked: no spelling in TODO.md or TEST-PLAN.md changes, and
+  no other TODO.md line moves), Obscurity.
+
+**Files:**
+- Modify: `TODO.md` (`## Later work`)
+
+**Interfaces:**
+- Consumes: `## Later work`, as the branch base `1e0941c5` carries it.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'Test-only list oracles. `documentCollectionGetHandler` and' TODO.md
+```
+
+Expected: `1`.
+
+- [ ] **Step 2: Edit 11h-1 — Later work files the spelling entry and the intro-cue entry**
+
+Old text:
+
+```text
+- Test-only list oracles. `documentCollectionGetHandler` and
+```
+
+New text:
+
+```text
+- TODO.md and TEST-PLAN.md still spell British.
+  TODO.md's "Unpinned but pinnable" bullet says
+  "colour" in three of its sub-bullets (F8/F40/AA26,
+  FS3, K28) and "centred" in one ("the centred
+  special label"); TEST-PLAN.md spells centre, colour,
+  labelled, neighbouring, honoured, and recognises in
+  23 lines. The 0a branch's 9f already made 0j say
+  "center". Say "color", "center" (and its forms),
+  "labeled", "neighboring", "honored", and
+  "recognizes", leaving `grey` alone (the CSS spells
+  both). Oracle: `grep -n -i -e centre -e colour -e
+  labelled -e neighbour -e honour -e recognis TODO.md
+  TEST-PLAN.md` prints nothing once this entry is gone
+- The Critical product path intro lost a cue. Its last
+  "then" before 0j became "and" in the 0a branch's 9f,
+  as the spec required, so "...(0i); and F13's
+  double-click under an open panel (0j)" reads as
+  though 0j rides the ledger's one deploy. "Eighteen
+  items, in this order" and `## Sequencing` still hold
+  the order (nothing there names 0j), so nothing
+  breaks; closing 0j removes the clause and this entry
+  with it. Restore "then". Oracle: the intro reads
+  "...(0i); then F13's double-click under an open panel
+  (0j)." or no longer names 0j
+- Test-only list oracles. `documentCollectionGetHandler` and
+```
+
+- [ ] **Step 3: Check the entries, their order, and the counts they cite**
+
+```bash
+grep -c '^## Later work$' TODO.md
+grep -c '^- TODO.md and TEST-PLAN.md still spell British\.$' TODO.md
+grep -c '^- The Critical product path intro lost a cue\. Its last$' TODO.md
+grep -n -A1 'prints nothing once this entry is gone$' TODO.md
+grep -n -A1 'or no longer names 0j$' TODO.md
+grep -c -i -e centre -e colour -e labelled -e neighbour -e honour -e recognis TEST-PLAN.md
+sed '/^- TODO.md and TEST-PLAN.md still spell British\./,/prints nothing once this entry is gone$/d' TODO.md | grep -c -i -e centre -e colour -e labelled -e neighbour -e honour -e recognis
+sed -n '/^## Sequencing/,/^## Close protocol/p' TODO.md | grep -c '0j'
+grep -c 'Eighteen items, in this order' TODO.md
+git diff -U0 TODO.md | grep '^-' | grep -vc '^---'
+git diff -U0 TODO.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; `1`; `1`; two lines whose second begins "- The Critical
+product path intro lost a cue."; two lines whose second begins
+"- Test-only list oracles."; `23`; `5`; `0`; `1`; `0` removed
+lines; no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TODO.md
+git commit -F - <<'EOF'
+File two wording cleanups in TODO.md Later work
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TODO.md` only.
+
+---
+
+## Task 11i: Join the two short lines in 0j
+
+**Commit subject:** `Join the two short lines in 0j`
+
+Commandments: Clarity, Uniformity (0j's lines wrap like their
+  neighbours).
+Abominations: Unbidden Helper Code (no other TODO.md line
+  changes, and no neighbouring line is reflowed), Obscurity.
+
+**Files:**
+- Modify: `TODO.md` (0j)
+
+**Interfaces:**
+- Consumes: Task 10f's 0j text, as committed in `93933fb5`, and the
+  lines it kept from Task 3, as committed in `2f1f8558`.
+- Produces: nothing later tasks read.
+
+- [ ] **Step 1: Confirm the anchors**
+
+```bash
+grep -cF 'empty canvas — `open-panel:' TODO.md
+```
+
+Expected: `1`.
+
+- [ ] **Step 2: Edit 11i-1 — 0j's two short lines read as one**
+
+Old text:
+
+```text
+  empty canvas — `open-panel:
+  false` closes the panel
+```
+
+New text:
+
+```text
+  empty canvas — `open-panel: false` closes the panel
+```
+
+- [ ] **Step 3: Check 0j's wording and its Oracle**
+
+```bash
+grep -c '^  empty canvas — `open-panel: false` closes the panel$' TODO.md
+grep -c 'empty canvas — `open-panel:$' TODO.md
+grep -c 'center-on-release pin still green' TODO.md
+grep -c '(`web-app/app/flow-fsm-reduce.ts:97`) — or another' TODO.md
+git diff -U0 TODO.md | grep '^[-+]' | grep -vc '^\(---\|+++\)'
+git diff -U0 TODO.md | grep '^+' | grep -E '\.(ts|md|html|css):[0-9]'
+```
+
+Expected: `1`; `0`; `1`; `1` (the cite line is untouched); `3` changed lines
+(two out, one in); no output from the last. Any mismatch: STOP and report.
+
+- [ ] **Step 4: Gate**
+
+```bash
+export DENO_DIR="$TMPDIR/deno-dir"
+./test validate
+```
+
+Expected: `ok | 4141 passed | 0 failed | 11 ignored`, timezone
+`ok | 8 passed | 0 failed`, exit 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git diff --stat
+git add TODO.md
+git commit -F - <<'EOF'
+Join the two short lines in 0j
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UTfBty6LdJJcXf1Y8vgKFv
+EOF
+```
+
+Expected `--stat`: `TODO.md` only.
+
+---
+
 ## Reviews
 
 ### Per-task spec-compliance review (fresh `planner`)
@@ -3632,7 +4634,7 @@ or wipe. Then:
   the plan's old text. Nothing else moved.
 - Each `file:line` cite in the new text holds at
   HEAD (Task 3: `web-app/flows/detail.ts:1099-1108`,
-  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–10j add
+  `web-app/app/flow-fsm-reduce.ts:97`; Tasks 4–11i add
   none, though the rewritten 0j lines of 9f and 10f keep
   the first of Task 3's).
 - The Review Focus lines the task touches hold.
@@ -3650,12 +4652,12 @@ no paraphrase crept into TEST-PLAN.md or TODO.md;
 baseline counts. A finding that the spec itself is
 wrong is reported, not fixed.
 
-### Whole-branch review (fresh `architect`, after Task 10j)
+### Whole-branch review (fresh `architect`, after Task 11i)
 
 Same brief. Review `git log --oneline 1e0941c5..HEAD`
 and `git diff 1e0941c5..HEAD` against the spec:
 
-- Thirty-two commits, in the spec's `## Sequence` order,
+- Forty-one commits, in the spec's `## Sequence` order,
   each subject exact: "Specify the 0a walk recipes",
   "Plan the 0a walk recipes", "File F13's one-point
   double-click as 0j", "Force I22's fault with
@@ -3683,15 +4685,24 @@ and `git diff 1e0941c5..HEAD` against the spec:
   plan for the review fixes", "Wait out F13's panel
   slide before it reads", "Start F23 clean and score
   it from an exact record", "Lower C6's viewport the
-  way Setup sets it".
+  way Setup sets it", "Amend the 0a spec and plan for
+  the fourth pass", "Read I22's retry after its cards
+  and focus first", "Aim F13 off the center and
+  require a visible tab", "Name AA32's re-aim path and
+  its BLOCKED exit", "Tighten C6's resize wait, order,
+  and scroll", "Set the viewport one way in Setup,
+  WB19, and WB19a", "Align the Shift-drag bullet's
+  ending with F23's", "File two wording cleanups in
+  TODO.md Later work", "Join the two short lines in
+  0j".
 - Every spec code block lands verbatim, as the
   amendments left it; F11 reads "every later
   double-click in F uses the same drive; F13 names its
   own".
-- All twelve Review Focus lines hold at HEAD.
+- All fifteen Review Focus lines hold at HEAD.
 - `## Summary` is unchanged by the diff.
-- The spec and this plan changed seven times after
-  commit 2, in commits 5a, 6a, 8a, 9a, 9g, 10a, and 10g (`git log
+- The spec and this plan changed eight times after
+  commit 2, in commits 5a, 6a, 8a, 9a, 9g, 10a, 10g, and 11a (`git log
   --oneline 5cccaa60..HEAD -- <both paths>` lists only
   them), and
   `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
@@ -3712,7 +4723,7 @@ git log --oneline 1e0941c5..HEAD
 ./test validate
 ```
 
-Expected: a clean tree; thirty-two commits; `ok | 4141
+Expected: a clean tree; forty-one commits; `ok | 4141
 passed | 0 failed | 11 ignored` and timezone
 `ok | 8 passed | 0 failed`.
 
