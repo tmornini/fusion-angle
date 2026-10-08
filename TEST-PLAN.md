@@ -2881,18 +2881,28 @@ opens and renders.)
   *different* node the way a person does: one point,
   two presses. Auto Fit must be off, as F12 left it
   (turn it off first if it is on): a re-fit at the
-  second press can fail the re-centred clause. Pick a
-  regular node: Create and Archive panels have no
+  second press can fail the re-centred clause. Confirm
+  `document.visibilityState === 'visible'` (a hidden
+  tab may never replay the panel's slide); else record
+  BLOCKED, naming the driver. Pick a regular node:
+  Create and Archive panels have no
   `#prop-node-name`. Aim before the
   first press: read the center of
   `.flow-node[aria-label="<name>"] > rect` once —
   the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
   `text` or the `g`, whose box includes the port —
   and `document.elementFromPoint` there must resolve
-  `.closest('.flow-node')` to that node. A point under
-  `.flow-props-panel` lands on the panel, so a
-  pre-press miss is re-aimed at another regular
-  node clear of the panel, not scored. Install a
+  `.closest('.flow-node')` to that node. That `rect`
+  must also not contain the center of the part of
+  `svg.flow-canvas`'s client box right of
+  `.flow-props-panel`: a node holding that point moves
+  less than half its size at the first release, so the
+  second press would still land on it and the case
+  could not fail. A point under `.flow-props-panel`
+  lands on the panel, so a pre-press miss is re-aimed
+  at another regular node whose `rect` also misses
+  that center, not scored. If none does, record
+  BLOCKED, naming that. Install a
   capture-phase `window` `pointerdown` listener that
   pushes `Date.now()` onto a new, empty array, then
   send both press/release pairs to that point inside
