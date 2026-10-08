@@ -114,7 +114,8 @@ to Claude-in-Chrome or chrome-devtools MCP.
 Setup, once: clear this origin's cookies with
 `Storage.clearDataForOrigin` (`storageTypes: 'cookies'`);
 set `Emulation.setDeviceMetricsOverride` to 1280×800 with
-`deviceScaleFactor: 1` (I10–I15 set ≤767 and restore);
+`deviceScaleFactor: 1` and `mobile: false` (I10–I15 set
+≤767 wide and C6 sets 400 high; each restores);
 open one tab and `activate_tab` it. That tab stays
 visible for the whole walk. Leave Chrome out of
 fullscreen: `Browser.getWindowForTarget` then
@@ -191,6 +192,10 @@ not repeat the note in every case.
   fresh before each gesture.
 - There is no `dblclick` listener: send two pointerdowns on
   one element id inside `DBLCLICK_MS` (400).
+  F13 alone sends both presses to one point read
+  before the first, as a person does: under an open
+  panel the first release centres the node, so a
+  re-read would chase it.
 - Chords carry the browser's `key`; Shift uppercases it.
 - `.focus()` selects the way Tab does; `.click()` selects
   nothing.
@@ -206,6 +211,9 @@ not repeat the note in every case.
   request and `Fetch.disable`. A miss without the
   pause is BLOCKED. A miss with the pause in
   place is FAIL of the exploratory half.
+  I22 also enables `Fetch` before its navigation, on
+  its own narrower pattern, and answers its one
+  paused GET with a 500 instead of continuing it.
 - Reduced motion is `Emulation.setEmulatedMedia`.
 - Downloads are intercepted at `URL.createObjectURL`;
   uploads are built with `DataTransfer`.
@@ -226,11 +234,29 @@ not repeat the note in every case.
   only focuses the window (TODO.md); that focusing
   click is the viewport center, then the intended
   control once.
-- Shift-drag (AA32/F19/F23): if the compositor does not
-  deliver Shift on pointer-up, the FSM emits add-node
-  instead of add-edge. Record BLOCKED naming that; do
-  not FAIL. Layer 1 and Layer 2 pins decide add-edge.
-  F23's mid-gesture Shift is the same compositor limit.
+- Shift-drag (AA32/F19/F23): press at the center of
+  the port circle's bounding box (`[data-connect-port]`),
+  never an eyeballed node edge; verify with
+  `elementFromPoint` first. A miss is a body-drag or
+  marquee, not Shift. The camera holds from press to
+  release, so a drop point read before the press stays
+  true. If Shift is not delivered, the preview layer's
+  text reads "New State" (a ghost card), not the edge
+  bezier; a release off a node, more than 20 canvas
+  units (`MIN_DRAG_DISTANCE`) from the source node's
+  right-edge midpoint, then emits add-node, one over a
+  node adds nothing. Record BLOCKED naming that.
+  Every Shift key event, down and up, carries `key`
+  `Shift`, code `ShiftLeft`, vk 16 (modifiers 8 down,
+  0 up): the page ignores a key event whose `key` is
+  not `Shift`, so a dropped keyUp leaves Shift held
+  until a later Shift keyUp or a reload.
+  Layer 1 and Layer 2 pins decide add-edge. F23 starts
+  from a reload, and a preview read of it that is not
+  what its case says is FAIL if its listener's record
+  up to it is exactly the inputs sent, in order, and
+  BLOCKED, naming the driver and the first difference,
+  if not (F23 names the reads and the record).
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
   "New State" nodes re-flow the graph and a
   double-click misses Data Capture.
@@ -315,13 +341,9 @@ not repeat the note in every case.
   remains readable after archive. The instance
   `Edit` (`[data-action="edit-instance"]`) sits
   below the fold at 1280×800. `scrollIntoView` it
-  (`block: "center"`) or raise
-  `Browser.setWindowBounds` height until the
-  Instances section is on-screen, then click that
-  button — never the record-type header Edit,
-  which opens the type form. A targeting miss is
-  BLOCKED, not FAIL. Restore the 1280×800 bounds
-  after the click if you raised them.
+  (`block: "center"`), then click that button —
+  never the record-type header Edit, which opens
+  the type form. A targeting miss is BLOCKED, not FAIL.
 - SV6/SV7/SV10: a second cookie jar is
   `Target.createBrowserContext` then
   `Target.createTarget` with that
@@ -371,9 +393,12 @@ the explorer actually drove, or for a pin that is
 itself red. The walk still gates nothing; this rule
 exists so FAIL can reach zero without lying.
 
-Walk-specific: F23 scores BLOCKED like AA32 when
-Shift is missing on pointer-up. AA33/AA34 score
-DEFERRED on AA32 when stray nodes block targeting.
+Walk-specific: an F23 preview read that is not what
+its case says scores FAIL if its listener's record
+up to it is exactly the inputs sent, in order, and
+BLOCKED, naming the driver and the first difference,
+if not. AA33/AA34 score DEFERRED on AA32 when stray
+nodes block targeting.
 F12's double-click miss after a pan-drag, F17
 off-canvas body-drag, F37b port-drag (hidden tab
 or otherwise), D36/D37/K6 list-drag, K13–K15
@@ -394,6 +419,17 @@ DEFERRED on WB14. Layer 1 pins decide the 412.
 I21 skeleton miss without the Fetch pause:
 BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
+I22 with the 500 fulfilled: a missing error state,
+message, focus, or card replacement, or a retry whose
+GET does not answer 200 (read once the cards replace
+the error state), is FAIL of the exploratory half.
+BLOCKED only if `Fetch` itself refuses.
+F13's second press off the node after the first
+release centred it, both presses less than
+`DBLCLICK_MS` apart: FAIL, not BLOCKED (TODO.md 0j).
+Anything but exactly two presses that close is
+BLOCKED, naming the driver, whatever the second
+press hit.
 SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
@@ -1195,20 +1231,52 @@ the second organization.
        the "submit" edge-rename mechanics — a name
        patch lands on the matching edge only);
        exploratory — the live port-drag
-- [ ] **AA32** Hold Shift and drag from "Review" onto
-  "Data Capture". PASS: during the drag the preview
-  redraws as a dashed-orange curved bezier because a
-  forward path "Data Capture" → "Review" already
-  exists, and the reachability check recognises the
-  release would close a loop. Release to create the
-  cycle edge; rename it "needs revision". Hold Shift
-  and drag from "Review" onto "Archive". PASS: preview
-  is a solid-blue curved bezier (no return path).
-  Release to create the edge; rename it "approve".
-  Drive the shift-drag with compositor mouse. If Shift
-  is not observed (release still port-add-node),
-  record BLOCKED naming that — an honest BLOCKED
-  costs nothing. Do not FAIL the compositor.
+- [ ] **AA32** Hold Shift and drag from "Review"'s port
+  onto "Data Capture". Aim by selector, before the
+  press: the press point is the center of
+  `.flow-node[aria-label="Review"] [data-connect-port]`'s
+  `getBoundingClientRect()`, and
+  `document.elementFromPoint` there must resolve
+  `.closest('[data-connect-port]')`; the drop point is
+  the center of
+  `.flow-node[aria-label="Data Capture"] > rect`, and
+  `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node.
+  Confirm `document.visibilityState === 'visible'`
+  (the preview paints under `requestAnimationFrame`,
+  so after the last move read the preview in a
+  `Runtime.evaluate` that awaits one
+  `requestAnimationFrame` before the query).
+  Drive: `Input.dispatchKeyEvent` `rawKeyDown` Shift
+  (`key` `Shift`, code `ShiftLeft`, vk 16, modifiers 8);
+  `mousePressed` at the press point (`button` `left`,
+  `clickCount` 1, modifiers 8); eight `mouseMoved`
+  steps to the drop point (`buttons` 1, modifiers 8).
+  PASS: before release,
+  `.flow-connect-preview path` carries
+  `stroke-dasharray` — the dashed-orange curved bezier
+  — because a forward path "Data Capture" → "Review"
+  already exists and the release would close a loop.
+  `mouseReleased` at the drop point (`button` `left`,
+  modifiers 8), then `keyUp` Shift (`key` `Shift`,
+  code `ShiftLeft`, vk 16, modifiers 0).
+  PASS: `.flow-edge` count +1, `.flow-node` count
+  unchanged. Rename the edge "needs revision". Repeat
+  onto `.flow-node[aria-label="Archive"] > rect`,
+  re-aiming both points. PASS: the preview path has
+  no `stroke-dasharray` (solid blue, no return path)
+  and no ghost card; release adds one edge and no
+  node. Rename it
+  "approve". A pre-press `elementFromPoint` miss is
+  re-aimed, not scored: aim at another point inside
+  the same box (the port circle's box for the press,
+  the node's `rect` for the drop), and if none
+  resolves, record BLOCKED before that press, naming
+  what covers it; a FAIL already scored stands.
+  BLOCKED, not FAIL, only if
+  Shift is not observed: before release the preview
+  layer's text reads "New State" (a ghost card), not
+  the bezier, naming that.
   Pin: tests/flow-cycle-edges.test.ts 'a back-edge to
        an ancestor is a cycle edge' (decides
        "Review"→"Data Capture" classifies as a cycle
@@ -1729,7 +1797,39 @@ the second organization.
   (the brand is collapse, and a screenshot-xy click
   there is the Apple menu).
   Pin: exploratory — each link's live navigation
-- [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
+- [ ] **C6** Scroll the dashboard at 1280×800. PASS:
+  the sidebar stays fixed while the main content
+  scrolls beside it. The window is the scroller — the
+  `.main-content` wrapper sets no overflow and
+  `.sidebar` is `position: fixed` — and CDP wheel and
+  key scrolls stall on a tab that is not composited,
+  so drive with `Runtime.evaluate`: from `scrollY` 0
+  (`window.scrollTo({top: 0, behavior: 'instant'})`
+  first; `behavior: 'instant'` keeps a page
+  `scroll-behavior` from animating any of these
+  calls), read
+  `#main-content`'s `getBoundingClientRect().top`
+  as t, then
+  `window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})`
+  and read `window.scrollY` as d. PASS: d > 0;
+  neither `html` nor `body` computes `overflow-y:
+  hidden` or `overflow-y: clip`; `#desktop-sidebar`'s
+  rect `top` is still 0; `#main-content`'s rect `top`
+  is t − d. A computed `overflow-y: hidden` or `clip`
+  on `html` or `body` is FAIL whether or not the page
+  fits. Otherwise, if d = 0, `#main-content`'s rect
+  `bottom` is at most `window.innerHeight`, and its
+  `scrollHeight` is at most its `clientHeight`, the
+  page fits the window: set
+  `Emulation.setDeviceMetricsOverride` to 1280×400
+  with `deviceScaleFactor: 1` and `mobile: false`, as
+  Setup does for 1280×800, and, once
+  `window.innerHeight` reads 400 (BLOCKED, naming the
+  override, if it has not within a few seconds), drive
+  again; BLOCKED, not FAIL, naming that, only if it
+  still fits. Restore the 1280×800 override if you
+  lowered it, and
+  `window.scrollTo({top: 0, behavior: 'instant'})`.
   Pin: exploratory — the sidebar's fixed position
        while the main content scrolls
 - [ ] **C7** Check that seed data populates all 4 dashboard
@@ -2742,7 +2842,7 @@ opens and renders.)
 - [ ] **F11** Click a node. PASS: the node gets the gold
   glow selection effect. Double-click it — the mechanics
   are in `### Driving notes`, and every later double-click
-  in F uses the same drive. PASS: the
+  in F uses the same drive; F13 names its own. PASS: the
   properties panel appears with the "State Properties"
   title and a close button on the right (regular nodes only
   — Create/Archive show their own kind title), then a
@@ -2789,9 +2889,55 @@ opens and renders.)
        take, `#panToRevealSelected`, passes the real
        `PANEL_WIDTH_PX` while the test above passes 0
 - [ ] **F13** While the panel is open, double-click a
-  *different* node (F11's drive). PASS: panel content
-  retargets to the
-  new node and the canvas re-centres on it.
+  *different* node the way a person does: one point,
+  two presses. Auto Fit must be off, as F12 left it
+  (turn it off first if it is on): a re-fit at the
+  second press can fail the re-centred clause. Confirm
+  `document.visibilityState === 'visible'` (a hidden
+  tab may never replay the panel's slide); else record
+  BLOCKED, naming the driver. Pick a regular node:
+  Create and Archive panels have no
+  `#prop-node-name`. Aim before the
+  first press: read the center of
+  `.flow-node[aria-label="<name>"] > rect` once —
+  the `NODE_WIDTH`×`NODE_HEIGHT` body, not the label
+  `text` or the `g`, whose box includes the port —
+  and `document.elementFromPoint` there must resolve
+  `.closest('.flow-node')` to that node. That `rect`
+  must also not contain the center of the part of
+  `svg.flow-canvas`'s client box right of
+  `.flow-props-panel`: a node holding that point moves
+  less than half its size at the first release, so the
+  second press would still land on it and the case
+  could not fail. A point under `.flow-props-panel`
+  lands on the panel, so a pre-press miss is re-aimed
+  at another regular node whose `rect` also misses
+  that center, not scored. If none does, record
+  BLOCKED, naming that. Install a
+  capture-phase `window` `pointerdown` listener that
+  pushes `Date.now()` onto a new, empty array, then
+  send both press/release pairs to that point inside
+  `DBLCLICK_MS`, never re-reading it between them.
+  After the second release read the array: anything
+  but exactly two pushed times, less than
+  `DBLCLICK_MS` apart, is no double-click, whatever
+  the second press hit: record BLOCKED, naming the
+  driver.
+  PASS: after the second press the panel is
+  still open, `#prop-node-name`'s `value` is the
+  double-clicked node's name, and the canvas has
+  re-centred on it. Every commit replaces the panel,
+  `#prop-node-name`, the node, and `svg.flow-canvas`,
+  and the new panel replays its ~200 ms slide: wait
+  250 ms after the second release, then query them
+  afresh and read all three clauses. The
+  straight-line distance from the node `rect`'s
+  client-box center to the center of the part of
+  `svg.flow-canvas`'s client box right of
+  `.flow-props-panel` is at most 4 px.
+  A second press that lands off the
+  node because the first release moved the camera is
+  FAIL, not BLOCKED: the gesture was delivered.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
        then double-click n2 retargets panel and selection
        to n2 (F13 retarget)' (decides the selection
@@ -2805,7 +2951,14 @@ opens and renders.)
        literals rather than reading `DBLCLICK_MS`);
        tests/flow-designer-actions.test.ts
        'applyPanToRevealSelected centers a node, else
-       null'; exploratory — the live retarget paint
+       null'; tests/browser/canvas-gestures.test.ts 'a
+       node click under an open panel centers it on
+       release (F13)' (decides the camera moves when a
+       single click under an open panel releases — the
+       move a one-point double-click's second press
+       meets); exploratory — the one-point double-click,
+       which TODO.md 0j owns until a red Layer 2 test
+       pins it, and the live retarget paint
 - [ ] **F14** Turn Auto Fit on, then double-click a node.
   PASS: the panel opens and the canvas re-fits to the
   panel-aware visible region — no toast, no blocking.
@@ -3008,15 +3161,36 @@ opens and renders.)
        add-node actions and returns connect to idle);
        exploratory — the preview vanishing
 - [ ] **F23** Begin a plain drag from a port (no
-  Shift). While the mouse remains stationary,
-  press and hold Shift. PASS: without any mouse
+  Shift). Start clean: reload the flow page, make the
+  focusing click (Driving notes), and confirm
+  `document.visibilityState === 'visible'` (the preview
+  paints under `requestAnimationFrame`). Then install a
+  capture-phase `window` listener on `pointerdown`,
+  `pointerup`, `keydown`, and `keyup` that records each
+  event's `type`, `key`, and `shiftKey`, and whether a
+  `pointerdown`'s target is inside `[data-connect-port]`.
+  Press at the port (modifiers 0) and read
+  `.flow-connect-preview` in a `Runtime.evaluate` that
+  awaits one `requestAnimationFrame` before the query:
+  it must show the ghost "New State" card. While the
+  mouse remains stationary, press and hold Shift
+  (`rawKeyDown`: `key` `Shift`, code `ShiftLeft`, vk 16,
+  modifiers 8) and read again. PASS: without any mouse
   movement the ghost "New State" card disappears
   and the preview collapses to the grey line (or
   curved bezier if the cursor is already over a
-  target). Release Shift — the ghost card
+  target). Release Shift (`keyUp`, the same fields,
+  modifiers 0) and read again — the ghost card
   returns. Release the mouse with Shift held to
   create an edge, or without Shift to create a
-  node.
+  node. A read that is not what the case says is FAIL
+  if the listener's record up to it is exactly the
+  inputs sent, in order — a `pointerdown` inside
+  `[data-connect-port]` with `shiftKey` false, then a
+  `keydown` with `key` `Shift`, then a `keyup` with
+  `key` `Shift` and `shiftKey` false, and no
+  `pointerup` — and BLOCKED, naming the driver and the
+  first difference, if not.
   Pin: tests/flow-fsm-scenarios.test.ts 'plain port-drag
        then shift-key toggles connect.isShift (F23)'
        (decides a bare shift-key input flips the in-flight
@@ -4540,11 +4714,9 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   Instances section sits below the fold at
   1280×800 — `scrollIntoView` the row's
   `[data-action="edit-instance"]` (`block:
-  "center"`) or raise `Browser.setWindowBounds`
-  height until that button is on-screen, then
-  click it. Do not click the record-type header
-  Edit (that opens the type form). Change an
-  instance value and Save so the head etag
+  "center"`), then click it. Do not click the
+  record-type header Edit (that opens the type form).
+  Change an instance value and Save so the head etag
   advances (or drive a second transition). In tab
   1, edit a value and transition. PASS: tab 1
   receives 412, re-GETs the instance, re-presents
@@ -4553,8 +4725,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   underneath you — values refreshed; re-apply your
   edit"), and does **not** auto-retry the
   transition. A targeting miss on header Edit is
-  BLOCKED, not FAIL. Restore 1280×800 bounds
-  after if you raised them.
+  BLOCKED, not FAIL.
   Pin: tests/api-work-order-transition-instance.test.ts
        'value-bearing stale If-Match → 412' (decides the
        server 412 when a transition's held etag is
@@ -6262,13 +6433,40 @@ layout.
        first read settles, and that the settled roster
        replaces it); exploratory — the live Fetch-paused
        skeleton
-- [ ] **I22** If an error occurs inside a `loadInto()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. The explorer has no way to force this fault live; if none occurs naturally, record BLOCKED naming that reason — an honest BLOCKED costs nothing.
+- [ ] **I22** Force a `loadInto()` fault on `ideas/`.
+  Before navigating, `Fetch.enable` with one pattern,
+  `*://localhost:*/api/organizations/*/ideas/` — the
+  collection GET `getIdeas` makes inside `loadInto`.
+  Never `/api/authentication/*`, and never a 401: a
+  401 drives refresh, not the error state. Do not
+  `wait_for_load` before answering. Answer the
+  `Fetch.requestPaused` with `Fetch.fulfillRequest`:
+  `responseCode` 500, `responseHeaders`
+  `[{name: 'content-type', value: 'application/json'}]`,
+  `body` `eyJlcnJvciI6IndhbGstZm9yY2VkIGZhdWx0In0=`
+  (base64 of `{"error":"walk-forced fault"}`). PASS:
+  `#ideas-list` shows "Something went wrong", text
+  containing "walk-forced fault", and a "Try Again"
+  `[data-retry-btn]` that is `document.activeElement`.
+  Read `document.activeElement` before any click: the
+  focusing click (Driving notes) blurs the button.
+  Then `Fetch.disable`, make that click on
+  `.page-header`, not at the viewport center, which
+  may land on Try Again, and click Try Again at its
+  box-model center. PASS: `[data-idea-card]` cards
+  replace the error state, and then a second GET of
+  `…/ideas/` answers 200 (the last
+  `performance.getEntriesByType('resource')` entry
+  whose name ends `/ideas/` has `responseStatus` 200).
+  BLOCKED only if `Fetch.enable` or
+  `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
        fetch renders the error state and calls
-       neither hook' (a rejected fetch renders a
-       "Try Again" control and calls neither
+       neither hook' (decides a rejected fetch
+       renders "Try Again" and calls neither
        `onEmpty` nor `onData`); exploratory — the
-       live retry click re-attempting the load
+       live forced fault, the button's focus, and
+       the retry's re-fetch
 
 ### Toasts
 

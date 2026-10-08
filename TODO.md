@@ -18,48 +18,23 @@ Eighteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
 The 0-items finish the release: the walk's remaining
-recipes and moorings and their count (0a–0c); admins
+moorings and their count (0b–0c); admins
 held to their own organization (0d), since no second
 tenant shares an origin before it ships; then the
 ledger's one deploy — `fa_` names (0e), the fence
 (0f), `FA_GIT_SHA` (0g), migrations (0h), and the wipe
-and reseed that ships them (0i). Then what a pilot
+and reseed that ships them (0i); and F13's
+double-click under an open panel (0j). Then what a pilot
 tenant needs (4–7), the process engine and its AI
 worker on that (9–12), and two processes last (13). An
 item's number is its name, which specs, plans, and
 code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
 
-- **0a.** Recipes a hidden, CDP-driven tab can execute
-  for AA32, C6, F13, and I22; Task 9 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
-  holds each case's text. AA32: the port is a 5-unit
-  circle on the node's widest perimeter gap
-  (`web-app/app/flow-graph.ts:220-270`), not its
-  right-middle, and a press that misses it starts a
-  body-drag or a marquee, so the case aims by selector
-  at `[data-connect-port]`'s center, confirmed by
-  `document.elementFromPoint`, and drops on the target
-  node's `> rect`. C6: the window is the scroller —
-  `.main-content` sets no overflow
-  (`web-app/app/styles/layout.css:145-151`) and the
-  sidebar is fixed — and CDP wheel and key input stall
-  on a tab that is not composited, so the case scrolls
-  with `window.scrollTo` through `Runtime.evaluate` and
-  reads the rects. F13: the double-click aims at the
-  node's body (`.flow-node[aria-label="<name>"] > rect`),
-  not its label or group, and the case names its Layer
-  2 pin, 'a node click under an open panel centers it
-  on release (F13)'
-  (`tests/browser/canvas-gestures.test.ts:451`). I22: a
-  CDP `Fetch` pattern answers the ideas collection GET
-  with a 500 — never `/api/authentication/*`, and never
-  a 401, which drives refresh instead — so the error
-  state and its Try Again are driven live. Oracle: the
-  next walk scores each of the four PASS or FAIL, never
-  BLOCKED
 - **0b.** F37a, R22, and WB22 moored to the product;
-  Task 10 of the same plan holds F37a's and R22's text.
+  Task 10 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
+  holds F37a's and R22's text.
   F37a: one cookie jar cannot reach the 412 — a flow
   save rings `fusion-angle:data`, and tab B re-reads
   and latches the new head within one GET — so tab B
@@ -82,7 +57,8 @@ code comments cite; specs and plans written before the
   `./test validate browser` and replace AT2's "on 4 Oct
   `./test` printed `ok | 4124 passed | 0 failed | 11
   ignored`" (`TEST-PLAN.md:479`) with that run's date
-  and its main suite's line; Task 11 of the same plan.
+  and its main suite's line; Task 11 of
+  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
   Oracle: AT2 names the latest Layer 2 run's count
 - **0d.** Admins act within their organization. Any
   organization's admin can write a password credential
@@ -631,6 +607,30 @@ code comments cite; specs and plans written before the
   (`WHERE path = '/invitations/'`). Oracle: every live
   database has been wiped and reseeded after the ledger
   store's landing, and holds `/migrations/0000-root`
+- **0j.** A double-click under an open panel lands
+  where a person aimed. With the properties panel
+  open, a click on another node selects it and, on
+  release, centers it (`web-app/flows/detail.ts:1099-1108`;
+  FLOW-CANVAS.md prescribes the centering, and
+  `tests/browser/canvas-gestures.test.ts` 'a node
+  click under an open panel centers it on release
+  (F13)' decides only that the camera moves). A
+  double-click's first release therefore slides the
+  node from under its second press, which meets
+  empty canvas — `open-panel: false` closes the panel
+  (`web-app/app/flow-fsm-reduce.ts:97`) — or another
+  node, which takes the panel. The walk's element-id
+  drive re-aims between the presses, which is how F13
+  passed on `8e834e76`. The brainstorm decides how a
+  single click still centers while a double-click
+  holds still — the 4 Oct plan refused a timer
+  (Cleverness) — and whether item 11's "panel callback
+  re-fitting at a double-click's second press" rides
+  along. Oracle: a red Layer 2 test — two presses at
+  one point on a second node under an open panel
+  leave the panel open on it — turns green with the
+  center-on-release pin still green, and the next walk
+  scores F13 PASS
 - **4.** `/status` — `{ up: boolean, components: { postgres:
   boolean } }`, 200 when every component is up and 503
   when any is not, built for more components.
@@ -2893,6 +2893,30 @@ Off the critical path; each with its oracle.
   reach — flows' `:id` route has get and put only.
   Oracle: delete the guard, or pin it with a
   flow-shaped fixture.
+- TODO.md and TEST-PLAN.md still spell British.
+  TODO.md's "Unpinned but pinnable" bullet says
+  "colour" in three of its sub-bullets (F8/F40/AA26,
+  FS3, K28) and "centred" in one ("the centred
+  special label"); TEST-PLAN.md spells centre, colour,
+  labelled, neighbouring, honoured, and recognises in
+  23 lines. The 0a branch's 9f already made 0j say
+  "center". Say "color", "center" (and its forms),
+  "labeled", "neighboring", "honored", and
+  "recognizes", leaving `grey` alone (the CSS spells
+  both). Oracle: `grep -n -i -e centre -e colour -e
+  labelled -e neighbour -e honour -e recognis TODO.md
+  TEST-PLAN.md` prints nothing once this entry is gone
+- The Critical product path intro lost a cue. Its last
+  "then" before 0j became "and" in the 0a branch's 9f,
+  as the spec required, so "...(0i); and F13's
+  double-click under an open panel (0j)" reads as
+  though 0j rides the ledger's one deploy. "Eighteen
+  items, in this order" and `## Sequencing` still hold
+  the order (nothing there names 0j), so nothing
+  breaks; closing 0j removes the clause and this entry
+  with it. Restore "then". Oracle: the intro reads
+  "...(0i); then F13's double-click under an open panel
+  (0j)." or no longer names 0j
 - Test-only list oracles. `documentCollectionGetHandler` and
   `documentGetHandler` (`api/document-family.ts`) and the
   `GetHandler` type (`api/routes.ts`) serve no route; sixteen
@@ -3172,7 +3196,7 @@ Off the critical path; each with its oracle.
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
   fences it)
-- 0a, 0b → 0c: the count follows the remedies
+- 0b → 0c: the count follows the moorings
 - 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
 - 0e → 0f → 0g → 0h → 0i, one deploy: names first, so
