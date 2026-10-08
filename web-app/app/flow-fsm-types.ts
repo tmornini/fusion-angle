@@ -1,10 +1,11 @@
 import type {
     InteractionState,
+    LastClick,
     Selection,
 } from './flow-interactions.ts';
 
 export type FsmState = InteractionState;
-export type { Selection };
+export type { LastClick, Selection };
 
 export interface NodeMoveUpdate {
     nodeId: string;
@@ -31,6 +32,7 @@ export type FsmInput =
         svgY: number;
         clientX: number;
         clientY: number;
+        now: number;
     }
     | {
         kind: 'pointer-down-on-node';
@@ -42,6 +44,8 @@ export type FsmInput =
         isLocked: boolean;
         svgX: number;
         svgY: number;
+        clientX: number;
+        clientY: number;
         now: number;
         selectedPositions: Map<
             string,
@@ -52,6 +56,8 @@ export type FsmInput =
         kind: 'pointer-down-on-edge';
         edgeId: string;
         now: number;
+        clientX: number;
+        clientY: number;
     }
     | {
         kind: 'pointer-move';

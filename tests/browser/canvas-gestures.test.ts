@@ -1,11 +1,12 @@
 import { assert, assertNotEquals, assertStrictEquals } from '@std/assert';
 import {
-    SHIFT, useBrowser, withAdminPage, type Page,
+    SHIFT, stays, useBrowser, withAdminPage, type Page,
     type Point,
 } from './fixtures.ts';
 import {
     CANVAS, EDGE, NODE, ONBOARDING, LAYOUT_TEST,
-    doubleClick, edgeCount, edgeLabelSelector,
+    doubleClick, doubleClickAt, edgeCount,
+    edgeLabelSelector,
     flowGraph, nodeCount, nodeIdNamed,
     nodeSelector, openFlow, portSelector,
 } from './canvas.ts';
@@ -16,6 +17,12 @@ const PANEL = '.flow-props-panel';
 const VIEWBOX =
     `document.querySelector('${CANVAS}')`
     + `.getAttribute('viewBox')`;
+// The open panel's node name, or null with no panel.
+const PANEL_NODE_NAME =
+    `document.querySelector('${PANEL}') === null ? null`
+    + ` : document.querySelector('#prop-node-name')`
+    + `?.value ?? null`;
+const STAY_MS = 600;
 
 // The properties panel covers the canvas's left edge;
 // a point under it lands on the panel, not the node.
@@ -468,6 +475,48 @@ Deno.test('a node click under an open panel centers it'
         await page.until(
             `${VIEWBOX} !== ${JSON.stringify(before)}`,
             'camera centred on Data Capture',
+        );
+    });
+});
+
+Deno.test('a double-click on a second node under an open'
++ ' panel keeps the panel on it (F13)', async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await openFlow(page, origin, ONBOARDING);
+        const review = await nodeIdNamed(page, 'Review');
+        const capture = await nodeIdNamed(
+            page, 'Data Capture',
+        );
+        await doubleClick(page, nodeSelector(review));
+        await page.waitFor(PANEL);
+        // Aimed once, at the body: the `g`'s box holds the
+        // port. A body holding the center of the canvas
+        // right of the panel barely moves at the first
+        // release, so the second press could not miss it.
+        const bodySelector = `${nodeSelector(capture)} > rect`;
+        const body = await page.center(bodySelector);
+        await assertClearOfPanel(page, body);
+        const canvas = await page.rect(CANVAS);
+        const panel = await page.rect(PANEL);
+        const left = Math.max(
+            canvas.x, panel.x + panel.width,
+        );
+        const cx = (left + canvas.x + canvas.width) / 2;
+        const cy = canvas.y + canvas.height / 2;
+        const box = await page.rect(bodySelector);
+        assert(
+            cx < box.x || cx > box.x + box.width
+                || cy < box.y || cy > box.y + box.height,
+            `Data Capture holds the visible center`
+            + ` (${cx}, ${cy})`,
+        );
+        await doubleClickAt(page, body);
+        await stays(page, PANEL_NODE_NAME, STAY_MS);
+        assertStrictEquals(
+            await page.evaluate<string | null>(
+                PANEL_NODE_NAME,
+            ),
+            'Data Capture',
         );
     });
 });

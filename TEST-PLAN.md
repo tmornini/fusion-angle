@@ -127,7 +127,8 @@ top-left of a fullscreen or flush window is the
 Apple menu; the next click opens About This Mac.
 Open a second tab of the same context only where a
 same-jar case needs one (SV8, SV8b, SV9). For a
-second identity (SV6, SV7, SV10) mint a second
+second identity (SV6, SV7, SV10) or a second jar of
+one identity (F37a) mint a second
 cookie jar with `Target.createBrowserContext`
 then `Target.createTarget` (`browserContextId`
 set, `url` `about:blank`) and
@@ -260,7 +261,7 @@ not repeat the note in every case.
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
   "New State" nodes re-flow the graph and a
   double-click misses Data Capture.
-- F37b: after F37a opens a second tab (born hidden),
+- F37b: after F37a opens its second jar (born hidden),
   re-activate tab A and confirm
   `document.visibilityState === 'visible'` before
   the port-drag. Driving the hidden tab is BLOCKED,
@@ -424,12 +425,13 @@ message, focus, or card replacement, or a retry whose
 GET does not answer 200 (read once the cards replace
 the error state), is FAIL of the exploratory half.
 BLOCKED only if `Fetch` itself refuses.
-F13's second press off the node after the first
-release centred it, both presses less than
-`DBLCLICK_MS` apart: FAIL, not BLOCKED (TODO.md 0j).
-Anything but exactly two presses that close is
-BLOCKED, naming the driver, whatever the second
-press hit.
+F13's one-point double-click, both presses less than
+`DBLCLICK_MS` apart: its Layer 2 pin decides it, so a
+pair after which the panel is closed or names another
+node is BLOCKED, naming the driver, unless that pin is
+red. Anything but exactly two presses that close is
+BLOCKED, naming the driver, whatever the second press
+hit.
 SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
@@ -512,7 +514,7 @@ any AT red.
 - [ ] **AT1** Run `deno check --frozen api client shared
   server tests web-app`. PASS: exits 0; no diagnostics emitted.
   Pin: exploratory — the command is its own witness
-- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and four preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub, the per-worker prefix on `BroadcastChannel` and `navigator.locks` names). PASS: exits 0; each pass reports `ok | N passed | 0 failed`, on 4 Oct `./test` printed `ok | 4124 passed | 0 failed | 11 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite. The 11 ignored are the live-Postgres placeholders, which skip without `POSTGRES_URL`; AT4 runs the eleven files `bin/test-postgres` names: `tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`, `tests/pg-message-plane.test.ts`, `tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`, `tests/pg-explain.test.ts`, `tests/pg-identifier-order.test.ts`, `tests/pg-standalone-read.test.ts`, `tests/schema-lifecycle.test.ts`, `tests/pg-ledger-store.test.ts`, and `tests/pg-ledger-seed.test.ts`.
+- [ ] **AT2** Run `./test` (delegates to `TZ=UTC deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/*.test.ts` for the main `Deno.test` suite, written against `@std/assert`, then `TZ=Pacific/Honolulu deno test --frozen --parallel --no-check --sanitize-ops --sanitize-resources tests/tz/*.test.ts` for the timezone suite; both carry the named permissions and four preloads — the HMAC key, the `localStorage` stub, the `sessionStorage` stub, the per-worker prefix on `BroadcastChannel` and `navigator.locks` names). PASS: exits 0; each pass reports `ok | N passed | 0 failed`, on 8 Oct `./test` printed `ok | 4152 passed | 0 failed | 11 ignored` for the main suite and `ok | 8 passed | 0 failed` for the timezone suite. The 11 ignored are the live-Postgres placeholders, which skip without `POSTGRES_URL`; AT4 runs the eleven files `bin/test-postgres` names: `tests/pg-acceptance.test.ts`, `tests/pg-races.test.ts`, `tests/pg-message-plane.test.ts`, `tests/pg-boot.test.ts`, `tests/pg-seed.test.ts`, `tests/pg-explain.test.ts`, `tests/pg-identifier-order.test.ts`, `tests/pg-standalone-read.test.ts`, `tests/schema-lifecycle.test.ts`, `tests/pg-ledger-store.test.ts`, and `tests/pg-ledger-seed.test.ts`.
   Pin: exploratory — the command is its own witness
 - [ ] **AT3** Run `./test validate`. PASS: exits 0 (composes AT1's `deno check --frozen api client shared server tests web-app` and AT2 plus the 78-char awk lint over `api/`, `client/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt, and the root scripts `test`, `deploy`, plus `bin/build`, `bin/build-lib`, `bin/serve`, `bin/test-postgres`, `bin/test-browser`, `bin/generate-schema-svg`, `bin/generate-api-documentation`, `bin/measure`, `bin/postgres-wipe`, `bin/postgres-lib`, `bin/postgres-seed`, and `bin/compose-lib`, plus `deno.json`, `Dockerfile`, `compose.yaml`, `.dockerignore`; the org-abbreviation identifier lint over `api/`, `client/`, `web-app/`, `tests/`, `shared/`, `server/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
   Pin: exploratory — the command is its own witness
@@ -2935,9 +2937,12 @@ opens and renders.)
   client-box center to the center of the part of
   `svg.flow-canvas`'s client box right of
   `.flow-props-panel` is at most 4 px.
-  A second press that lands off the
-  node because the first release moved the camera is
-  FAIL, not BLOCKED: the gesture was delivered.
+  A second press inside `DBLCLICK_MS` and within
+  `DBLCLICK_SLOP_PX` (4 px) of the first is the
+  double-click even when the first release slid the node
+  from under it; with its Layer 2 pin green, a delivered
+  pair after which the panel is closed or names another
+  node is BLOCKED, naming the driver, not FAIL.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
        then double-click n2 retargets panel and selection
        to n2 (F13 retarget)' (decides the selection
@@ -2956,9 +2961,13 @@ opens and renders.)
        release (F13)' (decides the camera moves when a
        single click under an open panel releases — the
        move a one-point double-click's second press
-       meets); exploratory — the one-point double-click,
-       which TODO.md 0j owns until a red Layer 2 test
-       pins it, and the live retarget paint
+       meets); tests/browser/canvas-gestures.test.ts 'a
+       double-click on a second node under an open panel
+       keeps the panel on it (F13)' (decides two presses
+       at one point on a second node under an open panel
+       leave the panel open on it); exploratory — the
+       panel-aware re-center after the pair and the live
+       retarget paint
 - [ ] **F14** Turn Auto Fit on, then double-click a node.
   PASS: the panel opens and the canvas re-fits to the
   panel-aware visible region — no toast, no blocking.
@@ -3503,22 +3512,31 @@ that the canvas re-renders after each step.)
        non-empty' (decides the empty stack is what disables
        the button); exploratory — the 800 ms save and the
        live button state
-- [ ] **F37a** Open the same flow in two tabs of the same
-  jar. In tab A, edit
-  a node name and let auto-save complete. In tab B (which
-  still shows the pre-edit head), click Undo immediately.
-  PASS: nothing looks wrong — no error toast, no stuck
-  spinner, no console error surfaces to the user. Under the
-  hood the stale-basis undo collides with tab A's save (HTTP
-  412) and the client silently retries with a freshly
-  resolved target against the new head — the 412-retry is
-  invisible to the tester by design.
-  Pin: tests/flow-undo-cursor.test.ts 'undo cursor: a 412
-       on attempt 1 is absorbed — attempt 2 succeeds with
-       no client-side baseline refetch' (decides the client
-       absorbs the 412 and the second attempt lands without
-       refetching a baseline); exploratory — the two live
-       tabs and the absence of any user-visible error
+- [ ] **F37a** Open the flow in tab A. Mint a second
+  cookie jar (`Target.createBrowserContext`, as SV6),
+  sign in there as the same member, and open the same
+  flow as tab B. In tab A, rename a node and let the
+  `PUT …/flows/:id` land (`SAVE_DELAY_MS` = 800 ms).
+  Tab B still shows the pre-edit name —
+  BroadcastChannel does not cross cookie jars. In tab
+  B, click Undo. PASS: tab B's network log shows
+  `POST …/flows/:id/undo` 412, a `GET …/flows/:id`,
+  then the undo POST 200; tab B repaints with tab A's
+  rename reverted (one step back from the new head);
+  no error toast, stuck spinner, console error, or
+  "Something went wrong". Two tabs of one jar cannot
+  show the 412: `fusion-angle:data` repaints tab B and
+  latches the new head within one GET of tab A's save.
+  Pin: tests/flow-undo-cursor.test.ts 'undo cursor: a
+       412 on attempt 1 is absorbed — attempt 2
+       succeeds with no client-side baseline refetch'
+       (decides the client absorbs the 412 and the
+       second attempt lands);
+       tests/flow-undo-cursor.test.ts 'a stale undo
+       tag is 412 from the statement' (decides the
+       stale latch refuses and stores nothing);
+       exploratory — the second jar's live staleness
+       and the absence of any user-visible error
 - [ ] **F37b** Toggle Auto Layout back on if F34 turned it
   off, then add a node via F15's plain port-drag (no
   Shift). Wait until the node count rises by one, then
@@ -4871,17 +4889,20 @@ per-user visibility filter.
        Archive-tab visibility (no fixture varies this)
 - [ ] **WB22** Inspect
   `web-app/app/presenters/workbox-inbox.ts`. PASS:
-  `buildInboxItems` takes
-  `(workOrders, transitionsByWo, activeClaimsByWo,
-  memberMap, mode)`
-  with no scope parameter. The presenter exports nothing
-  related to per-user visibility — the workbox shows all
-  work orders to all users by construction.
-  Pin: exploratory — confirmed directly by reading
-       `buildInboxItems`'s exported signature (five
-       parameters, no scope parameter); a function
-       signature is not something a `node:test` assertion
-       decides
+  `buildInboxItems` takes four parameters —
+  `(workOrders, activeClaimsByWo, memberMap, mode)` —
+  and no scope parameter. Its exports are
+  `InboxItem`, `InboxMode`, `ActiveClaim`,
+  `WorkboxInboxPresenter`, and `buildInboxItems`;
+  none filters by user — the workbox shows all work
+  orders to all users by construction.
+  Pin: tests/workbox-inbox.test.ts calls
+       `buildInboxItems` with exactly these four
+       arguments, so AT1's `deno check` rejects any
+       further required parameter; exploratory — the
+       absence of a scope parameter is read from the
+       source, since no `Deno.test` assertion inspects
+       a signature
 - [ ] **WB23** Claim, release, and transition a work
   order in two tabs of one cookie jar: act in the
   first tab, then act on the same work order in the
@@ -7455,16 +7476,31 @@ K30 only describes.
        to the camelCase domain shape'; exploratory —
        the live four-way comparison across the two
        record types and the two sign-ins
-- [ ] **R22** Save a new instance, then open it in
-  two tabs and edit it in both: save the first tab,
-  then the second. PASS: the stale save refuses; the fresh
-  one shows the merged values.
-  Pin: tests/api-instances-create.test.ts 'a declared
-       create over a live instance is 412' (decides that
-       a create declares itself with `If-None-Match: *`
-       and a second create of the same id refuses);
-       exploratory — the two-tab edit race, the refusal
-       notice, and the merged values on screen
+- [ ] **R22** Save a new instance, then open it in two
+  tabs and edit it in both: change one field in the
+  first tab and save, then change a different field
+  in the second and save. PASS: the first save
+  answers 200 and the list shows its edit over the
+  stored values; the second tab, still in edit (the
+  cross-tab bell reloads only a reading page), saves
+  to 412, stays in edit, and refreshes every field to
+  the stored values with the "This instance changed
+  underneath you — values refreshed; re-apply your
+  edit" notice and a warning toast. The second tab's
+  edit is not merged in: the form sends every
+  non-empty writable value, and a stale tag never
+  rebases onto a newer head.
+  Pin: tests/api-instances-patch.test.ts 'two
+       writers, same If-Match → first 200, second
+       412'; tests/api-instances-patch.test.ts 'R9:
+       stale formed pair after head advance → 412 (no
+       silent rebase onto newer head)';
+       tests/api-instances-patch.test.ts 'PATCH stale
+       If-Match → 412; re-GET + retry → 200';
+       tests/presenter-record-instances.test.ts 'edit
+       form surfaces 412 conflict notice';
+       exploratory — the two live tabs, the re-GET
+       repaint, and the toast
 
 ## J. Teardown
 

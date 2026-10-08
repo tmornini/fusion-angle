@@ -55,6 +55,7 @@ Deno.test(
             kind: 'pointer-down-on-canvas',
             svgX: 100, svgY: 100,
             clientX: 0, clientY: 0,
+            now: 1000,
         };
         const r = reduceFsm(state, input);
         assertStrictEquals(
@@ -90,6 +91,7 @@ Deno.test(
             kind: 'pointer-down-on-canvas',
             svgX: 100, svgY: 100,
             clientX: 0, clientY: 0,
+            now: 1000,
         };
         const afterDown = reduceFsm(state, down);
         const up: FsmInput = {
@@ -122,6 +124,7 @@ Deno.test('click on node selects it', () => {
         isMeta: false,
         isLocked: false,
         svgX: 0, svgY: 0,
+        clientX: 0, clientY: 0,
         now: 1000,
         selectedPositions: new Map([
             ['n1', { x: 0, y: 0 }],
@@ -155,6 +158,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 0, svgY: 0,
+            clientX: 0, clientY: 0,
             now: 1000,
             selectedPositions: new Map([
                 ['n1', { x: 0, y: 0 }],
@@ -232,6 +236,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 100, svgY: 50,
+            clientX: 100, clientY: 50,
             now: 1000,
             selectedPositions: new Map(),
         };
@@ -638,6 +643,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 0, svgY: 0,
+            clientX: 0, clientY: 0,
             now: 1000,
             selectedPositions: new Map([
                 ['n1', { x: 0, y: 0 }],
@@ -670,6 +676,7 @@ Deno.test(
             isMeta: false,
             isLocked: false,
             svgX: 0, svgY: 0,
+            clientX: 0, clientY: 0,
             now,
             selectedPositions: new Map([
                 ['n1', { x: 0, y: 0 }],

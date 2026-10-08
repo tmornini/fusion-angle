@@ -14,52 +14,21 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Eighteen items, in this order — each its own brainstorm
+Fifteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
-The 0-items finish the release: the walk's remaining
-moorings and their count (0b–0c); admins
+The 0-items finish the release: admins
 held to their own organization (0d), since no second
 tenant shares an origin before it ships; then the
 ledger's one deploy — `fa_` names (0e), the fence
 (0f), `FA_GIT_SHA` (0g), migrations (0h), and the wipe
-and reseed that ships them (0i); and F13's
-double-click under an open panel (0j). Then what a pilot
+and reseed that ships them (0i). Then what a pilot
 tenant needs (4–7), the process engine and its AI
 worker on that (9–12), and two processes last (13). An
 item's number is its name, which specs, plans, and
 code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
 
-- **0b.** F37a, R22, and WB22 moored to the product;
-  Task 10 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
-  holds F37a's and R22's text.
-  F37a: one cookie jar cannot reach the 412 — a flow
-  save rings `fusion-angle:data`, and tab B re-reads
-  and latches the new head within one GET — so tab B
-  is a second jar (`Target.createBrowserContext`, as
-  SV6), which keeps the stale head. R22: nothing merges
-  two editors' values — a PATCH merges `set` and
-  `clear` onto the head it latched, a stale tag answers
-  412 (ARCHITECTURE.md:316-322), and the page re-reads
-  and asks the person to re-apply
-  (`INSTANCE_CONFLICT_NOTICE`, `web-app/records/detail.ts`)
-  — so the case reads refuse-and-refresh, not merged
-  values. WB22: `buildInboxItems` takes four
-  parameters, `(workOrders, activeClaimsByWo,
-  memberMap, mode)`
-  (`web-app/app/presenters/workbox-inbox.ts:255`),
-  where the case and its Pin name five. Oracle: each
-  case's text matches the code, and the next walk
-  drives F37a and R22 PASS
-- **0c.** AT2's count, current: after 0a and 0b, run
-  `./test validate browser` and replace AT2's "on 4 Oct
-  `./test` printed `ok | 4124 passed | 0 failed | 11
-  ignored`" (`TEST-PLAN.md:479`) with that run's date
-  and its main suite's line; Task 11 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
-  Oracle: AT2 names the latest Layer 2 run's count
 - **0d.** Admins act within their organization. Any
   organization's admin can write a password credential
   for an identity in another organization and sign in
@@ -237,7 +206,7 @@ code comments cite; specs and plans written before the
   `postIdentityCredentialDocumentOp`,
   `api/routes.ts:2610`). The key's empty read roles,
   the one declaration of its kind
-  (`api/family-registry.ts:129-132`), leave when the
+  (`api/family-registry.ts:137-138`), leave when the
   hash leaves the body.
   `requester_identity_id` — the verified token's `sub` —
   stays readable. No read may
@@ -246,7 +215,7 @@ code comments cite; specs and plans written before the
   selecting `request`, `request_salt`, and the two
   secrets columns, which every read selects today
   (`api/backend-postgres.ts:446-665`, mapped by
-  `entityOf` at `:352-363`), though nothing derives
+  `entityOf` at `:340-368`), though nothing derives
   from `request`. Removing PII
   stays a tombstone, and the fence
   hides every `identities/:id/pii` pair that precedes a
@@ -607,30 +576,6 @@ code comments cite; specs and plans written before the
   (`WHERE path = '/invitations/'`). Oracle: every live
   database has been wiped and reseeded after the ledger
   store's landing, and holds `/migrations/0000-root`
-- **0j.** A double-click under an open panel lands
-  where a person aimed. With the properties panel
-  open, a click on another node selects it and, on
-  release, centers it (`web-app/flows/detail.ts:1099-1108`;
-  FLOW-CANVAS.md prescribes the centering, and
-  `tests/browser/canvas-gestures.test.ts` 'a node
-  click under an open panel centers it on release
-  (F13)' decides only that the camera moves). A
-  double-click's first release therefore slides the
-  node from under its second press, which meets
-  empty canvas — `open-panel: false` closes the panel
-  (`web-app/app/flow-fsm-reduce.ts:97`) — or another
-  node, which takes the panel. The walk's element-id
-  drive re-aims between the presses, which is how F13
-  passed on `8e834e76`. The brainstorm decides how a
-  single click still centers while a double-click
-  holds still — the 4 Oct plan refused a timer
-  (Cleverness) — and whether item 11's "panel callback
-  re-fitting at a double-click's second press" rides
-  along. Oracle: a red Layer 2 test — two presses at
-  one point on a second node under an open panel
-  leave the panel open on it — turns green with the
-  center-on-release pin still green, and the next walk
-  scores F13 PASS
 - **4.** `/status` — `{ up: boolean, components: { postgres:
   boolean } }`, 200 when every component is up and 503
   when any is not, built for more components.
@@ -840,11 +785,10 @@ code comments cite; specs and plans written before the
   (`api/routes.ts:1363-1366`), which TEST-PLAN
   F36/F45 call PASS — the brainstorm decides whether
   that stays); the Auto Layout switch committing
-  without `commitAndFit` (`web-app/flows/detail.ts:946-956`),
-  the resize path with no gesture guard
-  (`web-app/app/adapters/resize-observer.ts`), and the
-  panel callback re-fitting at a double-click's second
-  press; rotation only on the
+  without `commitAndFit` (`web-app/flows/detail.ts:946-956`)
+  and the resize path with no gesture guard
+  (`web-app/app/adapters/resize-observer.ts`);
+  rotation only on the
   toggle path (`web-app/app/flow-layout.ts:1032-1037`);
   the mirror trigger; and the canvas entries of the
   genericity bullet (two zoom
@@ -938,7 +882,12 @@ Off the critical path; each with its oracle.
   (`postOrganizationInvitationGrant`,
   `api/invitations-domain.ts:588`) and then lands
   (`:607`). Two grants of one email name one
-  document, `<organization-id>:<identity-id>`.
+  document, `<organization-id>:<identity-id>`. That
+  leg may hold already: the grant latches the head it
+  read (`genesis` or `in-order`, `:604-606`), and the
+  statement refuses a latch the head has moved past
+  (`rawOutcome`, `shared/ledger-statement.ts:204-214`);
+  no race pins it.
   Oracle: two writers race the last accepted admin,
   a record-type DELETE against an instance create, an
   attribute DELETE against a flow PUT, an instance
@@ -1292,6 +1241,53 @@ Off the critical path; each with its oracle.
 
 ## Later work
 
+- `./bin/measure api` — the API's speed, in one run,
+  on the chart. Nothing records how fast the API
+  answers: `--profile` counts each page's API requests
+  and times none
+  (`web-app/app/measure-profile-core.ts:122-162`). The
+  spawned server already times every request — one
+  JSON line each with `method`, `path`, `status`, and
+  `latencyMs`, dispatch to response construction
+  (`server/http-server.ts:477-496`; µs kept,
+  `tests/http-server.test.ts:216`, run) — and
+  `web-app/app/measure.ts:632` spawns it with
+  `stdout: 'null'`, so every sweep discards them. Pipe
+  stdout and drain it as stderr is drained
+  (`measure.ts:639-656`), keep the `/api/` lines, and
+  give each local `--record` row an `api` block shaped
+  like a page's: `latencyMs` (trimmed median),
+  `spread`, `requests`, and per route a `count` and
+  median `latencyMs`, ids folded by
+  `canonicalizeResource`, extended to fold an
+  `<id>:<id>` segment, which it leaves whole today
+  (run). `parseHistoryJsonl` validates the block when
+  present, as it does `spread`. A 5xx line fails the
+  run before `--record` writes; whether a sweep logs
+  one today is unmeasured. `api` is a mode word, as
+  `./test postgres` is:
+  `--runs 1 --record --visualize` over the full
+  registry (that preset parses today, run), taking
+  `--runs N` and refusing every other flag
+  (`--base-url` has no log to read). The report prints
+  the per-route table. The system trend, the mean of
+  page medians (`#sys-trend`), gains the API line on a
+  right axis: both axes from zero, each titled and
+  ticked in its line's color, API points square, the
+  tooltip naming the three slowest routes; rows before
+  the block draw no API point. Both lines take classes
+  colored from DESIGN-SYSTEM.md, readyMs `--primary`
+  and API `--accent`, retiring the hex at
+  `measure-viz.ts:1299` and `:1311`; the viz's own
+  `--accent` is blue (`:139`), and `padR = 16`, the
+  right margin a right axis must outgrow, is written
+  thrice (`:1202`, `:1395`, `:1420`). Oracle:
+  `./bin/measure api` on a clean tree appends one
+  `runs: 1` row carrying an `api` block whose
+  `requests` is above zero, the visualizer draws both
+  lines on two zero-based axes, and a `Deno.test`
+  feeding the harvester a log with one 5xx line
+  asserts the refusal
 - XSS can use the refresh cookie from the page. The
   cookie is HttpOnly, SameSite=Strict, Path=
   `/api/authentication`, Secure
@@ -1551,6 +1547,47 @@ Off the critical path; each with its oracle.
   Oracle: a rejected `getIdea` leaves none of its reads
   in flight, pinned as `tests/adapters-flow-stats.test.ts`
   pins `getFlowStats`, and the yield at `:195` is gone
+- A same-node double-click can move the node by the
+  camera's pan. With Auto Fit off and the flow
+  unlocked, the second press on the selected node's
+  body emits `open-panel: true`, `capture-pointer`, and
+  the gesture-start `request-update`, in that order. The
+  panel callback (`web-app/flows/detail.ts:1110-1117`)
+  runs first: `withPanelOpen(true)` pans the camera to
+  center the node — from a closed panel, and from an
+  open one when the camera has left the node off center
+  (`web-app/app/flow-designer-actions.ts:475-486`,
+  `:502-507`) — writing `x` and `y` into the `viewBox`
+  object in place
+  (`web-app/app/presenters/flow-designer.ts:489-490`),
+  an object the gesture's state shares. The drag's
+  start point was mapped through the camera before
+  that pan; each `pointermove` maps through it after
+  (`web-app/app/flow-interactions.ts:665-668`). A move
+  before the release therefore carries the pan offset,
+  and the release answers `move-nodes` by it, not by
+  the pointer's travel. FLOW-CANVAS.md `## Camera
+  rules` holds the camera still under an in-flight
+  gesture for the `request-update` callback only. Read
+  from the code, and reproduced in a scratch
+  composition of the presenter and the reducer, not in
+  the page. Auto Fit on is not affected:
+  `applyPanelTransition` returns null under Auto Fit
+  (`web-app/app/flow-designer-actions.ts:474`), so
+  `withPanelOpen` writes no `viewBox` field, and the
+  fit that follows assigns a fresh `viewBox` object
+  (`flow-designer.ts:1020-1021`), which the gesture's
+  state does not share. Item 11 lists the in-place
+  writes among its debts; this is the one that moves a
+  node. Oracle: a Layer 2 test in
+  `tests/browser/canvas-gestures.test.ts` with Auto Fit
+  off — click a node away from the visible center,
+  press it again inside the window, move the pointer
+  1 px, and release; then the same with the panel open
+  on that node and the camera panned off it — finds the
+  node's stored position moved by the pointer's travel
+  in canvas units (1 px over the zoom), not by the
+  camera's pan
 - Four panel doors are unpinned. A panel closed
   outside `withPanelOpen` must not hand the next
   empty-canvas click or delete the viewBox it saved on
@@ -1581,11 +1618,47 @@ Off the critical path; each with its oracle.
   under Auto Fit and switch it back off; zoom in once
   and click empty canvas — each keeping the zoomed
   camera
+- A double-click's second press under an open panel
+  re-fits the camera under Auto Fit. The panel callback
+  `(open) => ...` (`web-app/flows/detail.ts:1110-1117`)
+  runs `reconcileFitFromDom()`, and so does the
+  `request-update` callback (`:1093`) for a press that
+  starts no gesture, as a second press matched by its
+  point does. With Auto Fit on, such a press re-fits
+  between pointer-down and pointer-up. FLOW-CANVAS.md
+  `## Camera rules` forbids the `request-update`
+  callback's re-fit there in its MUST NOT and prescribes
+  it in its "Every other update" sentence, so the
+  section disagrees with itself, and any fix amends the
+  rule text. The re-fit undoes the first release's
+  centering; TEST-PLAN F13 requires Auto Fit off because
+  of it. F14's re-fit when a double-click opens a closed
+  panel is the `request-update` callback's, which
+  overwrites the panel callback's, so F14 does not need
+  the panel callback's. F14's re-fit lands at the
+  release for a draggable node, and at the press for a
+  locked flow or a press matched by its point, whose
+  release does nothing; a fix that removes press-time
+  re-fits must still re-fit those presses once, or F14
+  fails for them. The oracle's second node takes the
+  point rule's path; the first node pressed again, when
+  its first release left it under the press point,
+  takes the id rule's path: its panel callback re-fits
+  at the press, but the gesture-start commit installs
+  the gesture state's older `viewBox` before paint, so
+  the camera re-fits once, at the release, which a fix
+  that removes press-time re-fits leaves in place; it
+  needs its own case. Oracle: a Layer 2 test in
+  `tests/browser/canvas-gestures.test.ts` with Auto Fit
+  on (the fixture default) — the `viewBox` after a
+  double-click on a second node under an open panel
+  equals the one its first release left — and F13 no
+  longer requires Auto Fit off
 - A flow loaded with Auto Fit off does not fit on
   first paint. `withCanvasSize`
   (`web-app/app/presenters/flow-designer.ts:974-995`)
   fits only under `isAutoFit`, and the load-time block
-  (`web-app/flows/detail.ts:1798-1813`) is the only
+  (`web-app/flows/detail.ts:1797-1813`) is the only
   load-time fit — its `reconcileFitFromDom()` returns
   early for the same reason, though the run-four plan
   promises "onFlowLoaded keeps its explicit first fit"
@@ -1594,6 +1667,40 @@ Off the critical path; each with its oracle.
   Oracle: a flow loaded with Auto Fit off fits on first
   paint, or the plan says it
   does not
+- A press's stamp is the wall clock. `bindInteractions`
+  stamps each press with `Date.now()`
+  (`web-app/app/flow-interactions.ts:578`, `:619`,
+  `:634`, `:648`), and the three double-click checks in
+  `web-app/app/flow-fsm-reduce.ts` — a node press, an
+  edge press, and `isSecondPressNear` — compare
+  `now - time` to `DBLCLICK_MS`. A clock set back
+  between two presses makes that difference negative,
+  which is less than `DBLCLICK_MS`, so two presses on
+  one node seconds apart read as a double-click.
+  `performance.now()` is monotonic. Oracle: a Layer 2
+  test in `tests/browser/canvas-gestures.test.ts`
+  clicks one node twice, a second apart, with
+  `Date.now` set back an hour between the clicks, and
+  finds the panel closed
+- A Meta double-click opens the panel with nothing
+  selected. A Meta press toggles its node in the
+  selection (`nextSelectionForNodeClick`,
+  `web-app/app/flow-fsm-reduce.ts:350-363`), so the
+  first press of a pair on an unselected node selects
+  it, and the second, inside `DBLCLICK_MS`, takes the
+  same-element path (`:184-197`): it removes the node,
+  still emits `open-panel: true`, and starts a drag
+  over an empty selection (run: selection `none`;
+  actions `open-panel`, `capture-pointer`,
+  `request-update`). The adapter counts Ctrl as Meta
+  (`web-app/app/flow-interactions.ts:610-612`). It
+  predates the point rule; the tree before it behaves
+  the same (run). Whether the pair should keep the
+  node, or a Meta press should never count as a
+  double-click, is the brainstorm's. Oracle: a Layer 1
+  scenario in `tests/flow-fsm-scenarios.test.ts` — a
+  Meta pair on one node never ends with `open-panel:
+  true` beside an empty selection
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is
@@ -1967,6 +2074,23 @@ Off the critical path; each with its oracle.
     `<title>` copy (F10) — Layer 1, `buildGraphSvg` with
     a wired and an unwired Create node, locked and
     unlocked
+  - A second press that lands on a node centering slid
+    under the first press's point (F13) — Layer 2,
+    `tests/browser/canvas-gestures.test.ts`, beside 'a
+    double-click on a second node under an open panel
+    keeps the panel on it (F13)', which does not aim its
+    second press at a node: the pair keeps the panel on
+    the node the first press hit. A `mousedown` focuses
+    the pressed node, and its `focusin` dispatches
+    `canvas-focus`
+    (`web-app/app/flow-interactions.ts:785-798`), which
+    selects it and re-centers; the page replaces the
+    pressed node inside the `pointerdown` listener, so
+    Chrome's focus default should find it gone — by
+    reading, not by test. The Layer 1 scenario 'a press
+    on a node slid under the first press point neither
+    selects nor drags it (F13)' pins the pointer path
+    alone
   - The connect preview's markup — the "New State" ghost
     card, the grey straight line, and the bezier with its
     arrowhead (F15, F19, F23) — Layer 1,
@@ -1975,7 +2099,7 @@ Off the critical path; each with its oracle.
     / `withZoomedOut` through `#guardAutoFit`,
     `web-app/app/presenters/flow-designer.ts:877-903`)
     and the step path's 0.25 floor
-    (`web-app/app/flow-interactions.ts:945-950`) (F29) —
+    (`web-app/app/flow-interactions.ts:953-958`) (F29) —
     Layer 1, `tests/flow-designer-presenter.test.ts` for
     the buttons (only the wheel path is covered); the fit
     path's `MIN_ZOOM` clamp is pinned
@@ -2148,9 +2272,11 @@ Off the critical path; each with its oracle.
     updates the agent document'` never changes it
   - An event's `jti`, `parentJti`, `action`, and `at`
     reaching the presenter through one real adapter call
-    (G25) — Layer 1; the adapter test asserts chain
-    grouping and event counts only, and the presenter
-    test that renders `parentJti` hand-builds its fixture
+    (G25) — Layer 1; the adapter tests assert each
+    event's `jti` and `parentJti` and their order by
+    `at`, never an event's `action` or `at` value, and
+    the presenter test that renders `parentJti`
+    hand-builds its fixture
   - A `linked` provider badge distinct from `unlinked`
     (G26) — Layer 1, a scoped assertion in
     `presenter-identity-providers.test.ts`; `/linked/` is
@@ -2363,7 +2489,7 @@ Off the critical path; each with its oracle.
     a third test in `tests/browser/two-jars.test.ts`: B
     sits on `ideas/`, A writes, B's DOM is unchanged
     until B navigates
-- SP-6 sign-up (`web-app/auth/index.ts:641-651`)
+- SP-6 sign-up (`web-app/auth/index.ts:642-655`)
 - Billing (`web-app/billing/`)
 - Table migrations — wait on their trigger: the ledger
   store holds the table's DDL final, and item 0h ships
@@ -2405,9 +2531,16 @@ Off the critical path; each with its oracle.
   bearer per requester, minted by a simulated login
   whose own pairs land too, and the seed runs without
   the signing key (`tests/pg-seed.test.ts:433`).
+  SCHEMA.md says the reverse: its `fa_request_id_of`
+  index entry reads "A seed pair stores one"
+  (`SCHEMA.md:96`), while `withoutRequestIdLine`
+  strips the line from every seed row and throws on a
+  row without one (`api/ledger-seed.ts:113-126`).
   Oracle: a seeded write pair's secrets hold the line
   its requester would have sent, or SCHEMA.md names the
-  seed as the axiom's one exception
+  seed as the axiom's one exception; either way
+  SCHEMA.md's index entry matches what a seed pair
+  stores
 - Immutable document types. A family declares itself
   immutable where it declares its conditional; every
   write is a genesis under the never-written latch, so a
@@ -2561,7 +2694,9 @@ Off the critical path; each with its oracle.
   `api/derive-identity-tokens.ts:121`,
   `api/head-reads.ts:123`,
   `api/organization-requests.ts:56`,
-  `api/routes.ts:926`, `:3724`, and the test-only
+  `api/routes.ts:926`, `:3724`, its `…Containing`
+  sibling at `api/memberships.ts:263`, `:297`, and
+  `:310`, and the test-only
   `documentCollectionGetHandler`
   (`api/document-family.ts:434`) — while per-id reads go
   through `messageStore(db).getDocumentHead`.
@@ -2702,11 +2837,11 @@ Off the critical path; each with its oracle.
   (`api/mock-data/ai-members.ts`) spells four of its names
   again as agent names, and TEST-PLAN.md spells catalog
   names in prose: AA7a lists the four and picks "Claude
-  Haiku 4.5" (`:647-656`), AA8a's example names "Claude
-  Sonnet 4.6" (`:683`), two pin notes quote a
-  fixture's 'Claude Opus 4.8' (`:694`, `:5588`), and the
+  Haiku 4.5" (`:684-693`), AA8a's example names "Claude
+  Sonnet 4.6" (`:720`), two pin notes quote a
+  fixture's 'Claude Opus 4.8' (`:731`, `:5767`), and the
   native-select driving note and G24b spell GPT-5.5 and
-  "Claude Sonnet 4.6" (`:346-348`, `:5618`). Make the
+  "Claude Sonnet 4.6" (`:369-370`, `:5797`). Make the
   catalog the one list first: the roster takes each
   agent's name from its `model` id, and TEST-PLAN.md
   names models by their place in the catalog (the
@@ -2724,7 +2859,8 @@ Off the critical path; each with its oracle.
   `api/provider-models.ts` but in test fixtures;
   TEST-PLAN.md prose counts as a spelling
 - Cachability — the static server serves hashed names
-  and gzip sidecars, and its `HEAD` reports GET's
+  under `HASHED_CACHE_CONTROL` and gzip sidecars, and
+  its `HEAD` reports GET's
   `Content-Length`. The API serves no `HEAD`: its
   method switch has no case for it
   (`api/api.ts:964-1349`), so it answers 405, and that
@@ -2748,8 +2884,7 @@ Off the critical path; each with its oracle.
   `server/http-server.ts` `NO_STORE` and
   `CONTENT_SECURITY_POLICY`. Oracle: a measured
   `./bin/measure` repeat-load delta naming the header
-  that earned it; hashed assets carry
-  `HASHED_CACHE_CONTROL`; an API `HEAD` answers its GET's
+  that earned it; an API `HEAD` answers its GET's
   status and headers with no body, and a 405 carries
   `Allow`.
 - ACL-editing UI for record attributes (`read_roles` /
@@ -2852,11 +2987,19 @@ Off the critical path; each with its oracle.
   `name`) holds. Say "no read discovers pairs by
   pattern" instead. Oracle: the reworded line, and the
   one `.exec` named as the sanctioned parse
+- The message-plane spec cites a TODO.md line. Its
+  token section sends readers to "The cross-party
+  delegation bullet (`TODO.md:1580`)"
+  (`docs/superpowers/specs/2026-09-23-message-plane-design.md:177`);
+  that bullet has moved, and every edit above it moves
+  it again. Oracle: the spec names the
+  bullet by its title, "The cross-party delegation
+  ledger", and no line number
 - `./bin/measure --record` writes the literal `'unknown'` as
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and a `sysctl` read is unverifiable and
-  macOS-only. The ten newest of the fourteen rows in
+  macOS-only. The twelve newest of the sixteen rows in
   `measurements/history.jsonl` store `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
   which needs `measure-core.ts`'s field type and
@@ -2866,17 +3009,61 @@ Off the critical path; each with its oracle.
   key renders without the separator.
 - TEST-PLAN.md's Pin lines lag their pins. R4's says
   `RecordDetailEditPresenter` carries no CLI test
-  (`:6979`) and R6's omits 'a select attribute renders
+  (`:7185`) and R6's omits 'a select attribute renders
   no constraint picker', both stale;
   AA4's says `bindAddMemberDialog` has no browser test
-  (`:602`), though `tests/browser/member-create.test.ts`
+  (`:639`), though `tests/browser/member-create.test.ts`
   and `tests/browser/dialogs.test.ts` drive it; V8's
   says the state badge is claimed by nothing, though
   Declined and Revoked are, and expects "No outstanding
-  invitations." (`:5381`, `:5400`) where the test asserts
+  invitations." (`:5560`, `:5579`) where the test asserts
   "No pending invitations." instead. Oracle: each named
   Pin line names its test, and each named claim matches
   the code
+- Four phrases of the double-click text leave a reader
+  to guess. FLOW-CANVAS.md `## Camera rules` says a
+  press on the same element "keeps its own path"
+  without saying what the path does (a press on a
+  node's body applies the click's selection rule,
+  `nextSelectionForNodeClick` — Shift adds the node,
+  Meta or Ctrl toggles it — and, unless the flow is
+  locked, starts its drag and captures the pointer; a
+  press on its port selects that node alone, whatever
+  the modifiers, and starts a connect and captures the
+  pointer; an edge press selects the edge and starts
+  nothing; each emits `open-panel: true` inside the
+  window); its third-press sentence's "on the same
+  element" reads as where the third press lands, where
+  it means the double-click stays on the first press's
+  element, and "chains from the second" does not say
+  the window and the slop restart at the second press.
+  TEST-PLAN F13 and Scoring score a panel that "names
+  another node", where the Layer 2 pin decides a panel
+  that does not name that node, so a panel left open on
+  an edge falls between PASS and BLOCKED. Oracle: the
+  paragraph says what the same-element path does and
+  what restarts at the second press, and F13 and
+  Scoring say "closed or does not name that node"
+- The double-click spec and plan keep texts the branch
+  replaced. In
+  `docs/superpowers/specs/2026-10-07-double-click-under-panel-design.md`,
+  § 4 says the matching press "starts no gesture" (a
+  press on the same element keeps its own path), calls
+  the re-fit "against the Camera rules" (the section
+  disagrees with itself), and scores a delivered
+  double-click "that misses" BLOCKED (the shipped text
+  defers to the Layer 2 pin, which fails when the panel
+  is closed or does not name the double-clicked node);
+  `## Sequence` lists the close before the TEST-PLAN
+  pin, which the branch swapped; and § 3's "more than
+  4 px apart" reads against its scenarios 2, 3, and 8,
+  which put another element at the first press point on
+  purpose. The plan's Tasks 5, 6, and 7 and its Review
+  Focus items 3 and 9 carry the first texts, and Task
+  8's Check names TODO.md line numbers that the shipped
+  entry moved. Oracle: the spec and plan quote the
+  shipped texts and order, and the 4 px sentence says
+  it speaks of accidental proximity
 - The small bipolar gauge's `display` text has no
   legend or caption. Oracle: the gauge names what its number is, for the
   eye and for a screen reader
@@ -2899,24 +3086,12 @@ Off the critical path; each with its oracle.
   FS3, K28) and "centred" in one ("the centred
   special label"); TEST-PLAN.md spells centre, colour,
   labelled, neighbouring, honoured, and recognises in
-  23 lines. The 0a branch's 9f already made 0j say
-  "center". Say "color", "center" (and its forms),
+  22 lines. Say "color", "center" (and its forms),
   "labeled", "neighboring", "honored", and
   "recognizes", leaving `grey` alone (the CSS spells
   both). Oracle: `grep -n -i -e centre -e colour -e
   labelled -e neighbour -e honour -e recognis TODO.md
   TEST-PLAN.md` prints nothing once this entry is gone
-- The Critical product path intro lost a cue. Its last
-  "then" before 0j became "and" in the 0a branch's 9f,
-  as the spec required, so "...(0i); and F13's
-  double-click under an open panel (0j)" reads as
-  though 0j rides the ledger's one deploy. "Eighteen
-  items, in this order" and `## Sequencing` still hold
-  the order (nothing there names 0j), so nothing
-  breaks; closing 0j removes the clause and this entry
-  with it. Restore "then". Oracle: the intro reads
-  "...(0i); then F13's double-click under an open panel
-  (0j)." or no longer names 0j
 - Test-only list oracles. `documentCollectionGetHandler` and
   `documentGetHandler` (`api/document-family.ts`) and the
   `GetHandler` type (`api/routes.ts`) serve no route; sixteen
@@ -2949,8 +3124,8 @@ Off the critical path; each with its oracle.
   bell, `web-app/members/detail.ts:225-229`,
   `:261-271`, beside the save's own re-read at
   `:563`); two zoom implementations and two constant
-  sets (`web-app/app/flow-fsm-reduce.ts:12-14, 626-675`,
-  `web-app/app/flow-interactions.ts:16-18, 908-966`);
+  sets (`web-app/app/flow-fsm-reduce.ts:13-15, 712-761`,
+  `web-app/app/flow-interactions.ts:16-18, 916-974`);
   `#noteMutation` / `history()` beside
   `advanceHistory`
   (`web-app/app/presenters/flow-designer.ts:198-204`);
@@ -2998,7 +3173,7 @@ Off the critical path; each with its oracle.
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
 - One rehearsal per test process, if measurement earns
-  it. `tests/` calls `seededMockDb()` at 96 sites, and
+  it. `tests/` calls `seededMockDb()` at 98 sites, and
   `sharedMockDb()` seeds once per worker that uses it;
   each builds the identical dataset from nothing: hash,
   form, rehearse, land. A landing onto an absent table
@@ -3067,9 +3242,10 @@ Off the critical path; each with its oracle.
   transport (`inProcessFetch`,
   `tests/in-page-facade.ts:31-56`) does too, after
   `simulateLatency()`, its only caller, so a timer there
-  measures the handler alone. Record
-  per request: method, route family (ids folded to `:id`),
-  status, handler ms, wall stamp. A throwaway probe on
+  measures the handler alone. The `./bin/measure api`
+  entry harvests the server's own `latencyMs` log line
+  and records a median per route; this entry adds what
+  its charts need beyond that. A throwaway probe on
   the memory suite (`--parallel`) saw 7,318 requests
   over a 36 s span (~200/s, peak 1,845 in one second);
   handler ms p50 0.57, p90 4.5, p99 100, max 244;
@@ -3079,10 +3255,10 @@ Off the critical path; each with its oracle.
   the Postgres origin (`--base-url`) is where a rate means
   something. Visualize beside readyMs in `measure-viz`: a
   log-bucket latency histogram, per-route p50/p90/p99, and a
-  requests-per-second timeline. Oracle: `--record` writes the
-  per-route figures to `measurements/`; `--visualize` draws
-  the three charts; `--check` gates per-route p90 against
-  `measurements/budgets.json`.
+  requests-per-second timeline. `budgets.json` is keyed by
+  page, so per-route budgets need a key space it lacks.
+  Oracle: `--visualize` draws the three charts; `--check`
+  gates per-route p90 against `measurements/budgets.json`.
 - Filtering other collections by a body field. The
   partial index `fa_message_pairs_body` reaches
   `path = '/invitations/'` only
@@ -3196,7 +3372,6 @@ Off the critical path; each with its oracle.
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
   fences it)
-- 0b → 0c: the count follows the moorings
 - 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
 - 0e → 0f → 0g → 0h → 0i, one deploy: names first, so
@@ -3216,8 +3391,6 @@ Off the critical path; each with its oracle.
   pairs") — the closer removes the
   ARCHITECTURE.md bullet and this file's line in one
   commit; item 0f rewords two and closes none
-- Item 7 precedes routing the roster through the
-  profile
 - The claim-expiry event, succeeding
   `isClaimUnlapsedAt`'s request-stamp judgment, lands
   before any multi-process deployment

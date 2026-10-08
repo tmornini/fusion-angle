@@ -114,6 +114,29 @@ from) while the panel is open, it then runs
 `withSelectionCentered` to pan the newly selected node
 to the visible canvas center (zoom unchanged).
 
+A double-click is two presses inside `DBLCLICK_MS` on
+one element, or two presses inside it whose client
+points lie within `DBLCLICK_SLOP_PX` (4 px) of one
+another while the first press's element is still in the
+FSM's selection, even after centering has slid the node
+from under the pointer (`isSecondPressNear` in
+`web-app/app/flow-fsm-reduce.ts`). Pan mode is checked
+first, and a press on the same element as the last
+click keeps its own path. A press that matches only by
+its point, on another element or the bare canvas, runs
+the double-click on the first press's element and
+starts no gesture: it emits `open-panel: true`, keeps
+the selection, and captures no pointer, so its release
+is a no-op and the page does not center again. A third
+press chains from the second, on the same element. With
+Auto Fit on, a second press that starts no gesture
+under an open panel re-fits the camera between
+pointer-down and pointer-up through the `request-update`
+callback, which the MUST NOT above forbids and the
+"Every other update" sentence prescribes; TODO.md files
+the conflict as "A double-click's second press under an
+open panel re-fits the camera under Auto Fit."
+
 ## Special nodes
 
 The two special nodes (`isCreate` / `isArchive`) persist
