@@ -1525,6 +1525,37 @@ Off the critical path; each with its oracle.
   Oracle: a rejected `getIdea` leaves none of its reads
   in flight, pinned as `tests/adapters-flow-stats.test.ts`
   pins `getFlowStats`, and the yield at `:195` is gone
+- A same-node double-click can move the node by the
+  camera's pan. With Auto Fit off, the panel closed, and
+  the flow unlocked, the second press on the selected
+  node's body emits `open-panel: true`,
+  `capture-pointer`, and the gesture-start
+  `request-update`, in that order. The panel callback
+  (`web-app/flows/detail.ts:1110-1117`) runs first:
+  `withPanelOpen(true)` pans the camera to center the
+  node, writing `x` and `y` into the `viewBox` object
+  in place
+  (`web-app/app/presenters/flow-designer.ts:489-490`),
+  an object the gesture's state shares. The drag's
+  start point was mapped through the camera before
+  that pan; each `pointermove` maps through it after
+  (`web-app/app/flow-interactions.ts:665-668`). A move
+  before the release therefore carries the pan offset,
+  and the release answers `move-nodes` by it, not by
+  the pointer's travel. FLOW-CANVAS.md `## Camera
+  rules` holds the camera still under an in-flight
+  gesture for the `request-update` callback only. Read
+  from the code, not reproduced. Auto Fit on is not
+  affected: its fit assigns a fresh `viewBox` object
+  (`flow-designer.ts:1020-1021`), which the gesture's
+  state does not share. Item 11 lists the in-place
+  writes among its debts; this is the one that moves a
+  node. Oracle: a Layer 2 test in
+  `tests/browser/canvas-gestures.test.ts` with Auto Fit
+  off — click a node away from the visible center,
+  press it again inside the window, move the pointer
+  1 px, and release — finds the node within a pixel's
+  distance of where it started
 - Four panel doors are unpinned. A panel closed
   outside `withPanelOpen` must not hand the next
   empty-canvas click or delete the viewBox it saved on
