@@ -1547,10 +1547,12 @@ Off the critical path; each with its oracle.
   the pointer's travel. FLOW-CANVAS.md `## Camera
   rules` holds the camera still under an in-flight
   gesture for the `request-update` callback only. Read
-  from the code, not reproduced. Auto Fit on is not
-  affected: `applyPanelTransition` returns null under
-  Auto Fit (`web-app/app/flow-designer-actions.ts:474`),
-  so `withPanelOpen` writes no `viewBox` field, and the
+  from the code, and reproduced in a scratch
+  composition of the presenter and the reducer, not in
+  the page. Auto Fit on is not affected:
+  `applyPanelTransition` returns null under Auto Fit
+  (`web-app/app/flow-designer-actions.ts:474`), so
+  `withPanelOpen` writes no `viewBox` field, and the
   fit that follows assigns a fresh `viewBox` object
   (`flow-designer.ts:1020-1021`), which the gesture's
   state does not share. Item 11 lists the in-place
