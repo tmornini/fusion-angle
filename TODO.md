@@ -912,7 +912,12 @@ Off the critical path; each with its oracle.
   (`postOrganizationInvitationGrant`,
   `api/invitations-domain.ts:588`) and then lands
   (`:607`). Two grants of one email name one
-  document, `<organization-id>:<identity-id>`.
+  document, `<organization-id>:<identity-id>`. That
+  leg may hold already: the grant latches the head it
+  read (`genesis` or `in-order`, `:604-606`), and the
+  statement refuses a latch the head has moved past
+  (`rawOutcome`, `shared/ledger-statement.ts:204-214`);
+  no race pins it.
   Oracle: two writers race the last accepted admin,
   a record-type DELETE against an instance create, an
   attribute DELETE against a flow PUT, an instance
