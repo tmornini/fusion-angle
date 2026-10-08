@@ -1,10 +1,11 @@
 import type {
     InteractionState,
+    LastClick,
     Selection,
 } from './flow-interactions.ts';
 
 export type FsmState = InteractionState;
-export type { Selection };
+export type { LastClick, Selection };
 
 export interface NodeMoveUpdate {
     nodeId: string;

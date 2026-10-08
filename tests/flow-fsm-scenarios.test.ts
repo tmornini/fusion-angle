@@ -1,9 +1,12 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert, assertEquals, assertStrictEquals,
+} from '@std/assert';
 import { reduceFsm }
     from '../web-app/app/flow-fsm-reduce.ts';
 import type {
     FsmState,
     FsmInput,
+    FsmResult,
     Action,
     NodeWithPos,
 } from '../web-app/app/flow-fsm-types.ts';
@@ -66,6 +69,135 @@ function drive(
         out.push(...r.actions);
     }
     return { state: s, actions: out };
+}
+
+const PRESS_AT_MS = 1000;
+const PRESS_X = 300;
+const PRESS_Y = 200;
+const SLOP_PX = 4;
+const BEYOND_SLOP_PX = 5;
+const FAR_PX = 40;
+const LAST_INSIDE_MS = 399;
+const FIRST_OUTSIDE_MS = 400;
+const CHAINED_MS = 350;
+
+type NodePress = Extract<
+    FsmInput, { kind: 'pointer-down-on-node' }
+>;
+
+function nodePress(
+    nodeId: string,
+    now: number,
+    clientX: number,
+    clientY: number,
+): NodePress {
+    return {
+        kind: 'pointer-down-on-node',
+        nodeId,
+        isPort: false,
+        isDraggable: true,
+        isShift: false,
+        isMeta: false,
+        isLocked: false,
+        svgX: clientX, svgY: clientY,
+        clientX, clientY,
+        now,
+        selectedPositions: new Map([
+            [nodeId, { x: 0, y: 0 }],
+        ]),
+    };
+}
+
+function canvasPress(
+    now: number,
+    clientX: number,
+    clientY: number,
+): FsmInput {
+    return {
+        kind: 'pointer-down-on-canvas',
+        svgX: clientX, svgY: clientY,
+        clientX, clientY,
+        now,
+    };
+}
+
+function edgePress(
+    edgeId: string,
+    now: number,
+    clientX: number,
+    clientY: number,
+): FsmInput {
+    return {
+        kind: 'pointer-down-on-edge',
+        edgeId,
+        now,
+        clientX, clientY,
+    };
+}
+
+function releaseAt(
+    clientX: number,
+    clientY: number,
+): FsmInput {
+    return {
+        kind: 'pointer-up',
+        svgX: clientX, svgY: clientY,
+        clientX, clientY,
+        isShift: false,
+        hoverNodeId: null,
+        fromNodePosition: null,
+        allNodes: [],
+    };
+}
+
+// The first click of a double-click: n1 pressed and
+// released at PRESS_X, PRESS_Y, so n1 is selected.
+function afterFirstClickOnN1(): FsmState {
+    return drive(buildState(), [
+        nodePress('n1', PRESS_AT_MS, PRESS_X, PRESS_Y),
+        releaseAt(PRESS_X, PRESS_Y),
+    ]).state;
+}
+
+// Rule (b): the press runs n1's double-click and
+// starts no gesture.
+function assertSecondPressOfN1(
+    r: FsmResult,
+    now: number,
+    clientX: number,
+    clientY: number,
+): void {
+    const panels = findActions(r.actions, 'open-panel');
+    assertStrictEquals(panels.length, 1);
+    assertStrictEquals(panels[0]?.open, true);
+    assertStrictEquals(
+        findAction(r.actions, 'capture-pointer'),
+        undefined,
+    );
+    assertStrictEquals(r.state.selection.kind, 'nodes');
+    if (r.state.selection.kind === 'nodes') {
+        assertEquals(
+            [...r.state.selection.nodeIds], ['n1'],
+        );
+    }
+    assertStrictEquals(r.state.drag.kind, 'idle');
+    assertStrictEquals(r.state.connect.kind, 'idle');
+    assertStrictEquals(r.state.marquee.kind, 'idle');
+    assertStrictEquals(r.state.pan.kind, 'idle');
+    assertEquals(r.state.lastClick, {
+        kind: 'clicked', id: 'n1', time: now,
+        clientX, clientY,
+    });
+}
+
+// Today's canvas press: the selection clears, a
+// marquee starts, and the panel closes.
+function assertCanvasClick(r: FsmResult): void {
+    const panels = findActions(r.actions, 'open-panel');
+    assertStrictEquals(panels.length, 1);
+    assertStrictEquals(panels[0]?.open, false);
+    assertStrictEquals(r.state.selection.kind, 'none');
+    assertStrictEquals(r.state.marquee.kind, 'selecting');
 }
 
 Deno.test(
@@ -864,5 +996,214 @@ Deno.test(
         assertStrictEquals(
             r.state.selection.kind, 'none',
         );
+    },
+);
+
+Deno.test(
+    'a canvas press at the first press point inside'
+    + ' the window is the second press (F13)',
+    () => {
+        const second = reduceFsm(
+            afterFirstClickOnN1(),
+            canvasPress(
+                PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+                PRESS_X, PRESS_Y,
+            ),
+        );
+        assertSecondPressOfN1(
+            second, PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+            PRESS_X, PRESS_Y,
+        );
+        const thirdAt =
+            PRESS_AT_MS + DBLCLICK_WITHIN_MS + CHAINED_MS;
+        const third = reduceFsm(
+            second.state,
+            canvasPress(thirdAt, PRESS_X, PRESS_Y),
+        );
+        assertSecondPressOfN1(
+            third, thirdAt, PRESS_X, PRESS_Y,
+        );
+    },
+);
+
+Deno.test(
+    'a press on a node slid under the first press point'
+    + ' neither selects nor drags it (F13)',
+    () => {
+        const r = reduceFsm(
+            afterFirstClickOnN1(),
+            nodePress(
+                'n2', PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+                PRESS_X, PRESS_Y,
+            ),
+        );
+        assertSecondPressOfN1(
+            r, PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+            PRESS_X, PRESS_Y,
+        );
+    },
+);
+
+Deno.test(
+    'an edge press at the first press point inside'
+    + ' the window is the second press (F13)',
+    () => {
+        const r = reduceFsm(
+            afterFirstClickOnN1(),
+            edgePress(
+                'e1', PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+                PRESS_X, PRESS_Y,
+            ),
+        );
+        assertSecondPressOfN1(
+            r, PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+            PRESS_X, PRESS_Y,
+        );
+    },
+);
+
+Deno.test(
+    'a press 4 px from the first press point matches'
+    + ' and one 5 px away does not (F13 slop)',
+    () => {
+        const at = PRESS_AT_MS + DBLCLICK_WITHIN_MS;
+        assertSecondPressOfN1(
+            reduceFsm(
+                afterFirstClickOnN1(),
+                canvasPress(
+                    at, PRESS_X + SLOP_PX, PRESS_Y,
+                ),
+            ),
+            at, PRESS_X + SLOP_PX, PRESS_Y,
+        );
+        assertCanvasClick(
+            reduceFsm(
+                afterFirstClickOnN1(),
+                canvasPress(
+                    at, PRESS_X + BEYOND_SLOP_PX, PRESS_Y,
+                ),
+            ),
+        );
+    },
+);
+
+Deno.test(
+    'a press at the first press point 399 ms later'
+    + ' matches and 400 ms later does not (F13 window)',
+    () => {
+        const inside = PRESS_AT_MS + LAST_INSIDE_MS;
+        assertSecondPressOfN1(
+            reduceFsm(
+                afterFirstClickOnN1(),
+                canvasPress(inside, PRESS_X, PRESS_Y),
+            ),
+            inside, PRESS_X, PRESS_Y,
+        );
+        assertCanvasClick(
+            reduceFsm(
+                afterFirstClickOnN1(),
+                canvasPress(
+                    PRESS_AT_MS + FIRST_OUTSIDE_MS,
+                    PRESS_X, PRESS_Y,
+                ),
+            ),
+        );
+    },
+);
+
+Deno.test(
+    'a second press on the same node beyond the slop'
+    + ' is still its double-click (F13 same node)',
+    () => {
+        const r = reduceFsm(
+            afterFirstClickOnN1(),
+            nodePress(
+                'n1', PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+                PRESS_X + FAR_PX, PRESS_Y,
+            ),
+        );
+        const panels = findActions(r.actions, 'open-panel');
+        assertStrictEquals(panels.length, 1);
+        assertStrictEquals(panels[0]?.open, true);
+        assertStrictEquals(r.state.drag.kind, 'dragging');
+        assert(findAction(r.actions, 'capture-pointer'));
+    },
+);
+
+Deno.test(
+    'pan mode pans at the first press point inside'
+    + ' the window (F13 pan)',
+    () => {
+        const panning: FsmState = {
+            ...afterFirstClickOnN1(),
+            isPanMode: true,
+        };
+        const at = PRESS_AT_MS + DBLCLICK_WITHIN_MS;
+        const presses = [
+            canvasPress(at, PRESS_X, PRESS_Y),
+            nodePress('n2', at, PRESS_X, PRESS_Y),
+        ];
+        for (const press of presses) {
+            const r = reduceFsm(panning, press);
+            assertStrictEquals(r.state.pan.kind, 'panning');
+            assertStrictEquals(
+                findAction(r.actions, 'open-panel'),
+                undefined,
+            );
+        }
+    },
+);
+
+Deno.test(
+    'a second press on another node port or locked'
+    + ' node starts no connect and no drag (F13)',
+    () => {
+        const at = PRESS_AT_MS + DBLCLICK_WITHIN_MS;
+        const press = nodePress('n2', at, PRESS_X, PRESS_Y);
+        const inputs = [
+            { ...press, isPort: true },
+            { ...press, isLocked: true },
+        ];
+        for (const input of inputs) {
+            assertSecondPressOfN1(
+                reduceFsm(afterFirstClickOnN1(), input),
+                at, PRESS_X, PRESS_Y,
+            );
+        }
+    },
+);
+
+Deno.test(
+    'a press at the point after the node left the'
+    + ' selection is a canvas click (F13 stale)',
+    () => {
+        const at = PRESS_AT_MS + DBLCLICK_WITHIN_MS;
+        const deleted: FsmState = {
+            ...afterFirstClickOnN1(),
+            selection: { kind: 'none' },
+        };
+        assertCanvasClick(reduceFsm(
+            deleted, canvasPress(at, PRESS_X, PRESS_Y),
+        ));
+        const toggledOff = drive(buildState(), [
+            nodePress(
+                'n1', PRESS_AT_MS - FIRST_OUTSIDE_MS,
+                PRESS_X, PRESS_Y,
+            ),
+            releaseAt(PRESS_X, PRESS_Y),
+            {
+                ...nodePress(
+                    'n1', PRESS_AT_MS, PRESS_X, PRESS_Y,
+                ),
+                isMeta: true,
+            },
+            releaseAt(PRESS_X, PRESS_Y),
+        ]).state;
+        assertStrictEquals(
+            toggledOff.selection.kind, 'none',
+        );
+        assertCanvasClick(reduceFsm(
+            toggledOff, canvasPress(at, PRESS_X, PRESS_Y),
+        ));
     },
 );

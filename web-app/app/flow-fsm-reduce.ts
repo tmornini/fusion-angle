@@ -6,6 +6,7 @@ import type {
     FsmInput,
     FsmResult,
     Action,
+    LastClick,
     Selection,
 } from './flow-fsm-types.ts';
 
@@ -13,9 +14,64 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
 const ZOOM_STEP = 0.1;
 const DBLCLICK_MS = 400;
+const DBLCLICK_SLOP_PX = 4;
 const MIN_DRAG_DISTANCE = 20;
 const AUTOFIT_TOAST_MSG =
     'Disable Auto-Fit to change the view';
+
+type Clicked = Extract<LastClick, { kind: 'clicked' }>;
+
+function isStillSelected(
+    selection: Selection,
+    id: string,
+): boolean {
+    return selection.kind === 'nodes'
+        ? selection.nodeIds.has(id)
+        : selection.kind === 'edge'
+            && selection.edgeId === id;
+}
+
+function isSecondPressNear(
+    state: FsmState,
+    now: number,
+    clientX: number,
+    clientY: number,
+): state is FsmState & { lastClick: Clicked } {
+    const last = state.lastClick;
+    return last.kind === 'clicked'
+        && now - last.time < DBLCLICK_MS
+        && Math.hypot(
+            clientX - last.clientX,
+            clientY - last.clientY,
+        ) <= DBLCLICK_SLOP_PX
+        && isStillSelected(state.selection, last.id);
+}
+
+function secondPressOf(
+    state: FsmState & { lastClick: Clicked },
+    input: {
+        now: number;
+        clientX: number;
+        clientY: number;
+    },
+): FsmResult {
+    const next: FsmState = {
+        ...state,
+        lastClick: {
+            ...state.lastClick,
+            time: input.now,
+            clientX: input.clientX,
+            clientY: input.clientY,
+        },
+    };
+    return {
+        state: next,
+        actions: [
+            { kind: 'open-panel', open: true },
+            { kind: 'request-update', state: next },
+        ],
+    };
+}
 
 export function reduceFsm(
     state: FsmState,
@@ -79,6 +135,14 @@ function onCanvasPointerDown(
             ],
         };
     }
+    if (
+        isSecondPressNear(
+            state, input.now,
+            input.clientX, input.clientY,
+        )
+    ) {
+        return secondPressOf(state, input);
+    }
     const next: FsmState = {
         ...state,
         lastClick: { kind: 'none' },
@@ -116,6 +180,15 @@ function onNodePointerDown(
 ): FsmResult {
     if (state.isPanMode) {
         return startPanFromNode(state, input);
+    }
+    if (
+        isSecondPressNear(
+            state, input.now,
+            input.clientX, input.clientY,
+        )
+        && state.lastClick.id !== input.nodeId
+    ) {
+        return secondPressOf(state, input);
     }
     const isDbl =
         state.lastClick.kind === 'clicked'
@@ -303,6 +376,15 @@ function onEdgePointerDown(
         kind: 'pointer-down-on-edge';
     }>,
 ): FsmResult {
+    if (
+        isSecondPressNear(
+            state, input.now,
+            input.clientX, input.clientY,
+        )
+        && state.lastClick.id !== input.edgeId
+    ) {
+        return secondPressOf(state, input);
+    }
     const isDbl =
         state.lastClick.kind === 'clicked'
         && input.edgeId === state.lastClick.id
