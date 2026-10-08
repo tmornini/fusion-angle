@@ -3402,8 +3402,6 @@ Off the critical path; each with its oracle.
   pairs") — the closer removes the
   ARCHITECTURE.md bullet and this file's line in one
   commit; item 0f rewords two and closes none
-- Item 7 precedes routing the roster through the
-  profile
 - The claim-expiry event, succeeding
   `isClaimUnlapsedAt`'s request-stamp judgment, lands
   before any multi-process deployment
