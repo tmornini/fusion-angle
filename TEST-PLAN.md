@@ -424,12 +424,13 @@ message, focus, or card replacement, or a retry whose
 GET does not answer 200 (read once the cards replace
 the error state), is FAIL of the exploratory half.
 BLOCKED only if `Fetch` itself refuses.
-F13's second press off the node after the first
-release centred it, both presses less than
-`DBLCLICK_MS` apart: FAIL, not BLOCKED (TODO.md 0j).
-Anything but exactly two presses that close is
-BLOCKED, naming the driver, whatever the second
-press hit.
+F13's one-point double-click, both presses less than
+`DBLCLICK_MS` apart: its Layer 2 pin decides it, so a
+pair after which the panel is closed or names another
+node is BLOCKED, naming the driver, unless that pin is
+red. Anything but exactly two presses that close is
+BLOCKED, naming the driver, whatever the second press
+hit.
 SV7 when SV6 did not produce a second jar:
 DEFERRED on SV6, not FAIL. Two tabs of one jar
 is SV8b.
@@ -2935,9 +2936,12 @@ opens and renders.)
   client-box center to the center of the part of
   `svg.flow-canvas`'s client box right of
   `.flow-props-panel` is at most 4 px.
-  A second press that lands off the
-  node because the first release moved the camera is
-  FAIL, not BLOCKED: the gesture was delivered.
+  A second press inside `DBLCLICK_MS` and within
+  `DBLCLICK_SLOP_PX` (4 px) of the first is the
+  double-click even when the first release slid the node
+  from under it; with its Layer 2 pin green, a delivered
+  pair after which the panel is closed or names another
+  node is BLOCKED, naming the driver, not FAIL.
   Pin: tests/flow-fsm-scenarios.test.ts 'double-click n1
        then double-click n2 retargets panel and selection
        to n2 (F13 retarget)' (decides the selection
@@ -2956,9 +2960,13 @@ opens and renders.)
        release (F13)' (decides the camera moves when a
        single click under an open panel releases — the
        move a one-point double-click's second press
-       meets); exploratory — the one-point double-click,
-       which TODO.md 0j owns until a red Layer 2 test
-       pins it, and the live retarget paint
+       meets); tests/browser/canvas-gestures.test.ts 'a
+       double-click on a second node under an open panel
+       keeps the panel on it (F13)' (decides two presses
+       at one point on a second node under an open panel
+       leave the panel open on it); exploratory — the
+       panel-aware re-center after the pair and the live
+       retarget paint
 - [ ] **F14** Turn Auto Fit on, then double-click a node.
   PASS: the panel opens and the canvas re-fits to the
   panel-aware visible region — no toast, no blocking.
