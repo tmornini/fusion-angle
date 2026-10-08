@@ -2712,7 +2712,9 @@ Off the critical path; each with its oracle.
   `api/derive-identity-tokens.ts:121`,
   `api/head-reads.ts:123`,
   `api/organization-requests.ts:56`,
-  `api/routes.ts:926`, `:3724`, and the test-only
+  `api/routes.ts:926`, `:3724`, its `…Containing`
+  sibling at `api/memberships.ts:263`, `:297`, and
+  `:310`, and the test-only
   `documentCollectionGetHandler`
   (`api/document-family.ts:434`) — while per-id reads go
   through `messageStore(db).getDocumentHead`.
