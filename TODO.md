@@ -2990,7 +2990,7 @@ Off the critical path; each with its oracle.
   disagrees with itself), and scores a delivered
   double-click "that misses" BLOCKED (the shipped text
   defers to the Layer 2 pin, which fails when the panel
-  is closed or does not name that node);
+  is closed or does not name the double-clicked node);
   `## Sequence` lists the close before the TEST-PLAN
   pin, which the branch swapped; and § 3's "more than
   4 px apart" reads against its scenarios 2, 3, and 8,
@@ -2998,9 +2998,9 @@ Off the critical path; each with its oracle.
   purpose. The plan's Tasks 5, 6, and 7 and its Review
   Focus items 3 and 9 carry the first texts, and Task
   8's Check names TODO.md line numbers that the shipped
-  entry moved. Oracle: the spec and
-  plan quote the shipped texts and order, and the 4 px
-  sentence says it speaks of accidental proximity
+  entry moved. Oracle: the spec and plan quote the
+  shipped texts and order, and the 4 px sentence says
+  it speaks of accidental proximity
 - The small bipolar gauge's `display` text has no
   legend or caption. Oracle: the gauge names what its number is, for the
   eye and for a screen reader
