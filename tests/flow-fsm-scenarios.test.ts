@@ -1131,6 +1131,25 @@ Deno.test(
 );
 
 Deno.test(
+    'a second press on the same node inside the slop'
+    + ' is still its double-click (F13 same node)',
+    () => {
+        const r = reduceFsm(
+            afterFirstClickOnN1(),
+            nodePress(
+                'n1', PRESS_AT_MS + DBLCLICK_WITHIN_MS,
+                PRESS_X, PRESS_Y,
+            ),
+        );
+        const panels = findActions(r.actions, 'open-panel');
+        assertStrictEquals(panels.length, 1);
+        assertStrictEquals(panels[0]?.open, true);
+        assertStrictEquals(r.state.drag.kind, 'dragging');
+        assert(findAction(r.actions, 'capture-pointer'));
+    },
+);
+
+Deno.test(
     'pan mode pans at the first press point inside'
     + ' the window (F13 pan)',
     () => {
