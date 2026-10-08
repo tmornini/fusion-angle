@@ -1621,6 +1621,21 @@ Off the critical path; each with its oracle.
   Oracle: a flow loaded with Auto Fit off fits on first
   paint, or the plan says it
   does not
+- A press's stamp is the wall clock. `bindInteractions`
+  stamps each press with `Date.now()`
+  (`web-app/app/flow-interactions.ts:578`, `:619`,
+  `:634`, `:648`), and the three double-click checks in
+  `web-app/app/flow-fsm-reduce.ts` — a node press, an
+  edge press, and `isSecondPressNear` — compare
+  `now - time` to `DBLCLICK_MS`. A clock set back
+  between two presses makes that difference negative,
+  which is less than `DBLCLICK_MS`, so two presses on
+  one node seconds apart read as a double-click.
+  `performance.now()` is monotonic. Oracle: a Layer 2
+  test in `tests/browser/canvas-gestures.test.ts`
+  clicks one node twice, a second apart, with
+  `Date.now` set back an hour between the clicks, and
+  finds the panel closed
 - The first click after a page reload only focuses the window
   — the focusing click is the viewport center, never the
   top-left brand (that is the Apple menu when Chrome is
