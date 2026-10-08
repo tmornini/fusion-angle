@@ -4889,17 +4889,20 @@ per-user visibility filter.
        Archive-tab visibility (no fixture varies this)
 - [ ] **WB22** Inspect
   `web-app/app/presenters/workbox-inbox.ts`. PASS:
-  `buildInboxItems` takes
-  `(workOrders, transitionsByWo, activeClaimsByWo,
-  memberMap, mode)`
-  with no scope parameter. The presenter exports nothing
-  related to per-user visibility — the workbox shows all
-  work orders to all users by construction.
-  Pin: exploratory — confirmed directly by reading
-       `buildInboxItems`'s exported signature (five
-       parameters, no scope parameter); a function
-       signature is not something a `node:test` assertion
-       decides
+  `buildInboxItems` takes four parameters —
+  `(workOrders, activeClaimsByWo, memberMap, mode)` —
+  and no scope parameter. Its exports are
+  `InboxItem`, `InboxMode`, `ActiveClaim`,
+  `WorkboxInboxPresenter`, and `buildInboxItems`;
+  none filters by user — the workbox shows all work
+  orders to all users by construction.
+  Pin: tests/workbox-inbox.test.ts calls
+       `buildInboxItems` with exactly these four
+       arguments, so AT1's `deno check` rejects any
+       further required parameter; exploratory — the
+       absence of a scope parameter is read from the
+       source, since no `Deno.test` assertion inspects
+       a signature
 - [ ] **WB23** Claim, release, and transition a work
   order in two tabs of one cookie jar: act in the
   first tab, then act on the same work order in the
