@@ -2963,12 +2963,15 @@ Off the critical path; each with its oracle.
 - Four phrases of the double-click text leave a reader
   to guess. FLOW-CANVAS.md `## Camera rules` says a
   press on the same element "keeps its own path"
-  without saying what the path does (a node press
-  applies the click's selection rule — Shift adds the
-  node, Meta toggles it — and, unless the flow is
-  locked, starts its drag or connect and captures the
+  without saying what the path does (a press on a
+  node's body applies the click's selection rule,
+  `nextSelectionForNodeClick` — Shift adds the node,
+  Meta or Ctrl toggles it — and, unless the flow is
+  locked, starts its drag and captures the pointer; a
+  press on its port selects that node alone, whatever
+  the modifiers, and starts a connect and captures the
   pointer; an edge press selects the edge and starts
-  nothing; either emits `open-panel: true` inside the
+  nothing; each emits `open-panel: true` inside the
   window); its third-press sentence's "on the same
   element" reads as where the third press lands, where
   it means the double-click stays on the first press's
