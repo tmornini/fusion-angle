@@ -1602,7 +1602,7 @@ Off the critical path; each with its oracle.
   runs `reconcileFitFromDom()`, and so does the
   `request-update` callback (`:1093`) for a press that
   starts no gesture, as a second press matched by its
-  point does. With Auto Fit on, the second press re-fits
+  point does. With Auto Fit on, such a press re-fits
   between pointer-down and pointer-up. FLOW-CANVAS.md
   `## Camera rules` forbids the `request-update`
   callback's re-fit there in its MUST NOT and prescribes
