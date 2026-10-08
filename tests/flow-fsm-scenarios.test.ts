@@ -1226,3 +1226,33 @@ Deno.test(
         ));
     },
 );
+
+Deno.test(
+    'a press at an edge click point matches only while'
+    + ' that edge stays selected (F13 edge)',
+    () => {
+        const at = PRESS_AT_MS + DBLCLICK_WITHIN_MS;
+        const clicked = drive(buildState(), [
+            edgePress('e1', PRESS_AT_MS, PRESS_X, PRESS_Y),
+            releaseAt(PRESS_X, PRESS_Y),
+        ]).state;
+        const r = reduceFsm(
+            clicked, canvasPress(at, PRESS_X, PRESS_Y),
+        );
+        const panels = findActions(r.actions, 'open-panel');
+        assertStrictEquals(panels.length, 1);
+        assertStrictEquals(panels[0]?.open, true);
+        assertEquals(
+            r.state.selection,
+            { kind: 'edge', edgeId: 'e1' },
+        );
+        assertStrictEquals(r.state.marquee.kind, 'idle');
+        const switched: FsmState = {
+            ...clicked,
+            selection: { kind: 'edge', edgeId: 'e2' },
+        };
+        assertCanvasClick(reduceFsm(
+            switched, canvasPress(at, PRESS_X, PRESS_Y),
+        ));
+    },
+);
