@@ -617,8 +617,7 @@ code comments cite; specs and plans written before the
   (F13)' decides only that the camera moves). A
   double-click's first release therefore slides the
   node from under its second press, which meets
-  empty canvas — `open-panel:
-  false` closes the panel
+  empty canvas — `open-panel: false` closes the panel
   (`web-app/app/flow-fsm-reduce.ts:97`) — or another
   node, which takes the panel. The walk's element-id
   drive re-aims between the presses, which is how F13
