@@ -2934,26 +2934,6 @@ Off the critical path; each with its oracle.
   `name`) holds. Say "no read discovers pairs by
   pattern" instead. Oracle: the reworded line, and the
   one `.exec` named as the sanctioned parse
-- The double-click spec and plan keep texts the branch
-  replaced. In
-  `docs/superpowers/specs/2026-10-07-double-click-under-panel-design.md`,
-  § 4 says the matching press "starts no gesture" (a
-  press on the same element keeps its own path), calls
-  the re-fit "against the Camera rules" (the section
-  disagrees with itself), and scores a delivered
-  double-click "that misses" BLOCKED (the shipped text
-  defers to the Layer 2 pin, which fails when the panel
-  is closed or does not name that node);
-  `## Sequence` lists the close before the TEST-PLAN
-  pin, which the branch swapped; and § 3's "more than
-  4 px apart" reads against its scenarios 2, 3, and 8,
-  which put another element at the first press point on
-  purpose. The plan's Tasks 5, 6, and 7 and its Review
-  Focus items 3 and 9 carry the first texts, and Task
-  8's Check names TODO.md line numbers that the shipped
-  entry moved. Oracle: the spec and
-  plan quote the shipped texts and order, and the 4 px
-  sentence says it speaks of accidental proximity
 - `./bin/measure --record` writes the literal `'unknown'` as
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
@@ -2999,6 +2979,26 @@ Off the critical path; each with its oracle.
   paragraph says what the same-element path does and
   what restarts at the second press, and F13 and
   Scoring say "closed or does not name that node"
+- The double-click spec and plan keep texts the branch
+  replaced. In
+  `docs/superpowers/specs/2026-10-07-double-click-under-panel-design.md`,
+  § 4 says the matching press "starts no gesture" (a
+  press on the same element keeps its own path), calls
+  the re-fit "against the Camera rules" (the section
+  disagrees with itself), and scores a delivered
+  double-click "that misses" BLOCKED (the shipped text
+  defers to the Layer 2 pin, which fails when the panel
+  is closed or does not name that node);
+  `## Sequence` lists the close before the TEST-PLAN
+  pin, which the branch swapped; and § 3's "more than
+  4 px apart" reads against its scenarios 2, 3, and 8,
+  which put another element at the first press point on
+  purpose. The plan's Tasks 5, 6, and 7 and its Review
+  Focus items 3 and 9 carry the first texts, and Task
+  8's Check names TODO.md line numbers that the shipped
+  entry moved. Oracle: the spec and
+  plan quote the shipped texts and order, and the 4 px
+  sentence says it speaks of accidental proximity
 - The small bipolar gauge's `display` text has no
   legend or caption. Oracle: the gauge names what its number is, for the
   eye and for a screen reader
