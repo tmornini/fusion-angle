@@ -14,11 +14,10 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Seventeen items, in this order — each its own brainstorm
+Fifteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
-The 0-items finish the release: the walk's remaining
-moorings and their count (0b–0c); admins
+The 0-items finish the release: admins
 held to their own organization (0d), since no second
 tenant shares an origin before it ships; then the
 ledger's one deploy — `fa_` names (0e), the fence
@@ -30,35 +29,6 @@ item's number is its name, which specs, plans, and
 code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
 
-- **0b.** F37a, R22, and WB22 moored to the product;
-  Task 10 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`
-  holds F37a's and R22's text.
-  F37a: one cookie jar cannot reach the 412 — a flow
-  save rings `fusion-angle:data`, and tab B re-reads
-  and latches the new head within one GET — so tab B
-  is a second jar (`Target.createBrowserContext`, as
-  SV6), which keeps the stale head. R22: nothing merges
-  two editors' values — a PATCH merges `set` and
-  `clear` onto the head it latched, a stale tag answers
-  412 (ARCHITECTURE.md:316-322), and the page re-reads
-  and asks the person to re-apply
-  (`INSTANCE_CONFLICT_NOTICE`, `web-app/records/detail.ts`)
-  — so the case reads refuse-and-refresh, not merged
-  values. WB22: `buildInboxItems` takes four
-  parameters, `(workOrders, activeClaimsByWo,
-  memberMap, mode)`
-  (`web-app/app/presenters/workbox-inbox.ts:255`),
-  where the case and its Pin name five. Oracle: each
-  case's text matches the code, and the next walk
-  drives F37a and R22 PASS
-- **0c.** AT2's count, current: after 0b, run
-  `./test validate browser` and replace AT2's "on 4 Oct
-  `./test` printed `ok | 4124 passed | 0 failed | 11
-  ignored`" (`TEST-PLAN.md:516`) with that run's date
-  and its main suite's line; Task 11 of
-  `docs/superpowers/plans/test-plan-walk-2026-10-04.md`.
-  Oracle: AT2 names the latest Layer 2 run's count
 - **0d.** Admins act within their organization. Any
   organization's admin can write a password credential
   for an identity in another organization and sign in
@@ -3402,7 +3372,6 @@ Off the critical path; each with its oracle.
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
   fences it)
-- 0b → 0c: the count follows the moorings
 - 0d → 0i: no second tenant shares an origin until an
   organization's admin stops at its own identities
 - 0e → 0f → 0g → 0h → 0i, one deploy: names first, so
