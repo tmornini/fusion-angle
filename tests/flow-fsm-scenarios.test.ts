@@ -174,6 +174,10 @@ function assertSecondPressOfN1(
         findAction(r.actions, 'capture-pointer'),
         undefined,
     );
+    assertStrictEquals(
+        findAction(r.actions, 'request-update')?.state,
+        r.state,
+    );
     assertStrictEquals(r.state.selection.kind, 'nodes');
     if (r.state.selection.kind === 'nodes') {
         assertEquals(
