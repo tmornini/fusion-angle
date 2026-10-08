@@ -2986,7 +2986,7 @@ Off the critical path; each with its oracle.
   `cpuModel` (`web-app/app/measure.ts:956`). Deno exposes
   no CPU-model API — `navigator.hardwareConcurrency` is a
   count — and a `sysctl` read is unverifiable and
-  macOS-only. The ten newest of the fourteen rows in
+  macOS-only. The twelve newest of the sixteen rows in
   `measurements/history.jsonl` store `"unknown"`. The truthful
   shape omits the field rather than storing a sentinel,
   which needs `measure-core.ts`'s field type and
