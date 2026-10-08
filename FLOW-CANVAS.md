@@ -128,7 +128,12 @@ the double-click on the first press's element and
 starts no gesture: it emits `open-panel: true`, keeps
 the selection, and captures no pointer, so its release
 is a no-op and the page does not center again. A third
-press chains from the second, on the same element.
+press chains from the second, on the same element. With
+Auto Fit on, a second press under an open panel still
+re-fits the camera from pointer-down to pointer-up,
+which the MUST NOT above reads as forbidding; TODO.md
+files the conflict as "A double-click's second press
+under an open panel re-fits the camera under Auto Fit."
 
 ## Special nodes
 
