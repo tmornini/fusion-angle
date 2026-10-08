@@ -1551,8 +1551,8 @@ Off the critical path; each with its oracle.
   from the code, not reproduced. Auto Fit on is not
   affected: `applyPanelTransition` returns null under
   Auto Fit (`web-app/app/flow-designer-actions.ts:474`),
-  so the panel callback writes nothing in place, and its
-  fit assigns a fresh `viewBox` object
+  so `withPanelOpen` writes no `viewBox` field, and the
+  fit that follows assigns a fresh `viewBox` object
   (`flow-designer.ts:1020-1021`), which the gesture's
   state does not share. Item 11 lists the in-place
   writes among its debts; this is the one that moves a
