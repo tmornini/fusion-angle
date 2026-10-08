@@ -2124,7 +2124,7 @@ Off the critical path; each with its oracle.
     / `withZoomedOut` through `#guardAutoFit`,
     `web-app/app/presenters/flow-designer.ts:877-903`)
     and the step path's 0.25 floor
-    (`web-app/app/flow-interactions.ts:945-950`) (F29) —
+    (`web-app/app/flow-interactions.ts:953-958`) (F29) —
     Layer 1, `tests/flow-designer-presenter.test.ts` for
     the buttons (only the wheel path is covered); the fit
     path's `MIN_ZOOM` clamp is pinned
