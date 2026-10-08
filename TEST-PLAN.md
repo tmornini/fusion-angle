@@ -424,8 +424,9 @@ BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
 I22 with the 500 fulfilled: a missing error state,
 message, focus, or card replacement, or a retry whose
-GET does not answer 200, is FAIL of the exploratory
-half. BLOCKED only if `Fetch` itself refuses.
+GET does not answer 200 (read once the cards replace
+the error state), is FAIL of the exploratory half.
+BLOCKED only if `Fetch` itself refuses.
 F13's second press off the node after the first
 release centred it, both presses less than
 `DBLCLICK_MS` apart: FAIL, not BLOCKED (TODO.md 0j).
@@ -6429,12 +6430,16 @@ layout.
   `#ideas-list` shows "Something went wrong", text
   containing "walk-forced fault", and a "Try Again"
   `[data-retry-btn]` that is `document.activeElement`.
-  Then `Fetch.disable` and click Try Again at its
-  box-model center. PASS: a second GET of `…/ideas/`
-  answers 200 (the last
+  Read `document.activeElement` before any click: the
+  focusing click (Driving notes) blurs the button.
+  Then `Fetch.disable`, make that click on
+  `.page-header`, not at the viewport center, which
+  may land on Try Again, and click Try Again at its
+  box-model center. PASS: `[data-idea-card]` cards
+  replace the error state, and then a second GET of
+  `…/ideas/` answers 200 (the last
   `performance.getEntriesByType('resource')` entry
-  whose name ends `/ideas/` has `responseStatus` 200)
-  and `[data-idea-card]` cards replace the error state.
+  whose name ends `/ideas/` has `responseStatus` 200).
   BLOCKED only if `Fetch.enable` or
   `Fetch.fulfillRequest` itself is refused.
   Pin: tests/loading-states.test.ts 'a rejecting
