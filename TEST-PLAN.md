@@ -254,9 +254,9 @@ not repeat the note in every case.
   Layer 1 and Layer 2 pins decide add-edge. F23 starts
   from a reload, and a preview read of it that is not
   what its case says is FAIL if its listener's record
-  is exactly the inputs sent, in order, and BLOCKED,
-  naming the driver, if not (F23 names the reads and
-  the record).
+  up to it is exactly the inputs sent, in order, and
+  BLOCKED, naming the driver and the first difference,
+  if not (F23 names the reads and the record).
 - AA33/AA34: DEFERRED on AA32 when AA32's stray
   "New State" nodes re-flow the graph and a
   double-click misses Data Capture.
