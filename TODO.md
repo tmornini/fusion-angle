@@ -1615,12 +1615,16 @@ Off the critical path; each with its oracle.
   re-fit lands at the release for a draggable node, and
   at the press for a locked flow or a press matched by
   its point, whose release does nothing; a fix that
-  removes press-time re-fits must leave those presses
-  one, or F14 fails for them. The oracle's second node
-  takes the point rule's path; the first node pressed
-  again, when its first release left it under the press
-  point, takes the id rule's path and re-fits at the
-  press and again at the release, so it needs its own
+  removes press-time re-fits must still re-fit those
+  presses once, or F14 fails for them. The oracle's
+  second node takes the point rule's path; the first
+  node pressed again, when its first release left it
+  under the press point, takes the id rule's path: its
+  panel callback re-fits at the press, but the
+  gesture-start commit installs the gesture state's
+  older `viewBox` before paint, so the camera re-fits
+  once, at the release, which a fix that removes
+  press-time re-fits leaves in place; it needs its own
   case. Oracle: a Layer 2 test in
   `tests/browser/canvas-gestures.test.ts` with Auto Fit
   on (the fixture default) — the `viewBox` after a
