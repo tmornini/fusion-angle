@@ -2034,10 +2034,13 @@ Off the critical path; each with its oracle.
     unlocked
   - A second press that lands on a node centering slid
     under the first press's point (F13) — Layer 2,
-    `tests/browser/canvas-gestures.test.ts`, beside the
-    empty-canvas pair there: the pair keeps the panel on
-    the first node. A `mousedown` focuses the pressed
-    node, and its `focusin` dispatches `canvas-focus`
+    `tests/browser/canvas-gestures.test.ts`, beside 'a
+    double-click on a second node under an open panel
+    keeps the panel on it (F13)', which does not aim its
+    second press at a node: the pair keeps the panel on
+    the node the first press hit. A `mousedown` focuses
+    the pressed node, and its `focusin` dispatches
+    `canvas-focus`
     (`web-app/app/flow-interactions.ts:785-798`), which
     selects it and re-centers; the page replaces the
     pressed node inside the `pointerdown` listener, so
