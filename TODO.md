@@ -2855,11 +2855,11 @@ Off the critical path; each with its oracle.
   (`api/mock-data/ai-members.ts`) spells four of its names
   again as agent names, and TEST-PLAN.md spells catalog
   names in prose: AA7a lists the four and picks "Claude
-  Haiku 4.5" (`:647-656`), AA8a's example names "Claude
-  Sonnet 4.6" (`:683`), two pin notes quote a
-  fixture's 'Claude Opus 4.8' (`:694`, `:5588`), and the
+  Haiku 4.5" (`:684-693`), AA8a's example names "Claude
+  Sonnet 4.6" (`:720`), two pin notes quote a
+  fixture's 'Claude Opus 4.8' (`:731`, `:5767`), and the
   native-select driving note and G24b spell GPT-5.5 and
-  "Claude Sonnet 4.6" (`:346-348`, `:5618`). Make the
+  "Claude Sonnet 4.6" (`:369-370`, `:5797`). Make the
   catalog the one list first: the roster takes each
   agent's name from its `model` id, and TEST-PLAN.md
   names models by their place in the catalog (the
