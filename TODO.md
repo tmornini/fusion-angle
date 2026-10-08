@@ -2561,9 +2561,16 @@ Off the critical path; each with its oracle.
   bearer per requester, minted by a simulated login
   whose own pairs land too, and the seed runs without
   the signing key (`tests/pg-seed.test.ts:433`).
+  SCHEMA.md says the reverse: its `fa_request_id_of`
+  index entry reads "A seed pair stores one"
+  (`SCHEMA.md:96`), while `withoutRequestIdLine`
+  strips the line from every seed row and throws on a
+  row without one (`api/ledger-seed.ts:113-126`).
   Oracle: a seeded write pair's secrets hold the line
   its requester would have sent, or SCHEMA.md names the
-  seed as the axiom's one exception
+  seed as the axiom's one exception; either way
+  SCHEMA.md's index entry matches what a seed pair
+  stores
 - Immutable document types. A family declares itself
   immutable where it declares its conditional; every
   write is a genesis under the never-written latch, so a
