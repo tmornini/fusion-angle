@@ -3229,9 +3229,10 @@ Off the critical path; each with its oracle.
   transport (`inProcessFetch`,
   `tests/in-page-facade.ts:31-56`) does too, after
   `simulateLatency()`, its only caller, so a timer there
-  measures the handler alone. Record
-  per request: method, route family (ids folded to `:id`),
-  status, handler ms, wall stamp. A throwaway probe on
+  measures the handler alone. The `./bin/measure api`
+  entry harvests the server's own `latencyMs` log line
+  and records a median per route; this entry adds what
+  its charts need beyond that. A throwaway probe on
   the memory suite (`--parallel`) saw 7,318 requests
   over a 36 s span (~200/s, peak 1,845 in one second);
   handler ms p50 0.57, p90 4.5, p99 100, max 244;
@@ -3241,10 +3242,10 @@ Off the critical path; each with its oracle.
   the Postgres origin (`--base-url`) is where a rate means
   something. Visualize beside readyMs in `measure-viz`: a
   log-bucket latency histogram, per-route p50/p90/p99, and a
-  requests-per-second timeline. Oracle: `--record` writes the
-  per-route figures to `measurements/`; `--visualize` draws
-  the three charts; `--check` gates per-route p90 against
-  `measurements/budgets.json`.
+  requests-per-second timeline. `budgets.json` is keyed by
+  page, so per-route budgets need a key space it lacks.
+  Oracle: `--visualize` draws the three charts; `--check`
+  gates per-route p90 against `measurements/budgets.json`.
 - Filtering other collections by a body field. The
   partial index `fa_message_pairs_body` reaches
   `path = '/invitations/'` only
