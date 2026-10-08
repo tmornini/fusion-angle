@@ -2514,7 +2514,7 @@ Off the critical path; each with its oracle.
     a third test in `tests/browser/two-jars.test.ts`: B
     sits on `ideas/`, A writes, B's DOM is unchanged
     until B navigates
-- SP-6 sign-up (`web-app/auth/index.ts:641-651`)
+- SP-6 sign-up (`web-app/auth/index.ts:642-655`)
 - Billing (`web-app/billing/`)
 - Table migrations — wait on their trigger: the ledger
   store holds the table's DDL final, and item 0h ships
