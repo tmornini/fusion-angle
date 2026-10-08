@@ -840,11 +840,10 @@ code comments cite; specs and plans written before the
   (`api/routes.ts:1363-1366`), which TEST-PLAN
   F36/F45 call PASS — the brainstorm decides whether
   that stays); the Auto Layout switch committing
-  without `commitAndFit` (`web-app/flows/detail.ts:946-956`),
-  the resize path with no gesture guard
-  (`web-app/app/adapters/resize-observer.ts`), and the
-  panel callback re-fitting at a double-click's second
-  press; rotation only on the
+  without `commitAndFit` (`web-app/flows/detail.ts:946-956`)
+  and the resize path with no gesture guard
+  (`web-app/app/adapters/resize-observer.ts`);
+  rotation only on the
   toggle path (`web-app/app/flow-layout.ts:1032-1037`);
   the mirror trigger; and the canvas entries of the
   genericity bullet (two zoom
@@ -1581,6 +1580,28 @@ Off the critical path; each with its oracle.
   under Auto Fit and switch it back off; zoom in once
   and click empty canvas — each keeping the zoomed
   camera
+- A double-click's second press under an open panel
+  re-fits the camera under Auto Fit. The panel callback
+  `(open) => ...` (`web-app/flows/detail.ts:1110-1117`)
+  runs `reconcileFitFromDom()`, and so does the
+  `request-update` callback (`:1093`) for a press that
+  starts no gesture, as a second press matched by its
+  point does. With Auto Fit on, the second press re-fits
+  between pointer-down and pointer-up. FLOW-CANVAS.md
+  `## Camera rules` forbids the `request-update`
+  callback's re-fit there in its MUST NOT and prescribes
+  it in its "Every other update" sentence, so the
+  section disagrees with itself, and any fix amends the
+  rule text. The re-fit undoes the first release's
+  centering; TEST-PLAN F13 requires Auto Fit off because
+  of it. F14's re-fit when a double-click opens a closed
+  panel comes from both callbacks, so F14 does not need
+  the panel callback's. Oracle: a Layer 2 test in
+  `tests/browser/canvas-gestures.test.ts` with Auto Fit
+  on (the fixture default) — the `viewBox` after a
+  double-click on a second node under an open panel
+  equals the one its first release left — and F13 no
+  longer requires Auto Fit off
 - A flow loaded with Auto Fit off does not fit on
   first paint. `withCanvasSize`
   (`web-app/app/presenters/flow-designer.ts:974-995`)
