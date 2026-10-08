@@ -3183,7 +3183,7 @@ Off the critical path; each with its oracle.
   `./bin/measure` median by about 200 ms; unset leaves
   the no-op.
 - One rehearsal per test process, if measurement earns
-  it. `tests/` calls `seededMockDb()` at 96 sites, and
+  it. `tests/` calls `seededMockDb()` at 98 sites, and
   `sharedMockDb()` seeds once per worker that uses it;
   each builds the identical dataset from nothing: hash,
   form, rehearse, land. A landing onto an absent table
