@@ -317,9 +317,8 @@ async () => {
     });
 });
 
-Deno.test('a member PUT naming ANOTHER identity 403s, byte-pinned'
-+ ' to the SAME wording authorizeRequest returned, and'
-+ ' writes no row', async () => {
+Deno.test('a member PUT naming ANOTHER identity 403s'
++ ' at the identity fence, and writes no row', async () => {
     const db = await freshDb();
     const token = await organizationToken('nkgaOHZISTQrILTfPThWCA');
     const rid = generateIdentifier();
@@ -334,7 +333,8 @@ Deno.test('a member PUT naming ANOTHER identity 403s, byte-pinned'
     assertStrictEquals(res.status, 403);
     assertEquals(await res.json(), {
         error: 'forbidden: PUT ' + path
-            + ' requires a role this principal lacks',
+            + ' names an identity outside this'
+            + ' organization',
     });
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(

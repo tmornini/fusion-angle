@@ -197,8 +197,14 @@ async () => {
 
 // -- 3. ai-members + human-members wire equals derive ----------
 
-Deno.test('ai-agents + identities wire equals GET (GLOBAL)'
-+ ' + per-entity get + 404-byte parity', async () => {
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+Deno.test('ai-agents wire is global; identities wire is'
++ ' the accepted roster', async () => {
     const db = await seededDb();
     const token = await organizationToken();
 
@@ -217,11 +223,19 @@ Deno.test('ai-agents + identities wire equals GET (GLOBAL)'
         id: string;
         kind: string;
     }>(resHuman);
-    assertStrictEquals(
-        identities.filter((row) => row.kind === 'person')
-            .length,
-        12,
+    const heads = await organizationMembershipHeads(
+        db, STARK_ORGANIZATION, {
+            kind: 'state', state: 'accepted',
+        },
     );
+    const seatedIds = new Set(heads.map(
+        (head) => membershipOfHead(head).identity_id,
+    ));
+    const people = identities.filter(
+        (row) => row.kind === 'person',
+    );
+    assert(people.length > 0);
+    assert(identities.every((row) => seatedIds.has(row.id)));
 
     for (const row of agents) {
         const res = await handleRequest(
@@ -252,16 +266,14 @@ Deno.test('ai-agents + identities wire equals GET (GLOBAL)'
         expectedAiMessage,
     );
 
-    const expectedHumanMessage =
-        'Not found: identities/' + missingId;
+    const missingPath = '/identities/' + missingId;
     const humanMissingRes = await handleRequest(
-        db, req('GET', '/identities/' + missingId, token),
+        db, req('GET', missingPath, token),
     );
-    assertStrictEquals(humanMissingRes.status, 404);
-    assertStrictEquals(
-        (await humanMissingRes.json() as { error: string }).error,
-        expectedHumanMessage,
-    );
+    assertStrictEquals(humanMissingRes.status, 403);
+    assertEquals(await humanMissingRes.json(), {
+        error: outside('GET', missingPath),
+    });
 });
 
 // -- 4. current identity wire ---------------------------------
@@ -328,8 +340,9 @@ async () => {
 
     const humanId = generateIdentifier();
     const beforeHumanCreate = (await db.messagePairs.getAll()).length;
+    const humanPath = '/identities/' + humanId;
     const humanCreated = await handleRequest(db, req(
-        'PUT', '/identities/' + humanId, token, {
+        'PUT', humanPath, token, {
             kind: 'person',
             title: 't',
             department: 'd',
@@ -337,37 +350,13 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assertStrictEquals(humanCreated.status, 201);
+    assertStrictEquals(humanCreated.status, 403);
+    assertEquals(await humanCreated.json(), {
+        error: outside('PUT', humanPath),
+    });
     assertStrictEquals(
         (await db.messagePairs.getAll()).length,
-        beforeHumanCreate + 1,
-    );
-    const humanEdited = await handleRequest(db, req(
-        'PUT', '/identities/' + humanId, token, {
-            kind: 'person',
-            title: 't2',
-            department: 'd2',
-            strengths: [],
-            team_dimensions: {},
-        },
-    ));
-    assertStrictEquals(humanEdited.status, 200);
-    const identityGot = await handleRequest(
-        db, req('GET', '/identities/' + humanId, token),
-    );
-    assertStrictEquals(
-        ((await identityGot.json()) as { title: string })
-            .title,
-        't2',
-    );
-
-    const surviving = await handleRequest(
-        db, req('GET', '/identities/' + humanId, token),
-    );
-    assertStrictEquals(surviving.status, 200);
-    assertStrictEquals(
-        ((await surviving.json()) as { id: string }).id,
-        humanId,
+        beforeHumanCreate,
     );
 });
 
@@ -606,8 +595,9 @@ async () => {
     assertStrictEquals(aiDocumentMessagePairs.length, 1);
     assertStrictEquals(aiDocumentMessagePairs[0]!.method, 'PUT');
 
+    const humanPath = '/identities/' + humanId;
     const humanCreated = await handleRequest(db, req(
-        'PUT', '/identities/' + humanId, token, {
+        'PUT', humanPath, token, {
             kind: 'person',
             title: 't',
             department: 'd',
@@ -615,7 +605,10 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assertStrictEquals(humanCreated.status, 201);
+    assertStrictEquals(humanCreated.status, 403);
+    assertEquals(await humanCreated.json(), {
+        error: outside('PUT', humanPath),
+    });
 
     const humanPrefix = canonicalPath(
         undefined, '/identities/',
@@ -627,8 +620,7 @@ async () => {
     const humanDocumentMessagePairs = documentMessagePairsAt(
         humanRequests, humanPrefix,
     ).filter((messagePair) => messagePair.name === humanId);
-    assertStrictEquals(humanDocumentMessagePairs.length, 1);
-    assertStrictEquals(humanDocumentMessagePairs[0]!.method, 'PUT');
+    assertStrictEquals(humanDocumentMessagePairs.length, 0);
 });
 
 // -- 8. resend idempotency at drift altitude --------------------
@@ -681,15 +673,15 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
 // state_event_id ← event.id). Members are GLOBAL plane —
 // no organization stamp.
 
-Deno.test('GET identity is the latest PUT under clock-skewed'
-+ ' later arrival (stateless document, arrival order)',
+Deno.test('a membership-less identity PUT is forbidden',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const memberId = generateIdentifier();
-
+    const path = '/identities/' + memberId;
+    const before = (await db.messagePairs.getAll()).length;
     const genesis = await handleRequest(db, req(
-        'PUT', '/identities/' + memberId, token, {
+        'PUT', path, token, {
             kind: 'person',
             title: 'first',
             department: 'd',
@@ -697,23 +689,11 @@ async () => {
             team_dimensions: {},
         },
     ));
-    assertStrictEquals(genesis.status, 201);
-
-    const skewed = await handleRequest(db, req(
-        'PUT', '/identities/' + memberId, token, {
-            kind: 'person',
-            title: 'second',
-            department: 'd2',
-            strengths: [],
-            team_dimensions: {},
-        },
-    ));
-    assertStrictEquals(skewed.status, 200);
-
-    const res = await handleRequest(
-        db, req('GET', '/identities/' + memberId, token),
+    assertStrictEquals(genesis.status, 403);
+    assertEquals(await genesis.json(), {
+        error: outside('PUT', path),
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
-    assertStrictEquals(res.status, 200);
-    const got = await res.json() as { title: string };
-    assertStrictEquals(got.title, 'second');
 });

@@ -5,8 +5,11 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, POST, PUT } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
+import { GET, POST } from './in-page-facade.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -14,7 +17,6 @@ import {
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest,
-    pairIdOf,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { identityDocumentEntityOf } from '../api/routes.ts';
@@ -74,36 +76,51 @@ function req(
     });
 }
 
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+async function assertForbidden(
+    db: MemoryDbAdapter,
+    method: string,
+    path: string,
+    body?: unknown,
+): Promise<void> {
+    const res = await handleRequest(
+        db, req(method, path, DEV_TOKEN, body),
+    );
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: outside(method, path),
+    });
+}
+
 Deno.test(
-    'POST identities (person) writes the bare identity; its'
-    + ' PII enters via a separate PUT identities/:id/pii'
-    + ' (Phase 10 Task 2 intake decomposition)',
+    'POST identities (person) stores the identity; an admin'
+    + ' cannot read or write the membership-less id',
     async () => {
         const db = await freshDb();
+        const id = 'pnXmXrxOWayANgDLdCjuBw';
         await POST(db, 'identities/', {
-            id: 'pnXmXrxOWayANgDLdCjuBw',
+            id,
             kind: 'person',
         }, DEV_TOKEN,
             operationIdHeader());
-        const identity = (await GET<{ kind: string }>(
-            db, 'identities/pnXmXrxOWayANgDLdCjuBw', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
-        assertStrictEquals(identity.kind, 'person');
-        // No PII yet — create body no longer carries pii.
-        // Phase Final Task 2: identity spine ROW halves stripped.
-        await assertRejects(
-            () => deriveIdentityPii(db, 'pnXmXrxOWayANgDLdCjuBw'));
-        await PUT(
-            db, 'identities/pnXmXrxOWayANgDLdCjuBw/pii', pii('Alice')
-                , DEV_TOKEN,
-            operationIdHeader());
-        const piiRow = await deriveIdentityPii(db, 'pnXmXrxOWayANgDLdCjuBw');
-        assertStrictEquals(piiRow.name, 'Alice');
-        // A person carries no credential.
-        const creds = await deriveCredentialsFor(db
-            , 'pnXmXrxOWayANgDLdCjuBw');
+        const stored = JSON.parse(
+            await storedPutBodyText(db, '/identities/', id),
+        ) as { kind: string };
+        assertStrictEquals(stored.kind, 'person');
+        await assertForbidden(db, 'GET', '/identities/' + id);
+        await assertRejects(() => deriveIdentityPii(db, id));
+        await assertForbidden(
+            db, 'PUT', '/identities/' + id + '/pii',
+            pii('Alice'),
+        );
+        await assertRejects(() => deriveIdentityPii(db, id));
+        const creds = await deriveCredentialsFor(db, id);
         assertStrictEquals(creds.length, 0);
-        // Phase Final Stage B: identity spine tables retired.
     },
 );
 
@@ -118,10 +135,9 @@ Deno.test(
             credential: credential('syWUUcdBSbBgMwBiCrgbDw'),
         }, DEV_TOKEN,
             operationIdHeader());
-        const identity = (await GET<{ kind: string }>(
-            db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
-                operationIdHeader())).body().toValue();
-        assertStrictEquals(identity.kind, 'service');
+        await assertForbidden(
+            db, 'GET', '/identities/syWUUcdBSbBgMwBiCrgbDw',
+        );
         const creds = await deriveCredentialsFor(db
             , 'syWUUcdBSbBgMwBiCrgbDw');
         const cred = creds.find(c => c.kind === 'client_secret');
@@ -165,9 +181,8 @@ Deno.test(
 );
 
 Deno.test(
-    'a bad PUT identities/:id/pii after a good create leaves'
-    + ' the identity standing PII-less — the torn-state'
-    + ' acceptance the intake decomposition names',
+    'an admin PUT identities/:id/pii on a membership-less'
+    + ' create is forbidden and leaves it PII-less',
     async () => {
         const db = await freshDb();
         const torn = generateIdentifier();
@@ -175,20 +190,20 @@ Deno.test(
             id: torn, kind: 'person',
         }, DEV_TOKEN,
             operationIdHeader());
-        await assertRejects(
-            // PII missing the required `bio` key.
-            () => PUT(db, 'identities/' + torn + '/pii', {
+        await assertForbidden(
+            db, 'PUT', '/identities/' + torn + '/pii', {
                 name: 'Torn',
                 email: 'torn@example.com',
                 phone: '',
-            }, DEV_TOKEN,
-                operationIdHeader()),
+            },
         );
-        // The identity survives; it simply carries no PII yet.
-        const identity = (await GET<{ kind: string }>(
-            db, 'identities/' + torn, DEV_TOKEN, operationIdHeader()))
-            .body().toValue();
-        assertStrictEquals(identity.kind, 'person');
+        const stored = JSON.parse(
+            await storedPutBodyText(db, '/identities/', torn),
+        ) as { kind: string };
+        assertStrictEquals(stored.kind, 'person');
+        await assertForbidden(
+            db, 'GET', '/identities/' + torn,
+        );
         await assertRejects(
             () => deriveIdentityPii(db, torn));
     },
@@ -326,11 +341,10 @@ Deno.test(
     },
 );
 
-// One shape per family: the create stores the credential's
-// wire, so the route's identical PUT over it is the
-// statement's match.
-Deno.test('a route PUT of the create\'s credential stores nothing'
-+ ' and answers 200', async () => {
+// The created service has no seat. An admin PUT of its
+// credential names an identity outside the organization.
+Deno.test('a route PUT of the create\'s credential is forbidden'
++ ' and stores nothing', async () => {
     const db = await freshDb();
     const id = generateIdentifier();
     const credentialId = generateIdentifier();
@@ -355,9 +369,12 @@ Deno.test('a route PUT of the create\'s credential stores nothing'
     const res = await handleRequest(db, req(
         'PUT', credentials + credentialId, DEV_TOKEN, stored,
     ));
-    assertStrictEquals(res.status, 200);
-    assertStrictEquals(pairIdOf(res), head.id);
-    await res.body?.cancel();
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: outside(
+            'PUT', credentials + credentialId,
+        ),
+    });
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );

@@ -14,8 +14,6 @@ import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
     IdentityCredentialEntity,
-    IdentityPiiEntity,
-    MembershipEntity,
 } from '../shared/types.ts';
 import { nowUtc } from
     '../shared/types.ts';
@@ -79,8 +77,7 @@ import type { HttpMessage } from
 // the identities cases below exercise the ACTUAL
 // documentCollectionGetHandler/documentGetHandler — the SAME code
 // path Task 8 wires live for GET /identities, never a
-// reimplementation. A MEMBERSHIPS_TEST_WIRING mirror serves the
-// gate-15 fence-leg proof below the SAME way. Old-plane reads via
+// reimplementation. Old-plane reads via
 // the BASE adapter (identities, identity_pii, identity_credentials,
 // role_grants, identity_providers, identity_token_revocations are
 // ALL global-plane or parent-derived, never org-scoped-by-column)
@@ -108,6 +105,12 @@ import type { HttpMessage } from
 // shipped route posts a 'deleted' state for an identities/
 // identity_pii id, so derived-plane parity holds throughout
 // every case below regardless.
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
 
 function req(
     method: string,
@@ -195,112 +198,13 @@ async function derivedIdentity(
     ) as Promise<{ id: Id; kind: string }>;
 }
 
-// -- gate 15: the membership-fence inputs, derived from the ----
-// -- membership message plane (NEVER the org-scoped memberships --
-// -- store, which hides foreign rows and could not distinguish ---
-// -- foreign from orphan) ------------------------------------------
-//
-// The caller-org leg reads the org-nested memberships prefix (via
-// MEMBERSHIPS_TEST_WIRING's generic collection derivation, exactly
-// as tests/drift-roster.test.ts's own derivedMemberships does);
-// the any-membership leg unions that SAME derivation across every
-// KNOWN seeded organization — memberships is org-nested
-// (family-registry.ts), so there is no single global document to
-// scan, and the two seeded organizations are the drift-roster.
-// test.ts precedent's own known-org set (its case 1's "10/6
-// split", its THIRD_ORGANIZATION empty leg).
-//
-// Both legs ride documentCollectionGetHandler bare, uncoupled
-// by any wrapping transaction across the Promise.all pair — no
-// hazard: this suite seeds its db once per test and never
-// mutates it concurrently with a read, so no writer can land
-// between the two legs and tear the union.
 
-async function pairPlaneMembershipsAcrossKnownOrganizations(
-    db: DbAdapter,
-): Promise<MembershipEntity[]> {
-    const accepted = {
-        kind: 'state' as const,
-        state: 'accepted' as const,
-    };
-    const perOrganization = await Promise.all(
-        [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
-            async (organization) => {
-                const heads = await organizationMembershipHeads(
-                    db, organization, accepted,
-                );
-                return heads.map(membershipOfHead);
-            },
-        ),
-    );
-    return perOrganization.flat();
-}
-
-// viaMembership's OWN three-way algorithm (api/store-parent-
-// scoped.ts), re-derived here over the message-plane union above
-// rather than the row-plane's identity_id index: null (orphan,
-// visible), the bound org (co-member, visible), or a DIFFERENT
-// org (foreign, hidden).
-function pairPlaneOwnerOrganization(
-    memberships: readonly MembershipEntity[],
-    identityId: Id,
-    boundOrganization: Id,
-): Id | null {
-    const mine = memberships.filter(
-        (m) => m.identity_id === identityId,
-    );
-    if (mine.length === 0) return null;
-    return mine.some(
-        (m) => m.organization_id === boundOrganization,
-    )
-        ? boundOrganization
-        : mine[0]!.organization_id;
-}
-
-async function pairPlaneFencedPii(
-    db: DbAdapter, organization: Id,
-): Promise<IdentityPiiEntity[]> {
-    const rows = await deriveIdentityPiiRows(db);
-    const memberships =
-        await pairPlaneMembershipsAcrossKnownOrganizations(db);
-    return rows.filter((row) => {
-        const owner = pairPlaneOwnerOrganization(
-            memberships, row.id, organization,
-        );
-        return owner === null || owner === organization;
-    });
-}
-
-// One fence leg: PROVES the message-plane construction's visibility
-// decision equals the row-plane parentScope resolver's ACTUAL
-// decision (organizationScopedAdapter's identityPii.getById,
-// gate 15) — never assumed, always independently re-derived from
-// BOTH sides. When visible on both, the leaf rows themselves are
-// also pinned deep-equal.
-async function assertPiiFenceLeg(
-    db: DbAdapter, organization: Id, identityId: Id,
-): Promise<boolean> {
-    // Phase Final Task 2: row plane empty — fence decision is
-    // message-plane only. deriveIdentityPii is unfenced (leaf
-    // always derives when a slot exists); visibility is the
-    // membership fence alone.
-    const memberships =
-        await pairPlaneMembershipsAcrossKnownOrganizations(db);
-    const owner = pairPlaneOwnerOrganization(
-        memberships, identityId, organization,
-    );
-    const pairPlaneVisible =
-        owner === null || owner === organization;
-    // Slot always derives when present (fence is route-side).
-    await deriveIdentityPii(db, identityId);
-    return pairPlaneVisible;
-}
 
 // -- 1. identities collection parity + getById + 404 bytes ------
 
-Deno.test('identities collection wire equals derive (13 incl.'
-+ ' system; agents are not identities) + getById + 404-byte'
-+ ' parity', async () => {
+Deno.test('identities wire is the accepted roster;'
++ ' derive stays global; an absent id is forbidden',
+async () => {
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
 
@@ -317,19 +221,37 @@ Deno.test('identities collection wire equals derive (13 incl.'
     assertStrictEquals(res.status, 200);
     const parts = await partsOf<{ id: Id; kind: string }>(res);
     await assertPartsAreHeads(db, parts, { sees: 'whole' });
-    assertEquals(parts.map((part) => part.body().toValue()), derived);
+    const heads = await organizationMembershipHeads(
+        db, STARK_ORGANIZATION, {
+            kind: 'state', state: 'accepted',
+        },
+    );
+    const seated = new Set(heads.map(
+        (head) => membershipOfHead(head).identity_id,
+    ));
+    assertEquals(
+        sortById(parts.map((part) => part.body().toValue())),
+        sortById(derived.filter((row) => seated.has(row.id))),
+    );
 
     for (const identity of derived) {
         const one = await derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, identity.id,
         );
         assertEquals(one, identity);
+        const path = '/identities/' + identity.id;
         const leaf = await handleRequest(
-            db,
-            req('GET', '/identities/' + identity.id, token),
+            db, req('GET', path, token),
         );
-        assertStrictEquals(leaf.status, 200);
-        assertEquals(await leaf.json(), one);
+        if (seated.has(identity.id)) {
+            assertStrictEquals(leaf.status, 200);
+            assertEquals(await leaf.json(), one);
+        } else {
+            assertStrictEquals(leaf.status, 403);
+            assertEquals(await leaf.json(), {
+                error: outside('GET', path),
+            });
+        }
     }
 
     const missingId = generateIdentifier();
@@ -341,16 +263,22 @@ Deno.test('identities collection wire equals derive (13 incl.'
     ) as Error;
     assertInstanceOf(err, EntityNotFoundError);
     assertStrictEquals(err.message, expectedMessage);
+    const absentPath = '/identities/' + missingId;
+    const absent = await handleRequest(
+        db, req('GET', absentPath, token),
+    );
+    assertStrictEquals(absent.status, 403);
+    assertEquals(await absent.json(), {
+        error: outside('GET', absentPath),
+    });
 });
 
 // -- 2. identity-pii derive/fence parity + the THREE-WAY ------
 // -- viaMembership fence legs + leaf parity + 404 bytes ---------
 // -- Flat GET /identity-pii is retired (router 404). ------------
 
-Deno.test('identity-pii derive (12 seeded slots) fenced both'
-+ ' orgs + the THREE-WAY viaMembership fence legs (co-member'
-+ ' visible, FOREIGN-org hidden — orphan visible) + leaf +'
-+ ' 404 bytes', async () => {
+Deno.test('identity-pii derive lists every slot; the route'
++ ' serves a co-member and refuses an outsider', async () => {
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
 
@@ -358,28 +286,6 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
     const derivedRows = sortById(await deriveIdentityPiiRows(db));
     assertStrictEquals(derivedRows.length, 12);
     const unaffiliated = buildUnaffiliatedIdentity();
-
-    // -- fenced collection both orgs (message-plane fence) --
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const derivedFenced = sortById(
-            await pairPlaneFencedPii(db, organization),
-        );
-        assert(derivedFenced.length > 0);
-        // every fenced row is in the unfenced set
-        const unfencedIds = new Set(derivedRows.map(r => r.id));
-        for (const row of derivedFenced) {
-            assert(unfencedIds.has(row.id));
-        }
-        // Orphan Riley (member of NO org) is VISIBLE in
-        // BOTH orgs' fenced PII collections.
-        assert(
-            derivedFenced.some(
-                (row) => row.id === unaffiliated.id,
-            ),
-        );
-    }
 
     // -- per-identity leaf + 404 --
     for (const row of derivedRows) {
@@ -394,73 +300,72 @@ Deno.test('identity-pii derive (12 seeded slots) fenced both'
     assertInstanceOf(err, EntityNotFoundError);
     assertStrictEquals(err.message, expectedMessage);
 
-    // -- THE THREE-WAY FENCE LEGS (gate 15) --
     const adminToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
-
-    // co-member leg: 'XXZruirZyAOoRpNxaDnpSA' is a Stark member (seeded) with
-    // a
-    // seeded pii row — visible from STARK on both planes.
-    assertStrictEquals(
-        await assertPiiFenceLeg(db, STARK_ORGANIZATION
-            , 'XXZruirZyAOoRpNxaDnpSA'),
-        true,
+    const twoToken = await organizationToken(
+        'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_TWO,
     );
+    const self = await handleRequest(db, req(
+        'GET', '/identities/XXZruirZyAOoRpNxaDnpSA/pii',
+        adminToken,
+    ));
+    assertStrictEquals(self.status, 200);
+    const selfBody = await self.json() as { name: string };
+    assert(typeof selfBody.name === 'string');
 
-    // FOREIGN-org leg — the leak case, constructed explicitly: a
-    // fresh identity whose ONLY membership is ORGANIZATION_TWO
-    // must be HIDDEN from STARK (an org-scoped memberships store
-    // would instead read as orphan — the leak this fence closes)
-    // and VISIBLE from ORGANIZATION_TWO.
+    async function refusePii(
+        id: string, token: string,
+    ): Promise<void> {
+        const path = '/identities/' + id + '/pii';
+        const hidden = await handleRequest(
+            db, req('GET', path, token),
+        );
+        assertStrictEquals(hidden.status, 403);
+        assertEquals(await hidden.json(), {
+            error: outside('GET', path),
+        });
+    }
+
+    for (const token of [adminToken, twoToken]) {
+        await refusePii(unaffiliated.id, token);
+    }
+
     const foreignId = generateIdentifier();
-    await handleRequest(db, req(
+    const foreignCreated = await handleRequest(db, req(
         'POST', '/identities/', adminToken,
         { id: foreignId, kind: 'person' },
     ));
-    await handleRequest(db, req(
-        'PUT', '/identities/' + foreignId + '/pii', adminToken,
-        {
-            name: 'Foreign Fence', email: 'foreign-fence@x.com',
-            phone: '', bio: '',
-        },
-    ));
+    assertStrictEquals(foreignCreated.status, 201);
+    await foreignCreated.body?.cancel();
+    await seedIdentityPii(db, foreignId, {
+        name: 'Foreign Fence', email: 'foreign-fence@x.com',
+        phone: '', bio: '',
+    });
     await seedSeat(
         db, ORGANIZATION_TWO, foreignId, 'member', nowUtc(),
     );
-    assertStrictEquals(
-        await assertPiiFenceLeg(
-            db, STARK_ORGANIZATION, foreignId,
-        ),
-        false,
-    );
-    assertStrictEquals(
-        await assertPiiFenceLeg(
-            db, ORGANIZATION_TWO, foreignId,
-        ),
-        true,
-    );
+    await refusePii(foreignId, adminToken);
+    const visible = await handleRequest(db, req(
+        'GET', '/identities/' + foreignId + '/pii', twoToken,
+    ));
+    assertStrictEquals(visible.status, 200);
+    const visibleBody = await visible.json() as { name: string };
+    assertStrictEquals(visibleBody.name, 'Foreign Fence');
 
-    // orphan leg: a fresh identity with NO membership anywhere —
-    // visible from STARK (and would be from any org).
     const orphanId = generateIdentifier();
-    await handleRequest(db, req(
+    const orphanCreated = await handleRequest(db, req(
         'POST', '/identities/', adminToken,
         { id: orphanId, kind: 'person' },
     ));
-    await handleRequest(db, req(
-        'PUT', '/identities/' + orphanId + '/pii', adminToken,
-        {
-            name: 'Orphan Fence', email: 'orphan-fence@x.com',
-            phone: '', bio: '',
-        },
-    ));
-    assertStrictEquals(
-        await assertPiiFenceLeg(
-            db, STARK_ORGANIZATION, orphanId,
-        ),
-        true,
-    );
+    assertStrictEquals(orphanCreated.status, 201);
+    await orphanCreated.body?.cancel();
+    await seedIdentityPii(db, orphanId, {
+        name: 'Orphan Fence', email: 'orphan-fence@x.com',
+        phone: '', bio: '',
+    });
+    await refusePii(orphanId, adminToken);
+    await refusePii(orphanId, twoToken);
 });
 
 // The route fence, not the local seat scan. A non-accepted
@@ -485,17 +390,12 @@ async function callerPiiAfterNonAccepted(
     ));
     await created.body?.cancel();
     assertStrictEquals(created.status, 201);
-    const written = await handleRequest(db, req(
-        'PUT', '/identities/' + identityId + '/pii', token,
-        {
-            name: 'Fenced ' + state,
-            email: state + '-fence@x.com',
-            phone: '',
-            bio: '',
-        },
-    ));
-    await written.body?.cancel();
-    assertStrictEquals(written.status, 201);
+    await seedIdentityPii(db, identityId, {
+        name: 'Fenced ' + state,
+        email: state + '-fence@x.com',
+        phone: '',
+        bio: '',
+    });
     await seedSeat(
         db, STARK_ORGANIZATION, identityId, 'member',
         SEAT_AT,
@@ -537,8 +437,9 @@ for (const state of [
             await callerPiiAfterNonAccepted(state);
         assertStrictEquals(response.status, 403);
         assertEquals(await response.json(), {
-            error: 'forbidden: identity_pii/' + identityId
-                + ' belongs to a different organization',
+            error: outside(
+                'GET', '/identities/' + identityId + '/pii',
+            ),
         });
     });
 }
@@ -559,17 +460,12 @@ async () => {
     ));
     await created.body?.cancel();
     assertStrictEquals(created.status, 201);
-    const written = await handleRequest(db, req(
-        'PUT', '/identities/' + identityId + '/pii', caller,
-        {
-            name: 'Seatless Fence',
-            email: 'seatless-fence@x.com',
-            phone: '',
-            bio: '',
-        },
-    ));
-    await written.body?.cancel();
-    assertStrictEquals(written.status, 201);
+    await seedIdentityPii(db, identityId, {
+        name: 'Seatless Fence',
+        email: 'seatless-fence@x.com',
+        phone: '',
+        bio: '',
+    });
     await landMembership(
         db, ORGANIZATION_TWO, identityId, 'accepted',
         'member', ELSEWHERE_AT,
@@ -579,8 +475,9 @@ async () => {
     ));
     assertStrictEquals(hidden.status, 403);
     assertEquals(await hidden.json(), {
-        error: 'forbidden: identity_pii/' + identityId
-            + ' belongs to a different organization',
+        error: outside(
+            'GET', '/identities/' + identityId + '/pii',
+        ),
     });
     const visible = await handleRequest(db, req(
         'GET', '/identities/' + identityId + '/pii', home,
@@ -630,8 +527,6 @@ async () => {
     const parents = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,
     );
-    const memberships =
-        await pairPlaneMembershipsAcrossKnownOrganizations(db);
     const allDerived: IdentityCredentialEntity[] = [];
     for (const identity of parents) {
         const derived = sortById(
@@ -644,17 +539,37 @@ async () => {
             );
             assertEquals(one, row);
         }
-        // Read from an organization the identity's fence admits.
-        const organization = pairPlaneOwnerOrganization(
-            memberships, identity.id, STARK_ORGANIZATION,
-        ) ?? STARK_ORGANIZATION;
+        const starkSeat = await membershipOf(
+            db, STARK_ORGANIZATION, identity.id,
+        );
+        const twoSeat = starkSeat === null
+            ? await membershipOf(
+                db, ORGANIZATION_TWO, identity.id,
+            )
+            : null;
+        const organization = starkSeat !== null
+            ? STARK_ORGANIZATION
+            : twoSeat !== null
+                ? ORGANIZATION_TWO
+                : null;
+        const path = '/identities/' + identity.id
+            + '/credentials/';
+        const served = await handleRequest(db, req(
+            'GET', path,
+            await organizationToken(
+                'XXZruirZyAOoRpNxaDnpSA',
+                organization ?? STARK_ORGANIZATION,
+            ),
+        ));
+        if (organization === null) {
+            assertStrictEquals(served.status, 403);
+            assertEquals(await served.json(), {
+                error: outside('GET', path),
+            });
+            continue;
+        }
         const parts = await partsOf<Record<string, unknown>>(
-            await handleRequest(db, req(
-                'GET', '/identities/' + identity.id + '/credentials/',
-                await organizationToken(
-                    'XXZruirZyAOoRpNxaDnpSA', organization,
-                ),
-            )),
+            served,
         );
         assertEquals(
             parts.map((part) => part.body().toValue()['id']).sort(),
@@ -677,19 +592,15 @@ async () => {
     assertStrictEquals(err.message, expectedMessage);
 });
 
-// -- 3b. GATE 15 FENCE-INPUT FIX (post-session review finding): --
-// -- a mismatched below-facade write — document under identity A, -
-// -- body.identity_id names B — must fence on the ROW's -----------
-// -- identity_id (B), never the path (A), on BOTH planes; the -----
-// -- collection's WHERE(identity_id==path) semantics must ALSO ----
-// -- exclude it under path A on both planes, regardless of org ----
+// -- 3b. A mismatched below-facade write — document under --------
+// -- identity A, body.identity_id names B — is A's document. -----
+// -- Stark, where A is accepted, serves the leaf and omits the ---
+// -- credential from the collection. The other organization ------
+// -- refuses the path. Derive still filters on the body's id. ----
 
-Deno.test('credentials fence-input fix: a mismatched write (document'
-+ ' under identity A, body.identity_id names B) fences on the'
-+ ' ROW identity (B), never the path (A) — the leaf, checked from'
-+ " BOTH A's and B's org; the collection's WHERE(identity_id=="
-+ 'path) excludes the row under path A on both planes regardless'
-+ ' of org; the secret never rides either plane', async () => {
+Deno.test('a mismatched credential is the path identity'
++ ' document: Stark serves it, the other org refuses it',
+async () => {
     const db = await seededDb();
     const adminToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -697,10 +608,12 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
     const identityA = generateIdentifier();
     const identityB = generateIdentifier();
     for (const id of [identityA, identityB]) {
-        await handleRequest(db, req(
+        const created = await handleRequest(db, req(
             'POST', '/identities/', adminToken,
             { id, kind: 'person' },
         ));
+        assertStrictEquals(created.status, 201);
+        await created.body?.cancel();
     }
     // Different org memberships (the adjudicated scenario): A in
     // STARK, B in ORGANIZATION_TWO only — so the fence's answer
@@ -721,45 +634,45 @@ Deno.test('credentials fence-input fix: a mismatched write (document'
         status: 'set', secret: 'mismatch-secret', at: nowUtc(),
     });
 
-    const memberships =
-        await pairPlaneMembershipsAcrossKnownOrganizations(db);
-
+    const leafPath = '/identities/' + identityA
+        + '/credentials/' + cid;
+    const collectionPath = '/identities/' + identityA
+        + '/credentials/';
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
-        // -- leaf, path A: fence on ROW identity B --
         const credential = await deriveCredential(
             db, identityA, cid,
         );
         assertStrictEquals(credential.identity_id, identityB);
-        const owner = pairPlaneOwnerOrganization(
-            memberships, credential.identity_id, organization,
+        const token = await organizationToken(
+            'XXZruirZyAOoRpNxaDnpSA', organization,
         );
-        const derivedVisible =
-            owner === null || owner === organization;
-        // B is ORGANIZATION_TWO-only: hidden from STARK,
-        // visible from ORGANIZATION_TWO.
-        assertStrictEquals(
-            derivedVisible,
-            organization === ORGANIZATION_TWO,
-            'leaf visibility for ' + organization,
-        );
-        if (derivedVisible) {
-            const leaf = await handleRequest(db, req(
-                'GET',
-                '/identities/' + identityA + '/credentials/' + cid,
-                await organizationToken(
-                    'XXZruirZyAOoRpNxaDnpSA', organization,
-                ),
-            ));
+        const leaf = await handleRequest(db, req(
+            'GET', leafPath, token,
+        ));
+        if (organization === STARK_ORGANIZATION) {
             assertStrictEquals(leaf.status, 200);
-            await assertServedWithoutSecret(
-                db, await messageOfResponse(leaf),
+            const served = await messageOfResponse(leaf);
+            await assertServedWithoutSecret(db, served);
+            const value = served.body().toValue() as {
+                identity_id: string;
+            };
+            assertStrictEquals(value.identity_id, identityB);
+            const collection = await handleRequest(db, req(
+                'GET', collectionPath, token,
+            ));
+            assertStrictEquals(collection.status, 204);
+            assertEquals(
+                await partsOf<{ id: string }>(collection),
+                [],
             );
+        } else {
+            assertStrictEquals(leaf.status, 403);
+            assertEquals(await leaf.json(), {
+                error: outside('GET', leafPath),
+            });
         }
-
-        // -- collection, path A: mismatched identity_id (B)
-        // never equals path (A) — empty regardless of org.
         const derivedCollection = (
             await deriveCredentialsFor(db, identityA)
         ).filter((row) => row.identity_id === identityA);

@@ -245,14 +245,38 @@ Deno.test('featuredHumanMembers caps the list at six', () => {
     assertStrictEquals(featuredHumanMembers(ten).length, 6);
 });
 
-Deno.test('a { kind } identity reads as an absent profile',
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+Deno.test('an admin cannot store a membership-less'
+    + ' identity document',
 async () => {
-    const { ctx } = await adminContext();
+    const { db, ctx } = await adminContext();
     const id = generateIdentifier();
-    await ctx.PUT('identities/' + id, { kind: 'person' });
-    assertEquals(
-        (await getHumanMemberProfile(ctx, id)).profile,
-        { present: false },
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => ctx.PUT('identities/' + id, { kind: 'person' }),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    const read = await assertRejects(
+        () => getHumanMemberProfile(ctx, id),
+        RequestError,
+    );
+    assertStrictEquals(read.status, 403);
+    assertStrictEquals(
+        read.message,
+        outside('GET', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 
@@ -354,25 +378,27 @@ Deno.test('a member save latches its identity read and its'
     ]);
 });
 
-Deno.test('a member save over absent PII sends no PII latch',
+Deno.test('a member save cannot open a membership-less'
+    + ' identity',
 async () => {
     const { db } = await adminContext();
-    const { ctx, sent } = recordedContext(
+    const { ctx } = recordedContext(
         db, await organizationToken(),
     );
     const id = generateIdentifier();
-    await ctx.PUT('identities/' + id, { kind: 'person' });
-    const { read } = await getHumanMemberProfile(ctx, id);
-    sent.length = 0;
-    await putHumanMember(
-        ctx, id,
-        { held: read, body: MEMBER_DETAIL },
-        { current: { erased: true }, body: MEMBER_PII },
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => ctx.PUT('identities/' + id, { kind: 'person' }),
+        RequestError,
     );
-    assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
-        ['PUT', read.query('header.etag').toText()],
-        ['PUT', null],
-    ]);
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 Deno.test('getAdminSeatIds lists the admin seats only',

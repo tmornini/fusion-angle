@@ -97,48 +97,40 @@ Deno.test('POST /human-members is retired 404', async () => {
     assertStrictEquals(res.status, 404);
 });
 
-// AA9's covenant below the browser: a second identity PUT
-// REPLACES strengths, so an id toggled on in the same save
-// that toggles another off is what the next GET returns.
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
 Deno.test(
-    'a strengths PUT replaces the list — the toggled-on id'
-    + ' persists',
+    'an admin cannot replace strengths on a'
+    + ' membership-less identity',
     async () => {
         const db = await freshDb();
         const token = await organizationToken();
         const path = '/identities/xdaJyuuPyHfffCGLhqDrOQ';
-        const person = (strengths: string[]): unknown => ({
-            kind: 'person',
-            title: 'Admin',
-            department: 'Ops',
-            strengths,
-            team_dimensions: {},
-        });
+        const before = (await db.messagePairs.getAll()).length;
         const first = await handleRequest(db, apiRequest({
             method: 'PUT', path, token,
-            body: person([
-                'Strategic Planning',
-                'Data Analysis',
-                'Stakeholder Management',
-            ]),
+            body: {
+                kind: 'person',
+                title: 'Admin',
+                department: 'Ops',
+                strengths: [
+                    'Strategic Planning',
+                    'Data Analysis',
+                    'Stakeholder Management',
+                ],
+                team_dimensions: {},
+            },
         }));
-        assert(first.status === 201 || first.status === 200);
-        const second = await handleRequest(db, apiRequest({
-            method: 'PUT', path, token,
-            body: person([
-                'Strategic Planning',
-                'Stakeholder Management',
-                'Agile Methods',
-            ]),
-        }));
-        assert(second.status === 201 || second.status === 200);
-        const row = (await GET<{ strengths: string[] }>(
-            db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
-            operationIdHeader())).body().toValue();
-        assertEquals(row.strengths, [
-            'Strategic Planning',
-            'Stakeholder Management',
-            'Agile Methods',
-        ]);
+        assertStrictEquals(first.status, 403);
+        assertEquals(await first.json(), {
+            error: outside('PUT', path),
+        });
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
     },
 );

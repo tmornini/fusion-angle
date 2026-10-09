@@ -1,4 +1,8 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
@@ -11,6 +15,15 @@ import {
     '../client/identity-credentials.ts';
 import { deriveCredentialsFor } from
     '../api/derive-identity-spine.ts';
+import { RequestError } from '../shared/http-errors.ts';
+
+const ORPHAN = 'pnXmXrxOWayANgDLdCjuBw';
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -21,7 +34,8 @@ async function setup() {
 // Phase Final Task 2: identity_credentials ROW half stripped —
 // event count and active state live on the message plane.
 
-Deno.test('ledger retains set, rotate, revoke; latest wins',
+Deno.test('an admin cannot revoke a membership-less'
+    + ' credential',
 async () => {
     const { db, ctx } = await setup();
     await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
@@ -39,18 +53,30 @@ async () => {
         secret: 'phc-v2',
         at: '2026-01-02T00:00:00.000000Z',
     });
-    await postIdentityCredentialRevocation(
-        ctx, 'pnXmXrxOWayANgDLdCjuBw', 'password',
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => postIdentityCredentialRevocation(
+            ctx, ORPHAN, 'password',
+        ),
+        RequestError,
     );
-    const events = await deriveCredentialsFor(db, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(events.length, 3);   // retained
-    // Phase Final Stage B: identity spine tables retired.
-    const state =
-        await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(state.active.length, 0); // revoked
+    assertStrictEquals(err.status, 403);
+    assert(err.message.startsWith(
+        'forbidden: PUT /identities/' + ORPHAN
+            + '/credentials/',
+    ));
+    assert(err.message.includes(
+        'names an identity outside this organization',
+    ));
+    const events = await deriveCredentialsFor(db, ORPHAN);
+    assertStrictEquals(events.length, 2);
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
-Deno.test('the secret never leaves the state adapter',
+Deno.test('an admin cannot read a membership-less'
+    + ' credential ledger',
 async () => {
     const { db, ctx } = await setup();
     await seedIdentityCredential(db, 'pnXmXrxOWayANgDLdCjuBw'
@@ -61,17 +87,26 @@ async () => {
         secret: 'super-secret',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    const state =
-        await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals('secret' in state, false);
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => getIdentityCredentialState(ctx, ORPHAN),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
     assertStrictEquals(
-        JSON.stringify(state)
-            .includes('super-secret'),
-        false,
+        err.message,
+        outside(
+            'GET',
+            '/identities/' + ORPHAN + '/credentials/',
+        ) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 
-Deno.test('credential state is latest by at, not array order',
+Deno.test('an admin cannot read a membership-less'
+    + ' credential by at',
 async () => {
     const { db, ctx } = await setup();
     // Appended in REVERSE chronological order: the later
@@ -92,7 +127,19 @@ async () => {
         secret: '',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    const state =
-        await getIdentityCredentialState(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertEquals(state.active, ['password']);
+    const err = await assertRejects(
+        () => getIdentityCredentialState(ctx, ORPHAN),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside(
+            'GET',
+            '/identities/' + ORPHAN + '/credentials/',
+        ) + ' ()',
+    );
+    assertStrictEquals(
+        (await deriveCredentialsFor(db, ORPHAN)).length, 2,
+    );
 });

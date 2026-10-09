@@ -1,4 +1,8 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -111,17 +115,35 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+const OUTSIDER = 'fndCYAsXazdzMUlEGMNIZw';
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+async function assertOutside(
+    res: Response, method: string, path: string,
+): Promise<void> {
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: outside(method, path),
+    });
+}
+
 // ── regime 1: the route-table 405s (15 patterns, 36 combos) ──
 
 // Task 10: PATCH alphabet — no identity-spine patch yet.
-Deno.test('PATCH identities/:id 405s (no patch handler'
-+ ' wired)', async () => {
+Deno.test('PATCH identities/:id on an outsider is forbidden',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER;
     const res = await handleRequest(db, req(
-        'PATCH', '/identities/fndCYAsXazdzMUlEGMNIZw', token, {},
+        'PATCH', path, token, {},
     ));
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'PATCH', path);
 });
 
 Deno.test('PUT identities 405s (no put handler wired)', async () => {
@@ -143,34 +165,37 @@ async () => {
     assertStrictEquals(res.status, 405);
 });
 
-Deno.test('POST identities/:id 405s (no post handler wired)',
+Deno.test('POST identities/:id on an outsider is forbidden',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER;
     const res = await handleRequest(
-        db, req('POST', '/identities/fndCYAsXazdzMUlEGMNIZw', token, {}),
+        db, req('POST', path, token, {}),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'POST', path);
 });
 
-Deno.test('DELETE identities/:id 405s (no delete handler wired)',
+Deno.test('DELETE identities/:id on an outsider is forbidden',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER;
     const res = await handleRequest(
-        db, req('DELETE', '/identities/fndCYAsXazdzMUlEGMNIZw', token),
+        db, req('DELETE', path, token),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'DELETE', path);
 });
 
-Deno.test('POST identities/:id/pii 405s (no post handler wired)',
+Deno.test('POST identities/:id/pii on an outsider is forbidden',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER + '/pii';
     const res = await handleRequest(
-        db, req('POST', '/identities/fndCYAsXazdzMUlEGMNIZw/pii', token, {}),
+        db, req('POST', path, token, {}),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'POST', path);
 });
 
 Deno.test('PUT identity-pii 404s (route retired)', async () => {
@@ -202,67 +227,61 @@ async () => {
     assertStrictEquals(res.status, 404);
 });
 
-Deno.test('PUT identities/:id/credentials 405s (no put handler'
-+ ' wired)', async () => {
+Deno.test('PUT identities/:id/credentials on an outsider'
++ ' is forbidden', async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER + '/credentials/';
     const res = await handleRequest(
-        db, req(
-            'PUT', '/identities/fndCYAsXazdzMUlEGMNIZw/credentials/', token
-                , {},
-        ),
+        db, req('PUT', path, token, {}),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'PUT', path);
 });
 
-Deno.test('POST identities/:id/credentials 405s (no post handler'
-+ ' wired)', async () => {
+Deno.test('POST identities/:id/credentials on an outsider'
++ ' is forbidden', async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER + '/credentials/';
     const res = await handleRequest(
-        db, req(
-            'POST', '/identities/fndCYAsXazdzMUlEGMNIZw/credentials/', token
-                , {},
-        ),
+        db, req('POST', path, token, {}),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'POST', path);
 });
 
-Deno.test('DELETE identities/:id/credentials 405s (no delete'
-+ ' handler wired)', async () => {
+Deno.test('DELETE identities/:id/credentials on an outsider'
++ ' is forbidden', async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER + '/credentials/';
     const res = await handleRequest(
-        db, req('DELETE', '/identities/fndCYAsXazdzMUlEGMNIZw/credentials/'
-            , token),
+        db, req('DELETE', path, token),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'DELETE', path);
 });
 
-Deno.test('POST identities/:id/credentials/:cid 405s (no post'
-+ ' handler wired)', async () => {
+Deno.test('POST identities/:id/credentials/:cid on an'
++ ' outsider is forbidden', async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER + '/credentials/'
+        + 'WeXjAaAxGSpLpamfEuvcww';
     const res = await handleRequest(
-        db, req(
-            'POST', '/identities/fndCYAsXazdzMUlEGMNIZw/credentials/'
-                + 'WeXjAaAxGSpLpamfEuvcww', token, {},
-        ),
+        db, req('POST', path, token, {}),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'POST', path);
 });
 
-Deno.test('DELETE identities/:id/credentials/:cid 405s (no delete'
-+ ' handler wired)', async () => {
+Deno.test('DELETE identities/:id/credentials/:cid on an'
++ ' outsider is forbidden', async () => {
     const db = await freshDb();
     const token = await organizationToken();
+    const path = '/identities/' + OUTSIDER + '/credentials/'
+        + 'WeXjAaAxGSpLpamfEuvcww';
     const res = await handleRequest(
-        db, req(
-            'DELETE', '/identities/fndCYAsXazdzMUlEGMNIZw/credentials/'
-                + 'WeXjAaAxGSpLpamfEuvcww', token,
-        ),
+        db, req('DELETE', path, token),
     );
-    assertStrictEquals(res.status, 405);
+    await assertOutside(res, 'DELETE', path);
 });
 
 Deno.test('POST identity-token-revocations/:id 404s'
@@ -538,7 +557,7 @@ const SARAH_PROVIDER = {
     at: '2026-01-01T00:00:00.000000Z',
 };
 
-Deno.test('GET /identities/:id/providers lists that identity',
+Deno.test('GET providers of an unseated identity is forbidden',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -546,20 +565,11 @@ async () => {
         db, 'toccYYkLEABmlbpHJalgtQ', generateIdentifier(),
         SARAH_PROVIDER,
     );
+    const path = '/identities/toccYYkLEABmlbpHJalgtQ/providers/';
     const res = await handleRequest(
-        db, req('GET', '/identities/toccYYkLEABmlbpHJalgtQ/providers/'
-            , token),
+        db, req('GET', path, token),
     );
-    assertStrictEquals(res.status, 200);
-    const rows = await partBodiesOf<{
-        readonly provider: string;
-        readonly provider_subject: string;
-        readonly action: string;
-    }>(res);
-    assertStrictEquals(rows.length, 1);
-    assertStrictEquals(rows[0]!.provider, 'google');
-    assertStrictEquals(rows[0]!.provider_subject, 'sub-sarah');
-    assertStrictEquals(rows[0]!.action, 'linked');
+    await assertOutside(res, 'GET', path);
 });
 
 Deno.test('GET /identities/:id/providers 403s for a member'
@@ -822,12 +832,11 @@ Deno.test('POST /identity-tokens/:jti/revocation is retired'
     assertStrictEquals(res.status, 404);
 });
 
-// Spec 2026-09-15 exact-read folds § 1: the chain lookup reads
-// the path identity's OWN tokens collection, so a jti another
-// identity owns is unknown to it — 409, the same status as
-// reuse. Same security, the unknown status.
-Deno.test('POST rotation 409s when path identity is not the'
-+ ' jti owner', async () => {
+// The caller's own token lands. Rotating it through an
+// unseated path identity is the fence, before the
+// unknown-jti status.
+Deno.test('POST rotation of an unseated path identity'
++ ' is forbidden', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
@@ -841,13 +850,13 @@ Deno.test('POST rotation 409s when path identity is not the'
         },
     ));
     assert(put.status === 200 || put.status === 201);
+    await put.body?.cancel();
+    const path = '/identities/toccYYkLEABmlbpHJalgtQ/tokens/'
+        + 'kGolXBkfDPCBVKcZzZIHnQ/rotation';
     const res = await handleRequest(db, req(
-        'POST',
-        '/identities/toccYYkLEABmlbpHJalgtQ/tokens/kGolXBkfDPCBVKcZzZIHnQ/'
-            + 'rotation',
-        token, {},
+        'POST', path, token, {},
     ));
-    assertStrictEquals(res.status, 409);
+    await assertOutside(res, 'POST', path);
 });
 
 Deno.test('GET /identities/:id/tokens/:jti 404s for an absent'

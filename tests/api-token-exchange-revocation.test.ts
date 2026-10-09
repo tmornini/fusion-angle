@@ -147,6 +147,10 @@ async function revokedDb(): Promise<MemoryDbAdapter> {
         db, generateIdentifier(), ORGANIZATION_A, USER_1,
         '2020-01-01T00:00:00.000000Z',
     );
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', USER_1, 'member',
+        '2020-01-01T00:00:00.000000Z',
+    );
     // logout-everywhere as of now: every USER_1 token minted
     // before this stamp is dead.
     await seedTokenRevocationPair(
@@ -211,6 +215,10 @@ Deno.test(
         await seedMembershipPair(
             db, generateIdentifier(), ORGANIZATION_A,
             USER_1, '2020-01-01T00:00:00.000000Z',
+        );
+        await seedSeat(
+            db, 'AjdvjuECVZEgZoFajaIEkg', USER_1, 'member',
+            '2020-01-01T00:00:00.000000Z',
         );
         const actorJti = generateIdentifier();
         const iat = Math.floor(Date.now() / 1000) - 10;

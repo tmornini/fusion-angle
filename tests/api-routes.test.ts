@@ -1,4 +1,9 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
+import { RequestError } from '../shared/http-errors.ts';
 import { GETCollection } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
@@ -22,9 +27,14 @@ import { operationIdHeader } from './operation-id-header.ts';
 const ANY_ID = generateIdentifier();
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 // The collections that serve their heads as parts.
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
 const SERVED_COLLECTIONS: readonly string[] = [
     'ai-agents/',
-    'identities/' + ANY_ID + '/organizations/',
     'organizations/' + STARK + '/ideas/',
     'organizations/' + STARK + '/projects/',
     'organizations/' + STARK + '/work-orders/',
@@ -46,6 +56,29 @@ const SERVED_COLLECTIONS: readonly string[] = [
     'organizations/' + STARK + '/projects/'
         + ANY_ID + '/objective-actual-scores/',
 ];
+
+Deno.test(
+    'GET identities/:id/organizations/ on an outsider'
+    + ' is forbidden',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const route = 'identities/' + ANY_ID + '/organizations/';
+        const token = await devToken();
+        const err = await assertRejects(
+            () => GETCollection(
+                db, route, token,
+                operationIdHeader(),
+            ),
+            RequestError,
+        );
+        assertStrictEquals(err.status, 403);
+        assertStrictEquals(
+            err.message,
+            outside('GET', '/' + route) + ' ()',
+        );
+    },
+);
 
 for (const route of SERVED_COLLECTIONS) {
     Deno.test(

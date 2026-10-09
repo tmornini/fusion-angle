@@ -10,12 +10,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     apiRequest, pairIdOf, storedPutBodyText,
     framedRequest,
-    invitationLatched,
-    partBodiesOf,
 } from './http-fixtures.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
@@ -42,6 +40,8 @@ import { bytesToBase64Url } from '../shared/base64url.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
+// The caller's own slot. The fence admits self.
+const SELF = 'XXZruirZyAOoRpNxaDnpSA';
 
 function req(
     method: string,
@@ -97,6 +97,31 @@ async function pairsAtPii(
     );
 }
 
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+async function assertOrphanPiiForbidden(
+    db: MemoryDbAdapter,
+    id: string,
+): Promise<void> {
+    const before = (await db.messagePairs.getAll()).length;
+    const path = '/identities/' + id + '/pii';
+    const res = await handleRequest(db, req(
+        'PUT', path, DEV_TOKEN, humanPii('Ann'),
+    ));
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: outside('PUT', path),
+    });
+    assertStrictEquals((await pairsAtPii(db, id)).length, 0);
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+}
+
 async function loginPassword(
     db: MemoryDbAdapter,
     username: string,
@@ -126,7 +151,7 @@ async function loginPassword(
 
 Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
     const db = await freshDb();
-    const id = 'tyqfBGunVEufdtzApefuyw';
+    const id = SELF;
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann'),
@@ -158,7 +183,7 @@ Deno.test('PUT-PUT leaves two pairs and Supersedes', async () => {
 Deno.test('PUT-DELETE leaves a bodyless DELETE head and an'
 + ' absent derive', async () => {
     const db = await freshDb();
-    const id = 'uEYoNLWQrgIToJPFkyvdPw';
+    const id = SELF;
     const put = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Bob'),
@@ -191,7 +216,7 @@ Deno.test('PUT-DELETE leaves a bodyless DELETE head and an'
 
 Deno.test('DELETE-PUT is live again at three pairs', async () => {
     const db = await freshDb();
-    const id = 'uFgKFelNjvJcrtefsfZxrA';
+    const id = SELF;
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Cara'),
@@ -223,7 +248,7 @@ Deno.test('DELETE-PUT is live again at three pairs', async () => {
 Deno.test('a byte-identical resend against the LIVE slot replays'
 + ' the stored response and appends nothing', async () => {
     const db = await freshDb();
-    const id = 'uKYubOSYwiunzyPztWBtkw';
+    const id = SELF;
     const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
@@ -248,7 +273,7 @@ Deno.test('a byte-identical resend against the LIVE slot replays'
 Deno.test('a superseded body put again stores a new row',
 async () => {
     const db = await freshDb();
-    const id = 'uLUQPJnlVuzeGqXLYqCItA';
+    const id = SELF;
     const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
@@ -294,7 +319,7 @@ const EDITED_BIO = 'the edited erasure-completeness pin text';
 Deno.test('erased PII remains in superseded pairs; login is 401',
 async () => {
     const db = await freshDb();
-    const id = generateIdentifier();
+    const id = SELF;
     const create = await handleRequest(db, req(
         'PUT', '/identities/' + id, DEV_TOKEN,
         { kind: 'person', ...humanDetail() },
@@ -318,27 +343,6 @@ async () => {
             at: AT,
         },
     );
-    const grantRes = await handleRequest(db, req(
-        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/',
-        await organizationToken(),
-        {
-            email: ERASED_EMAIL,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(grantRes.status, 201);
-    const invitationId =
-        ((await grantRes.json()) as { id: string }).id;
-    const acceptRes = await handleRequest(db, await invitationLatched(db, req(
-        'PUT',
-        '/identities/' + id + '/invitations/' + invitationId,
-        await organizationToken(id, 'AjdvjuECVZEgZoFajaIEkg'),
-        {
-            state: 'accepted',
-            at: AT,
-        },
-    )));
-    assertStrictEquals(acceptRes.status, 200);
     const edit = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         {
@@ -368,18 +372,6 @@ async () => {
             || r.name === EDITED_NAME
             || r.email === ERASED_EMAIL
             || r.email === EDITED_EMAIL));
-    const roster = await handleRequest(db, req(
-        'GET',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg'
-            + '/memberships/?state=accepted',
-        await organizationToken(),
-    ));
-    assertStrictEquals(roster.status, 200);
-    const rosterText = JSON.stringify(await partBodiesOf(roster));
-    assert(!rosterText.includes(ERASED_NAME));
-    assert(!rosterText.includes(EDITED_NAME));
-    assert(!rosterText.includes(ERASED_EMAIL));
-    assert(!rosterText.includes(EDITED_EMAIL));
     for (const username of [ERASED_EMAIL, EDITED_EMAIL]) {
         const login = await loginPassword(db, username);
         assertStrictEquals(login.status, 401);
@@ -394,7 +386,7 @@ async () => {
 Deno.test('PUT-PUT-DELETE adds exactly three pairs (no document'
 + ' splices)', async () => {
     const db = await freshDb();
-    const id = 'XSNEaxodzAorrAiVBegDGw';
+    const id = SELF;
     const first = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         humanPii('Ann'),
@@ -418,11 +410,19 @@ Deno.test('PUT-PUT-DELETE adds exactly three pairs (no document'
     assertStrictEquals(head?.method, 'DELETE');
 });
 
+// An unseated id never reaches the tombstone story.
+Deno.test('a membership-less identity PII put is forbidden',
+async () => {
+    await assertOrphanPiiForbidden(
+        await freshDb(), 'tyqfBGunVEufdtzApefuyw',
+    );
+});
+
 // G5: stored PUT = piiEntityOf (GET derive). GET self-only
 // so this pin writes and reads the caller's own slot.
 Deno.test('stored PUT body equals piiEntityOf', async () => {
     const db = await freshDb();
-    const id = 'XXZruirZyAOoRpNxaDnpSA';
+    const id = SELF;
     const fields = humanPii('Gina');
     const put = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii',

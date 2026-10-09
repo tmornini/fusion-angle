@@ -105,6 +105,7 @@ import {
 } from '../shared/identifier.ts';
 import { parsedMembershipName } from
     '../shared/membership-name.ts';
+import { membershipOf } from './memberships.ts';
 import {
     membershipNameRefusal,
     type ViewQuery,
@@ -518,7 +519,7 @@ async function dispatched(
     // chain guard (Region B, below, SELF_ONLY_TOKEN_ROUTES):
     // MEMBER_VERBS widens the token revocation document's PUT
     // and both token operations' POSTs to the member tier, but
-    // an admin may still name any identity. False for a bearer-
+    // an admin may name a co-member. False for a bearer-
     // exempt route (no fence ran, so no role to hold) — the
     // guard below only ever runs on an authenticated route.
     let callerIsAdmin = false;
@@ -725,6 +726,38 @@ async function dispatched(
     );
     if (named !== undefined) return named;
 
+    // Co-membership is the fence. Self stays self. An
+    // identity the caller may not name is one 403,
+    // absent included, before any read of it.
+    if (
+        matched.segments[0] === 'identities'
+        && matched.segments[1] === ':id'
+    ) {
+        const pathIdentity = params[0];
+        if (
+            typeof pathIdentity === 'string'
+            && pathIdentity !== actor
+        ) {
+            const seated = organization === undefined
+                ? null
+                : await membershipOf(
+                    adapter, organization, pathIdentity,
+                );
+            if (seated === null) {
+                return Response.json(
+                    {
+                        error: 'forbidden: ' + method
+                            + ' ' + pathname
+                            + ' names an identity'
+                            + ' outside this'
+                            + ' organization',
+                    },
+                    { status: HTTP_FORBIDDEN },
+                );
+            }
+        }
+    }
+
     let viewQuery: ViewQuery | undefined;
     if (method === 'GET' && matched.query !== undefined) {
         const judged = matched.query(ctx.search);
@@ -789,19 +822,20 @@ async function dispatched(
         }
     }
 
-    // Region B of the pre-dispatch ownership fence: WP8's
-    // self-only token-chain guard. It runs after body-parse
-    // regardless of bearerExempt, mirroring Region A above.
+    // Region B of the pre-dispatch ownership fence. A
+    // member acts on its own token chain, an admin on a
+    // co-member's. The identity fence above has already
+    // refused every other identity. The code stays.
     try {
-        // WP8 self-only token-chain guard. MEMBER_VERBS widens
-        // the token revocation document's PUT and both token
-        // operations' POSTs to the member tier (Region A's
-        // route-policy check already cleared each). The path
-        // identity IS the document, or owns the chain the
-        // operation acts on — compare it to the actor. A
-        // member may act only on its OWN chain; an admin may
-        // name any identity. The 403 body reuses
-        // authorizeRequest's OWN wording (request-auth.ts).
+        // MEMBER_VERBS widens the token revocation
+        // document's PUT and both token operations' POSTs
+        // to the member tier (Region A's route-policy
+        // check already cleared each). The path identity
+        // IS the document, or owns the chain the operation
+        // acts on — compare it to the actor. A member may
+        // act only on its own chain; an admin may act on
+        // a co-member's. The 403 body reuses
+        // authorizeRequest's wording (request-auth.ts).
         if (
             SELF_ONLY_TOKEN_ROUTES.has(
                 method + ' ' + routePattern,

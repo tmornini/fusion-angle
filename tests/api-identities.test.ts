@@ -1,4 +1,10 @@
-import { assertEquals, assertStrictEquals, assertThrows } from '@std/assert';
+import {
+    assertEquals,
+    assertRejects,
+    assertStrictEquals,
+    assertThrows,
+} from '@std/assert';
+import { RequestError } from '../shared/http-errors.ts';
 import type { IdentityEntityFields } from '../shared/types.ts';
 import {
     validateIdentityEntity,
@@ -100,31 +106,70 @@ async function freshDb() {
     return db;
 }
 
-Deno.test('PUT then GET an identity round-trips', async () => {
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+Deno.test('an admin cannot round-trip a membership-less'
+    + ' identity', async () => {
     const db = await freshDb();
     const id = generateIdentifier();
-    await PUT(
-        db, 'identities/' + id, { kind: 'person' }, DEV_TOKEN,
-        operationIdHeader());
-    const got = (await GET<{ id: string; kind: string }>(
-        db, 'identities/' + id, DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertEquals(got, { id, kind: 'person' });
+    const before = (await db.messagePairs.getAll()).length;
+    const put = await assertRejects(
+        () => PUT(
+            db, 'identities/' + id, { kind: 'person' },
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        RequestError,
+    );
+    assertStrictEquals(put.status, 403);
+    assertStrictEquals(
+        put.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    const got = await assertRejects(
+        () => GET(
+            db, 'identities/' + id, DEV_TOKEN,
+            operationIdHeader(),
+        ),
+        RequestError,
+    );
+    assertStrictEquals(got.status, 403);
+    assertStrictEquals(
+        got.message,
+        outside('GET', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
-Deno.test('bootstrap seeds an identity per member, id-equal',
+Deno.test('bootstrap keeps the caller identity and fences'
+    + ' the system identity',
 async () => {
     const db = memoryDbAdapter();
     const { postBootstrap } =
         await import('../api/mock-data.ts');
     await postBootstrap(db);
-    const sys = (await GET<{ kind: string }>(
-        db, 'identities/' + SYSTEM_MEMBER_ID, DEV_TOKEN, operationIdHeader()))
-        .body().toValue();
-    assertStrictEquals(sys.kind, 'service');
+    const sys = await assertRejects(
+        () => GET(
+            db, 'identities/' + SYSTEM_MEMBER_ID,
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        RequestError,
+    );
+    assertStrictEquals(sys.status, 403);
+    assertStrictEquals(
+        sys.message,
+        outside(
+            'GET', '/identities/' + SYSTEM_MEMBER_ID,
+        ) + ' ()',
+    );
     const cur = (await GET<{ kind: string }>(
         db, 'identities/XXZruirZyAOoRpNxaDnpSA', DEV_TOKEN,
-            operationIdHeader())).body().toValue();
+        operationIdHeader())).body().toValue();
     assertStrictEquals(cur.kind, 'person');
 });
 

@@ -395,15 +395,12 @@ async () => {
 
     const unownedId = generateIdentifier();
     const unownedCreate = await handleRequest(db, req(
-        'PUT', '/identities/' + unownedId, token, {
-            kind: 'person',
-            title: 'Engineer',
-            department: 'Product',
-            strengths: [],
-            team_dimensions: {},
+        'POST', '/identities/', token, {
+            id: unownedId, kind: 'person',
         },
     ));
     assertStrictEquals(unownedCreate.status, 201);
+    await unownedCreate.body?.cancel();
 
     assertStrictEquals(
         await resolveOwningOrganization(
@@ -414,15 +411,12 @@ async () => {
 
     const ownedId = generateIdentifier();
     const ownedCreate = await handleRequest(db, req(
-        'PUT', '/identities/' + ownedId, token, {
-            kind: 'person',
-            title: 'Engineer',
-            department: 'Product',
-            strengths: [],
-            team_dimensions: {},
+        'POST', '/identities/', token, {
+            id: ownedId, kind: 'person',
         },
     ));
     assertStrictEquals(ownedCreate.status, 201);
+    await ownedCreate.body?.cancel();
     await seedSeat(
         db, STARK_ORGANIZATION, ownedId, 'member', nowUtc(),
     );

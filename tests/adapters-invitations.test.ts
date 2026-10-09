@@ -928,7 +928,9 @@ Deno.test('the sent view omits the email when PII is erased',
     const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
     await postInvitation(tony, 'sarah@x.com');
-    await eraseIdentityPii(db, 'XXZruirZyAOoRpNxaDnpSA'
+    // Sarah is pending in Wayne, so Tony is not her
+    // co-member. She erases her own PII.
+    await eraseIdentityPii(db, 'toccYYkLEABmlbpHJalgtQ'
         , 'BBjWJsjYIDkTRKIIPrzWRw', 'toccYYkLEABmlbpHJalgtQ');
     const sent = await getSentInvitations(tony, 'pending');
     assertStrictEquals(sent.length, 1);

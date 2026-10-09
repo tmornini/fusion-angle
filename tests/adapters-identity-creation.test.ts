@@ -1,6 +1,7 @@
 import { operationIdHeader } from './operation-id-header.ts';
 import {
     assert,
+    assertInstanceOf,
     assertNotStrictEquals,
     assertRejects,
     assertStrictEquals,
@@ -11,14 +12,22 @@ import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
 import {
+    IdentityPiiIntakeFailedError,
     postIdentityCreation,
 } from '../client/identities.ts';
+import { storedPutBodyText } from './http-fixtures.ts';
 import {
     deriveIdentityPii,
     deriveCredentialsFor,
 } from '../api/derive-identity-spine.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { RequestError } from '../shared/http-errors.ts';
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -33,24 +42,33 @@ async function setup() {
 // identity_credentials ROW halves stripped — oracles are the
 // message plane (GET + derive).
 
-Deno.test('postIdentityCreation mints a person identity'
-    + ' with PII', async () => {
+Deno.test('postIdentityCreation stores the person and'
+    + ' the admin PII hop is forbidden', async () => {
     const { db, ctx } = await setup();
-    await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', {
-        kind: 'person',
-        pii: {
-            name: 'Pat', email: 'pat@example.com',
-            phone: '555-0100', bio: 'bio',
-        },
-    });
-    const identity = (await GET<{ kind: string }>(
-        db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(identity.kind, 'person');
-    const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
-    assertStrictEquals(pii.email, 'pat@example.com');
-    // Phase Final Stage B: identity spine tables retired.
-    // Phase Final Stage B: identity spine tables retired.
+    const id = 'fndCYAsXazdzMUlEGMNIZw';
+    const err = await assertRejects(
+        () => postIdentityCreation(ctx, id, {
+            kind: 'person',
+            pii: {
+                name: 'Pat', email: 'pat@example.com',
+                phone: '555-0100', bio: 'bio',
+            },
+        }),
+        IdentityPiiIntakeFailedError,
+    );
+    const cause = err.cause;
+    assertInstanceOf(cause, RequestError);
+    assertStrictEquals(cause.status, 403);
+    assertStrictEquals(
+        cause.message,
+        outside('PUT', '/identities/' + id + '/pii')
+            + ' ()',
+    );
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/identities/', id),
+    ) as { kind: string };
+    assertStrictEquals(stored.kind, 'person');
+    await assertRejects(() => deriveIdentityPii(db, id));
 });
 
 Deno.test('postIdentityCreation mints a service identity'
@@ -59,10 +77,20 @@ Deno.test('postIdentityCreation mints a service identity'
     await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', {
         kind: 'service', secret: 'top-secret',
     });
-    const identity = (await GET<{ kind: string }>(
-        db, 'identities/syWUUcdBSbBgMwBiCrgbDw', DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(identity.kind, 'service');
+    const read = await assertRejects(
+        () => GET<{ kind: string }>(
+            db, 'identities/syWUUcdBSbBgMwBiCrgbDw',
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        RequestError,
+    );
+    assertStrictEquals(read.status, 403);
+    assertStrictEquals(
+        read.message,
+        outside(
+            'GET', '/identities/syWUUcdBSbBgMwBiCrgbDw',
+        ) + ' ()',
+    );
     const creds = await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw');
     const cred = creds.find(r => r.kind === 'client_secret');
     assert(cred, 'credential exists on message plane');
@@ -86,7 +114,13 @@ Deno.test('a resent postIdentityCreation is 409 and leaves'
             phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
         },
     };
-    await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
+    const first = await assertRejects(
+        () => postIdentityCreation(
+            ctx, 'fndCYAsXazdzMUlEGMNIZw', spec,
+        ),
+        IdentityPiiIntakeFailedError,
+    );
+    assertInstanceOf(first.cause, RequestError);
     const resent = await assertRejects(
         () => postIdentityCreation(
             ctx, 'fndCYAsXazdzMUlEGMNIZw', spec,
@@ -94,13 +128,13 @@ Deno.test('a resent postIdentityCreation is 409 and leaves'
         RequestError,
     );
     assertStrictEquals(resent.status, 409);
-    // Message-plane document at identities/:id is one head.
-    const identity = (await GET<{ kind: string }>(
-        db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(identity.kind, 'person');
-    const pii = await deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw');
-    assertStrictEquals(pii.email, 'a@example.com');
+    const stored = JSON.parse(await storedPutBodyText(
+        db, '/identities/', 'fndCYAsXazdzMUlEGMNIZw',
+    )) as { kind: string };
+    assertStrictEquals(stored.kind, 'person');
+    await assertRejects(
+        () => deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw'),
+    );
 });
 
 Deno.test('a second service creation for the same id is 409'

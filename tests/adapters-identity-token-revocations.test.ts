@@ -1,9 +1,11 @@
 import {
     assert,
     assertEquals,
+    assertRejects,
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
+import { RequestError } from '../shared/http-errors.ts';
 import {
     validateIdentityTokenRevocationEntity,
 } from '../api/validators.ts';
@@ -58,23 +60,29 @@ async function setup() {
 // Phase Final Task 2: identity_token_revocations ROW half
 // stripped — append count lives on the message plane.
 
-Deno.test('logout-everywhere appends, never splices',
+Deno.test('logout-everywhere on a membership-less'
+    + ' identity is forbidden',
 async () => {
-    // Revoke a subject OTHER than the writer's ('XXZruirZyAOoRpNxaDnpSA',
-    // via devToken) so the second append's own Bearer is not
-    // self-revoked by the first — the gate correctly revokes
-    // the actor's stale token when it logs ITSELF out
-    // everywhere. The latest-wins reduce is pinned at the
-    // token-verify layer (access-token tests).
     const { db, ctx } = await setup();
     const target = generateIdentifier();
-    await postIdentityLogoutEverywhere(ctx, target);
-    await postIdentityLogoutEverywhere(ctx, target);
-    const rows = await deriveTokenRevocationsFor(
-        db, target,
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => postIdentityLogoutEverywhere(ctx, target),
+        RequestError,
     );
-    assertStrictEquals(rows.length, 2);            // retained
-    assert(rows.every(
-        r => r.identity_id === target));
-    // Phase Final Stage B: identity spine tables retired.
+    assertStrictEquals(err.status, 403);
+    assert(err.message.startsWith(
+        'forbidden: PUT /identities/' + target
+            + '/token-revocations/',
+    ));
+    assert(err.message.includes(
+        'names an identity outside this organization',
+    ));
+    assertStrictEquals(
+        (await deriveTokenRevocationsFor(db, target)).length,
+        0,
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });

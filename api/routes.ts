@@ -1,6 +1,5 @@
 import {
     EntityNotFoundError,
-    ForeignOrganizationError,
     RetiredEntityError,
 } from './db.ts';
 import type {
@@ -36,7 +35,6 @@ import type {
     ProjectObjectiveActualScoreEntity,
     RecordEntity,
     RecordAttributeEntity,
-    MembershipEntity,
     IdentityProviderEntity,
     MessagePairEntity,
     TransitionFieldValueEntity,
@@ -307,7 +305,8 @@ import {
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
 import {
-    membershipsOfIdentity,
+    membershipOfHead,
+    organizationMembershipHeads,
 } from './memberships.ts';
 import {
     invitationsViewQueryOf,
@@ -675,24 +674,6 @@ export function route(
         segments: pattern.split('/'),
         ...handlers,
     };
-}
-
-// Visibility from the target's accepted memberships.
-// None is an orphan, visible. A membership in the
-// bound organization is a co-member, visible. Any
-// other organization is foreign, hidden.
-function ownerOrganizationViaMembershipPairPlane(
-    memberships: readonly MembershipEntity[],
-    boundOrganization: Id,
-): Id | null {
-    if (memberships.length === 0) return null;
-    const inBound = memberships.some(
-        (membership) =>
-            membership.organization_id === boundOrganization,
-    );
-    return inBound
-        ? boundOrganization
-        : memberships[0]!.organization_id;
 }
 
 // The bundle a live POST /records forms (Phase 6 Task 4, the
@@ -3513,11 +3494,32 @@ export async function postOrganizationDocumentOp(
 
 export const routes: Route[] = [
     route('identities/', {
-        // GET serves the stored heads at the global prefix
-        // (identities is organizationNested:false, so the
-        // selector ignores whatever organization value the
-        // caller passes).
-        select: collectionSelect(IDENTITIES_WIRING),
+        // Accepted seats of the fenced organization,
+        // intersected with identity heads by identity
+        // id. A seated service would appear; none exist.
+        select: async (db, _params, _actor, organization) => {
+            const org = requireOrganization(organization);
+            const [heads, memberships] = await Promise.all([
+                db.messagePairs.getCollectionHeadPairs(
+                    '/identities/',
+                ),
+                organizationMembershipHeads(db, org, {
+                    kind: 'state',
+                    state: 'accepted',
+                }),
+            ]);
+            const seated = new Set<string>();
+            for (const head of memberships) {
+                seated.add(
+                    membershipOfHead(head).identity_id,
+                );
+            }
+            return wholeCollectionSelection(
+                heads.filter((head) =>
+                    seated.has(head.name)),
+                'stateless',
+            );
+        },
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
         // ROUTE_POLICY. The identity and, for a service, its
@@ -3655,32 +3657,13 @@ export const routes: Route[] = [
     // storedPathAndNameOf keeps the document at the identity's
     // own prefix under the name 'pii'. GET serves the stored
     // head.
-    // authorizeIdentityPii (the gate dispatch) restricts a GET
-    // to self or admin. The selector then applies the same
-    // viaMembership org fence credentials use: foreign 403,
-    // orphan visible. A member never reads another identity's
-    // pii. The fence runs before the head is read, so a
-    // foreign identity's absent or erased PII answers 403,
-    // never a 404 or 410 that would describe it.
+    // authorizeIdentityPii restricts a GET to self or
+    // admin. The identity fence has already refused a
+    // path identity outside the organization, so this
+    // selector reads the head as a document.
     route('identities/:id/pii', {
-        select: async (db, p, _actor, organization) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
+        select: async (db, p) => {
             const identityId = param(p, 0);
-            const memberships = await membershipsOfIdentity(
-                db, identityId,
-            );
-            const owner =
-                ownerOrganizationViaMembershipPairPlane(
-                    memberships, organizationId,
-                );
-            if (owner !== null
-                && owner !== organizationId) {
-                throw new ForeignOrganizationError(
-                    'identity_pii', identityId,
-                );
-            }
             const head = await db.messagePairs.getHeadPair(
                 identityPrefixFor(identityId), PII_DOCUMENT_NAME,
             );
@@ -3713,18 +3696,14 @@ export const routes: Route[] = [
     // body's identity_id to that path, so a hand-crafted admin
     // PUT can store a credential whose identity disagrees with
     // it: the collection keeps the heads whose stored
-    // identity_id is the path identity, then fences on that
-    // identity (gate 15's co-membership ledger), as the row
-    // plane's WHERE did before it fenced. A collection none of
-    // whose heads survive is empty, never a 403. ADMIN-ONLY:
+    // identity_id is the path identity. A collection none
+    // of whose heads survive is empty. The identity fence
+    // is the organization gate. ADMIN-ONLY:
     // /identities is not member-tier, so these fall to the
     // root admin entries — NO MEMBER_VERBS entry. The secret
     // reaches no reader (credentialReader).
     route(CREDENTIALS_COLLECTION_PATTERN, {
-        select: async (db, p, _actor, organization, roles) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
+        select: async (db, p, _actor, _organization, roles) => {
             const identityId = param(p, 0);
             const heads = (
                 await db.messagePairs.getCollectionHeadPairs(
@@ -3732,39 +3711,19 @@ export const routes: Route[] = [
                 )
             ).filter((head) =>
                 storedCredentialIdentityOf(head) === identityId);
-            if (heads.length > 0) {
-                const memberships = await membershipsOfIdentity(
-                    db, identityId,
-                );
-                const owner =
-                    ownerOrganizationViaMembershipPairPlane(
-                        memberships, organizationId,
-                    );
-                if (owner !== null && owner !== organizationId) {
-                    throw new ForeignOrganizationError(
-                        'identity_credentials', identityId,
-                    );
-                }
-            }
             return {
                 ...wholeCollectionSelection(heads, 'stateless'),
                 reader: credentialReader(roles),
             };
         },
     }),
-    // The fence input is the head's own identity_id, never
-    // the path: the path :id only keys the prefix the pair
-    // lives at, and no validator ties body.identity_id to
-    // it, so a hand-crafted admin PUT can store a credential
-    // whose identity disagrees with its path. The row plane
-    // this replaced fenced on the stored field; so does this.
-    // A foreign identity's credential 403s; an absent one
-    // 404s. The secret reaches no reader (credentialReader).
+    // The path :id only keys the prefix. No validator
+    // ties body.identity_id to it. The identity fence
+    // has already refused a foreign path. An absent
+    // credential 404s. The secret reaches no reader
+    // (credentialReader).
     route(CREDENTIAL_DETAIL_PATTERN, {
-        select: async (db, p, _actor, organization, roles) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
+        select: async (db, p, _actor, _organization, roles) => {
             const identityId = param(p, 0);
             const cid = param(p, 1);
             const head = await db.messagePairs.getHeadPair(
@@ -3772,20 +3731,6 @@ export const routes: Route[] = [
             );
             if (head === null) {
                 throw new EntityNotFoundError(
-                    'identity_credentials', cid,
-                );
-            }
-            const identityOfHead =
-                storedCredentialIdentityOf(head);
-            const memberships = await membershipsOfIdentity(
-                db, identityOfHead,
-            );
-            const owner =
-                ownerOrganizationViaMembershipPairPlane(
-                    memberships, organizationId,
-                );
-            if (owner !== null && owner !== organizationId) {
-                throw new ForeignOrganizationError(
                     'identity_credentials', cid,
                 );
             }

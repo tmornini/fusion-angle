@@ -853,9 +853,13 @@ Deno.test('only the invitee may accept', async () => {
             at: '2026-04-01T00:00:01.000000Z',
         },
     );
+    const path = '/identities/' + invitee.id
+        + '/invitations/' + name;
     await assertError(
         refused, 403,
-        'forbidden: only the invitee may accept',
+        'forbidden: PUT ' + path
+            + ' names an identity outside this'
+            + ' organization',
     );
 });
 
@@ -1021,13 +1025,17 @@ async () => {
     assertStrictEquals(empty.status, 204);
     assertEquals(await partsOf(empty), []);
     const lonely = generateIdentifier();
+    const lonelyPath = '/identities/' + lonely
+        + '/invitations/';
     const lonelyView = await handleRequest(db, req(
-        'GET',
-        '/identities/' + lonely + '/invitations/',
-        admin,
+        'GET', lonelyPath, admin,
     ));
-    assertStrictEquals(lonelyView.status, 204);
-    await lonelyView.body?.cancel();
+    assertStrictEquals(lonelyView.status, 403);
+    assertEquals(await lonelyView.json(), {
+        error: 'forbidden: GET ' + lonelyPath
+            + ' names an identity outside this'
+            + ' organization',
+    });
 
     const pending = await person(db, 'view-p@example.com');
     const accepted = await person(db, 'view-a@example.com');
@@ -1191,14 +1199,16 @@ async () => {
         own.map((body) => body.organization_id).sort(),
         [ORG, otherOrganization].sort(),
     );
+    const notOwnPath = '/identities/' + pending.id
+        + '/invitations/';
     const notOwn = await handleRequest(db, req(
-        'GET',
-        '/identities/' + pending.id + '/invitations/',
-        accepted.token,
+        'GET', notOwnPath, accepted.token,
     ));
     await assertError(
         notOwn, 403,
-        'forbidden: invitation list is self or admin',
+        'forbidden: GET ' + notOwnPath
+            + ' names an identity outside this'
+            + ' organization',
     );
 });
 
