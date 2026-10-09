@@ -1414,7 +1414,7 @@ export interface InvitationEntity {
     identity_id: Id;
     // The invitation's own grant time (validated at write
     // time by grantInvitation's validateTimestampField(body,
-    // 'grantAt', …)), a domain fact — NOT a ledger fact.
+    // 'at', …)), a domain fact — NOT a ledger fact.
     // GET .../invitations/:id/versions/ stamps a DIFFERENT
     // `at` on each row: the message pair's own arrival time
     // (versionSnapshotsAt, document-family.ts,

@@ -242,7 +242,7 @@ async function inviteDave(db: DbAdapter): Promise<string> {
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        { email: 'dave@x.com', grantAt: AT },
+        { email: 'dave@x.com', at: AT },
     ));
     assertStrictEquals(res.status, 201);
     await res.body?.cancel();

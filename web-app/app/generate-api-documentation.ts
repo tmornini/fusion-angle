@@ -490,7 +490,7 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     writeExample(
         'post',
         '/organizations/:id/invitations/',
-        { email: 'email', grantAt: AT },
+        { email: 'email', at: AT },
     ),
     writeExample(
         'put',

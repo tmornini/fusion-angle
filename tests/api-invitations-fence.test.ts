@@ -204,7 +204,7 @@ async function inviteSarahToWayne(
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
         {
             email: 'sarah@x.com',
-            grantAt: AT,
+            at: AT,
         }));
     assertStrictEquals(res.status, 201);
     const body = await res.json() as { id: string };
@@ -253,7 +253,7 @@ Deno.test('a non-admin is forbidden from granting', async () => {
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             email: 'demo@example.com',
-            grantAt: AT,
+            at: AT,
         }));
     assertStrictEquals(res.status, 403);
     assertEquals(await res.json(), {
@@ -388,7 +388,7 @@ async () => {
     const db = await seed();
     const body = {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
     };
     const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -427,7 +427,7 @@ async () => {
     const granted = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
     }));
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
@@ -474,7 +474,7 @@ async () => {
     const granted = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
     }));
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
@@ -517,7 +517,7 @@ async () => {
     const granted = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
     }));
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
@@ -557,17 +557,17 @@ Deno.test('grant: empty email is rejected (400)', async () => {
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
-        { email: '', grantAt: AT }));
+        { email: '', at: AT }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
 });
 
-Deno.test('grant: empty grantAt is rejected (400)', async () => {
+Deno.test('invite: empty at is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
-        { email: 'sarah@x.com', grantAt: '' }));
+        { email: 'sarah@x.com', at: '' }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
 });
@@ -610,19 +610,19 @@ Deno.test('grant: missing email is rejected (400)', async () => {
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
-        { grantAt: AT }));
+        { at: AT }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
 });
 
-Deno.test('grant: non-string grantAt is rejected (400)', async () => {
+Deno.test('invite: non-string at is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
         {
             email: 'sarah@x.com',
-            grantAt: 42,
+            at: 42,
         }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();

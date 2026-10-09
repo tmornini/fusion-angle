@@ -1566,7 +1566,7 @@ async () => {
             },
             body: JSON.stringify({
                 email: UNSEATED_EMAIL,
-                grantAt: nowUtc(),
+                at: nowUtc(),
             }),
         },
     ));

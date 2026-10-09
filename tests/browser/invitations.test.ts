@@ -35,7 +35,7 @@ Deno.test('an accept over a revoke paints the row'
                     token: await adminToken(),
                     body: {
                         email: DAVID_EMAIL,
-                        grantAt: nowUtc(),
+                        at: nowUtc(),
                     },
                 }),
             );

@@ -1139,7 +1139,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-accept@x.com',
-            grantAt: '2026-03-01T00:00:00.000000Z',
+            at: '2026-03-01T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(acceptGrant.status, 201);
@@ -1178,7 +1178,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-decline@x.com',
-            grantAt: '2026-03-02T00:00:00.000000Z',
+            at: '2026-03-02T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(declineGrant.status, 201);
@@ -1218,7 +1218,7 @@ Deno.test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             + '/invitations/',
         adminToken, {
             email: 'drift-states-invitee-revoke@x.com',
-            grantAt: '2026-03-03T00:00:00.000000Z',
+            at: '2026-03-03T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(revokeGrant.status, 201);

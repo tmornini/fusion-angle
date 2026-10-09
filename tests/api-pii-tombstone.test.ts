@@ -323,7 +323,7 @@ async () => {
         await organizationToken(),
         {
             email: ERASED_EMAIL,
-            grantAt: AT,
+            at: AT,
         },
     ));
     assertStrictEquals(grantRes.status, 201);

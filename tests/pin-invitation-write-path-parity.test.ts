@@ -93,7 +93,7 @@ Deno.test('membershipOf: pre-tx vs in-tx agree before and'
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
-            grantAt: '2026-06-04T00:00:00.000000Z',
+            at: '2026-06-04T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grant.status, 201);

@@ -535,7 +535,7 @@ export async function getInvitationVersionOnOrganizationNest(
 
 function invitationFields(
     body: Record<string, unknown>,
-): { email: string; grantAt: string } {
+): { email: string; at: string } {
     const email = body['email'];
     if (typeof email !== 'string' || email === '') {
         throw new ValidationError(
@@ -543,12 +543,12 @@ function invitationFields(
         );
     }
     assertOnlyKeys(
-        body, ['email', 'grantAt'], 'InvitationGrant',
+        body, ['email', 'at'], 'Invitation',
     );
     return {
         email,
-        grantAt: validateTimestampField(
-            body, 'grantAt', 'InvitationGrant',
+        at: validateTimestampField(
+            body, 'at', 'Invitation',
         ),
     };
 }
@@ -572,7 +572,7 @@ export async function postOrganizationInvitation(
         throw new Error('requestId is required');
     }
     const organizationId = param(params, 0);
-    const { email, grantAt } = invitationFields(payload);
+    const { email, at } = invitationFields(payload);
     const match = (await deriveIdentityPiiRows(db))
         .find((person) => person.email === email);
     if (match === undefined) {
@@ -583,7 +583,7 @@ export async function postOrganizationInvitation(
     const name = membershipNameOf(organizationId, match.id);
     const parsed = parsedName(name);
     const request: MembershipRequest = {
-        state: 'pending', type: 'member', at: grantAt,
+        state: 'pending', type: 'member', at,
     };
     const head = await readHead(db, name);
     const from = head === null

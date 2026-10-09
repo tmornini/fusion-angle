@@ -144,7 +144,7 @@ export async function postInvitation(
             'organizations/'
                 + activeOrganization(ctx)
                 + '/invitations/',
-            { email, grantAt: nowUtc() },
+            { email, at: nowUtc() },
         );
     } catch (err) {
         if (

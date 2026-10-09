@@ -150,7 +150,7 @@ async function invite(
         'POST',
         '/organizations/' + organization + '/invitations/',
         admin,
-        { email, grantAt: at },
+        { email, at },
     ));
 }
 

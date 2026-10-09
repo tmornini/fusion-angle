@@ -2189,7 +2189,7 @@ export function formInvitationSeedInput(
         + '/invitations/';
     const body = {
         email: buildUnaffiliatedIdentity().email,
-        grantAt: MOCK_SEED_TIMESTAMP,
+        at: MOCK_SEED_TIMESTAMP,
     };
     const model = buildRequestModel({
         method: 'POST',

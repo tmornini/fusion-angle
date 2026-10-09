@@ -396,14 +396,14 @@ async () => {
     );
 
     async function inviteTo(
-        email: string, grantAt: string,
+        email: string, at: string,
     ): Promise<Response> {
         return handleRequest(db, req(
             'POST',
             '/organizations/' + organization
                 + '/invitations/',
             adminToken,
-            { email, grantAt },
+            { email, at },
         ));
     }
 

@@ -399,7 +399,7 @@ async function createWorkOrder(
 async function inviteAndAccept(
     db: MemoryDbAdapter, adminToken: string,
     inviteeToken: string, inviteeId: string,
-    inviteeEmail: string, grantAt: string,
+    inviteeEmail: string, at: string,
     acceptAt: string, organization: string,
 ): Promise<string> {
     const name = membershipNameOf(organization, inviteeId);
@@ -407,7 +407,7 @@ async function inviteAndAccept(
         'POST',
         '/organizations/' + organization + '/invitations/',
         adminToken,
-        { email: inviteeEmail, grantAt },
+        { email: inviteeEmail, at },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
@@ -864,7 +864,7 @@ Deno.test('deriveInvitationStates: a repeated accept is 409'
         tokenA,
         {
             email: 'invitee-reaccept@x.com',
-            grantAt: '2026-04-02T00:00:00.000000Z',
+            at: '2026-04-02T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
@@ -934,7 +934,7 @@ Deno.test('deriveInvitationStates: a repeated decline is 409'
         tokenA,
         {
             email: 'invitee-redecline@x.com',
-            grantAt: '2026-04-03T00:00:00.000000Z',
+            at: '2026-04-03T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');

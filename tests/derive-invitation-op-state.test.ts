@@ -105,7 +105,7 @@ async function invite(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
             email,
-            grantAt: '2026-06-01T00:00:00.000000Z',
+            at: '2026-06-01T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(res.status, 201);

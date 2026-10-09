@@ -124,7 +124,7 @@ async function invite(
     return handleRequest(db, req(
         'POST', '/organizations/' + STARK + '/invitations/',
         await organizationToken(),
-        { email, grantAt: AT },
+        { email, at: AT },
     ));
 }
 
