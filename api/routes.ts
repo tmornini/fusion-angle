@@ -294,7 +294,7 @@ import {
 } from './organization-requests.ts';
 import {
     getOrganizationInvitations,
-    postOrganizationInvitationGrant,
+    postOrganizationInvitation,
     getInvitationOnOrganizationNest,
     putInvitationOnOrganizationNest,
     getInvitationVersionsOnOrganizationNest,
@@ -5146,7 +5146,7 @@ export const routes: Route[] = [
     route('organizations/:id/invitations/', {
         query: viewQueryOf,
         select: getOrganizationInvitations,
-        post: postOrganizationInvitationGrant,
+        post: postOrganizationInvitation,
     }),
     route(
         'organizations/:id/invitations/:membership-id',

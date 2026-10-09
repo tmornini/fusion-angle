@@ -36,7 +36,7 @@ import {
 import { putIdentityDefaultOrganization } from
     './organization-requests.ts';
 import {
-    postOrganizationInvitationGrant,
+    postOrganizationInvitation,
     putInvitationOnOrganizationNest,
 } from './invitations-domain.ts';
 import type {
@@ -719,7 +719,7 @@ async function postMockDataLoadIn(
                     ),
                 ),
             )),
-        postOrganizationInvitationGrant(
+        postOrganizationInvitation(
             adapter,
             [input.invitation.organization],
             input.invitation.body,

@@ -533,7 +533,7 @@ export async function getInvitationVersionOnOrganizationNest(
     );
 }
 
-function grantFields(
+function invitationFields(
     body: Record<string, unknown>,
 ): { email: string; grantAt: string } {
     const email = body['email'];
@@ -553,8 +553,8 @@ function grantFields(
     };
 }
 
-// POST /organizations/:id/invitations/ — grant pending.
-export async function postOrganizationInvitationGrant(
+// POST /organizations/:id/invitations/ — invite pending.
+export async function postOrganizationInvitation(
     db: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
@@ -572,7 +572,7 @@ export async function postOrganizationInvitationGrant(
         throw new Error('requestId is required');
     }
     const organizationId = param(params, 0);
-    const { email, grantAt } = grantFields(payload);
+    const { email, grantAt } = invitationFields(payload);
     const match = (await deriveIdentityPiiRows(db))
         .find((person) => person.email === email);
     if (match === undefined) {

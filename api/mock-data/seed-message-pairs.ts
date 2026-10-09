@@ -1421,7 +1421,7 @@ export function buildMockDataInvocations():
     // hashSeedCredentials, before pass 1, like every
     // human's.
     // Its invitation is granted through the live
-    // postOrganizationInvitationGrant in pass 2
+    // postOrganizationInvitation in pass 2
     // (mock-data.ts) — the invitations side channel has
     // no WRITE_RESPONSE_SPECS entry, so it cannot ride
     // formSeedMessagePair.
