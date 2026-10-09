@@ -493,7 +493,7 @@ Deno.test(
         assertStrictEquals(
             url.pathname,
             '/api/organizations/AjdvjuECVZEgZoFajaIEkg'
-                + '/invitations/',
+                + '/memberships/',
         );
         assertStrictEquals(url.search, '?state=removed');
         assertStrictEquals(

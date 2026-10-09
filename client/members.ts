@@ -60,7 +60,7 @@ function requireOrganization(ctx: RequestContext): string {
 
 function acceptedMemberships(ctx: RequestContext): string {
     return 'organizations/' + requireOrganization(ctx)
-        + '/invitations/?state=accepted';
+        + '/memberships/?state=accepted';
 }
 
 function membershipItem(

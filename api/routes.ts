@@ -309,6 +309,8 @@ import {
     membershipsOfIdentity,
 } from './memberships.ts';
 import {
+    invitationsViewQueryOf,
+    membershipsViewQueryOf,
     viewQueryOf,
     type QueryRefusal,
     type ViewQuery,
@@ -5144,9 +5146,13 @@ export const routes: Route[] = [
     // Invitation send nest. POST grants pending. PUT
     // revokes. Storage prefix stays /invitations/.
     route('organizations/:id/invitations/', {
-        query: viewQueryOf,
+        query: invitationsViewQueryOf,
         select: getOrganizationInvitations,
         post: postOrganizationInvitation,
+    }),
+    route('organizations/:id/memberships/', {
+        query: membershipsViewQueryOf,
+        select: getOrganizationInvitations,
     }),
     route(
         'organizations/:id/invitations/:membership-id',

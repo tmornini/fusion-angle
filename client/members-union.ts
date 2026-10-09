@@ -50,7 +50,7 @@ export async function getMembers(
             )
             : ctx.GETCollection<MembershipEntity>(
                 'organizations/' + organization
-                    + '/invitations/?state=accepted',
+                    + '/memberships/?state=accepted',
             ),
         ctx.GETCollection<AIAgentEntity>('ai-agents/')
             .then(parts => parts.map((m) => m.body().toValue())),
@@ -137,7 +137,7 @@ export async function getFormerMembers(
         MembershipEntity
     >(
         'organizations/' + organization
-            + '/invitations/?state=removed',
+            + '/memberships/?state=removed',
     );
     return removed.map(
         part => new FormerMember(part.body().toValue()),

@@ -371,7 +371,7 @@ async () => {
     const roster = await handleRequest(db, req(
         'GET',
         '/organizations/AjdvjuECVZEgZoFajaIEkg'
-            + '/invitations/?state=accepted',
+            + '/memberships/?state=accepted',
         await organizationToken(),
     ));
     assertStrictEquals(roster.status, 200);

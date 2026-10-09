@@ -65,14 +65,14 @@ for (const route of SERVED_COLLECTIONS) {
 // part.
 Deno.test(
     'GET organizations/' + STARK
-    + '/invitations/?state=accepted serves the'
+    + '/memberships/?state=accepted serves the'
     + ' admin membership on an empty db',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const parts = await GETCollection(
             db, 'organizations/' + STARK
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
             await devToken(), operationIdHeader(),
         );
         assertStrictEquals(parts.length, 1);

@@ -59,7 +59,7 @@ Deno.test(
             identity_id: string;
         }>(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
             token, operationIdHeader()))
             .map((part) => part.body().toValue());
         assert(seats.some(s => s.identity_id === ALICE));

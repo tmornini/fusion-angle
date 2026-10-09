@@ -159,7 +159,7 @@ Deno.test(
             );
             assertEquals(
                 paths.filter(p => p.endsWith(
-                    '/invitations/?state=accepted',
+                    '/memberships/?state=accepted',
                 )).length,
                 1,
             );

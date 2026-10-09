@@ -318,7 +318,7 @@ async function rosterIds(
 ): Promise<Set<string>> {
     const res = await handleRequest(db, req(
         'GET', '/organizations/' + WAYNE
-            + '/invitations/?state=accepted',
+            + '/memberships/?state=accepted',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , WAYNE)));
     assertStrictEquals(res.status, 200);

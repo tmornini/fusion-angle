@@ -816,7 +816,7 @@ async () => {
 });
 
 const ACCEPTED = ORGANIZATION
-    + '/invitations/?state=accepted';
+    + '/memberships/?state=accepted';
 
 Deno.test(ACCEPTED + ' serves its accepted heads as parts,'
     + ' each its document GET', async () => {

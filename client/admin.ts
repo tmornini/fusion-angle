@@ -42,7 +42,7 @@ export async function getOrganizationSeats(
     // today's readers only count them.
     return (await ctx.GETCollection<MembershipEntity>(
         'organizations/' + organization
-            + '/invitations/?state=accepted',
+            + '/memberships/?state=accepted',
     )).toSorted((a, b) => {
         const left = a.body().toValue();
         const right = b.body().toValue();

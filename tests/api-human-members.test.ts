@@ -85,7 +85,7 @@ Deno.test(
             identity_id: string;
         }>(
             db, 'organizations/' + organization
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
             token,
             operationIdHeader()))
             .map((part) => part.body().toValue());

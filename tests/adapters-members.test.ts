@@ -114,7 +114,7 @@ Deno.test(
             MembershipEntity
         >(
             'organizations/' + STARK
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
         );
         const mine = accepted.filter((part) =>
             part.body().toValue().identity_id === ALICE

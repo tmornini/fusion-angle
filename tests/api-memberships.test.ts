@@ -32,9 +32,6 @@ const ORG = 'AjdvjuECVZEgZoFajaIEkg';
 const MALFORMED =
     'membership-id must be two identifiers joined by'
     + ' one colon';
-const MEMBER_VIEW =
-    'forbidden: members read accepted or removed'
-    + ' memberships';
 const LAST_ADMIN =
     'the last accepted admin cannot be removed'
     + ' or demoted';
@@ -1085,37 +1082,74 @@ async () => {
     assertStrictEquals(removal.status, 200);
     await removal.body?.cancel();
 
-    const everywhere = await handleRequest(db, req(
-        'GET',
-        '/organizations/' + ORG + '/invitations/',
-        admin,
+    const invitations = '/organizations/' + ORG
+        + '/invitations/';
+    const memberships = '/organizations/' + ORG
+        + '/memberships/';
+    const pendingView = await handleRequest(db, req(
+        'GET', invitations, admin,
     ));
-    assertStrictEquals(everywhere.status, 200);
-    const parts = await partsOf<MembershipEntity>(
-        everywhere,
+    assertStrictEquals(pendingView.status, 200);
+    const pendingParts = await partsOf<MembershipEntity>(
+        pendingView,
     );
-    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    await assertPartsAreHeads(
+        db, pendingParts, { sees: 'whole' },
+    );
     assertEquals(
-        parts.map((part) => part.body().toValue().state)
-            .sort(),
-        [
-            'accepted', 'declined', 'pending',
-            'removed', 'revoked',
-        ],
+        pendingParts.map(
+            (part) => part.body().toValue().state,
+        ),
+        ['pending'],
     );
-    for (const state of [
-        'pending', 'accepted', 'declined',
-        'revoked', 'removed',
-    ] as const) {
+    const acceptedDefault = await handleRequest(db, req(
+        'GET', memberships, admin,
+    ));
+    assertStrictEquals(acceptedDefault.status, 200);
+    const acceptedParts = await partsOf<MembershipEntity>(
+        acceptedDefault,
+    );
+    await assertPartsAreHeads(
+        db, acceptedParts, { sees: 'whole' },
+    );
+    assertEquals(
+        acceptedParts.map(
+            (part) => part.body().toValue().state,
+        ),
+        ['accepted'],
+    );
+    for (const state of ['declined', 'revoked'] as const) {
         const filtered = await handleRequest(db, req(
-            'GET',
-            '/organizations/' + ORG
-                + '/invitations/?state=' + state,
+            'GET', invitations + '?state=' + state,
             admin,
         ));
         assertStrictEquals(filtered.status, 200);
         assertEquals(await statesOf(filtered), [state]);
     }
+    for (const state of ['accepted', 'removed'] as const) {
+        const filtered = await handleRequest(db, req(
+            'GET', memberships + '?state=' + state,
+            admin,
+        ));
+        assertStrictEquals(filtered.status, 200);
+        assertEquals(await statesOf(filtered), [state]);
+    }
+    await assertError(
+        await handleRequest(db, req(
+            'GET', invitations + '?state=accepted',
+            admin,
+        )),
+        400,
+        'state must be one of pending, declined,'
+            + ' revoked',
+    );
+    await assertError(
+        await handleRequest(db, req(
+            'GET', memberships + '?state=pending', admin,
+        )),
+        400,
+        'state must be one of accepted, removed',
+    );
 
     const elsewhere = await invite(
         db, otherAdmin, pending.email,
@@ -1168,29 +1202,45 @@ async () => {
     );
 });
 
-Deno.test('a bad view query is 400 before the member rule',
-async () => {
+Deno.test('a bad view query is 400 for a reader of'
+    + ' that view', async () => {
     const { db, admin } = await basis();
     const member = await person(db, 'member@example.com');
-    const badState = await handleRequest(db, req(
-        'GET',
-        '/organizations/' + ORG
-            + '/invitations/?state=nope',
-        member.token,
-    ));
+    const alphabet = 'state must be one of pending,'
+        + ' accepted, declined, revoked, removed';
+    const invitations = '/organizations/' + ORG
+        + '/invitations/';
+    const memberships = '/organizations/' + ORG
+        + '/memberships/';
     await assertError(
-        badState, 400,
-        'state must be one of pending, accepted,'
-            + ' declined, revoked, removed',
+        await handleRequest(db, req(
+            'GET', invitations + '?state=nope', admin,
+        )),
+        400, alphabet,
     );
-    const extra = await handleRequest(db, req(
-        'GET',
-        '/organizations/' + ORG
-            + '/invitations/?state=pending&extra=1',
-        admin,
-    ));
     await assertError(
-        extra, 400,
+        await handleRequest(db, req(
+            'GET', memberships + '?state=nope',
+            member.token,
+        )),
+        400, alphabet,
+    );
+    await assertError(
+        await handleRequest(db, req(
+            'GET', invitations + '?state=nope',
+            member.token,
+        )),
+        403,
+        'forbidden: GET ' + invitations
+            + ' requires a role this principal lacks',
+    );
+    await assertError(
+        await handleRequest(db, req(
+            'GET',
+            invitations + '?state=pending&extra=1',
+            admin,
+        )),
+        400,
         'a view takes one ?state= and nothing else',
     );
 });
@@ -1228,25 +1278,33 @@ Deno.test('a member reads accepted and removed, and a'
     assertStrictEquals(removed.status, 200);
     await removed.body?.cancel();
 
-    const list = '/organizations/' + ORG + '/invitations/';
+    const invitations = '/organizations/' + ORG
+        + '/invitations/';
+    const memberships = '/organizations/' + ORG
+        + '/memberships/';
+    const denied = 'forbidden: GET ' + invitations
+        + ' requires a role this principal lacks';
     for (const search of [
         '', '?state=pending', '?state=declined',
-        '?state=revoked',
+        '?state=revoked', '?state=accepted',
+        '?state=removed',
     ]) {
         const refused = await handleRequest(db, req(
-            'GET', list + search, member.token,
+            'GET', invitations + search, member.token,
         ));
-        await assertError(refused, 403, MEMBER_VIEW);
+        await assertError(refused, 403, denied);
     }
     const acceptedView = await handleRequest(db, req(
-        'GET', list + '?state=accepted', member.token,
+        'GET', memberships + '?state=accepted',
+        member.token,
     ));
     assertStrictEquals(acceptedView.status, 200);
     assertEquals(
         await statesOf(acceptedView), ['accepted'],
     );
     const removedView = await handleRequest(db, req(
-        'GET', list + '?state=removed', member.token,
+        'GET', memberships + '?state=removed',
+        member.token,
     ));
     assertStrictEquals(removedView.status, 200);
     assertEquals(
@@ -1412,7 +1470,7 @@ Deno.test('version routes 404 a name never written and a'
     >(await handleRequest(db, req(
         'GET',
         '/organizations/' + ORG
-            + '/invitations/?state=accepted',
+            + '/memberships/?state=accepted',
         admin,
     )));
     assert(

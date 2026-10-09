@@ -127,7 +127,7 @@ function aiMemberDocumentBody(
 
 // -- 1. seeded memberships wire equals derive ------------------
 
-Deno.test('seeded GET invitations wire equals the accepted'
+Deno.test('seeded GET memberships wire equals the accepted'
 + ' view, both orgs (the 10/6 split), plus the empty-'
 + ' organization leg',
 async () => {
@@ -140,7 +140,7 @@ async () => {
         db, req(
             'GET',
             '/organizations/' + STARK_ORGANIZATION
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
             tokenStark,
         ),
     );
@@ -172,7 +172,7 @@ async () => {
         db, req(
             'GET',
             '/organizations/' + ORGANIZATION_TWO
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
             tokenTwo,
         ),
     );
@@ -486,7 +486,7 @@ async () => {
     const acceptedView = await handleRequest(db, req(
         'GET',
         '/organizations/' + organization
-            + '/invitations/?state=accepted',
+            + '/memberships/?state=accepted',
         adminToken,
     ));
     assertStrictEquals(acceptedView.status, 200);

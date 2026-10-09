@@ -1181,6 +1181,28 @@ export const API_DOC_ROOMS:
         ],
     },
     {
+        hash: 'get/organizations/id/memberships',
+        verb: 'GET',
+        uri: '/api/organizations/:id/memberships/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '400',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
         hash: 'get/organizations/id/objectives',
         verb: 'GET',
         uri: '/api/organizations/:id/objectives/',

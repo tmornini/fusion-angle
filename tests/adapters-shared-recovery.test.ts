@@ -335,7 +335,7 @@ Deno.test('a recover context silently refreshes a dead access token',
         deadAccess);
     // the 401 triggers refresh + org re-scope + one retry
     const members = (await ctx.GETCollection(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/invitations/?state=accepted',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/memberships/?state=accepted',
     )).map(part => part.body().toValue());
     assertStrictEquals(members.length, 1);
 }));
@@ -358,7 +358,7 @@ Deno.test('concurrent 401s share exactly one refresh grant',
     // branded reuse and revoke the fresh chain
     const [members, organizations] = await Promise.all([
         ctx.GETCollection('organizations/AjdvjuECVZEgZoFajaIEkg'
-            + '/invitations/?state=accepted')
+            + '/memberships/?state=accepted')
             .then(parts => parts.map(part => part.body().toValue())),
         ctx.GETCollection(
             'identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
@@ -396,7 +396,7 @@ Deno.test('a live credential with an anonymous-seed holder re-scopes'
         seed);
     // recovery re-installs the live token, re-scopes, and retries
     const members = (await ctx.GETCollection(
-        'organizations/AjdvjuECVZEgZoFajaIEkg/invitations/?state=accepted',
+        'organizations/AjdvjuECVZEgZoFajaIEkg/memberships/?state=accepted',
     )).map(part => part.body().toValue());
     assertStrictEquals(members.length, 1);
     // the live session is preserved (not scrubbed) and now scoped

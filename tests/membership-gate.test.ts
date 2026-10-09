@@ -1,9 +1,11 @@
 import { assertEquals, assertStrictEquals } from
     '@std/assert';
 import {
+    invitationsViewQueryOf,
     memberSeesState,
     memberViewRefusal,
     membershipNameRefusal,
+    membershipsViewQueryOf,
     viewQueryOf,
 } from '../api/membership-gate.ts';
 
@@ -31,13 +33,63 @@ Deno.test('a view takes exactly one state of the five',
 
 Deno.test('a repeated, unknown, or empty state, or any'
     + ' other parameter, is refused', () => {
+    const parsers = [
+        viewQueryOf,
+        invitationsViewQueryOf,
+        membershipsViewQueryOf,
+    ];
     for (const search of [
         '?state=pending&state=accepted', '?state=deleted',
         '?state=', '?state', '?STATE=pending',
         '?state=pending&page=2', '?page=2',
     ]) {
-        assertStrictEquals(
-            viewQueryOf(search).kind, 'refused', search,
+        for (const parse of parsers) {
+            assertStrictEquals(
+                parse(search).kind, 'refused', search,
+            );
+        }
+    }
+});
+
+Deno.test('invitations view defaults to pending', () => {
+    assertEquals(
+        invitationsViewQueryOf(''),
+        { kind: 'state', state: 'pending' },
+    );
+});
+
+Deno.test('invitations view names its alphabet on a'
+    + ' foreign state', () => {
+    const judged = invitationsViewQueryOf(
+        '?state=accepted',
+    );
+    assertStrictEquals(judged.kind, 'refused');
+    if (judged.kind === 'refused') {
+        assertEquals(
+            judged.error,
+            'state must be one of pending, declined,'
+                + ' revoked',
+        );
+    }
+});
+
+Deno.test('memberships view defaults to accepted', () => {
+    assertEquals(
+        membershipsViewQueryOf(''),
+        { kind: 'state', state: 'accepted' },
+    );
+});
+
+Deno.test('memberships view names its alphabet on a'
+    + ' foreign state', () => {
+    const judged = membershipsViewQueryOf(
+        '?state=pending',
+    );
+    assertStrictEquals(judged.kind, 'refused');
+    if (judged.kind === 'refused') {
+        assertEquals(
+            judged.error,
+            'state must be one of accepted, removed',
         );
     }
 });

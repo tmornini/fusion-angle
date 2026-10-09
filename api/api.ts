@@ -106,7 +106,6 @@ import {
 import { parsedMembershipName } from
     '../shared/membership-name.ts';
 import {
-    memberViewRefusal,
     membershipNameRefusal,
     type ViewQuery,
 } from './membership-gate.ts';
@@ -734,20 +733,6 @@ async function dispatched(
                 { error: judged.error },
                 { status: HTTP_BAD_REQUEST },
             );
-        }
-        if (
-            routePattern
-                === 'organizations/:id/invitations/'
-        ) {
-            const memberRefusal = memberViewRefusal(
-                roles, judged,
-            );
-            if (memberRefusal !== undefined) {
-                return Response.json(
-                    { error: memberRefusal },
-                    { status: HTTP_FORBIDDEN },
-                );
-            }
         }
         viewQuery = judged;
     }
