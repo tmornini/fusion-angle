@@ -604,6 +604,7 @@ Deno.test('a concurrent facade refresh and remint present'
         body: {
             email: 'demo@example.com',
             at: '2026-06-04T00:00:01.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     }));
     assertStrictEquals(granted.status, 201);

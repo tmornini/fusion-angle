@@ -2118,7 +2118,9 @@ export const API_DOC_ROOMS:
         hash: 'post/organizations/id/invitations',
         verb: 'POST',
         uri: '/api/organizations/:id/invitations/',
-        body: '{\n  "email": "email",\n  "at": "2020-01-01T00:00:00.000Z"\n}',
+        body:
+            '{\n  "email": "email",\n  "at": "2020-01-01T00:00:00.000Z",\n  '
+            + '"expiresAt": "2020-01-15T00:00:00.000Z"\n}',
         headers:
         [
             'Authorization: Bearer …',

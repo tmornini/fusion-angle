@@ -66,6 +66,7 @@ import {
     identityMembershipHeads,
     type MembershipActor,
     type MembershipRequest,
+    type MembershipTransitionBody,
 } from './memberships.ts';
 import {
     membershipNameOf,
@@ -164,10 +165,46 @@ function askedQuery(query: ViewQuery | undefined): ViewQuery {
     return query ?? { kind: 'every' };
 }
 
+function pendingMembership(
+    next: MembershipTransitionBody,
+    expiresAt: string,
+): MembershipEntity {
+    if (next.state !== 'pending') {
+        throw new Error('a grant must land pending');
+    }
+    return {
+        id: next.id,
+        organization_id: next.organization_id,
+        identity_id: next.identity_id,
+        type: next.type,
+        state: next.state,
+        at: next.at,
+        expires_at: expiresAt,
+    };
+}
+
+function settledMembership(
+    next: MembershipTransitionBody,
+): MembershipEntity {
+    if (next.state === 'pending') {
+        throw new Error(
+            'a put transition landed pending',
+        );
+    }
+    return {
+        id: next.id,
+        organization_id: next.organization_id,
+        identity_id: next.identity_id,
+        type: next.type,
+        state: next.state,
+        at: next.at,
+    };
+}
+
 function storedMembership(
     membership: MembershipEntity,
 ): Record<string, unknown> {
-    return {
+    const stored: Record<string, unknown> = {
         id: membership.id,
         organization_id: membership.organization_id,
         identity_id: membership.identity_id,
@@ -175,6 +212,10 @@ function storedMembership(
         state: membership.state,
         at: membership.at,
     };
+    if (membership.state === 'pending') {
+        stored['expires_at'] = membership.expires_at;
+    }
+    return stored;
 }
 
 function headerOf(
@@ -543,7 +584,7 @@ export async function getInvitationVersionOnOrganizationNest(
 
 function invitationFields(
     body: Record<string, unknown>,
-): { email: string; at: string } {
+): { email: string; at: string; expiresAt: string } {
     const email = body['email'];
     if (typeof email !== 'string' || email === '') {
         throw new ValidationError(
@@ -551,14 +592,20 @@ function invitationFields(
         );
     }
     assertOnlyKeys(
-        body, ['email', 'at'], 'Invitation',
+        body, ['email', 'at', 'expiresAt'], 'Invitation',
     );
-    return {
-        email,
-        at: validateTimestampField(
-            body, 'at', 'Invitation',
-        ),
-    };
+    const at = validateTimestampField(
+        body, 'at', 'Invitation',
+    );
+    const expiresAt = validateTimestampField(
+        body, 'expiresAt', 'Invitation',
+    );
+    if (expiresAt <= at) {
+        throw new ValidationError(
+            'expiresAt must be after at',
+        );
+    }
+    return { email, at, expiresAt };
 }
 
 // POST /organizations/:id/invitations/ — invite pending.
@@ -580,7 +627,9 @@ export async function postOrganizationInvitation(
         throw new Error('requestId is required');
     }
     const organizationId = param(params, 0);
-    const { email, at } = invitationFields(payload);
+    const { email, at, expiresAt } = invitationFields(
+        payload,
+    );
     const match = (await deriveIdentityPiiRows(db))
         .find((person) => person.email === email);
     if (match === undefined) {
@@ -615,7 +664,9 @@ export async function postOrganizationInvitation(
     const answer = await landMembership(
         db, 'POST', actor, requestAt, operationId,
         received, payload, name, 'pending',
-        storedMembership(outcome.next), condition,
+        storedMembership(
+            pendingMembership(outcome.next, expiresAt),
+        ), condition,
         {
             kind: 'created',
             location: '/organizations/' + organizationId
@@ -794,6 +845,17 @@ async function putMembership(
             HTTP_CONFLICT,
         );
     }
+    if (
+        from !== null
+        && from.state === 'pending'
+        && request.state === 'accepted'
+        && from.expires_at <= requestAt
+    ) {
+        throw new ApiError(
+            'the invitation expired at ' + from.expires_at,
+            HTTP_CONFLICT,
+        );
+    }
     const outcome = membershipTransition(
         actorKind, parsed, from, request,
     );
@@ -808,8 +870,9 @@ async function putMembership(
         }
         return servedHead(head, received.requestId);
     }
+    const next = settledMembership(outcome.next);
     if (from !== null) {
-        await refuseLastAdmin(db, from, outcome.next);
+        await refuseLastAdmin(db, from, next);
     }
     const condition: SiblingCondition = head === null
         ? { kind: 'never-written', declarer: 'client' }
@@ -817,7 +880,7 @@ async function putMembership(
     const answer = await landMembership(
         db, 'PUT', actor, requestAt, operationId,
         received, payload, name, request.state,
-        storedMembership(outcome.next), condition,
+        storedMembership(next), condition,
         { kind: 'parent' },
     );
     if (answer.outcome === 'land') {

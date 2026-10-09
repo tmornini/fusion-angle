@@ -33,6 +33,8 @@ import { documentFamilyWiring } from
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
 const AT = '2020-01-01T00:00:00.000Z';
+const INVITATION_EXPIRES_AT =
+    '2020-01-15T00:00:00.000Z';
 const KEPT_ROOT_NAMES = new Set([
     'index.html',
     'index.ts',
@@ -490,7 +492,11 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
     writeExample(
         'post',
         '/organizations/:id/invitations/',
-        { email: 'email', at: AT },
+        {
+            email: 'email',
+            at: AT,
+            expiresAt: INVITATION_EXPIRES_AT,
+        },
     ),
     writeExample(
         'put',

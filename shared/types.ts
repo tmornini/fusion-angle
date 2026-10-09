@@ -1387,17 +1387,27 @@ export interface OrganizationEntity {
 // no separate role-grants family.
 export type MembershipType = 'admin' | 'member';
 
-// The membership body (spec §1): the name fixes the two
-// ids; `at` is when the current state was entered.
-export interface MembershipEntity {
+// The membership body (spec §1). The name fixes the two
+// ids. `at` is when the current state was entered.
+// Pending carries expires_at. Every other state is the
+// six keys.
+type MembershipFields = {
     // `<organization-id>:<identity-id>`
     id: string;
     organization_id: Id;
     identity_id: Id;
     type: MembershipType;
-    state: InvitationState;
     at: string;
-}
+};
+
+export type MembershipEntity =
+    | (MembershipFields & {
+        state: 'pending';
+        expires_at: string;
+    })
+    | (MembershipFields & {
+        state: Exclude<InvitationState, 'pending'>;
+    });
 
 // An invitation binding an identity to an organization, awaiting the holder's
 // answer. Immutable like a membership, but its lifecycle is derived from the

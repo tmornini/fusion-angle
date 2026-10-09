@@ -41,6 +41,8 @@ const OTHER_O = 'yXVKeCiguypnNcNelXVldQ';
 const NAME = { organizationId: O, identityId: I };
 const AT = '2026-10-01T12:00:00.000000Z';
 const LATER = '2026-10-02T12:00:00.000000Z';
+const PENDING_EXPIRES =
+    '2026-10-08T12:00:00.000000Z';
 const LAST_ADMIN =
     'the last accepted admin cannot be removed or demoted';
 
@@ -48,14 +50,21 @@ function held(
     state: InvitationState,
     type: MembershipType = 'member',
 ): MembershipEntity {
-    return {
+    const core = {
         id: O + ':' + I,
         organization_id: O,
         identity_id: I,
         type,
-        state,
         at: AT,
     };
+    if (state === 'pending') {
+        return {
+            ...core,
+            state,
+            expires_at: PENDING_EXPIRES,
+        };
+    }
+    return { ...core, state };
 }
 
 function expectLands(
@@ -394,12 +403,37 @@ Deno.test('every transition the table does not name'
     }
 });
 
-function removed(membership: MembershipEntity): MembershipEntity {
-    return { ...membership, state: 'removed', at: LATER };
+function removed(
+    membership: MembershipEntity,
+): MembershipEntity {
+    return {
+        id: membership.id,
+        organization_id: membership.organization_id,
+        identity_id: membership.identity_id,
+        type: membership.type,
+        state: 'removed',
+        at: LATER,
+    };
 }
 
-function demoted(membership: MembershipEntity): MembershipEntity {
-    return { ...membership, type: 'member', at: LATER };
+function demoted(
+    membership: MembershipEntity,
+): MembershipEntity {
+    const core = {
+        id: membership.id,
+        organization_id: membership.organization_id,
+        identity_id: membership.identity_id,
+        type: 'member' as const,
+        at: LATER,
+    };
+    if (membership.state === 'pending') {
+        return {
+            ...core,
+            state: 'pending',
+            expires_at: membership.expires_at,
+        };
+    }
+    return { ...core, state: membership.state };
 }
 
 Deno.test('removing the sole accepted admin'
@@ -528,6 +562,50 @@ Deno.test('an organization id that is not an'
         ).message,
         gate,
     );
+});
+
+Deno.test('a pending membership requires expires_at'
+    + ' and every other state refuses it', () => {
+    const pending = {
+        id: O + ':' + I,
+        organization_id: O,
+        identity_id: I,
+        type: 'member' as const,
+        state: 'pending' as const,
+        at: AT,
+    };
+    assertEquals(
+        assertThrows(
+            () => validateMembershipBody(pending),
+            ValidationError,
+        ).message,
+        'missing required key "expires_at"'
+            + ' for MembershipEntity',
+    );
+    const expiresAt = '2026-10-08T12:00:00.000000Z';
+    assertEquals(
+        validateMembershipBody({
+            ...pending,
+            expires_at: expiresAt,
+        }),
+        { ...pending, expires_at: expiresAt },
+    );
+    for (const state of [
+        'accepted', 'declined', 'revoked', 'removed',
+    ] as const) {
+        assertEquals(
+            assertThrows(
+                () => validateMembershipBody({
+                    ...pending,
+                    state,
+                    expires_at: expiresAt,
+                }),
+                ValidationError,
+            ).message,
+            'unexpected key "expires_at"'
+                + ' for MembershipEntity',
+        );
+    }
 });
 
 Deno.test('membershipOf holds an accepted head and its'

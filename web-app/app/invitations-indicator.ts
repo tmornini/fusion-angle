@@ -1,5 +1,6 @@
 import { $ } from './dom.ts';
 import { navigateTo } from './navigation.ts';
+import { nowUtc } from '../../shared/types.ts';
 
 // Wire the click + change subscription exactly once per page load
 // (module state resets on every full-page navigation), so re-renders
@@ -36,16 +37,20 @@ async function renderBell(
     badge: HTMLElement | null,
 ): Promise<void> {
     const { sessionContext } = await import('./client.ts');
-    const { getInvitations } =
+    const { getInvitations, invitationIsExpired } =
         await import('../../client/index.ts');
     const pending = await getInvitations(
         sessionContext(), 'pending',
     );
-    if (pending.length === 0) {
+    const now = nowUtc();
+    const open = pending.filter(
+        (row) => !invitationIsExpired(row, now),
+    );
+    if (open.length === 0) {
         bell.classList.add('hidden');
         if (badge) badge.textContent = '';
         return;
     }
-    if (badge) badge.textContent = String(pending.length);
+    if (badge) badge.textContent = String(open.length);
     bell.classList.remove('hidden');
 }

@@ -407,7 +407,11 @@ async function inviteAndAccept(
         'POST',
         '/organizations/' + organization + '/invitations/',
         adminToken,
-        { email: inviteeEmail, at },
+        {
+            email: inviteeEmail,
+            at,
+            expiresAt: '2099-12-31T00:00:00.000000Z',
+        },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
@@ -865,6 +869,7 @@ Deno.test('deriveInvitationStates: a repeated accept is 409'
         {
             email: 'invitee-reaccept@x.com',
             at: '2026-04-02T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
@@ -935,6 +940,7 @@ Deno.test('deriveInvitationStates: a repeated decline is 409'
         {
             email: 'invitee-redecline@x.com',
             at: '2026-04-03T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');

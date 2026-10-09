@@ -35,6 +35,7 @@ const MALFORMED =
 const LAST_ADMIN =
     'the last accepted admin cannot be removed'
     + ' or demoted';
+const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 
 function itemPath(
     nest: 'organizations' | 'identities',
@@ -126,14 +127,21 @@ function expected(
     type: MembershipEntity['type'] = 'member',
     organization = ORG,
 ): MembershipEntity {
-    return {
+    const core = {
         id: membershipNameOf(organization, identity),
         organization_id: organization,
         identity_id: identity,
         type,
-        state,
         at,
     };
+    if (state === 'pending') {
+        return {
+            ...core,
+            state,
+            expires_at: EXPIRES_AT,
+        };
+    }
+    return { ...core, state };
 }
 
 async function invite(
@@ -147,7 +155,7 @@ async function invite(
         'POST',
         '/organizations/' + organization + '/invitations/',
         admin,
-        { email, at },
+        { email, at, expiresAt: EXPIRES_AT },
     ));
 }
 

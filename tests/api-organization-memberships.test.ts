@@ -23,6 +23,7 @@ const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 const DAVE = generateIdentifier();
 const AT = '2026-01-01T00:00:00.000000Z';
+const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 const INVITATION_ALPHABET =
     'state must be one of pending, declined, revoked';
 const MEMBERSHIP_ALPHABET =
@@ -61,7 +62,11 @@ async function seeded(): Promise<{
         method: 'POST',
         path: nest('invitations'),
         token: admin,
-        body: { email: 'dave@x.com', at: AT },
+        body: {
+            email: 'dave@x.com',
+            at: AT,
+            expiresAt: EXPIRES_AT,
+        },
     }));
     assertStrictEquals(invited.status, 201);
     await invited.body?.cancel();

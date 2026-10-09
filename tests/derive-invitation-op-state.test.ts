@@ -106,6 +106,7 @@ async function invite(
             + '/invitations/', admin, {
             email,
             at: '2026-06-01T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(res.status, 201);

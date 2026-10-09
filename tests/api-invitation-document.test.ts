@@ -38,6 +38,7 @@ import { membershipNameOf } from
 // are storage-only.
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 const SARAH_NAME = membershipNameOf(STARK, SARAH);
@@ -124,7 +125,7 @@ async function invite(
     return handleRequest(db, req(
         'POST', '/organizations/' + STARK + '/invitations/',
         await organizationToken(),
-        { email, at: AT },
+        { email, at: AT, expiresAt: EXPIRES_AT },
     ));
 }
 
@@ -168,7 +169,10 @@ async () => {
     // bytes.
     assertEquals(
         Object.keys(withoutId(wire)).sort(),
-        ['at', 'identity_id', 'organization_id', 'state', 'type'],
+        [
+            'at', 'expires_at', 'identity_id',
+            'organization_id', 'state', 'type',
+        ],
     );
     assertStrictEquals(wire.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
     assertStrictEquals(wire.identity_id, 'toccYYkLEABmlbpHJalgtQ');
@@ -195,6 +199,7 @@ async () => {
         type: 'member',
         at: AT,
         state: 'pending',
+        expires_at: EXPIRES_AT,
     });
     const requests = await db.messagePairs.getAll();
     assertStrictEquals(requests.length, before);
@@ -329,6 +334,7 @@ async () => {
         type: 'member',
         at: AT,
         state: 'pending',
+        expires_at: EXPIRES_AT,
     });
     assertEquals(withoutId(documents[1]!.body), {
         organization_id: STARK,
@@ -366,6 +372,7 @@ async () => {
         type: 'member',
         at: AT,
         state: 'pending',
+        expires_at: EXPIRES_AT,
     });
     assertEquals(withoutId(documents[1]!.body), {
         organization_id: STARK,
@@ -548,6 +555,7 @@ Deno.test('a resent POST of a pending email is 200'
         type: 'member',
         at: AT,
         state: 'pending',
+        expires_at: EXPIRES_AT,
     });
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,

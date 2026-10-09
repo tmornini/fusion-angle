@@ -236,6 +236,7 @@ Deno.test('a grant\'s 201 carries its own pair\'s three'
         body: {
             email: 'sarah.chen@company.com',
             at: '2026-06-04T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     }));
     assertStrictEquals(grant.status, 201);

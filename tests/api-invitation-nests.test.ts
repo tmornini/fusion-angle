@@ -100,6 +100,7 @@ Deno.test('identity nest offers GET on / and'
 });
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 const DAVE = generateIdentifier();
@@ -163,7 +164,7 @@ async function inviteWayne(
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        { email, at: AT },
+        { email, at: AT, expiresAt: EXPIRES_AT },
     ));
 }
 

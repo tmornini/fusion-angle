@@ -5,6 +5,12 @@
 export const MOCK_SEED_TIMESTAMP =
     '2026-01-01T00:00:00.000000Z';
 
+// One year after MOCK_SEED_TIMESTAMP. The seeded pending
+// invitation passes this explicitly; the gate does not
+// invent an expiry.
+export const MOCK_SEED_INVITATION_EXPIRES_AT =
+    '2027-01-01T00:00:00.000000Z';
+
 // The seed's root org id (Stark Industries). Local to the
 // seed — there is no global default org any more.
 export const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
