@@ -2172,18 +2172,18 @@ export async function formDefaultOrganizationSeedMessagePair(
 // The seeded pending invitation as the organization-scoped
 // grant route receives it: the Stark admin invites the
 // unaffiliated identity by email (Decision 8).
-export interface InvitationGrantSeedInput {
+export interface InvitationSeedInput {
     readonly organization: Id;
-    readonly granterId: Id;
+    readonly inviterId: Id;
     readonly body: Record<string, unknown>;
     readonly requestAt: string;
     readonly operationId: string;
     readonly received: ReceivedRequest;
 }
 
-export function formInvitationGrantSeedInput(
+export function formInvitationSeedInput(
     requestAt: string,
-): InvitationGrantSeedInput {
+): InvitationSeedInput {
     const operationId = generateIdentifier();
     const target = '/organizations/' + STARK_ORGANIZATION
         + '/invitations/';
@@ -2205,7 +2205,7 @@ export function formInvitationGrantSeedInput(
     }
     return {
         organization: STARK_ORGANIZATION,
-        granterId: 'XXZruirZyAOoRpNxaDnpSA',
+        inviterId: 'XXZruirZyAOoRpNxaDnpSA',
         body,
         requestAt,
         operationId,
