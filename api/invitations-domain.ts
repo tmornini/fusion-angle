@@ -16,16 +16,19 @@ import {
 } from '../shared/types.ts';
 import {
     assertOnlyKeys,
+    validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
 } from './validators.ts';
 import {
     attemptFor,
+    canonicalPath,
     formWriteMessagePair,
     httpDateOf,
     IF_MATCH_HEADER,
     IF_NONE_MATCH_HEADER,
     parseEntityTags,
+    PII_DOCUMENT_NAME,
     runStateWrite,
     runWrite,
 } from './message-pair.ts';
@@ -39,6 +42,7 @@ import type {
 import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityPiiRows,
+    identityPrefixFor,
 } from './derive-identity-spine.ts';
 import { param } from './document-family.ts';
 import {
@@ -87,6 +91,11 @@ const OPERATION_PATTERN =
     'invitations/:membership-name/:state';
 const OPERATION_SEGMENTS = [
     'invitations', ':membership-name', ':state',
+];
+const MEMBERSHIP_CREATE_PATTERN =
+    'organizations/:id/memberships/';
+const MEMBERSHIP_CREATE_SEGMENTS = [
+    'organizations', ':id', 'memberships', '',
 ];
 
 function requireAdmin(
@@ -616,6 +625,117 @@ export async function postOrganizationInvitation(
     );
     if (answer.outcome === 'land') {
         notify(db, organizationId, match.id);
+    }
+    return answer.response;
+}
+
+// POST /organizations/:id/memberships/ — one accepted
+// person. The handler declares the three geneses.
+export async function postOrganizationMembership(
+    db: DbAdapter,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    _messagePair: MessagePair | undefined,
+    _organization: Id | undefined,
+    roles: readonly string[],
+    requestAt: string,
+    operationId: string,
+    received?: ReceivedRequest,
+): Promise<unknown> {
+    requireWriteStamp(requestAt, operationId);
+    requireAdmin(roles, ADMIN_WRITE);
+    if (received === undefined) {
+        throw new Error('requestId is required');
+    }
+    const organizationId = param(params, 0);
+    const created = validateMembershipCreateBody(payload);
+    const name = membershipNameOf(
+        organizationId, created.id,
+    );
+    const profile = created.identity;
+    const receivedPair = await formWriteMessagePair({
+        method: 'POST',
+        pathname: received.target,
+        routePattern: MEMBERSHIP_CREATE_PATTERN,
+        routeSegments: MEMBERSHIP_CREATE_SEGMENTS,
+        pathSegments: [
+            'organizations', organizationId,
+            'memberships', '',
+        ],
+        headerFields: received.headerFields,
+        body: payload,
+        bodyBytes: received.bodyBytes,
+        requesterIdentityId: actor,
+        requestAt,
+        organization: undefined,
+        responseBody: undefined,
+        operationId,
+        requestId: received.requestId,
+    });
+    const answer = await runStateWrite(db, {
+        kind: 'siblings',
+        received: receivedPair,
+        siblings: [
+            {
+                method: 'PUT',
+                path: MEMBERSHIPS_PATH,
+                name,
+                state: storedMembership({
+                    id: name,
+                    organization_id: organizationId,
+                    identity_id: created.id,
+                    type: created.membership.type,
+                    state: 'accepted',
+                    at: created.membership.at,
+                }),
+                condition: {
+                    kind: 'genesis',
+                    declarer: 'handler',
+                },
+            },
+            {
+                method: 'PUT',
+                path: canonicalPath(
+                    undefined, '/identities/',
+                ),
+                name: created.id,
+                state: {
+                    id: created.id,
+                    kind: 'person',
+                    ...profile,
+                },
+                condition: {
+                    kind: 'genesis',
+                    declarer: 'handler',
+                },
+            },
+            {
+                method: 'PUT',
+                path: identityPrefixFor(created.id),
+                name: PII_DOCUMENT_NAME,
+                state: {
+                    name: created.pii.name,
+                    email: created.pii.email,
+                    phone: created.pii.phone,
+                    bio: created.pii.bio,
+                },
+                condition: {
+                    kind: 'genesis',
+                    declarer: 'handler',
+                },
+            },
+        ],
+        reader: { sees: 'whole' },
+        answer: {
+            kind: 'created',
+            location: '/organizations/'
+                + organizationId
+                + '/invitations/' + name,
+        },
+    });
+    if (answer.outcome === 'land') {
+        notify(db, organizationId, created.id);
     }
     return answer.response;
 }

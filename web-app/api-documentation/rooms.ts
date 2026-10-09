@@ -2141,6 +2141,30 @@ export const API_DOC_ROOMS:
         ],
     },
     {
+        hash: 'post/organizations/id/memberships',
+        verb: 'POST',
+        uri: '/api/organizations/:id/memberships/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
         hash: 'post/organizations/id/objectives',
         verb: 'POST',
         uri: '/api/organizations/:id/objectives/',

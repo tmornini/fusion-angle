@@ -16,6 +16,8 @@ import {
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
@@ -213,3 +215,128 @@ Deno.test('admin GET invitations ?state=accepted names'
         error: INVITATION_ALPHABET,
     });
 });
+
+Deno.test(
+    'admin POST memberships creates one accepted'
+    + ' person',
+    async () => {
+        const { db, admin, member } = await seeded();
+        const id = generateIdentifier();
+        const name = membershipNameOf(STARK, id);
+        const body = {
+            id,
+            membership: { type: 'member', at: AT },
+            identity: {
+                title: 'Engineer',
+                department: 'Product',
+                strengths: [],
+                team_dimensions: {},
+            },
+            pii: {
+                name: 'Ada',
+                email: 'ada@x.com',
+                phone: '',
+                bio: '',
+            },
+        };
+        const created = await handleRequest(
+            db, apiRequest({
+                method: 'POST',
+                path: nest('memberships'),
+                token: admin,
+                body,
+            }),
+        );
+        assertStrictEquals(created.status, 201);
+        assertStrictEquals(
+            created.headers.get('location'),
+            '/organizations/' + STARK
+                + '/invitations/' + name,
+        );
+        const etag = created.headers.get('etag');
+        assert(etag !== null && etag !== '');
+        assertEquals(await created.json(), {
+            id: name,
+            organization_id: STARK,
+            identity_id: id,
+            type: 'member',
+            state: 'accepted',
+            at: AT,
+        });
+        const membership = await db.messagePairs
+            .getHeadPair('/invitations/', name);
+        assert(membership !== null);
+        assertStrictEquals(
+            etag, '"' + membership.id + '"',
+        );
+        const identity = await db.messagePairs
+            .getHeadPair('/identities/', id);
+        assert(identity !== null);
+        const pii = await db.messagePairs.getHeadPair(
+            '/identities/' + id + '/', 'pii',
+        );
+        assert(pii !== null);
+        const count = (
+            await db.messagePairs.getAll()
+        ).length;
+        const resent = await handleRequest(
+            db, apiRequest({
+                method: 'POST',
+                path: nest('memberships'),
+                token: admin,
+                body,
+            }),
+        );
+        assertStrictEquals(resent.status, 409);
+        await resent.body?.cancel();
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length,
+            count,
+        );
+        const forbidden = await handleRequest(
+            db, apiRequest({
+                method: 'POST',
+                path: nest('memberships'),
+                token: member,
+                body: {
+                    ...body,
+                    id: generateIdentifier(),
+                },
+            }),
+        );
+        assertStrictEquals(forbidden.status, 403);
+        await forbidden.body?.cancel();
+        const incomplete = await handleRequest(
+            db, apiRequest({
+                method: 'POST',
+                path: nest('memberships'),
+                token: admin,
+                body: {
+                    ...body,
+                    id: generateIdentifier(),
+                    identity: {
+                        department: 'Product',
+                        strengths: [],
+                        team_dimensions: {},
+                    },
+                },
+            }),
+        );
+        assertStrictEquals(incomplete.status, 400);
+        await incomplete.body?.cancel();
+        const listed = await handleRequest(
+            db, apiRequest({
+                method: 'GET',
+                path: nest('memberships'),
+                token: admin,
+            }),
+        );
+        assertStrictEquals(listed.status, 200);
+        const rows = await partBodiesOf<{
+            identity_id: string;
+        }>(listed);
+        assert(rows.some(
+            (row) => row.identity_id === id,
+        ));
+    },
+);

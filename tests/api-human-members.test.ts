@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, GETCollection, PUT } from './in-page-facade.ts';
+import { GET, GETCollection } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -10,8 +10,6 @@ import {
 } from './http-fixtures.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
-import { membershipNameOf } from
-    '../shared/membership-name.ts';
 
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -35,49 +33,42 @@ async function freshDb() {
 }
 
 Deno.test(
-    'PUT identity and an accepted membership'
-    + ' creates the person',
+    'a memberships POST creates the person',
     async () => {
         const db = await freshDb();
         const token = await organizationToken();
-        const put = await handleRequest(db, req(
-            'PUT', '/identities/xdaJyuuPyHfffCGLhqDrOQ', token, {
-                kind: 'person',
-                title: 'Engineer',
-                department: 'Product',
-                strengths: [],
-                team_dimensions: {},
-            },
-        ));
-        assert(put.status === 201 || put.status === 200);
-        await PUT(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ/pii', {
-            name: 'Alice',
-            email: 'alice@example.com',
-            phone: '',
-            bio: '',
-        }, token,
-            operationIdHeader());
         const organization = 'AjdvjuECVZEgZoFajaIEkg';
         const identity = 'xdaJyuuPyHfffCGLhqDrOQ';
-        const seat = await handleRequest(db, apiRequest({
-            method: 'PUT',
-            path: '/organizations/' + organization
-                + '/invitations/'
-                + membershipNameOf(organization, identity),
+        const created = await handleRequest(db, req(
+            'POST',
+            '/organizations/' + organization
+                + '/memberships/',
             token,
-            body: {
-                state: 'accepted',
-                type: 'member',
-                at: AT,
+            {
+                id: identity,
+                membership: {
+                    type: 'member',
+                    at: AT,
+                },
+                identity: {
+                    title: 'Engineer',
+                    department: 'Product',
+                    strengths: [],
+                    team_dimensions: {},
+                },
+                pii: {
+                    name: 'Alice',
+                    email: 'alice@example.com',
+                    phone: '',
+                    bio: '',
+                },
             },
-            headers: { 'If-None-Match': '*' },
-        }));
-        assert(
-            seat.status === 201 || seat.status === 200,
-        );
+        ));
+        assertStrictEquals(created.status, 201);
+        await created.body?.cancel();
         const row = (await GET<{
             kind: string; title: string;
-        }>(db, 'identities/xdaJyuuPyHfffCGLhqDrOQ', token,
+        }>(db, 'identities/' + identity, token,
             operationIdHeader())).body().toValue();
         assertStrictEquals(row.kind, 'person');
         assertStrictEquals(row.title, 'Engineer');

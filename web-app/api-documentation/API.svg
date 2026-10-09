@@ -474,7 +474,9 @@
     <circle class="filled" cx="34" cy="1060" r="5"/>
   </a>
   <rect class="empty" x="69" y="1055" width="10" height="10" fill="none"/>
-  <rect class="empty" x="109" y="1055" width="10" height="10" fill="none"/>
+  <a href="#post/organizations/id/memberships">
+    <circle class="filled" cx="114" cy="1060" r="5"/>
+  </a>
   <rect class="empty" x="149" y="1055" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1055" width="10" height="10" fill="none"/>
   <text class="uri" x="224" y="1063">/api/organizations/:id/memberships/</text>

@@ -295,6 +295,7 @@ import {
 import {
     getOrganizationInvitations,
     postOrganizationInvitation,
+    postOrganizationMembership,
     getInvitationOnOrganizationNest,
     putInvitationOnOrganizationNest,
     getInvitationVersionsOnOrganizationNest,
@@ -3113,6 +3114,9 @@ export const WRITE_RESPONSE_SPECS:
     'organizations/:id/invitations/': {
         conditional: 'none',
     },
+    'organizations/:id/memberships/': {
+        conditional: 'none',
+    },
     'identities/:id/invitations/:membership-id': {
         conditional: 'in-order',
     },
@@ -5153,6 +5157,7 @@ export const routes: Route[] = [
     route('organizations/:id/memberships/', {
         query: membershipsViewQueryOf,
         select: getOrganizationInvitations,
+        post: postOrganizationMembership,
     }),
     route(
         'organizations/:id/invitations/:membership-id',

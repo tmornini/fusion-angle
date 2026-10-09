@@ -36,7 +36,6 @@ import {
     type InvitationOutcome,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
-    HumanMemberPiiIntakeFailedError,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
@@ -600,18 +599,9 @@ async function submitHumanForm(): Promise<void> {
             })),
         );
     } catch (err) {
-        if (err instanceof HumanMemberPiiIntakeFailedError) {
-            reportFault(
-                ctx,
-                'Member added, but its contact details'
-                + ' failed to save',
-                err,
-            );
-        } else {
-            reportFault(
-                ctx, 'Failed to add member', err,
-            );
-        }
+        reportFault(
+            ctx, 'Failed to add member', err,
+        );
         return;
     }
     showToast('Member added', 'success');

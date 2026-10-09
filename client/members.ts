@@ -29,7 +29,6 @@ export {
 import {
     RequestError,
     HTTP_NOT_FOUND,
-    HTTP_PRECONDITION_FAILED,
 } from '../shared/http-errors.ts';
 
 export type HumanMemberDraft =
@@ -227,19 +226,6 @@ export async function getHumanMemberProfile(
     return { profile: profileOf(read.body().toValue()), read };
 }
 
-export class HumanMemberPiiIntakeFailedError extends Error {
-    readonly id: string;
-    constructor(id: string, cause: unknown) {
-        super(
-            `human member ${id} was created, but its PII`
-            + ' intake failed — it now carries no PII until a'
-            + ' retry succeeds',
-            { cause },
-        );
-        this.id = id;
-    }
-}
-
 // The identity save latches the identity read it was formed
 // from; the PII save, when there is one, latches the held
 // PII, and goes unlatched when the member had none (a
@@ -280,44 +266,24 @@ export async function postHumanMemberCreation(
 ): Promise<void> {
     const { name, email, phone, bio, ...detail } =
         input;
-    await ctx.PUT(`identities/${id}`, {
-        kind: 'person',
-        title: detail.title,
-        department: detail.department,
-        strengths: detail.strengths,
-        team_dimensions: detail.team_dimensions,
-    });
-    try {
-        await ctx.PUT(`identities/${id}/pii`, {
-            name, email, phone, bio,
-        });
-    } catch (err) {
-        throw new HumanMemberPiiIntakeFailedError(id, err);
-    }
-    const item = membershipItem(ctx, id);
-    const body = {
-        state: 'accepted',
-        type: 'member',
-        at: nowUtc(),
-    };
-    try {
-        await ctx.PUT(item, body, 'creates');
-    } catch (err) {
-        // If-None-Match meets a head as 412. Accepted
-        // means the seat already landed. Any other state
-        // is put once, latched on the head just read. A
-        // 412 from that put propagates.
-        if (
-            !(err instanceof RequestError)
-            || err.status !== HTTP_PRECONDITION_FAILED
-        ) {
-            throw err;
-        }
-        const held = await ctx.GET<MembershipEntity>(item);
-        if (held.body().toValue().state !== 'accepted') {
-            await ctx.PUT(item, body, [held]);
-        }
-    }
+    await ctx.POST(
+        'organizations/' + requireOrganization(ctx)
+            + '/memberships/',
+        {
+            id,
+            membership: {
+                type: 'member',
+                at: nowUtc(),
+            },
+            identity: {
+                title: detail.title,
+                department: detail.department,
+                strengths: detail.strengths,
+                team_dimensions: detail.team_dimensions,
+            },
+            pii: { name, email, phone, bio },
+        },
+    );
     notifyMembershipChanges();
 }
 
