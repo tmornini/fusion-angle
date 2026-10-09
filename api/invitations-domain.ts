@@ -82,10 +82,10 @@ const ADMIN_WRITE =
     'forbidden: an organization invitation write'
     + ' requires an admin role';
 const INVITEE_READ =
-    'forbidden: only the invitee or an admin'
+    'forbidden: only the invitee'
     + ' may read this invitation';
 const LIST_READ =
-    'forbidden: invitation list is self or admin';
+    'forbidden: invitation list is self';
 
 const OPERATION_PATTERN =
     'invitations/:membership-name/:state';
@@ -107,13 +107,12 @@ function requireAdmin(
     }
 }
 
-function requireSelfOrAdmin(
+function requireSelf(
     actor: Id,
     identityId: Id,
-    roles: readonly string[],
     message: string,
 ): void {
-    if (actor !== identityId && !roles.includes('admin')) {
+    if (actor !== identityId) {
         throw new ApiError(message, HTTP_FORBIDDEN);
     }
 }
@@ -397,11 +396,11 @@ export async function getIdentityInvitations(
     params: string[],
     actor: Id,
     _organization: Id | undefined,
-    roles: readonly string[],
+    _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
-    requireSelfOrAdmin(actor, identityId, roles, LIST_READ);
+    requireSelf(actor, identityId, LIST_READ);
     return wholeCollectionSelection(
         await identityMembershipHeads(
             db, identityId, askedQuery(query),
@@ -420,7 +419,7 @@ export async function getInvitationOnIdentityNest(
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
     const name = membershipName(params);
-    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    requireSelf(actor, identityId, INVITEE_READ);
     const head = await visibleHead(
         db, name, roles, 'identity',
     );
@@ -473,7 +472,7 @@ export async function getInvitationVersionsOnIdentityNest(
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
     const name = membershipName(params);
-    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    requireSelf(actor, identityId, INVITEE_READ);
     await visibleHead(db, name, roles, 'identity');
     return selectVersionsAt(
         db, MEMBERSHIPS_PATH, name, 'stateless',
@@ -494,7 +493,7 @@ export async function getInvitationVersionOnIdentityNest(
     const identityId = param(params, 0);
     const name = membershipName(params);
     const tag = param(params, params.length - 1);
-    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    requireSelf(actor, identityId, INVITEE_READ);
     await visibleHead(db, name, roles, 'identity');
     return selectVersionAt(
         db, MEMBERSHIPS_PATH, name, tag, 'stateless',

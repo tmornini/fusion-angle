@@ -30,24 +30,20 @@ import {
 } from './validators.ts';
 
 // GET /identities/:id/organizations/ — the organization
-// heads the path identity holds an accepted membership in. Self or
-// admin. Caller claims must not shape another identity's
-// list.
+// heads the path identity holds an accepted membership
+// in. Self only. Caller claims must not shape the list.
 export async function selectIdentityOrganizations(
     db: DbAdapter,
     params: string[],
     actor: Id,
     _organization: Id | undefined,
-    roles: readonly string[],
+    _roles: readonly string[],
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
-    if (
-        actor !== identityId
-        && !roles.includes('admin')
-    ) {
+    if (actor !== identityId) {
         throw new ApiError(
             'forbidden: identity organizations'
-            + ' are self or admin',
+            + ' are self',
             HTTP_FORBIDDEN,
         );
     }

@@ -376,14 +376,14 @@ Deno.test('an admin names only co-members on identity'
             method: 'GET',
             pathOf: (id) =>
                 '/identities/' + id + '/organizations/',
-            coMember: 200,
+            coMember: 403,
         },
         {
             label: 'GET invitations',
             method: 'GET',
             pathOf: (id) =>
                 '/identities/' + id + '/invitations/',
-            coMember: 200,
+            coMember: 403,
         },
         {
             label: 'GET invitation',
@@ -391,7 +391,7 @@ Deno.test('an admin names only co-members on identity'
             pathOf: (id) =>
                 '/identities/' + id + '/invitations/'
                 + (id === fx.memberA ? seatA : seatB),
-            coMember: 200,
+            coMember: 403,
         },
         {
             label: 'GET identity versions',
@@ -414,7 +414,7 @@ Deno.test('an admin names only co-members on identity'
                 '/identities/' + id + '/invitations/'
                 + (id === fx.memberA ? seatA : seatB)
                 + '/versions/',
-            coMember: 200,
+            coMember: 403,
         },
         {
             label: 'GET invitation version',
@@ -423,7 +423,7 @@ Deno.test('an admin names only co-members on identity'
                 '/identities/' + id + '/invitations/'
                 + (id === fx.memberA ? seatA : seatB)
                 + '/versions/' + etag,
-            coMember: 404,
+            coMember: 403,
         },
     ];
     for (const hop of hops) {
@@ -459,6 +459,34 @@ Deno.test('an admin names only co-members on identity'
             );
         }
     }
+});
+
+Deno.test('the identity nest is self-only', async () => {
+    const fx = await world();
+    const admin = await adminToken(fx.organizationB);
+    const member = await memberToken(
+        fx.memberB, fx.organizationB,
+    );
+    const invitations = '/identities/' + fx.memberB
+        + '/invitations/';
+    const organizations = '/identities/' + fx.memberB
+        + '/organizations/';
+    const adminInvitations = await call(
+        fx.db, 'GET', invitations, admin,
+    );
+    assertStrictEquals(adminInvitations.status, 403);
+    const ownInvitations = await call(
+        fx.db, 'GET', invitations, member,
+    );
+    assertStrictEquals(ownInvitations.status, 200);
+    const adminOrganizations = await call(
+        fx.db, 'GET', organizations, admin,
+    );
+    assertStrictEquals(adminOrganizations.status, 403);
+    const ownOrganizations = await call(
+        fx.db, 'GET', organizations, member,
+    );
+    assertStrictEquals(ownOrganizations.status, 200);
 });
 
 Deno.test('GET identities/ lists only the claim'
