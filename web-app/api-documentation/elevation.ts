@@ -1,6 +1,6 @@
 export const API_ELEVATION_SVG: string =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 771 1732" width="7'
-    + '71" height="1732">\n  <defs>\n    <style>\n      .legend, .wing, .col'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 771 1780" width="7'
+    + '71" height="1780">\n  <defs>\n    <style>\n      .legend, .wing, .col'
     + ' { font-family:\n        ui-sans-serif, system-ui, sans-serif;\n     '
     + ' }\n      .legend { fill: hsl(217 38% 38%);\n        font-size: 11px;'
     + ' }\n      .wing { fill: hsl(217 45% 15%);\n        font-size: 12px; f'
@@ -10,7 +10,7 @@ export const API_ELEVATION_SVG: string =
     + 'nt-size: 8.5px;\n        fill: hsl(217 45% 15%); }\n      .filled { f'
     + 'ill: hsl(217 45% 15%); }\n      .empty { fill: none;\n        stroke:'
     + ' hsl(217 30% 40%);\n        stroke-width: 1; }\n    </style>\n  </def'
-    + 's>\n  <rect x="0" y="0" width="771" height="1732" fill="hsl(217 30% 9'
+    + 's>\n  <rect x="0" y="0" width="771" height="1780" fill="hsl(217 30% 9'
     + '7%)"/>\n  <text class="legend" x="16" y="28">filled circle = offered '
     + 'verb (item or operation)</text>\n  <text class="col" x="34" y="50">GE'
     + 'T</text>\n  <text class="col" x="74" y="50">PUT</text>\n  <text class'
@@ -675,4 +675,12 @@ export const API_ELEVATION_SVG: string =
     + '0" height="10" fill="none"/>\n  <rect class="empty" x="189" y="1685" '
     + 'width="10" height="10" fill="none"/>\n  <text class="uri" x="224" y="'
     + '1693">/api/organizations/:organization-id/record-types/:record-type-i'
-    + 'd/versions/:etag</text>\n</svg>\n';
+    + 'd/versions/:etag</text>\n  <text class="wing" x="16" y="1722">backing'
+    + '</text>\n  <rect class="empty" x="29" y="1733" width="10" height="10"'
+    + ' fill="none"/>\n  <rect class="empty" x="69" y="1733" width="10" heig'
+    + 'ht="10" fill="none"/>\n  <rect class="empty" x="109" y="1733" width="'
+    + '10" height="10" fill="none"/>\n  <rect class="empty" x="149" y="1733"'
+    + ' width="10" height="10" fill="none"/>\n  <rect class="empty" x="189" '
+    + 'y="1733" width="10" height="10" fill="none"/>\n  <text class="uri" x='
+    + '"224" y="1741">/api/invitations/ organization_id identity_id pending '
+    + 'accepted declined revoked removed</text>\n</svg>\n';

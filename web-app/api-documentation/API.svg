@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 771 1732" width="771" height="1732">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 771 1780" width="771" height="1780">
   <defs>
     <style>
       .legend, .wing, .col { font-family:
@@ -21,7 +21,7 @@
         stroke-width: 1; }
     </style>
   </defs>
-  <rect x="0" y="0" width="771" height="1732" fill="hsl(217 30% 97%)"/>
+  <rect x="0" y="0" width="771" height="1780" fill="hsl(217 30% 97%)"/>
   <text class="legend" x="16" y="28">filled circle = offered verb (item or operation)</text>
   <text class="col" x="34" y="50">GET</text>
   <text class="col" x="74" y="50">PUT</text>
@@ -788,4 +788,11 @@
   <rect class="empty" x="149" y="1685" width="10" height="10" fill="none"/>
   <rect class="empty" x="189" y="1685" width="10" height="10" fill="none"/>
   <text class="uri" x="224" y="1693">/api/organizations/:organization-id/record-types/:record-type-id/versions/:etag</text>
+  <text class="wing" x="16" y="1722">backing</text>
+  <rect class="empty" x="29" y="1733" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="1733" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1733" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1733" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1733" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1741">/api/invitations/ organization_id identity_id pending accepted declined revoked removed</text>
 </svg>

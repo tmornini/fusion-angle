@@ -90,6 +90,15 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         createBodyIdField: 'id', // INERT — no collection
             // POST exists; genesis is PUT /ai-agents/:id.
     },
+    {
+        family: 'invitations',
+        organizationNested: false, // GLOBAL plane:
+            // one document per membership, never
+            // nested under an organization.
+        createBodyIdField: 'id', // INERT — no
+            // collection POST at /invitations/; the
+            // HTTP views POST at the organization nest.
+    },
 ];
 
 export function familyRegistration(

@@ -29,6 +29,10 @@ import { AUTHENTICATION_ROUTES } from
     '../../api/request-auth.ts';
 import { documentFamilyWiring } from
     '../../api/document-family.ts';
+import { FAMILY_REGISTRY } from
+    '../../api/family-registry.ts';
+import { INVITATION_STATES } from
+    '../../shared/types.ts';
 
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
@@ -883,6 +887,15 @@ export function verbRoomHtml(
         }
         lines.push('</ul>');
     }
+    const storageField = viewStorageField(lower, uri);
+    if (storageField !== undefined) {
+        lines.push('<h2>Storage</h2>', '<ul>');
+        lines.push(
+            '  <li>/invitations/ selects on '
+            + storageField + '</li>',
+        );
+        lines.push('</ul>');
+    }
     lines.push('<h2>Status</h2>', '<ul>');
     for (const code of statusCodes) {
         const href = statusHref(depth, code);
@@ -953,6 +966,50 @@ function uriX(): number {
     return verbColumnX(HTTP_VERBS.length) + 8;
 }
 
+// An organization-nested family's documents live
+// under the organizations wing, which the route
+// table already draws. A global family with no wing
+// of its own has no route: no verb and no room.
+function backingFamiliesOf(
+    routeWings: ReadonlySet<string>,
+): string[] {
+    const families: string[] = [];
+    for (const entry of FAMILY_REGISTRY) {
+        const first = entry.organizationNested
+            ? 'organizations'
+            : entry.family;
+        if (!routeWings.has(first)) {
+            families.push(entry.family);
+        }
+    }
+    families.sort();
+    return families;
+}
+
+function backingRowText(family: string): string {
+    const uri = '/api/' + family + '/';
+    if (family !== 'invitations') return uri;
+    return uri + ' organization_id identity_id '
+        + INVITATION_STATES.join(' ');
+}
+
+function viewStorageField(
+    verb: string,
+    uri: string,
+): string | undefined {
+    if (verb !== 'get') return undefined;
+    if (
+        uri === '/organizations/:id/invitations/'
+        || uri === '/organizations/:id/memberships/'
+    ) {
+        return 'organization_id';
+    }
+    if (uri === '/identities/:id/invitations/') {
+        return 'identity_id';
+    }
+    return undefined;
+}
+
 export function svgOf(rows: readonly Route[]): string {
     const wings = new Map<string, Route[]>();
     for (const row of rows) {
@@ -966,11 +1023,20 @@ export function svgOf(rows: readonly Route[]): string {
     for (const name of wingNames) {
         wings.get(name)!.sort(compareUri);
     }
+    const backingFamilies = backingFamiliesOf(
+        new Set(wingNames),
+    );
     let longest = 0;
     for (const row of rows) {
         longest = Math.max(
             longest,
             wireUriOf(uriOf(row)).length,
+        );
+    }
+    for (const family of backingFamilies) {
+        longest = Math.max(
+            longest,
+            backingRowText(family).length,
         );
     }
     const width = Math.ceil(
@@ -1038,6 +1104,43 @@ export function svgOf(rows: readonly Route[]): string {
                 '  <text class="uri" x="' + uriX()
                 + '" y="' + (cy + 3) + '">'
                 + escapeXml(uri) + '</text>',
+            );
+            y += ROW_H;
+        }
+        y += 8;
+    }
+    if (backingFamilies.length > 0) {
+        y += 6;
+        parts.push(
+            '  <text class="wing" x="' + PAD + '" y="'
+            + y + '">' + escapeXml('backing')
+            + '</text>',
+        );
+        y += WING_H - 8;
+        for (const family of backingFamilies) {
+            const label = backingRowText(family);
+            const cy = y;
+            for (
+                let index = 0;
+                index < HTTP_VERBS.length;
+                index += 1
+            ) {
+                const cx = verbColumnX(index)
+                    + VERB_W / 2;
+                const rx = cx - EMPTY / 2;
+                const ry = cy - EMPTY / 2;
+                parts.push(
+                    '  <rect class="empty" x="'
+                    + rx + '" y="' + ry
+                    + '" width="' + EMPTY
+                    + '" height="' + EMPTY
+                    + '" fill="none"/>',
+                );
+            }
+            parts.push(
+                '  <text class="uri" x="' + uriX()
+                + '" y="' + (cy + 3) + '">'
+                + escapeXml(label) + '</text>',
             );
             y += ROW_H;
         }
