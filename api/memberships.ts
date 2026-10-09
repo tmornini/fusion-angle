@@ -180,7 +180,7 @@ export function membershipTransition(
     request: MembershipRequest,
 ): MembershipOutcome {
     const fromState = from === null ? 'none' : from.state;
-    // The grant on a pending head changes nothing.
+    // A pending invite posted again changes nothing.
     if (
         actor === 'admin'
         && fromState === 'pending'
