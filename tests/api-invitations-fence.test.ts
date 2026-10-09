@@ -195,7 +195,7 @@ async function person(
 
 // Grant via the gate as Tony scoped to Wayne, returning the new
 // invitation id straight from storage.
-async function grantSarahToWayne(
+async function inviteSarahToWayne(
     db: MemoryDbAdapter,
 ): Promise<string> {
     const res = await handleRequest(db, req(
@@ -217,7 +217,7 @@ async () => {
     // Sarah holds no role, so the deny-by-default policy would
     // 403 her on /members; the invitation facade stands apart.
     const db = await seed();
-    await grantSarahToWayne(db);
+    await inviteSarahToWayne(db);
     const res = await handleRequest(db, req(
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/',
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
@@ -287,7 +287,7 @@ Deno.test('a pending invite writes no membership', async () => {
     // Reachability derives from the membership ledger; a pending
     // invite must not add one, so the org stays unreachable.
     const db = await seed();
-    await grantSarahToWayne(db);
+    await inviteSarahToWayne(db);
     const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
@@ -296,7 +296,7 @@ Deno.test('a pending invite writes no membership', async () => {
 
 Deno.test('a pending invitee is absent from the roster', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const before = await rosterIds(db);
     assert(!before.has('toccYYkLEABmlbpHJalgtQ'));
     // Sarah accepts; now the Wayne roster includes her.
@@ -330,7 +330,7 @@ async function rosterIds(
 
 Deno.test('accept makes the invitation org reachable', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
@@ -354,7 +354,7 @@ Deno.test('accept makes the invitation org reachable', async () => {
 Deno.test('an invitation event is owned by the inviting org',
 async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const rows = await deriveInvitationStates(db);
     assert(
         rows.some((r) => r.entity_id === id),
@@ -574,7 +574,7 @@ Deno.test('grant: empty grantAt is rejected (400)', async () => {
 
 Deno.test('accept: empty state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -585,7 +585,7 @@ Deno.test('accept: empty state is rejected (400)', async () => {
 
 Deno.test('decline: empty state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -596,7 +596,7 @@ Deno.test('decline: empty state is rejected (400)', async () => {
 
 Deno.test('revoke: empty state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/' + WAYNE + '/invitations/' + id,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
@@ -630,7 +630,7 @@ Deno.test('grant: non-string grantAt is rejected (400)', async () => {
 
 Deno.test('accept: missing state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -641,7 +641,7 @@ Deno.test('accept: missing state is rejected (400)', async () => {
 
 Deno.test('accept: non-string at is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -652,7 +652,7 @@ Deno.test('accept: non-string at is rejected (400)', async () => {
 
 Deno.test('decline: missing at is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -664,7 +664,7 @@ Deno.test('decline: missing at is rejected (400)', async () => {
 Deno.test('a removed member who re-accepts is 409 — not a'
 + ' silent re-admission', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -710,7 +710,7 @@ Deno.test('a removed member who re-accepts is 409 — not a'
 
 Deno.test('revoke: missing at is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/' + WAYNE + '/invitations/' + id,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),

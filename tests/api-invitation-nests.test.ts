@@ -154,7 +154,7 @@ function req(
     });
 }
 
-async function grantWayne(
+async function inviteWayne(
     db: DbAdapter,
     email: string,
 ): Promise<Response> {
@@ -178,7 +178,7 @@ async function membershipsFor(
 Deno.test('admin POST org nest grants pending',
 async () => {
     const db = await seedWorld();
-    const res = await grantWayne(db, 'sarah@x.com');
+    const res = await inviteWayne(db, 'sarah@x.com');
     assertStrictEquals(res.status, 201);
     const body = await res.json() as {
         id: string;
@@ -221,7 +221,7 @@ async () => {
 Deno.test('invitee PUT identity nest accepted writes'
     + ' the seat', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com');
+    await inviteWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
@@ -245,7 +245,7 @@ Deno.test('invitee PUT identity nest accepted writes'
 
 Deno.test('invitee PUT declined', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'dave@x.com');
+    await inviteWayne(db, 'dave@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/' + DAVE
@@ -268,7 +268,7 @@ Deno.test('invitee PUT declined', async () => {
 
 Deno.test('admin PUT org nest revoked', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com');
+    await inviteWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
@@ -288,7 +288,7 @@ Deno.test('admin PUT org nest revoked', async () => {
 
 Deno.test('invitee PUT revoked is 409', async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com');
+    await inviteWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
@@ -310,7 +310,7 @@ Deno.test('invitee PUT revoked is 409', async () => {
 Deno.test('admin PUT accepted on a pending head is 409',
 async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com');
+    await inviteWayne(db, 'sarah@x.com');
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/'
@@ -334,7 +334,7 @@ Deno.test('a second accept latched on the accepted head'
 + ' is 409 and stores nothing',
 async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'sarah@x.com');
+    await inviteWayne(db, 'sarah@x.com');
     const first = await handleRequest(db, await invitationLatched(db, req(
         'PUT',
         '/identities/toccYYkLEABmlbpHJalgtQ/invitations/'
@@ -370,7 +370,7 @@ async () => {
 Deno.test('org-less invitee reaches identity nest',
 async () => {
     const db = await seedWorld();
-    await grantWayne(db, 'dave@x.com');
+    await inviteWayne(db, 'dave@x.com');
     const token = await reachableToken(DAVE, []);
     const list = await handleRequest(db, req(
         'GET',
@@ -401,7 +401,7 @@ async () => {
 Deno.test('the invitation item GETs carry their head\'s ETag',
 async () => {
     const db = await seedWorld();
-    const granted = await grantWayne(db, 'sarah@x.com');
+    const granted = await inviteWayne(db, 'sarah@x.com');
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
     const head = await db.messagePairs.getHeadPair(

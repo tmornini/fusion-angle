@@ -395,7 +395,7 @@ async () => {
         organization, marcusId,
     );
 
-    async function grantTo(
+    async function inviteTo(
         email: string, grantAt: string,
     ): Promise<Response> {
         return handleRequest(db, req(
@@ -447,7 +447,7 @@ async () => {
     }
 
     // A: fresh grant — pending, named by the pair.
-    const sarahGrant = await grantTo(
+    const sarahGrant = await inviteTo(
         'sarah.chen@company.com',
         '2026-06-01T00:00:00.000000Z',
     );
@@ -459,7 +459,7 @@ async () => {
     // Phase Final Stage B: roster tables retired.
 
     // B: accept — accepted + the membership on the message plane.
-    const jessicaGrant = await grantTo(
+    const jessicaGrant = await inviteTo(
         'jessica.park@company.com',
         '2026-06-01T00:00:01.000000Z',
     );
@@ -508,7 +508,7 @@ async () => {
     assertStrictEquals(seats.status, 404);
 
     // C: decline.
-    const emilyGrant = await grantTo(
+    const emilyGrant = await inviteTo(
         'emily.rodriguez@company.com',
         '2026-06-01T00:00:03.000000Z',
     );
@@ -523,7 +523,7 @@ async () => {
     assertStrictEquals(emilyRow.state, 'declined');
 
     // D: revoke.
-    const marcusGrant = await grantTo(
+    const marcusGrant = await inviteTo(
         'marcus@acmecorp.com',
         '2026-06-01T00:00:05.000000Z',
     );
@@ -540,7 +540,7 @@ async () => {
     // E: a second grant of Sarah's pending membership stores
     // nothing and does not open another document.
     const beforeDerived = (await deriveInvitations(db)).length;
-    const sarahDuplicate = await grantTo(
+    const sarahDuplicate = await inviteTo(
         'sarah.chen@company.com',
         '2026-06-01T00:00:07.000000Z',
     );

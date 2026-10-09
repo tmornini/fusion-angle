@@ -396,7 +396,7 @@ async function createWorkOrder(
     return { stateEventIds };
 }
 
-async function grantAndAccept(
+async function inviteAndAccept(
     db: MemoryDbAdapter, adminToken: string,
     inviteeToken: string, inviteeId: string,
     inviteeEmail: string, grantAt: string,
@@ -532,7 +532,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const inviteeToken = await organizationToken(
         inviteeId, organizationA,
     );
-    const invitationId = await grantAndAccept(
+    const invitationId = await inviteAndAccept(
         db, tokenA, inviteeToken, inviteeId,
         'invitee-union@x.com',
         '2026-01-05T00:00:00.000000Z',

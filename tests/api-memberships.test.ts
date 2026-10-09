@@ -139,7 +139,7 @@ function expected(
     };
 }
 
-async function grant(
+async function invite(
     db: MemoryDbAdapter,
     admin: string,
     email: string,
@@ -224,7 +224,7 @@ async () => {
     const invitee = await person(db, 'grant@example.com');
     const at = '2026-04-01T00:00:00.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const response = await grant(
+    const response = await invite(
         db, admin, 'grant@example.com', at,
     );
     assertStrictEquals(response.status, 201);
@@ -246,12 +246,12 @@ Deno.test('a grant on a pending head is 200 and stores'
     const invitee = await person(db, 'again@example.com');
     const name = membershipNameOf(ORG, invitee.id);
     const firstAt = '2026-04-01T00:00:00.000000Z';
-    const first = await grant(
+    const first = await invite(
         db, admin, 'again@example.com', firstAt,
     );
     assertStrictEquals(first.status, 201);
     await first.body?.cancel();
-    const second = await grant(
+    const second = await invite(
         db, admin, 'again@example.com',
         '2026-04-02T00:00:00.000000Z',
     );
@@ -293,7 +293,7 @@ Deno.test('an admin pending PUT on a pending head is 409'
     const invitee = await person(db, 'still@example.com');
     const name = membershipNameOf(ORG, invitee.id);
     const at = '2026-04-01T00:00:00.000000Z';
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'still@example.com', at,
     );
     assertStrictEquals(granted.status, 201);
@@ -317,7 +317,7 @@ Deno.test('an admin pending PUT on a pending head is 409'
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before,
     );
-    const second = await grant(
+    const second = await invite(
         db, admin, 'still@example.com',
         '2026-04-02T00:00:00.000000Z',
     );
@@ -331,7 +331,7 @@ Deno.test('an admin pending PUT on a declined head'
     const invitee = await person(db, 'later@example.com');
     const name = membershipNameOf(ORG, invitee.id);
     const declineAt = '2026-04-01T00:00:01.000000Z';
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'later@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -372,7 +372,7 @@ Deno.test('a grant on an accepted head is 409', async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'seated@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'seated@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -386,7 +386,7 @@ Deno.test('a grant on an accepted head is 409', async () => {
     );
     assertStrictEquals(accepted.status, 200);
     await accepted.body?.cancel();
-    const again = await grant(
+    const again = await invite(
         db, admin, 'seated@example.com',
         '2026-04-02T00:00:00.000000Z',
     );
@@ -403,7 +403,7 @@ async () => {
     const invitee = await person(db, 'accept@example.com');
     const at = '2026-04-01T00:00:01.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'accept@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -430,7 +430,7 @@ async () => {
     const invitee = await person(db, 'decline@example.com');
     const at = '2026-04-01T00:00:01.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'decline@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -453,7 +453,7 @@ async () => {
     const invitee = await person(db, 'revoke@example.com');
     const at = '2026-04-01T00:00:01.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'revoke@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -476,7 +476,7 @@ Deno.test('an admin removal lands removed and deletes'
     const invitee = await person(db, 'remove@example.com');
     const at = '2026-04-01T00:00:02.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'remove@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -509,7 +509,7 @@ async () => {
     const invitee = await person(db, 'retype@example.com');
     const at = '2026-04-01T00:00:02.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'retype@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -542,7 +542,7 @@ async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'sametype@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'sametype@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -625,7 +625,7 @@ Deno.test('revoked to accepted lands a seat', async () => {
     const invitee = await person(db, 'back@example.com');
     const at = '2026-04-01T00:00:02.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'back@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -659,7 +659,7 @@ async () => {
     const invitee = await person(db, 'restore@example.com');
     const at = '2026-04-01T00:00:03.000000Z';
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'restore@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -709,7 +709,7 @@ Deno.test('re-invite after decline, revoke, or removal'
             db, state + '@example.com',
         );
         const name = membershipNameOf(ORG, invitee.id);
-        const granted = await grant(
+        const granted = await invite(
             db, admin, state + '@example.com',
             '2026-04-01T00:00:00.000000Z',
         );
@@ -740,7 +740,7 @@ Deno.test('re-invite after decline, revoke, or removal'
             );
         await terminal.body?.cancel();
         const at = '2026-04-02T00:00:00.000000Z';
-        const again = await grant(
+        const again = await invite(
             db, admin, state + '@example.com', at,
         );
         assertStrictEquals(again.status, 201);
@@ -760,7 +760,7 @@ async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'stale@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'stale@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -793,7 +793,7 @@ async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'repeat@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'repeat@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -823,7 +823,7 @@ async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'nope@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'nope@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -845,7 +845,7 @@ Deno.test('only the invitee may accept', async () => {
     const { db, admin } = await basis();
     const invitee = await person(db, 'self@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, 'self@example.com',
         '2026-04-01T00:00:00.000000Z',
     );
@@ -1041,7 +1041,7 @@ async () => {
         pending, accepted, declined, revoked, removed,
     ];
     for (const invitee of people) {
-        const granted = await grant(
+        const granted = await invite(
             db, admin, invitee.email,
             '2026-04-01T00:00:00.000000Z',
         );
@@ -1117,7 +1117,7 @@ async () => {
         assertEquals(await statesOf(filtered), [state]);
     }
 
-    const elsewhere = await grant(
+    const elsewhere = await invite(
         db, otherAdmin, pending.email,
         '2026-04-02T00:00:00.000000Z', otherOrganization,
     );
@@ -1206,7 +1206,7 @@ Deno.test('a member reads accepted and removed, and a'
     );
     assertStrictEquals(seated.status, 201);
     await seated.body?.cancel();
-    const granted = await grant(
+    const granted = await invite(
         db, admin, pending.email,
         '2026-04-01T00:00:01.000000Z',
     );
@@ -1292,7 +1292,7 @@ Deno.test('re-invite after decline is one pending document'
     const { db, admin } = await basis();
     const invitee = await person(db, 'return@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, invitee.email,
         '2026-04-01T00:00:00.000000Z',
     );
@@ -1305,7 +1305,7 @@ Deno.test('re-invite after decline is one pending document'
     );
     await declined.body?.cancel();
     const at = '2026-04-02T00:00:00.000000Z';
-    const again = await grant(db, admin, invitee.email, at);
+    const again = await invite(db, admin, invitee.email, at);
     assertStrictEquals(again.status, 201);
     assertEquals(
         await membershipOf(again),
@@ -1353,7 +1353,7 @@ Deno.test('version routes 404 a name never written and a'
     );
     const invitee = await person(db, 'versions@example.com');
     const name = membershipNameOf(ORG, invitee.id);
-    const granted = await grant(
+    const granted = await invite(
         db, admin, invitee.email,
         '2026-04-01T00:00:00.000000Z',
     );

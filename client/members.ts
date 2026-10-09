@@ -73,7 +73,7 @@ function membershipItem(
         + membershipNameOf(organization, identityId);
 }
 
-function byGrantThenIdentity(
+function byAtThenIdentity(
     a: HttpMessage<MembershipEntity>,
     b: HttpMessage<MembershipEntity>,
 ): number {
@@ -113,7 +113,7 @@ export function buildHumanMemberMap(
     memberships: readonly HttpMessage<MembershipEntity>[],
 ): Map<MemberId, HumanMember> {
     const map = new Map<MemberId, HumanMember>();
-    const granted = memberships.toSorted(byGrantThenIdentity);
+    const granted = memberships.toSorted(byAtThenIdentity);
     for (const membership of granted) {
         const identityId = membership.body()
             .toValue().identity_id;

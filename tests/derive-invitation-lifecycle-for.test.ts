@@ -54,7 +54,7 @@ function nameOf(identity: string): string {
     return membershipNameOf(ORGANIZATION_TWO, identity);
 }
 
-async function grant(
+async function invite(
     db: MemoryDbAdapter,
     email: string,
 ): Promise<string> {
@@ -113,7 +113,7 @@ Deno.test('the version list: pending-only (granted,'
 + ' unanswered) matches deriveInvitationStates\'s own subset',
 async () => {
     const db = await seededDb();
-    const id = await grant(db, 'sarah.chen@company.com');
+    const id = await invite(db, 'sarah.chen@company.com');
 
     const scoped = await versionStates(db, id);
     assertStrictEquals(scoped?.length, 1);
@@ -131,7 +131,7 @@ Deno.test('the version list: accepted carries both the'
 + ' pending and accepted rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
-    const id = await grant(db, 'sarah.chen@company.com');
+    const id = await invite(db, 'sarah.chen@company.com');
 
     const accept = await handleRequest(
         db, await invitationLatched(db, req(
@@ -157,7 +157,7 @@ Deno.test('the version list: declined carries both the'
 + ' pending and declined rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
-    const id = await grant(db, 'jessica.park@company.com');
+    const id = await invite(db, 'jessica.park@company.com');
 
     const decline = await handleRequest(
         db, await invitationLatched(db, req(
@@ -183,7 +183,7 @@ Deno.test('the version list: revoked carries both the'
 + ' pending and revoked rows, matching the bulk subset',
 async () => {
     const db = await seededDb();
-    const id = await grant(db, 'emily.rodriguez@company.com');
+    const id = await invite(db, 'emily.rodriguez@company.com');
 
     const revoke = await handleRequest(
         db, await invitationLatched(db, req(

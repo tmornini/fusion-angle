@@ -236,7 +236,7 @@ async function seedInviteeWorld(): Promise<DbAdapter> {
     return db;
 }
 
-async function grantDave(db: DbAdapter): Promise<string> {
+async function inviteDave(db: DbAdapter): Promise<string> {
     const res = await handleRequest(db, req(
         'POST',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
@@ -268,7 +268,7 @@ async function seedMemberOrganizations(): Promise<DbAdapter> {
 Deno.test('org-less invitee GET identity-nest versions is 200',
 async () => {
     const db = await seedInviteeWorld();
-    const name = await grantDave(db);
+    const name = await inviteDave(db);
     const token = await reachableToken(DAVE, []);
     const item = await handleRequest(db, req(
         'GET',
@@ -438,7 +438,7 @@ Deno.test(
 Deno.test('identities, members, and identity-nest lists are 200',
 async () => {
     const db = await seedInviteeWorld();
-    const name = await grantDave(db);
+    const name = await inviteDave(db);
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const identityVersions =
@@ -728,7 +728,7 @@ Deno.test(
     + ' splice, and body at is the grant time',
     async () => {
         const db = await seedInviteeWorld();
-        const name = await grantDave(db);
+        const name = await inviteDave(db);
         const token = await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         );
