@@ -32,8 +32,8 @@ import {
     fillHumanMemberProfile,
     postHumanMemberCreation,
     postAIMemberCreation,
-    postInvitationGrant,
-    type InvitationGrantOutcome,
+    postInvitation,
+    type InvitationOutcome,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
     HumanMemberPiiIntakeFailedError,
@@ -466,16 +466,16 @@ async function handleInviteSubmit(): Promise<void> {
         showToast('Email is required', 'error');
         return;
     }
-    let outcome: InvitationGrantOutcome;
+    let outcome: InvitationOutcome;
     try {
-        outcome = await postInvitationGrant(
+        outcome = await postInvitation(
             sessionContext(), email,
         );
     } catch (err) {
         // An unexpected fault — the server's expected 404 / 409
         // come back as outcomes below, never as a throw.
         log.error(
-            'postInvitationGrant failed',
+            'postInvitation failed',
             'members', err,
         );
         showToast(

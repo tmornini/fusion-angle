@@ -130,15 +130,15 @@ export async function getSentInvitations(
 // active organization. The server resolves the email.
 // 'sent' covers a fresh grant and a repeated pending one.
 // 404 and 409 become 'no-identity' and 'already-member'.
-export type InvitationGrantOutcome =
+export type InvitationOutcome =
     | 'sent'
     | 'no-identity'
     | 'already-member';
 
-export async function postInvitationGrant(
+export async function postInvitation(
     ctx: RequestContext,
     email: string,
-): Promise<InvitationGrantOutcome> {
+): Promise<InvitationOutcome> {
     try {
         await ctx.POST(
             'organizations/'
