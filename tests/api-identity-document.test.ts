@@ -6,6 +6,7 @@ import {
     assertStrictEquals,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
+import { RequestError } from '../shared/http-errors.ts';
 import { PUT, GET } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
@@ -23,7 +24,6 @@ import {
 } from '../api/validators.ts';
 import {
     postIdentityDocumentOp,
-    identityDocumentEntityOf,
 } from '../api/routes.ts';
 import {
     runWrite,
@@ -36,7 +36,6 @@ import {
 } from '../api/document-family.ts';
 import {
     apiRequest,
-    storedPutBodyText,
 } from './http-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -56,6 +55,12 @@ import { operationIdHeader } from
 
 function identityFields() {
     return { kind: 'person' as const };
+}
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
 }
 
 // -- 1. validators: accept + the label mandate + missing key --
@@ -174,13 +179,15 @@ async () => {
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
+// Two PUTs of the caller's own document converge; a
+// fresh id stays outside the fence.
 
 Deno.test('a byte-identical PUT resend to identities/:id converges'
 + ' to one stored request/response pair', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = identityFields();
-    const id = generateIdentifier();
+    const id = 'XXZruirZyAOoRpNxaDnpSA';
     const first = (await PUT(
         db, 'identities/' + id, body, DEV_TOKEN,
         operationIdHeader())).body().toValue();
@@ -190,6 +197,29 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
     assertEquals(first, second);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
+});
+
+Deno.test('a membership-less identity PUT is forbidden'
++ ' and stores nothing', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = generateIdentifier();
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => PUT(
+            db, 'identities/' + id, identityFields(),
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 // -- 4. below-route via the generic handlers (the drift-file
@@ -319,53 +349,51 @@ Deno.test('a DELETE-head derives absent through the generic document'
 // itself carries NO organization_id (organizationNested:false —
 // the Phase 8 fix) through the generic successBody builder. ---
 
-Deno.test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
-+ ' {id, kind} only, no organization_id', async () => {
+Deno.test('a membership-less identity document write'
++ ' is forbidden', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const body = identityFields();
     const id = generateIdentifier();
-    const written = (await PUT<Record<string, unknown>>(
-        db, 'identities/' + id, body, DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertEquals(
-        Object.keys(written).sort(),
-        ['id', 'kind'],
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => PUT(
+            db, 'identities/' + id, identityFields(),
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        RequestError,
     );
-    assertStrictEquals(written['id'], id);
-    assertStrictEquals(written['kind'], 'person');
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
-Deno.test('stored PUT body equals identityDocumentEntityOf',
+Deno.test('a membership-less identity stores no document',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const id = generateIdentifier();
-    const body = identityFields();
+    const path = '/identities/' + id;
+    const before = (await db.messagePairs.getAll()).length;
     const put = await handleRequest(
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/' + id,
+            path,
             token: DEV_TOKEN,
-            body,
+            body: identityFields(),
         }),
     );
-    assertStrictEquals(put.status, 201);
-    const stored = JSON.parse(
-        await storedPutBodyText(db, '/identities/', id),
-    );
-    assertEquals(
-        stored,
-        identityDocumentEntityOf(
-            {
-                name: id,
-                messagePairId: id,
-                method: 'PUT',
-                body,
-            },
-            '',
-        ),
+    assertStrictEquals(put.status, 403);
+    assertEquals(await put.json(), {
+        error: outside('PUT', path),
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 
@@ -380,78 +408,85 @@ const PII_FACET = {
     bio: '',
 };
 
-Deno.test('PUT service identity with title is 400', async () => {
+Deno.test('a membership-less service document is forbidden',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
+    const path = '/identities/uYxxmcHuFJghfKLveLDneg';
     const res = await handleRequest(
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/uYxxmcHuFJghfKLveLDneg',
+            path,
             token: DEV_TOKEN,
             body: { kind: 'service', title: 'Bot' },
         }),
     );
-    assertStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: outside('PUT', path),
+    });
 });
 
-Deno.test('PUT person identity with a partial profile is 400',
+Deno.test('a membership-less partial profile is forbidden',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
+    const path = '/identities/qUceZILomWDFIEtnAaLHKg';
     const res = await handleRequest(
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/qUceZILomWDFIEtnAaLHKg',
+            path,
             token: DEV_TOKEN,
             body: { kind: 'person', title: 'Engineer' },
         }),
     );
-    assertStrictEquals(res.status, 400);
+    assertStrictEquals(res.status, 403);
     assertEquals(await res.json(), {
-        error: 'missing required key "department"'
-            + ' for IdentityEntity',
+        error: outside('PUT', path),
     });
 });
 
-Deno.test('GET identity returns the whole profile',
+Deno.test('an admin cannot read a membership-less profile',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const id = generateIdentifier();
-    const profile = {
-        title: 'Engineer',
-        department: 'Product',
-        strengths: ['Leadership'],
-        team_dimensions: { driver: 60 },
-    };
+    const path = '/identities/' + id;
+    const before = (await db.messagePairs.getAll()).length;
     const put = await handleRequest(
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identities/' + id,
+            path,
             token: DEV_TOKEN,
-            body: { kind: 'person', ...profile },
+            body: {
+                kind: 'person',
+                title: 'Engineer',
+                department: 'Product',
+                strengths: ['Leadership'],
+                team_dimensions: { driver: 60 },
+            },
         }),
     );
-    assert(put.status === 201 || put.status === 200);
-    const got = (await GET<{
-        id: string;
-        kind: string;
-        title: string;
-        department: string;
-        strengths: string[];
-        team_dimensions: Record<string, number>;
-    }>(db, 'identities/' + id, DEV_TOKEN, operationIdHeader()))
-        .body().toValue();
-    assertStrictEquals(got.id, id);
-    assertStrictEquals(got.kind, 'person');
-    assertStrictEquals(got.title, profile.title);
-    assertStrictEquals(got.department, profile.department);
-    assertEquals(got.strengths, profile.strengths);
-    assertEquals(
-        got.team_dimensions, profile.team_dimensions,
+    assertStrictEquals(put.status, 403);
+    assertEquals(await put.json(), {
+        error: outside('PUT', path),
+    });
+    const got = await assertRejects(
+        () => GET(
+            db, 'identities/' + id, DEV_TOKEN,
+            operationIdHeader(),
+        ),
+        RequestError,
+    );
+    assertStrictEquals(got.status, 403);
+    assertStrictEquals(
+        got.message, outside('GET', path) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 

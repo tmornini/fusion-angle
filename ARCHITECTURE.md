@@ -153,9 +153,15 @@ not on the very next request.
 
 A foreign id under the caller's own organization path
 is absent there: a write geneses or 404s, a read 404s.
-Global-plane reads (an organization document, an
-identity's PII or credentials) answer a foreign owner
-403, an absent one 404. Path
+Global-plane reads of an organization document answer
+a foreign owner 403, an absent one 404. Global-plane
+identity reads and writes are the identity fence:
+co-membership. When the path identity is not the actor,
+an accepted membership in the claim organization admits
+the request. Absent, orphan, and foreign answer the same
+403, body `forbidden: <METHOD> <path> names an identity
+outside this organization`. Self stays self. The `/`
+admin tier stays and reaches co-members only. Path
 `:organization-id` on an org-nested route must equal the
 claim org else 403. A membership name's organization
 half must equal the path's (403). Its identity half
@@ -171,10 +177,25 @@ the document: one row at `/invitations/`, named
 document and no `former-members/` route. `accepted`
 grants the role. The members roster is accepted
 memberships plus `/ai-agents` (not a members
-collection, not identities). Two views over that
-prefix, and `?state=` selects. A member reads
-`accepted` and `removed`; a member's other
-organization view is 403. Removal is a PUT to
+collection, not identities).
+
+| View | States | Default | Who reads |
+| --- | --- | --- | --- |
+| `organizations/:id/invitations/` | `pending`, `declined`, `revoked` | `pending` | admin |
+| `organizations/:id/memberships/` | `accepted`, `removed` | `accepted` | member, admin |
+
+No query selects the default. `?state=` names one
+state of the view. A state outside the view is 400.
+A member GET of `invitations/` is 403. Items and
+versions stay at
+`organizations/:id/invitations/:membership-id` for
+every state. The identity nest
+`identities/:id/invitations/` (and its item,
+versions, and `identities/:id/organizations/`) is
+self-only. An admin reads the organization nest, not
+another identity's nest.
+
+Removal is a PUT to
 `removed`. The last accepted admin refuses (409), and
 a removed member's access ends at the next mint,
 refresh, or expiry per the named covenant. The system
@@ -184,15 +205,16 @@ membership stays a PUT head in state `removed`, and
 the name resolver paints it "Former member" — an
 author who left is not an unknown id.
 
-Grant (admin) lands `pending`. Accept (invitee) lands
-`accepted` on that same document. It does not write a
-seat. Decline and revoke land their states on it.
-The invitee reads a membership of an organization it
-is not yet in, on the identity view.
+An admin's invitation POST lands `pending`. Accept
+(invitee) lands `accepted` on that same document. It
+does not write a seat. Decline and revoke land their
+states on it. The invitee reads their own pending
+invitation on the identity nest.
 
-Receive at `identities/:id/invitations/` and send at
-`organizations/:id/invitations/` are the two views,
-not two documents.
+A write through a view lands at `/invitations/`. The
+identity nest is self-only access to that same
+document, including the invitee's accept and decline
+PUTs, and it is not a second organization view.
 
 ## Derivation
 
@@ -419,7 +441,7 @@ Client verbs take `ctx: RequestContext` first. Mutations
 return `Promise<void>` by default; change-awareness flows
 through notification channels. Named non-void exceptions:
 `putRecordInstance` / `patchRecordInstance` → `{ etag }`;
-`postInvitationGrant` → `InvitationGrantOutcome`;
+`postInvitation` → `InvitationOutcome`;
 `postMockDataLoad` / `postBootstrap` →
 `SeededCredentials`; `postSessionRefresh` /
 `postPasswordLogin` → `SessionCredentials`;

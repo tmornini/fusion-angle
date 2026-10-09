@@ -1,7 +1,6 @@
 import {
     assert,
     assertEquals,
-    assertMatch,
     assertStrictEquals,
 } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
@@ -230,11 +229,10 @@ Deno.test('a provider at the retired flat prefix is not served'
     );
 });
 
-// The credential PUT validator admits no body without its
-// identity_id, so a stored head lacking it is the store's
-// fault, never the reader's: the request crashes, as a state
-// head with no state does.
-Deno.test('a credential head without an identity answers 500',
+// The credential selector reads the head. A stored head
+// with no identity_id is that document, not a crash.
+Deno.test('a credential head without an identity reads'
+    + ' as the stored document',
 async () => {
     const db = await seededMockDb();
     const token = await organizationToken();
@@ -264,23 +262,16 @@ async () => {
             token,
         })),
     );
-    assertStrictEquals(got.status, 500);
-    assertEquals(await got.json(), { error: 'internal error' });
-    assertStrictEquals(calls.length, 1);
-    const [event, , error] = calls[0]!;
-    assertStrictEquals(event, 'request failed');
-    assertMatch(
-        (error as Error).message,
-        new RegExp(ME + '/credentials/' + cid + '.*' + messagePair.id),
-    );
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), { id: cid, ...body });
+    assertStrictEquals(calls.length, 0);
 });
 
-// The fence judges the stored identity_id, the row plane's
-// rule: a credential whose body names an identity seated
-// elsewhere is foreign to the path identity's organization,
-// whatever the path says.
+// The path identity is the caller. The selector returns the
+// stored document and strips the secret. It does not walk
+// the body's identity_id.
 Deno.test('a credential naming an identity seated elsewhere'
-    + ' answers 403', async () => {
+    + ' reads as the stored document', async () => {
     const db = await seededMockDb();
     const elsewhere = await seedSeatedIdentity(db, ORGANIZATION_TWO);
     const cid = generateIdentifier();
@@ -297,8 +288,10 @@ Deno.test('a credential naming an identity seated elsewhere'
     const got = await handleRequest(db, apiRequest({
         method: 'GET', path, token: await organizationToken(),
     }));
-    assertStrictEquals(got.status, 403);
-    await got.body?.cancel();
+    assertStrictEquals(got.status, 200);
+    const served = await got.json() as Record<string, unknown>;
+    assertStrictEquals(served['identity_id'], elsewhere);
+    assertEquals('secret' in served, false);
 });
 
 // The fence precedes the head read: an absent foreign PII is

@@ -1,7 +1,7 @@
 import { assert, assertEquals } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { devToken } from './token-fixtures.ts';
+import { claimToken } from './token-fixtures.ts';
 import {
     seedServiceIdentity,
 } from './identity-fixtures.ts';
@@ -24,6 +24,7 @@ const FIELDS = {
 };
 
 const SERVICE = 'uWzjNIEeEtVWqZoJMLeYpw';
+const ROOT = 'AjdvjuECVZEgZoFajaIEkg';
 
 async function seededDb() {
     const db = memoryDbAdapter();
@@ -32,8 +33,19 @@ async function seededDb() {
     return db;
 }
 
+async function serviceToken(): Promise<string> {
+    return claimToken({
+        sub: SERVICE,
+        organization: ROOT,
+        organizations: [ROOT],
+        roles: ['admin:' + ROOT],
+    });
+}
+
 async function setup() {
-    return inPageContext(await seededDb(), await devToken());
+    return inPageContext(
+        await seededDb(), await serviceToken(),
+    );
 }
 
 Deno.test('an unregistered service reads as registered: false',
@@ -79,7 +91,7 @@ async () => {
 
 Deno.test('a first registration sends no latch', async () => {
     const { ctx, sent } = recordedContext(
-        await seededDb(), await devToken(),
+        await seededDb(), await serviceToken(),
     );
     await putClientRegistration(
         ctx, SERVICE, FIELDS, { registered: false },
@@ -92,7 +104,7 @@ Deno.test('a first registration sends no latch', async () => {
 Deno.test('a registration update latches the held registration',
 async () => {
     const { ctx, sent } = recordedContext(
-        await seededDb(), await devToken(),
+        await seededDb(), await serviceToken(),
     );
     await putClientRegistration(
         ctx, SERVICE, FIELDS, { registered: false },
@@ -111,7 +123,7 @@ async () => {
 Deno.test('a deregistration latches the held registration',
 async () => {
     const { ctx, sent } = recordedContext(
-        await seededDb(), await devToken(),
+        await seededDb(), await serviceToken(),
     );
     await putClientRegistration(
         ctx, SERVICE, FIELDS, { registered: false },

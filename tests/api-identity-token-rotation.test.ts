@@ -168,31 +168,39 @@ Deno.test(
     },
 );
 
-// Spec § 1 "Unknown": a jti outside THIS identity's own
-// tokens collection is unknown to this identity — the
-// chain lookup reads one collection, never the plane, so a
-// chain another identity owns is not seen, not 403'd. Same
-// security (you cannot rotate or revoke a chain you do not
-// own), the unknown status. DEV_TOKEN is the root admin, so
-// the gate admits the foreign path and the handler decides.
+// A path identity with no accepted seat is outside the
+// claim organization. The fence answers 403 before the
+// handler's unknown-jti status. The caller's own chain
+// stays as seeded.
 const OTHER_IDENTITY = 'toccYYkLEABmlbpHJalgtQ';
 
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
 Deno.test(
-    'rotating another identity\'s jti is unknown: 409, and'
+    'rotating an unseated identity is forbidden, and'
         + ' the owning chain stays live',
     async () => {
         const db = await seededDb();
+        const path = '/identities/' + OTHER_IDENTITY
+            + '/tokens/' + ROOT_JTI + '/rotation';
         const err = await assertRejects(
             () => POST(
                 db,
-                `identities/${OTHER_IDENTITY}/tokens/`
-                    + `${ROOT_JTI}/rotation`,
+                'identities/' + OTHER_IDENTITY + '/tokens/'
+                    + ROOT_JTI + '/rotation',
                 {},
                 DEV_TOKEN,
                 operationIdHeader()),
-        ) as RequestError;
-        assertInstanceOf(err, RequestError);
-        assertStrictEquals(err.status, 409);
+            RequestError,
+        );
+        assertStrictEquals(err.status, 403);
+        assertStrictEquals(
+            err.message, outside('POST', path) + ' ()',
+        );
         const rows = await deriveIdentityTokensFor(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );
@@ -203,21 +211,26 @@ Deno.test(
 );
 
 Deno.test(
-    'revoking another identity\'s jti is unknown: 404, and'
+    'revoking an unseated identity is forbidden, and'
         + ' the owning chain stays live',
     async () => {
         const db = await seededDb();
+        const path = '/identities/' + OTHER_IDENTITY
+            + '/tokens/' + ROOT_JTI + '/revocation';
         const err = await assertRejects(
             () => POST(
                 db,
-                `identities/${OTHER_IDENTITY}/tokens/`
-                    + `${ROOT_JTI}/revocation`,
+                'identities/' + OTHER_IDENTITY + '/tokens/'
+                    + ROOT_JTI + '/revocation',
                 {},
                 DEV_TOKEN,
                 operationIdHeader()),
-        ) as RequestError;
-        assertInstanceOf(err, RequestError);
-        assertStrictEquals(err.status, 404);
+            RequestError,
+        );
+        assertStrictEquals(err.status, 403);
+        assertStrictEquals(
+            err.message, outside('POST', path) + ' ()',
+        );
         const rows = await deriveIdentityTokensFor(
             db, 'XXZruirZyAOoRpNxaDnpSA',
         );

@@ -83,6 +83,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../family-registry.ts';
 import {
+    MOCK_SEED_INVITATION_EXPIRES_AT,
     MOCK_SEED_TIMESTAMP,
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -1421,7 +1422,7 @@ export function buildMockDataInvocations():
     // hashSeedCredentials, before pass 1, like every
     // human's.
     // Its invitation is granted through the live
-    // postOrganizationInvitationGrant in pass 2
+    // postOrganizationInvitation in pass 2
     // (mock-data.ts) — the invitations side channel has
     // no WRITE_RESPONSE_SPECS entry, so it cannot ride
     // formSeedMessagePair.
@@ -2172,24 +2173,25 @@ export async function formDefaultOrganizationSeedMessagePair(
 // The seeded pending invitation as the organization-scoped
 // grant route receives it: the Stark admin invites the
 // unaffiliated identity by email (Decision 8).
-export interface InvitationGrantSeedInput {
+export interface InvitationSeedInput {
     readonly organization: Id;
-    readonly granterId: Id;
+    readonly inviterId: Id;
     readonly body: Record<string, unknown>;
     readonly requestAt: string;
     readonly operationId: string;
     readonly received: ReceivedRequest;
 }
 
-export function formInvitationGrantSeedInput(
+export function formInvitationSeedInput(
     requestAt: string,
-): InvitationGrantSeedInput {
+): InvitationSeedInput {
     const operationId = generateIdentifier();
     const target = '/organizations/' + STARK_ORGANIZATION
         + '/invitations/';
     const body = {
         email: buildUnaffiliatedIdentity().email,
-        grantAt: MOCK_SEED_TIMESTAMP,
+        at: MOCK_SEED_TIMESTAMP,
+        expiresAt: MOCK_SEED_INVITATION_EXPIRES_AT,
     };
     const model = buildRequestModel({
         method: 'POST',
@@ -2205,7 +2207,7 @@ export function formInvitationGrantSeedInput(
     }
     return {
         organization: STARK_ORGANIZATION,
-        granterId: 'XXZruirZyAOoRpNxaDnpSA',
+        inviterId: 'XXZruirZyAOoRpNxaDnpSA',
         body,
         requestAt,
         operationId,

@@ -193,7 +193,7 @@ Deno.test(
             GET: async (path: string) => {
                 paths.push(path);
                 if (path.endsWith(
-                    '/invitations/?state=removed',
+                    '/memberships/?state=removed',
                 )) {
                     return responseMessage([]);
                 }
@@ -234,10 +234,10 @@ Deno.test(
                 if (
                     path.endsWith('/versions/')
                     || path.endsWith(
-                        '/invitations/?state=accepted',
+                        '/memberships/?state=accepted',
                     )
                     || path.endsWith(
-                        '/invitations/?state=removed',
+                        '/memberships/?state=removed',
                     )
                     || path === 'ai-agents/'
                 ) {

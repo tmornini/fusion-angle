@@ -94,7 +94,7 @@ async function adminRead(
     return await res.json();
 }
 
-async function grant(
+async function invite(
     db: MemoryDbAdapter,
     email: string,
 ): Promise<void> {
@@ -105,7 +105,8 @@ async function grant(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
             email,
-            grantAt: '2026-06-01T00:00:00.000000Z',
+            at: '2026-06-01T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(res.status, 201);
@@ -116,7 +117,7 @@ Deno.test('an invitation GET: pending (granted, unanswered)'
 + ' reads \'pending\', matching its newest version',
 async () => {
     const db = await seededDb();
-    await grant(db, 'sarah.chen@company.com');
+    await invite(db, 'sarah.chen@company.com');
     const id = nameOf(SARAH);
 
     assertStrictEquals(
@@ -132,7 +133,7 @@ Deno.test('an invitation GET: accepted reads \'accepted\','
 + ' matching its newest version', async () => {
     const db = await seededDb();
     const id = nameOf(SARAH);
-    await grant(db, 'sarah.chen@company.com');
+    await invite(db, 'sarah.chen@company.com');
 
     const accept = await handleRequest(
         db, await invitationLatched(db, req(
@@ -161,7 +162,7 @@ Deno.test('an invitation GET: declined reads \'declined\','
 + ' matching its newest version', async () => {
     const db = await seededDb();
     const id = nameOf(JESSICA);
-    await grant(db, 'jessica.park@company.com');
+    await invite(db, 'jessica.park@company.com');
 
     const decline = await handleRequest(
         db, await invitationLatched(db, req(
@@ -190,7 +191,7 @@ Deno.test('an invitation GET: revoked reads \'revoked\','
 + ' matching its newest version', async () => {
     const db = await seededDb();
     const id = nameOf(EMILY);
-    await grant(db, 'emily.rodriguez@company.com');
+    await invite(db, 'emily.rodriguez@company.com');
 
     const revoke = await handleRequest(
         db, await invitationLatched(db, req(

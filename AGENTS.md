@@ -206,6 +206,9 @@ cannot know:
   inline styles (use CSS custom properties + classes per
   DESIGN-SYSTEM.md), present-tense imperative
   commit messages, Co-Authored-By trailer.
+  `grant` is a verb; the noun stays only for RFC 6749
+  `grant_type` / `invalid_grant`, RFC 7591 `grant_types`,
+  Postgres `GRANT`, and the OAuth adapter's internals.
 - **Commandments touched by the task.** Name them.
 - **Abominations the task specifically risks.** Name them.
 - **Existing codebase patterns to match.** RequestContext

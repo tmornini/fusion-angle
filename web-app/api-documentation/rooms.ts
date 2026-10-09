@@ -1181,6 +1181,28 @@ export const API_DOC_ROOMS:
         ],
     },
     {
+        hash: 'get/organizations/id/memberships',
+        verb: 'GET',
+        uri: '/api/organizations/:id/memberships/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '400',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
         hash: 'get/organizations/id/objectives',
         verb: 'GET',
         uri: '/api/organizations/:id/objectives/',
@@ -2097,8 +2119,8 @@ export const API_DOC_ROOMS:
         verb: 'POST',
         uri: '/api/organizations/:id/invitations/',
         body:
-            '{\n  "email": "email",\n  "grantAt": "2020-01-01T00:00:00.000Z"'
-            + '\n}',
+            '{\n  "email": "email",\n  "at": "2020-01-01T00:00:00.000Z",\n  '
+            + '"expiresAt": "2020-01-15T00:00:00.000Z"\n}',
         headers:
         [
             'Authorization: Bearer …',
@@ -2118,6 +2140,30 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '409',
+        ],
+    },
+    {
+        hash: 'post/organizations/id/memberships',
+        verb: 'POST',
+        uri: '/api/organizations/:id/memberships/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
         ],
     },
     {

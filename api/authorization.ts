@@ -157,9 +157,8 @@ const MEMBER_VERBS: Readonly<
     '/identities/:id/organizations': ['GET'],
     // Invitee (or admin) may read and answer.
     '/identities/:id/invitations': ['GET', 'PUT'],
-    // A member reads accepted and removed only. The
-    // gate and the selectors enforce that rule.
-    '/organizations/:id/invitations': ['GET'],
+    // Accepted and removed. Invitations stay admin.
+    '/organizations/:id/memberships': ['GET'],
 };
 
 const MEMBER_TIER: readonly PolicyEntry[] =
@@ -193,11 +192,20 @@ export function isPermitted(
     pathname: string,
     heldRoles: readonly string[],
 ): boolean {
+    const pathSegs = pathname.split('/').filter(Boolean);
     for (const entry of ROUTE_POLICY) {
         if (entry.verb !== method) continue;
         if (!matchesOnSegmentBoundary(
             pathname, entry.pathPrefix,
         )) continue;
+        // The document row is not a nest grant. Without
+        // this, it would still admit member GET on
+        // invitations after that row moves.
+        if (
+            entry.pathPrefix === '/organizations/:id'
+            && pathSegs.length === 3
+            && pathSegs[2] === 'invitations'
+        ) continue;
         for (const role of entry.roles) {
             if (heldRoles.includes(role)) return true;
         }

@@ -32,11 +32,10 @@ import {
     fillHumanMemberProfile,
     postHumanMemberCreation,
     postAIMemberCreation,
-    postInvitationGrant,
-    type InvitationGrantOutcome,
+    postInvitation,
+    type InvitationOutcome,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
-    HumanMemberPiiIntakeFailedError,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
@@ -466,16 +465,16 @@ async function handleInviteSubmit(): Promise<void> {
         showToast('Email is required', 'error');
         return;
     }
-    let outcome: InvitationGrantOutcome;
+    let outcome: InvitationOutcome;
     try {
-        outcome = await postInvitationGrant(
+        outcome = await postInvitation(
             sessionContext(), email,
         );
     } catch (err) {
         // An unexpected fault — the server's expected 404 / 409
         // come back as outcomes below, never as a throw.
         log.error(
-            'postInvitationGrant failed',
+            'postInvitation failed',
             'members', err,
         );
         showToast(
@@ -600,18 +599,9 @@ async function submitHumanForm(): Promise<void> {
             })),
         );
     } catch (err) {
-        if (err instanceof HumanMemberPiiIntakeFailedError) {
-            reportFault(
-                ctx,
-                'Member added, but its contact details'
-                + ' failed to save',
-                err,
-            );
-        } else {
-            reportFault(
-                ctx, 'Failed to add member', err,
-            );
-        }
+        reportFault(
+            ctx, 'Failed to add member', err,
+        );
         return;
     }
     showToast('Member added', 'success');

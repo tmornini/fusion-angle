@@ -1915,6 +1915,111 @@ export function validateInvitationEntity(
     };
 }
 
+const MEMBERSHIP_CREATE_KEYS: readonly string[] = [
+    'id', 'membership', 'identity', 'pii',
+];
+const MEMBERSHIP_CREATE_MEMBERSHIP_KEYS:
+    readonly string[] = ['type', 'at'];
+
+export function validateMembershipCreateBody(
+    body: Record<string, unknown>,
+): {
+    readonly id: string;
+    readonly membership: {
+        readonly type: MembershipType;
+        readonly at: string;
+    };
+    readonly identity: {
+        readonly title: string;
+        readonly department: string;
+        readonly strengths: string[];
+        readonly team_dimensions: Record<string, number>;
+    };
+    readonly pii: Omit<IdentityPiiEntity, 'id'>;
+} {
+    assertOnlyKeys(
+        body, MEMBERSHIP_CREATE_KEYS,
+        'MembershipCreate',
+    );
+    const id = pickIdentifier(body, 'id');
+    const membershipRaw = body['membership'];
+    if (
+        membershipRaw === null
+        || typeof membershipRaw !== 'object'
+        || Array.isArray(membershipRaw)
+    ) {
+        throw new ValidationError(
+            'membership must be an object',
+        );
+    }
+    const membershipBody = membershipRaw as
+        Record<string, unknown>;
+    assertOnlyKeys(
+        membershipBody, MEMBERSHIP_CREATE_MEMBERSHIP_KEYS,
+        'MembershipCreate.membership',
+    );
+    const identityRaw = body['identity'];
+    if (
+        identityRaw === null
+        || typeof identityRaw !== 'object'
+        || Array.isArray(identityRaw)
+    ) {
+        throw new ValidationError(
+            'identity must be an object',
+        );
+    }
+    const identityBody = identityRaw as
+        Record<string, unknown>;
+    assertOnlyKeys(
+        identityBody, IDENTITY_PROFILE_KEYS,
+        'MembershipCreate.identity',
+    );
+    const identity = validateIdentityEntity({
+        kind: 'person',
+        ...identityBody,
+    });
+    if (identity.kind !== 'person'
+        || !('title' in identity)) {
+        throw new ValidationError(
+            'identity requires the four profile keys',
+        );
+    }
+    const piiRaw = body['pii'];
+    if (
+        piiRaw === null
+        || typeof piiRaw !== 'object'
+        || Array.isArray(piiRaw)
+    ) {
+        throw new ValidationError(
+            'pii must be an object',
+        );
+    }
+    return {
+        id,
+        membership: {
+            type: validateEnumField(
+                membershipBody, 'type',
+                ['admin', 'member'],
+                'membership type',
+                'MembershipCreate.membership',
+            ),
+            at: validateTimestampField(
+                membershipBody, 'at',
+                'MembershipCreate.membership',
+            ),
+        },
+        identity: {
+            title: identity.title,
+            department: identity.department,
+            strengths: identity.strengths,
+            team_dimensions: identity.team_dimensions,
+        },
+        pii: validateIdentityPiiEntity(
+            piiRaw as Record<string, unknown>,
+        ),
+    };
+}
+
 export interface MembershipRequestBody {
     readonly state: InvitationState;
     readonly type?: MembershipType;

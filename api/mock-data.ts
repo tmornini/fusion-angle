@@ -36,7 +36,7 @@ import {
 import { putIdentityDefaultOrganization } from
     './organization-requests.ts';
 import {
-    postOrganizationInvitationGrant,
+    postOrganizationInvitation,
     putInvitationOnOrganizationNest,
 } from './invitations-domain.ts';
 import type {
@@ -144,12 +144,12 @@ import {
     defaultOrganizationSeedBody,
     memberPrimaryOrganization,
     seededOrganizationBody,
-    formInvitationGrantSeedInput,
+    formInvitationSeedInput,
 } from './mock-data/seed-message-pairs.ts';
 import type {
     InstanceChainSeedInput,
     InstanceTransitionSeedInput,
-    InvitationGrantSeedInput,
+    InvitationSeedInput,
 } from './mock-data/seed-message-pairs.ts';
 import { instancesUriPrefix } from
     './derive-record-instances.ts';
@@ -380,7 +380,7 @@ export interface RehearsedSeed {
 // inputs (Decision 8), and the seed's shared requestAt.
 export interface MockDataSeedInput {
     readonly messagePairs: ReadonlyMap<string, MessagePair>;
-    readonly invitation: InvitationGrantSeedInput;
+    readonly invitation: InvitationSeedInput;
     readonly instanceChain: InstanceChainSeedInput;
     readonly requestAt: string;
 }
@@ -412,7 +412,7 @@ export async function rehearseMockData(
         );
     const input: MockDataSeedInput = {
         messagePairs,
-        invitation: formInvitationGrantSeedInput(requestAt),
+        invitation: formInvitationSeedInput(requestAt),
         instanceChain:
             await formInstanceChainSeedInput(requestAt),
         requestAt,
@@ -719,11 +719,11 @@ async function postMockDataLoadIn(
                     ),
                 ),
             )),
-        postOrganizationInvitationGrant(
+        postOrganizationInvitation(
             adapter,
             [input.invitation.organization],
             input.invitation.body,
-            input.invitation.granterId,
+            input.invitation.inviterId,
             undefined,
             input.invitation.organization,
             ['admin'],

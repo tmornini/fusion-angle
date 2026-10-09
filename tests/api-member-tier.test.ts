@@ -53,7 +53,7 @@ async () => {
     assertStrictEquals(list.status, 200);
     const roster = await handleRequest(
         db, req('GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
-            + '/invitations/?state=accepted'
+            + '/memberships/?state=accepted'
             , token));
     assertStrictEquals(roster.status, 200);
 });
@@ -219,7 +219,7 @@ async () => {
     const former = await handleRequest(
         db, req(
             'GET',
-            '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/memberships/'
                 + '?state=removed',
             token,
         ),

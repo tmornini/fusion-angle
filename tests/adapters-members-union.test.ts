@@ -1,8 +1,10 @@
 import {
     assert,
+    assertRejects,
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
+import { RequestError } from '../shared/http-errors.ts';
 import { withLocalStorageAsync } from
     './fixtures/local-storage.ts';
 import {
@@ -398,23 +400,33 @@ Deno.test(
 // absent profile — never a present one full of empty
 // strings. The roster fill (fillHumanMemberProfile) is what
 // turns absence into a read; before it, the row says so.
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
 Deno.test(
-    'a seat whose identity has no profile reads as absent',
+    'an admin cannot seat a membership-less identity'
+    + ' by writing its document',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const { db, ctx } = await adminContext();
         const id = generateIdentifier();
-        await ctx.PUT('identities/' + id, { kind: 'person' });
-        const { seedSeat } = await import(
-            './root-admin-fixture.ts'
+        const before = (await db.messagePairs.getAll()).length;
+        const err = await assertRejects(
+            () => ctx.PUT(
+                'identities/' + id, { kind: 'person' },
+            ),
+            RequestError,
         );
-        await seedSeat(
-            db, 'AjdvjuECVZEgZoFajaIEkg', id, 'member',
+        assertStrictEquals(err.status, 403);
+        assertStrictEquals(
+            err.message,
+            outside('PUT', '/identities/' + id) + ' ()',
         );
-        const row = (await getMembers(ctx)).find(
-            m => m.idForLink() === id,
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
         );
-        assert(row !== undefined && isHumanMember(row));
-        assertStrictEquals(row.profile().present, false);
     }),
 );
 
@@ -493,7 +505,7 @@ Deno.test(
         assertStrictEquals(
             url.pathname,
             '/api/organizations/AjdvjuECVZEgZoFajaIEkg'
-                + '/invitations/',
+                + '/memberships/',
         );
         assertStrictEquals(url.search, '?state=removed');
         assertStrictEquals(

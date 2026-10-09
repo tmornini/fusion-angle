@@ -19,6 +19,7 @@ function heldMessage(
         type: 'member',
         state: 'pending',
         at: '2026-01-01T00:00:00.000000Z',
+        expires_at: '2099-12-31T00:00:00.000000Z',
     });
 }
 

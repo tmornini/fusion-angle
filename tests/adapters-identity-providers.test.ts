@@ -14,6 +14,7 @@ import {
     assertStrictEquals,
     assertThrows,
 } from '@std/assert';
+import { RequestError } from '../shared/http-errors.ts';
 import {
     validateIdentityProviderEntity,
 } from '../api/validators.ts';
@@ -95,7 +96,8 @@ async () => {
     }
 });
 
-Deno.test('linked providers are latest by at, not array order',
+Deno.test('an admin cannot read a membership-less'
+    + ' provider log',
 async () => {
     const { db, ctx } = await adminCtx();
     // Appended in REVERSE chronological order: the later
@@ -113,8 +115,22 @@ async () => {
         ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw', action: 'unlinked',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    assertEquals(
-        await getProvidersFor(ctx, 'prBESZPjJDiuXCeZLmbiVw'), ['google']);
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => getProvidersFor(ctx, 'prBESZPjJDiuXCeZLmbiVw'),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        'forbidden: GET /identities/'
+            + 'prBESZPjJDiuXCeZLmbiVw/providers/'
+            + ' names an identity outside this'
+            + ' organization ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 // G4: stored PUT = identityProviderEntityOf (GET derive).

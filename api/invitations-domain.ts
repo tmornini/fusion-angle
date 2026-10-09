@@ -16,16 +16,19 @@ import {
 } from '../shared/types.ts';
 import {
     assertOnlyKeys,
+    validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
 } from './validators.ts';
 import {
     attemptFor,
+    canonicalPath,
     formWriteMessagePair,
     httpDateOf,
     IF_MATCH_HEADER,
     IF_NONE_MATCH_HEADER,
     parseEntityTags,
+    PII_DOCUMENT_NAME,
     runStateWrite,
     runWrite,
 } from './message-pair.ts';
@@ -39,6 +42,7 @@ import type {
 import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityPiiRows,
+    identityPrefixFor,
 } from './derive-identity-spine.ts';
 import { param } from './document-family.ts';
 import {
@@ -62,6 +66,7 @@ import {
     identityMembershipHeads,
     type MembershipActor,
     type MembershipRequest,
+    type MembershipTransitionBody,
 } from './memberships.ts';
 import {
     membershipNameOf,
@@ -78,15 +83,20 @@ const ADMIN_WRITE =
     'forbidden: an organization invitation write'
     + ' requires an admin role';
 const INVITEE_READ =
-    'forbidden: only the invitee or an admin'
+    'forbidden: only the invitee'
     + ' may read this invitation';
 const LIST_READ =
-    'forbidden: invitation list is self or admin';
+    'forbidden: invitation list is self';
 
 const OPERATION_PATTERN =
     'invitations/:membership-name/:state';
 const OPERATION_SEGMENTS = [
     'invitations', ':membership-name', ':state',
+];
+const MEMBERSHIP_CREATE_PATTERN =
+    'organizations/:id/memberships/';
+const MEMBERSHIP_CREATE_SEGMENTS = [
+    'organizations', ':id', 'memberships', '',
 ];
 
 function requireAdmin(
@@ -98,13 +108,12 @@ function requireAdmin(
     }
 }
 
-function requireSelfOrAdmin(
+function requireSelf(
     actor: Id,
     identityId: Id,
-    roles: readonly string[],
     message: string,
 ): void {
-    if (actor !== identityId && !roles.includes('admin')) {
+    if (actor !== identityId) {
         throw new ApiError(message, HTTP_FORBIDDEN);
     }
 }
@@ -156,10 +165,46 @@ function askedQuery(query: ViewQuery | undefined): ViewQuery {
     return query ?? { kind: 'every' };
 }
 
+function pendingMembership(
+    next: MembershipTransitionBody,
+    expiresAt: string,
+): MembershipEntity {
+    if (next.state !== 'pending') {
+        throw new Error('a grant must land pending');
+    }
+    return {
+        id: next.id,
+        organization_id: next.organization_id,
+        identity_id: next.identity_id,
+        type: next.type,
+        state: next.state,
+        at: next.at,
+        expires_at: expiresAt,
+    };
+}
+
+function settledMembership(
+    next: MembershipTransitionBody,
+): MembershipEntity {
+    if (next.state === 'pending') {
+        throw new Error(
+            'a put transition landed pending',
+        );
+    }
+    return {
+        id: next.id,
+        organization_id: next.organization_id,
+        identity_id: next.identity_id,
+        type: next.type,
+        state: next.state,
+        at: next.at,
+    };
+}
+
 function storedMembership(
     membership: MembershipEntity,
 ): Record<string, unknown> {
-    return {
+    const stored: Record<string, unknown> = {
         id: membership.id,
         organization_id: membership.organization_id,
         identity_id: membership.identity_id,
@@ -167,6 +212,10 @@ function storedMembership(
         state: membership.state,
         at: membership.at,
     };
+    if (membership.state === 'pending') {
+        stored['expires_at'] = membership.expires_at;
+    }
+    return stored;
 }
 
 function headerOf(
@@ -388,11 +437,11 @@ export async function getIdentityInvitations(
     params: string[],
     actor: Id,
     _organization: Id | undefined,
-    roles: readonly string[],
+    _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
-    requireSelfOrAdmin(actor, identityId, roles, LIST_READ);
+    requireSelf(actor, identityId, LIST_READ);
     return wholeCollectionSelection(
         await identityMembershipHeads(
             db, identityId, askedQuery(query),
@@ -411,7 +460,7 @@ export async function getInvitationOnIdentityNest(
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
     const name = membershipName(params);
-    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    requireSelf(actor, identityId, INVITEE_READ);
     const head = await visibleHead(
         db, name, roles, 'identity',
     );
@@ -464,7 +513,7 @@ export async function getInvitationVersionsOnIdentityNest(
 ): Promise<HeadSelection> {
     const identityId = param(params, 0);
     const name = membershipName(params);
-    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    requireSelf(actor, identityId, INVITEE_READ);
     await visibleHead(db, name, roles, 'identity');
     return selectVersionsAt(
         db, MEMBERSHIPS_PATH, name, 'stateless',
@@ -485,7 +534,7 @@ export async function getInvitationVersionOnIdentityNest(
     const identityId = param(params, 0);
     const name = membershipName(params);
     const tag = param(params, params.length - 1);
-    requireSelfOrAdmin(actor, identityId, roles, INVITEE_READ);
+    requireSelf(actor, identityId, INVITEE_READ);
     await visibleHead(db, name, roles, 'identity');
     return selectVersionAt(
         db, MEMBERSHIPS_PATH, name, tag, 'stateless',
@@ -533,9 +582,9 @@ export async function getInvitationVersionOnOrganizationNest(
     );
 }
 
-function grantFields(
+function invitationFields(
     body: Record<string, unknown>,
-): { email: string; grantAt: string } {
+): { email: string; at: string; expiresAt: string } {
     const email = body['email'];
     if (typeof email !== 'string' || email === '') {
         throw new ValidationError(
@@ -543,18 +592,24 @@ function grantFields(
         );
     }
     assertOnlyKeys(
-        body, ['email', 'grantAt'], 'InvitationGrant',
+        body, ['email', 'at', 'expiresAt'], 'Invitation',
     );
-    return {
-        email,
-        grantAt: validateTimestampField(
-            body, 'grantAt', 'InvitationGrant',
-        ),
-    };
+    const at = validateTimestampField(
+        body, 'at', 'Invitation',
+    );
+    const expiresAt = validateTimestampField(
+        body, 'expiresAt', 'Invitation',
+    );
+    if (expiresAt <= at) {
+        throw new ValidationError(
+            'expiresAt must be after at',
+        );
+    }
+    return { email, at, expiresAt };
 }
 
-// POST /organizations/:id/invitations/ — grant pending.
-export async function postOrganizationInvitationGrant(
+// POST /organizations/:id/invitations/ — invite pending.
+export async function postOrganizationInvitation(
     db: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
@@ -572,7 +627,9 @@ export async function postOrganizationInvitationGrant(
         throw new Error('requestId is required');
     }
     const organizationId = param(params, 0);
-    const { email, grantAt } = grantFields(payload);
+    const { email, at, expiresAt } = invitationFields(
+        payload,
+    );
     const match = (await deriveIdentityPiiRows(db))
         .find((person) => person.email === email);
     if (match === undefined) {
@@ -583,7 +640,7 @@ export async function postOrganizationInvitationGrant(
     const name = membershipNameOf(organizationId, match.id);
     const parsed = parsedName(name);
     const request: MembershipRequest = {
-        state: 'pending', type: 'member', at: grantAt,
+        state: 'pending', type: 'member', at,
     };
     const head = await readHead(db, name);
     const from = head === null
@@ -607,7 +664,9 @@ export async function postOrganizationInvitationGrant(
     const answer = await landMembership(
         db, 'POST', actor, requestAt, operationId,
         received, payload, name, 'pending',
-        storedMembership(outcome.next), condition,
+        storedMembership(
+            pendingMembership(outcome.next, expiresAt),
+        ), condition,
         {
             kind: 'created',
             location: '/organizations/' + organizationId
@@ -616,6 +675,117 @@ export async function postOrganizationInvitationGrant(
     );
     if (answer.outcome === 'land') {
         notify(db, organizationId, match.id);
+    }
+    return answer.response;
+}
+
+// POST /organizations/:id/memberships/ — one accepted
+// person. The handler declares the three geneses.
+export async function postOrganizationMembership(
+    db: DbAdapter,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    _messagePair: MessagePair | undefined,
+    _organization: Id | undefined,
+    roles: readonly string[],
+    requestAt: string,
+    operationId: string,
+    received?: ReceivedRequest,
+): Promise<unknown> {
+    requireWriteStamp(requestAt, operationId);
+    requireAdmin(roles, ADMIN_WRITE);
+    if (received === undefined) {
+        throw new Error('requestId is required');
+    }
+    const organizationId = param(params, 0);
+    const created = validateMembershipCreateBody(payload);
+    const name = membershipNameOf(
+        organizationId, created.id,
+    );
+    const profile = created.identity;
+    const receivedPair = await formWriteMessagePair({
+        method: 'POST',
+        pathname: received.target,
+        routePattern: MEMBERSHIP_CREATE_PATTERN,
+        routeSegments: MEMBERSHIP_CREATE_SEGMENTS,
+        pathSegments: [
+            'organizations', organizationId,
+            'memberships', '',
+        ],
+        headerFields: received.headerFields,
+        body: payload,
+        bodyBytes: received.bodyBytes,
+        requesterIdentityId: actor,
+        requestAt,
+        organization: undefined,
+        responseBody: undefined,
+        operationId,
+        requestId: received.requestId,
+    });
+    const answer = await runStateWrite(db, {
+        kind: 'siblings',
+        received: receivedPair,
+        siblings: [
+            {
+                method: 'PUT',
+                path: MEMBERSHIPS_PATH,
+                name,
+                state: storedMembership({
+                    id: name,
+                    organization_id: organizationId,
+                    identity_id: created.id,
+                    type: created.membership.type,
+                    state: 'accepted',
+                    at: created.membership.at,
+                }),
+                condition: {
+                    kind: 'genesis',
+                    declarer: 'handler',
+                },
+            },
+            {
+                method: 'PUT',
+                path: canonicalPath(
+                    undefined, '/identities/',
+                ),
+                name: created.id,
+                state: {
+                    id: created.id,
+                    kind: 'person',
+                    ...profile,
+                },
+                condition: {
+                    kind: 'genesis',
+                    declarer: 'handler',
+                },
+            },
+            {
+                method: 'PUT',
+                path: identityPrefixFor(created.id),
+                name: PII_DOCUMENT_NAME,
+                state: {
+                    name: created.pii.name,
+                    email: created.pii.email,
+                    phone: created.pii.phone,
+                    bio: created.pii.bio,
+                },
+                condition: {
+                    kind: 'genesis',
+                    declarer: 'handler',
+                },
+            },
+        ],
+        reader: { sees: 'whole' },
+        answer: {
+            kind: 'created',
+            location: '/organizations/'
+                + organizationId
+                + '/invitations/' + name,
+        },
+    });
+    if (answer.outcome === 'land') {
+        notify(db, organizationId, created.id);
     }
     return answer.response;
 }
@@ -675,6 +845,17 @@ async function putMembership(
             HTTP_CONFLICT,
         );
     }
+    if (
+        from !== null
+        && from.state === 'pending'
+        && request.state === 'accepted'
+        && from.expires_at <= requestAt
+    ) {
+        throw new ApiError(
+            'the invitation expired at ' + from.expires_at,
+            HTTP_CONFLICT,
+        );
+    }
     const outcome = membershipTransition(
         actorKind, parsed, from, request,
     );
@@ -689,8 +870,9 @@ async function putMembership(
         }
         return servedHead(head, received.requestId);
     }
+    const next = settledMembership(outcome.next);
     if (from !== null) {
-        await refuseLastAdmin(db, from, outcome.next);
+        await refuseLastAdmin(db, from, next);
     }
     const condition: SiblingCondition = head === null
         ? { kind: 'never-written', declarer: 'client' }
@@ -698,7 +880,7 @@ async function putMembership(
     const answer = await landMembership(
         db, 'PUT', actor, requestAt, operationId,
         received, payload, name, request.state,
-        storedMembership(outcome.next), condition,
+        storedMembership(next), condition,
         { kind: 'parent' },
     );
     if (answer.outcome === 'land') {

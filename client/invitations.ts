@@ -6,6 +6,8 @@ import type {
 import {
     nowUtc,
 } from '../shared/types.ts';
+import { addUtcSeconds } from
+    '../shared/work-order-claims.ts';
 import {
     activeOrganization,
     type RequestContext,
@@ -38,8 +40,17 @@ export interface InvitationView {
     readonly id: Id;
     readonly organizationId: Id;
     readonly invitedAt: string;
+    readonly expiresAt?: string;
     readonly state: InvitationState;
     readonly message: HttpMessage<MembershipEntity>;
+}
+
+export function invitationIsExpired(
+    view: InvitationView,
+    now: string,
+): view is InvitationView & { readonly expiresAt: string } {
+    return view.expiresAt !== undefined
+        && view.expiresAt <= now;
 }
 
 // One outstanding membership as the inviting admin sees
@@ -57,13 +68,15 @@ function inviteeViewOf(
     message: HttpMessage<MembershipEntity>,
 ): InvitationView {
     const row = message.body().toValue();
-    return {
+    const view: InvitationView = {
         id: row.id,
         organizationId: row.organization_id,
         invitedAt: row.at,
         state: row.state,
         message,
     };
+    if (row.state !== 'pending') return view;
+    return { ...view, expiresAt: row.expires_at };
 }
 
 function sentViewOf(
@@ -130,21 +143,33 @@ export async function getSentInvitations(
 // active organization. The server resolves the email.
 // 'sent' covers a fresh grant and a repeated pending one.
 // 404 and 409 become 'no-identity' and 'already-member'.
-export type InvitationGrantOutcome =
+export type InvitationOutcome =
     | 'sent'
     | 'no-identity'
     | 'already-member';
 
-export async function postInvitationGrant(
+export const INVITATION_EXPIRY_DAYS = 14;
+
+function invitationExpiresAt(at: string): string {
+    return addUtcSeconds(at, INVITATION_EXPIRY_DAYS
+        * 24 * 60 * 60);
+}
+
+export async function postInvitation(
     ctx: RequestContext,
     email: string,
-): Promise<InvitationGrantOutcome> {
+): Promise<InvitationOutcome> {
+    const at = nowUtc();
     try {
         await ctx.POST(
             'organizations/'
                 + activeOrganization(ctx)
                 + '/invitations/',
-            { email, grantAt: nowUtc() },
+            {
+                email,
+                at,
+                expiresAt: invitationExpiresAt(at),
+            },
         );
     } catch (err) {
         if (

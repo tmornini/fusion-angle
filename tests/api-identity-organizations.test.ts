@@ -65,41 +65,62 @@ async () => {
     }
 });
 
-Deno.test('GET identities/:id/organizations/ is self or'
-    + ' admin', async () => {
+Deno.test('GET identities/:id/organizations/ is'
+    + ' self-only', async () => {
     const db = await seededMockDb();
-    const otherId = buildMembers()[0]!.id;
-    const res = await handleRequest(
+    const identityId = buildMembers()[0]!.id;
+    const admin = await handleRequest(
         db,
         framedRequest(
-            BASE + '/identities/XXZruirZyAOoRpNxaDnpSA/organizations/',
+            BASE + '/identities/' + identityId
+                + '/organizations/',
             {
                 headers: {
                     Authorization: 'Bearer '
-                        + await devToken(otherId),
+                        + await claimToken({
+                            organizations: [
+                                'AjdvjuECVZEgZoFajaIEkg',
+                                'BBjWJsjYIDkTRKIIPrzWRw',
+                            ],
+                            roles: [
+                                'admin:AjdvjuECVZEgZoFajaIEkg',
+                                'admin:BBjWJsjYIDkTRKIIPrzWRw',
+                            ],
+                        }),
                 },
             },
         ),
     );
-    assertStrictEquals(res.status, 403);
+    assertStrictEquals(admin.status, 403);
+    await admin.body?.cancel();
+    const self = await GETCollection<OrganizationEntity>(
+        db,
+        'identities/' + identityId + '/organizations/',
+        await devToken(identityId),
+        operationIdHeader(),
+    );
+    assertStrictEquals(self.length, 1);
 });
 
-Deno.test('admin GET lists the path identity seats',
-async () => {
+Deno.test('caller claims do not shape an identity\'s'
+    + ' organizations', async () => {
     const db = await seededMockDb();
     const identityId = buildMembers()[0]!.id;
-    // Admin claims name both seeded orgs; the path
-    // identity holds one live seat. Claims of the
-    // caller must not shape this list.
+    // The path identity holds one live seat. Naming
+    // both seeded orgs on the caller's own token
+    // must not add the other.
     const parts = await GETCollection<OrganizationEntity>(
         db,
         'identities/' + identityId + '/organizations/',
         await claimToken({
-            organizations: ['AjdvjuECVZEgZoFajaIEkg'
-                , 'BBjWJsjYIDkTRKIIPrzWRw'],
+            sub: identityId,
+            organizations: [
+                'AjdvjuECVZEgZoFajaIEkg',
+                'BBjWJsjYIDkTRKIIPrzWRw',
+            ],
             roles: [
-                'admin:AjdvjuECVZEgZoFajaIEkg',
-                'admin:BBjWJsjYIDkTRKIIPrzWRw',
+                'member:AjdvjuECVZEgZoFajaIEkg',
+                'member:BBjWJsjYIDkTRKIIPrzWRw',
             ],
         }),
         operationIdHeader());

@@ -1,5 +1,6 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import { familyRegistration } from '../api/family-registry.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 
 Deno.test('ideas registers organization-nested', () => {
     assertEquals(familyRegistration('ideas'), {
@@ -102,6 +103,25 @@ Deno.test('ai-agents is a live global-plane family,'
         organizationNested: false,
         createBodyIdField: 'id',
     });
+});
+
+Deno.test('invitations is a global backing family', () => {
+    assertEquals(familyRegistration('invitations'), {
+        family: 'invitations',
+        organizationNested: false,
+        createBodyIdField: 'id',
+    });
+});
+
+Deno.test('canonicalPath keeps /invitations/ global',
+() => {
+    assertEquals(
+        canonicalPath(
+            'AjdvjuECVZEgZoFajaIEkg',
+            '/invitations/',
+        ),
+        '/invitations/',
+    );
 });
 
 Deno.test('an unregistered family returns undefined', () => {

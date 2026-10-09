@@ -1172,8 +1172,7 @@ async () => {
     assertStrictEquals(res.status, 404);
     // Message plane proves pb's pii still exists while the
     // collection is gone. Nested GET of a FOREIGN-org
-    // identity: authorizeIdentityPii allows admin; the org
-    // fence should still 403 pb.
+    // identity: the identity fence 403s pb.
     assertStrictEquals(
         (await deriveIdentityPii(fx.db, fx.pb)).id, fx.pb);
     const foreign = await handleRequest(fx.db, req(
@@ -1186,8 +1185,9 @@ async () => {
         await foreign.json() as { error: string };
     assertStrictEquals(
         foreignBody.error,
-        'forbidden: identity_pii/' + fx.pb + ' belongs to a'
-        + ' different organization',
+        'forbidden: GET /identities/' + fx.pb + '/pii'
+            + ' names an identity outside this'
+            + ' organization',
     );
 });
 
@@ -1212,7 +1212,7 @@ async () => {
         assertStrictEquals(r.secret, undefined);
     }
     // pb is a B-only member — its nested collection 403s
-    // through the A facade (honest foreign ownership).
+    // through the A facade (outside the organization).
     // Phase Final Task 2: message plane proves pb's credential
     // exists while fence 403s under A.
     assertStrictEquals(
@@ -1228,9 +1228,9 @@ async () => {
     const otherBody = await other.json() as { error: string };
     assertStrictEquals(
         otherBody.error,
-        'forbidden: identity_credentials/' + fx.pb
-            + ' belongs to a'
-        + ' different organization',
+        'forbidden: GET /identities/' + fx.pb
+            + '/credentials/ names an identity'
+            + ' outside this organization',
     );
     // a single read projects secret out too
     const one = await handleRequest(fx.db, req(
@@ -1255,9 +1255,10 @@ async () => {
         await foreign.json() as { error: string };
     assertStrictEquals(
         foreignBody.error,
-        'forbidden: identity_credentials/' + fx.pbCred
-            + ' belongs to'
-        + ' a different organization',
+        'forbidden: GET /identities/' + fx.pb
+            + '/credentials/' + fx.pbCred
+            + ' names an identity outside this'
+            + ' organization',
     );
 });
 
@@ -1327,18 +1328,10 @@ async () => {
     );
 });
 
-// ---- Orphan visibility (null owner → visible to all orgs) ----
-// isVisible keeps a row whose owner resolves to null: an
-// identity that belongs to NO org, or a state event whose
-// entity matches nothing, is an orphan — visible to every
-// tenant so an incomplete-but-harmless row is not mistaken for
-// another tenant's data. The covenant above pins the
-// co-member-visible and foreign-hidden branches; these pin the
-// THIRD branch the membership resolvers pass through, so a
-// keyed-read rewrite that silently drops the orphan would fail
-// here.
+// A seatless identity is outside the claim organization.
+// The identity fence refuses it. Derive still sees the slot.
 
-Deno.test('identity-pii shows an orphan with no membership',
+Deno.test('identity-pii refuses an orphan with no membership',
 async () => {
     const fx = await deepDb();
     const orphan = generateIdentifier();
@@ -1358,15 +1351,24 @@ async () => {
     assertStrictEquals(
         (await deriveIdentityPii(fx.db, orphan)).id,
         orphan);
+    const path = '/identities/' + orphan + '/pii';
     const res = await handleRequest(fx.db, req(
-        'GET', '/identities/' + orphan + '/pii',
+        'GET', path,
         await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
-    assertStrictEquals(res.status, 200);
+    assertStrictEquals(res.status, 403);
+    const body = await res.json() as { error: string };
+    assertStrictEquals(
+        body.error,
+        'forbidden: GET ' + path
+            + ' names an identity outside this'
+            + ' organization',
+    );
 });
 
-Deno.test('nested credentials show an orphan with no membership',
+Deno.test(
+    'nested credentials refuse an orphan with no membership',
 async () => {
     const fx = await deepDb();
     const orphan = generateIdentifier();
@@ -1375,18 +1377,25 @@ async () => {
         identity_id: orphan, kind: 'password',
         status: 'set', secret: 'HASH-orphan', at: T8_AT,
     });
-    // orphan has no membership → null owner → visible orphan in
-    // its own nested collection, read through the A facade.
+    const before =
+        (await fx.db.messagePairs.getAll()).length;
+    const path = '/identities/' + orphan + '/credentials/';
     const res = await handleRequest(fx.db, req(
-        'GET', '/identities/' + orphan + '/credentials/',
+        'GET', path,
         await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
-    assertStrictEquals(res.status, 200);
-    const ids = (await partBodiesOf<{
-        identity_id: string;
-    }>(res)).map(r => r.identity_id);
-    assertEquals(ids, [orphan]);
+    assertStrictEquals(res.status, 403);
+    const body = await res.json() as { error: string };
+    assertStrictEquals(
+        body.error,
+        'forbidden: GET ' + path
+            + ' names an identity outside this'
+            + ' organization',
+    );
+    assertStrictEquals(
+        (await fx.db.messagePairs.getAll()).length, before,
+    );
 });
 
 // Orphan states/:id writes retired with the document. Pin

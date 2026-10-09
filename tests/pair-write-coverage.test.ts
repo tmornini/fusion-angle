@@ -53,7 +53,9 @@ const NAMED_EXEMPT_ROUTE_PATTERNS:
         // /invitations/ (storage prefix). PAIR_WIRE
         // would store a second nest document and turn
         // grant 200 into 201 via sendWriteResponse.
+        // Membership create forms those pairs itself.
         'organizations/:id/invitations/',
+        'organizations/:id/memberships/',
         'organizations/:id/invitations/:membership-id',
         'identities/:id/invitations/:membership-id',
     ]);

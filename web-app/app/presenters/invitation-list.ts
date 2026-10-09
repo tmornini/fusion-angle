@@ -6,10 +6,13 @@ import {
     INVITATION_STATE_CONFIG,
 } from './state-display.ts';
 import {
+    invitationIsExpired,
     type InvitationView,
     type SentInvitation,
 } from '../../../client/index.ts';
-import { type InvitationState } from '../../../shared/types.ts';
+import {
+    type InvitationState, nowUtc,
+} from '../../../shared/types.ts';
 
 function stateBadge(state: InvitationState): SafeHtml {
     const cfg = INVITATION_STATE_CONFIG[state];
@@ -18,13 +21,17 @@ function stateBadge(state: InvitationState): SafeHtml {
     }">${cfg.label}</span>`;
 }
 
-function inviteeActions(): SafeHtml {
-    return html`
-        <div class="flex items-center gap-2">
+function inviteeActions(inv: InvitationView): SafeHtml {
+    const accept = invitationIsExpired(inv, nowUtc())
+        ? html``
+        : html`
             <button type="button"
                 class="btn btn-primary btn-sm"
                 data-invitation-action="accept"
-            >Accept</button>
+            >Accept</button>`;
+    return html`
+        <div class="flex items-center gap-2">
+            ${accept}
             <button type="button"
                 class="btn btn-secondary btn-sm"
                 data-invitation-action="decline"
@@ -48,7 +55,7 @@ function buildInviteeRow(inv: InvitationView): SafeHtml {
             ${stateBadge(inv.state)}
             ${
                 inv.state === 'pending'
-                    ? inviteeActions()
+                    ? inviteeActions(inv)
                     : html``
             }
         </div>`;

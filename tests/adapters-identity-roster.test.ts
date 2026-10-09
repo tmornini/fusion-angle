@@ -1,8 +1,8 @@
 import {
-    assert,
     assertEquals,
+    assertInstanceOf,
+    assertRejects,
     assertStrictEquals,
-    fail,
 } from '@std/assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { inPageContext } from './in-page-facade.ts';
@@ -10,6 +10,7 @@ import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getIdentityRoster,
+    IdentityPiiIntakeFailedError,
     postIdentityCreation,
 } from '../client/identities.ts';
 import {
@@ -20,7 +21,13 @@ import {
 } from '../client/identity-tokens.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import type { IdentityTokenEntity } from '../shared/types.ts';
+import { RequestError } from '../shared/http-errors.ts';
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -31,49 +38,61 @@ async function setup() {
     };
 }
 
-Deno.test('getIdentityRoster joins pii; person carries fields',
+const PERSON = 'pnXmXrxOWayANgDLdCjuBw';
+const SERVICE = 'syWUUcdBSbBgMwBiCrgbDw';
+
+Deno.test('getIdentityRoster omits a membership-less person',
 async () => {
     const { ctx } = await setup();
-    await postIdentityCreation(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
-        kind: 'person',
-        pii: {
-            name: 'Ada', email: 'ada@x.io',
-            phone: '555', bio: 'builds',
-        },
-    });
+    const err = await assertRejects(
+        () => postIdentityCreation(ctx, PERSON, {
+            kind: 'person',
+            pii: {
+                name: 'Ada', email: 'ada@x.io',
+                phone: '555', bio: 'builds',
+            },
+        }),
+        IdentityPiiIntakeFailedError,
+    );
+    const cause = err.cause;
+    assertInstanceOf(cause, RequestError);
+    assertStrictEquals(cause.status, 403);
+    assertStrictEquals(
+        cause.message,
+        outside('PUT', '/identities/' + PERSON + '/pii')
+            + ' ()',
+    );
     const roster = await getIdentityRoster(ctx);
-    const row = roster.find(r => r.id === 'pnXmXrxOWayANgDLdCjuBw');
-    assert(row, 'roster row for pnXmXrxOWayANgDLdCjuBw exists');
-    assertStrictEquals(row.kind, 'person');
-    if (row.kind === 'person' && !row.pii.erased) {
-        assertStrictEquals(row.pii.name, 'Ada');
-        assertStrictEquals(row.pii.email, 'ada@x.io');
-        assertStrictEquals(row.pii.phone, '555');
-        assertStrictEquals(row.pii.bio, 'builds');
-    } else {
-        fail('expected a present-pii person row');
-    }
+    assertEquals(
+        roster.find((row) => row.id === PERSON),
+        undefined,
+    );
 });
 
-Deno.test('getIdentityRoster reports a nameless service unnamed',
+Deno.test('getIdentityRoster omits a membership-less service',
 async () => {
     const { ctx } = await setup();
-    await postIdentityCreation(ctx, 'syWUUcdBSbBgMwBiCrgbDw', {
+    await postIdentityCreation(ctx, SERVICE, {
         kind: 'service', secret: 'shh',
     });
     const roster = await getIdentityRoster(ctx);
-    const row = roster.find(r => r.id === 'syWUUcdBSbBgMwBiCrgbDw');
-    assert(row, 'roster row for syWUUcdBSbBgMwBiCrgbDw exists');
-    assertStrictEquals(row.kind, 'service');
-    if (row.kind === 'service') {
-        assertStrictEquals(row.service.named, false);
-    } else {
-        fail('expected a service row');
-    }
+    assertEquals(
+        roster.find((row) => row.id === SERVICE),
+        undefined,
+    );
+    const err = await assertRejects(
+        () => ctx.GET('identities/' + SERVICE),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('GET', '/identities/' + SERVICE) + ' ()',
+    );
 });
 
-Deno.test('getIdentityRoster leaves a service unnamed'
-+ ' (agents are not identities)',
+Deno.test('getIdentityRoster omits a fresh membership-less'
+    + ' service',
 async () => {
     const { ctx } = await setup();
     const serviceId = generateIdentifier();
@@ -81,164 +100,178 @@ async () => {
         kind: 'service', secret: 'shh',
     });
     const roster = await getIdentityRoster(ctx);
-    const row = roster.find(r => r.id === serviceId);
-    assert(row, 'roster row for service exists');
-    assertStrictEquals(row.kind, 'service');
-    if (row.kind === 'service') {
-        assertStrictEquals(row.service.named, false);
-    } else {
-        fail('expected a service row');
-    }
-});
-
-Deno.test('getIdentityRoster reports erased person as erased',
-async () => {
-    const { ctx } = await setup();
-    await postIdentityCreation(ctx, 'pnXmXrxOWayANgDLdCjuBw', {
-        kind: 'person',
-        pii: {
-            name: 'Ada', email: 'ada@x.io',
-            phone: '555', bio: 'builds',
-        },
-    });
-    await ctx.DELETE('identities/pnXmXrxOWayANgDLdCjuBw/pii');
-    const roster = await getIdentityRoster(ctx);
-    const row = roster.find(r => r.id === 'pnXmXrxOWayANgDLdCjuBw');
-    assert(row, 'roster row for pnXmXrxOWayANgDLdCjuBw exists');
-    assertStrictEquals(row.kind, 'person');
-    assertStrictEquals(row.pii.erased, true);
-});
-
-Deno.test('getProviderEvents returns one identity\'s link log',
-async () => {
-    const { ctx } = await setup();
-    await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/providers/'
-        + 'YiJPbufDpkyrZcZCYbUJpg', {
-        identity_id: 'pnXmXrxOWayANgDLdCjuBw', provider: 'google',
-        provider_subject: 'g-1', action: 'linked',
-        at: '2026-01-01T00:00:00.000000Z',
-    });
-    await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/providers/'
-        + generateIdentifier(), {
-        identity_id: 'pnXmXrxOWayANgDLdCjuBw', provider: 'google',
-        provider_subject: 'g-1', action: 'unlinked',
-        at: '2026-01-02T00:00:00.000000Z',
-    });
-    const otherId = generateIdentifier();
-    await ctx.PUT('identities/' + otherId + '/providers/'
-        + generateIdentifier(), {
-        identity_id: otherId, provider: 'github',
-        provider_subject: 'h-1', action: 'linked',
-        at: '2026-01-03T00:00:00.000000Z',
-    });
-    const events = await getProviderEvents(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(events.length, 2);
+    assertEquals(
+        roster.find((row) => row.id === serviceId),
+        undefined,
+    );
+    const err = await assertRejects(
+        () => ctx.GET('identities/' + serviceId),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
     assertStrictEquals(
-        events.every(e => e.providerSubject === 'g-1'),
-        true,
+        err.message,
+        outside('GET', '/identities/' + serviceId) + ' ()',
     );
 });
 
-Deno.test('getTokenChainsFor groups one identity\'s tokens',
+Deno.test('an admin cannot erase a membership-less person',
 async () => {
     const { ctx } = await setup();
-    const chain2 = generateIdentifier();
-    const otherId = generateIdentifier();
-    const secondJti = generateIdentifier();
-    const thirdJti = generateIdentifier();
-    const otherJti = generateIdentifier();
-    await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/tokens/'
-        + 'jmvogLnzTmiQlAkVvDHrvQ', {
-        jti: 'jmvogLnzTmiQlAkVvDHrvQ', identity_id: 'pnXmXrxOWayANgDLdCjuBw'
-            , action: 'issued',
-        chain_id: 'WeXjAaAxGSpLpamfEuvcww',
-        at: '2026-01-01T00:00:00.000000Z',
-    });
-    await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/tokens/'
-        + secondJti, {
-        jti: secondJti,
-        identity_id: 'pnXmXrxOWayANgDLdCjuBw', action: 'issued',
-        chain_id: 'WeXjAaAxGSpLpamfEuvcww',
-        at: '2026-01-02T00:00:00.000000Z',
-    });
-    await ctx.PUT('identities/pnXmXrxOWayANgDLdCjuBw/tokens/'
-        + thirdJti, {
-        jti: thirdJti,
-        identity_id: 'pnXmXrxOWayANgDLdCjuBw', action: 'issued',
-        chain_id: chain2,
-        at: '2026-01-03T00:00:00.000000Z',
-    });
-    await ctx.PUT('identities/' + otherId + '/tokens/'
-        + otherJti, {
-        jti: otherJti,
-        identity_id: otherId, action: 'issued',
-        chain_id: generateIdentifier(),
-        at: '2026-01-04T00:00:00.000000Z',
-    });
-    const chains = await getTokenChainsFor(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(chains.length, 2);
-    const WeXjAaAxGSpLpamfEuvcww = chains.find(
-        c => c.chainId === 'WeXjAaAxGSpLpamfEuvcww');
-    assert(WeXjAaAxGSpLpamfEuvcww, 'chain WeXjAaAxGSpLpamfEuvcww present');
-    assertStrictEquals(WeXjAaAxGSpLpamfEuvcww.events.length, 2);
-    const second = chains.find(c => c.chainId === chain2);
-    assert(second, 'second chain present');
-    assertStrictEquals(second.events.length, 1);
+    await assertRejects(
+        () => postIdentityCreation(ctx, PERSON, {
+            kind: 'person',
+            pii: {
+                name: 'Ada', email: 'ada@x.io',
+                phone: '555', bio: 'builds',
+            },
+        }),
+        IdentityPiiIntakeFailedError,
+    );
+    const err = await assertRejects(
+        () => ctx.DELETE('identities/' + PERSON + '/pii'),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside(
+            'DELETE', '/identities/' + PERSON + '/pii',
+        ) + ' ()',
+    );
+    const roster = await getIdentityRoster(ctx);
+    assertEquals(
+        roster.find((row) => row.id === PERSON),
+        undefined,
+    );
 });
 
-Deno.test('a revoked chain shows every successor\'s parent',
+Deno.test('an admin cannot read a membership-less'
+    + ' provider log',
 async () => {
     const { ctx } = await setup();
-    const identity = 'pnXmXrxOWayANgDLdCjuBw';
+    const cid = 'YiJPbufDpkyrZcZCYbUJpg';
+    const item = '/identities/' + PERSON
+        + '/providers/' + cid;
+    const err = await assertRejects(
+        () => ctx.PUT(
+            'identities/' + PERSON + '/providers/' + cid,
+            {
+                identity_id: PERSON, provider: 'google',
+                provider_subject: 'g-1', action: 'linked',
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        ),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message, outside('PUT', item) + ' ()',
+    );
+    const read = await assertRejects(
+        () => getProviderEvents(ctx, PERSON),
+        RequestError,
+    );
+    assertStrictEquals(read.status, 403);
+    assertStrictEquals(
+        read.message,
+        outside(
+            'GET',
+            '/identities/' + PERSON + '/providers/',
+        ) + ' ()',
+    );
+});
+
+Deno.test('an admin cannot read a membership-less'
+    + ' token chain',
+async () => {
+    const { ctx } = await setup();
+    const jti = 'jmvogLnzTmiQlAkVvDHrvQ';
+    const item = '/identities/' + PERSON + '/tokens/' + jti;
+    const err = await assertRejects(
+        () => ctx.PUT(
+            'identities/' + PERSON + '/tokens/' + jti,
+            {
+                jti, identity_id: PERSON, action: 'issued',
+                chain_id: 'WeXjAaAxGSpLpamfEuvcww',
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        ),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message, outside('PUT', item) + ' ()',
+    );
+    const read = await assertRejects(
+        () => getTokenChainsFor(ctx, PERSON),
+        RequestError,
+    );
+    assertStrictEquals(read.status, 403);
+    assertStrictEquals(
+        read.message,
+        outside(
+            'GET', '/identities/' + PERSON + '/tokens/',
+        ) + ' ()',
+    );
+});
+
+Deno.test('an admin cannot rotate a membership-less'
+    + ' token chain',
+async () => {
+    const { ctx } = await setup();
     const root = generateIdentifier();
-    const tokens = 'identities/' + identity + '/tokens/';
-    await ctx.PUT(tokens + root, {
-        jti: root, identity_id: identity, action: 'issued',
-        chain_id: generateIdentifier(),
-        at: '2026-01-01T00:00:00.000000Z',
-    });
-    const a = (await ctx.POST<IdentityTokenEntity>(
-        tokens + root + '/rotation', {},
-    )).body().toValue();
-    const b = (await ctx.POST<IdentityTokenEntity>(
-        tokens + a.jti + '/rotation', {},
-    )).body().toValue();
-    await ctx.POST(tokens + b.jti + '/revocation', {});
-    const heads = (await ctx.GETCollection<IdentityTokenEntity>(
-        tokens,
-    )).map((part) => part.body().toValue());
-    const headA = heads.find((head) => head.jti === a.jti);
-    const headB = heads.find((head) => head.jti === b.jti);
-    assert(headA && headB, 'both successors listed');
-    assertStrictEquals(headA.action, 'revoked');
-    assertStrictEquals(headA.parent_jti, root);
-    assertStrictEquals(headB.action, 'revoked');
-    assertStrictEquals(headB.parent_jti, a.jti);
-    const [chain] = await getTokenChainsFor(ctx, identity);
-    assert(chain, 'the chain is listed');
-    const eventA = chain.events.find((e) => e.jti === a.jti);
-    const eventB = chain.events.find((e) => e.jti === b.jti);
-    assertStrictEquals(eventA?.parentJti, root);
-    assertStrictEquals(eventB?.parentJti, a.jti);
+    const item = '/identities/' + PERSON + '/tokens/' + root;
+    const err = await assertRejects(
+        () => ctx.PUT(
+            'identities/' + PERSON + '/tokens/' + root,
+            {
+                jti: root, identity_id: PERSON,
+                action: 'issued',
+                chain_id: generateIdentifier(),
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        ),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message, outside('PUT', item) + ' ()',
+    );
 });
 
-Deno.test('getTokenChainsFor orders a chain\'s events by at',
+Deno.test('an admin cannot order a membership-less'
+    + ' token chain',
 async () => {
     const { ctx } = await setup();
     const identity = generateIdentifier();
-    const chain = generateIdentifier();
-    const tokens = 'identities/' + identity + '/tokens/';
-    const later = generateIdentifier();
-    const earlier = generateIdentifier();
-    await ctx.PUT(tokens + later, {
-        jti: later, identity_id: identity, action: 'issued',
-        chain_id: chain, at: '2026-01-02T00:00:00.000000Z',
-    });
-    await ctx.PUT(tokens + earlier, {
-        jti: earlier, identity_id: identity, action: 'issued',
-        chain_id: chain, at: '2026-01-01T00:00:00.000000Z',
-    });
-    const [only] = await getTokenChainsFor(ctx, identity);
-    assert(only, 'the chain is listed');
-    assertEquals(only.events.map((e) => e.jti), [earlier, later]);
+    const jti = generateIdentifier();
+    const item = '/identities/' + identity
+        + '/tokens/' + jti;
+    const err = await assertRejects(
+        () => ctx.PUT(
+            'identities/' + identity + '/tokens/' + jti,
+            {
+                jti, identity_id: identity, action: 'issued',
+                chain_id: generateIdentifier(),
+                at: '2026-01-02T00:00:00.000000Z',
+            },
+        ),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message, outside('PUT', item) + ' ()',
+    );
+    const read = await assertRejects(
+        () => getTokenChainsFor(ctx, identity),
+        RequestError,
+    );
+    assertStrictEquals(read.status, 403);
+    assertStrictEquals(
+        read.message,
+        outside(
+            'GET', '/identities/' + identity + '/tokens/',
+        ) + ' ()',
+    );
 });

@@ -19,11 +19,10 @@ import {
     seedPersonIdentity,
 } from './identity-fixtures.ts';
 import {
-    apiRequest, storedPutBodyText,
+    apiRequest,
 } from './http-fixtures.ts';
 import {
     deriveClientRegistration,
-    registrationEntityOf,
 } from '../api/derive-identity-spine.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -45,6 +44,12 @@ async function freshDb() {
     return db;
 }
 
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
 async function rejectsWithStatus(
     fn: () => Promise<unknown>,
     status: number,
@@ -52,6 +57,18 @@ async function rejectsWithStatus(
     const err = await assertRejects(fn) as RequestError;
     assertInstanceOf(err, RequestError);
     assertStrictEquals(err.status, status);
+}
+
+async function rejectsOutside(
+    fn: () => Promise<unknown>,
+    method: string,
+    path: string,
+): Promise<void> {
+    const err = await assertRejects(fn, RequestError);
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message, outside(method, path) + ' ()',
+    );
 }
 
 Deno.test('unauthenticated registration access is 401,'
@@ -84,153 +101,163 @@ async () => {
     );
 });
 
-Deno.test('an absent identity is 404', async () => {
+const SERVICE = 'uWzjNIEeEtVWqZoJMLeYpw';
+const PERSON = 'pjQzgITAPDQVyvCVpzpIfQ';
+
+Deno.test('an absent identity registration is forbidden',
+async () => {
     const db = await freshDb();
-    await rejectsWithStatus(
+    const id = generateIdentifier();
+    const path = '/identities/' + id + '/registration';
+    const before = (await db.messagePairs.getAll()).length;
+    await rejectsOutside(
         () => PUT(
-            db,
-            'identities/' + generateIdentifier()
-                + '/registration',
+            db, 'identities/' + id + '/registration',
             { ...REGISTRATION }, DEV_TOKEN,
-            operationIdHeader()),
-        404,
+            operationIdHeader(),
+        ),
+        'PUT', path,
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 
-Deno.test("a kind-'person' identity is 400", async () => {
+Deno.test('a membership-less person registration is forbidden',
+async () => {
     const db = await freshDb();
-    await seedPersonIdentity(db, 'pjQzgITAPDQVyvCVpzpIfQ', {
+    await seedPersonIdentity(db, PERSON, {
         name: 'Ada', email: 'ada@example.com',
         phone: '', bio: '',
     });
-    await rejectsWithStatus(
-        () => PUT(db, 'identities/pjQzgITAPDQVyvCVpzpIfQ/registration',
+    const path = '/identities/' + PERSON + '/registration';
+    await rejectsOutside(
+        () => PUT(
+            db, 'identities/' + PERSON + '/registration',
             { ...REGISTRATION }, DEV_TOKEN,
-            operationIdHeader()),
-        400,
+            operationIdHeader(),
+        ),
+        'PUT', path,
     );
 });
 
-Deno.test('a rogue body key is 400 (validator at the gate)',
+Deno.test('a rogue registration body on a membership-less'
+    + ' service is forbidden',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    await rejectsWithStatus(
-        () => PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
+    await seedServiceIdentity(db, SERVICE);
+    const path = '/identities/' + SERVICE + '/registration';
+    await rejectsOutside(
+        () => PUT(
+            db, 'identities/' + SERVICE + '/registration',
             { ...REGISTRATION, rogue: 'x' }, DEV_TOKEN,
-            operationIdHeader()),
-        400,
+            operationIdHeader(),
+        ),
+        'PUT', path,
     );
 });
 
-Deno.test('PUT registers; GET reads it back; a second PUT'
-+ ' overwrites (rotate-JWKS)', async () => {
-    const db = await freshDb();
-    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    const put = (await PUT<Record<string, unknown>>(
-        db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        { ...REGISTRATION }, DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertEquals(put, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
-    const got = (await GET<Record<string, unknown>>(
-        db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertEquals(got, { id: 'uWzjNIEeEtVWqZoJMLeYpw', ...REGISTRATION });
-    const rotated = {
-        ...REGISTRATION, jwks: '{"keys":[{"kty":"EC"}]}',
-    };
-    await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        { ...rotated }, DEV_TOKEN,
-        operationIdHeader());
-    const reread = (await GET<{ jwks: string }>(
-        db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration', DEV_TOKEN,
-        operationIdHeader())).body().toValue();
-    assertStrictEquals(reread.jwks, rotated.jwks);
-});
-
-Deno.test('GET with no registration yet is 404 (identity'
-+ ' exists)', async () => {
-    const db = await freshDb();
-    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    await rejectsWithStatus(
-        () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-            DEV_TOKEN, operationIdHeader()),
-        404,
-    );
-});
-
-Deno.test('DELETE deregisters: a marked tombstone, then 410',
+Deno.test('registering a membership-less service is forbidden',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        { ...REGISTRATION }, DEV_TOKEN,
-        operationIdHeader());
-    const prefix = '/identities/uWzjNIEeEtVWqZoJMLeYpw/registration/';
-    const afterPut = (await db.messagePairs.getAll()).filter(
-        (row) => row.path === prefix,
+    await seedServiceIdentity(db, SERVICE);
+    const path = '/identities/' + SERVICE + '/registration';
+    const before = (await db.messagePairs.getAll()).length;
+    await rejectsOutside(
+        () => PUT(
+            db, 'identities/' + SERVICE + '/registration',
+            { ...REGISTRATION }, DEV_TOKEN,
+            operationIdHeader(),
+        ),
+        'PUT', path,
     );
-    assertStrictEquals(afterPut.length, 1);
-    await DELETE(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-        DEV_TOKEN,
-        operationIdHeader());
-    const afterDel = (await db.messagePairs.getAll()).filter(
-        (row) => row.path === prefix,
-    );
-    // G5: DELETE appends a tombstone; it does not replace
-    // the prior pair the way /pii does.
-    assertStrictEquals(afterDel.length, 2);
-    assertStrictEquals(
-        afterDel.filter((row) => row.method === 'PUT').length,
-        1,
+    await rejectsOutside(
+        () => GET(
+            db, 'identities/' + SERVICE + '/registration',
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        'GET', path,
     );
     assertStrictEquals(
-        afterDel.filter((row) => row.method === 'DELETE')
-            .length,
-        1,
+        (await db.messagePairs.getAll()).length, before,
     );
-    await rejectsWithStatus(
-        () => GET(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
-            DEV_TOKEN, operationIdHeader()),
-        410,
+    await assertRejects(
+        () => deriveClientRegistration(db, SERVICE),
     );
 });
 
-// G5: stored PUT = registrationEntityOf (GET derive).
-Deno.test('stored PUT body equals registrationEntityOf',
+Deno.test('a membership-less service has no registration'
+    + ' to read',
 async () => {
     const db = await freshDb();
-    await seedServiceIdentity(db, 'uWzjNIEeEtVWqZoJMLeYpw');
-    const id = 'uWzjNIEeEtVWqZoJMLeYpw';
+    await seedServiceIdentity(db, SERVICE);
+    const path = '/identities/' + SERVICE + '/registration';
+    await rejectsOutside(
+        () => GET(
+            db, 'identities/' + SERVICE + '/registration',
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        'GET', path,
+    );
+});
+
+Deno.test('deregistering a membership-less service is'
+    + ' forbidden',
+async () => {
+    const db = await freshDb();
+    await seedServiceIdentity(db, SERVICE);
+    const path = '/identities/' + SERVICE + '/registration';
+    const prefix = path + '/';
+    const before = (await db.messagePairs.getAll()).filter(
+        (row) => row.path === prefix,
+    ).length;
+    await rejectsOutside(
+        () => PUT(
+            db, 'identities/' + SERVICE + '/registration',
+            { ...REGISTRATION }, DEV_TOKEN,
+            operationIdHeader(),
+        ),
+        'PUT', path,
+    );
+    await rejectsOutside(
+        () => DELETE(
+            db, 'identities/' + SERVICE + '/registration',
+            DEV_TOKEN, operationIdHeader(),
+        ),
+        'DELETE', path,
+    );
+    const after = (await db.messagePairs.getAll()).filter(
+        (row) => row.path === prefix,
+    );
+    assertStrictEquals(after.length, before);
+});
+
+Deno.test('a membership-less registration stores nothing',
+async () => {
+    const db = await freshDb();
+    await seedServiceIdentity(db, SERVICE);
+    const path = '/identities/' + SERVICE + '/registration';
+    const before = (await db.messagePairs.getAll()).length;
     const put = await handleRequest(db, apiRequest({
         method: 'PUT',
-        path: '/identities/' + id + '/registration',
+        path,
         token: DEV_TOKEN,
         body: { ...REGISTRATION },
     }));
-    assertStrictEquals(put.status, 201);
-    const stored = JSON.parse(
-        await storedPutBodyText(
-            db, '/identities/' + id + '/registration/', '',
-        ),
-    );
-    const expected = registrationEntityOf(id, {
-        name: '',
-        messagePairId: id,
-        method: 'PUT',
-        body: { ...REGISTRATION },
+    assertStrictEquals(put.status, 403);
+    assertEquals(await put.json(), {
+        error: outside('PUT', path),
     });
-    assertStrictEquals(Object.keys(expected)[0], 'id');
-    assertEquals(stored, expected);
-    assertEquals(
-        stored, await deriveClientRegistration(db, id),
-    );
-    assertEquals(stored, await put.json());
     const got = await handleRequest(db, apiRequest({
         method: 'GET',
-        path: '/identities/' + id + '/registration',
+        path,
         token: DEV_TOKEN,
     }));
-    assertStrictEquals(got.status, 200);
-    assertEquals(stored, await got.json());
+    assertStrictEquals(got.status, 403);
+    assertEquals(await got.json(), {
+        error: outside('GET', path),
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });

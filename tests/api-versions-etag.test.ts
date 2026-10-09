@@ -8,8 +8,10 @@ import { routes, matchRoute } from
     '../api/routes.ts';
 import { pathSegmentsOf } from
     '../api/path-segments.ts';
-import { memoryDbAdapter } from
-    '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -201,6 +203,7 @@ Deno.test('registered families offer versions/ and :etag',
 });
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 
 function req(
     method: string,
@@ -236,13 +239,17 @@ async function seedInviteeWorld(): Promise<DbAdapter> {
     return db;
 }
 
-async function grantDave(db: DbAdapter): Promise<string> {
+async function inviteDave(db: DbAdapter): Promise<string> {
     const res = await handleRequest(db, req(
         'POST',
         '/organizations/BBjWJsjYIDkTRKIIPrzWRw/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
-        { email: 'dave@x.com', grantAt: AT },
+        {
+            email: 'dave@x.com',
+            at: AT,
+            expiresAt: EXPIRES_AT,
+        },
     ));
     assertStrictEquals(res.status, 201);
     await res.body?.cancel();
@@ -268,7 +275,7 @@ async function seedMemberOrganizations(): Promise<DbAdapter> {
 Deno.test('org-less invitee GET identity-nest versions is 200',
 async () => {
     const db = await seedInviteeWorld();
-    const name = await grantDave(db);
+    const name = await inviteDave(db);
     const token = await reachableToken(DAVE, []);
     const item = await handleRequest(db, req(
         'GET',
@@ -435,10 +442,17 @@ Deno.test(
     },
 );
 
-Deno.test('identities, members, and identity-nest lists are 200',
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+Deno.test('self and membership version lists are 200;'
+    + ' an invitee nest is forbidden',
 async () => {
     const db = await seedInviteeWorld();
-    const name = await grantDave(db);
+    const name = await inviteDave(db);
     const token = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
     const identityVersions =
@@ -463,16 +477,45 @@ async () => {
     );
     const membershipParts = await partsOf(membershipList);
     assert(membershipParts.length >= 1, membershipVersions);
+    const inviteeVersions = '/identities/' + DAVE
+        + '/invitations/' + name + '/versions/';
     const invitations = await handleRequest(db, req(
-        'GET',
-        '/identities/' + DAVE + '/invitations/' + name
-            + '/versions/',
-        token,
+        'GET', inviteeVersions, token,
     ));
-    assertStrictEquals(invitations.status, 200);
-    const parts = await partsOf<MembershipEntity>(invitations);
-    assert(parts.length >= 1);
+    assertStrictEquals(invitations.status, 403);
+    assertEquals(await invitations.json(), {
+        error: outside('GET', inviteeVersions),
+    });
 });
+
+Deno.test(
+    'a membership-less identity version list is forbidden',
+    async () => {
+        const db = (await seedInviteeWorld()) as MemoryDbAdapter;
+        const token = await organizationToken();
+        const id = generateIdentifier();
+        const tag = generateIdentifier();
+        const listPath = '/identities/' + id + '/versions/';
+        const before = (await db.messagePairs.getAll()).length;
+        const list = await handleRequest(
+            db, req('GET', listPath, token),
+        );
+        assertStrictEquals(list.status, 403);
+        assertEquals(await list.json(), {
+            error: outside('GET', listPath),
+        });
+        const item = await handleRequest(db, req(
+            'GET', listPath + tag, token,
+        ));
+        assertStrictEquals(item.status, 403);
+        assertEquals(await item.json(), {
+            error: outside('GET', listPath + tag),
+        });
+        assertStrictEquals(
+            (await db.messagePairs.getAll()).length, before,
+        );
+    },
+);
 
 // The identity document route offers no DELETE. A
 // DELETE head is still Gone on both version routes:
@@ -503,13 +546,21 @@ async function deleteIdentityDocument(
     );
 }
 
+async function seatCoMember(db: DbAdapter): Promise<string> {
+    const id = generateIdentifier();
+    await seedSeat(
+        db, 'AjdvjuECVZEgZoFajaIEkg', id, 'member', AT,
+    );
+    return id;
+}
+
 Deno.test(
     'a deleted identity answers 410 on both version'
         + ' routes',
     async () => {
         const db = await seedInviteeWorld();
         const token = await organizationToken();
-        const id = generateIdentifier();
+        const id = await seatCoMember(db);
         const created = await handleRequest(db, req(
             'PUT', '/identities/' + id, token,
             { kind: 'person' },
@@ -543,7 +594,7 @@ Deno.test(
     async () => {
         const db = await seedInviteeWorld();
         const token = await organizationToken();
-        const id = generateIdentifier();
+        const id = await seatCoMember(db);
         const path = '/identities/' + id;
         const first = await handleRequest(db, req(
             'PUT', path, token, { kind: 'person' },
@@ -728,24 +779,29 @@ Deno.test(
     + ' splice, and body at is the grant time',
     async () => {
         const db = await seedInviteeWorld();
-        const name = await grantDave(db);
+        const name = await inviteDave(db);
         const token = await organizationToken(
             'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
         );
+        const path = '/identities/' + DAVE + '/invitations/'
+            + name + '/versions/';
         const list = await handleRequest(db, req(
-            'GET',
-            '/identities/' + DAVE + '/invitations/'
-                + name + '/versions/',
-            token,
+            'GET', path, token,
         ));
-        assertStrictEquals(list.status, 200);
-        const parts = await partsOf<MembershipEntity>(list);
-        assertStrictEquals(parts.length, 1);
-        assertStrictEquals(parts[0]!.body().toValue().at, AT);
+        assertStrictEquals(list.status, 403);
+        assertEquals(await list.json(), {
+            error: outside('GET', path),
+        });
         const stored = await messageStore(db).getDocumentHead(
             '/invitations/', name,
         );
         assert(stored);
+        assertStrictEquals(
+            HttpMessage.fromWire<MembershipEntity>(
+                stored.response,
+            ).body().toValue().at,
+            AT,
+        );
         assertNotStrictEquals(AT, stored.response_at);
         const date = HttpMessage.fromWire<unknown>(
             stored.response,

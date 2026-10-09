@@ -80,7 +80,8 @@ Deno.test('accept writes the seat at the invitation'
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
-            grantAt: '2026-06-05T00:00:00.000000Z',
+            at: '2026-06-05T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grant.status, 201);

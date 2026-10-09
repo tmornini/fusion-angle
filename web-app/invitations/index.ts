@@ -9,11 +9,13 @@ import { log } from '../app/logger.ts';
 import {
     getInvitations,
     InvitationChangedError,
+    invitationIsExpired,
     postInvitationAcceptance,
     postInvitationDecline,
     subscribeInvitationChanges,
     type InvitationView,
 } from '../../client/index.ts';
+import { nowUtc } from '../../shared/types.ts';
 import { sessionContext } from '../app/client.ts';
 import {
     InvitationListPresenter,
@@ -80,6 +82,16 @@ async function onListClick(e: MouseEvent): Promise<void> {
     if (invitation === undefined) return;
     try {
         if (action === 'accept') {
+            const now = nowUtc();
+            if (invitationIsExpired(invitation, now)) {
+                showToast(
+                    'the invitation expired at '
+                        + invitation.expiresAt,
+                    'error',
+                );
+                rerender();
+                return;
+            }
             await postInvitationAcceptance(
                 sessionContext(), invitation,
             );

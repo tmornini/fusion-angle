@@ -28,6 +28,7 @@ Deno.test('an accept over a revoke paints the row'
         // still releases the earlier resource.
         const origin = await startOrigin();
         try {
+            const at = nowUtc();
             const granted = await handleRequest(
                 origin.db, apiRequest({
                     method: 'POST',
@@ -35,7 +36,9 @@ Deno.test('an accept over a revoke paints the row'
                     token: await adminToken(),
                     body: {
                         email: DAVID_EMAIL,
-                        grantAt: nowUtc(),
+                        at,
+                        expiresAt:
+                            '2099-12-31T00:00:00.000000Z',
                     },
                 }),
             );

@@ -649,10 +649,8 @@ the second organization.
   "Jordan Rivera" (`jordan.rivera@company.com`, Title:
   QA Lead, Department: Quality), and click Create.
   PASS: toast confirms creation; the person writes as
-  `PUT /identities/:id` plus PII and an accepted
-  membership at Stark Industries (`PUT
-  organizations/:id/invitations/:membership-id`,
-  If-None-Match: *). It does not write a seat. The
+  one POST `organizations/:id/memberships/`.
+  It does not write a seat. The
   person appears in the accepted-membership roster
   alongside Sarah Chen.
   Pin: tests/adapters-members.test.ts
@@ -1662,7 +1660,7 @@ the second organization.
        bounce-to-invitations branch); exploratory —
        the live reload and the absence of an error
        card or retry loop
-- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — the absence marker (`—`) where an organization name and an inviter name are not on the read, a date sub-line, a Pending state badge, and Accept / Decline buttons. No "Invited by" line. Click neither — B29 still needs the zero-membership state.
+- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — the absence marker (`—`) where an organization name and an inviter name are not on the read, a date sub-line, a Pending state badge, and Accept / Decline buttons. No "Invited by" line. Click neither — B29 still needs the zero-membership state. The seeded pending invitation expires one year after `MOCK_SEED_TIMESTAMP`, at `2027-01-01T00:00:00.000000Z`. The case stays walkable through 2026, so Accept and Decline are still on the card during the walk.
   Pin: tests/boot-organization-gate.test.ts
        'invitations page keeps an empty organization
        list' (its `resolveOrganizationGate([],
@@ -5176,7 +5174,7 @@ FSM, unlike `flows/detail`).
 > (`getMemberMap` is the accepted view, the removed
 > view, `/ai-agents`, and the system member; a missing
 > name may read `MEMBER_WITHOUT_PII_NAME`). Invite
-> **grant** stays admin-gated: `postInvitationGrant`
+> stays admin-gated: `postInvitation`
 > posts the organization nest, and a non-admin is 403.
 
 - [ ] **G11** Navigate to `members/index.html` (reachable
@@ -5317,10 +5315,9 @@ FSM, unlike `flows/detail`).
   form appears
   with a Model pulldown and a Skill Focus textarea; no
   Auth Token field or security warning. Create Human
-  writes `PUT /identities/:id` plus PII and an accepted
-  membership at the active organization
-  (`organizations/:id/invitations/:membership-id`,
-  If-None-Match: *). It does not write a seat. The
+  writes one POST `organizations/:id/memberships/` at
+  the active organization.
+  It does not write a seat. The
   person appears in the accepted-membership roster.
   "Invite member" (V1) still grants a pending
   membership for an EXISTING identity.
@@ -5361,11 +5358,11 @@ FSM, unlike `flows/detail`).
 > `TODO.md`).
 > Sources:
 > `web-app/members/index.ts` (`handleInviteSubmit`),
-> `client/invitations.ts` (`postInvitationGrant`,
+> `client/invitations.ts` (`postInvitation`,
 > `postInvitationAcceptance`, `postInvitationDecline`,
 > `postInvitationRevocation`),
 > `api/invitations-domain.ts`
-> (`postOrganizationInvitationGrant`,
+> (`postOrganizationInvitation`,
 > `putInvitationOnIdentityNest`,
 > `putInvitationOnOrganizationNest`),
 > `web-app/invitations/`,
@@ -5388,8 +5385,9 @@ FSM, unlike `flows/detail`).
   grant is idempotent — sending the same email again
   while still pending returns the same pending invitation
   (no duplicate, no error). Source: `handleInviteSubmit`,
-  `postInvitationGrant`,
-  `postOrganizationInvitationGrant`.
+  `postInvitation`,
+  `postOrganizationInvitation`. The POST body is
+  { email, at, expiresAt }.
   Pin: tests/adapters-invitations.test.ts 'grant by email
        appends a pending invitation';
        tests/adapters-invitations.test.ts 'grant stamps the
@@ -5415,7 +5413,8 @@ FSM, unlike `flows/detail`).
   pending invitation is created. Leftover: does not
   consume invitation A (V1). Source:
   `setInviteEmailError` in `web-app/members/index.ts`;
-  `postOrganizationInvitationGrant`.
+  `postOrganizationInvitation`. The POST body is
+  { email, at, expiresAt }.
   Pin: tests/adapters-invitations.test.ts 'grant by unknown
        email returns no-identity';
        tests/adapters-invitations.test.ts 'grant for an
@@ -5832,12 +5831,14 @@ FSM, unlike `flows/detail`).
   Service). With Person selected, the person form
   (`#add-identity-person-form`) shows Name/Email/Phone/
   Bio inputs; fill Name + Email, click "Create"
-  (`#add-identity-submit`) → two sequential requests
-  (POST `identities` `{id, kind}`, then PUT
-  `identities/:id/pii` carrying the PII fields), an
-  "Identity added" toast, the dialog closes, and the new
-  person appears in the roster (name + email); a
-  second-hop failure toasts a partial-state message
+  (`#add-identity-submit`). The person half fails until
+  a follow-up re-aims the page. `postIdentityCreation`
+  still POSTs `identities`, then the PII PUT is 403,
+  because that identity has no membership. The person
+  is not listed. The members statement, POST
+  `organizations/:id/memberships/`, is now the person
+  create.
+  A second-hop failure toasts a partial-state message
   naming the PII-less identity rather than a blanket
   create failure. Re-open the dialog and click the
   "Service" radio → the person form hides and the
@@ -5948,7 +5949,14 @@ FSM, unlike `flows/detail`).
        native `<dialog>` confirm/cancel interaction, the
        toast, the in-place re-render, and whether
        Email/Phone/Bio each independently read "—"
-- [ ] **G47** On the system service identity's detail
+- [ ] **G47** This case fails because service identities
+  hold no membership: every admin route under
+  `identities/<service>/` is 403, GET `identities/`
+  omits services, and the registration card flow does
+  not succeed; a follow-up gives services a membership
+  or a rule of their own, and the steps below are the
+  procedure that follow-up would restore.
+  On the system service identity's detail
   page (admin session), a "Client registration" card
   renders before Credentials showing "Not registered."
   and a "Register client" button

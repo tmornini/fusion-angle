@@ -36,15 +36,17 @@ const MEMBERSHIP_BODY_KEYS: readonly string[] = [
 
 const MEMBERSHIP_TYPES = ['admin', 'member'] as const;
 
-// The store edge: exactly the six keys, `id` equal to
-// the name of its two ids, a known type and state, an
-// RFC-3339 zulu `at`.
+// The store edge. Pending carries expires_at. Every
+// other state is the six keys. `id` equals the name of
+// its two ids. Type and state are known. `at` and
+// `expires_at` are RFC-3339 zulu.
 export function validateMembershipBody(
     body: Record<string, unknown>,
 ): MembershipEntity {
-    assertOnlyKeys(
-        body, MEMBERSHIP_BODY_KEYS, 'MembershipEntity',
-    );
+    const keys = body['state'] === 'pending'
+        ? [...MEMBERSHIP_BODY_KEYS, 'expires_at']
+        : MEMBERSHIP_BODY_KEYS;
+    assertOnlyKeys(body, keys, 'MembershipEntity');
     const organizationId = pickIdentifier(
         body, 'organization_id',
     );
@@ -56,20 +58,36 @@ export function validateMembershipBody(
             'id must be the membership name',
         );
     }
+    const type = validateEnumField(
+        body, 'type', MEMBERSHIP_TYPES,
+        'membership type', 'MembershipEntity',
+    );
+    const state = assertInvitationState(
+        pickString(body, 'state'), 'MembershipEntity',
+    );
+    const at = validateTimestampField(
+        body, 'at', 'MembershipEntity',
+    );
+    if (state === 'pending') {
+        return {
+            id,
+            organization_id: organizationId,
+            identity_id: identityId,
+            type,
+            state,
+            at,
+            expires_at: validateTimestampField(
+                body, 'expires_at', 'MembershipEntity',
+            ),
+        };
+    }
     return {
         id,
         organization_id: organizationId,
         identity_id: identityId,
-        type: validateEnumField(
-            body, 'type', MEMBERSHIP_TYPES,
-            'membership type', 'MembershipEntity',
-        ),
-        state: assertInvitationState(
-            pickString(body, 'state'), 'MembershipEntity',
-        ),
-        at: validateTimestampField(
-            body, 'at', 'MembershipEntity',
-        ),
+        type,
+        state,
+        at,
     };
 }
 
@@ -87,10 +105,22 @@ export type MembershipRequest = {
     readonly at: string,
 };
 
+// The transition result. It never carries expires_at:
+// a grant's handler adds that key, and a move out of
+// pending drops it by building this shape.
+export type MembershipTransitionBody = {
+    readonly id: string;
+    readonly organization_id: Id;
+    readonly identity_id: Id;
+    readonly type: MembershipType;
+    readonly state: InvitationState;
+    readonly at: string;
+};
+
 export type MembershipOutcome =
     | {
         readonly kind: 'lands',
-        readonly next: MembershipEntity,
+        readonly next: MembershipTransitionBody,
     }
     | { readonly kind: 'unchanged' }
     | { readonly kind: 'refused', readonly error: string };
@@ -180,7 +210,7 @@ export function membershipTransition(
     request: MembershipRequest,
 ): MembershipOutcome {
     const fromState = from === null ? 'none' : from.state;
-    // The grant on a pending head changes nothing.
+    // A pending invite posted again changes nothing.
     if (
         actor === 'admin'
         && fromState === 'pending'

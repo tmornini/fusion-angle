@@ -1,6 +1,7 @@
 import {
     assert,
     assertEquals,
+    assertRejects,
     assertStrictEquals,
 } from '@std/assert';
 import { adminContext } from './context-fixtures.ts';
@@ -26,6 +27,10 @@ import {
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import {
+    HTTP_CONFLICT,
+    RequestError,
+} from '../shared/http-errors.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
@@ -86,17 +91,37 @@ Deno.test(
         assertStrictEquals(membership.identity_id, ALICE);
         assertStrictEquals(membership.state, 'accepted');
         assertStrictEquals(membership.type, 'member');
-        const wrote = sent.filter((request) =>
-            request.method === 'PUT'
-            && request.path === '/api/'
-                + membershipResource(ALICE)
+        const writes = sent.filter((request) =>
+            request.method !== 'GET'
         );
-        assertStrictEquals(wrote.length, 1);
-        assertStrictEquals(wrote[0]!.ifNoneMatch, '*');
-        assertEquals(JSON.parse(wrote[0]!.body ?? 'null'), {
-            state: 'accepted',
-            type: 'member',
-            at: membership.at,
+        assertStrictEquals(writes.length, 1);
+        const wrote = writes[0]!;
+        assertStrictEquals(wrote.method, 'POST');
+        assertStrictEquals(
+            wrote.path,
+            '/api/organizations/' + STARK
+                + '/memberships/',
+        );
+        assertStrictEquals(wrote.ifMatch, null);
+        assertStrictEquals(wrote.ifNoneMatch, null);
+        assertEquals(JSON.parse(wrote.body ?? 'null'), {
+            id: ALICE,
+            membership: {
+                type: 'member',
+                at: membership.at,
+            },
+            identity: {
+                title: 'Engineer',
+                department: 'Product',
+                strengths: [],
+                team_dimensions: {},
+            },
+            pii: {
+                name: 'Alice',
+                email: 'alice@example.com',
+                phone: '',
+                bio: '',
+            },
         });
     },
 );
@@ -109,12 +134,18 @@ Deno.test(
         await seedCurrentMember(db);
         const draft = buildHumanMember('Alice');
         await postHumanMemberCreation(ctx, ALICE, draft);
-        await postHumanMemberCreation(ctx, ALICE, draft);
+        const err = await assertRejects(
+            () => postHumanMemberCreation(
+                ctx, ALICE, draft,
+            ),
+            RequestError,
+        );
+        assertStrictEquals(err.status, HTTP_CONFLICT);
         const accepted = await ctx.GETCollection<
             MembershipEntity
         >(
             'organizations/' + STARK
-                + '/invitations/?state=accepted',
+                + '/memberships/?state=accepted',
         );
         const mine = accepted.filter((part) =>
             part.body().toValue().identity_id === ALICE
@@ -130,14 +161,10 @@ Deno.test(
 );
 
 Deno.test(
-    'postHumanMemberCreation accepts a removed'
-    + ' membership, latched on its head',
+    'postHumanMemberCreation of a removed id is 409',
     async () => {
-        const { db } = await adminContext();
+        const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
-        const { ctx, sent } = recordedContext(
-            db, await organizationToken(),
-        );
         const id = generateIdentifier();
         const draft = buildHumanMember('Returning');
         await postHumanMemberCreation(ctx, id, draft);
@@ -150,28 +177,18 @@ Deno.test(
         assertStrictEquals(
             removed.body().toValue().state, 'removed',
         );
-        const tag = removed.query('header.etag').toText();
-        sent.length = 0;
-        await postHumanMemberCreation(ctx, id, draft);
-        const path = '/api/' + membershipResource(id);
-        assertEquals(
-            sent.filter((request) => request.path === path)
-                .map((request) => [
-                    request.method,
-                    request.ifMatch,
-                    request.ifNoneMatch,
-                ]),
-            [
-                ['PUT', null, '*'],
-                ['GET', null, null],
-                ['PUT', tag, null],
-            ],
+        const err = await assertRejects(
+            () => postHumanMemberCreation(
+                ctx, id, draft,
+            ),
+            RequestError,
         );
+        assertStrictEquals(err.status, HTTP_CONFLICT);
         const after = await ctx.GET<MembershipEntity>(
             membershipResource(id),
         );
         assertStrictEquals(
-            after.body().toValue().state, 'accepted',
+            after.body().toValue().state, 'removed',
         );
         assertStrictEquals(
             after.body().toValue().type, 'member',
@@ -228,14 +245,38 @@ Deno.test('featuredHumanMembers caps the list at six', () => {
     assertStrictEquals(featuredHumanMembers(ten).length, 6);
 });
 
-Deno.test('a { kind } identity reads as an absent profile',
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
+
+Deno.test('an admin cannot store a membership-less'
+    + ' identity document',
 async () => {
-    const { ctx } = await adminContext();
+    const { db, ctx } = await adminContext();
     const id = generateIdentifier();
-    await ctx.PUT('identities/' + id, { kind: 'person' });
-    assertEquals(
-        (await getHumanMemberProfile(ctx, id)).profile,
-        { present: false },
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => ctx.PUT('identities/' + id, { kind: 'person' }),
+        RequestError,
+    );
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    const read = await assertRejects(
+        () => getHumanMemberProfile(ctx, id),
+        RequestError,
+    );
+    assertStrictEquals(read.status, 403);
+    assertStrictEquals(
+        read.message,
+        outside('GET', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
     );
 });
 
@@ -337,25 +378,27 @@ Deno.test('a member save latches its identity read and its'
     ]);
 });
 
-Deno.test('a member save over absent PII sends no PII latch',
+Deno.test('a member save cannot open a membership-less'
+    + ' identity',
 async () => {
     const { db } = await adminContext();
-    const { ctx, sent } = recordedContext(
+    const { ctx } = recordedContext(
         db, await organizationToken(),
     );
     const id = generateIdentifier();
-    await ctx.PUT('identities/' + id, { kind: 'person' });
-    const { read } = await getHumanMemberProfile(ctx, id);
-    sent.length = 0;
-    await putHumanMember(
-        ctx, id,
-        { held: read, body: MEMBER_DETAIL },
-        { current: { erased: true }, body: MEMBER_PII },
+    const before = (await db.messagePairs.getAll()).length;
+    const err = await assertRejects(
+        () => ctx.PUT('identities/' + id, { kind: 'person' }),
+        RequestError,
     );
-    assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
-        ['PUT', read.query('header.etag').toText()],
-        ['PUT', null],
-    ]);
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message,
+        outside('PUT', '/identities/' + id) + ' ()',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });
 
 Deno.test('getAdminSeatIds lists the admin seats only',

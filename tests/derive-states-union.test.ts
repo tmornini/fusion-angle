@@ -396,10 +396,10 @@ async function createWorkOrder(
     return { stateEventIds };
 }
 
-async function grantAndAccept(
+async function inviteAndAccept(
     db: MemoryDbAdapter, adminToken: string,
     inviteeToken: string, inviteeId: string,
-    inviteeEmail: string, grantAt: string,
+    inviteeEmail: string, at: string,
     acceptAt: string, organization: string,
 ): Promise<string> {
     const name = membershipNameOf(organization, inviteeId);
@@ -407,7 +407,11 @@ async function grantAndAccept(
         'POST',
         '/organizations/' + organization + '/invitations/',
         adminToken,
-        { email: inviteeEmail, grantAt },
+        {
+            email: inviteeEmail,
+            at,
+            expiresAt: '2099-12-31T00:00:00.000000Z',
+        },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
 
@@ -532,7 +536,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const inviteeToken = await organizationToken(
         inviteeId, organizationA,
     );
-    const invitationId = await grantAndAccept(
+    const invitationId = await inviteAndAccept(
         db, tokenA, inviteeToken, inviteeId,
         'invitee-union@x.com',
         '2026-01-05T00:00:00.000000Z',
@@ -864,7 +868,8 @@ Deno.test('deriveInvitationStates: a repeated accept is 409'
         tokenA,
         {
             email: 'invitee-reaccept@x.com',
-            grantAt: '2026-04-02T00:00:00.000000Z',
+            at: '2026-04-02T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');
@@ -934,7 +939,8 @@ Deno.test('deriveInvitationStates: a repeated decline is 409'
         tokenA,
         {
             email: 'invitee-redecline@x.com',
-            grantAt: '2026-04-03T00:00:00.000000Z',
+            at: '2026-04-03T00:00:00.000000Z',
+            expiresAt: '2099-12-31T00:00:00.000000Z',
         },
     ));
     assertStrictEquals(grantRes.status, 201, 'grant failed');

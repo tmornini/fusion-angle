@@ -20,6 +20,8 @@ import {
 
 const ITEM_ROUTE =
     'organizations/:organization-id/invitations/:membership-id';
+const PENDING_EXPIRES_AT =
+    '2099-12-31T00:00:00.000000Z';
 
 // A membership PUT landed below the gate and below any
 // mirror: no seat moves. In order on the head when one
@@ -41,6 +43,9 @@ export async function landMembership(
         state,
         at,
     };
+    if (state === 'pending') {
+        body['expires_at'] = PENDING_EXPIRES_AT;
+    }
     const head = await db.messagePairs.getHeadPair(
         MEMBERSHIPS_PATH, name,
     );

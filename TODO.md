@@ -14,69 +14,19 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Fifteen items, in this order — each its own brainstorm
+Fourteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
-The 0-items finish the release: admins
-held to their own organization (0d), since no second
-tenant shares an origin before it ships; then the
-ledger's one deploy — `fa_` names (0e), the fence
-(0f), `FA_GIT_SHA` (0g), migrations (0h), and the wipe
-and reseed that ships them (0i). Then what a pilot
+The 0-items finish the release: the ledger's one
+deploy — `fa_` names (0e), the fence (0f),
+`FA_GIT_SHA` (0g), migrations (0h), and the wipe and
+reseed that ships them (0i). Then what a pilot
 tenant needs (4–7), the process engine and its AI
 worker on that (9–12), and two processes last (13). An
 item's number is its name, which specs, plans, and
 code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
 
-- **0d.** Admins act within their organization. Any
-  organization's admin can write a password credential
-  for an identity in another organization and sign in
-  as it. `ROUTE_POLICY` grants `admin` every verb at
-  `/` (`api/authorization.ts:180-184`); `identities/…`
-  is the global plane, which the organization fence
-  never sees; and the credential PUT checks nothing —
-  `postIdentityCredentialDocumentOp`
-  (`api/routes.ts:2610`) ignores the path identity and
-  the actor and lands the body, whose `secret` the gate
-  checks only as a string (`api/validators.ts:587`) —
-  while sign-in reads that identity's own credentials
-  (`deriveCredentialsFor`, `api/authentication.ts:1729`).
-  No test drives either answer yet. The same unscoped
-  arm reaches the token chain:
-  the gate's self-or-admin guard
-  (`SELF_ONLY_TOKEN_ROUTES`, `api/api.ts:430-434`,
-  checked at `:807-845`) lets an admin name any
-  identity, `callerIsAdmin` being the claim
-  organization's `admin` role (`:701-702`), so an
-  organization's admin can rotate or revoke the token
-  chain of an identity outside it. The sweep covers
-  every other admin-reachable `identities/:id/…` write
-  — the identity PUT (`api/routes.ts:3595`), PII PUT and
-  DELETE (`:3690-3694`; `authorizeIdentityPii`,
-  `api/request-auth.ts:160-176`, admits any admin),
-  credentials (`:3793`), registration (`:3826`,
-  `:3833`), tokens (`:3911`), and providers (`:4019`) —
-  and `GET identities/`, which serves the stored heads
-  at the global prefix whatever the caller's
-  organization (`api/routes.ts:3509-3514`). The reads of
-  PII and credentials carry a membership fence
-  (`:3659-3686`, `:3774-3785`) that admits an identity
-  with no membership. No root operator exists: the `/`
-  tier every organization admin holds is the only
-  cross-organization reach (`api/authorization.ts:172-186`).
-  Scope the admin arm to identities with an accepted
-  membership in the claim's organization; member
-  creation lands the identity before its membership
-  (`postHumanMemberCreation`, `client/members.ts:276`),
-  so the brainstorm orders that, and decides whether a
-  cross-organization operator should exist at all.
-  Oracle: a red test first plants a credential across
-  organizations and signs in with it; then, on each
-  route above, an organization admin naming an identity
-  with no accepted membership in its organization is
-  403 before any read or write, and naming one that
-  holds one is unchanged.
 - **0e.** Everything we own, named `fa_` — so that operating the
   system makes what is ours trivial to find:
   `env | grep FA_` lists every variable the system needs.
@@ -879,7 +829,7 @@ Off the critical path; each with its oracle.
   membership (`membershipOf`,
   `api/organization-requests.ts:120-129`) and then
   writes. A grant reads the membership head
-  (`postOrganizationInvitationGrant`,
+  (`postOrganizationInvitation`,
   `api/invitations-domain.ts:588`) and then lands
   (`:607`). Two grants of one email name one
   document, `<organization-id>:<identity-id>`. That
@@ -1309,7 +1259,9 @@ Off the critical path; each with its oracle.
   accepted, a power the membership spec keeps open
   (`docs/superpowers/specs/`
   `2026-10-01-membership-and-versions-design.md:269-270`).
-  It lands beside item 0d, which bounds
+  It lands beside the shipped identity fence and the
+  memberships statement
+  (`POST organizations/:id/memberships/`), which bounds
   whom an admin may name at all. Oracle: a seat the
   identity did not accept reads pending until it does,
   or the owner rules the direct seat a deliberate power
@@ -3364,6 +3316,17 @@ Off the critical path; each with its oracle.
   'npm:' deno.json deno.lock` prints nothing;
   `./test postgres` green; `./bin/measure --check` green
   against the committed budgets.
+- Re-aim the identities page's person create onto
+  the memberships statement (G44's person half).
+- A service-identity rule: membership or a fence of
+  its own (G47).
+- Move items and versions under `memberships/`, with
+  `identities/:id/memberships/` subsuming
+  `identities/:id/organizations/`.
+- A derived map of every storage prefix, gated by
+  `--check`.
+- Retire the leftover role-grant identifiers.
+- Delete a pending invitation after `expires_at`.
 
 ## Sequencing
 
@@ -3372,8 +3335,8 @@ Off the critical path; each with its oracle.
   → 0f, 6, 9, 11, 13 (its findings are their oracles).
 - 0f → 5 (its link token is a secret at rest: item 0f
   fences it)
-- 0d → 0i: no second tenant shares an origin until an
-  organization's admin stops at its own identities
+- 0d is shipped: an organization's admin stops at its
+  own identities. 0i remains the wipe
 - 0e → 0f → 0g → 0h → 0i, one deploy: names first, so
   operators rename once and item 0f's verbs read
   `FA_POSTGRES_URL`; the fence; `FA_GIT_SHA`, which

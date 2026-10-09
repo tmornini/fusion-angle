@@ -47,6 +47,51 @@ export function viewQueryOf(
     return { kind: 'state', state };
 }
 
+const INVITATION_VIEW_STATES:
+    readonly InvitationState[] = [
+        'pending', 'declined', 'revoked',
+    ];
+const MEMBERSHIP_VIEW_STATES:
+    readonly InvitationState[] = [
+        'accepted', 'removed',
+    ];
+
+function viewQueryIn(
+    search: string,
+    allowed: readonly InvitationState[],
+    fallback: InvitationState,
+    alphabetError: string,
+): ViewQuery | QueryRefusal {
+    const judged = viewQueryOf(search);
+    if (judged.kind === 'refused') return judged;
+    if (judged.kind === 'every') {
+        return { kind: 'state', state: fallback };
+    }
+    if (!allowed.includes(judged.state)) {
+        return { kind: 'refused', error: alphabetError };
+    }
+    return judged;
+}
+
+export function invitationsViewQueryOf(
+    search: string,
+): ViewQuery | QueryRefusal {
+    return viewQueryIn(
+        search, INVITATION_VIEW_STATES, 'pending',
+        'state must be one of pending, declined,'
+            + ' revoked',
+    );
+}
+
+export function membershipsViewQueryOf(
+    search: string,
+): ViewQuery | QueryRefusal {
+    return viewQueryIn(
+        search, MEMBERSHIP_VIEW_STATES, 'accepted',
+        'state must be one of accepted, removed',
+    );
+}
+
 export const MEMBER_VISIBLE_STATES:
     readonly InvitationState[] = [
         'accepted',

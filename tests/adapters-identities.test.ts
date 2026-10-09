@@ -1,19 +1,25 @@
-import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    inPageContext,
-    recordedContext,
-} from './in-page-facade.ts';
+    assertRejects,
+    assertStrictEquals,
+} from '@std/assert';
+import { memoryDbAdapter } from '../api/db-memory.ts';
+import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     getIdentity,
-    getMemberPii,
     deleteIdentityPii,
 } from '../client/identities.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { seedAdminSchema } from './test-fixtures.ts';
+import { RequestError } from '../shared/http-errors.ts';
+
+const ORPHAN = 'pnXmXrxOWayANgDLdCjuBw';
+
+function outside(method: string, path: string): string {
+    return 'forbidden: ' + method + ' ' + path
+        + ' names an identity outside this'
+        + ' organization';
+}
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -21,58 +27,48 @@ async function setup() {
     return { db, ctx: inPageContext(db, await devToken()) };
 }
 
-Deno.test('getIdentity reads kind', async () => {
-    const { db, ctx } = await setup();
-    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
-        name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
-    });
-    const id = await getIdentity(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(id.isPerson(), true);
-});
+async function assertOutside(
+    fn: () => Promise<unknown>,
+    method: string,
+    path: string,
+): Promise<void> {
+    const err = await assertRejects(fn, RequestError);
+    assertStrictEquals(err.status, 403);
+    assertStrictEquals(
+        err.message, outside(method, path) + ' ()',
+    );
+}
 
-Deno.test('getMemberPii is present, then erased after delete',
+Deno.test('getIdentity refuses a membership-less person',
 async () => {
     const { db, ctx } = await setup();
-    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
-        name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
+    await seedPersonIdentity(db, ORPHAN, {
+        name: 'P', email: 'p@x.io',
+        phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
-    const before = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(before.erased, false);
-    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw', before);
-    const after = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assertStrictEquals(after.erased, true);
-});
-
-Deno.test('erasing PII keeps identity and person kind',
-async () => {
-    const { db, ctx } = await setup();
-    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
-        name: 'P', email: 'p@x.io', phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
-    });
-    await deleteIdentityPii(
-        ctx, 'pnXmXrxOWayANgDLdCjuBw',
-        await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw'),
+    const before = (await db.messagePairs.getAll()).length;
+    await assertOutside(
+        () => getIdentity(ctx, ORPHAN),
+        'GET', '/identities/' + ORPHAN,
     );
     assertStrictEquals(
-        (await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw')).erased,
-        true,
+        (await db.messagePairs.getAll()).length, before,
     );
-    assertStrictEquals((await getIdentity(ctx
-        , 'pnXmXrxOWayANgDLdCjuBw')).isPerson(), true);
 });
 
-Deno.test('a PII erase latches the held PII', async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    await seedPersonIdentity(db, 'pnXmXrxOWayANgDLdCjuBw', {
-        name: 'P', email: 'p@x.io', phone: '', bio: 'b',
+Deno.test('an admin cannot erase a membership-less PII',
+async () => {
+    const { db, ctx } = await setup();
+    await seedPersonIdentity(db, ORPHAN, {
+        name: 'P', email: 'p@x.io',
+        phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
     });
-    const { ctx, sent } = recordedContext(db, await devToken());
-    const pii = await getMemberPii(ctx, 'pnXmXrxOWayANgDLdCjuBw');
-    assert(!pii.erased);
-    sent.length = 0;
-    await deleteIdentityPii(ctx, 'pnXmXrxOWayANgDLdCjuBw', pii);
-    assertEquals(sent.map((r) => [r.method, r.ifMatch]), [
-        ['DELETE', pii.message.query('header.etag').toText()],
-    ]);
+    const before = (await db.messagePairs.getAll()).length;
+    await assertOutside(
+        () => deleteIdentityPii(ctx, ORPHAN, { erased: true }),
+        'DELETE', '/identities/' + ORPHAN + '/pii',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
 });

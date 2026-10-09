@@ -74,6 +74,13 @@ Deno.test('svg draws the /api/ wire prefix',
     );
 });
 
+Deno.test('the map names /invitations/ as backing',
+() => {
+    const svg = svgOf(routes);
+    assertMatch(svg, /\/invitations\//);
+    assertMatch(svg, /backing/);
+});
+
 Deno.test('rooms stay a page tree, not an /api/ folder',
 () => {
     const row = routes.find((r) =>

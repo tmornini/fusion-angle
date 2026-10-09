@@ -131,7 +131,7 @@ Deno.test(
                 identity_id: string;
             }>(
                 db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
-                    + '/invitations/?state=accepted',
+                    + '/memberships/?state=accepted',
                 await organizationToken(),
                 operationIdHeader()))
                     .map((part) => part.body().toValue());

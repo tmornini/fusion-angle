@@ -73,6 +73,7 @@ async function allMemberships(db: MemoryDbAdapter) {
 }
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 
 // Below-facade pair formation (the member-fixtures.ts idiom,
 // mirroring person()'s own reasoning below): the invitation
@@ -195,7 +196,7 @@ async function person(
 
 // Grant via the gate as Tony scoped to Wayne, returning the new
 // invitation id straight from storage.
-async function grantSarahToWayne(
+async function inviteSarahToWayne(
     db: MemoryDbAdapter,
 ): Promise<string> {
     const res = await handleRequest(db, req(
@@ -204,7 +205,8 @@ async function grantSarahToWayne(
             , 'BBjWJsjYIDkTRKIIPrzWRw'),
         {
             email: 'sarah@x.com',
-            grantAt: AT,
+            at: AT,
+            expiresAt: EXPIRES_AT,
         }));
     assertStrictEquals(res.status, 201);
     const body = await res.json() as { id: string };
@@ -217,7 +219,7 @@ async () => {
     // Sarah holds no role, so the deny-by-default policy would
     // 403 her on /members; the invitation facade stands apart.
     const db = await seed();
-    await grantSarahToWayne(db);
+    await inviteSarahToWayne(db);
     const res = await handleRequest(db, req(
         'GET', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/',
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
@@ -242,6 +244,7 @@ async () => {
         type: 'member',
         state: 'pending',
         at: AT,
+        expires_at: EXPIRES_AT,
     });
 });
 
@@ -253,7 +256,8 @@ Deno.test('a non-admin is forbidden from granting', async () => {
             , 'AjdvjuECVZEgZoFajaIEkg'),
         {
             email: 'demo@example.com',
-            grantAt: AT,
+            at: AT,
+            expiresAt: EXPIRES_AT,
         }));
     assertStrictEquals(res.status, 403);
     assertEquals(await res.json(), {
@@ -287,7 +291,7 @@ Deno.test('a pending invite writes no membership', async () => {
     // Reachability derives from the membership ledger; a pending
     // invite must not add one, so the org stays unreachable.
     const db = await seed();
-    await grantSarahToWayne(db);
+    await inviteSarahToWayne(db);
     const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
@@ -296,7 +300,7 @@ Deno.test('a pending invite writes no membership', async () => {
 
 Deno.test('a pending invitee is absent from the roster', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const before = await rosterIds(db);
     assert(!before.has('toccYYkLEABmlbpHJalgtQ'));
     // Sarah accepts; now the Wayne roster includes her.
@@ -318,7 +322,7 @@ async function rosterIds(
 ): Promise<Set<string>> {
     const res = await handleRequest(db, req(
         'GET', '/organizations/' + WAYNE
-            + '/invitations/?state=accepted',
+            + '/memberships/?state=accepted',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA'
             , WAYNE)));
     assertStrictEquals(res.status, 200);
@@ -330,7 +334,7 @@ async function rosterIds(
 
 Deno.test('accept makes the invitation org reachable', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/toccYYkLEABmlbpHJalgtQ/invitations/' + id,
         await organizationToken('toccYYkLEABmlbpHJalgtQ'
@@ -354,7 +358,7 @@ Deno.test('accept makes the invitation org reachable', async () => {
 Deno.test('an invitation event is owned by the inviting org',
 async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const rows = await deriveInvitationStates(db);
     assert(
         rows.some((r) => r.entity_id === id),
@@ -388,7 +392,8 @@ async () => {
     const db = await seed();
     const body = {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
+        expiresAt: EXPIRES_AT,
     };
     const tok = await organizationToken('XXZruirZyAOoRpNxaDnpSA'
         , 'BBjWJsjYIDkTRKIIPrzWRw');
@@ -427,7 +432,8 @@ async () => {
     const granted = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
+        expiresAt: EXPIRES_AT,
     }));
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
@@ -474,7 +480,8 @@ async () => {
     const granted = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
+        expiresAt: EXPIRES_AT,
     }));
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
@@ -517,7 +524,8 @@ async () => {
     const granted = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/', tok, {
         email: 'sarah@x.com',
-        grantAt: GRANT_AT,
+        at: GRANT_AT,
+        expiresAt: EXPIRES_AT,
     }));
     assertStrictEquals(granted.status, 201);
     await granted.body?.cancel();
@@ -557,24 +565,32 @@ Deno.test('grant: empty email is rejected (400)', async () => {
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
-        { email: '', grantAt: AT }));
+        {
+            email: '',
+            at: AT,
+            expiresAt: EXPIRES_AT,
+        }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
 });
 
-Deno.test('grant: empty grantAt is rejected (400)', async () => {
+Deno.test('invite: empty at is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
-        { email: 'sarah@x.com', grantAt: '' }));
+        {
+            email: 'sarah@x.com',
+            at: '',
+            expiresAt: EXPIRES_AT,
+        }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
 });
 
 Deno.test('accept: empty state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -585,7 +601,7 @@ Deno.test('accept: empty state is rejected (400)', async () => {
 
 Deno.test('decline: empty state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -596,7 +612,7 @@ Deno.test('decline: empty state is rejected (400)', async () => {
 
 Deno.test('revoke: empty state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/' + WAYNE + '/invitations/' + id,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
@@ -610,19 +626,20 @@ Deno.test('grant: missing email is rejected (400)', async () => {
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
-        { grantAt: AT }));
+        { at: AT }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
 });
 
-Deno.test('grant: non-string grantAt is rejected (400)', async () => {
+Deno.test('invite: non-string at is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/organizations/' + WAYNE + '/invitations/',
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
         {
             email: 'sarah@x.com',
-            grantAt: 42,
+            at: 42,
+            expiresAt: EXPIRES_AT,
         }));
     assertStrictEquals(res.status, 400);
     await res.body?.cancel();
@@ -630,7 +647,7 @@ Deno.test('grant: non-string grantAt is rejected (400)', async () => {
 
 Deno.test('accept: missing state is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -641,7 +658,7 @@ Deno.test('accept: missing state is rejected (400)', async () => {
 
 Deno.test('accept: non-string at is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -652,7 +669,7 @@ Deno.test('accept: non-string at is rejected (400)', async () => {
 
 Deno.test('decline: missing at is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -664,7 +681,7 @@ Deno.test('decline: missing at is rejected (400)', async () => {
 Deno.test('a removed member who re-accepts is 409 — not a'
 + ' silent re-admission', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const accept = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/identities/' + SARAH + '/invitations/' + id,
         await organizationToken(SARAH, STARK),
@@ -710,7 +727,7 @@ Deno.test('a removed member who re-accepts is 409 — not a'
 
 Deno.test('revoke: missing at is rejected (400)', async () => {
     const db = await seed();
-    const id = await grantSarahToWayne(db);
+    const id = await inviteSarahToWayne(db);
     const res = await handleRequest(db, await invitationLatched(db, req(
         'PUT', '/organizations/' + WAYNE + '/invitations/' + id,
         await organizationToken('XXZruirZyAOoRpNxaDnpSA', WAYNE),
