@@ -47,17 +47,31 @@ every request (`incomingContext`), then `dispatched`:
    unmatched 404, identifier params, `fenceRequest`,
    nested org must equal fenced org (mismatch 403,
    fixed body, no auto-exchange), `authorizeRequest`.
-5. **Body parse** for PUT/POST/PATCH, then **the
+5. **Identity fence.** When the matched route's
+   first segment is `identities` and the second is
+   `:id`, and the path identity is not the actor,
+   `membershipOf` must find an accepted seat in the
+   claim organization. Null answers 403 and nothing
+   else runs. The body is `forbidden: <METHOD> <path>
+   names an identity outside this organization`.
+   Self stays self: the seat check is skipped.
+   Absent, orphan, and foreign are that same 403,
+   not 404. `POST identities/` is not this fence.
+   `GET identities/` is the accepted-membership
+   roster: it lists co-members of the claim
+   organization.
+6. **Body parse** for PUT/POST/PATCH, then **the
    conditional** (`preconditionRefusal`): its
    presence and form, per route and verb, with no
    head read. See Conditional classes.
-6. **Region B.** Self-only token
+7. **Region B.** Self-only token
    routes (`SELF_ONLY_TOKEN_ROUTES`): the
    token-revocations PUT and the jti rotation and
-   revocation POSTs. A member acts only on its own
-   chain; an admin may name any identity. Any other
-   caller is 403 by form, before any read.
-7. **Pair plane.** Wired writes form the received
+   revocation POSTs. A member acts on its own token
+   chain, an admin on a co-member's. The identity
+   fence has already refused every other identity.
+   Any other caller is 403 by form, before any read.
+8. **Pair plane.** Wired writes form the received
    pair before any transaction
    (`formWriteMessagePair`). A DELETE that is not an
    operation meets the DELETE table first:
@@ -66,7 +80,7 @@ every request (`incomingContext`), then `dispatched`:
    row the write forms (Conditional classes says
    how). A stale latch answers 412, even for a
    byte-identical resend.
-8. **Handler.** Matched verb with `ctx.base`. A GET
+9. **Handler.** Matched verb with `ctx.base`. A GET
    route either selects heads (`select`,
    `api/head-reads.ts`) and the gate serves them
    through `servedResponse`
@@ -116,7 +130,7 @@ answers 200 through the served response: this
 request's date and request-id, the head's etag and
 operation-id, the three lines from the head's
 envelope, and the head's body projected for the
-requester. A pending grant sent again is `POST
+requester. A pending invitation sent again is `POST
 organizations/:id/invitations/`. It answers 200
 and stores nothing. A membership item PUT whose
 `state` is `pending` is 409. `putMembership`
@@ -151,9 +165,11 @@ that head serves, three lines included. The envelope
 carries `date` and `request-id` and no `etag`, since
 it names no one state. A deleted head is no part of
 it, and a collection that selects none answers 204.
-The two membership views are that collection:
-`identities/:id/invitations/` by `identity_id` and
+The three membership views are that collection:
+`identities/:id/invitations/` by `identity_id`,
 `organizations/:id/invitations/` by
+`organization_id`, and
+`organizations/:id/memberships/` by
 `organization_id`, each with an optional `?state=`.
 `versions/:etag` serves the stored PUT the tag names,
 through the same function. `versions/` is
@@ -253,7 +269,7 @@ through E are the write shapes the spec audits
 | `optional` | If-Match, If-None-Match: *, or neither; a DELETE's useful one is If-Match (If-None-Match: * passes the gate, but a live head refuses it 412) | class A document PUTs; every DELETE but the release |
 | `required` | If-Match or If-None-Match: * | class B: the flow and work-order PUTs; the instance PATCH; the organization-nest membership item `organizations/:id/invitations/:membership-id` |
 | `in-order` | If-Match, one tag per document the operation derives from | class C operations: conversion, undo, claim and release, transition, binding, and the identity-nest membership PUTs (accept and decline) |
-| `none` | no conditional | class D POST creates; class E operations: the grants, including the membership grant, token rotation and revocation |
+| `none` | no conditional | class D POST creates; class E operations: the invitation POST, token rotation and revocation |
 
 The instance PATCH does two writes: If-None-Match: *
 declares a create of the id the client minted, and
@@ -344,23 +360,36 @@ received pair's ETag names that head. The work-order transition, the
 record-type edit, and conversion read so.
 
 **POST creates** (class D). Flows, work orders,
-objectives, identities, and record types.
+objectives, identities, record types, and the
+memberships statement.
 The handler declares each created document's genesis,
 so a resent create answers 409 and stores nothing. The
 201 answers the created document's state. The
-membership grant is not this shape.
+memberships statement is three handler-declared
+geneses, answers 201 the membership, and Location
+the invitation item
+`/organizations/<organization-id>/invitations/<organization-id>:<identity-id>`.
 
-**Membership grant.**
+**Invitation POST.**
 `POST organizations/:id/invitations/` →
-`postOrganizationInvitationGrant`
+`postOrganizationInvitation`
 (`api/invitations-domain.ts`). Conditional `none`.
-The body is `{ email, grantAt }`. A name never
+The body is `{ email, at, expiresAt }`. A name never
 written, or a declined, revoked, or removed head,
 lands `pending` as the handler's genesis or in order
-on the head. A pending grant sent again stores
+on the head. A pending invitation sent again stores
 nothing and answers that head. An accepted membership
 answers 409. One email under one organization names
 one document, `<organization-id>:<identity-id>`.
+`expiresAt` is required and strictly after `at`.
+
+**Membership statement.**
+`POST organizations/:id/memberships/` →
+`postOrganizationMembership`. One statement, three
+handler-declared geneses (the accepted membership at
+`/invitations/`, the person identity, and its PII).
+201 the membership. Location the invitation item. A
+resend is 409. A member token is 403.
 
 **Idea conversion.**
 `POST organizations/:id/ideas/:id/conversion` in
@@ -392,17 +421,23 @@ and the same binding again are no-ops. The document PUT
 supersedes only; a work order is born by `POST
 …/work-orders/`. History is `…/work-orders/:id/versions/`.
 
-**Memberships.** One document at `/invitations/`,
-named `<organization-id>:<identity-id>`. Five states:
+**Memberships.** `/invitations/` is backing storage.
+The document still lives there, named
+`<organization-id>:<identity-id>`. Five states remain
 `pending`, `accepted`, `declined`, `revoked`,
-`removed`. There is no seat document. Two views, each
-a collection GET: `identities/:id/invitations/` and
-`organizations/:id/invitations/`. `?state=` selects
-one state; no query selects every state an admin may
-read. A member reads `accepted` and `removed` on the
-organization view. Any other `?state=`, or no query,
-is 403 for that member. A bad query is 400. A view
-that selects none is 204.
+`removed`. There is no seat document.
+`organizations/:id/invitations/` is the offer: states
+`pending`, `declined`, `revoked`; default `pending`;
+admin. A member GET of that collection is 403.
+`organizations/:id/memberships/` is the seat: states
+`accepted`, `removed`; default `accepted`; member and
+admin. Items stay at
+`organizations/:id/invitations/:membership-id`.
+Nothing moved under `memberships/`. The identity nest
+`identities/:id/invitations/` is self-only. An admin
+GET of a co-member's identity nest is 403. Self is
+200. A bad query is 400. A view that selects none is
+204.
 
 The identity-nest item is `in-order`. Accept
 (`pending` → `accepted`) and decline
