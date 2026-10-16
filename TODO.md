@@ -3312,8 +3312,27 @@ Off the critical path; each with its oracle.
   'npm:' deno.json deno.lock` prints nothing;
   `./test postgres` green; `./bin/measure --check` green
   against the committed budgets.
-- Re-aim the identities page's person create onto
-  the memberships statement (G44's person half).
+- A person identity is created only by its person.
+  Retire the members statement's identity and PII
+  geneses and `POST identities/`'s `kind: 'person'`,
+  with SP-6 and item 5; SP-6 decides the route and the
+  status. Until then an organization admin's
+  `POST identities/` with a person body mints an
+  orphan no view lists.
+- Remove the never-verified `client_secret`: the
+  credential kind, the seed row, the dialog field, and
+  the service's Credentials card. OAuth's
+  `client_credentials` `grant_type` with
+  `private_key_jwt` covers the need. Before the
+  service-identity rule (G47).
+- Rewrite bare prose "admin" in the living docs as
+  "organization admin" or "operator".
+- Fence `PUT organizations/:id`. It passes the path
+  fence (`api/api.ts:629`), and the membership fence
+  gates only its GET (`api/api.ts:664`), so an
+  organization admin can create an organization or
+  overwrite another's document. Security; a red test
+  first.
 - A service-identity rule: membership or a fence of
   its own (G47).
 - Move items and versions under `memberships/`, with
