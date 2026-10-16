@@ -151,6 +151,27 @@ next mint/refresh/exchange or access-token expiry
 (`ACCESS_TTL_SECONDS`, 15 min in `api/authentication.ts`),
 not on the very next request.
 
+Two names for people. An **organization admin** is an
+identity holding an accepted membership of
+`type: 'admin'` in one organization. At mint that
+membership is the claim `admin:<organization-id>`; at
+the gate, `projectClaimRolesForOrganization`
+(`api/authorization.ts:22`) projects it to the role
+`admin` for the claim organization only.
+`ROUTE_POLICY`'s `/` rows grant that role every verb,
+and the identity fence confines it to co-members. It
+reaches no other organization's documents but one:
+`PUT organizations/:id` passes the path fence
+(`api/api.ts:629`), and the membership fence gates
+only its GET (`api/api.ts:664`), so an organization
+admin can create an organization or overwrite
+another's document. The **operator** is whoever holds
+`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY` and runs
+`./deploy`, the seed, and the wipe. The operator is
+not an identity, holds no token, and never acts over
+HTTP. Organizations come from the operator's seed, or
+from that unfenced `PUT organizations/:id`.
+
 A foreign id under the caller's own organization path
 is absent there: a write geneses or 404s, a read 404s.
 Global-plane reads of an organization document answer
