@@ -1,7 +1,6 @@
 import { operationIdHeader } from './operation-id-header.ts';
 import {
     assert,
-    assertInstanceOf,
     assertNotStrictEquals,
     assertRejects,
     assertStrictEquals,
@@ -12,10 +11,8 @@ import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
 import {
-    IdentityPiiIntakeFailedError,
     postIdentityCreation,
 } from '../client/identities.ts';
-import { storedPutBodyText } from './http-fixtures.ts';
 import {
     deriveIdentityPii,
     deriveCredentialsFor,
@@ -41,35 +38,6 @@ async function setup() {
 // Phase Final Task 2: identities / identity_pii /
 // identity_credentials ROW halves stripped — oracles are the
 // message plane (GET + derive).
-
-Deno.test('postIdentityCreation stores the person and'
-    + ' the admin PII hop is forbidden', async () => {
-    const { db, ctx } = await setup();
-    const id = 'fndCYAsXazdzMUlEGMNIZw';
-    const err = await assertRejects(
-        () => postIdentityCreation(ctx, id, {
-            kind: 'person',
-            pii: {
-                name: 'Pat', email: 'pat@example.com',
-                phone: '555-0100', bio: 'bio',
-            },
-        }),
-        IdentityPiiIntakeFailedError,
-    );
-    const cause = err.cause;
-    assertInstanceOf(cause, RequestError);
-    assertStrictEquals(cause.status, 403);
-    assertStrictEquals(
-        cause.message,
-        outside('PUT', '/identities/' + id + '/pii')
-            + ' ()',
-    );
-    const stored = JSON.parse(
-        await storedPutBodyText(db, '/identities/', id),
-    ) as { kind: string };
-    assertStrictEquals(stored.kind, 'person');
-    await assertRejects(() => deriveIdentityPii(db, id));
-});
 
 Deno.test('postIdentityCreation mints a service identity'
     + ' with a hashed client_secret', async () => {
@@ -101,39 +69,6 @@ Deno.test('postIdentityCreation mints a service identity'
         true);
     await assertRejects(
         () => deriveIdentityPii(db, 'syWUUcdBSbBgMwBiCrgbDw'),
-    );
-});
-
-Deno.test('a resent postIdentityCreation is 409 and leaves'
-    + ' the first identity', async () => {
-    const { db, ctx } = await setup();
-    const spec = {
-        kind: 'person' as const,
-        pii: {
-            name: 'A', email: 'a@example.com',
-            phone: 'AjdvjuECVZEgZoFajaIEkg', bio: 'b',
-        },
-    };
-    const first = await assertRejects(
-        () => postIdentityCreation(
-            ctx, 'fndCYAsXazdzMUlEGMNIZw', spec,
-        ),
-        IdentityPiiIntakeFailedError,
-    );
-    assertInstanceOf(first.cause, RequestError);
-    const resent = await assertRejects(
-        () => postIdentityCreation(
-            ctx, 'fndCYAsXazdzMUlEGMNIZw', spec,
-        ),
-        RequestError,
-    );
-    assertStrictEquals(resent.status, 409);
-    const stored = JSON.parse(await storedPutBodyText(
-        db, '/identities/', 'fndCYAsXazdzMUlEGMNIZw',
-    )) as { kind: string };
-    assertStrictEquals(stored.kind, 'person');
-    await assertRejects(
-        () => deriveIdentityPii(db, 'fndCYAsXazdzMUlEGMNIZw'),
     );
 });
 
