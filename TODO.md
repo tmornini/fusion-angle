@@ -2237,10 +2237,6 @@ Off the critical path; each with its oracle.
     AI edit (G41) — Layer 1, a spy on `ctx.POST` during
     `putHumanMember`/`putAIMember`; the cited tests prove
     the PUT lands, never that POST stays silent
-  - The second-hop `IdentityPiiIntakeFailedError` toast
-    and the error class itself (G44) — Layer 1; `grep -rn
-    IdentityPiiIntakeFailedError tests/` is empty, though
-    the torn-state mechanism it wraps is pinned
   - The Erase PII button present for a person and absent
     for a service (G45) — Layer 1; neither
     `presenter-identity-detail.test.ts` fixture asserts
