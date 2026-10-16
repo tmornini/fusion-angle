@@ -1,5 +1,5 @@
 import {
-    $, $$, $input, $required, $textarea,
+    $, $input, $required,
     populateIcons,
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
@@ -13,7 +13,6 @@ import {
     iconPersonPlus, iconSend,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
-import { trimStrings } from '../app/format.ts';
 import {
     handleDialogClick, closeDialog,
 } from '../app/dialog.ts';
@@ -21,7 +20,6 @@ import {
     getIdentityRoster,
     postIdentityCreation,
     subscribeIdentityChanges,
-    IdentityPiiIntakeFailedError,
     type IdentityRosterRow,
     type RequestContext,
 } from '../../client/index.ts';
@@ -37,11 +35,10 @@ let identityListEl: HTMLElement | null = null;
 
 // Mint-once discipline (Phase 10 Task 2): the Add Identity
 // dialog mints its entity id ONCE per dialog session and reuses
-// it across retries — a retry after a partial (second-hop PII
-// PUT) failure re-submits against the SAME identity rather than
-// minting a fresh one and orphaning the first. Reset whenever
-// the dialog opens (bindAddIdentityDialog), so a later session
-// never reuses a stale id from an abandoned earlier one.
+// it across retries, so a retry of a create that already landed
+// answers 409 rather than minting a second identity. Reset
+// whenever the dialog opens (bindAddIdentityDialog), so a later
+// session never reuses a stale id from an abandoned earlier one.
 let pendingIdentityId: string | null = null;
 
 function currentIdentityId(): string {
@@ -135,14 +132,6 @@ function bindAddIdentityDialog(): void {
             () => void handleAddIdentitySubmit(),
             { signal },
         );
-    $$(
-        '#add-identity-kind-toggle input', document,
-    ).forEach(input => {
-        input.addEventListener(
-            'change', onKindRadioChange,
-            { signal },
-        );
-    });
     $('#add-identity-dialog', document)
         ?.addEventListener(
             'keydown', onDialogKeydown,
@@ -162,34 +151,11 @@ function bindAddIdentityDialog(): void {
         );
 }
 
-// The dialog's inputs are static markup, so a cancelled,
+// The dialog's input is static markup, so a cancelled,
 // escaped, or submitted session would greet the next one with
 // last time's text. Open is the one path all three share.
 function clearAddIdentityFields(): void {
-    $input('#id-name', document)!.value = '';
-    $input('#id-email', document)!.value = '';
-    $input('#id-phone', document)!.value = '';
-    $textarea('#id-bio', document)!.value = '';
     $input('#svc-secret', document)!.value = '';
-}
-
-function onKindRadioChange(e: Event): void {
-    const target = e.target as HTMLInputElement;
-    const kind = target.value;
-    const personForm = $(
-        '#add-identity-person-form', document,
-    );
-    const serviceForm = $(
-        '#add-identity-service-form', document,
-    );
-    if (!personForm || !serviceForm) return;
-    if (kind === 'person') {
-        personForm.classList.remove('hidden');
-        serviceForm.classList.add('hidden');
-    } else {
-        personForm.classList.add('hidden');
-        serviceForm.classList.remove('hidden');
-    }
 }
 
 function onDialogKeydown(e: KeyboardEvent): void {
@@ -201,73 +167,8 @@ function onDialogKeydown(e: KeyboardEvent): void {
     $('#add-identity-submit', document)?.click();
 }
 
-function selectedKind(): 'person' | 'service' {
-    const checked = $input(
-        '#add-identity-kind-toggle'
-        + ' input[name="identity-kind"]:checked',
-        document,
-    );
-    if (checked && checked.value === 'service') {
-        return 'service';
-    }
-    return 'person';
-}
-
 async function handleAddIdentitySubmit(
 ): Promise<void> {
-    const kind = selectedKind();
-    if (kind === 'person') {
-        await submitPersonForm();
-    } else {
-        await submitServiceForm();
-    }
-}
-
-async function submitPersonForm(): Promise<void> {
-    const name = $input('#id-name', document)!.value;
-    const email = $input('#id-email', document)!.value;
-    if (!name || !email) {
-        showToast(
-            'Name and email are required', 'error',
-        );
-        return;
-    }
-    const phone = $input('#id-phone', document)!.value;
-    const bio = $textarea('#id-bio', document)!.value;
-    const id = currentIdentityId();
-    const ctx = sessionContext();
-    try {
-        await postIdentityCreation(
-            ctx,
-            id,
-            {
-                kind: 'person',
-                pii: trimStrings({
-                    name, email, phone, bio,
-                }),
-            },
-        );
-    } catch (err) {
-        if (err instanceof IdentityPiiIntakeFailedError) {
-            reportFault(
-                ctx,
-                'Identity created, but its contact'
-                + ' details failed to save',
-                err,
-            );
-        } else {
-            reportFault(
-                ctx, 'Failed to add identity', err,
-            );
-        }
-        return;
-    }
-    showToast('Identity added', 'success');
-    closeDialog('add-identity');
-    void refresh(ctx);
-}
-
-async function submitServiceForm(): Promise<void> {
     const secret = $input(
         '#svc-secret', document,
     )!.value.trim();
