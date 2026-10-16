@@ -181,12 +181,13 @@ co-membership. When the path identity is not the actor,
 an accepted membership in the claim organization admits
 the request. Absent, orphan, and foreign answer the same
 403, body `forbidden: <METHOD> <path> names an identity
-outside this organization`. Self stays self. The `/`
-admin tier stays and reaches co-members only. Path
-`:organization-id` on an org-nested route must equal the
-claim org else 403. A membership name's organization
-half must equal the path's (403). Its identity half
-must equal the path's (404).
+outside this organization`. Self stays self. The
+organization admin's `/` rows stay and reach co-members
+only on the identity plane. Path `:organization-id` on an
+org-nested route must equal the claim org else 403. A
+membership name's organization half must equal the
+path's (403). Its identity half must equal the path's
+(404).
 
 ## Identity and memberships
 
