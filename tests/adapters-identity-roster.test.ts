@@ -1,6 +1,5 @@
 import {
     assertEquals,
-    assertInstanceOf,
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
@@ -10,7 +9,6 @@ import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getIdentityRoster,
-    IdentityPiiIntakeFailedError,
     postIdentityCreation,
 } from '../client/identities.ts';
 import {
@@ -44,21 +42,17 @@ const SERVICE = 'syWUUcdBSbBgMwBiCrgbDw';
 Deno.test('getIdentityRoster omits a membership-less person',
 async () => {
     const { ctx } = await setup();
+    await ctx.POST('identities/', { id: PERSON, kind: 'person' });
     const err = await assertRejects(
-        () => postIdentityCreation(ctx, PERSON, {
-            kind: 'person',
-            pii: {
-                name: 'Ada', email: 'ada@x.io',
-                phone: '555', bio: 'builds',
-            },
+        () => ctx.PUT('identities/' + PERSON + '/pii', {
+            name: 'Ada', email: 'ada@x.io',
+            phone: '555', bio: 'builds',
         }),
-        IdentityPiiIntakeFailedError,
+        RequestError,
     );
-    const cause = err.cause;
-    assertInstanceOf(cause, RequestError);
-    assertStrictEquals(cause.status, 403);
+    assertStrictEquals(err.status, 403);
     assertStrictEquals(
-        cause.message,
+        err.message,
         outside('PUT', '/identities/' + PERSON + '/pii')
             + ' ()',
     );
@@ -118,15 +112,13 @@ async () => {
 Deno.test('an admin cannot erase a membership-less person',
 async () => {
     const { ctx } = await setup();
+    await ctx.POST('identities/', { id: PERSON, kind: 'person' });
     await assertRejects(
-        () => postIdentityCreation(ctx, PERSON, {
-            kind: 'person',
-            pii: {
-                name: 'Ada', email: 'ada@x.io',
-                phone: '555', bio: 'builds',
-            },
+        () => ctx.PUT('identities/' + PERSON + '/pii', {
+            name: 'Ada', email: 'ada@x.io',
+            phone: '555', bio: 'builds',
         }),
-        IdentityPiiIntakeFailedError,
+        RequestError,
     );
     const err = await assertRejects(
         () => ctx.DELETE('identities/' + PERSON + '/pii'),

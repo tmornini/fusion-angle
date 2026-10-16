@@ -45,90 +45,9 @@
             class="flex flex-col gap-3 py-4
                 dialog-scroll"
         >
-            <fieldset
-                class="flex items-center gap-4"
-                id="add-identity-kind-toggle"
-            >
-                <legend class="label mr-2"
-                >Kind</legend>
-                <label
-                    class="flex items-center gap-1"
-                >
-                    <input
-                        type="radio"
-                        name="identity-kind"
-                        value="person"
-                        checked
-                    />
-                    Person
-                </label>
-                <label
-                    class="flex items-center gap-1"
-                >
-                    <input
-                        type="radio"
-                        name="identity-kind"
-                        value="service"
-                    />
-                    Service
-                </label>
-            </fieldset>
-
-            <div
-                id="add-identity-person-form"
-                class="flex flex-col gap-3"
-            >
-                <div>
-                    <label
-                        class="label mb-1 block"
-                        for="id-name"
-                    >Name</label>
-                    <input
-                        class="input"
-                        id="id-name"
-                        placeholder="Full name"
-                    />
-                </div>
-                <div>
-                    <label
-                        class="label mb-1 block"
-                        for="id-email"
-                    >Email</label>
-                    <input
-                        class="input"
-                        type="email"
-                        placeholder="person@company.com"
-                        id="id-email"
-                    />
-                </div>
-                <div>
-                    <label
-                        class="label mb-1 block"
-                        for="id-phone"
-                    >Phone</label>
-                    <input
-                        class="input"
-                        id="id-phone"
-                        placeholder="+1 (555) 000-0000"
-                    />
-                </div>
-                <div>
-                    <label
-                        class="label mb-1 block"
-                        for="id-bio"
-                    >Bio</label>
-                    <textarea
-                        class="textarea"
-                        rows="2"
-                        id="id-bio"
-                        placeholder="Short bio..."
-                    ></textarea>
-                </div>
-            </div>
-
             <div
                 id="add-identity-service-form"
-                class="flex flex-col gap-3 hidden"
+                class="flex flex-col gap-3"
             >
                 <div>
                     <label

@@ -3520,13 +3520,13 @@ export const routes: Route[] = [
                 'stateless',
             );
         },
-        // Admin-only — POST /identities has no member-tier
-        // entry, so it falls to the root admin tier in
-        // ROUTE_POLICY. The identity and, for a service, its
-        // client_secret credential are declared geneses in one
-        // statement, so a resent create answers 409 and stores
-        // nothing. A person's PII enters later via PUT
-        // identities/:id/pii.
+        // Organization admin only — POST /identities has no
+        // member-tier entry, so it falls to the organization
+        // admin's `/` rows in ROUTE_POLICY. The identity and,
+        // for a service, its client_secret credential are
+        // declared geneses in one statement, so a resent
+        // create answers 409 and stores nothing. A person's
+        // PII enters later via PUT identities/:id/pii.
         post: async (
             db, _p, body, _actor, messagePair, organization,
         ) => {

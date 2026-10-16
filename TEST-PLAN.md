@@ -5827,54 +5827,25 @@ FSM, unlike `flows/detail`).
 
 - [ ] **G44** Navigate to `identities/index.html`. Click
   "Add Identity". PASS: the `add-identity` dialog opens
-  with a Kind toggle (Person checked by default /
-  Service). With Person selected, the person form
-  (`#add-identity-person-form`) shows Name/Email/Phone/
-  Bio inputs; fill Name + Email, click "Create"
-  (`#add-identity-submit`). The person half fails until
-  a follow-up re-aims the page. `postIdentityCreation`
-  still POSTs `identities`, then the PII PUT is 403,
-  because that identity has no membership. The person
-  is not listed. The members statement, POST
-  `organizations/:id/memberships/`, is now the person
-  create.
-  A second-hop failure toasts a partial-state message
-  naming the PII-less identity rather than a blanket
-  create failure. Re-open the dialog and click the
-  "Service" radio → the person form hides and the
-  service form (`#svc-secret`, "Client Secret") shows;
-  enter a secret, Create → a "Service identity added"
-  toast, the dialog closes, and a new "Service"-badged
-  row appears. Submitting Person with an empty Name or
-  Email shows "Name and email are required" and keeps
-  the dialog open. Source: `web-app/identities/index.ts`
-  (`handleAddIdentitySubmit` / `submitPersonForm` /
-  `submitServiceForm`).
-  Pin: tests/adapters-identity-creation.test.ts
-       'postIdentityCreation mints a person identity with
-       PII' (decides the two-sequential-request person
-       create — POST identities then PUT identities/:id
-       /pii — lands both the kind and the PII);
-       tests/api-identities-create.test.ts 'a bad PUT
-       identities/:id/pii after a good create leaves the
-       identity standing PII-less — the torn-state
-       acceptance the intake decomposition names' (decides
-       the underlying torn-state mechanism this case's
-       "rather than a blanket create failure" clause
-       relies on: a failed second-hop PII write leaves the
-       identity surviving, standing PII-less);
+  on the service form (`#svc-secret`, "Client Secret"),
+  with no Kind toggle and no person form. Click "Create"
+  (`#add-identity-submit`) with the secret empty → "A
+  client secret is required" and the dialog stays open.
+  Enter a secret, Create → a "Service identity added"
+  toast and the dialog closes. The roster append fails
+  until G47's line lands: `GET identities/` omits
+  services, so the new service is not listed (see G47).
+  Source: `web-app/identities/index.ts`
+  (`handleAddIdentitySubmit`).
+  Pin: tests/browser/dialogs.test.ts 'the add-identity
+       dialog opens on the service form' (decides no
+       Kind toggle, no person form, and a visible
+       `#svc-secret`);
        tests/adapters-identity-creation.test.ts
        'postIdentityCreation mints a service identity
-       with a hashed client_secret' (decides the Service
-       path's credential sub-object is hashed, never the
-       plaintext secret); exploratory — the live dialog
-       Kind toggle, the "Identity added"/"Service
-       identity added" toasts, the roster append, the
-       specific toast text and the
-       `IdentityPiiIntakeFailedError` class the
-       second-hop failure raises (see Unpinned but
-       pinnable), and the "Name and email are required"
-       validation
+       with a hashed client_secret' (decides the
+       credential sub-object is hashed, never the
+       plaintext secret); exploratory — the toast text
 - [ ] **G45** From the roster, click a person row
   (`.card[data-identity-id]`). PASS: navigates to
   `identities/detail.html?identityId=<id>`, which

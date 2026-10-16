@@ -209,6 +209,10 @@ cannot know:
   `grant` is a verb; the noun stays only for RFC 6749
   `grant_type` / `invalid_grant`, RFC 7591 `grant_types`,
   Postgres `GRANT`, and the OAuth adapter's internals.
+  Prose names a person "organization admin" or
+  "operator" (ARCHITECTURE.md `## Tenancy`), never bare
+  "admin"; the role string `admin` and the membership
+  type `'admin'` stay.
 - **Commandments touched by the task.** Name them.
 - **Abominations the task specifically risks.** Name them.
 - **Existing codebase patterns to match.** RequestContext

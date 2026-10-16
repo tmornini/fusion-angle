@@ -1264,9 +1264,9 @@ async () => {
 
 // identity-credentials stays ADMIN-ONLY after nesting: the
 // /identities surface carries no member-tier entry, so the
-// nested credentials route falls to the root admin tier. Admin
-// reads it; a plain member is denied, exactly as the flat
-// /identity-credentials route was.
+// nested credentials route falls to the organization admin's
+// `/` rows. An organization admin reads it; a plain member is
+// denied, exactly as the flat /identity-credentials route was.
 Deno.test('nested credentials are admin-only (member denied)',
 async () => {
     const fx = await deepDb();
