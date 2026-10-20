@@ -6,7 +6,6 @@ import {
 import { handleRequest } from '../api/api.ts';
 import {
     claimToken,
-    devToken,
     organizationToken,
 } from './token-fixtures.ts';
 import {
@@ -166,17 +165,6 @@ async () => {
 Deno.test('enumerate returns only the caller member orgs',
 async () => {
     const { db, organizationA } = await twoOrganizations();
-    // Seeded through the live document PUT (not a raw
-    // db.organizations.put) so organizationA has a message pair — the
-    // GET /identities/:id/organizations/ derives from
-    // the ledger, not the old organizations table. organizationB stays a
-    // raw row: `current` is never a member of B, so the
-    // membership filter excludes it whether or not it derives.
-    await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationA,
-        await devToken('XXZruirZyAOoRpNxaDnpSA'),
-        organizationRow('Acme'),
-    ));
     // Phase Final Stage B: organizations table retired
     // — B need not derive for membership-filter
     // exclusion of non-members.
@@ -220,18 +208,11 @@ async function contentMemberDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     const organizationA = generateIdentifier();
-    // seedAdminSchema (not bare postSchemaCreation) so `current`
-    // can create org A through the live document PUT below —
-    // GET /identities/:id/organizations/ derives
-    // from the ledger, so a raw db.organizations.put would be
-    // invisible to it. `current` never appears in an assertion
-    // here; it exists only to author the org A document.
+    // GET /identities/:id/organizations/ derives from the
+    // ledger, so org A needs its document pair; it is written
+    // below the fence, the path the operator's seed takes.
     await seedAdminSchema(db);
-    await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationA,
-        await devToken('XXZruirZyAOoRpNxaDnpSA'),
-        organizationRow('Acme'),
-    ));
+    await seedOrganizationDocument(db, organizationA, 'Acme');
     // B stays a raw row: toccYYkLEABmlbpHJalgtQ is never a member of B, so
     // the
     // membership filter excludes it whether or not it derives.

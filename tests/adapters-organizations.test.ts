@@ -1,6 +1,9 @@
 import { assertEquals, assertStrictEquals } from '@std/assert';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
-import { organizationRow } from './test-fixtures.ts';
+import {
+    organizationRow,
+    seedOrganizationDocument,
+} from './test-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getOrganization,
@@ -55,10 +58,7 @@ async () => {
         ctx, await getOrganization(ctx, 'AjdvjuECVZEgZoFajaIEkg'),
         organizationRow('Acme'),
     );
-    await ctx.PUT(
-        'organizations/' + generateIdentifier(),
-        organizationRow('Beta'),
-    );
+    await seedOrganizationDocument(db, generateIdentifier(), 'Beta');
     await seedMembershipPair(
         db, generateIdentifier(),
         'AjdvjuECVZEgZoFajaIEkg', 'XXZruirZyAOoRpNxaDnpSA',
@@ -75,9 +75,7 @@ async () => {
     const [low, high] = [generateIdentifier(), generateIdentifier()]
         .sort(compareIdentifiers) as [string, string];
     for (const id of [high, low]) {
-        await ctx.PUT(
-            'organizations/' + id, organizationRow('O-' + id),
-        );
+        await seedOrganizationDocument(db, id, 'O-' + id);
         await seedMembershipPair(
             db, generateIdentifier(), id, 'XXZruirZyAOoRpNxaDnpSA',
             '2026-06-04T00:00:00.000000Z',

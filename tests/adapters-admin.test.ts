@@ -253,7 +253,8 @@ Deno.test(
         // derives from the ledger, so the row needs a message
         // pair — a raw db.organizations.put would be invisible.
         await ctx.PUT('organizations/AjdvjuECVZEgZoFajaIEkg'
-            , organizationRow('Acme'));
+            , organizationRow('Acme'),
+            [await getOrganizationEntity(ctx)]);
         const { seedSeat } = await import(
             './root-admin-fixture.ts'
         );

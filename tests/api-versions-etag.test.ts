@@ -390,22 +390,31 @@ Deno.test(
     async () => {
         const db = await seedMemberOrganizations();
         const id = generateIdentifier();
+        await seedOrganizationDocument(db, id, 'Genesis');
         const token = await claimToken({
             organization: id,
             organizations: [id],
             roles: ['admin:' + id],
         });
         const path = '/organizations/' + id;
+        const genesisBody = organizationRow('Genesis');
         const firstBody = organizationRow('First');
         const secondBody = organizationRow('Second');
-        const first = await handleRequest(db, req(
-            'PUT', path, token, firstBody,
+        const read = await handleRequest(db, req(
+            'GET', path, token,
         ));
-        assertStrictEquals(first.status, 201);
+        assertStrictEquals(read.status, 200);
+        await read.body?.cancel();
+        const first = await handleRequest(db, apiRequest({
+            method: 'PUT', path, token, body: firstBody,
+            headers: { 'If-Match': read.headers.get('ETag')! },
+        }));
+        assertStrictEquals(first.status, 200);
         await first.body?.cancel();
-        const second = await handleRequest(db, req(
-            'PUT', path, token, secondBody,
-        ));
+        const second = await handleRequest(db, apiRequest({
+            method: 'PUT', path, token, body: secondBody,
+            headers: { 'If-Match': first.headers.get('ETag')! },
+        }));
         assertStrictEquals(second.status, 200);
         await second.body?.cancel();
         const list = await handleRequest(db, req(
@@ -415,11 +424,14 @@ Deno.test(
         const versions = await partsOf<OrganizationEntity>(
             list,
         );
-        assertStrictEquals(versions.length, 2);
+        assertStrictEquals(versions.length, 3);
         assertEquals(versions[0]!.body().toValue(), {
-            id, ...firstBody,
+            id, ...genesisBody,
         });
         assertEquals(versions[1]!.body().toValue(), {
+            id, ...firstBody,
+        });
+        assertEquals(versions[2]!.body().toValue(), {
             id, ...secondBody,
         });
         for (const part of versions) {

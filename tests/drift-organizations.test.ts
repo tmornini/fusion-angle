@@ -276,10 +276,18 @@ Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
     const updatedFields = organizationRow(
         'Stark Industries Renamed',
     );
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION,
-        adminToken, updatedFields,
+    const read = await handleRequest(db, req(
+        'GET', '/organizations/' + STARK_ORGANIZATION, adminToken,
     ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK_ORGANIZATION,
+        token: adminToken,
+        body: updatedFields,
+        headers: { 'If-Match': read.headers.get('ETag')! },
+    }));
     assertStrictEquals(put.status, 200);
     const putBody = await put.json() as OrganizationEntity;
     assertStrictEquals(putBody.name, 'Stark Industries Renamed');

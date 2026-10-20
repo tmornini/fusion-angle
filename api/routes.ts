@@ -3063,9 +3063,11 @@ export const WRITE_RESPONSE_SPECS:
     'identities/:id/tokens/:jti/revocation': {
         conditional: 'none',
     },
-    // G3: GET wins. Stored PUT = GET, `id` first.
+    // G3: GET wins. Stored PUT = GET, `id` first. Class B: a
+    // PUT only rewrites the live head and never creates the
+    // document; the operator's seed does.
     'organizations/:id': {
-        conditional: 'optional',
+        conditional: 'required',
         successBody: (params, body) => organizationEntityOf({
             name: param(params, 0),
             messagePairId: param(params, 0),
