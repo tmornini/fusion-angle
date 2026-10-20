@@ -267,7 +267,7 @@ through E are the write shapes the spec audits
 | Conditional | Takes | Routes |
 |---|---|---|
 | `optional` | If-Match, If-None-Match: *, or neither; a DELETE's useful one is If-Match (If-None-Match: * passes the gate, but a live head refuses it 412) | class A document PUTs; every DELETE but the release |
-| `required` | If-Match or If-None-Match: * | class B: the flow and work-order PUTs; the instance PATCH; the organization-nest membership item `organizations/:id/invitations/:membership-id` |
+| `required` | If-Match or If-None-Match: * | class B: the flow, work-order, and organization document PUTs; the instance PATCH; the organization-nest membership item `organizations/:id/invitations/:membership-id` |
 | `in-order` | If-Match, one tag per document the operation derives from | class C operations: conversion, undo, claim and release, transition, binding, and the identity-nest membership PUTs (accept and decline) |
 | `none` | no conditional | class D POST creates; class E operations: the invitation POST, token rotation and revocation |
 
