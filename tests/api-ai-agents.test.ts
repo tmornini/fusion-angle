@@ -1,12 +1,17 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, PUT } from './in-page-facade.ts';
+import { GET, GETCollection, PUT } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
+import {
+    claimToken,
+    DEV_TOKEN,
+    organizationToken,
+} from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
     apiRequest,
+    partBodiesOf,
 } from './http-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import { generateIdentifier } from
@@ -93,6 +98,93 @@ function flowDocument(
         revivals: [],
     };
 }
+
+const STARK = 'AjdvjuECVZEgZoFajaIEkg';
+const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
+
+function aiPath(organization: string, id = ''): string {
+    return '/organizations/' + organization
+        + '/ai-agents/' + id;
+}
+
+Deno.test('an AI document lives under its organization',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const body = agentFields('Scoped agent');
+    const put = await handleRequest(db, req(
+        'PUT', aiPath(STARK, id), DEV_TOKEN, body,
+    ));
+    assertStrictEquals(put.status, 201);
+    await put.body?.cancel();
+    const got = await handleRequest(db, req(
+        'GET', aiPath(STARK, id), DEV_TOKEN,
+    ));
+    assertStrictEquals(got.status, 200);
+    assertEquals(await got.json(), { id, ...body });
+    const listed = await handleRequest(db, req(
+        'GET', aiPath(STARK), DEV_TOKEN,
+    ));
+    assertStrictEquals(listed.status, 200);
+    assertEquals(
+        (await partBodiesOf<{ id: string }>(listed))
+            .map((row) => row.id),
+        [id],
+    );
+});
+
+// Foreign path 403 at the organization fence; a Stark id
+// under Wayne's own path does not exist there (404).
+Deno.test('another organization reads no AI of ours',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const put = await handleRequest(db, req(
+        'PUT', aiPath(STARK, id), DEV_TOKEN,
+        agentFields('Stark agent'),
+    ));
+    assertStrictEquals(put.status, 201);
+    await put.body?.cancel();
+    const wayne = await claimToken({
+        organization: WAYNE,
+        organizations: [WAYNE],
+        roles: ['admin:' + WAYNE],
+    });
+    const foreignPath = await handleRequest(db, req(
+        'GET', aiPath(STARK, id), wayne,
+    ));
+    assertStrictEquals(foreignPath.status, 403);
+    await foreignPath.body?.cancel();
+    const foreignId = await handleRequest(db, req(
+        'GET', aiPath(WAYNE, id), wayne,
+    ));
+    assertStrictEquals(foreignId.status, 404);
+    await foreignId.body?.cancel();
+    assertEquals(
+        await GETCollection(
+            db, aiPath(WAYNE).slice(1), wayne,
+            operationIdHeader(),
+        ),
+        [],
+    );
+});
+
+Deno.test('the global ai-agents routes are gone',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    for (const [method, path, body] of [
+        ['GET', '/ai-agents/', undefined],
+        ['GET', '/ai-agents/' + id, undefined],
+        ['PUT', '/ai-agents/' + id, agentFields('Global')],
+    ] as const) {
+        const res = await handleRequest(db, req(
+            method, path, DEV_TOKEN, body,
+        ));
+        assertStrictEquals(res.status, 404, method + path);
+        await res.body?.cancel();
+    }
+});
 
 Deno.test('PUT /ai-agents/:id writes the four fields; GET'
 + ' returns them', async () => {
