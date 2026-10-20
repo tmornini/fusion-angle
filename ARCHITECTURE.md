@@ -172,7 +172,9 @@ is absent there: a write geneses or 404s, a read 404s.
 Global-plane reads of an organization document answer
 a foreign owner 403, an absent one 404. Its PUT takes
 the path fence: a foreign or absent id is 403, and the
-claim organization's own PUT requires If-Match.
+claim organization's own PUT requires If-Match. A
+claim organization with no document answers that PUT
+404, whatever its conditional.
 Global-plane identity reads and writes are the identity
 fence: co-membership. When the path identity is not the
 actor, an accepted membership in the claim organization
