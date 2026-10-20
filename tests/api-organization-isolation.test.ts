@@ -301,6 +301,43 @@ async () => {
     );
 });
 
+// No request creates an organization: a claim organization
+// with no document is the head read's miss, 404, whichever
+// conditional the PUT carries (RFC 9110 §13.2.1), and
+// nothing is stored.
+for (const [precondition, headers] of [
+    ['If-None-Match: *', { 'if-none-match': '*' }],
+    ['If-Match', { 'if-match': '"' + generateIdentifier() + '"' }],
+] as const) {
+    Deno.test('a PUT with ' + precondition + ' on an absent claim'
+    + ' organization is 404', async () => {
+        const { db, organizationB } = await twoOrganizations();
+        await seedMembershipPair(
+            db, generateIdentifier(), organizationB,
+            'XXZruirZyAOoRpNxaDnpSA',
+        );
+        const res = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + organizationB,
+            token: await organizationToken(
+                'XXZruirZyAOoRpNxaDnpSA', organizationB,
+            ),
+            body: organizationRow('Genesis'),
+            headers,
+        }));
+        assertStrictEquals(res.status, 404);
+        assertEquals(await res.json(), {
+            error: 'Not found: organizations/' + organizationB,
+        });
+        assertEquals(
+            (await deriveOrganizations(db)).filter(
+                (organization) => organization.id === organizationB,
+            ),
+            [],
+        );
+    });
+}
+
 // ---- T8: the parent-derived READ fence (server-side join) ----
 
 const T8_AT = '2026-06-04T00:00:00.000000Z';
