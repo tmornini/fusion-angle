@@ -3326,14 +3326,6 @@ Off the critical path; each with its oracle.
   default organization, since PRIMARY takes the
   earliest join and the personal organization would be
   every person's earliest.
-- A claim naming an organization with no document
-  passes the path fence on `PUT organizations/:id`, and
-  `If-None-Match: *` there creates the document,
-  against decision 5's "never a genesis"
-  (`docs/superpowers/specs/org-document-put-fence-design.md`).
-  Unreachable today: every claim organization has a
-  seeded document, and nothing pins that. Open: which
-  status refuses it, and at which gate.
 - Remove the never-verified `client_secret`: the
   credential kind, the seed row, the dialog field, and
   the service's Credentials card. OAuth's
