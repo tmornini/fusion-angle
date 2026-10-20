@@ -211,9 +211,12 @@ These are the spec's "Left to the builder" items.
   refusal (Task 8) is the whole rule.
 - **A service member detail page** shows the service's
   name, its description, and a link to its identity, plus
-  Remove. It has no Edit, because the spec names none.
-  `PUT organizations/:id/services/:id` exists but has no
-  page control. Owner, flag this if you want Edit.
+  Edit and Remove. Edit is the owner's ruling, given
+  after this plan was first drafted. It works as the AI
+  page's does: Name and Description are both required,
+  and the PUT
+  `organizations/:id/services/:id` latches the read it
+  came from.
 
 ## Order, and where it departs from the prompt
 
@@ -2570,17 +2573,20 @@ Unbidden Helper Code.
   - 'getServiceMember reads the document and its
     membership'
   - 'getMembers lists a service member as a service'
+  - 'a service member save latches its read and answers
+    the new head'
 - Consumes `recordedContext` (`tests/in-page-facade.ts:95`),
   `adminContext` (`tests/context-fixtures.ts:16`),
   `assertRejects`, and `RequestError`.
-- The file imports `postServiceMemberCreation` and
-  `getServiceMember` from `../client/service-members.ts`,
+- The file imports `postServiceMemberCreation`,
+  `getServiceMember`, `getServiceMemberEntity`, and
+  `putServiceMember` from `../client/service-members.ts`,
   which Task 22 creates. Until then `./test check` fails
   with exactly one TS2307 for that specifier. That is
   this red commit's named type error (Global
   Constraints).
 
-- [ ] **Step 1: The four cases**
+- [ ] **Step 1: The five cases**
 
 - **'postServiceMemberCreation posts the memberships
   statement'.** Through `recordedContext`, one write is
@@ -2607,6 +2613,18 @@ Unbidden Helper Code.
 - **'getMembers lists a service member as a service'.**
   Exactly one member has `kind === 'service'`, and it has
   that id.
+- **'a service member save latches its read and answers
+  the new head'.** This mirrors
+  `tests/adapters-ai-members.test.ts:78`.
+  1. Create the member.
+  2. `held = await getServiceMemberEntity(ctx, id)`.
+  3. Through `recordedContext`,
+     `putServiceMember(ctx, held, { name: 'CI bot', description: 'Builds v2' })`.
+  4. The one write sent is a PUT to
+     `/api/organizations/<STARK>/services/<id>` whose
+     `If-Match` is `held`'s ETag.
+  5. The returned message's body is
+     `{ id, name: 'CI bot', description: 'Builds v2' }`.
 
 - [ ] **Step 2: Red in exactly this file**
 
@@ -2680,6 +2698,11 @@ export class ServiceMember {
   - `postServiceMemberCreation(ctx: RequestContext, id: MemberId, input: ServiceMemberDraft): Promise<void>`,
     which POSTs the statement, then notifies
     `notifyMembershipChanges()` and its own channel
+  - `getServiceMemberEntity(ctx: RequestContext, id: MemberId): Promise<HttpMessage<ServiceEntity>>`,
+    as `getAIMemberEntity` (`client/ai-members.ts:119-124`)
+  - `putServiceMember(ctx: RequestContext, held: HttpMessage<ServiceEntity>, input: ServiceMemberDraft): Promise<HttpMessage<ServiceEntity>>`,
+    a PUT latched with `[held]`, then a notify on its own
+    channel, as `putAIMember` (`:128-145`)
 
 - [ ] **Step 1: The type, the verbs, and the union**
 
@@ -2688,7 +2711,7 @@ As above.
 - [ ] **Step 2: Layer 1 is green**
 
 Run `./test validate`. Expected: exit 0, and Task 21's
-four cases are `ok`. The members page compiles, because
+five cases are `ok`. The members page compiles, because
 `ManagedMembersPresenter` filters by kind and ignores a
 `'service'` member until Task 24.
 
@@ -3049,14 +3072,22 @@ Test Weakening, Unbidden Helper Code.
 - [ ] **Step 1: The red cases**
 
 - **Service detail presenter.** 'service member detail
-  shows its name, description, identity link, and
+  shows its name, description, identity link, Edit, and
   Remove'. It is built from `makeServiceMember` (Task 23).
   The HTML holds:
   - the name and the description
   - `href` equal to
     `buildPageUrl('identity-detail', { identityId: id })`
+  - `id="member-edit-btn"`
   - `data-dialog-open="confirm-remove"`
-  - no `member-edit-btn`
+- **Service detail presenter, edit mode.** 'service
+  member edit mode shows Name and Description fields'.
+  The editable render holds inputs prefilled with the
+  name and the description, plus `member-cancel-btn`. It
+  does not hold `member-remove-btn`. This mirrors the AI
+  presenter's edit-mode case in
+  `tests/presenter-member-detail.test.ts`; read that case
+  and match its draft shape and its calls.
 - **AI detail presenter.** 'AI member detail links its
   identity and offers Remove'. The same link and
   `confirm-remove` assertions. `member-edit-btn` stays.
@@ -3132,9 +3163,24 @@ Generalization, Swallowed Failures.
   export `buildRemoveAffordance`. It now has three users.
   Only the `export` keyword changes, with no move.
 - Create `web-app/app/presenters/service-member-detail.ts`:
-  `ServiceMemberDetailPresenter`. It has one "Service
-  Member" card (Name, Description), the identity link,
-  and `buildRemoveAffordance(removal)`. It has no Edit.
+  `ServiceMemberDetailPresenter` and
+  `ServiceMemberDraftFields { name: string; description: string }`.
+  It has a read mode and an edit mode, as
+  `web-app/app/presenters/ai-member-detail.ts` does:
+  - one "Service Member" card (Name, Description) and the
+    identity link
+  - read mode: Edit plus `buildRemoveAffordance(removal)`
+  - edit mode: Cancel plus Save
+- `web-app/members/detail.ts`: add `saveServiceMember`,
+  modelled on `saveAIMember` (`:581-636`):
+  - toast `'Name and description are required'` when
+    either trimmed field is empty
+  - `getServiceMemberEntity`, then
+    `putServiceMember(ctx, held, { ...rest, ...patch })`,
+    then a reload with `getServiceMember`
+  - copy: `'Failed to save service member'`,
+    `'Service member saved'`,
+    `'Failed to reload service member'`
 - `web-app/app/presenters/ai-member-detail.ts`:
   - the "AI Member" card (`:305-316`) gains the identity
     link
@@ -3399,6 +3445,16 @@ paragraph after `:166-172`:
     SERVICES
   - the member's detail links its identity, whose
     registration card is G47
+  - Edit changes the description, and "Service member
+    saved" shows it
+  - Remove ends the membership, and the row leaves
+    SERVICES
+
+  The added pins are
+  tests/adapters-service-members.test.ts 'a service
+  member save latches its read and answers the new
+  head', and tests/browser/member-create.test.ts
+  'removing a service member drops it from the roster'.
 
   Pin: tests/browser/member-create.test.ts 'adding a
   service member toasts success and lists it'.
@@ -3519,14 +3575,14 @@ lands the branch.
 
 ## Questions for the owner
 
-1. **TODO closures.** The spec closes each TODO line in
-   its behavior commit (Tasks 8 and 14). The prompt puts
-   both in the docs tail (Task 38). The plan follows the
-   prompt. Should they move?
-2. **Service Edit.** The service member detail page has
-   no Edit, because the spec names none. The API PUT
-   exists. Add Edit as the AI page has it?
-3. **`memberIds` naming a service member.** The write law
+Settled by the owner after the first draft:
+- TODO closures stay in the docs tail (Task 38).
+- The service member detail page is editable (Tasks 21,
+  22, 29, and 30).
+
+Open:
+
+1. **`memberIds` naming a service member.** The write law
    refuses an AI id in a node's `memberIds`
    (`api/validators.ts:204-212`). It says nothing of a
    service member's id. The designer's people picker
