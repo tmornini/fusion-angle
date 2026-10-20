@@ -93,9 +93,14 @@ plane" because of it.
 7. Nothing in the product depends on the unfenced PUT.
    The seed and the bootstrap seed write below the
    fence; `tests/root-admin-fixture.ts` forms its pair
-   directly. Five test sites create an organization
-   over HTTP as setup or as the subject; they move to
-   `seedOrganizationDocument` (section 2).
+   directly. Thirteen test sites in six files lean on
+   it, as setup or as the subject (section 2): twelve
+   cases the fence breaks, and one setup PUT it leaves
+   dead. A case that needs another organization seeds
+   it with `seedOrganizationDocument`; a case whose
+   subject is the PUT's write path PUTs its fixture's
+   own claim organization with the current `If-Match`;
+   the dead PUT is deleted.
 
 ## 1. The fence
 
@@ -158,30 +163,57 @@ No pin for a stale `If-Match` or `If-None-Match: *`:
 under `optional` the shared gate already answers both
 412, so a new pin could not fail.
 
-The fix commit carries the tests it breaks. Each moves
-an HTTP organization create to
+The fix commit carries the twelve cases it breaks, and
+deletes one setup PUT it leaves dead. Each case keeps
+its covenant. A case that needs an organization other
+than its token's claim seeds it with
 `seedOrganizationDocument(db, id, name)`
 (`tests/test-fixtures.ts`), the path the operator's
-seed takes:
+seed takes. A case whose subject is the PUT's write
+path PUTs its fixture's own claim organization with
+`If-Match` from the head it reads. A count changes
+only where a case's own setup changes:
 
-- `tests/derive-organizations.test.ts`. "deriveOrganization
-  mirrors the PUT wire body exactly" PUTs with the
-  current `If-Match` on the fixture's own organization
-  `AjdvjuECVZEgZoFajaIEkg` and asserts 200, keeping its
-  wire-equals-derive covenant. "deriveOrganizations
-  mirrors every PUT wire body, id-lex ordered" seeds
-  its two organizations directly; it asserts order and
-  names, not how they were written.
-- `tests/api-organization-isolation.test.ts:174` and
-  `:229`, setup only.
+- `tests/derive-organizations.test.ts`, six cases.
+  Five PUT `DEV_TOKEN`'s claim organization
+  `AjdvjuECVZEgZoFajaIEkg`, which `seedAdminSchema`
+  seeds, with the current `If-Match`, and assert 200:
+  "deriveOrganization mirrors the PUT wire body
+  exactly" (`:73`), "a second live PUT supersedes the
+  first" (`:129`), "the pair lives at the flat
+  /organizations/ prefix" (`:153`; still four pairs,
+  and it finds the PUT's own pair by its ETag, since
+  the seed's pair now shares its name), "a PUT whose
+  body echoes id round-trips" (`:175`), and "stored
+  PUT body equals organizationEntityOf id-first"
+  (`:198`). "deriveOrganizations mirrors every PUT
+  wire body, id-lex ordered" (`:85`) seeds its two
+  organizations directly; it asserts order and names,
+  not how they were written.
+- `tests/api-organization-isolation.test.ts:229`
+  (`contentMemberDb`), setup only, moves to
+  `seedOrganizationDocument`. `:174` is deleted, not
+  moved: `twoOrganizations` already seeds
+  organizationA, so that PUT only overwrote it, and
+  behind the fence it is a 403 nothing reads.
 - `tests/adapters-organizations.test.ts:59` and `:79`,
-  setup only.
+  setup only, move to `seedOrganizationDocument`.
+- `tests/adapters-admin.test.ts:243`, "getOrganization
+  derives seat usage from the memberships ledger": its
+  setup PUT (`:255`) latches the head it reads.
+- `tests/api-versions-etag.test.ts:387`, "two
+  organization PUTs list oldest first": it seeds its
+  claim organization, then PUTs twice with `If-Match`.
+  The list holds three versions, the seed's first, and
+  still runs oldest first.
 - `tests/drift-organizations.test.ts` leg 4 sends
   `If-Match` from the head it reads and still asserts
   200 and full wire, derive, and stored parity.
 
 Unchanged and green: `tests/adapters-admin.test.ts:270`
-(the client latches `If-Match`),
+("putOrganizationGeneralInfo latches the held
+organization": the client latches `If-Match`; `:243`
+above is a different case),
 `api-organization-isolation.test.ts:271` (a member's
 403), the seed and mock-data suites.
 
@@ -226,6 +258,15 @@ pinned at Layer 1 through the in-page facade.
   organization, since PRIMARY takes the earliest join
   and the personal organization would be every
   person's earliest.
+- TODO.md: file, beside it, the absent-claim genesis
+  hole. A claim naming an organization with no
+  document passes the path fence on
+  `PUT organizations/:id`, and `If-None-Match: *` there
+  creates the document, against decision 5's "never a
+  genesis". It is unreachable today, because every
+  claim organization has a seeded document, and
+  nothing pins that. Open: which status refuses it,
+  and at which gate. The line decides nothing.
 - TODO.md:558 cites `client/identities.ts:314` for
   `postIdentityCreation`; it is `:284`.
 - `docs/superpowers/specs/identities-person-retire-design.md`
@@ -241,24 +282,27 @@ Each commit one line, present-tense imperative, with
 the `Co-Authored-By` trailer.
 
 1. Add the organization document fence spec
-2. Add the organization document fence plan
-3. Pin the organization document PUT fence (R1-R3,
+2. Amend the fence spec's test sites
+3. Add the organization document fence plan
+4. Pin the organization document PUT fence (R1-R3,
    red)
-4. Fence the organization document PUT (section 1's
+5. Fence the organization document PUT (section 1's
    edits, section 2's moved tests, the regenerated
    `rooms.ts`)
-5. Rewrite the tenancy prose on the fence
+6. Rewrite the tenancy prose on the fence
    (ARCHITECTURE.md)
-6. Name the organization PUT a class B write (API.md)
-7. Close the fence line and file personal organizations
+7. Name the organization PUT a class B write (API.md)
+8. Close the fence line and file personal organizations
    (TODO.md)
-8. Retarget the postIdentityCreation citation
-   (TODO.md:558)
-9. Correct the person-retire roster oracle
+9. File the absent-claim organization genesis
+   (TODO.md)
+10. Retarget the postIdentityCreation citation
+    (TODO.md:558)
+11. Correct the person-retire roster oracle
 
 ## 5. Oracle
 
-1. R1-R3 are red at commit 3 and green at commit 4.
+1. R1-R3 are red at commit 4 and green at commit 5.
 2. `./test validate browser` is green on the branch
    tip.
 3. `grep -n "unfenced\|but one:" ARCHITECTURE.md`
