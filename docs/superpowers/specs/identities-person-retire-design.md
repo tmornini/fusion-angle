@@ -269,7 +269,9 @@ their files.
    `grep -rn IdentityPiiIntakeFailedError tests TODO.md TEST-PLAN.md`
    prints nothing.
 3. `grep -rn "kind: 'person'" client/identities.ts`
-   prints nothing.
+   prints only the two roster lines, the
+   `IdentityRosterRow` type (`:75`) and its row
+   (`:114`).
 4. `git diff d4ef5913 -- api server shared` prints
    only the comment rewrite at `api/routes.ts:3524`.
 5. `grep -rn "admin tier" ARCHITECTURE.md api tests`
