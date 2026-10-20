@@ -32,8 +32,10 @@ import {
     deriveIdentityPiiRows,
     deriveCredential,
 } from '../api/derive-identity-spine.ts';
-import { deriveOrganization } from
-    '../api/derive-organizations.ts';
+import {
+    deriveOrganization,
+    deriveOrganizations,
+} from '../api/derive-organizations.ts';
 import {
     apiRequest,
     framedRequest,
@@ -272,6 +274,50 @@ async () => {
         await organizationToken('toccYYkLEABmlbpHJalgtQ', organizationA),
         organizationRow('Hijack')));
     assertStrictEquals(res.status, 403);
+});
+
+// The organization document's PUT takes the path fence: its
+// id must be the claim organization. An absent id is the
+// path fence's fixed 403, and nothing is stored.
+Deno.test('an organization admin PUT on an absent id is 403',
+async () => {
+    const { db, organizationA } = await twoOrganizations();
+    const fresh = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'PUT', '/organizations/' + fresh,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
+        organizationRow('Fresh')));
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: 'forbidden: path organization does not match'
+            + ' the token organization',
+    });
+    assertEquals(
+        (await deriveOrganizations(db))
+            .filter((organization) => organization.id === fresh),
+        [],
+    );
+});
+
+// A real organization the caller is no member of answers
+// the same 403, and its document keeps its name.
+Deno.test('an organization admin PUT on a foreign org is 403',
+async () => {
+    const { db, organizationA, organizationB } =
+        await twoOrganizations();
+    await seedOrganizationDocument(db, organizationB, 'Wayne');
+    const res = await handleRequest(db, req(
+        'PUT', '/organizations/' + organizationB,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
+        organizationRow('Hijack')));
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: 'forbidden: path organization does not match'
+            + ' the token organization',
+    });
+    assertStrictEquals(
+        (await deriveOrganization(db, organizationB)).name, 'Wayne',
+    );
 });
 
 // ---- T8: the parent-derived READ fence (server-side join) ----
