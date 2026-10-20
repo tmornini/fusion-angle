@@ -555,7 +555,7 @@ code comments cite; specs and plans written before the
   (`formSeedCredentialMessagePairs`,
   `api/mock-data/seed-message-pairs.ts:2421`), only
   services get a secret from the UI
-  (`postIdentityCreation`, `client/identities.ts:314`),
+  (`postIdentityCreation`, `client/identities.ts:284`),
   and `postHumanMemberCreation`
   (`client/members.ts:276`) lands the identity, its
   PII, and a membership, and no credential, for a
