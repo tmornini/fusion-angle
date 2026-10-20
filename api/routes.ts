@@ -262,6 +262,7 @@ import {
     type WorkOrderVersion,
 } from './work-order-version.ts';
 import {
+    deriveOrganization,
     organizationEntityOf,
 } from './derive-organizations.ts';
 import {
@@ -3465,9 +3466,10 @@ async function authGrantOffered(): Promise<never> {
     );
 }
 
-// PUT /organizations/:id — the tenant root's document,
-// a pure message-plane write. The response is the entity
-// organizationEntityOf forms.
+// The tenant root's document, a pure message-plane write:
+// the operator's seed writes its genesis here, below the
+// route. The response is the entity organizationEntityOf
+// forms.
 export async function postOrganizationDocumentOp(
     db: DbAdapter,
     p: string[],
@@ -3492,6 +3494,24 @@ export async function postOrganizationDocumentOp(
         );
     }
     return entity;
+}
+
+// PUT /organizations/:id only rewrites the live head; no
+// request creates an organization. A claim organization
+// with no document is the head read's miss, 404, whichever
+// conditional the PUT carries (RFC 9110 §13.2.1); a foreign
+// path is the fence's 403 before this runs.
+async function putLiveOrganizationDocumentOp(
+    db: DbAdapter,
+    p: string[],
+    body: Record<string, unknown>,
+    actor: Id,
+    messagePair: MessagePair | undefined,
+) {
+    await deriveOrganization(db, param(p, 0));
+    return postOrganizationDocumentOp(
+        db, p, body, actor, messagePair,
+    );
 }
 
 export const routes: Route[] = [
@@ -5056,7 +5076,7 @@ export const routes: Route[] = [
             db, canonicalPath(undefined, '/organizations/'),
             param(p, 0), 'organizations',
         ),
-        put: postOrganizationDocumentOp,
+        put: putLiveOrganizationDocumentOp,
     }),
     route('organizations/:id/versions/', {
         select: (db, p) => {
