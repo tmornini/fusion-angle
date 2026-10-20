@@ -160,34 +160,33 @@ the gate, `projectClaimRolesForOrganization`
 `admin` for the claim organization only.
 `ROUTE_POLICY`'s `/` rows grant that role every verb,
 and the identity fence confines it to co-members. It
-reaches no other organization's documents but one:
-`PUT organizations/:id` passes the path fence
-(`api/api.ts:629`), and the membership fence gates
-only its GET (`api/api.ts:664`), so an organization
-admin can create an organization or overwrite
-another's document. The **operator** is whoever holds
-`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY` and runs
-`./deploy`, the seed, and the wipe. The operator is
-not an identity, holds no token, and never acts over
-HTTP. Organizations come from the operator's seed, or
-from that unfenced `PUT organizations/:id`.
+reaches no other organization's documents. The
+**operator** is whoever holds `POSTGRES_URL` and
+`JWT_HMAC_SIGNING_KEY` and runs `./deploy`, the seed,
+and the wipe. The operator is not an identity, holds
+no token, and never acts over HTTP. Organizations come
+only from the operator's seed; no request creates one.
 
 A foreign id under the caller's own organization path
 is absent there: a write geneses or 404s, a read 404s.
 Global-plane reads of an organization document answer
-a foreign owner 403, an absent one 404. Global-plane
-identity reads and writes are the identity fence:
-co-membership. When the path identity is not the actor,
-an accepted membership in the claim organization admits
-the request. Absent, orphan, and foreign answer the same
-403, body `forbidden: <METHOD> <path> names an identity
-outside this organization`. Self stays self. The
-organization admin's `/` rows stay and reach co-members
-only on the identity plane. Path `:organization-id` on an
-org-nested route must equal the claim org else 403. A
-membership name's organization half must equal the
-path's (403). Its identity half must equal the path's
-(404).
+a foreign owner 403, an absent one 404. Its PUT takes
+the path fence: a foreign or absent id is 403, and the
+claim organization's own PUT requires If-Match. A
+claim organization with no document answers that PUT
+404, whatever its conditional.
+Global-plane identity reads and writes are the identity
+fence: co-membership. When the path identity is not the
+actor, an accepted membership in the claim organization
+admits the request. Absent, orphan, and foreign answer
+the same 403, body `forbidden: <METHOD> <path> names an
+identity outside this organization`. Self stays self.
+The organization admin's `/` rows stay and reach only
+co-members and the claim organization. Path
+`:organization-id` on an org-nested route must equal the
+claim org else 403. A membership name's organization
+half must equal the path's (403). Its identity half
+must equal the path's (404).
 
 ## Identity and memberships
 

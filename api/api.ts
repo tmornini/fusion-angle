@@ -618,16 +618,20 @@ async function dispatched(
                 // before authorizeRequest. Path org never
                 // authorizes alone — mismatch (incl.
                 // nonexistent path org) is 403 with a fixed
-                // body. No auto-exchange. The organization
-                // document and its versions keep the
-                // membership fence below; every other
-                // organizations/... match takes this arm.
+                // body. No auto-exchange. Reads of the
+                // organization document and its versions keep
+                // the membership fence below; its PUT, and
+                // every other organizations/... match, take
+                // this arm.
                 if (
                     match !== null
                     && match.route.segments[0]
                         === 'organizations'
-                    && !isOrganizationDocumentPath(
-                        fencePattern,
+                    && !(
+                        method === 'GET'
+                        && isOrganizationDocumentPath(
+                            fencePattern,
+                        )
                     )
                     && fenceParams[0]
                         !== fenced.organization
@@ -658,9 +662,8 @@ async function dispatched(
                 // fence READS to the caller's memberships.
                 // A real org the caller is not a member of
                 // is 403 (honest); a genuinely absent id
-                // stays 404. PUT is not gated here — a new
-                // org is created before its first membership
-                // exists.
+                // stays 404. The document's PUT took the
+                // path fence above.
                 if (method === 'GET'
                     && isOrganizationDocumentPath(
                         fencePattern,

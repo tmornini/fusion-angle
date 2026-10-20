@@ -2585,7 +2585,7 @@ export const API_DOC_ROOMS:
         [
             'Authorization: Bearer …',
             'Operation-ID: on every request',
-            'If-Match or If-None-Match: * (optional)',
+            'If-Match or If-None-Match: *',
         ],
         responseHeaders:
         [
@@ -2601,6 +2601,7 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+            '428',
         ],
     },
     {

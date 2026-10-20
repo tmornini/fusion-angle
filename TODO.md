@@ -555,7 +555,7 @@ code comments cite; specs and plans written before the
   (`formSeedCredentialMessagePairs`,
   `api/mock-data/seed-message-pairs.ts:2421`), only
   services get a secret from the UI
-  (`postIdentityCreation`, `client/identities.ts:314`),
+  (`postIdentityCreation`, `client/identities.ts:284`),
   and `postHumanMemberCreation`
   (`client/members.ts:276`) lands the identity, its
   PII, and a membership, and no credential, for a
@@ -3319,6 +3319,13 @@ Off the critical path; each with its oracle.
   status. Until then an organization admin's
   `POST identities/` with a person body mints an
   orphan no view lists.
+- A person identity's genesis also creates that
+  person's personal organization, an organization like
+  any other, with an accepted `admin` membership, in
+  the same statement; with SP-6 and item 5. Open: the
+  default organization, since PRIMARY takes the
+  earliest join and the personal organization would be
+  every person's earliest.
 - Remove the never-verified `client_secret`: the
   credential kind, the seed row, the dialog field, and
   the service's Credentials card. OAuth's
@@ -3327,12 +3334,6 @@ Off the critical path; each with its oracle.
   service-identity rule (G47).
 - Rewrite bare prose "admin" in the living docs as
   "organization admin" or "operator".
-- Fence `PUT organizations/:id`. It passes the path
-  fence (`api/api.ts:629`), and the membership fence
-  gates only its GET (`api/api.ts:664`), so an
-  organization admin can create an organization or
-  overwrite another's document. Security; a red test
-  first.
 - A service-identity rule: membership or a fence of
   its own (G47).
 - Move items and versions under `memberships/`, with

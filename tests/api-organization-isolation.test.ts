@@ -6,7 +6,6 @@ import {
 import { handleRequest } from '../api/api.ts';
 import {
     claimToken,
-    devToken,
     organizationToken,
 } from './token-fixtures.ts';
 import {
@@ -32,8 +31,10 @@ import {
     deriveIdentityPiiRows,
     deriveCredential,
 } from '../api/derive-identity-spine.ts';
-import { deriveOrganization } from
-    '../api/derive-organizations.ts';
+import {
+    deriveOrganization,
+    deriveOrganizations,
+} from '../api/derive-organizations.ts';
 import {
     apiRequest,
     framedRequest,
@@ -164,17 +165,6 @@ async () => {
 Deno.test('enumerate returns only the caller member orgs',
 async () => {
     const { db, organizationA } = await twoOrganizations();
-    // Seeded through the live document PUT (not a raw
-    // db.organizations.put) so organizationA has a message pair — the
-    // GET /identities/:id/organizations/ derives from
-    // the ledger, not the old organizations table. organizationB stays a
-    // raw row: `current` is never a member of B, so the
-    // membership filter excludes it whether or not it derives.
-    await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationA,
-        await devToken('XXZruirZyAOoRpNxaDnpSA'),
-        organizationRow('Acme'),
-    ));
     // Phase Final Stage B: organizations table retired
     // — B need not derive for membership-filter
     // exclusion of non-members.
@@ -218,18 +208,11 @@ async function contentMemberDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     const organizationA = generateIdentifier();
-    // seedAdminSchema (not bare postSchemaCreation) so `current`
-    // can create org A through the live document PUT below —
-    // GET /identities/:id/organizations/ derives
-    // from the ledger, so a raw db.organizations.put would be
-    // invisible to it. `current` never appears in an assertion
-    // here; it exists only to author the org A document.
+    // GET /identities/:id/organizations/ derives from the
+    // ledger, so org A needs its document pair; it is written
+    // below the fence, the path the operator's seed takes.
     await seedAdminSchema(db);
-    await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationA,
-        await devToken('XXZruirZyAOoRpNxaDnpSA'),
-        organizationRow('Acme'),
-    ));
+    await seedOrganizationDocument(db, organizationA, 'Acme');
     // B stays a raw row: toccYYkLEABmlbpHJalgtQ is never a member of B, so
     // the
     // membership filter excludes it whether or not it derives.
@@ -273,6 +256,87 @@ async () => {
         organizationRow('Hijack')));
     assertStrictEquals(res.status, 403);
 });
+
+// The organization document's PUT takes the path fence: its
+// id must be the claim organization. An absent id is the
+// path fence's fixed 403, and nothing is stored.
+Deno.test('an organization admin PUT on an absent id is 403',
+async () => {
+    const { db, organizationA } = await twoOrganizations();
+    const fresh = generateIdentifier();
+    const res = await handleRequest(db, req(
+        'PUT', '/organizations/' + fresh,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
+        organizationRow('Fresh')));
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: 'forbidden: path organization does not match'
+            + ' the token organization',
+    });
+    assertEquals(
+        (await deriveOrganizations(db))
+            .filter((organization) => organization.id === fresh),
+        [],
+    );
+});
+
+// A real organization the caller is no member of answers
+// the same 403, and its document keeps its name.
+Deno.test('an organization admin PUT on a foreign org is 403',
+async () => {
+    const { db, organizationA, organizationB } =
+        await twoOrganizations();
+    await seedOrganizationDocument(db, organizationB, 'Wayne');
+    const res = await handleRequest(db, req(
+        'PUT', '/organizations/' + organizationB,
+        await organizationToken('XXZruirZyAOoRpNxaDnpSA', organizationA),
+        organizationRow('Hijack')));
+    assertStrictEquals(res.status, 403);
+    assertEquals(await res.json(), {
+        error: 'forbidden: path organization does not match'
+            + ' the token organization',
+    });
+    assertStrictEquals(
+        (await deriveOrganization(db, organizationB)).name, 'Wayne',
+    );
+});
+
+// No request creates an organization: a claim organization
+// with no document is the head read's miss, 404, whichever
+// conditional the PUT carries (RFC 9110 §13.2.1), and
+// nothing is stored.
+for (const [precondition, headers] of [
+    ['If-None-Match: *', { 'if-none-match': '*' }],
+    ['If-Match', { 'if-match': '"' + generateIdentifier() + '"' }],
+] as const) {
+    Deno.test('a PUT with ' + precondition + ' on an absent claim'
+    + ' organization is 404', async () => {
+        const { db, organizationB } = await twoOrganizations();
+        await seedMembershipPair(
+            db, generateIdentifier(), organizationB,
+            'XXZruirZyAOoRpNxaDnpSA',
+        );
+        const res = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + organizationB,
+            token: await organizationToken(
+                'XXZruirZyAOoRpNxaDnpSA', organizationB,
+            ),
+            body: organizationRow('Genesis'),
+            headers,
+        }));
+        assertStrictEquals(res.status, 404);
+        assertEquals(await res.json(), {
+            error: 'Not found: organizations/' + organizationB,
+        });
+        assertEquals(
+            (await deriveOrganizations(db)).filter(
+                (organization) => organization.id === organizationB,
+            ),
+            [],
+        );
+    });
+}
 
 // ---- T8: the parent-derived READ fence (server-side join) ----
 

@@ -276,10 +276,18 @@ Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
     const updatedFields = organizationRow(
         'Stark Industries Renamed',
     );
-    const put = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION,
-        adminToken, updatedFields,
+    const read = await handleRequest(db, req(
+        'GET', '/organizations/' + STARK_ORGANIZATION, adminToken,
     ));
+    assertStrictEquals(read.status, 200);
+    await read.body?.cancel();
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK_ORGANIZATION,
+        token: adminToken,
+        body: updatedFields,
+        headers: { 'If-Match': read.headers.get('ETag')! },
+    }));
     assertStrictEquals(put.status, 200);
     const putBody = await put.json() as OrganizationEntity;
     assertStrictEquals(putBody.name, 'Stark Industries Renamed');
@@ -303,6 +311,33 @@ Deno.test('leg 4: PUT /organizations/:id then wire + derive agree'
     assertStrictEquals(Object.keys(expected).at(0), 'id');
     assertEquals(stored, expected);
     // Phase Final Stage B: organizations table retired.
+});
+
+// The organization document's PUT is class B: it only
+// rewrites the live head, so a PUT naming no head is 428
+// (RFC 6585 §3) and stores nothing.
+Deno.test('leg 4b: PUT /organizations/:id with no precondition'
++ ' is 428 and leaves the head unchanged', async () => {
+    const db = await seededDb();
+    const adminToken = await organizationToken(
+        MULTI_ORGANIZATION_IDENTITY_ID, STARK_ORGANIZATION,
+    );
+    const before = await deriveOrganization(
+        db, STARK_ORGANIZATION,
+    );
+    const put = await handleRequest(db, req(
+        'PUT', '/organizations/' + STARK_ORGANIZATION,
+        adminToken, organizationRow('Stark Unlatched'),
+    ));
+    assertStrictEquals(put.status, 428);
+    assertEquals(await put.json(), {
+        error: 'If-Match or If-None-Match is required to PUT'
+            + ' /organizations/' + STARK_ORGANIZATION,
+    });
+    assertEquals(
+        await deriveOrganization(db, STARK_ORGANIZATION),
+        before,
+    );
 });
 
 // ---- leg 5: no organizations states event (precondition) -----
