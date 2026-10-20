@@ -305,7 +305,8 @@ first. A conditional that fails answers what the RFC says
 even when another status reads friendlier: an `If-Match`
 that names no current representation answers 412, even
 for an id never written (RFC 9110 §13.1.1) where a PUT can
-create it; where only a POST creates — a work order — a
+create it; where no PUT creates — a work order, or an
+organization's document — a
 conditional PUT on an absent one answers 404, its
 preconditions ignored (§13.2.1), and a PUT with neither
 precondition answers 428 (RFC 6585 §3); and a deleted
