@@ -267,8 +267,9 @@ Each is pinned in the task named.
    `getHumanMember`, and `getOrganizationSeats`.
 2. **A removed AI still offered or accepted.** A removed
    AI's id must leave the designer's AI picker and fail
-   `agentIds` at the write law (400). Its document stays.
-   Pinned in Task 19.
+   `agentIds` at the write law (400). Its document stays,
+   and its id stays refused in `memberIds`. Pinned in
+   Task 19.
 3. **A double click on Create.** The id is minted once per
    dialog session (`pendingMemberId`,
    `web-app/members/index.ts:77`). A second submit of the
@@ -2381,18 +2382,34 @@ git commit -m "Seed each AI as a member of Stark" \
 
 ## Part G: an AI is live while its membership is accepted
 
-### Task 19: Pin AI liveness on the accepted membership
+### Task 19: Pin AI liveness and the program-member law
 
 **Agent:** `planner`
 
-**Commit subject:** `Pin AI liveness on its membership`
+**Commit subject:** `Pin AI liveness and program memberIds`
 
 **Brief:** Commandments: Logic, Reliability, Security
 (the write law). Abominations: Test Weakening.
 
+The owner's ruling, given after the first draft: the
+flow write law's `memberIds` check refuses a service
+member's id as it refuses an AI's (option A). The law's
+message, "person identities only", becomes true again.
+The law dates from `2c5ed9a2`, where it guarded the move
+of AI ids out of `memberIds`. "Not an AI" meant "a
+person" only while people and AIs were the only members.
+Checking `memberIds` against membership in general stays
+out of scope.
+
 **Files:**
-- Modify: `tests/api-ai-agents.test.ts`. Add 'a flow
-  write naming a removed AI member in agentIds is 400'.
+- Modify: `tests/api-ai-agents.test.ts`. Add:
+  - 'a flow write naming a removed AI member in agentIds
+    is 400'
+  - 'a flow write naming a removed AI member in memberIds
+    is 400'
+- Modify: `tests/api-service-members.test.ts`. Add 'a
+  flow write naming a service member in memberIds is
+  400'.
 - Modify: `tests/adapters-ai-members.test.ts`. Add
   'getAIMembers omits an AI whose membership is removed'.
 - Modify: `tests/adapters-members-union.test.ts`. Add
@@ -2410,52 +2427,93 @@ git commit -m "Seed each AI as a member of Stark" \
 
   The removal answers 200.
 
-- [ ] **Step 1: The three cases**
+- [ ] **Step 1: The five cases**
 
-- **Server:** with the AI removed, the flow PUT of Task
-  1's file shape, with `graphNode([], [id])`, answers
-  400. The AI document still answers 200, because
-  removal leaves it.
+The flow PUTs use `tests/api-ai-agents.test.ts`'s
+`flowDocument` and `graphNode` shape, with
+`If-None-Match: *`. `tests/api-service-members.test.ts`
+copies the two helpers locally; it is one file's need,
+not a fixture.
+
+- **Removed AI in `agentIds`.** With the AI removed, a
+  flow PUT with `graphNode([], [id])` answers 400. The AI
+  document still answers 200, because removal leaves it.
+- **Removed AI in `memberIds`.** With the AI removed, a
+  flow PUT with `graphNode([id])` answers 400, with
+  `{ error: 'memberIds may name person identities only, not AI agents or services' }`.
+  A program stays a program after its membership ends.
+- **Service in `memberIds`.** With `serviceMember()`'s
+  world, a flow PUT with `graphNode([id])` answers 400,
+  with the same body. The flow head is `null` afterwards.
 - **getAIMembers:** the result has no member with that
   id.
 - **getMembers:** no `isAIMember` member has that id.
 
-- [ ] **Step 2: Layer 1 is red in exactly these three**
+- [ ] **Step 2: Layer 1 is red in exactly these**
 
-Run `./test`, teed to `task19-red.log`. The server case
-answers 201 against 400. Each client case still lists
-the AI.
+Run `./test`, teed to `task19-red.log`. Expected red:
+
+| Case | Actual | Expected |
+|---|---|---|
+| removed AI in `agentIds` | 201 | 400 |
+| service in `memberIds` | 201 | 400 |
+| getAIMembers omits… | lists the AI | omits it |
+| getMembers omits… | lists the AI | omits it |
+
+'Removed AI in `memberIds`' is red on its body only. Its
+status is already 400, because Task 2's law refuses any
+of the organization's AI documents, but the message
+differs. Report its actual body.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add tests/api-ai-agents.test.ts \
+    tests/api-service-members.test.ts \
     tests/adapters-ai-members.test.ts \
     tests/adapters-members-union.test.ts
-git commit -m "Pin AI liveness on its membership" \
+git commit -m "Pin AI liveness and program memberIds" \
     -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 20: Read AI liveness from accepted memberships
+### Task 20: Read AI liveness and refuse program memberIds
 
 **Agent:** `architect` (`AIMember` gains its membership,
-which Task 30's Remove latches; the law's live set is
+which Task 30's Remove latches; the law's two sets are
 shared by both write paths)
 
-**Commit subject:** `Read AI liveness from memberships`
+**Commit subject:** `Read AI liveness, refuse program memberIds`
 
 **Brief:** Commandments: Logic, Uniformity (the server
 law and the client picker read one rule), Reliability,
 Telling not asking. Abominations: Shared Mutable State,
-Internal Defense, Test Weakening.
+Internal Defense, Test Weakening (the unit tests' call
+sites gain an argument, and their assertions stay).
 
 **Files:**
+- `api/validators.ts:198-222`: `assertFlowGraphWriteLaw`
+  takes two sets. The `memberIds` message and the comment
+  become the ones below.
 - `api/routes.ts:1306-1315`: `assertLiveFlowGraphWriteLaw`
-  reads `liveAiMemberIds(db, organization)`.
-- `api/memberships.ts`, or `api/routes.ts` beside the law:
-  add `liveAiMemberIds`.
+  runs three reads in parallel:
+  - `liveOrganizationDocumentIds(db, organization, 'ai-agents')`
+  - `liveOrganizationDocumentIds(db, organization, 'services')`
+  - `organizationMembershipHeads(db, organization, { kind: 'state', state: 'accepted' })`
+    (`api/memberships.ts:321-332`)
+
+  From them it builds:
+  - `programIds`: the AI document ids together with the
+    service document ids
+  - `liveAgentIds`: the AI document ids whose id is an
+    accepted membership's `identity_id`
+- `tests/validators.test.ts:806`, `:831`, and every other
+  `assertFlowGraphWriteLaw(` call: pass both sets. Each
+  case passes its old set as both arguments, and every
+  assertion stays.
+  `'not AI agents'` (`:806`) still matches the new
+  message.
 - `shared/types.ts:808-866`: `AIMember` takes and keeps
   `readonly membership: HttpMessage<MembershipEntity>`,
   as `HumanMember` does (`:721-740`).
@@ -2481,13 +2539,18 @@ Internal Defense, Test Weakening.
 
 **Interfaces:**
 - Produces:
-  - `liveAiMemberIds(db: DbAdapter, organization: Id): Promise<Set<Id>>`.
-    It returns the ids that are in both
-    `liveOrganizationDocumentIds(db, organization, 'ai-agents')`
-    and the `identity_id`s of
-    `organizationMembershipHeads(db, organization, { kind: 'state', state: 'accepted' })`
-    (`api/memberships.ts:321-332`). The two reads run in
-    parallel.
+  - `assertFlowGraphWriteLaw(graph: StoredGraph, programIds: ReadonlySet<string>, liveAgentIds: ReadonlySet<string>): void`.
+    It does two things:
+    - A `memberIds` entry in `programIds` throws
+      `'memberIds may name person identities only, not AI agents or services'`.
+    - An `agentIds` entry not in `liveAgentIds` throws
+      `'agentIds must name a live AI agent'`, unchanged.
+
+    The comment reads: "memberIds may name person
+    identities only: an AI or service member is a
+    program, whether or not its membership is accepted.
+    agentIds must name the organization's live AI
+    members."
   - `new AIMember(parent: MemberEntity, detail: AIMemberEntity, membership: HttpMessage<MembershipEntity>)`
   - `buildAIAgentMap(agents: readonly AIAgentEntity[], memberships: readonly HttpMessage<MembershipEntity>[]): Map<MemberId, AIMember>`.
     It keeps only agents whose id holds a membership in
@@ -2498,9 +2561,6 @@ Internal Defense, Test Weakening.
     a missing document is. Member detail's
     `isAbsentMember` (`web-app/members/detail.ts:143-148`)
     already reads that as absent.
-- `assertFlowGraphWriteLaw`'s signature does not change.
-  Only its live set narrows.
-
 - [ ] **Step 1: The server law**
 
 As above.
@@ -2521,7 +2581,7 @@ one in the report.
 - [ ] **Step 4: Layer 1 is green**
 
 Run `./test validate`. Expected: exit 0, and Task 19's
-three cases are `ok`.
+five cases are `ok`.
 
 Three cases create their AI by `PUT`, which no longer
 makes a live AI:
@@ -2544,7 +2604,7 @@ Task 18.
 Stage every file listed, plus the tests Step 4 rewrote.
 
 ```bash
-git commit -m "Read AI liveness from memberships" \
+git commit -m "Read AI liveness, refuse program memberIds" \
     -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3352,11 +3412,11 @@ paths. Prose rules: "organization admin" and "operator",
 never a bare "admin"; `grant` is a verb; about 78
 characters per line.
 
-### Task 33: Record the members statement in API.md
+### Task 33: Record the member kinds and the flow law
 
-**Commit subject:** `Record the three member kinds in API.md`
+**Commit subject:** `Record the member kinds and flow law`
 
-**Files:** `API.md`
+**Files:** `API.md`, `FLOW-CANVAS.md`
 - **`:50-62`, the identity fence.** `GET identities/`
   lists co-members, including AI and service members.
 - **`:365-375` and `:389-396`.** The memberships
@@ -3392,6 +3452,15 @@ characters per line.
   `EXPECTED_MESSAGE_PAIR_COUNT = 1889`; bootstrap eight.
 - **`POST identities/`.** Person only, and a service is
   400.
+- **The flow write law, under the flows composition.** A
+  node's `memberIds` refuses any of the organization's
+  AI or service member ids, accepted or removed, with
+  400. Its `agentIds` must name AI members whose
+  membership is accepted.
+- **`FLOW-CANVAS.md:160-162`.** `memberIds` is person
+  members. `agentIds` holds the organization's live AI
+  members, not "live `/ai-agents` ids". The write law
+  refuses AI and service member ids in `memberIds`.
 
 ### Task 34: Name services as co-members in ARCHITECTURE.md
 
@@ -3579,13 +3648,9 @@ Settled by the owner after the first draft:
 - TODO closures stay in the docs tail (Task 38).
 - The service member detail page is editable (Tasks 21,
   22, 29, and 30).
+- The flow write law refuses a service member's id in
+  `memberIds`, as it refuses an AI's (option A; Tasks 19
+  and 20). Checking `memberIds` against membership in
+  general stays out of scope.
 
-Open:
-
-1. **`memberIds` naming a service member.** The write law
-   refuses an AI id in a node's `memberIds`
-   (`api/validators.ts:204-212`). It says nothing of a
-   service member's id. The designer's people picker
-   lists humans only after Task 16, so no page can send
-   one, but the API would accept it. Refuse it as the
-   AI's is refused?
+None remain open.
