@@ -194,7 +194,8 @@ Status ladder:
   selects at least one
 - **201** — a genesis: a landed PUT with no live
   head, including a PUT after a DELETE (never a work
-  order's document PUT, which supersedes only); a POST
+  order's or an organization's document PUT, which
+  supersede only); a POST
   create, with `Location`; an instance create
 - **204** — DELETE success (landed, or already-gone);
   a collection GET that selects none, including a
@@ -209,7 +210,9 @@ Status ladder:
 - **404** — authenticated unmatched; DELETE
   never-written; genuine absence, as a GET of a name
   never written; a conditional work-order PUT on a work
-  order never created; a tag that names no PUT pair at
+  order never created; a conditional organization
+  document PUT on a claim organization with no
+  document; a tag that names no PUT pair at
   the document; a membership name whose identity is not
   the path's
 - **405** — no handler, including DELETE on a
