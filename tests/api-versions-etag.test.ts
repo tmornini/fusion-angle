@@ -148,7 +148,8 @@ Deno.test('registered families offer versions/ and :etag',
 () => {
     const lists = [
         '/identities/abc/versions/',
-        '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+            + 'UQTJZvCoKlFjEoDlDUwekw/versions/',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw/versions/',
         '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/',
@@ -168,7 +169,8 @@ Deno.test('registered families offer versions/ and :etag',
     ];
     const snapshots = [
         '/identities/abc/versions/YiJPbufDpkyrZcZCYbUJpg',
-        '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+            + 'UQTJZvCoKlFjEoDlDUwekw/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/'
@@ -671,15 +673,17 @@ async function deleteAiAgentDocument(
 ): Promise<void> {
     const messagePair = await formWriteMessagePair({
         method: 'DELETE',
-        pathname: '/ai-agents/' + id,
-        routePattern: 'ai-agents/:id',
-        routeSegments: ['ai-agents', ':id'],
-        pathSegments: ['ai-agents', id],
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/' + id,
+        routePattern: 'organizations/:id/ai-agents/:id',
+        routeSegments: ['organizations', ':id', 'ai-agents', ':id'],
+        pathSegments: [
+            'organizations', 'AjdvjuECVZEgZoFajaIEkg', 'ai-agents', id,
+        ],
         headerFields: [],
         body: {},
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-08-01T00:00:00.000000Z',
-        organization: undefined,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: undefined,
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
@@ -699,7 +703,8 @@ Deno.test(
         const token = await organizationToken();
         const id = generateIdentifier();
         const created = await handleRequest(db, req(
-            'PUT', '/ai-agents/' + id, token,
+            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+                + id, token,
             aiAgentDocument('First'),
         ));
         assertStrictEquals(created.status, 201);
@@ -707,7 +712,8 @@ Deno.test(
         assert(tag !== null);
         await created.body?.cancel();
         await deleteAiAgentDocument(db, id);
-        const listPath = '/ai-agents/' + id + '/versions/';
+        const listPath = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/' + id + '/versions/';
         const list = await handleRequest(
             db, req('GET', listPath, token),
         );
@@ -732,7 +738,8 @@ Deno.test(
         const db = await seedInviteeWorld();
         const token = await organizationToken();
         const id = generateIdentifier();
-        const path = '/ai-agents/' + id;
+        const path = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/' + id;
         const firstBody = aiAgentDocument('First');
         const secondBody = aiAgentDocument('Second');
         const first = await handleRequest(db, req(

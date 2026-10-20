@@ -66,7 +66,8 @@ Deno.test('a member is denied the admin surfaces', async () => {
     for (const [method, path] of [
         ['GET', '/identities/'],
         ['PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg'],
-        ['PUT', '/ai-agents/UuvoBhQJUSEsiJwscXPkUg'],
+        ['PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/UuvoBhQJUSEsiJwscXPkUg'],
     ] as const) {
         const res = await handleRequest(db, req(
             method, path, token,

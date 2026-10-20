@@ -1813,7 +1813,7 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
         + '/objective-baseline-scores/:sid',
     'organizations/:id/projects/:id'
         + '/objective-actual-scores/:sid',
-    'ai-agents/:id',
+    'organizations/:id/ai-agents/:id',
     'identities/',
     'identities/:id',
     'identities/:id/pii',

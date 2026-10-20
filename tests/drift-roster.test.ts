@@ -209,7 +209,10 @@ Deno.test('ai-agents wire is global; identities wire is'
     const token = await organizationToken();
 
     const resAi = await handleRequest(
-        db, req('GET', '/ai-agents/', token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION + '/ai-agents/',
+            token,
+        ),
     );
     assertStrictEquals(resAi.status, 200);
     const agents = await partBodiesOf<{ id: string }>(resAi);
@@ -239,7 +242,11 @@ Deno.test('ai-agents wire is global; identities wire is'
 
     for (const row of agents) {
         const res = await handleRequest(
-            db, req('GET', '/ai-agents/' + row.id, token),
+            db, req(
+                'GET', '/organizations/' + STARK_ORGANIZATION
+                    + '/ai-agents/' + row.id,
+                token,
+            ),
         );
         assertStrictEquals(res.status, 200);
         const got = await res.json() as { id: string };
@@ -258,7 +265,11 @@ Deno.test('ai-agents wire is global; identities wire is'
     const expectedAiMessage =
         'Not found: ai-agents/' + missingId;
     const aiMissingRes = await handleRequest(
-        db, req('GET', '/ai-agents/' + missingId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + missingId,
+            token,
+        ),
     );
     assertStrictEquals(aiMissingRes.status, 404);
     assertStrictEquals(
@@ -309,7 +320,8 @@ async () => {
 
     const beforeCreate = (await db.messagePairs.getAll()).length;
     const created = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId, token,
         aiMemberDocumentBody('Chain AI'),
     ));
     assertStrictEquals(created.status, 201);
@@ -317,7 +329,11 @@ async () => {
         (await db.messagePairs.getAll()).length, beforeCreate + 1,
     );
     const agent1 = await handleRequest(
-        db, req('GET', '/ai-agents/' + aiId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiId,
+            token,
+        ),
     );
     assertStrictEquals(agent1.status, 200);
     assertStrictEquals(
@@ -326,12 +342,17 @@ async () => {
     );
 
     const facetPut = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId, token,
         aiMemberDocumentBody('Chain AI Facet'),
     ));
     assertStrictEquals(facetPut.status, 200);
     const agent2 = await handleRequest(
-        db, req('GET', '/ai-agents/' + aiId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiId,
+            token,
+        ),
     );
     assertStrictEquals(
         ((await agent2.json()) as { name: string }).name,
@@ -581,13 +602,14 @@ async () => {
     const humanId = HUMAN_DRIFT_METHOD_FILTER_1;
 
     const aiCreated = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId, token,
         aiMemberDocumentBody('Filter AI'),
     ));
     assertStrictEquals(aiCreated.status, 201);
 
     const aiPrefix = canonicalPath(
-        undefined, '/ai-agents/',
+        STARK_ORGANIZATION, '/ai-agents/',
     );
     const [aiRequests] = await Promise.all([
         db.messagePairs.getCollectionPairs(aiPrefix),
@@ -640,7 +662,8 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const body = aiMemberDocumentBody('Resend AI Facet');
     const operationId = generateIdentifier();
     const first = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token, body,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId, token, body,
         operationId,
     ));
     assertStrictEquals(first.status, 201);
@@ -648,7 +671,8 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     assertStrictEquals(afterFirst, beforeCount + 1);
 
     const second = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token, body,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId, token, body,
         operationId,
     ));
     assertStrictEquals(second.status, 200);
@@ -660,7 +684,11 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     );
 
     const got = await handleRequest(
-        db, req('GET', '/ai-agents/' + aiId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiId,
+            token,
+        ),
     );
     assertStrictEquals(
         ((await got.json()) as { name: string }).name,

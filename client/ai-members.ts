@@ -10,6 +10,7 @@ import type { HttpMessage } from
 import {
     createSubscriptionChannel,
 } from './channels.ts';
+import { requireOrganization } from './members.ts';
 
 const aiMemberChanges =
     createSubscriptionChannel();
@@ -25,6 +26,11 @@ export type AIMemberDraft =
 
 function agentParent(id: MemberId): MemberEntity {
     return { id, type: 'ai' };
+}
+
+function aiAgentsPath(ctx: RequestContext): string {
+    return 'organizations/' + requireOrganization(ctx)
+        + '/ai-agents/';
 }
 
 export function buildAIMemberMap(
@@ -85,7 +91,7 @@ export async function getAIMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, AIMember>> {
     const agents = (await ctx.GETCollection<AIAgentEntity>(
-        'ai-agents/',
+        aiAgentsPath(ctx),
     )).map((m) => m.body().toValue());
     return buildAIAgentMap(agents);
 }
@@ -102,7 +108,7 @@ export async function getAIMember(
     id: MemberId,
 ): Promise<AIMember> {
     const agent = (await ctx.GET<AIAgentEntity>(
-        `ai-agents/${id}`,
+        aiAgentsPath(ctx) + id,
     )).body().toValue();
     return new AIMember(
         agentParent(id),
@@ -120,7 +126,7 @@ export function getAIMemberEntity(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<HttpMessage<AIAgentEntity>> {
-    return ctx.GET<AIAgentEntity>(`ai-agents/${id}`);
+    return ctx.GET<AIAgentEntity>(aiAgentsPath(ctx) + id);
 }
 
 // A save from the held agent names the head it replaces,
@@ -131,7 +137,7 @@ export async function putAIMember(
     input: AIMemberDraft,
 ): Promise<HttpMessage<AIAgentEntity>> {
     const saved = await ctx.PUT<AIAgentEntity>(
-        `ai-agents/${held.body().toValue().id}`,
+        aiAgentsPath(ctx) + held.body().toValue().id,
         {
             name: input.name,
             description: input.description,
@@ -149,7 +155,7 @@ export async function postAIMemberCreation(
     id: MemberId,
     input: AIMemberDraft,
 ): Promise<void> {
-    await ctx.PUT(`ai-agents/${id}`, {
+    await ctx.PUT(aiAgentsPath(ctx) + id, {
         name: input.name,
         description: input.description,
         skill_focus: input.skill_focus,

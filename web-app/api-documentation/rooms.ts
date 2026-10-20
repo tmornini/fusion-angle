@@ -262,93 +262,6 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'get/ai-agents',
-        verb: 'GET',
-        uri: '/api/ai-agents/',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        responseHeaders:
-        [],
-        statuses:
-        [
-            '200',
-            '204',
-            '401',
-            '404',
-        ],
-    },
-    {
-        hash: 'get/ai-agents/id',
-        verb: 'GET',
-        uri: '/api/ai-agents/:id',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        responseHeaders:
-        [
-            'last-modified: on 2xx',
-            'requester-identity-id: on 2xx',
-            'response-at: on 2xx',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '404',
-        ],
-    },
-    {
-        hash: 'get/ai-agents/id/versions',
-        verb: 'GET',
-        uri: '/api/ai-agents/:id/versions/',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        responseHeaders:
-        [],
-        statuses:
-        [
-            '200',
-            '401',
-            '404',
-            '410',
-        ],
-    },
-    {
-        hash: 'get/ai-agents/id/versions/etag',
-        verb: 'GET',
-        uri: '/api/ai-agents/:id/versions/:etag',
-        body: 'none',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-        ],
-        responseHeaders:
-        [
-            'last-modified: on 2xx',
-            'requester-identity-id: on 2xx',
-            'response-at: on 2xx',
-        ],
-        statuses:
-        [
-            '200',
-            '401',
-            '404',
-            '410',
-        ],
-    },
-    {
         hash: 'get/identities',
         verb: 'GET',
         uri: '/api/identities/',
@@ -788,6 +701,97 @@ export const API_DOC_ROOMS:
             '401',
             '403',
             '404',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/ai-agents',
+        verb: 'GET',
+        uri: '/api/organizations/:id/ai-agents/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/ai-agents/id',
+        verb: 'GET',
+        uri: '/api/organizations/:id/ai-agents/:id',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/ai-agents/id/versions',
+        verb: 'GET',
+        uri: '/api/organizations/:id/ai-agents/:id/versions/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+            '410',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/ai-agents/id/versions/etag',
+        verb: 'GET',
+        uri: '/api/organizations/:id/ai-agents/:id/versions/:etag',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+            '410',
         ],
     },
     {
@@ -2287,35 +2291,6 @@ export const API_DOC_ROOMS:
         ],
     },
     {
-        hash: 'put/ai-agents/id',
-        verb: 'PUT',
-        uri: '/api/ai-agents/:id',
-        body:
-            '{\n  "name": "name",\n  "description": "description",\n  "model'
-            + '": "nqNVXnBkUBLoKlenbyPIZQ",\n  "skill_focus": "skill_focus"'
-            + '\n}',
-        headers:
-        [
-            'Authorization: Bearer …',
-            'Operation-ID: on every request',
-            'If-Match or If-None-Match: * (optional)',
-        ],
-        responseHeaders:
-        [
-            'last-modified: on 2xx',
-            'requester-identity-id: on 2xx',
-            'response-at: on 2xx',
-        ],
-        statuses:
-        [
-            '200',
-            '400',
-            '401',
-            '404',
-            '412',
-        ],
-    },
-    {
         hash: 'put/identities/id',
         verb: 'PUT',
         uri: '/api/identities/:id',
@@ -2602,6 +2577,36 @@ export const API_DOC_ROOMS:
             '404',
             '412',
             '428',
+        ],
+    },
+    {
+        hash: 'put/organizations/id/ai-agents/id',
+        verb: 'PUT',
+        uri: '/api/organizations/:id/ai-agents/:id',
+        body:
+            '{\n  "name": "name",\n  "description": "description",\n  "model'
+            + '": "nqNVXnBkUBLoKlenbyPIZQ",\n  "skill_focus": "skill_focus"'
+            + '\n}',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+            'If-Match or If-None-Match: * (optional)',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '400',
+            '401',
+            '403',
+            '404',
+            '412',
         ],
     },
     {

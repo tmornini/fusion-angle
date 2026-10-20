@@ -239,7 +239,8 @@ Deno.test(
                     || path.endsWith(
                         '/memberships/?state=removed',
                     )
-                    || path === 'ai-agents/'
+                    || path === 'organizations/' + organization
+                        + '/ai-agents/'
                 ) {
                     return [];
                 }

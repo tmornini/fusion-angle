@@ -1687,14 +1687,18 @@ export function buildMockDataInvocations():
             });
         }
     }
+    // Every seeded AI belongs to Stark: no seeded flow names
+    // one in Wayne (spec decision 10).
     for (const m of aiMembers) {
         const { id: _id, ...fields } = m;
-        const key = seedMessagePairKey('ai-agents/:id', m.id);
+        const key = seedMessagePairKey(
+            'organizations/:id/ai-agents/:id', m.id,
+        );
         invocations.push({
             key,
-            routePattern: 'ai-agents/:id',
-            idParams: [m.id],
-            organization: undefined,
+            routePattern: 'organizations/:id/ai-agents/:id',
+            idParams: [STARK_ORGANIZATION, m.id],
+            organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: fields,
             operation: key,

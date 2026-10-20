@@ -31,7 +31,7 @@ function aiDraft(name: string) {
 }
 
 Deno.test(
-    'postAIMemberCreation writes PUT /ai-agents/:id',
+    'postAIMemberCreation writes PUT organizations/:id/ai-agents/:id',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -48,7 +48,8 @@ Deno.test(
         assertStrictEquals(detail.name, 'Claude');
         const agent = (await ctx.GET<{
             id: string; name: string;
-        }>('ai-agents/' + agentId)).body().toValue();
+        }>('organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+            + agentId)).body().toValue();
         assertStrictEquals(agent.name, 'Claude');
     },
 );

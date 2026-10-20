@@ -955,6 +955,7 @@ async function postMockDataLoadIn(
                     seedIdentifier('seed-flow-org2'),
                 ),
             ),
+            ORGANIZATION_TWO,
         ),
     ]);
 
@@ -1008,7 +1009,10 @@ async function postMockDataLoadIn(
                 fields,
                 SYSTEM_MEMBER_ID,
                 requireMessagePair(
-                    messagePairs, seedMessagePairKey('ai-agents/:id', m.id),
+                    messagePairs,
+                    seedMessagePairKey(
+                        'organizations/:id/ai-agents/:id', m.id,
+                    ),
                 ),
             );
         }),

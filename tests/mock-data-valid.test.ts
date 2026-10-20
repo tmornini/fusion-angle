@@ -601,15 +601,16 @@ Deno.test(
                 new Set(rows.map(m => m.organization_id)),
             );
         }
+        const agentPrefix = canonicalPath(
+            STARK_ORGANIZATION, '/ai-agents/',
+        );
         const [agentRequests] =
             await Promise.all([
-                db.messagePairs.getCollectionPairs('/ai-agents/',
-                ),
-                db.messagePairs.getCollectionPairs('/ai-agents/',
-                ),
+                db.messagePairs.getCollectionPairs(agentPrefix),
+                db.messagePairs.getCollectionPairs(agentPrefix),
             ]);
         const agentIds = new Set(
-            deriveDocumentsAt(agentRequests, '/ai-agents/').keys(),
+            deriveDocumentsAt(agentRequests, agentPrefix).keys(),
         );
         const violations = new Set<string>();
         for (const s of states) {

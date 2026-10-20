@@ -168,16 +168,18 @@ export function documentFamilyWiring(
     return DOCUMENT_FAMILY_WIRINGS[family];
 }
 
-// Live document ids at a global-plane family prefix.
-// Used by the flow write-path graph law to tell AI
-// member ids from person members and to confirm an
-// agentId names a live /ai-agents document.
-export async function liveGlobalDocumentIds(
+// Live document ids at an organization's family prefix
+// (/organizations/<organization>/<family>/). Used by the
+// flow write-path graph law to tell AI member ids from
+// person members and to confirm an agentId names one of
+// the organization's live AI documents.
+export async function liveOrganizationDocumentIds(
     db: DbAdapter,
+    organization: Id,
     family: string,
 ): Promise<Set<string>> {
     const prefix = canonicalPath(
-        undefined, '/' + family + '/',
+        organization, '/' + family + '/',
     );
     const live = await messageStore(db).getCollection(
         prefix,

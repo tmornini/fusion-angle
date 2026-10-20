@@ -141,7 +141,6 @@ const MEMBER_VERBS: Readonly<
         ['GET', 'PUT', 'POST', 'DELETE'],
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
-    '/ai-agents': ['GET'],
     // :id only — the root collection is retired.
     // The old '/organizations' prefix also matched
     // GET /organizations/:id; keep that document.

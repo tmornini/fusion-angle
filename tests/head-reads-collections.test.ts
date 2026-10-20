@@ -46,8 +46,7 @@ const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 
 const STREAM: readonly [string, (id: string) => string][] = [
     ['/identities/', (id) => '/identities/' + id],
-    ['/ai-agents/', (id) => '/ai-agents/' + id],
-    ...['ideas', 'projects', 'work-orders', 'objectives'].map(
+    ...['ideas', 'projects', 'work-orders', 'objectives', 'ai-agents'].map(
         (family) => [
             '/organizations/' + STARK + '/' + family + '/',
             (id: string) => '/organizations/' + STARK + '/'

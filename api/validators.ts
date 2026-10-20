@@ -196,8 +196,8 @@ export function asConstraint(
 }
 
 // Write-path graph law: memberIds may name person
-// identities only. agentIds must name live /ai-agents
-// documents.
+// identities only. agentIds must name the organization's
+// live AI documents.
 export function assertFlowGraphWriteLaw(
     graph: StoredGraph,
     liveAgentIds: ReadonlySet<string>,

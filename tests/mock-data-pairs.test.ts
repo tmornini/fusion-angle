@@ -312,14 +312,15 @@ Deno.test('a seeded flow create pair sits at its org-nested'
         , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/');
 });
 
-Deno.test('a seeded AI agent pair sits at the global'
+Deno.test('a seeded AI agent pair sits at its organization\'s'
 + ' ai-agents document', async () => {
     const db = await sharedMockDb();
     const firstAgent = buildAiMembers()[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.name === firstAgent.id
-            && r.path === '/ai-agents/',
+            && r.path === '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/',
     );
     assert(row, 'no request row for the seeded agent');
     const embedded = messagePairJsonOf(row!.response) as {

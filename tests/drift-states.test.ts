@@ -1292,13 +1292,18 @@ async () => {
     const aiMemberId = DRIFT_STATES_AI_CHAIN_1;
 
     const created = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiMemberId, token,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiMemberId, token,
         aiMemberDetail('Drift Bot'),
     ));
     assertStrictEquals(created.status, 201);
     const got = await handleRequest(
         db,
-        req('GET', '/ai-agents/' + aiMemberId, token),
+        req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiMemberId,
+            token,
+        ),
     );
     assertStrictEquals(got.status, 200);
     assertStrictEquals(
@@ -1307,13 +1312,18 @@ async () => {
     );
 
     const updated = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiMemberId, token,
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiMemberId, token,
         aiMemberDetail('Drift Bot 2'),
     ));
     assertStrictEquals(updated.status, 200);
     const after = await handleRequest(
         db,
-        req('GET', '/ai-agents/' + aiMemberId, token),
+        req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiMemberId,
+            token,
+        ),
     );
     assertStrictEquals(
         ((await after.json()) as { name: string }).name,

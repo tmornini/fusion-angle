@@ -172,29 +172,31 @@ async function identityPiiDocumentMessagePair(
 }
 
 async function aiAgentDocumentMessagePair(
+    organization: Id,
     id: Id,
     body: Record<string, unknown>,
     requestAt: string,
 ): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['ai-agents/:id'];
+    const spec = WRITE_RESPONSE_SPECS['organizations/:id/ai-agents/:id'];
     if (spec === undefined || !('conditional' in spec)) {
         throw new Error(
-            'no per-write response spec for ai-agents/:id',
+            'no per-write response spec for'
+            + ' organizations/:id/ai-agents/:id',
         );
     }
     return formWriteMessagePair({
         method: 'PUT',
-        pathname: `/ai-agents/${id}`,
-        routePattern: 'ai-agents/:id',
-        routeSegments: ['ai-agents', ':id'],
-        pathSegments: ['ai-agents', id],
+        pathname: `/organizations/${organization}/ai-agents/${id}`,
+        routePattern: 'organizations/:id/ai-agents/:id',
+        routeSegments: ['organizations', ':id', 'ai-agents', ':id'],
+        pathSegments: ['organizations', organization, 'ai-agents', id],
         headerFields: [],
         body,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
-        organization: undefined,
+        organization,
         responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, undefined,
+            [organization, id], body, SYSTEM_MEMBER_ID, organization,
         ),
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
@@ -239,7 +241,9 @@ export async function seedAIMember(
     const body = { name, ...aiDetail() };
     await postAiAgentDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID,
-        await aiAgentDocumentMessagePair(id, body, requestAt),
+        await aiAgentDocumentMessagePair(
+            MEMBER_ORGANIZATION, id, body, requestAt,
+        ),
     );
 }
 

@@ -16,6 +16,7 @@ import type { HttpMessage } from
 import {
     buildHumanMemberMap,
     getHumanMemberProfile,
+    requireOrganization,
 } from './members.ts';
 import {
     buildAIAgentMap,
@@ -52,8 +53,12 @@ export async function getMembers(
                 'organizations/' + organization
                     + '/memberships/?state=accepted',
             ),
-        ctx.GETCollection<AIAgentEntity>('ai-agents/')
-            .then(parts => parts.map((m) => m.body().toValue())),
+        organization === undefined
+            ? Promise.resolve([] as AIAgentEntity[])
+            : ctx.GETCollection<AIAgentEntity>(
+                'organizations/' + requireOrganization(ctx)
+                    + '/ai-agents/',
+            ).then(parts => parts.map((m) => m.body().toValue())),
     ]);
     const humans = buildHumanMemberMap(memberships);
     const ais = buildAIAgentMap(agents);

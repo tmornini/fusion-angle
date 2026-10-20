@@ -47,7 +47,7 @@ function sessionOrganization(
         ?? ctx.identity.organizations?.[0];
 }
 
-function requireOrganization(ctx: RequestContext): string {
+export function requireOrganization(ctx: RequestContext): string {
     const organization = sessionOrganization(ctx);
     if (organization === undefined) {
         throw new Error(

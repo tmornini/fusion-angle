@@ -187,8 +187,10 @@ Deno.test('documentWriteResponseSpec produces the ai-agents'
         skill_focus: 's',
     };
     const actual = documentWriteResponseSpec(wiring)
-        .successBody!([AG_1], body, 'XXZruirZyAOoRpNxaDnpSA'
-            , 'AjdvjuECVZEgZoFajaIEkg');
+        .successBody!(
+            ['AjdvjuECVZEgZoFajaIEkg', AG_1], body,
+            'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
+        );
     assertEquals(actual, { id: AG_1, ...body });
 });
 

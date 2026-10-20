@@ -283,7 +283,7 @@ import {
     documentVersionsSelectRoute,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
-    liveGlobalDocumentIds,
+    liveOrganizationDocumentIds,
     type DocumentFamilyWiring,
 } from './document-family.ts';
 import {
@@ -511,12 +511,12 @@ export function aiAgentDocumentEntityOf(
     };
 }
 // The ai-agents wiring row — the FOURTEENTH registered
-// family. Not a member and not an identity: a standing
-// agent document on the global plane. Stateless: no
+// family: an organization's AI member document; its
+// identity is a `service` identity (Task 6). Stateless: no
 // lifecycle state. notFoundTable matches the family name.
 const AI_AGENTS_WIRING: DocumentFamilyWiring = {
     family: 'ai-agents',
-    httpNest: 'global',
+    httpNest: 'organization',
     lifecycle: 'stateless',
     notFoundTable: 'ai-agents',
     validateDocument: validateAiAgentDocumentBody,
@@ -1305,13 +1305,14 @@ export async function postFlowCreationOp(
 // pair keeps compiling; the live route always supplies one.
 async function assertLiveFlowGraphWriteLaw(
     db: DbAdapter,
+    organization: Id,
     graph: Record<string, unknown>,
 ): Promise<void> {
     const parsed = asStoredGraph(
         graph, 'FlowDocumentBody.graph',
     );
-    const liveAgentIds = await liveGlobalDocumentIds(
-        db, 'ai-agents',
+    const liveAgentIds = await liveOrganizationDocumentIds(
+        db, organization, 'ai-agents',
     );
     assertFlowGraphWriteLaw(parsed, liveAgentIds);
 }
@@ -1322,9 +1323,12 @@ export async function postFlowDocumentOp(
     body: Record<string, unknown>,
     _actor: Id,
     messagePair?: MessagePair,
+    organization?: Id,
 ): Promise<FlowEntity> {
     const doc = validateFlowDocumentBody(withoutId(body));
-    await assertLiveFlowGraphWriteLaw(db, doc.graph);
+    await assertLiveFlowGraphWriteLaw(
+        db, requireOrganization(organization), doc.graph,
+    );
     const entity = {
         ...doc.entity,
         ...documentOperationOrganization(body),
@@ -2977,7 +2981,8 @@ export const WRITE_RESPONSE_SPECS:
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive).
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
-    'ai-agents/:id': documentWriteResponseSpec(AI_AGENTS_WIRING),
+    'organizations/:id/ai-agents/:id':
+        documentWriteResponseSpec(AI_AGENTS_WIRING),
     // G5: piiEntityOf (GET derive). DELETE is a marked
     // tombstone pair; PUT appends.
     'identities/:id/pii': {
@@ -3659,15 +3664,8 @@ export const routes: Route[] = [
             select: getInvitationVersionOnIdentityNest,
         },
     ),
-    documentCollectionRoute(AI_AGENTS_WIRING),
-    route('ai-agents/:id', {
-        select: documentSelect(AI_AGENTS_WIRING),
-        put: documentPutHandler(AI_AGENTS_WIRING),
-    }),
     documentVersionsSelectRoute(IDENTITIES_WIRING),
     documentVersionSelectRoute(IDENTITIES_WIRING),
-    documentVersionsSelectRoute(AI_AGENTS_WIRING),
-    documentVersionSelectRoute(AI_AGENTS_WIRING),
     // PII is a facet of the identity's own subtree: GET is
     // self-or-admin, PUT/DELETE self-or-admin (enforced in
     // the request gate, mirroring
@@ -4189,7 +4187,7 @@ export const routes: Route[] = [
             const documentBody = flowCreateDocumentBody(b);
             validateFlowDocumentBody(documentBody);
             await assertLiveFlowGraphWriteLaw(
-                db, documentBody.graph as
+                db, org, documentBody.graph as
                     Record<string, unknown>,
             );
             // validateProjectFlowEntity accepts EXACTLY
@@ -5242,6 +5240,10 @@ export const routes: Route[] = [
     documentEntityRoute(OBJECTIVES_WIRING),
     documentVersionsSelectRoute(OBJECTIVES_WIRING),
     documentVersionSelectRoute(OBJECTIVES_WIRING),
+    documentCollectionRoute(AI_AGENTS_WIRING),
+    documentEntityRoute(AI_AGENTS_WIRING),
+    documentVersionsSelectRoute(AI_AGENTS_WIRING),
+    documentVersionSelectRoute(AI_AGENTS_WIRING),
     // Objective revisions nest under their parent objective:
     // param 0 is the path org, param 1 is the objective, so
     // the SERVER filters the collection to that objective

@@ -233,11 +233,12 @@ function aiMemberDetail(name: string) {
 }
 
 async function createAiMember(
-    db: MemoryDbAdapter, token: string, id: string,
+    db: MemoryDbAdapter, token: string, organizationA: string,
+    id: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + id, token,
-        aiMemberDetail('Bot ' + id),
+        'PUT', '/organizations/' + organizationA + '/ai-agents/' + id,
+        token, aiMemberDetail('Bot ' + id),
     ));
     assertStrictEquals(res.status, 201, 'ai-agent create failed');
 }
@@ -492,7 +493,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     // orphan (members are GLOBAL plane; ownership rides the
     // membership message plane).
     const aiMemberId = generateIdentifier();
-    await createAiMember(db, tokenA, aiMemberId);
+    await createAiMember(db, tokenA, organizationA, aiMemberId);
 
     // (c) a work order's create-op birth (3 events).
     const workOrderId = generateIdentifier();
@@ -762,7 +763,8 @@ async () => {
     const agent = await handleRequest(
         fx.db,
         req(
-            'GET', '/ai-agents/' + fx.aiMemberId,
+            'GET', '/organizations/' + fx.organizationA
+                + '/ai-agents/' + fx.aiMemberId,
             await organizationToken(fx.adminA, fx.organizationA),
         ),
     );

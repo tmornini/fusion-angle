@@ -188,14 +188,14 @@ Deno.test(
     'direct hash paints before page ready',
 async () => {
     const { origin, page } = await openDocs(
-        '#get/ai-agents',
+        '#get/organizations/id/ai-agents',
     );
     try {
         assertStrictEquals(
             await page.evaluate<string>(
                 'location.hash',
             ),
-            '#get/ai-agents',
+            '#get/organizations/id/ai-agents',
         );
         assertStrictEquals(
             await page.evaluate<boolean>(
@@ -209,7 +209,7 @@ async () => {
                 `document.querySelector('${ROOM_H1}')`
                 + `.textContent.trim()`,
             ),
-            'GET /api/ai-agents/',
+            'GET /api/organizations/:id/ai-agents/',
         );
         assertStrictEquals(
             await page.evaluate<boolean>(

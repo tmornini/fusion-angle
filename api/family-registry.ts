@@ -83,12 +83,13 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
     },
     {
         family: 'ai-agents',
-        organizationNested: false, // GLOBAL plane: a
-            // standing agent is not a member and not an
-            // identity, and is not nested under an
-            // organization.
+        organizationNested: true, // organization plane:
+            // one document per organization; genesis is
+            // the members statement (Task 6). Until
+            // Task 32, PUT also creates.
         createBodyIdField: 'id', // INERT — no collection
-            // POST exists; genesis is PUT /ai-agents/:id.
+            // POST exists; genesis is the members
+            // statement (Task 6).
     },
     {
         family: 'invitations',

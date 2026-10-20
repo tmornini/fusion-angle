@@ -44,12 +44,14 @@ Deno.test('PUT /ai-agents/:id writes the agent', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
-        'PUT', '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
+        'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
         agentFields('Claude'),
     ));
     assert(put.status === 201 || put.status === 200);
     const got = (await GET<{ name: string }>(
-        db, 'ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
         operationIdHeader())).body().toValue();
     assertStrictEquals(got.name, 'Claude');
 });
@@ -69,7 +71,8 @@ Deno.test('a flow write with an AI agent id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await PUT(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg',
+    await PUT(db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+        + '/ai-agents/UuvoBhQJUSEsiJwscXPkUg',
         agentFields('Bot'), token,
         operationIdHeader());
     const { DEFAULT_LOCK_TIMEOUT } = await import(

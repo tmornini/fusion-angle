@@ -368,6 +368,7 @@ Deno.test('the document body carries state/state_at/graph while'
     // reconstructs the return entity from the body.
     const flow = await postFlowDocumentOp(
         db, generateIdentifier(), body, 'XXZruirZyAOoRpNxaDnpSA',
+        undefined, 'AjdvjuECVZEgZoFajaIEkg',
     );
     for (const key of [
         'state', 'state_at', 'state_event_id',

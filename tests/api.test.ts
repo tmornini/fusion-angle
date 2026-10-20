@@ -149,7 +149,8 @@ Deno.test(
             db, generateIdentifier(), 'Opus',
         );
         const ais = (await GETCollection(
-            db, 'ai-agents/', DEV_TOKEN, operationIdHeader()))
+            db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/',
+            DEV_TOKEN, operationIdHeader()))
                 .map((m) => m.body().toValue());
         assertStrictEquals(ais.length, 1);
     },
@@ -160,7 +161,7 @@ Deno.test(
     async () => {
         const db = await freshDb();
         const err = await assertRejects(
-            () => PUT(db, 'ai-agents/'
+            () => PUT(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
                 + generateIdentifier(), {
                 rogue_field: 'extra',
             }, DEV_TOKEN,

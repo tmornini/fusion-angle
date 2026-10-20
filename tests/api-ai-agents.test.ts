@@ -191,7 +191,7 @@ Deno.test('PUT /ai-agents/:id writes the four fields; GET'
     const db = await freshDb();
     const body = agentFields('Drafting agent');
     const put = await handleRequest(db, req(
-        'PUT', '/ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN, body,
+        'PUT', aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg'), DEV_TOKEN, body,
     ));
     assert(
         put.status === 201 || put.status === 200,
@@ -215,7 +215,7 @@ Deno.test('PUT /ai-agents/:id writes the four fields; GET'
         description: string;
         skill_focus: string;
         model: string;
-    }>(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg', DEV_TOKEN,
+    }>(db, aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg').slice(1), DEV_TOKEN,
         operationIdHeader())).body().toValue();
     assertEquals(got, written);
 });
@@ -224,7 +224,7 @@ Deno.test('a flow write with an AI member id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const agentId = generateIdentifier();
-    await PUT(db, 'ai-agents/' + agentId, {
+    await PUT(db, aiPath(STARK, agentId).slice(1), {
         name: 'Bot',
         description: '',
         skill_focus: '',
@@ -255,7 +255,7 @@ Deno.test('a flow write with agentIds naming a live'
     const db = await freshDb();
     const agent = agentFields('Live agent');
     const minted = await handleRequest(db, req(
-        'PUT', '/ai-agents/UxpkDaNMmbWLvCTkyrFfGA', DEV_TOKEN,
+        'PUT', aiPath(STARK, 'UxpkDaNMmbWLvCTkyrFfGA'), DEV_TOKEN,
         agent,
     ));
     assert(
