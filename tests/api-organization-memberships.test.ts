@@ -11,6 +11,8 @@ import { seedPersonIdentity } from
     './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { firstProviderModel } from './member-fixtures.ts';
+import { landMembership } from './membership-fixtures.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 import {
     apiRequest,
     partBodiesOf,
@@ -639,4 +641,35 @@ async () => {
             [SARAH]: 'person',
         },
     );
+});
+
+// Below the gate a store bug can still seat an identity with
+// no document; every membership read then fails loudly,
+// never reading the seat as a person.
+Deno.test('a read of a seat with no identity fails loudly',
+async () => {
+    const { db, admin } = await seeded();
+    const ghost = generateIdentifier();
+    await landMembership(
+        db, STARK, ghost, 'accepted', 'member', AT,
+    );
+    for (const path of [
+        nest('memberships'),
+        nest('invitations') + membershipNameOf(STARK, ghost),
+    ]) {
+        const { result: got, calls } = await captureConsole(
+            'error', () => read(db, admin, path),
+        );
+        assertStrictEquals(got.status, 500, path);
+        assertEquals(
+            await got.json(), { error: 'internal error' },
+        );
+        assertStrictEquals(calls.length, 1, path);
+        const [event, , error] = calls[0]!;
+        assertStrictEquals(event, 'request failed');
+        assertStrictEquals(
+            (error as Error).message,
+            'no identity document for ' + ghost,
+        );
+    }
 });
