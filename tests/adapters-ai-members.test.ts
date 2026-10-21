@@ -18,6 +18,7 @@ import { devToken, organizationToken } from
 import {
     postAIMemberCreation,
     putAIMember,
+    getAIMember,
     getAIMemberEntity,
     getAIMembers,
 } from '../client/ai-members.ts';
@@ -47,26 +48,41 @@ function aiDraft(name: string) {
 }
 
 Deno.test(
-    'postAIMemberCreation writes PUT organizations/:id/ai-agents/:id',
+    'postAIMemberCreation posts the memberships statement',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo User');
-        const ctx = inPageContext(db, await devToken());
-        const agentId = generateIdentifier();
-
-        await postAIMemberCreation(
-            ctx, agentId, aiDraft('Claude'),
+        const { ctx, sent } = recordedContext(
+            db, await devToken(),
         );
+        const agentId = generateIdentifier();
+        const draft = aiDraft('Claude');
 
-        const detail = (await getAIMemberEntity(ctx, agentId))
-            .body().toValue();
-        assertStrictEquals(detail.name, 'Claude');
-        const agent = (await ctx.GET<{
-            id: string; name: string;
-        }>('organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
-            + agentId)).body().toValue();
-        assertStrictEquals(agent.name, 'Claude');
+        await postAIMemberCreation(ctx, agentId, draft);
+
+        const writes = sent.filter((request) =>
+            request.method !== 'GET'
+        );
+        assertStrictEquals(writes.length, 1);
+        const wrote = writes[0]!;
+        assertStrictEquals(wrote.method, 'POST');
+        assertStrictEquals(
+            wrote.path,
+            '/api/organizations/' + STARK + '/memberships/',
+        );
+        assertStrictEquals(wrote.ifMatch, null);
+        assertStrictEquals(wrote.ifNoneMatch, null);
+        const body = JSON.parse(wrote.body ?? 'null');
+        const at = body.membership.at;
+        assertEquals(body, {
+            id: agentId,
+            kind: 'ai',
+            membership: { type: 'member', at },
+            ai: draft,
+        });
+        const member = await getAIMember(ctx, agentId);
+        assertStrictEquals(member.nameText(), 'Claude');
     },
 );
 
