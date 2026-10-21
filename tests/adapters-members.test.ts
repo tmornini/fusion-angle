@@ -26,6 +26,14 @@ import {
     putHumanMember,
     type HumanMemberDraft,
 } from '../client/members.ts';
+import {
+    getAIMember,
+    getAIMemberEntity,
+} from '../client/ai-members.ts';
+import {
+    getServiceMember,
+    getServiceMemberEntity,
+} from '../client/service-members.ts';
 import { getMembers } from '../client/members-union.ts';
 import {
     getOrganizationSeats,
@@ -36,6 +44,7 @@ import {
     nowUtc,
     type HumanMember,
     type MembershipEntity,
+    type MembershipReadEntity,
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -536,6 +545,66 @@ async () => {
         await getHumanMember(ctx, serviceId), null,
     );
 });
+
+// Removal ends the seat and nothing else: the member's
+// document stays, and so does its identity, which the
+// membership read still joins by kind.
+Deno.test(
+    'postMembershipRemoval removes an AI or service member',
+    async () => {
+        const { db, ctx } = await adminContext();
+        const aiId = generateIdentifier();
+        const serviceId = generateIdentifier();
+        await postMember(db, {
+            id: aiId,
+            kind: 'ai',
+            membership: { type: 'member', at: nowUtc() },
+            ai: {
+                name: 'Ops Assistant',
+                description: 'Triage',
+                skill_focus: 'routing',
+                model: firstProviderModel().id,
+            },
+        });
+        await postMember(db, {
+            id: serviceId,
+            kind: 'service',
+            membership: { type: 'member', at: nowUtc() },
+            service: {
+                name: 'Nightly import',
+                description: 'Loads the ledger export',
+            },
+        });
+
+        const ai = await getAIMember(ctx, aiId);
+        await postMembershipRemoval(ctx, ai);
+        const aiSeat = (await ctx.GET<MembershipReadEntity>(
+            membershipResource(aiId),
+        )).body().toValue();
+        assertStrictEquals(aiSeat.state, 'removed');
+        assertStrictEquals(aiSeat.identity_kind, 'service');
+        assertStrictEquals(
+            (await getAIMemberEntity(ctx, aiId))
+                .query('status').toNumber(),
+            200,
+        );
+
+        const service = await getServiceMember(ctx, serviceId);
+        await postMembershipRemoval(ctx, service);
+        const serviceSeat = (
+            await ctx.GET<MembershipReadEntity>(
+                membershipResource(serviceId),
+            )
+        ).body().toValue();
+        assertStrictEquals(serviceSeat.state, 'removed');
+        assertStrictEquals(serviceSeat.identity_kind, 'service');
+        assertStrictEquals(
+            (await getServiceMemberEntity(ctx, serviceId))
+                .query('status').toNumber(),
+            200,
+        );
+    },
+);
 
 // A service identity, written first, then seated through
 // the item PUT, with no ai-agents/ or services/ document in

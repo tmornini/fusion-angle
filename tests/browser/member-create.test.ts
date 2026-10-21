@@ -5,6 +5,8 @@ import {
 } from './fixtures.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
+import { buildPageUrl } from
+    '../../web-app/app/navigation.ts';
 
 const browser = useBrowser();
 const STAY_MS = 1500;
@@ -142,6 +144,91 @@ Deno.test(
                 assertEquals(
                     await page.evaluate<boolean>(MARKER),
                     true,
+                );
+            },
+        );
+    },
+);
+
+Deno.test(
+    'removing a service member drops it from the roster',
+    async () => {
+        await withAdminPage(
+            browser.get(),
+            async (page, origin) => {
+                await openAddMember(
+                    page, origin.baseUrl,
+                );
+                await page.click(
+                    '#add-member-kind-toggle'
+                    + ' input[value="service"]',
+                );
+                await page.until(
+                    `document.querySelector(`
+                    + `'#add-member-service-form')`
+                    + `?.checkVisibility() === true`,
+                    'service form visible',
+                );
+                await page.evaluate(`(() => {
+                    document.querySelector(
+                        '#service-name',
+                    ).value = 'CI bot';
+                    document.querySelector(
+                        '#service-description',
+                    ).value = 'Builds every commit';
+                    return true;
+                })()`);
+                await page.click('#add-member-submit');
+                await page.until(
+                    `document.body.textContent`
+                    + `.includes('CI bot')`,
+                    'roster shows CI bot',
+                );
+                const memberId = await page.evaluate<string>(
+                    `[...document.querySelectorAll(`
+                    + `'[data-member-id]')].find(row =>`
+                    + ` row.textContent.includes('CI bot'))`
+                    + `.getAttribute('data-member-id')`,
+                );
+                await page.click(
+                    '[data-member-id="' + memberId + '"]',
+                );
+                await page.ready('member-detail');
+                const identityLink = 'a[href="' + buildPageUrl(
+                    'identity-detail', { identityId: memberId },
+                ) + '"]';
+                await page.until(
+                    `document.querySelector(${
+                        JSON.stringify(identityLink)
+                    })?.checkVisibility() === true`,
+                    'identity link visible',
+                );
+                await page.click('#member-remove-btn');
+                await page.waitFor('#confirm-remove-dialog[open]');
+                await page.click(
+                    '[data-member-action="confirm-remove"]',
+                );
+                await page.until(
+                    `[...document.querySelectorAll(`
+                    + `'.toast')].some(t => t.textContent`
+                    + `.includes('Member removed'))`,
+                    'Member removed toast',
+                );
+                await page.navigate(
+                    registryUrl(origin.baseUrl, 'members'),
+                );
+                await page.ready('members');
+                await page.until(
+                    `document.querySelectorAll(`
+                    + `'[data-member-id]').length > 0`,
+                    'roster rendered',
+                );
+                assertStrictEquals(
+                    await page.evaluate<boolean>(
+                        `document.body.textContent`
+                        + `.includes('CI bot')`,
+                    ),
+                    false,
                 );
             },
         );
