@@ -11,8 +11,6 @@ const browser = useBrowser();
 // page clears them on open. Type, cancel, reopen, then read
 // every field the dialog owns.
 
-const ADD_IDENTITY_FIELDS = ['#svc-secret'];
-
 const ADD_MEMBER_FIELDS = [
     '#hw-name', '#hw-email', '#hw-title', '#hw-phone',
     '#hw-bio', '#ai-name', '#ai-description',
@@ -67,59 +65,6 @@ async () => {
                 + ` === null`
                 + ` && document.querySelector(`
                 + `'#add-identity-dialog') === null`,
-            ),
-            true,
-        );
-    });
-});
-
-Deno.test('the add-identity dialog reopens with every field empty',
-async () => {
-    await withAdminPage(browser.get(), async (page, origin) => {
-        await page.navigate(
-            registryUrl(origin.baseUrl, 'identities'),
-        );
-        await page.ready('identities');
-        await openDialog(page, 'add-identity');
-        await page.evaluate(fillFields(ADD_IDENTITY_FIELDS));
-        await cancelDialog(page, 'add-identity');
-        await openDialog(page, 'add-identity');
-        const values = await page.evaluate<string[]>(
-            fieldValues(ADD_IDENTITY_FIELDS),
-        );
-        assertEquals(
-            values, ADD_IDENTITY_FIELDS.map(() => ''),
-        );
-    });
-});
-
-Deno.test('the add-identity dialog opens on the service form',
-async () => {
-    await withAdminPage(browser.get(), async (page, origin) => {
-        await page.navigate(
-            registryUrl(origin.baseUrl, 'identities'),
-        );
-        await page.ready('identities');
-        await openDialog(page, 'add-identity');
-        assertEquals(
-            await page.evaluate<boolean>(
-                `document.querySelector(`
-                + `'#add-identity-dialog`
-                + ` input[name="identity-kind"]') === null`,
-            ),
-            true,
-        );
-        assertEquals(
-            await page.evaluate<boolean>(
-                `document.querySelector(`
-                + `'#add-identity-person-form') === null`,
-            ),
-            true,
-        );
-        assertEquals(
-            await page.evaluate<boolean>(
-                `document.querySelector('#svc-secret')`
-                + `.checkVisibility()`,
             ),
             true,
         );

@@ -7,9 +7,9 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { inPageContext } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { seedServiceIdentity } from './identity-fixtures.ts';
 import {
     getIdentityRoster,
-    postIdentityCreation,
 } from '../client/identities.ts';
 import {
     getProviderEvents,
@@ -65,10 +65,8 @@ async () => {
 
 Deno.test('getIdentityRoster omits a membership-less service',
 async () => {
-    const { ctx } = await setup();
-    await postIdentityCreation(ctx, SERVICE, {
-        kind: 'service', secret: 'shh',
-    });
+    const { db, ctx } = await setup();
+    await seedServiceIdentity(db, SERVICE);
     const roster = await getIdentityRoster(ctx);
     assertEquals(
         roster.find((row) => row.id === SERVICE),
@@ -88,11 +86,9 @@ async () => {
 Deno.test('getIdentityRoster omits a fresh membership-less'
     + ' service',
 async () => {
-    const { ctx } = await setup();
+    const { db, ctx } = await setup();
     const serviceId = generateIdentifier();
-    await postIdentityCreation(ctx, serviceId, {
-        kind: 'service', secret: 'shh',
-    });
+    await seedServiceIdentity(db, serviceId);
     const roster = await getIdentityRoster(ctx);
     assertEquals(
         roster.find((row) => row.id === serviceId),
