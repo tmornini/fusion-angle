@@ -48,7 +48,7 @@ committed. TEST-PLAN.md is not re-run.
    (`web-app/app/flow-graph.ts:388-406`), ahead of
    `.flow-content` (`:1413-1417`). `syncViewport` keeps
    both rects sized to the viewBox on every gesture
-   frame (`web-app/app/flow-gesture-render.ts:89-112`).
+   frame (`web-app/app/flow-gesture-render.ts:89-118`).
    The viewBox always shares the canvas aspect ratio, so
    `xMidYMid meet` never letterboxes
    (`web-app/app/flow-interactions.ts:244-250`,
