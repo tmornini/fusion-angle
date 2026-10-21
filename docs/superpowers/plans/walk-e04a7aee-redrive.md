@@ -74,11 +74,12 @@ committed. TEST-PLAN.md is not re-run.
    `pointer-down-on-canvas` (`:641-649`).
    `ancestorAttr` walks `parentElement` looking for the
    attribute (`:270-282`). With pan mode off and no
-   recent node click, `onCanvasPointerDown` sets
-   `marquee: { kind: 'selecting' }` and captures the
-   pointer (`web-app/app/flow-fsm-reduce.ts:112-166`,
+   recent node or edge click, `onCanvasPointerDown`
+   sets `marquee: { kind: 'selecting' }` and captures
+   the pointer (`web-app/app/flow-fsm-reduce.ts:112-166`,
    the second-press branch at `:138-145` needs a
-   `lastClick` from a node, `:34-48`). So the background
+   `lastClick` from a node or edge, `:28-48` and
+   `:399-405`). So the background
    is any point that hits inside `svg.flow-canvas` with
    no `[data-node-id]` or `[data-edge-id]` ancestor.
 3. **The point exists, and the explorer already has
