@@ -11,8 +11,8 @@
 re-drive F52 once with it.
 
 **Architecture:** One bounded re-drive on 8081, then a
-driving note only if that re-drive scores BLOCKED. The
-new Step 2 tests the condition the canvas `pointerdown`
+driving note only if that re-drive reaches Step 3 and
+scores BLOCKED. The new Step 2 tests the condition the canvas `pointerdown`
 handler uses to start a marquee. It no longer tests for
 one guessed element. No product, test, or TEST-PLAN.md
 case text changes.
