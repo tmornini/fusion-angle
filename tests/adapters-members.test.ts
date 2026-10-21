@@ -8,6 +8,7 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { apiRequest } from './http-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
+import { seedServiceIdentity } from './identity-fixtures.ts';
 import { recordedContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { responseMessage } from './fixtures/response-message.ts';
@@ -536,12 +537,14 @@ async () => {
     );
 });
 
-// A service identity seated through the item PUT, with no
-// ai-agents/ or services/ document in the organization.
+// A service identity, written first, then seated through
+// the item PUT, with no ai-agents/ or services/ document in
+// the organization.
 async function seatServiceIdentity(
     db: MemoryDbAdapter,
     id: string,
 ): Promise<void> {
+    await seedServiceIdentity(db, id);
     const token = await organizationToken();
     const seated = await handleRequest(db, apiRequest({
         method: 'PUT',
@@ -553,14 +556,6 @@ async function seatServiceIdentity(
     }));
     assertStrictEquals(seated.status, 201);
     await seated.body?.cancel();
-    const identity = await handleRequest(db, apiRequest({
-        method: 'PUT',
-        path: '/identities/' + id,
-        token,
-        body: { kind: 'service' },
-    }));
-    assertStrictEquals(identity.status, 201);
-    await identity.body?.cancel();
 }
 
 // One member-kind rule for every reader (Review Focus 1):

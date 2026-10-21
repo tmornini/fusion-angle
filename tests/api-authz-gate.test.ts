@@ -4,6 +4,7 @@ import { handleRequest } from '../api/api.ts';
 import { GET } from './in-page-facade.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
+import { seedIdentityDocument } from './identity-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
@@ -70,6 +71,7 @@ Deno.test('admin may write a membership type', async () => {
     await seedRootAdmin(db);
     const organization = 'AjdvjuECVZEgZoFajaIEkg';
     const identity = 'prBESZPjJDiuXCeZLmbiVw';
+    await seedIdentityDocument(db, identity, 'person');
     const res = await handleRequest(db, framedRequest(
         `${BASE}/organizations/${organization}/invitations/`
             + membershipNameOf(organization, identity), {

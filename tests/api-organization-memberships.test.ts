@@ -19,7 +19,6 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
-import { captureConsole } from './fixtures/console-capture.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
@@ -594,16 +593,18 @@ async () => {
     assertStrictEquals(seat['identity_kind'], 'service');
 });
 
-// Every seat's identity has a document (memberGeneses and
-// postBootstrapIn write both), so a seat without one is
-// the store's bug: both reads refuse it with their
-// evidence, never serve it as a person.
-Deno.test('a seat whose identity has no document refuses'
-    + ' the read',
+// A seat names an identity with its document (memberGeneses
+// and postBootstrapIn write both), so an organization
+// admin's genesis naming an unknown identity is refused as
+// absent (RFC 9110 §15.5.5): it appends nothing, and every
+// membership read of the organization still answers.
+Deno.test('a seat for an identity with no document is'
+    + ' refused',
 async () => {
     const { db, admin } = await seeded();
     const ghost = generateIdentifier();
     const name = membershipNameOf(STARK, ghost);
+    const before = (await db.messagePairs.getAll()).length;
     const seated = await handleRequest(db, apiRequest({
         method: 'PUT',
         path: nest('invitations') + name,
@@ -611,24 +612,31 @@ async () => {
         body: { state: 'accepted', type: 'member', at: AT },
         headers: { 'If-None-Match': '*' },
     }));
-    assertStrictEquals(seated.status, 201);
-    await seated.body?.cancel();
-    for (
-        const path of [
-            nest('memberships'), nest('invitations') + name,
-        ]
-    ) {
-        const { result: got, calls } = await captureConsole(
-            'error', () => read(db, admin, path),
-        );
-        assertStrictEquals(got.status, 500, path);
-        assertEquals(await got.json(), { error: 'internal error' });
-        assertStrictEquals(calls.length, 1, path);
-        const [event, , error] = calls[0]!;
-        assertStrictEquals(event, 'request failed');
-        assertStrictEquals(
-            (error as Error).message,
-            'no identity document for ' + ghost,
-        );
-    }
+    assertStrictEquals(seated.status, 404);
+    assertEquals(await seated.json(), {
+        error: 'Not found: identities/' + ghost,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    const item = await read(
+        db, admin, nest('invitations') + name,
+    );
+    assertStrictEquals(item.status, 404);
+    await item.body?.cancel();
+    const listed = await read(db, admin, nest('memberships'));
+    assertStrictEquals(listed.status, 200);
+    const rows = await partBodiesOf<{
+        identity_id: string;
+        identity_kind?: string;
+    }>(listed);
+    assertEquals(
+        Object.fromEntries(rows.map(
+            (row) => [row.identity_id, row.identity_kind],
+        )),
+        {
+            XXZruirZyAOoRpNxaDnpSA: 'person',
+            [SARAH]: 'person',
+        },
+    );
 });
