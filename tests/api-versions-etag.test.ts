@@ -720,14 +720,14 @@ Deno.test(
         const token = await organizationToken();
         const id = generateIdentifier();
         await postAiMember(db, token, id, aiAgentDocument('First'));
-        const created = await handleRequest(db, req(
+        const head = await handleRequest(db, req(
             'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
                 + id, token,
         ));
-        assertStrictEquals(created.status, 200);
-        const tag = pairIdOf(created);
+        assertStrictEquals(head.status, 200);
+        const tag = pairIdOf(head);
         assert(tag !== null);
-        await created.body?.cancel();
+        await head.body?.cancel();
         await deleteAiAgentDocument(db, id);
         const listPath = '/organizations/AjdvjuECVZEgZoFajaIEkg'
             + '/ai-agents/' + id + '/versions/';

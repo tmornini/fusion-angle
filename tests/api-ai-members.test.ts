@@ -62,7 +62,7 @@ Deno.test('PUT /ai-agents/:id writes the agent', async () => {
         body: agentFields('Claude'),
         headers: { 'If-Match': etag },
     }));
-    assert(put.status === 201 || put.status === 200);
+    assertStrictEquals(put.status, 200);
     const got = (await GET<{ name: string }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
             + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,

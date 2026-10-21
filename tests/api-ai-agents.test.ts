@@ -12,6 +12,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
+import { getModelsByProvider } from '../api/provider-models.ts';
 import {
     apiRequest,
     partBodiesOf,
@@ -281,11 +282,14 @@ Deno.test('an AI PUT never creates', async () => {
 Deno.test('an AI PUT rewrites the four fields; GET'
 + ' returns them', async () => {
     const db = await freshDb();
+    const seatedModel = [...getModelsByProvider().values()]
+        .flat()[1]!;
+    assert(seatedModel.id !== firstProviderModel().id);
     await postMember(db, {
         id: 'UuvoBhQJUSEsiJwscXPkUg',
         kind: 'ai',
         membership: { type: 'member', at: AT },
-        ai: agentFields('Seated agent'),
+        ai: { ...agentFields('Seated agent'), model: seatedModel.id },
     });
     const head = await handleRequest(db, req(
         'GET', aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg'), DEV_TOKEN,
@@ -306,10 +310,7 @@ Deno.test('an AI PUT rewrites the four fields; GET'
         body,
         headers: { 'If-Match': etag },
     }));
-    assert(
-        put.status === 201 || put.status === 200,
-        'expected 201 or 200, got ' + put.status,
-    );
+    assertStrictEquals(put.status, 200);
     const written = await put.json() as {
         id: string;
         name: string;
