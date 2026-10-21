@@ -101,7 +101,7 @@ The code does not rule out marquee-from-background.
 - Base: `walk-e04a7aee-redrive` at `4b332f58`, plus this
   plan's commit. Nothing lands on `master` or
   `next-release` without the owner's word. Never push,
-  force-push, rebase, or `-D`.
+  force-push, or `-D`. The explorer never rebases.
 - The master owns 8080. The re-drive deploys on 8081.
 - One attempt. A miss is scored, not retried.
 - If the gesture is delivered and then a check
