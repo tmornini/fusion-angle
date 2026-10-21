@@ -248,6 +248,8 @@ svg.flow-stats-canvas
     border-radius: var(--radius);
     box-shadow: var(--shadow-xl);
     padding: var(--space-4);
+    /* Read-only: the node beneath stays the hover target. */
+    pointer-events: none;
     /* Page module sets --card-x / --card-y (unitless px). */
     left: clamp(
         0px,
