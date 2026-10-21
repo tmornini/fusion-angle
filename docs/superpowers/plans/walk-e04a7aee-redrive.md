@@ -226,7 +226,7 @@ SHA>.txt` in the walk's format:
   these fails, score FAIL. The master then files
   `docs/superpowers/test-plan-mitigations/<date>-F-F52.md`
   in the TEST-PLAN.md:7780-7797 format, with Pin copied
-  from F52 (TEST-PLAN.md:3941-3954), Suspected layer
+  from F52 (TEST-PLAN.md:3947-3955), Suspected layer
   `UI`, and `Reproduced by: not reproduced — Layer 3
   re-drive only; no red test yet`. The master commits
   it with the subject `Add the F52 mid-marquee Space
