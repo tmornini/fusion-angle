@@ -460,14 +460,14 @@ limit that note already names.
 | F. Tools | 80 |
 | F2. Workbox | 32 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 40 |
+| G. Admin Pages | 41 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 26 |
 | J. Teardown | 3 |
 | SV. Server (Deno + Postgres) | 9 |
-| **Total** | **404** |
+| **Total** | **405** |
 
 A3 **is** SV1 — counted once, in A. The explorer
 skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
@@ -475,7 +475,7 @@ F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 404 distinct
+The per-section table above counts 405 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
@@ -630,12 +630,14 @@ the second organization.
 
 - [ ] **AA4** Navigate to Members (sidebar). Click "+
   Add Member". PASS: dialog opens with a Kind toggle
-  (Human / AI, Human selected by default), a Human form
-  below showing Name, Email, Title, Department, Phone,
-  Bio, and an AI form (hidden by default) with Name, a
-  Model pulldown (grouped by provider, no default
-  selection), Description, and a Skill Focus textarea —
-  no Auth Token field or security warning.
+  (Human / AI / Service, Human selected by default), a
+  Human form below showing Name, Email, Title,
+  Department, Phone, Bio, an AI form (hidden by default)
+  with Name, a Model pulldown (grouped by provider, no
+  default selection), Description, and a Skill Focus
+  textarea, and a Service form (hidden by default) with
+  Name and Description — no Auth Token field or security
+  warning.
   Pin: exploratory — the live dialog affordance
        (`bindAddMemberDialog` in
        web-app/members/index.ts carries no CLI or
@@ -683,18 +685,19 @@ the second organization.
 - [ ] **AA7a** Click "+ Add Member", switch the Kind
   toggle to AI. PASS: the Human form hides and the AI
   form appears; the AIs group already holds Claude Opus
-  4.8, Claude Sonnet 4.6, GPT-5.5, and Grok 4.3 (agents
-  are global, not seated) — do not Create any of them.
+  4.8, Claude Sonnet 4.6, GPT-5.5, and Grok 4.3 (seated
+  members of Stark, not global) — do not Create any of
+  them.
   Fill Name "Ops Assistant", pick Model "Claude Haiku
   4.5", fill Description and Skill Focus. PASS: Create
   is blocked until a Model is chosen; once chosen, click
-  Create → toast confirms and the AI is written as a
-  message-plane AI agent document (`PUT
-  /ai-agents/:id`); it appears in the AIs group beside
-  the four seeded agents.
+  Create → toast confirms and the AI is created by one
+  POST `organizations/:id/memberships/` with
+  `kind: 'ai'`; it appears in the AIs group beside the
+  four seeded agents.
   Pin: tests/adapters-ai-members.test.ts
-       'postAIMemberCreation writes PUT /ai-agents/:id'
-       (decides the AI-agent write this Create
+       'postAIMemberCreation posts the memberships
+       statement' (decides the one POST this Create
        triggers); exploratory — the live Kind toggle,
        the disabled-until-Model-chosen gate, and the
        AIs-group append
@@ -5175,33 +5178,38 @@ FSM, unlike `flows/detail`).
 > nested `GET identities/:id/pii` (self or admin). A
 > non-admin Ideas list must paint without
 > `GET /identities` or `GET /identity-pii`
-> (`getMemberMap` is the accepted view, the removed
-> view, `/ai-agents`, and the system member; a missing
+> (`getMemberMap` reads the accepted memberships, the
+> removed view, the organization's `ai-agents/` and
+> `services/`, and the system member; a missing
 > name may read `MEMBER_WITHOUT_PII_NAME`). Invite
 > stays admin-gated: `postInvitation`
 > posts the organization nest, and a non-admin is 403.
 
 - [ ] **G11** Navigate to `members/index.html` (reachable
   via the "Members" sidebar entry). PASS: page header reads
-  "Members" with a static subtitle "Manage humans and AIs
-  in your organization" (no count display — header text is
+  "Members" with a static subtitle "Manage humans, AIs, and
+  services in your organization" (no count display — header text is
   static, populated counts live in the sidebar header and
   the table grouping). A `+ Add Member` button
   on the right opens the kind-picker dialog. Below the
-  header sit a search input, three kind chips (All /
-  Humans / AIs, with All pressed by default), and a
-  members state selector (Members / Former members,
+  header sit a search input, four kind chips (All /
+  Humans / AIs / Services, with All pressed by default),
+  and a members state selector (Members / Former members,
   Members pressed). Both are segmented controls: one
   `aria-pressed` in each group. The list
   table groups members under YOU (the signed-in human),
-  then HUMANS, then AIs, each group showing avatar/name,
-  title (humans) or the model name (AIs), and department
-  (humans only). The YOU group is a third header, not a
-  row inside HUMANS.
+  then HUMANS, then AIs, then SERVICES, each group
+  showing avatar/name, title (humans) or the model name
+  (AIs), and department (humans only); a service row
+  shows its avatar and name. The YOU group is a separate header, not
+  a row inside HUMANS.
   Pin: tests/presenter-members.test.ts 'ManagedMembersPresenter
        renders three sections with YOU above
        HUMANS above AIs' (decides the YOU/HUMANS/AIs
        group order); tests/presenter-members.test.ts
+       'ManagedMembersPresenter renders a SERVICES section
+       below AIs' (decides SERVICES follows AIs);
+       tests/presenter-members.test.ts
        'YOU section contains only the current member'
        (decides the YOU block excludes other humans);
        tests/presenter-members.test.ts 'HUMANS section
@@ -5239,22 +5247,25 @@ FSM, unlike `flows/detail`).
        pinned above)
 - [ ] **G13** Type in the search input. PASS: filters the
   list in real-time — human members match on name, email,
-  title, or department; AI members match on name or
-  description (not provider/model). Click the Humans
-  filter chip. PASS: only the YOU and HUMANS groups are
-  visible (the AIs group is hidden — `#buildSelfSection`
-  only hides itself under kind=ai, not kind=human). Click
-  AIs. PASS: only the AIs group is visible. Click
-  All. PASS: all three groups return.
+  title, or department; AI and service members match on
+  name or description (not provider/model). Click the
+  Humans filter chip. PASS: only the YOU and HUMANS
+  groups are visible (the AIs and SERVICES groups are
+  hidden — `#buildSelfSection` only hides itself under
+  kind=ai and kind=service, not kind=human). Click AIs.
+  PASS: only the AIs group is visible. Click Services.
+  PASS: only the SERVICES group is visible. Click All.
+  PASS: all four groups return.
   Pin: tests/presenter-members.test.ts 'search filter
        applies to all three sections' (decides a search
        term narrows YOU/HUMANS/AIs alike);
        tests/presenter-members.test.ts 'kind=human filter
        hides AIs but keeps YOU';
        tests/presenter-members.test.ts 'kind=ai filter
-       hides YOU and HUMANS' (together decide the
-       Humans/AIs/All chip behavior — the second test is
-       also why the corrected Humans-chip PASS line above
+       hides YOU and HUMANS'; tests/presenter-members.test.ts
+       'kind=service filter shows only SERVICES' (together
+       decide the Humans/AIs/Services/All chip behavior —
+       the second test is also why the corrected Humans-chip PASS line above
        names YOU explicitly); exploratory — the live
        keystroke-by-keystroke filtering and the
        name/email/title/department match fields (Layer-1
@@ -5262,30 +5273,36 @@ FSM, unlike `flows/detail`).
        Unpinned but pinnable)
 - [ ] **G43** Navigate to `identities/index.html` (or
   click "Identities" in the sidebar). PASS: the header
-  reads "Identities" with an "Add Identity" button
-  (`#add-identity-btn`); `#identity-list` renders one
+  reads "Identities" with no create button
+  (G44); `#identity-list` renders one
   `.card[data-identity-id]` per identity — a person row
   shows an initials avatar + name + email sub-line + a
-  "Person" badge. For Stark organization admin Tony, the
-  list is one person row for each identity that holds an
-  accepted Stark membership: Emily Rodriguez, Sarah Chen,
-  Lisa Wang, Marcus Johnson, Tony Stark, and Jessica
-  Park. Jordan Rivera is added if AA5's create held, and
-  any seat an earlier case removed drops out (B28
-  removes Lisa Wang). Riley Okafor holds no membership
-  and the Wayne-only members hold no Stark seat, so the
-  identity fence lists neither, and no "Identity without
-  PII" row stands in for them. No service row appears,
-  because a service holds no membership (G47).
-  `getIdentityRoster` GETs identities only —
-  AA7a's "Ops Assistant" is an `ai-agents/:id` document,
-  not an identity row, so it does not appear on this
-  list either. An empty roster renders "No identities
-  yet." Source: `web-app/identities/index.ts`,
+  "Person" badge; a service row shows a shield avatar
+  plus "Service account" + "—", then a "Service"
+  badge. For Stark organization admin Tony, the list is
+  one row for each identity that holds an accepted
+  Stark membership. The person rows are Emily
+  Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony
+  Stark, and Jessica Park. Jordan Rivera is added if
+  AA5's create held, and any seat an earlier case
+  removed drops out (B28 removes Lisa Wang). Riley
+  Okafor holds no membership and the Wayne-only members
+  hold no Stark seat, so the identity fence lists
+  neither, and no "Identity without PII" row stands in
+  for them. The service rows are one for each AI and
+  service member seated in Stark, each a `service`
+  identity unnamed on this page. An empty roster
+  renders "No identities yet."
+  Source: `web-app/identities/index.ts`,
   `web-app/app/presenters/identity-list.ts`
   (`IdentityRosterPresenter`).
   Pin: tests/presenter-identity-list.test.ts 'person row
        shows name, email, and Person badge';
+       tests/presenter-identity-list.test.ts 'unnamed
+       service redacts to a label, not the id' (decides
+       the "Service account" label —
+       `UNNAMED_SERVICE_NAME` — for each seated AI's
+       service row);
        tests/presenter-identity-list.test.ts 'renders an
        empty state when no identities';
        tests/api-identity-fence.test.ts 'GET identities/
@@ -5296,14 +5313,14 @@ FSM, unlike `flows/detail`).
        (decides Riley's absence);
        tests/adapters-identity-roster.test.ts
        'getIdentityRoster omits a membership-less service'
-       (decides there is no service row);
+       (decides an unseated service has no row);
        exploratory — the live named-row census
 - [ ] **G14** Return to `members/index.html` (G43 left
   the explorer on Identities). Click `+ Add Member`. PASS:
   dialog opens with the Kind toggle defaulting to Human,
-  the Human form visible, and the AI form hidden. Switch
-  the toggle to AI. PASS: the Human form hides, the AI
-  form appears
+  the Human form visible, and the AI and Service forms
+  hidden. Switch the toggle to AI. PASS: the Human form
+  hides, the AI form appears
   with a Model pulldown and a Skill Focus textarea; no
   Auth Token field or security warning. Create Human
   writes one POST `organizations/:id/memberships/` at
@@ -5326,15 +5343,41 @@ FSM, unlike `flows/detail`).
   toast "Model is required" fires and no POST happens.
   Pick a Model (Driving notes: native `<select>`),
   fill the other AI fields, click Create.
-  PASS: toast confirms and the AI is written as a
-  message-plane AI agent document (`PUT /ai-agents/:id`);
-  it appears in the AIs group (agents are global, not
-  seated).
+  PASS: toast confirms and the AI is created by the
+  memberships statement (one POST
+  `organizations/:id/memberships/` with `kind: 'ai'`); it
+  appears in the AIs group, a seated member of the
+  organization.
   Pin: tests/adapters-ai-members.test.ts
-       'postAIMemberCreation writes PUT /ai-agents/:id'
-       (decides the AI-agent write this Create
+       'postAIMemberCreation posts the memberships
+       statement' (decides the one POST this Create
        triggers); exploratory — the live "Model is
        required" toast and the no-POST-until-chosen gate
+- [ ] **G14b** With Kind=Service selected, leave Name
+  and Description empty and click Create. PASS: a toast
+  "Name and description are required" fires and no POST
+  happens. Fill both ("CI bot" and a description) and
+  click Create. PASS: toast "Service member added", and
+  the row appears under SERVICES. Click the row. PASS: the
+  member's detail shows its name and description and
+  links its identity, whose registration card is G47.
+  Click Edit, change the description, and Save. PASS:
+  toast "Service member saved" and the new description
+  shows. Click Remove and confirm. PASS: the membership
+  ends and the row leaves SERVICES.
+  Pin: tests/browser/member-create.test.ts 'adding a
+       service member toasts success and lists it'
+       (decides the Create and the SERVICES row);
+       tests/adapters-service-members.test.ts 'a service
+       member save latches its read and answers the new
+       head' (decides the Edit save);
+       tests/browser/member-create.test.ts 'removing a
+       service member drops it from the roster' (decides
+       Remove); tests/presenter-service-member-detail.test.ts
+       'service member detail shows its name, description,
+       identity link, Edit, and Remove' (decides the
+       detail page); exploratory — the live empty-form
+       toast
 
 ### Membership invitations (V) — Members "Invite member"
 
@@ -5680,7 +5723,8 @@ FSM, unlike `flows/detail`).
   `/identities/:id`, `/identities/:id/pii`,
   `/identities/:id/tokens` GET, `/identities/:id/
   providers`, `/identities/:id/registration`, or `PUT
-  /ai-agents/:id`); a 403 here is a real fault the page
+  organizations/:id/ai-agents/:id`); a 403 here is a
+  real fault the page
   re-throws rather than the AI-fallback path. From
   `members/index.html`, click any human
   member's row. PASS: navigates to `member-detail`. Read
@@ -5759,8 +5803,9 @@ FSM, unlike `flows/detail`).
 - [ ] **G24** From `members/index.html`, click any AI
   member's row. PASS: navigates to `member-detail`. Read
   mode shows the AI Member card (Name, Model as
-  "{name} — {provider}", Description, Skill Focus);
-  there is no Auth Token section.
+  "{name} — {provider}", Description, Skill Focus), a
+  link to the AI's identity, and a Remove button; there
+  is no Auth Token section.
   Pin: tests/presenter-member-detail.test.ts
        'AIMemberDetailPresenter renders the model name,
        provider, and skill focus' (decides the Skill
@@ -5772,8 +5817,11 @@ FSM, unlike `flows/detail`).
        assertion's model-NAME half passes from the
        identity's own Name heading alone and decides
        nothing about the Model row's name);
-       exploratory — the live avatar and Description
-       text
+       tests/presenter-member-detail.test.ts 'AI member
+       detail links its identity and offers Remove'
+       (decides the identity link and the Remove
+       button); exploratory — the live avatar and
+       Description text
 - [ ] **G24a** Click Edit. PASS: identity fields become
   inputs (Name text, Model pulldown grouped by provider
   with the current model pre-selected, Description
@@ -5834,7 +5882,7 @@ FSM, unlike `flows/detail`).
   (Identity Providers / Tokens buttons), and — for a
   person — an "Erase PII" button
   (`#identity-erase-btn`). A service identity instead
-  shows a "Credentials" card and NO erase button (only
+  shows no Credentials card and NO erase button (only
   persons carry erasable PII). Source:
   `web-app/identities/index.ts` (`onListClick`),
   `web-app/identities/detail.ts`,
@@ -5846,8 +5894,8 @@ FSM, unlike `flows/detail`).
        a person); tests/presenter-identity-detail.test.ts
        'named service detail shows its name and Service
        badge, never the secret' (decides a service instead
-       shows a Credentials card, no Personal Information
-       card, and never the secret); exploratory — the live
+       shows no Credentials card and no Personal
+       Information card, and never the secret); exploratory — the live
        click-through navigation and the erase button's
        presence for a person versus its absence for a
        service (neither test asserts `#identity-erase-btn`
@@ -6115,8 +6163,9 @@ FSM, unlike `flows/detail`).
   (and PII when contact fields change) persists the
   profile; reload shows the new values. On an AI
   detail page, change Description or Skill Focus and
-  Save. PASS: `PUT /ai-agents/:id` persists; reload
-  shows the new values. No composing POST writes
+  Save. PASS: `PUT organizations/:id/ai-agents/:id`
+  persists, latched on the `If-Match` of the read it came
+  from; reload shows the new values. No composing POST writes
   three pairs.
   Pin: tests/adapters-members.test.ts 'putHumanMember
        updates the identity profile' (decides a Title
@@ -6133,7 +6182,8 @@ FSM, unlike `flows/detail`).
        Title-only save omits the PII PUT);
        tests/adapters-ai-members.test.ts 'putAIMember
        updates the agent document' (decides a Skill
-       Focus edit persists via `PUT ai-agents/:id`);
+       Focus edit persists via
+       `PUT organizations/:id/ai-agents/:id`);
        exploratory — the live reload showing the new
        values (no test asserts the absence of a 3-pair
        composing POST)
