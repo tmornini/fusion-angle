@@ -2,6 +2,7 @@ import type {
     MemberId,
     MemberEntity,
     AIAgentEntity,
+    MembershipEntity,
 } from '../shared/types.ts';
 import { AIMember } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
@@ -11,6 +12,12 @@ import {
     createSubscriptionChannel,
 } from './channels.ts';
 import { requireOrganization } from './members.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
+import {
+    RequestError,
+    HTTP_NOT_FOUND,
+} from '../shared/http-errors.ts';
 
 const aiMemberChanges =
     createSubscriptionChannel();
@@ -33,56 +40,58 @@ function aiAgentsPath(ctx: RequestContext): string {
         + '/ai-agents/';
 }
 
-export function buildAIMemberMap(
-    parents: readonly MemberEntity[],
-    details: readonly AIAgentEntity[],
-): Map<MemberId, AIMember> {
-    const detailById = new Map(
-        details.map(d => [d.id, d]),
-    );
-    const map = new Map<MemberId, AIMember>();
-    for (const parent of parents) {
-        if (parent.type !== 'ai') continue;
-        const detail = detailById.get(parent.id);
-        if (detail === undefined) {
-            throw new Error(
-                'no AI detail for member ' + parent.id,
-            );
-        }
-        map.set(
-            parent.id,
-            new AIMember(
-                parent, {
-                    id: detail.id,
-                    name: detail.name,
-                    description: detail.description,
-                    skill_focus: detail.skill_focus,
-                    model: detail.model,
-                },
-            ),
-        );
-    }
-    return map;
+function acceptedMembershipsPath(
+    ctx: RequestContext,
+): string {
+    return 'organizations/' + requireOrganization(ctx)
+        + '/memberships/?state=accepted';
 }
 
+function membershipItemPath(
+    ctx: RequestContext,
+    id: MemberId,
+): string {
+    const organization = requireOrganization(ctx);
+    return 'organizations/' + organization
+        + '/invitations/'
+        + membershipNameOf(organization, id);
+}
+
+function aiMemberOf(
+    agent: AIAgentEntity,
+    membership: HttpMessage<MembershipEntity>,
+): AIMember {
+    return new AIMember(
+        agentParent(agent.id),
+        {
+            id: agent.id,
+            name: agent.name,
+            description: agent.description,
+            skill_focus: agent.skill_focus,
+            model: agent.model,
+        },
+        membership,
+    );
+}
+
+// An AI is a member while its membership is accepted: an
+// agent document with no seat among the memberships given
+// is not a member.
 export function buildAIAgentMap(
     agents: readonly AIAgentEntity[],
+    memberships: readonly HttpMessage<MembershipEntity>[],
 ): Map<MemberId, AIMember> {
+    const seats = new Map(memberships.map(
+        (membership) => [
+            membership.body().toValue().identity_id,
+            membership,
+        ],
+    ));
     const map = new Map<MemberId, AIMember>();
     for (const agent of agents) {
-        map.set(
-            agent.id,
-            new AIMember(
-                agentParent(agent.id),
-                {
-                    id: agent.id,
-                    name: agent.name,
-                    description: agent.description,
-                    skill_focus: agent.skill_focus,
-                    model: agent.model,
-                },
-            ),
-        );
+        const membership = seats.get(agent.id);
+        if (membership === undefined) continue;
+        map.set(agent.id, aiMemberOf(agent, membership));
     }
     return map;
 }
@@ -90,10 +99,15 @@ export function buildAIAgentMap(
 export async function getAIMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, AIMember>> {
-    const agents = (await ctx.GETCollection<AIAgentEntity>(
-        aiAgentsPath(ctx),
-    )).map((m) => m.body().toValue());
-    return buildAIAgentMap(agents);
+    const [memberships, agents] = await Promise.all([
+        ctx.GETCollection<MembershipEntity>(
+            acceptedMembershipsPath(ctx),
+        ),
+        ctx.GETCollection<AIAgentEntity>(
+            aiAgentsPath(ctx),
+        ).then((parts) => parts.map((m) => m.body().toValue())),
+    ]);
+    return buildAIAgentMap(agents, memberships);
 }
 
 export async function getAIMembers(
@@ -103,23 +117,26 @@ export async function getAIMembers(
     return Array.from(map.values());
 }
 
+// A membership that is not accepted is absence, as a
+// missing document is.
 export async function getAIMember(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<AIMember> {
-    const agent = (await ctx.GET<AIAgentEntity>(
-        aiAgentsPath(ctx) + id,
-    )).body().toValue();
-    return new AIMember(
-        agentParent(id),
-        {
-            id: agent.id,
-            name: agent.name,
-            description: agent.description,
-            skill_focus: agent.skill_focus,
-            model: agent.model,
-        },
-    );
+    const [agent, membership] = await Promise.all([
+        ctx.GET<AIAgentEntity>(aiAgentsPath(ctx) + id),
+        ctx.GET<MembershipEntity>(
+            membershipItemPath(ctx, id),
+        ),
+    ]);
+    if (membership.body().toValue().state !== 'accepted') {
+        throw new RequestError(
+            'no live AI member ' + id,
+            HTTP_NOT_FOUND,
+            membership,
+        );
+    }
+    return aiMemberOf(agent.body().toValue(), membership);
 }
 
 export function getAIMemberEntity(

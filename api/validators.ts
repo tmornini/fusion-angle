@@ -197,19 +197,21 @@ export function asConstraint(
 }
 
 // Write-path graph law: memberIds may name person
-// identities only. agentIds must name the organization's
-// live AI documents.
+// identities only: an AI or service member is a program,
+// whether or not its membership is accepted. agentIds
+// must name the organization's live AI members.
 export function assertFlowGraphWriteLaw(
     graph: StoredGraph,
+    programIds: ReadonlySet<string>,
     liveAgentIds: ReadonlySet<string>,
 ): void {
     for (const node of graph.nodes) {
         for (const id of node.memberIds) {
-            if (liveAgentIds.has(id)) {
+            if (programIds.has(id)) {
                 throw new ValidationError(
                     'memberIds may name person'
                     + ' identities only, not AI'
-                    + ' agents',
+                    + ' agents or services',
                 );
             }
         }

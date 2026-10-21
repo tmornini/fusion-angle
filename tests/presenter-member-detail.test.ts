@@ -142,6 +142,14 @@ function makeAIMember() {
                 'Deep reasoning over long docs.',
             model: firstProviderModel().id,
         },
+        responseMessage<MembershipEntity>({
+            id: 'ai_1',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'ai_1',
+            type: 'member',
+            state: 'accepted',
+            at: '2026-01-01T00:00:00.000000Z',
+        }),
     );
 }
 

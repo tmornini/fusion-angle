@@ -1,6 +1,6 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, PUT } from './in-page-facade.ts';
+import { GET } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -71,10 +71,22 @@ Deno.test('a flow write with an AI agent id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await PUT(db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
-        + '/ai-agents/UuvoBhQJUSEsiJwscXPkUg',
-        agentFields('Bot'), token,
-        operationIdHeader());
+    const created = await handleRequest(db, req(
+        'POST',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/memberships/',
+        token,
+        {
+            id: 'UuvoBhQJUSEsiJwscXPkUg',
+            kind: 'ai',
+            membership: {
+                type: 'member',
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+            ai: agentFields('Bot'),
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
     const { DEFAULT_LOCK_TIMEOUT } = await import(
         '../shared/types.ts'
     );

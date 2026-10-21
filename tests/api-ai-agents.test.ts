@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, GETCollection, PUT } from './in-page-facade.ts';
+import { GET, GETCollection } from './in-page-facade.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -268,13 +268,17 @@ Deno.test('a flow write with an AI member id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const agentId = generateIdentifier();
-    await PUT(db, aiPath(STARK, agentId).slice(1), {
-        name: 'Bot',
-        description: '',
-        skill_focus: '',
-        model: firstProviderModel().id,
-    }, DEV_TOKEN,
-        operationIdHeader());
+    await postMember(db, {
+        id: agentId,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: {
+            name: 'Bot',
+            description: '',
+            skill_focus: '',
+            model: firstProviderModel().id,
+        },
+    });
     const token = await organizationToken();
     const res = await handleRequest(db, apiRequest({
         method: 'PUT',
@@ -297,14 +301,12 @@ Deno.test('a flow write with an AI member id in memberIds'
 Deno.test('a flow write with agentIds naming a live'
 + ' AI agent is 201 or 200', async () => {
     const db = await freshDb();
-    const agent = agentFields('Live agent');
-    const minted = await handleRequest(db, req(
-        'PUT', aiPath(STARK, 'UxpkDaNMmbWLvCTkyrFfGA'), DEV_TOKEN,
-        agent,
-    ));
-    assert(
-        minted.status === 201 || minted.status === 200,
-    );
+    await postMember(db, {
+        id: 'UxpkDaNMmbWLvCTkyrFfGA',
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Live agent'),
+    });
     const token = await organizationToken();
     const res = await handleRequest(db, apiRequest({
         method: 'PUT',

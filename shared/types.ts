@@ -813,6 +813,9 @@ export interface ServiceEntity {
 
 export class AIMember {
     readonly kind = 'ai' as const;
+    // The membership this member was read through: its
+    // removal names the head it replaces.
+    readonly membership: HttpMessage<MembershipEntity>;
     readonly #id: MemberId;
     readonly #name: string;
     readonly #description: string;
@@ -822,7 +825,9 @@ export class AIMember {
     constructor(
         parent: MemberEntity,
         detail: AIMemberEntity,
+        membership: HttpMessage<MembershipEntity>,
     ) {
+        this.membership = membership;
         this.#id = parent.id;
         this.#name = detail.name;
         this.#description =

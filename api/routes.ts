@@ -1334,10 +1334,26 @@ async function assertLiveFlowGraphWriteLaw(
     const parsed = asStoredGraph(
         graph, 'FlowDocumentBody.graph',
     );
-    const liveAgentIds = await liveOrganizationDocumentIds(
-        db, organization, 'ai-agents',
+    const [aiIds, serviceIds, accepted] = await Promise.all([
+        liveOrganizationDocumentIds(
+            db, organization, 'ai-agents',
+        ),
+        liveOrganizationDocumentIds(
+            db, organization, 'services',
+        ),
+        organizationMembershipHeads(
+            db, organization,
+            { kind: 'state', state: 'accepted' },
+        ),
+    ]);
+    const programIds = new Set([...aiIds, ...serviceIds]);
+    const seated = new Set(accepted.map(
+        (head) => membershipOfHead(head).identity_id,
+    ));
+    const liveAgentIds = new Set(
+        [...aiIds].filter((id) => seated.has(id)),
     );
-    assertFlowGraphWriteLaw(parsed, liveAgentIds);
+    assertFlowGraphWriteLaw(parsed, programIds, liveAgentIds);
 }
 
 export async function postFlowDocumentOp(
