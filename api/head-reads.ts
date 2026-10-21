@@ -74,8 +74,7 @@ export type HeadSelection =
     };
 
 // A head served whole needs no reader of its own: the
-// credential and the instance are the only projections,
-// and the membership the only join.
+// credential and the instance are the only projections.
 export function wholeHeadSelection(
     head: MessagePairEntity,
     lifecycle: Lifecycle,
