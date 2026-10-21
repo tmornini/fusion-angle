@@ -11,8 +11,11 @@ import { handleRequest } from '../api/api.ts';
 import { bodyOf } from '../api/derive-documents.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
-import { seedPersonIdentity } from
-    './identity-fixtures.ts';
+import {
+    seedPersonIdentity,
+    seedServiceIdentity,
+} from './identity-fixtures.ts';
+import { firstProviderModel } from './member-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     apiRequest,
@@ -35,6 +38,9 @@ const MALFORMED =
 const LAST_ADMIN =
     'the last accepted admin cannot be removed'
     + ' or demoted';
+const SERVICE_ADMIN =
+    'an AI or service member cannot be an organization'
+    + ' admin';
 const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 
 function itemPath(
@@ -701,6 +707,91 @@ async () => {
         await seatHead(db, invitee.id),
         { method: 'PUT', type: 'member' },
     );
+});
+
+Deno.test('an AI or service member is never made an'
+    + ' organization admin', async () => {
+    const { db, admin } = await basis();
+    const kinds = [
+        {
+            kind: 'ai',
+            ai: {
+                name: 'Ops Assistant',
+                description: 'Triage',
+                skill_focus: 'routing',
+                model: firstProviderModel().id,
+            },
+        },
+        {
+            kind: 'service',
+            service: {
+                name: 'Nightly import',
+                description: 'Loads the ledger export',
+            },
+        },
+    ];
+    for (const member of kinds) {
+        const id = generateIdentifier();
+        const name = membershipNameOf(ORG, id);
+        const created = await handleRequest(db, req(
+            'POST', '/organizations/' + ORG + '/memberships/',
+            admin,
+            {
+                id,
+                ...member,
+                membership: {
+                    type: 'member',
+                    at: '2026-04-01T00:00:00.000000Z',
+                },
+            },
+        ));
+        assertStrictEquals(created.status, 201);
+        await created.body?.cancel();
+        const retyped = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'accepted',
+                type: 'admin',
+                at: '2026-04-01T00:00:01.000000Z',
+            },
+        );
+        await assertError(retyped, 409, SERVICE_ADMIN);
+        assertEquals(
+            await seatHead(db, id),
+            { method: 'PUT', type: 'member' },
+        );
+        const removed = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'removed',
+                at: '2026-04-01T00:00:02.000000Z',
+            },
+        );
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+        const promoted = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'accepted',
+                type: 'admin',
+                at: '2026-04-01T00:00:03.000000Z',
+            },
+        );
+        await assertError(promoted, 409, SERVICE_ADMIN);
+        const restored = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'accepted',
+                type: 'member',
+                at: '2026-04-01T00:00:04.000000Z',
+            },
+        );
+        assertStrictEquals(restored.status, 200);
+        await restored.body?.cancel();
+        const seatless = generateIdentifier();
+        await seedServiceIdentity(db, seatless);
+        const seated = await directSeat(
+            db, admin, seatless, 'admin',
+            '2026-04-01T00:00:05.000000Z',
+        );
+        await assertError(seated, 409, SERVICE_ADMIN);
+    }
 });
 
 Deno.test('re-invite after decline, revoke, or removal'

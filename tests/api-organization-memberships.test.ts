@@ -529,3 +529,28 @@ async () => {
     assertStrictEquals(put.status, 200);
     assertEquals(await put.json(), { id, ...edited });
 });
+
+Deno.test('an AI or service member is never created an'
+    + ' organization admin', async () => {
+    const { db, admin } = await seeded();
+    for (const body of [
+        aiBody(generateIdentifier()),
+        serviceBody(generateIdentifier()),
+    ]) {
+        const res = await post(db, admin, {
+            ...body, membership: { type: 'admin', at: AT },
+        });
+        assertStrictEquals(res.status, 400);
+        assertEquals(await res.json(), {
+            error: 'an AI or service member cannot be an'
+                + ' organization admin',
+        });
+        assertStrictEquals(
+            await db.messagePairs.getHeadPair(
+                '/invitations/',
+                membershipNameOf(STARK, body.id),
+            ),
+            null,
+        );
+    }
+});
