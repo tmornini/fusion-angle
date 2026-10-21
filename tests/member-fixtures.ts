@@ -2,6 +2,7 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     HumanMember,
     AIMember,
+    ServiceMember,
     SYSTEM_MEMBER_ID,
     nowUtc,
     type Id,
@@ -116,6 +117,16 @@ export function makeAIMember(
     return new AIMember(
         memberParentEntity(id, 'ai'),
         { id, name, ...aiDetail() },
+        seatedMembership(id),
+    );
+}
+
+export function makeServiceMember(
+    id: string,
+    name: string,
+): ServiceMember {
+    return new ServiceMember(
+        { id, name, description: '' },
         seatedMembership(id),
     );
 }

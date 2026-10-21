@@ -9,9 +9,12 @@ import { membershipNameOf } from
     '../shared/membership-name.ts';
 import { formatDate } from
     '../web-app/app/format.ts';
+import { buildPageUrl } from
+    '../web-app/app/navigation.ts';
 import {
     makeHumanMember,
     makeAIMember,
+    makeServiceMember,
 } from './member-fixtures.ts';
 import {
     ManagedMembersPresenter,
@@ -206,6 +209,7 @@ Deno.test(
                 makeHuman('self', 'Demo'),
                 makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
                 makeAI('ai1', 'Claude'),
+                makeServiceMember('svc1', 'CI bot'),
             ],
             'self',
             s => applyManagedMembersKind(s, 'ai'),
@@ -226,6 +230,10 @@ Deno.test(
             html.includes('Claude'),
             'Claude row must render',
         );
+        assert(
+            !html.includes('SERVICES'),
+            'SERVICES must be hidden under kind=ai',
+        );
     },
 );
 
@@ -236,6 +244,7 @@ Deno.test(
             [
                 makeHuman('self', 'Demo'),
                 makeAI('ai1', 'Claude'),
+                makeServiceMember('svc1', 'CI bot'),
             ],
             'self',
             s =>
@@ -248,6 +257,76 @@ Deno.test(
         assert(
             !html.includes('AIs'),
             'AIs hidden under kind=human',
+        );
+        assert(
+            !html.includes('SERVICES'),
+            'SERVICES hidden under kind=human',
+        );
+    },
+);
+
+Deno.test(
+    'kind=service filter shows only SERVICES',
+    () => {
+        const html = htmlOf(
+            [
+                makeHuman('self', 'Demo'),
+                makeHuman('xdaJyuuPyHfffCGLhqDrOQ', 'Alice'),
+                makeAI('ai1', 'Claude'),
+                makeServiceMember('svc1', 'CI bot'),
+            ],
+            'self',
+            s => applyManagedMembersKind(s, 'service'),
+        );
+        assert(
+            html.includes('SERVICES'),
+            'SERVICES must remain visible',
+        );
+        assert(
+            html.includes('CI bot'),
+            'CI bot row must render',
+        );
+        assert(
+            !html.includes('YOU'),
+            'YOU must be hidden under kind=service',
+        );
+        assert(
+            !html.includes('HUMANS'),
+            'HUMANS must be hidden under kind=service',
+        );
+        assert(
+            !html.includes('AIs'),
+            'AIs must be hidden under kind=service',
+        );
+    },
+);
+
+Deno.test(
+    'ManagedMembersPresenter renders a SERVICES section'
+    + ' below AIs',
+    () => {
+        const html = htmlOf(
+            [
+                makeHuman('self', 'Demo'),
+                makeAI('ai1', 'Claude'),
+                makeServiceMember('svc1', 'CI bot'),
+            ],
+            'self',
+        );
+        const aisIdx = html.indexOf('AIs');
+        const servicesIdx = html.indexOf('SERVICES');
+        assert(aisIdx >= 0, 'AIs section must render');
+        assert(
+            aisIdx < servicesIdx,
+            'SERVICES must follow AIs',
+        );
+        assert(
+            html.slice(servicesIdx).includes(
+                buildPageUrl(
+                    'member-detail', { memberId: 'svc1' },
+                ),
+            ),
+            'the service row links its member detail',
         );
     },
 );
