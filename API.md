@@ -481,12 +481,15 @@ serves the stored body plus `identity_kind`, `'person'`
 or `'service'`, derived from the seat's identity
 document in the transaction that read the seat and
 never stored. A member is human if and only if its
-`identity_kind` is `'person'`. A genesis naming an
-identity with no identity document answers 404, and a
+`identity_kind` is `'person'`. The item PUT genesis
+(`If-None-Match: *`) on
+`organizations/:id/invitations/:membership-id` naming
+an identity with no identity document answers 404, and a
 read of a seat with no identity document answers 500,
 which signals a store bug. Every member kind, human, AI,
 and service, uses a seat on the organization's Seats
-bar.
+bar. The organization page's Active People stat counts
+person seats only.
 
 The identity-nest item is `in-order`. Accept
 (`pending` → `accepted`) and decline

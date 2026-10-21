@@ -5289,9 +5289,12 @@ FSM, unlike `flows/detail`).
   Okafor holds no membership and the Wayne-only members
   hold no Stark seat, so the identity fence lists
   neither, and no "Identity without PII" row stands in
-  for them. The service rows are one for each AI and
-  service member seated in Stark, each a `service`
-  identity unnamed on this page. An empty roster
+  for them. The service rows are the four seeded AIs
+  (Claude Opus 4.8, Claude Sonnet 4.6, GPT-5.5, and
+  Grok 4.3), plus a fifth for AA7a's "Ops Assistant" if
+  that case held, each a `service` identity unnamed on
+  this page. The system identity holds no seat and
+  never lists. An empty roster
   renders "No identities yet."
   Source: `web-app/identities/index.ts`,
   `web-app/app/presenters/identity-list.ts`
@@ -5301,7 +5304,7 @@ FSM, unlike `flows/detail`).
        tests/presenter-identity-list.test.ts 'unnamed
        service redacts to a label, not the id' (decides
        the "Service account" label —
-       `UNNAMED_SERVICE_NAME` — for each seated AI's
+       `UNNAMED_SERVICE_NAME` — for each AI's
        service row);
        tests/presenter-identity-list.test.ts 'renders an
        empty state when no identities';
@@ -5314,7 +5317,8 @@ FSM, unlike `flows/detail`).
        tests/adapters-identity-roster.test.ts
        'getIdentityRoster omits a membership-less service'
        (decides an unseated service has no row);
-       exploratory — the live named-row census
+       exploratory — the live named-row census and the
+       shield-avatar/service-badge styling
 - [ ] **G14** Return to `members/index.html` (G43 left
   the explorer on Identities). Click `+ Add Member`. PASS:
   dialog opens with the Kind toggle defaulting to Human,
@@ -5946,8 +5950,9 @@ FSM, unlike `flows/detail`).
        native `<dialog>` confirm/cancel interaction, the
        toast, the in-place re-render, and whether
        Email/Phone/Bio each independently read "—"
-- [ ] **G47** On the members page (admin session), add a
-  Service member "CI bot" (G14b), open its detail, follow
+- [ ] **G47** On the members page (organization admin
+  session), add a new Service member "CI bot" as in
+  G14b, open its detail, follow
   its Identity link → the identity detail page, where a
   "Client registration" card renders showing "Not
   registered." and a "Register client" button
