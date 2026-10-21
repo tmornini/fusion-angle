@@ -231,7 +231,7 @@ export const PAGE_REGISTRY: Record<
         sourceFile: 'index',
         icon: iconPeople,
         keywords:
-            'members humans AI manage admin',
+            'members humans AI services manage admin',
         cssBundles: ['pages-members'],
         loader: () => import('../members/index.ts'),
     },

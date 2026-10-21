@@ -331,6 +331,7 @@ function onKindChipClick(e: Event): void {
         kind !== 'all'
         && kind !== 'human'
         && kind !== 'ai'
+        && kind !== 'service'
     ) return;
     membersState = applyManagedMembersKind(
         membersState, kind as MemberKindFilter,

@@ -7,16 +7,19 @@ import {
 import {
     ICON_SIZE,
     iconBrain,
+    iconMonitor,
 } from '../icons.ts';
 import { MEMBER_WITHOUT_PII_NAME } from '../../../client/index.ts';
 import {
     FormerMember,
     HumanMember,
     AIMember,
+    ServiceMember,
     type Member,
     isFormerMember,
     isHumanMember,
     isAIMember,
+    isServiceMember,
 } from '../../../shared/types.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
@@ -27,7 +30,8 @@ import {
 export type MemberKindFilter =
     | 'all'
     | 'human'
-    | 'ai';
+    | 'ai'
+    | 'service';
 
 export class HumanMemberRowPresenter {
     readonly #member: HumanMember;
@@ -197,6 +201,70 @@ export class AIMemberRowPresenter {
     }
 }
 
+export class ServiceMemberRowPresenter {
+    readonly #member: ServiceMember;
+
+    constructor(member: ServiceMember) {
+        this.#member = member;
+    }
+
+    idForLink(): string {
+        return this.#member.idForLink();
+    }
+
+    matchesSearch(query: string): boolean {
+        if (query === '') return true;
+        return this.#member
+            .matchesSearch(query);
+    }
+
+    buildRow(): SafeHtml {
+        return html`
+        <div class="${
+            'card card-hover p-4 cursor-pointer'
+            + ' flex items-center gap-4'
+        }"
+            data-member-id="${
+                this.#member.idForLink()
+            }">
+            <div class="${
+                'avatar avatar-tinted'
+            }">
+                ${iconMonitor(
+                    ICON_SIZE.base,
+                    'text-primary',
+                )}
+            </div>
+            <div class="flex-fill min-w-0">
+                <p class="${
+                    'font-medium truncate'
+                }">
+                    <a href="${
+                        buildPageUrl(
+                            'member-detail',
+                            {
+                                memberId: this
+                                    .#member
+                                    .idForLink(),
+                            },
+                        )
+                    }">${
+                        this.#member.nameText()
+                    }</a>
+                </p>
+                <p class="${
+                    'text-xs text-muted truncate'
+                }">
+                    ${
+                        this.#member
+                            .descriptionText()
+                    }
+                </p>
+            </div>
+        </div>`;
+    }
+}
+
 export class FormerMemberRowPresenter {
     readonly #member: FormerMember;
 
@@ -258,6 +326,7 @@ export function applyManagedMembersKind(
 export class ManagedMembersPresenter {
     readonly #humans: HumanMemberRowPresenter[];
     readonly #ais: AIMemberRowPresenter[];
+    readonly #services: ServiceMemberRowPresenter[];
     readonly #formers: FormerMemberRowPresenter[];
     readonly #currentMemberId: string;
     readonly #search: string;
@@ -274,6 +343,11 @@ export class ManagedMembersPresenter {
             .filter(isAIMember)
             .map(
                 w => new AIMemberRowPresenter(w),
+            );
+        this.#services = state.members
+            .filter(isServiceMember)
+            .map(
+                w => new ServiceMemberRowPresenter(w),
             );
         this.#formers = state.members
             .filter(isFormerMember)
@@ -296,6 +370,10 @@ export class ManagedMembersPresenter {
         return this.#ais.length;
     }
 
+    serviceCount(): number {
+        return this.#services.length;
+    }
+
     renderList(
         container: HTMLElement,
     ): void {
@@ -310,18 +388,24 @@ export class ManagedMembersPresenter {
         setHtml(container, html`${
             this.#buildSelfSection()
         }${
-            this.#kind === 'ai'
-                ? html``
-                : this.#buildHumansSection()
+            this.#kind === 'all' || this.#kind === 'human'
+                ? this.#buildHumansSection()
+                : html``
         }${
-            this.#kind === 'human'
-                ? html``
-                : this.#buildAIsSection()
+            this.#kind === 'all' || this.#kind === 'ai'
+                ? this.#buildAIsSection()
+                : html``
+        }${
+            this.#kind === 'all' || this.#kind === 'service'
+                ? this.#buildServicesSection()
+                : html``
         }`);
     }
 
     #buildSelfSection(): SafeHtml {
-        if (this.#kind === 'ai') return html``;
+        if (this.#kind === 'ai' || this.#kind === 'service') {
+            return html``;
+        }
         const self = this.#humans.find(
             p => p.idForLink()
                 === this.#currentMemberId,
@@ -380,6 +464,28 @@ export class ManagedMembersPresenter {
                 filtered.length === 0
                     ? this.#buildEmptyRow(
                         'No AIs match your'
+                        + ' filter.',
+                    )
+                    : html`${filtered.map(
+                        p => p.buildRow(),
+                    )}`
+            }`;
+    }
+
+    #buildServicesSection(): SafeHtml {
+        const filtered = this.#services.filter(
+            p => p.matchesSearch(this.#search),
+        );
+        return html`
+            <div class="${
+                'member-section-header'
+                + ' text-xs font-semibold'
+                + ' text-muted mt-4'
+            }">SERVICES</div>
+            ${
+                filtered.length === 0
+                    ? this.#buildEmptyRow(
+                        'No services match your'
                         + ' filter.',
                     )
                     : html`${filtered.map(
