@@ -53,7 +53,7 @@ committed. TEST-PLAN.md is not re-run.
    `xMidYMid meet` never letterboxes
    (`web-app/app/flow-interactions.ts:244-250`,
    FLOW-CANVAS.md:72-76). No CSS rule turns off
-   pointer events on either grid rect. Only
+   pointer events on either grid rect. In CSS, only
    `.flow-marquee` has `pointer-events: none`
    (`web-app/app/styles/pages-flow-detail.css:110-117`).
    So every point on the canvas background hit-tests to
