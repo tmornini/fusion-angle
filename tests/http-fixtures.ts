@@ -384,7 +384,8 @@ export async function assertPartIsDocumentGet(
 
 // The reader a membership read on the organization nest
 // serves with: each seat's identity kind from the identity
-// ledger, a person when the identity has no document.
+// ledger. Every seat's identity has a document; a seat
+// without one is the fixture's bug.
 export async function membershipJoinReader(
     db: DbAdapter,
     parts: readonly HttpMessage<{
@@ -398,11 +399,12 @@ export async function membershipJoinReader(
         joined: new Map(parts.map((part) => {
             const { id, identity_id } = part.body().toValue();
             const kind = kinds.get(identity_id);
-            return [id, {
-                identity_kind: kind === undefined
-                    ? 'person'
-                    : kind,
-            }];
+            if (kind === undefined) {
+                throw new Error(
+                    'no identity document for ' + identity_id,
+                );
+            }
+            return [id, { identity_kind: kind }];
         })),
     };
 }

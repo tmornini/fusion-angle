@@ -6,6 +6,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
+import { seedIdentityDocument } from './identity-fixtures.ts';
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest,
@@ -208,10 +209,12 @@ Deno.test('PUT /identity-token-revocations/:rid is retired'
 Deno.test('a member reads ?state=removed',
 async () => {
     const db = await memberDb();
+    const leaver = generateIdentifier();
+    await seedIdentityDocument(db, leaver, 'person');
     await landMembership(
         db,
         'AjdvjuECVZEgZoFajaIEkg',
-        generateIdentifier(),
+        leaver,
         'removed',
         'member',
         '2026-01-01T00:00:00.000000Z',

@@ -213,8 +213,8 @@ async () => {
     )).body().toValue();
     assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
 });
 
 // -- 4. the DELETE-head derives absent — below-route via the

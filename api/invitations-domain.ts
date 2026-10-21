@@ -478,9 +478,9 @@ export async function getInvitationOnIdentityNest(
 
 // A membership read on the organization nest joins each
 // seat's identity kind, the one rule every roster reader
-// sorts members by. A seat whose identity has no document
-// is a person: a service identity is always written with
-// its document.
+// sorts members by. Every seat's identity has a document
+// (memberGeneses and postBootstrapIn write both), so a
+// seat without one is the store's bug, never served bare.
 function identityKindJoin(
     heads: readonly MessagePairEntity[],
     kinds: ReadonlyMap<Id, IdentityKind>,
@@ -490,11 +490,13 @@ function identityKindJoin(
         joined: new Map(heads.map((head) => {
             const membership = membershipOfHead(head);
             const kind = kinds.get(membership.identity_id);
-            return [membership.id, {
-                identity_kind: kind === undefined
-                    ? 'person'
-                    : kind,
-            }];
+            if (kind === undefined) {
+                throw new Error(
+                    'no identity document for '
+                        + membership.identity_id,
+                );
+            }
+            return [membership.id, { identity_kind: kind }];
         })),
     };
 }

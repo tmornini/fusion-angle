@@ -594,7 +594,9 @@ async () => {
             .some((row) => row.id === ghost),
         false,
     );
-    await seedSeat(db, organizationA, ghost, 'member', AT);
+    await landMembership(
+        db, organizationA, ghost, 'accepted', 'member', AT,
+    );
     assertStrictEquals(
         (await deriveMembers(db, organizationA))
             .some((row) => row.id === ghost),

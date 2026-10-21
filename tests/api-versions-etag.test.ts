@@ -575,14 +575,13 @@ Deno.test(
         const db = await seedInviteeWorld();
         const token = await organizationToken();
         const id = await seatCoMember(db);
-        const created = await handleRequest(db, req(
-            'PUT', '/identities/' + id, token,
-            { kind: 'person' },
+        const head = await handleRequest(db, req(
+            'GET', '/identities/' + id, token,
         ));
-        assertStrictEquals(created.status, 201);
-        const tag = pairIdOf(created);
+        assertStrictEquals(head.status, 200);
+        const tag = pairIdOf(head);
         assert(tag !== null);
-        await created.body?.cancel();
+        await head.body?.cancel();
         await deleteIdentityDocument(db, id);
         const listPath = '/identities/' + id + '/versions/';
         const list = await handleRequest(
@@ -610,11 +609,7 @@ Deno.test(
         const token = await organizationToken();
         const id = await seatCoMember(db);
         const path = '/identities/' + id;
-        const first = await handleRequest(db, req(
-            'PUT', path, token, { kind: 'person' },
-        ));
-        assertStrictEquals(first.status, 201);
-        await first.body?.cancel();
+        // The seat's own person document is the first PUT.
         const second = await handleRequest(db, req(
             'PUT', path, token, { kind: 'service' },
         ));

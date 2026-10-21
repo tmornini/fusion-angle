@@ -186,8 +186,8 @@ async () => {
     const putId = pairIdOf(put);
     await put.body?.cancel();
     const requests = await db.messagePairs.getAll();
-    // nil root + seedAdminSchema's 2 pairs + this PUT.
-    assertStrictEquals(requests.length, 4);
+    // nil root + seedAdminSchema's 3 pairs + this PUT.
+    assertStrictEquals(requests.length, 5);
     const stored = requests.find((row) => row.id === putId);
     assert(stored !== undefined);
     assertStrictEquals(stored.path, '/organizations/');

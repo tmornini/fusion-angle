@@ -282,8 +282,8 @@ Deno.test('a same-body PUT resend under the head\'s tag to'
     assertEquals(head.body().toValue(), second);
     // The schema's rows and the create's three: the fields
     // equal the head's, so the statement stores nothing.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
 });
 
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
@@ -390,7 +390,7 @@ async () => {
     assertStrictEquals(res.status, 201);
     await res.body?.cancel();
     const messagePairs = await db.messagePairs.getAll();
-    assertStrictEquals(messagePairs.length, 6);
+    assertStrictEquals(messagePairs.length, 7);
 
     const documentRow =
         documentRowAt(messagePairs, ENTITY_PREFIX, WO_C1);
@@ -515,8 +515,8 @@ Deno.test('a work-order create ignores a raw colliding states'
     await res.body?.cancel();
     // The fixture's pairs + 3 create pairs (operation,
     // version, join).
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
+    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
 });
 
 // -- 5. the PUT is its own version ---------------------------

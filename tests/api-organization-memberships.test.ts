@@ -19,6 +19,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
@@ -557,9 +558,7 @@ Deno.test('an AI or service member is never created an'
 
 // A membership read carries its identity's kind, derived
 // when served and never stored: the one rule every roster
-// reader sorts members by. A seat whose identity has no
-// document is a person, since a service identity is
-// always written with its document.
+// reader sorts members by.
 Deno.test('a membership read carries its identity\'s kind',
 async () => {
     const { db, admin } = await seeded();
@@ -593,4 +592,43 @@ async () => {
     assertStrictEquals(item.status, 200);
     const seat = await item.json() as Record<string, unknown>;
     assertStrictEquals(seat['identity_kind'], 'service');
+});
+
+// Every seat's identity has a document (memberGeneses and
+// postBootstrapIn write both), so a seat without one is
+// the store's bug: both reads refuse it with their
+// evidence, never serve it as a person.
+Deno.test('a seat whose identity has no document refuses'
+    + ' the read',
+async () => {
+    const { db, admin } = await seeded();
+    const ghost = generateIdentifier();
+    const name = membershipNameOf(STARK, ghost);
+    const seated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: nest('invitations') + name,
+        token: admin,
+        body: { state: 'accepted', type: 'member', at: AT },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(seated.status, 201);
+    await seated.body?.cancel();
+    for (
+        const path of [
+            nest('memberships'), nest('invitations') + name,
+        ]
+    ) {
+        const { result: got, calls } = await captureConsole(
+            'error', () => read(db, admin, path),
+        );
+        assertStrictEquals(got.status, 500, path);
+        assertEquals(await got.json(), { error: 'internal error' });
+        assertStrictEquals(calls.length, 1, path);
+        const [event, , error] = calls[0]!;
+        assertStrictEquals(event, 'request failed');
+        assertStrictEquals(
+            (error as Error).message,
+            'no identity document for ' + ghost,
+        );
+    }
 });
