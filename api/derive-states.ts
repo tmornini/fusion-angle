@@ -357,6 +357,8 @@ const OWNER_PROBE_FAMILY: Record<string, string> = {
     record_attributes: 'record-types',
     record_instances: 'record-types',
     objectives: 'objectives',
+    'ai-agents': 'ai-agents',
+    services: 'services',
     memberships: 'memberships',
     flow_records: 'flows',
     flow_tags: 'flows',
