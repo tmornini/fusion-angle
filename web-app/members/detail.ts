@@ -14,6 +14,12 @@ import {
     aiMemberPatchFromDraft,
     isAIMemberFieldKey,
     type AIMemberDraftFields,
+    ServiceMemberDetailPresenter,
+    ServiceMemberDetailEditPresenter,
+    serviceMemberDraftFromMember,
+    serviceMemberPatchFromDraft,
+    isServiceMemberFieldKey,
+    type ServiceMemberDraftFields,
     seatRemovalOf, type SeatRemoval,
 } from '../app/presenters/index.ts';
 import { showToast } from '../app/toast.ts';
@@ -46,6 +52,10 @@ import {
     getAIMemberEntity,
     putAIMember,
     subscribeAIMemberChanges,
+    getServiceMember,
+    getServiceMemberEntity,
+    putServiceMember,
+    subscribeServiceMemberChanges,
     getAdminSeatIds,
     postMembershipRemoval,
 } from '../../client/index.ts';
@@ -53,6 +63,8 @@ import { sessionContext } from '../app/client.ts';
 import {
     HumanMember,
     AIMember,
+    ServiceMember,
+    type SeatedMember,
     type MemberPii,
     type IdentityPiiEntity,
 } from '../../shared/types.ts';
@@ -85,7 +97,20 @@ type AIState =
         draft: AIMemberDraftFields;
     };
 
-type PageState = HumanState | AIState;
+type ServiceState =
+    | {
+        kind: 'reading';
+        variant: 'service';
+        member: ServiceMember;
+    }
+    | {
+        kind: 'editing';
+        variant: 'service';
+        member: ServiceMember;
+        draft: ServiceMemberDraftFields;
+    };
+
+type PageState = HumanState | AIState | ServiceState;
 
 let state: PageState | null = null;
 let pageContainer: HTMLElement | null = null;
@@ -103,6 +128,8 @@ function buildPresenter():
     | HumanMemberDetailEditPresenter
     | AIMemberDetailPresenter
     | AIMemberDetailEditPresenter
+    | ServiceMemberDetailPresenter
+    | ServiceMemberDetailEditPresenter
 {
     if (state === null) {
         throw new Error(
@@ -118,11 +145,20 @@ function buildPresenter():
                 state.member, state.draft,
             );
     }
+    if (state.variant === 'ai') {
+        return state.kind === 'reading'
+            ? new AIMemberDetailPresenter(
+                state.member, removalOf(),
+            )
+            : new AIMemberDetailEditPresenter(
+                state.member, state.draft,
+            );
+    }
     return state.kind === 'reading'
-        ? new AIMemberDetailPresenter(
-            state.member,
+        ? new ServiceMemberDetailPresenter(
+            state.member, removalOf(),
         )
-        : new AIMemberDetailEditPresenter(
+        : new ServiceMemberDetailEditPresenter(
             state.member, state.draft,
         );
 }
@@ -133,10 +169,10 @@ function rerender(): void {
         .renderUpdate(pageContainer);
 }
 
-// Try human, then AI. A null human read, a 404, or a 410
-// on either kind is expected absence for that kind: a
-// removed membership is not a human member, as a
-// never-seated one is not. Only absence on both kinds is
+// Try human, then AI, then service. A null human read, a
+// 404, or a 410 on any kind is expected absence for that
+// kind: a removed membership is not a member, as a
+// never-seated one is not. Only absence on every kind is
 // genuine not-found (return null → caller redirects). Any
 // other status is a real fault and must surface — never
 // collapse into the silent redirect that absence uses.
@@ -149,7 +185,7 @@ export function isAbsentMember(err: unknown): boolean {
 
 async function loadMemberByEitherKind(
     memberId: string,
-): Promise<HumanMember | AIMember | null> {
+): Promise<SeatedMember | null> {
     const ctx = sessionContext();
     try {
         const human = await getHumanMember(
@@ -166,10 +202,19 @@ async function loadMemberByEitherKind(
             ctx, memberId,
         );
     } catch (errAi) {
-        if (isAbsentMember(errAi)) {
+        if (!isAbsentMember(errAi)) {
+            throw errAi;
+        }
+    }
+    try {
+        return await getServiceMember(
+            ctx, memberId,
+        );
+    } catch (errService) {
+        if (isAbsentMember(errService)) {
             return null;
         }
-        throw errAi;
+        throw errService;
     }
 }
 
@@ -205,19 +250,7 @@ export async function init(
                 adminSeatIds, memberId, ctx.identity.id,
             );
 
-            if (member.kind === 'human') {
-                state = {
-                    kind: 'reading',
-                    variant: 'human',
-                    member,
-                };
-            } else {
-                state = {
-                    kind: 'reading',
-                    variant: 'ai',
-                    member,
-                };
-            }
+            state = reduceSave(member);
             buildPresenter()
                 .renderShell(container);
             bindStableListeners(container);
@@ -228,12 +261,15 @@ export async function init(
             subscribeAIMemberChanges(
                 () => void refresh(memberId),
             );
+            subscribeServiceMemberChanges(
+                () => void refresh(memberId),
+            );
         },
     });
 }
 
 export function reduceSave(
-    fresh: HumanMember | AIMember,
+    fresh: SeatedMember,
 ): PageState {
     if (fresh.kind === 'human') {
         return {
@@ -242,16 +278,23 @@ export function reduceSave(
             member: fresh,
         };
     }
+    if (fresh.kind === 'ai') {
+        return {
+            kind: 'reading',
+            variant: 'ai',
+            member: fresh,
+        };
+    }
     return {
         kind: 'reading',
-        variant: 'ai',
+        variant: 'service',
         member: fresh,
     };
 }
 
 export function reduceRefresh(
     current: PageState,
-    fresh: HumanMember | AIMember | null,
+    fresh: SeatedMember | null,
 ): PageState {
     if (current.kind === 'editing') return current;
     if (fresh === null) return current;
@@ -371,12 +414,21 @@ function beginEdit(): void {
                 state.member,
             ),
         };
-    } else {
+    } else if (state.variant === 'ai') {
         state = {
             kind: 'editing',
             variant: 'ai',
             member: state.member,
             draft: aiMemberDraftFromMember(
+                state.member,
+            ),
+        };
+    } else {
+        state = {
+            kind: 'editing',
+            variant: 'service',
+            member: state.member,
+            draft: serviceMemberDraftFromMember(
                 state.member,
             ),
         };
@@ -388,19 +440,7 @@ function cancelEdit(): void {
     if (!state || state.kind !== 'editing') {
         return;
     }
-    if (state.variant === 'human') {
-        state = {
-            kind: 'reading',
-            variant: 'human',
-            member: state.member,
-        };
-    } else {
-        state = {
-            kind: 'reading',
-            variant: 'ai',
-            member: state.member,
-        };
-    }
+    state = reduceSave(state.member);
     rerender();
 }
 
@@ -424,7 +464,18 @@ function onInput(e: Event): void {
         };
         return;
     }
-    if (!isAIMemberFieldKey(field)) return;
+    if (state.variant === 'ai') {
+        if (!isAIMemberFieldKey(field)) return;
+        state = {
+            ...state,
+            draft: {
+                ...state.draft,
+                [field]: target.value,
+            },
+        };
+        return;
+    }
+    if (!isServiceMemberFieldKey(field)) return;
     state = {
         ...state,
         draft: {
@@ -462,13 +513,15 @@ async function handleSave(): Promise<void> {
     }
     if (state.variant === 'human') {
         await saveHumanMember(state);
-    } else {
+    } else if (state.variant === 'ai') {
         await saveAIMember(state);
+    } else {
+        await saveServiceMember(state);
     }
 }
 
 async function performRemove(): Promise<void> {
-    if (!state || state.variant !== 'human') return;
+    if (!state) return;
     const ctx = sessionContext();
     try {
         await postMembershipRemoval(ctx, state.member);
@@ -628,6 +681,69 @@ async function saveAIMember(
     } catch (err) {
         reportFault(
             ctx, 'Failed to reload AI member', err,
+        );
+        return;
+    }
+    state = reduceSave(fresh);
+    rerender();
+}
+
+async function saveServiceMember(
+    s: Extract<
+        ServiceState,
+        { kind: 'editing' }
+    >,
+): Promise<void> {
+    const patch = trimStrings(
+        serviceMemberPatchFromDraft(s.draft),
+    );
+    if (patch.name === '' || patch.description === '') {
+        showToast(
+            'Name and description are required',
+            'error',
+        );
+        return;
+    }
+    const memberId = s.member.idForLink();
+    const ctx = sessionContext();
+    let held;
+    try {
+        held = await getServiceMemberEntity(
+            ctx, memberId,
+        );
+    } catch (err) {
+        reportFault(
+            ctx,
+            'Failed to save service member',
+            err,
+        );
+        return;
+    }
+    // putServiceMember writes the whole document, so
+    // merge the edited fields onto the stored one.
+    const { id: _id, ...rest } = held.body().toValue();
+    try {
+        await putServiceMember(
+            ctx, held,
+            { ...rest, ...patch },
+        );
+    } catch (err) {
+        reportFault(
+            ctx,
+            'Failed to save service member',
+            err,
+        );
+        return;
+    }
+    showToast(
+        'Service member saved', 'success',
+    );
+    let fresh;
+    try {
+        fresh = await getServiceMember(ctx, memberId);
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to reload service member', err,
         );
         return;
     }

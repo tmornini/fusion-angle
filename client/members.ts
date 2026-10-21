@@ -8,6 +8,7 @@ import type {
     MemberPii,
     MembershipEntity,
     MembershipReadEntity,
+    SeatedMember,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -21,8 +22,10 @@ import { membershipNameOf } from
     '../shared/membership-name.ts';
 import { getMemberPii } from './identities.ts';
 import {
+    notifyAIMemberChanges,
     notifyHumanMemberChanges,
     notifyMembershipChanges,
+    notifyServiceMemberChanges,
 } from './membership-changes.ts';
 export {
     subscribeHumanMemberChanges,
@@ -301,14 +304,16 @@ export async function postHumanMemberCreation(
     notifyMembershipChanges();
 }
 
-// The membership PUT that ends the place — the identity
-// survives. The API refuses the last admin (409); the page
-// mirrors that guard through getAdminSeatIds rather than
-// discovering it here. The removal names the membership
-// the member was read through.
+// The membership PUT that ends the seat — the identity
+// and the member's document survive. The API refuses the
+// last admin (409); the page mirrors that guard through
+// getAdminSeatIds rather than discovering it here. The
+// removal names the membership the member was read
+// through, then rings the member's own kind; the
+// membership bell already carries the human channel.
 export async function postMembershipRemoval(
     ctx: RequestContext,
-    member: HumanMember,
+    member: SeatedMember,
 ): Promise<void> {
     await ctx.PUT(
         membershipItem(ctx, member.idForLink()),
@@ -316,6 +321,8 @@ export async function postMembershipRemoval(
         [member.membership],
     );
     notifyMembershipChanges();
+    if (member.kind === 'ai') notifyAIMemberChanges();
+    if (member.kind === 'service') notifyServiceMemberChanges();
 }
 
 export async function getAdminSeatIds(

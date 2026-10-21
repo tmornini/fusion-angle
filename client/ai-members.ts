@@ -8,27 +8,20 @@ import { AIMember, nowUtc } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import {
-    createSubscriptionChannel,
-} from './channels.ts';
 import { requireOrganization } from './members.ts';
-import { notifyMembershipChanges } from
-    './membership-changes.ts';
+import {
+    notifyAIMemberChanges,
+    notifyMembershipChanges,
+} from './membership-changes.ts';
+export {
+    subscribeAIMemberChanges,
+} from './membership-changes.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,
 } from '../shared/http-errors.ts';
-
-const aiMemberChanges =
-    createSubscriptionChannel();
-
-export function subscribeAIMemberChanges(
-    fn: () => void,
-): () => void {
-    return aiMemberChanges.subscribe(fn);
-}
 
 export type AIMemberDraft =
     Omit<AIAgentEntity, 'id'>;
@@ -165,7 +158,7 @@ export async function putAIMember(
         },
         [held],
     );
-    aiMemberChanges.notify();
+    notifyAIMemberChanges();
     return saved;
 }
 
@@ -193,5 +186,5 @@ export async function postAIMemberCreation(
         },
     );
     notifyMembershipChanges();
-    aiMemberChanges.notify();
+    notifyAIMemberChanges();
 }

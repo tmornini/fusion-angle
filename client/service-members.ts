@@ -8,27 +8,20 @@ import { ServiceMember, nowUtc } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import {
-    createSubscriptionChannel,
-} from './channels.ts';
 import { requireOrganization, isHumanSeat } from './members.ts';
-import { notifyMembershipChanges } from
-    './membership-changes.ts';
+import {
+    notifyMembershipChanges,
+    notifyServiceMemberChanges,
+} from './membership-changes.ts';
+export {
+    subscribeServiceMemberChanges,
+} from './membership-changes.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,
 } from '../shared/http-errors.ts';
-
-const serviceMemberChanges =
-    createSubscriptionChannel();
-
-export function subscribeServiceMemberChanges(
-    fn: () => void,
-): () => void {
-    return serviceMemberChanges.subscribe(fn);
-}
 
 export type ServiceMemberDraft =
     Omit<ServiceEntity, 'id'>;
@@ -116,7 +109,7 @@ export async function postServiceMemberCreation(
         },
     );
     notifyMembershipChanges();
-    serviceMemberChanges.notify();
+    notifyServiceMemberChanges();
 }
 
 export function getServiceMemberEntity(
@@ -142,6 +135,6 @@ export async function putServiceMember(
         },
         [held],
     );
-    serviceMemberChanges.notify();
+    notifyServiceMemberChanges();
     return saved;
 }

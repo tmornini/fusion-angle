@@ -180,6 +180,11 @@ Deno.test(
                 })()`);
                 await page.click('#add-member-submit');
                 await page.until(
+                    `!document.querySelector(`
+                    + `'#add-member-dialog[open]')`,
+                    'dialog closed',
+                );
+                await page.until(
                     `document.body.textContent`
                     + `.includes('CI bot')`,
                     'roster shows CI bot',
@@ -190,9 +195,13 @@ Deno.test(
                     + ` row.textContent.includes('CI bot'))`
                     + `.getAttribute('data-member-id')`,
                 );
-                await page.click(
-                    '[data-member-id="' + memberId + '"]',
-                );
+                const row = '[data-member-id="' + memberId + '"]';
+                // Compositor click uses viewport coords; the
+                // SERVICES section sits below the 800px fold.
+                await page.evaluate(`document.querySelector(${
+                    JSON.stringify(row)
+                }).scrollIntoView({block: 'center'})`);
+                await page.click(row);
                 await page.ready('member-detail');
                 const identityLink = 'a[href="' + buildPageUrl(
                     'identity-detail', { identityId: memberId },
@@ -202,6 +211,26 @@ Deno.test(
                         JSON.stringify(identityLink)
                     })?.checkVisibility() === true`,
                     'identity link visible',
+                );
+                // The click-navigation from the roster runs a
+                // cross-document view transition; while it
+                // plays, a pointer reaches only <html>
+                // (measured: elementFromPoint at the button's
+                // centre), so wait until Remove is reachable.
+                await page.until(
+                    `(() => {
+                        const btn = document.querySelector(
+                            '#member-remove-btn');
+                        if (!btn) return false;
+                        const b = btn.getBoundingClientRect();
+                        const hit = document.elementFromPoint(
+                            b.x + b.width / 2,
+                            b.y + b.height / 2);
+                        return hit !== null
+                            && hit.closest('#member-remove-btn')
+                                === btn;
+                    })()`,
+                    'Remove reachable',
                 );
                 await page.click('#member-remove-btn');
                 await page.waitFor('#confirm-remove-dialog[open]');

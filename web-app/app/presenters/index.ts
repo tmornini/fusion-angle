@@ -99,6 +99,15 @@ export {
     type AIMemberFieldKey,
 } from './ai-member-detail.ts';
 export {
+    ServiceMemberDetailPresenter,
+    ServiceMemberDetailEditPresenter,
+    serviceMemberDraftFromMember,
+    serviceMemberPatchFromDraft,
+    isServiceMemberFieldKey,
+    type ServiceMemberDraftFields,
+    type ServiceMemberFieldKey,
+} from './service-member-detail.ts';
+export {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
     type FlowSnapshot,

@@ -559,7 +559,7 @@ function buildReadonlyActionButtons(
 // the page container so the page's own click delegate
 // drives open, cancel, and backdrop through
 // handleDialogClick. Absent for the last admin seat.
-function buildRemoveAffordance(
+export function buildRemoveAffordance(
     removal: SeatRemoval,
 ): SafeHtml {
     if (!removal.removable) {

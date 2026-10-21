@@ -992,6 +992,10 @@ export class FormerMember {
     }
 }
 
+// A member holding a seat the roster manages: what a
+// removal reads.
+export type SeatedMember = HumanMember | AIMember | ServiceMember;
+
 export type Member =
     | HumanMember
     | AIMember
