@@ -3341,6 +3341,57 @@ Off the critical path; each with its oracle.
   `--check`.
 - Retire the leftover role-grant identifiers.
 - Delete a pending invitation after `expires_at`.
+- The flow write law's three liveness reads
+  (`api/routes.ts:1339-1358`) run outside the write
+  transaction, so a removal in that window admits a
+  just-removed AI, the same state a removal after the
+  write leaves. Oracle: the law's reads run on the
+  write transaction's view.
+- A whitespace-only name passes the members page check
+  (`web-app/members/index.ts:682` tests the untrimmed
+  value, then trims), and `validateServiceDocumentBody`
+  and `validateAiAgentDocumentBody` accept `''`
+  (`asString`, `shared/json-assert.ts:54`). Oracle: both
+  gates refuse an empty name, and the page checks the
+  trimmed values.
+- Membership reads make 1+N sequential identity head
+  reads (`api/derive-identity-spine.ts:448-455`); the
+  memory median went 0.432 to 0.563 ms, and Postgres is
+  unmeasured. Oracle: measure on Postgres before
+  batching.
+- `buildShell` and the action-button builders are
+  byte-identical in `human-member-detail.ts`,
+  `ai-member-detail.ts` and `service-member-detail.ts`
+  (`web-app/app/presenters/`, `buildShell` at
+  `service-member-detail.ts:62`). Share the member
+  detail chrome. Oracle: one definition of each
+  remains under `web-app/app/presenters/`.
+- The accepted-memberships path is built four times
+  (`client/admin.ts:48`, `ai-members.ts:42`,
+  `members.ts:66`, `members-union.ts:57`). Export one
+  builder from `client/members.ts`. Oracle: `grep -rn
+  "state=accepted" client/` finds one line.
+- Unreachable `isHumanSeat` checks:
+  `client/service-members.ts:78` and the no-op filter at
+  `client/members-union.ts:78`. Oracle: both removed,
+  `./test validate` green.
+- `required` sits on the service fields only
+  (`web-app/members/index.html:318,331`); the dialog
+  has no form submit, and the siblings carry none.
+  Oracle: the attribute is on all the dialogs' fields
+  or none, and the page check is the one gate.
+- Tests: no client-verb pin that a second
+  `postAIMemberCreation` of one id is 409;
+  `tests/api-memberships.test.ts:724-810` asserts no
+  unchanged pair count after its refused retype,
+  reinstatement and direct seat. Oracle: both pins
+  exist and are red when the refusal writes a pair.
+- `postServiceDocumentOp` (`api/routes.ts:2639-2654`)
+  and the AI op answer an entity and write nothing when
+  given no pair; `tests/mock-data-pairs.test.ts:84-170`'s
+  count addends do not sum to 1889. Oracle: the ops
+  refuse a missing pair, and the addends sum to
+  `EXPECTED_MESSAGE_PAIR_COUNT`.
 
 ## Sequencing
 
