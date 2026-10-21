@@ -502,9 +502,11 @@ function identityKindJoin(
 }
 
 // The seats' identity kinds, read in the caller's
-// transaction: a seat and its kind are one snapshot, so a
-// service member landing between the two reads is never
-// read as a person.
+// transaction. Under READ COMMITTED the reads are not one
+// snapshot; the order closes the race: seats are read
+// before kinds, and a seat lands in the same commit as its
+// identity document, so a service member landing between
+// the two reads is never read as a person.
 function seatedIdentityKinds(
     view: DbAdapter,
     heads: readonly MessagePairEntity[],

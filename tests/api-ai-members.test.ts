@@ -43,7 +43,8 @@ async function freshDb() {
     return db;
 }
 
-Deno.test('PUT /ai-agents/:id writes the agent', async () => {
+Deno.test('PUT /organizations/:id/ai-agents/:id writes'
++ ' the agent', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await seedAIMember(db, 'UQTJZvCoKlFjEoDlDUwekw', 'Seated');

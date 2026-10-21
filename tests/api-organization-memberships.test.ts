@@ -644,8 +644,9 @@ async () => {
 });
 
 // Below the gate a store bug can still seat an identity with
-// no document; every membership read then fails loudly,
-// never reading the seat as a person.
+// no document; an organization-nest roster read then fails
+// loudly, never reading the seat as a person. Identity-nest
+// reads serve as stored.
 Deno.test('a read of a seat with no identity fails loudly',
 async () => {
     const { db, admin } = await seeded();

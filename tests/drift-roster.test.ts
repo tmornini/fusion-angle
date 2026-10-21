@@ -251,8 +251,8 @@ function outside(method: string, path: string): string {
         + ' organization';
 }
 
-Deno.test('ai-agents wire is global; identities wire is'
-+ ' the accepted roster', async () => {
+Deno.test('ai-agents wire is organization-nested;'
++ ' identities wire is the accepted roster', async () => {
     const db = await seededDb();
     const token = await organizationToken();
 

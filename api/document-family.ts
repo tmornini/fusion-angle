@@ -170,9 +170,10 @@ export function documentFamilyWiring(
 
 // Live document ids at an organization's family prefix
 // (/organizations/<organization>/<family>/). Used by the
-// flow write-path graph law to tell AI member ids from
-// person members and to confirm an agentId names one of
-// the organization's live AI documents.
+// flow write-path graph law, which reads the ai-agents and
+// services families and the accepted seats to tell program
+// ids from person members and to confirm an agentId names
+// a seated, live AI document.
 export async function liveOrganizationDocumentIds(
     db: DbAdapter,
     organization: Id,

@@ -95,7 +95,8 @@ function serviceFacet(
 
 // GET identities, then fill each person via nested
 // GET identities/:id/pii. Service rows stay unnamed
-// (serviceFacet(undefined)); agents are not identities.
+// (serviceFacet(undefined)); an AI member has a service
+// identity, so it reads as a row too.
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {

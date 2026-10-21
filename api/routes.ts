@@ -2633,8 +2633,9 @@ export async function postAiAgentDocumentOp(
     return entity;
 }
 
-// Service document write — message-plane only. Not a member
-// and not an identity. `messagePair` is optional so a
+// Service document write — message-plane only. It writes the
+// service member document alone; the statement writes its
+// identity and membership. `messagePair` is optional so a
 // below-facade caller keeps compiling.
 export async function postServiceDocumentOp(
     db: DbAdapter,
@@ -3595,7 +3596,7 @@ export const routes: Route[] = [
     route('identities/', {
         // Accepted seats of the fenced organization,
         // intersected with identity heads by identity
-        // id. A seated service would appear; none exist.
+        // id. Seated AI and service members appear too.
         select: async (db, _params, _actor, organization) => {
             const org = requireOrganization(organization);
             const [heads, memberships] = await Promise.all([
