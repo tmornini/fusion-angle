@@ -1292,9 +1292,17 @@ async () => {
     const aiMemberId = DRIFT_STATES_AI_CHAIN_1;
 
     const created = await handleRequest(db, req(
-        'PUT', '/organizations/' + STARK_ORGANIZATION
-            + '/ai-agents/' + aiMemberId, token,
-        aiMemberDetail('Drift Bot'),
+        'POST', '/organizations/' + STARK_ORGANIZATION
+            + '/memberships/', token,
+        {
+            id: aiMemberId,
+            kind: 'ai',
+            membership: {
+                type: 'member',
+                at: '2026-06-01T00:00:00.000000Z',
+            },
+            ai: aiMemberDetail('Drift Bot'),
+        },
     ));
     assertStrictEquals(created.status, 201);
     const got = await handleRequest(
@@ -1306,6 +1314,8 @@ async () => {
         ),
     );
     assertStrictEquals(got.status, 200);
+    const gotTag = got.headers.get('ETag');
+    assert(gotTag !== null);
     assertStrictEquals(
         ((await got.json()) as { name: string }).name,
         'Drift Bot',
@@ -1315,6 +1325,7 @@ async () => {
         'PUT', '/organizations/' + STARK_ORGANIZATION
             + '/ai-agents/' + aiMemberId, token,
         aiMemberDetail('Drift Bot 2'),
+        { 'If-Match': gotTag },
     ));
     assertStrictEquals(updated.status, 200);
     const after = await handleRequest(

@@ -690,6 +690,28 @@ async function deleteAiAgentDocument(
     );
 }
 
+// Only the members statement creates an AI agent document;
+// the agent's PUT edits the head the statement wrote.
+async function postAiMember(
+    db: DbAdapter,
+    token: string,
+    id: string,
+    document: ReturnType<typeof aiAgentDocument>,
+): Promise<void> {
+    const created = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/memberships/',
+        token,
+        {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: AT },
+            ai: document,
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+}
+
 Deno.test(
     'a deleted AI agent answers 410 on both version'
         + ' routes',
@@ -697,12 +719,12 @@ Deno.test(
         const db = await seedInviteeWorld();
         const token = await organizationToken();
         const id = generateIdentifier();
+        await postAiMember(db, token, id, aiAgentDocument('First'));
         const created = await handleRequest(db, req(
-            'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
                 + id, token,
-            aiAgentDocument('First'),
         ));
-        assertStrictEquals(created.status, 201);
+        assertStrictEquals(created.status, 200);
         const tag = pairIdOf(created);
         assert(tag !== null);
         await created.body?.cancel();
@@ -735,16 +757,35 @@ Deno.test(
         const id = generateIdentifier();
         const path = '/organizations/AjdvjuECVZEgZoFajaIEkg'
             + '/ai-agents/' + id;
+        const genesisBody = aiAgentDocument('Genesis');
         const firstBody = aiAgentDocument('First');
         const secondBody = aiAgentDocument('Second');
-        const first = await handleRequest(db, req(
-            'PUT', path, token, firstBody,
+        await postAiMember(db, token, id, genesisBody);
+        const genesis = await handleRequest(db, req(
+            'GET', path, token,
         ));
-        assertStrictEquals(first.status, 201);
+        assertStrictEquals(genesis.status, 200);
+        await genesis.body?.cancel();
+        const genesisTag = genesis.headers.get('ETag');
+        assert(genesisTag !== null);
+        const first = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path,
+            token,
+            body: firstBody,
+            headers: { 'If-Match': genesisTag },
+        }));
+        assertStrictEquals(first.status, 200);
         await first.body?.cancel();
-        const second = await handleRequest(db, req(
-            'PUT', path, token, secondBody,
-        ));
+        const firstTag = first.headers.get('ETag');
+        assert(firstTag !== null);
+        const second = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path,
+            token,
+            body: secondBody,
+            headers: { 'If-Match': firstTag },
+        }));
         assertStrictEquals(second.status, 200);
         await second.body?.cancel();
         const list = await handleRequest(db, req(
@@ -758,11 +799,14 @@ Deno.test(
             skill_focus: string;
             model: string;
         }>(list);
-        assertStrictEquals(versions.length, 2);
+        assertStrictEquals(versions.length, 3);
         assertEquals(versions[0]!.body().toValue(), {
-            id, ...firstBody,
+            id, ...genesisBody,
         });
         assertEquals(versions[1]!.body().toValue(), {
+            id, ...firstBody,
+        });
+        assertEquals(versions[2]!.body().toValue(), {
             id, ...secondBody,
         });
         for (const part of versions) {

@@ -85,8 +85,7 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         family: 'ai-agents',
         organizationNested: true, // organization plane:
             // one document per organization; genesis is
-            // the members statement (Task 6). Until
-            // Task 32, PUT also creates.
+            // the members statement (Task 6).
         createBodyIdField: 'id', // INERT — no collection
             // POST exists; genesis is the members
             // statement (Task 6).

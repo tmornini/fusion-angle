@@ -165,7 +165,9 @@ Deno.test(
                 + generateIdentifier(), {
                 rogue_field: 'extra',
             }, DEV_TOKEN,
-                operationIdHeader()),
+                operationIdHeader([
+                    ['If-Match', '"' + generateIdentifier() + '"'],
+                ])),
         ) as Error;
         assertMatch(err.message, /unexpected key|missing/);
     },

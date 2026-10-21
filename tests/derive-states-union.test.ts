@@ -237,8 +237,14 @@ async function createAiMember(
     id: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'PUT', '/organizations/' + organizationA + '/ai-agents/' + id,
-        token, aiMemberDetail('Bot ' + id),
+        'POST', '/organizations/' + organizationA + '/memberships/',
+        token,
+        {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: AT },
+            ai: aiMemberDetail('Bot ' + id),
+        },
     ));
     assertStrictEquals(res.status, 201, 'ai-agent create failed');
 }

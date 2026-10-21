@@ -118,11 +118,12 @@ async () => {
     const db = await freshDb();
     const id = generateIdentifier();
     const body = agentFields('Scoped agent');
-    const put = await handleRequest(db, req(
-        'PUT', aiPath(STARK, id), DEV_TOKEN, body,
-    ));
-    assertStrictEquals(put.status, 201);
-    await put.body?.cancel();
+    await postMember(db, {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: body,
+    });
     const got = await handleRequest(db, req(
         'GET', aiPath(STARK, id), DEV_TOKEN,
     ));
@@ -145,12 +146,12 @@ Deno.test('another organization reads no AI of ours',
 async () => {
     const db = await freshDb();
     const id = generateIdentifier();
-    const put = await handleRequest(db, req(
-        'PUT', aiPath(STARK, id), DEV_TOKEN,
-        agentFields('Stark agent'),
-    ));
-    assertStrictEquals(put.status, 201);
-    await put.body?.cancel();
+    await postMember(db, {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Stark agent'),
+    });
     const wayne = await claimToken({
         organization: WAYNE,
         organizations: [WAYNE],
@@ -277,13 +278,34 @@ Deno.test('an AI PUT never creates', async () => {
     );
 });
 
-Deno.test('PUT /ai-agents/:id writes the four fields; GET'
+Deno.test('an AI PUT rewrites the four fields; GET'
 + ' returns them', async () => {
     const db = await freshDb();
-    const body = agentFields('Drafting agent');
-    const put = await handleRequest(db, req(
-        'PUT', aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg'), DEV_TOKEN, body,
+    await postMember(db, {
+        id: 'UuvoBhQJUSEsiJwscXPkUg',
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Seated agent'),
+    });
+    const head = await handleRequest(db, req(
+        'GET', aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg'), DEV_TOKEN,
     ));
+    assertStrictEquals(head.status, 200);
+    await head.body?.cancel();
+    const etag = head.headers.get('ETag');
+    assert(etag !== null);
+    const body = {
+        ...agentFields('Drafting agent'),
+        description: 'A rewritten agent',
+        skill_focus: 'routing',
+    };
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg'),
+        token: DEV_TOKEN,
+        body,
+        headers: { 'If-Match': etag },
+    }));
     assert(
         put.status === 201 || put.status === 200,
         'expected 201 or 200, got ' + put.status,

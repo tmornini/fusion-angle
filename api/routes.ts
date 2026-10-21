@@ -513,8 +513,10 @@ export function aiAgentDocumentEntityOf(
 }
 // The ai-agents wiring row — the FOURTEENTH registered
 // family: an organization's AI member document; its
-// identity is a `service` identity (Task 6). Stateless: no
-// lifecycle state. notFoundTable matches the family name.
+// identity is a `service` identity (Task 6). The members
+// statement creates; the PUT edits a live head. Stateless:
+// no lifecycle state. notFoundTable matches the family
+// name.
 const AI_AGENTS_WIRING: DocumentFamilyWiring = {
     family: 'ai-agents',
     httpNest: 'organization',
@@ -3042,10 +3044,13 @@ export const WRITE_RESPONSE_SPECS:
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive).
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
-    'organizations/:id/ai-agents/:id':
-        documentWriteResponseSpec(AI_AGENTS_WIRING),
-    // Only the members statement creates a service, so its
-    // PUT is class B: it names the head it replaces.
+    // Only the members statement creates an AI or a
+    // service, so each PUT is class B: it names the head
+    // it replaces.
+    'organizations/:id/ai-agents/:id': {
+        ...documentWriteResponseSpec(AI_AGENTS_WIRING),
+        conditional: 'required',
+    },
     'organizations/:id/services/:id': {
         ...documentWriteResponseSpec(SERVICES_WIRING),
         conditional: 'required',
@@ -5266,7 +5271,10 @@ export const routes: Route[] = [
     documentVersionsSelectRoute(OBJECTIVES_WIRING),
     documentVersionSelectRoute(OBJECTIVES_WIRING),
     documentCollectionRoute(AI_AGENTS_WIRING),
-    documentEntityRoute(AI_AGENTS_WIRING),
+    route('organizations/:id/ai-agents/:id', {
+        select: documentSelect(AI_AGENTS_WIRING),
+        put: documentEditHandler(AI_AGENTS_WIRING),
+    }),
     documentVersionsSelectRoute(AI_AGENTS_WIRING),
     documentVersionSelectRoute(AI_AGENTS_WIRING),
     documentCollectionRoute(SERVICES_WIRING),
