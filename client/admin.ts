@@ -17,7 +17,10 @@ import {
 } from './request-context.ts';
 import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
-import { getHumanMembers } from './members.ts';
+import {
+    getHumanMembers,
+    getNonHumanMemberIds,
+} from './members.ts';
 
 export function getOrganizationEntity(
     ctx: RequestContext,
@@ -39,11 +42,18 @@ export async function getOrganizationSeats(
     // The roster serves in write order; memberships read
     // in grant order (at, then identity), the one order a
     // member list has (see buildHumanMemberMap), though
-    // today's readers only count them.
-    return (await ctx.GETCollection<MembershipEntity>(
-        'organizations/' + organization
-            + '/memberships/?state=accepted',
-    )).toSorted((a, b) => {
+    // today's readers only count them. People only: the
+    // AI and service members drop out.
+    const [seats, nonHuman] = await Promise.all([
+        ctx.GETCollection<MembershipEntity>(
+            'organizations/' + organization
+                + '/memberships/?state=accepted',
+        ),
+        getNonHumanMemberIds(ctx),
+    ]);
+    return seats.filter(
+        seat => !nonHuman.has(seat.body().toValue().identity_id),
+    ).toSorted((a, b) => {
         const left = a.body().toValue();
         const right = b.body().toValue();
         return byAtThenIdAscending(

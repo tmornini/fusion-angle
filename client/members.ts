@@ -7,6 +7,8 @@ import type {
     IdentityPiiEntity,
     MemberPii,
     MembershipEntity,
+    AIAgentEntity,
+    ServiceEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -129,14 +131,39 @@ export function buildHumanMemberMap(
     return map;
 }
 
+// A membership's kind test, not a roster: the ids of the
+// organization's AI and service members, an aggregate
+// that drops the responses it was built from.
+export async function getNonHumanMemberIds(
+    ctx: RequestContext,
+): Promise<ReadonlySet<MemberId>> {
+    const organization = requireOrganization(ctx);
+    const [agents, services] = await Promise.all([
+        ctx.GETCollection<AIAgentEntity>(
+            'organizations/' + organization + '/ai-agents/',
+        ),
+        ctx.GETCollection<ServiceEntity>(
+            'organizations/' + organization + '/services/',
+        ),
+    ]);
+    return new Set([
+        ...agents.map(part => part.body().toValue().id),
+        ...services.map(part => part.body().toValue().id),
+    ]);
+}
+
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const map = buildHumanMemberMap(
-        await ctx.GETCollection<MembershipEntity>(
+    const [memberships, nonHuman] = await Promise.all([
+        ctx.GETCollection<MembershipEntity>(
             acceptedMemberships(ctx),
         ),
-    );
+        getNonHumanMemberIds(ctx),
+    ]);
+    const map = buildHumanMemberMap(memberships.filter(
+        part => !nonHuman.has(part.body().toValue().identity_id),
+    ));
     const filled = await Promise.all(
         [...map.entries()].map(async ([id, member]) => {
             const pii = await getMemberPii(ctx, id);
@@ -203,6 +230,7 @@ export async function getHumanMember(
         ).then(read => read.body().toValue()),
         getMemberPii(ctx, id),
     ]);
+    if (identity.kind !== 'person') return null;
     return new HumanMember(
         seatedHumanParent(id),
         profileOf(identity),

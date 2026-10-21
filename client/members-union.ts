@@ -3,6 +3,7 @@ import type {
     Member,
     MembershipEntity,
     AIAgentEntity,
+    ServiceEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -44,7 +45,7 @@ export async function getMembers(
 ): Promise<Member[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
-    const [memberships, agents] = await Promise.all([
+    const [memberships, agents, services] = await Promise.all([
         organization === undefined
             ? Promise.resolve(
                 [] as HttpMessage<MembershipEntity>[],
@@ -59,8 +60,18 @@ export async function getMembers(
                 'organizations/' + requireOrganization(ctx)
                     + '/ai-agents/',
             ).then(parts => parts.map((m) => m.body().toValue())),
+        organization === undefined
+            ? Promise.resolve([] as ServiceEntity[])
+            : ctx.GETCollection<ServiceEntity>(
+                'organizations/' + organization + '/services/',
+            ).then(parts => parts.map((m) => m.body().toValue())),
     ]);
-    const humans = buildHumanMemberMap(memberships);
+    const nonHuman = new Set(
+        [...agents, ...services].map(row => row.id),
+    );
+    const humans = buildHumanMemberMap(memberships.filter(
+        part => !nonHuman.has(part.body().toValue().identity_id),
+    ));
     const ais = buildAIAgentMap(agents);
     return fillHumanMemberPii(ctx, [
         ...humans.values(),
