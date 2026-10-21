@@ -550,14 +550,13 @@ code comments cite; specs and plans written before the
   whether it logs. Replaces the compose healthcheck's
   `fetch('/')`, which proves static serving only. Item
   6's health probe; item 13 answers it per process.
-- **5.** A person's first sign-in — no page mints a human
+- **5.** A person's first sign-in — no page mints a
   credential: the seed does
   (`formSeedCredentialMessagePairs`,
-  `api/mock-data/seed-message-pairs.ts:2421`), only
-  services get a secret from the UI
-  (`postIdentityCreation`, `client/identities.ts:284`),
-  and `postHumanMemberCreation`
-  (`client/members.ts:276`) lands the identity, its
+  `api/mock-data/seed-message-pairs.ts:2458`), and a
+  service signs in by `client_credentials` and holds
+  none; `postHumanMemberCreation`
+  (`client/members.ts:278`) lands the identity, its
   PII, and a membership, and no credential, for a
   member who cannot sign in. One primitive, two flows:
   a single-use, expiring, emailed link whose holder
@@ -767,7 +766,9 @@ code comments cite; specs and plans written before the
   every node is an AI seat; record content treated as
   data, never as instruction. Consumes items 9, 10, and
   11. Includes: roster seat naming an AI agent
-  (`tests/family-registry.test.ts:97-105`);
+  (`tests/family-registry.test.ts:98-105`); an AI seat's
+  identity is a `service` identity with an accepted
+  membership;
   FLOW-CANVAS.md's display-only AI checkboxes
   (`## Members and attributes`).
 - **13.** Two processes — high availability for the app and
@@ -2527,7 +2528,7 @@ Off the critical path; each with its oracle.
   a missing stamp throws
 - Roster map mints `{ erased: true }` before the PII
   fill. `buildHumanMemberMap` plants a tombstone on
-  every seat (`client/members.ts:125`);
+  every seat (`client/members.ts:128`);
   `getHumanMemberMap` then overwrites it: a sentinel
   standing in for absence. A fill that throws leaves seats looking
   erased. Oracle: `buildHumanMemberMap` carries no
@@ -3325,16 +3326,14 @@ Off the critical path; each with its oracle.
   default organization, since PRIMARY takes the
   earliest join and the personal organization would be
   every person's earliest.
-- Remove the never-verified `client_secret`: the
-  credential kind, the seed row, the dialog field, and
-  the service's Credentials card. OAuth's
-  `client_credentials` `grant_type` with
-  `private_key_jwt` covers the need. Before the
-  service-identity rule (G47).
+- A members-page control to reinstate a removed member.
+  The API already reinstates one through the item PUT
+  (`removed` → `accepted`); the page offers Remove only.
+  Oracle: a removed AI, service, or human member
+  restores from the Former members view, as `type:
+  'member'`.
 - Rewrite bare prose "admin" in the living docs as
   "organization admin" or "operator".
-- A service-identity rule: membership or a fence of
-  its own (G47).
 - Move items and versions under `memberships/`, with
   `identities/:id/memberships/` subsuming
   `identities/:id/organizations/`.
