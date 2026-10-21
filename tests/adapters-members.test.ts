@@ -25,7 +25,13 @@ import {
     putHumanMember,
     type HumanMemberDraft,
 } from '../client/members.ts';
+import { getMembers } from '../client/members-union.ts';
 import {
+    getOrganizationSeats,
+    getOrganizationStats,
+} from '../client/admin.ts';
+import {
+    isHumanMember,
     nowUtc,
     type HumanMember,
     type MembershipEntity,
@@ -528,4 +534,62 @@ async () => {
     assertStrictEquals(
         await getHumanMember(ctx, serviceId), null,
     );
+});
+
+// A service identity seated through the item PUT, with no
+// ai-agents/ or services/ document in the organization.
+async function seatServiceIdentity(
+    db: MemoryDbAdapter,
+    id: string,
+): Promise<void> {
+    const token = await organizationToken();
+    const seated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/invitations/'
+            + membershipNameOf(STARK, id),
+        token,
+        body: { state: 'accepted', type: 'member', at: nowUtc() },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(seated.status, 201);
+    await seated.body?.cancel();
+    const identity = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/identities/' + id,
+        token,
+        body: { kind: 'service' },
+    }));
+    assertStrictEquals(identity.status, 201);
+    await identity.body?.cancel();
+}
+
+// One member-kind rule for every reader (Review Focus 1):
+// a member is human if and only if its identity's kind is
+// 'person', so the palette's and the people picker's
+// roster, member detail, the members page, and the people
+// count all read a documentless service member as no
+// human.
+Deno.test('a documentless service member is no reader\'s'
+    + ' human',
+async () => {
+    const { db, ctx } = await adminContext();
+    const id = generateIdentifier();
+    await seatServiceIdentity(db, id);
+    const seatsP = getOrganizationSeats(ctx);
+    assertEquals({
+        humanMembers: (await getHumanMembers(ctx))
+            .map((m) => m.idForLink()),
+        humanMember: await getHumanMember(ctx, id),
+        members: (await getMembers(ctx))
+            .filter(isHumanMember)
+            .map((m) => m.idForLink()),
+        activePeopleCount: (
+            await getOrganizationStats(ctx, seatsP)
+        ).activePeopleCount,
+    }, {
+        humanMembers: ['XXZruirZyAOoRpNxaDnpSA'],
+        humanMember: null,
+        members: ['XXZruirZyAOoRpNxaDnpSA'],
+        activePeopleCount: 1,
+    });
 });

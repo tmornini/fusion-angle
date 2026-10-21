@@ -554,3 +554,43 @@ Deno.test('an AI or service member is never created an'
         );
     }
 });
+
+// A membership read carries its identity's kind, derived
+// when served and never stored: the one rule every roster
+// reader sorts members by. A seat whose identity has no
+// document is a person, since a service identity is
+// always written with its document.
+Deno.test('a membership read carries its identity\'s kind',
+async () => {
+    const { db, admin } = await seeded();
+    const id = generateIdentifier();
+    const name = membershipNameOf(STARK, id);
+    const created = await post(db, admin, serviceBody(id));
+    assertStrictEquals(created.status, 201);
+    const stored = await created.json() as Record<
+        string, unknown
+    >;
+    assertStrictEquals(stored['identity_kind'], undefined);
+    const listed = await read(db, admin, nest('memberships'));
+    assertStrictEquals(listed.status, 200);
+    const rows = await partBodiesOf<{
+        identity_id: string;
+        identity_kind?: string;
+    }>(listed);
+    assertEquals(
+        Object.fromEntries(rows.map(
+            (row) => [row.identity_id, row.identity_kind],
+        )),
+        {
+            XXZruirZyAOoRpNxaDnpSA: 'person',
+            [SARAH]: 'person',
+            [id]: 'service',
+        },
+    );
+    const item = await read(
+        db, admin, nest('invitations') + name,
+    );
+    assertStrictEquals(item.status, 200);
+    const seat = await item.json() as Record<string, unknown>;
+    assertStrictEquals(seat['identity_kind'], 'service');
+});
