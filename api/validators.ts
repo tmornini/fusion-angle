@@ -472,7 +472,7 @@ export function validateMemberEntity(
         body, MEMBER_BODY_KEYS, 'MemberEntity',
     );
     const type = validateEnumField(
-        body, 'type', ['human', 'ai', 'system'],
+        body, 'type', ['human', 'ai', 'service', 'system'],
         'member type', 'MemberEntity',
     );
     return {

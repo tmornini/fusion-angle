@@ -18,7 +18,7 @@ export interface ProviderModel {
     api_name: string;
 }
 
-export type MemberKind = 'human' | 'ai' | 'system';
+export type MemberKind = 'human' | 'ai' | 'service' | 'system';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
@@ -874,6 +874,54 @@ export class AIMember {
     }
 }
 
+export class ServiceMember {
+    readonly kind = 'service' as const;
+    // The membership this member was read through: its
+    // removal names the head it replaces.
+    readonly membership: HttpMessage<MembershipEntity>;
+    readonly #id: MemberId;
+    readonly #name: string;
+    readonly #description: string;
+
+    constructor(
+        detail: ServiceEntity,
+        membership: HttpMessage<MembershipEntity>,
+    ) {
+        this.membership = membership;
+        this.#id = detail.id;
+        this.#name = detail.name;
+        this.#description = detail.description;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    name(): string {
+        return this.nameText();
+    }
+
+    descriptionText(): string {
+        return this.#description;
+    }
+
+    matchesSearch(term: string): boolean {
+        const lowerTerm = term.toLowerCase();
+        return (
+            this.#name
+                .toLowerCase()
+                .includes(lowerTerm)
+            || this.#description
+                .toLowerCase()
+                .includes(lowerTerm)
+        );
+    }
+}
+
 // System member: a synthetic, read-only actor — the
 // platform itself as the author of seed-time state
 // events. Exactly one exists; it has a parent row
@@ -947,6 +995,7 @@ export class FormerMember {
 export type Member =
     | HumanMember
     | AIMember
+    | ServiceMember
     | SystemMember
     | FormerMember;
 
@@ -960,6 +1009,12 @@ export function isAIMember(
     w: Member,
 ): w is AIMember {
     return w.kind === 'ai';
+}
+
+export function isServiceMember(
+    w: Member,
+): w is ServiceMember {
+    return w.kind === 'service';
 }
 
 export function isSystemMember(
