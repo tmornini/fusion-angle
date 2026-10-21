@@ -567,6 +567,7 @@ async function postMockDataLoadIn(
 ): Promise<void> {
     const messagePairs = input.messagePairs;
     const members = buildMembers();
+    const aiMembers = buildAiMembers();
     const unaffiliated = buildUnaffiliatedIdentity();
 
     await Promise.all([
@@ -632,6 +633,30 @@ async function postMockDataLoadIn(
                 ),
             ];
         }),
+        ...aiMembers.map((m) => {
+            const messagePair = requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
+                    MEMBERSHIP_ITEM_ROUTE, m.id + '-0',
+                ),
+            );
+            return putInvitationOnOrganizationNest(
+                adapter,
+                [
+                    STARK_ORGANIZATION,
+                    membershipNameOf(STARK_ORGANIZATION, m.id),
+                ],
+                membershipSeedBody(
+                    STARK_ORGANIZATION, m.id, 'member',
+                ),
+                SYSTEM_MEMBER_ID,
+                messagePair,
+                STARK_ORGANIZATION,
+                ['admin'],
+                messagePair.requestAt,
+                messagePair.operationId,
+            );
+        }),
         postIdentityDocumentOp(
             adapter,
             SYSTEM_MEMBER_ID,
@@ -642,6 +667,17 @@ async function postMockDataLoadIn(
                 seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
             ),
         ),
+        ...aiMembers.map((m) =>
+            postIdentityDocumentOp(
+                adapter,
+                m.id,
+                identityDocumentBodyOf('service'),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey('identities/:id', m.id),
+                ),
+            )),
         postIdentityDocumentOp(
             adapter,
             unaffiliated.id,
@@ -930,8 +966,6 @@ async function postMockDataLoadIn(
     ]);
 
     const ideaSubmissions = buildIdeaSubmissions();
-
-    const aiMembers = buildAiMembers();
 
     const workOrderTraces = seedWorkOrderTraces([
         ...mockStateEvents, ...leadToCloseData.stateEvents,

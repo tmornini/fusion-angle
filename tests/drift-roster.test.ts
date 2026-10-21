@@ -154,7 +154,7 @@ async () => {
         sortById(starkParts.map((part) => part.body().toValue())),
         sortById(stark),
     );
-    assertStrictEquals(stark.length, 6);
+    assertStrictEquals(stark.length, 10);
     const starkSeats = await handleRequest(
         db, req(
             'GET',

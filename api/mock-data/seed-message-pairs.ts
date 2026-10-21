@@ -1350,7 +1350,9 @@ export function buildMockDataInvocations():
         // on the organization-nest item route, ordered
         // before the human-member triple below — the SAME
         // write order postMockDataLoadIn uses (memberships
-        // land before the member they join is created).
+        // land before the member they join is created). Each
+        // AI member's accepted Stark membership is formed the
+        // same way, beside its organization document below.
         const organizations = member.id === 'XXZruirZyAOoRpNxaDnpSA'
             ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
             : [assignOrganization(index)];
@@ -1690,6 +1692,35 @@ export function buildMockDataInvocations():
     // Every seeded AI belongs to Stark: no seeded flow names
     // one in Wayne (spec decision 10).
     for (const m of aiMembers) {
+        const identityKey = seedMessagePairKey(
+            'identities/:id', m.id,
+        );
+        invocations.push({
+            key: identityKey,
+            routePattern: 'identities/:id',
+            idParams: [m.id],
+            organization: undefined,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            body: identityDocumentBodyOf('service'),
+            operation: identityKey,
+        });
+        const membershipKey = seedMessagePairKey(
+            MEMBERSHIP_ITEM_ROUTE, m.id + '-0',
+        );
+        invocations.push({
+            key: membershipKey,
+            routePattern: MEMBERSHIP_ITEM_ROUTE,
+            idParams: [
+                STARK_ORGANIZATION,
+                membershipNameOf(STARK_ORGANIZATION, m.id),
+            ],
+            organization: STARK_ORGANIZATION,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            body: membershipSeedBody(
+                STARK_ORGANIZATION, m.id, 'member',
+            ),
+            operation: membershipKey,
+        });
         const { id: _id, ...fields } = m;
         const key = seedMessagePairKey(
             'organizations/:id/ai-agents/:id', m.id,
