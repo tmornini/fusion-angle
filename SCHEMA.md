@@ -171,6 +171,12 @@ which `projectedBody` (`api/served-response.ts`) drops
 from every read and every write's answer, admins
 included.
 
+`password` is the only credential kind. A service holds
+no stored secret: it signs in by `client_credentials`
+with `private_key_jwt`, verified against the `jwks` of
+its registration. A `client_secret` credential body is
+refused at the gate.
+
 ## PII erasure is a tombstone
 
 Document DELETE is a marked tombstone pair. No physical
