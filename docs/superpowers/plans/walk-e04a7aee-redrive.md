@@ -30,7 +30,7 @@ under Findings.
 
 | Case | Re-drive score | Resolution here |
 |---|---|---|
-| F52 | BLOCKED at C1 Step 2 | Task R1 replaces C1; R2 on a BLOCKED |
+| F52 | BLOCKED at C1 Step 2 | Task R1 replaces C1; R2 on a Step 3 BLOCKED |
 | F75 | PASS | out of scope |
 
 Task R1 replaces the old Task C1 for F52. The old plan's
@@ -207,7 +207,8 @@ SHA>.txt` in the walk's format:
   Finding 1, it is `rect.flow-grid-dots`. If
   `background` is false, score BLOCKED with "R1 Step 2:
   P hit `<name>`, not empty canvas background; no press
-  sent". Then stop and go to R2.
+  sent". Then stop. R2 does not run: a Step 2
+  BLOCKED earns no driving note.
 - [ ] **Step 3:** Press at P. Send four moves along
   P→Q, at i/8 of the way for i = 1..4. Read the
   `width` attribute of `.flow-marquee`. If it is 0,
@@ -232,36 +233,32 @@ SHA>.txt` in the walk's format:
 
 ### Task R2: Note the F52 drive limit (master only)
 
-Runs only if R1 scored BLOCKED. It replaces the old
-Task C3. Only the master edits it; an explorer never does
+Runs only if R1 reached Step 3 and no marquee was
+delivered (a Step 3 BLOCKED). A Step 2 BLOCKED earns no
+driving note. R2 replaces the old Task C3. Only the
+master edits it; an explorer never does
 (TEST-PLAN.md:444-446).
 
 **Files:** `TEST-PLAN.md` § Driving notes (`:187` on).
 Append after the last bullet.
 
-- [ ] **Step 1:** Add the one bullet that names the
-  step R1 blocked at, with `<date>`, `<sha>`, and
-  `<name>` taken from the scored line:
-  - Step 2: `- F52: the canvas inset (x + 4, y + 4) hit
-    <name>, not empty canvas background, on the <date>
-    re-drive on <sha>, so no marquee press was sent; score
-    BLOCKED on one attempt — the reducer and scenario
-    pins decide it.`
-  - Step 3: `- F52: CDP delivered no in-flight marquee
+- [ ] **Step 1:** Add this bullet, with `<date>` and
+  `<sha>` taken from the scored line:
+  - `- F52: CDP delivered no in-flight marquee
     on the <date> re-drive on <sha> (a press on empty
     background at the canvas inset, then \`buttons: 1\`
     moves); score BLOCKED on one attempt — the reducer
     and scenario pins decide it.`
 
-  Neither bullet cites the 4b332f58 re-drive's Step 2
-  BLOCKED. That result came from the old check, not
-  from a driver limit (Finding 1).
+  The bullet does not cite the 4b332f58 re-drive's
+  Step 2 BLOCKED. That result came from the old check,
+  not from a driver limit (Finding 1).
 - [ ] **Step 2:** Run `./test validate`. Expected:
   PASS. Then commit `TEST-PLAN.md` only, with the
   subject `Note the F52 marquee drive limit`.
 
-If R1 scores PASS, neither R2 nor any stub makes a
-commit.
+If R1 scores PASS or blocks at Step 2, neither R2 nor
+any stub makes a commit.
 
 ---
 
@@ -272,5 +269,6 @@ commit.
   and the 8081 stack is down (`./deploy` takes compose
   down on exit).
 - [ ] Report F52 as PASS, FAIL (with the stub path), or
-  BLOCKED (with the step and the R2 commit). Nothing
+  BLOCKED (with the step, plus the R2 commit for a
+  Step 3 BLOCKED). Nothing
   lands without the owner's word.
