@@ -5946,17 +5946,11 @@ FSM, unlike `flows/detail`).
        native `<dialog>` confirm/cancel interaction, the
        toast, the in-place re-render, and whether
        Email/Phone/Bio each independently read "—"
-- [ ] **G47** This case fails because service identities
-  hold no membership: every admin route under
-  `identities/<service>/` is 403, GET `identities/`
-  omits services, and the registration card flow does
-  not succeed; a follow-up gives services a membership
-  or a rule of their own, and the steps below are the
-  procedure that follow-up would restore.
-  On the system service identity's detail
-  page (admin session), a "Client registration" card
-  renders before Credentials showing "Not registered."
-  and a "Register client" button
+- [ ] **G47** On the members page (admin session), add a
+  Service member "CI bot" (G14b), open its detail, follow
+  its Identity link → the identity detail page, where a
+  "Client registration" card renders showing "Not
+  registered." and a "Register client" button
   (`data-identity-action="registration"`). Click it →
   the `client-registration-dialog` opens; fill Grant
   types `client_credentials`, Audience `fusion-angle`,
@@ -5983,7 +5977,9 @@ FSM, unlike `flows/detail`).
   (`buildRegistrationCard`). Wire:
   PUT|GET|DELETE `identities/:id/registration` (admin
   realm; kind gate 404/400).
-  Pin: tests/adapters-client-registration.test.ts 'an
+  Pin: tests/api-service-members.test.ts 'an organization
+       admin reaches a service member identity (G47)';
+       tests/adapters-client-registration.test.ts 'an
        unregistered service reads as registered: false';
        tests/adapters-client-registration.test.ts 'put then
        get round-trips through the camelCase domain shape';
