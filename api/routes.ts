@@ -47,8 +47,6 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
 } from '../shared/types.ts';
-import { hashPassword } from
-    '../shared/password-hash.ts';
 import {
     validateAiAgentDocumentBody,
     validateServiceDocumentBody,
@@ -3600,13 +3598,6 @@ export const routes: Route[] = [
                 'stateless',
             );
         },
-        // Organization admin only — POST /identities has no
-        // member-tier entry, so it falls to the organization
-        // admin's `/` rows in ROUTE_POLICY. The identity and,
-        // for a service, its client_secret credential are
-        // declared geneses in one statement, so a resent
-        // create answers 409 and stores nothing. A person's
-        // PII enters later via PUT identities/:id/pii.
         post: async (
             db, _p, body, _actor, messagePair, organization,
         ) => {
@@ -3628,45 +3619,10 @@ export const routes: Route[] = [
                     kind: 'genesis', declarer: 'handler',
                 },
             };
-            const credentials: StateSibling[] = [];
-            if (b.kind === 'service') {
-                const { id: credId, ...fields } =
-                    b.credential as {
-                        id: string;
-                        secret: string;
-                    } & Record<string, unknown>;
-                if (typeof fields.secret !== 'string'
-                    || fields.secret === '') {
-                    throw new ValidationError(
-                        'IdentityCreateServiceBody'
-                        + '.credential.secret must'
-                        + ' be a non-empty string',
-                    );
-                }
-                const credential = {
-                    id: credId,
-                    ...validateIdentityCredentialEntity({
-                        ...fields,
-                        secret: await hashPassword(fields.secret),
-                    }),
-                };
-                credentials.push({
-                    method: 'PUT',
-                    path: canonicalPath(
-                        org,
-                        '/identities/' + b.id + '/credentials/',
-                    ),
-                    name: credId,
-                    state: credential,
-                    condition: {
-                        kind: 'genesis', declarer: 'handler',
-                    },
-                });
-            }
             await runStateWrite(db, {
                 kind: 'siblings',
                 received: requirePair(messagePair),
-                siblings: [identity, ...credentials],
+                siblings: [identity],
                 reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });

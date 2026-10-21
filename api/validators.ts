@@ -3690,51 +3690,31 @@ export function validateFlowUndoBody(
     return { eventId, at };
 }
 
-// Identity creation, discriminated by kind. A person carries
-// only {id, kind} — its PII enters later via the separate PUT
-// identities/:id/pii (Phase 10 Task 2's intake decomposition);
-// a service carries its credential sub-object (a deterministic-
-// id'd client_secret row whose secret is hashed client-side
-// before it crosses the gate). The route pins the identity kind.
-export interface IdentityCreatePersonBody {
+// Identity creation. A person carries only {id, kind} — its
+// PII enters later via the separate PUT identities/:id/pii
+// (Phase 10 Task 2's intake decomposition). A service is
+// created only by the memberships statement, never here.
+// The route pins the identity kind.
+export interface IdentityCreateBody {
     readonly id: string;
     readonly kind: 'person';
 }
 
-export interface IdentityCreateServiceBody {
-    readonly id: string;
-    readonly kind: 'service';
-    readonly credential: Record<string, unknown>;
-}
-
-export type IdentityCreateBody =
-    | IdentityCreatePersonBody
-    | IdentityCreateServiceBody;
-
-const IDENTITY_CREATE_PERSON_KEYS: readonly string[] = [
+const IDENTITY_CREATE_KEYS: readonly string[] = [
     'id', 'kind',
 ];
 
-const IDENTITY_CREATE_SERVICE_KEYS: readonly string[] = [
-    'id', 'kind', 'credential',
-];
-
 // The HTTP-body gate for POST /identities: a bare person
-// identity (its PII lands later via PUT identities/:id/pii), OR
-// a service identity + its client_secret credential row, written
-// atomically. The credential sub-object is NOT fully validated
-// here — the parent-scoped identity_credentials store re-
-// validates its own body (validateIdentityCredentialEntity) when
-// the composing put lands, and the identities store pins the
-// kind through validateIdentityEntity. The credential's secret
-// is hashed client-side; the route never touches crypto.
-// Identity creation writes NO state event — identities carry no
-// lifecycle event at creation — so the handler needs no actor.
+// identity (its PII lands later via PUT identities/:id/pii).
+// The identities store pins the kind through
+// validateIdentityEntity. Identity creation writes NO state
+// event — identities carry no lifecycle event at creation —
+// so the handler needs no actor.
 export function validateIdentityCreateBody(
     body: Record<string, unknown>,
 ): IdentityCreateBody {
     const kind = validateEnumField(
-        body, 'kind', ['person', 'service'],
+        body, 'kind', ['person'],
         'identity kind', 'IdentityCreateBody',
     );
     const id = pickIdentifier(body, 'id');
@@ -3743,27 +3723,12 @@ export function validateIdentityCreateBody(
             'IdentityCreateBody.id must be non-empty',
         );
     }
-    if (kind === 'person') {
-        assertOnlyKeys(
-            body,
-            IDENTITY_CREATE_PERSON_KEYS,
-            'IdentityCreatePersonBody',
-        );
-        return { id, kind };
-    }
     assertOnlyKeys(
         body,
-        IDENTITY_CREATE_SERVICE_KEYS,
-        'IdentityCreateServiceBody',
+        IDENTITY_CREATE_KEYS,
+        'IdentityCreateBody',
     );
-    return {
-        id,
-        kind,
-        credential: asObject(
-            body['credential'],
-            'IdentityCreateServiceBody.credential',
-        ),
-    };
+    return { id, kind };
 }
 
 export interface WorkOrderCreateBody {

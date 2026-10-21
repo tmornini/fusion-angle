@@ -1,5 +1,4 @@
 import {
-    assert,
     assertEquals,
     assertRejects,
     assertStrictEquals,
@@ -46,21 +45,6 @@ function pii(name: string) {
         email: `${name}@example.com`.toLowerCase(),
         phone: '',
         bio: '',
-    };
-}
-
-// The client_secret credential facet — the row the
-// identity_credentials store re-validates after the composing
-// POST puts it. `secret` arrives already hashed; the test
-// passes an opaque non-empty stand-in.
-function credential(id: string) {
-    return {
-        id: `${id}-client-secret`,
-        identity_id: id,
-        kind: 'client_secret',
-        status: 'set',
-        secret: 'hashed-secret',
-        at: '2026-01-01T00:00:00.000000Z',
     };
 }
 
@@ -125,32 +109,6 @@ Deno.test(
 );
 
 Deno.test(
-    'POST identities (service) writes the identity and its'
-    + ' client_secret credential in one operation',
-    async () => {
-        const db = await freshDb();
-        await POST(db, 'identities/', {
-            id: 'syWUUcdBSbBgMwBiCrgbDw',
-            kind: 'service',
-            credential: credential('syWUUcdBSbBgMwBiCrgbDw'),
-        }, DEV_TOKEN,
-            operationIdHeader());
-        await assertForbidden(
-            db, 'GET', '/identities/syWUUcdBSbBgMwBiCrgbDw',
-        );
-        const creds = await deriveCredentialsFor(db
-            , 'syWUUcdBSbBgMwBiCrgbDw');
-        const cred = creds.find(c => c.kind === 'client_secret');
-        assert(cred, 'credential exists on message plane');
-        assertStrictEquals(cred.status, 'set');
-        // A service carries no PII.
-        await assertRejects(
-            () => deriveIdentityPii(db, 'syWUUcdBSbBgMwBiCrgbDw'));
-        // Phase Final Stage B: identity spine tables retired.
-    },
-);
-
-Deno.test(
     'POST identities (person) rejects a legacy pii-bearing'
     + ' body: PII now enters ONLY via PUT identities/:id/pii'
     + ' (Phase 10 Task 2 retires the create-time PII facet, and'
@@ -206,35 +164,6 @@ Deno.test(
         );
         await assertRejects(
             () => deriveIdentityPii(db, torn));
-    },
-);
-
-Deno.test(
-    'POST identities (service) rolls back the identity when'
-    + ' its credential sub-object is invalid',
-    async () => {
-        const db = await freshDb();
-        const doomed = generateIdentifier();
-        await assertRejects(
-            // Credential with a malformed `at` — the
-            // identity_credentials store rejects it mid-tx,
-            // AFTER the identities put has landed, so both must
-            // roll back.
-            () => POST(db, 'identities/', {
-                id: doomed,
-                kind: 'service',
-                credential: {
-                    ...credential(doomed),
-                    at: 'not-a-timestamp',
-                },
-            }, DEV_TOKEN,
-                operationIdHeader()),
-        );
-        await assertRejects(
-            () => GET(db, 'identities/' + doomed, DEV_TOKEN,
-                operationIdHeader()));
-        const creds = await deriveCredentialsFor(db, doomed);
-        assertStrictEquals(creds.length, 0);
     },
 );
 
@@ -361,42 +290,3 @@ Deno.test(
         );
     },
 );
-
-// The created service has no seat. An admin PUT of its
-// credential names an identity outside the organization.
-Deno.test('a route PUT of the create\'s credential is forbidden'
-+ ' and stores nothing', async () => {
-    const db = await freshDb();
-    const id = generateIdentifier();
-    const credentialId = generateIdentifier();
-    const created = await handleRequest(db, req(
-        'POST', '/identities/', DEV_TOKEN, {
-            id,
-            kind: 'service',
-            credential: { ...credential(id), id: credentialId },
-        },
-    ));
-    assertStrictEquals(created.status, 201);
-    await created.body?.cancel();
-    const credentials = '/identities/' + id + '/credentials/';
-    const head = await db.messagePairs.getHeadPair(
-        credentials, credentialId,
-    );
-    assert(head !== null);
-    const { id: _id, ...stored } = JSON.parse(
-        await storedPutBodyText(db, credentials, credentialId),
-    ) as Record<string, unknown>;
-    const before = (await db.messagePairs.getAll()).length;
-    const res = await handleRequest(db, req(
-        'PUT', credentials + credentialId, DEV_TOKEN, stored,
-    ));
-    assertStrictEquals(res.status, 403);
-    assertEquals(await res.json(), {
-        error: outside(
-            'PUT', credentials + credentialId,
-        ),
-    });
-    assertStrictEquals(
-        (await db.messagePairs.getAll()).length, before,
-    );
-});
