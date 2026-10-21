@@ -20,6 +20,7 @@ import { organizationToken } from './token-fixtures.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
+    membershipJoinReader,
     invitationLatched,
     partBodiesOf,
     partsOf,
@@ -28,7 +29,10 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
-import type { MembershipEntity } from '../shared/types.ts';
+import type {
+    MembershipEntity,
+    MembershipReadEntity,
+} from '../shared/types.ts';
 
 const TONY = 'XXZruirZyAOoRpNxaDnpSA';
 const ORG = 'AjdvjuECVZEgZoFajaIEkg';
@@ -124,6 +128,14 @@ async function membershipOf(
     response: Response,
 ): Promise<MembershipEntity> {
     return await response.json() as MembershipEntity;
+}
+
+// A read on the organization nest: the stored membership
+// joined with its identity's kind.
+async function membershipReadOf(
+    response: Response,
+): Promise<MembershipReadEntity> {
+    return await response.json() as MembershipReadEntity;
 }
 
 function expected(
@@ -374,8 +386,11 @@ Deno.test('an admin pending PUT on a declined head'
     ));
     assertStrictEquals(head.status, 200);
     assertEquals(
-        await membershipOf(head),
-        expected(invitee.id, 'declined', declineAt),
+        await membershipReadOf(head),
+        {
+            ...expected(invitee.id, 'declined', declineAt),
+            identity_kind: 'person',
+        },
     );
 });
 
@@ -1201,7 +1216,8 @@ async () => {
         pendingView,
     );
     await assertPartsAreHeads(
-        db, pendingParts, { sees: 'whole' },
+        db, pendingParts,
+        await membershipJoinReader(db, pendingParts),
     );
     assertEquals(
         pendingParts.map(
@@ -1217,7 +1233,8 @@ async () => {
         acceptedDefault,
     );
     await assertPartsAreHeads(
-        db, acceptedParts, { sees: 'whole' },
+        db, acceptedParts,
+        await membershipJoinReader(db, acceptedParts),
     );
     assertEquals(
         acceptedParts.map(
@@ -1446,11 +1463,14 @@ Deno.test('a member reads accepted and removed, and a'
     ));
     assertStrictEquals(adminItem.status, 200);
     assertEquals(
-        await membershipOf(adminItem),
-        expected(
-            pending.id, 'pending',
-            '2026-04-01T00:00:01.000000Z',
-        ),
+        await membershipReadOf(adminItem),
+        {
+            ...expected(
+                pending.id, 'pending',
+                '2026-04-01T00:00:01.000000Z',
+            ),
+            identity_kind: 'person',
+        },
     );
 });
 
@@ -1479,7 +1499,9 @@ Deno.test('re-invite after decline is one pending document'
         expected(invitee.id, 'pending', at),
     );
     assertStrictEquals(await putCount(db, name), 3);
-    const organizationView = await partBodiesOf<MembershipEntity>(
+    const organizationView = await partBodiesOf<
+        MembershipReadEntity
+    >(
         await handleRequest(db, req(
             'GET',
             '/organizations/' + ORG
@@ -1488,7 +1510,10 @@ Deno.test('re-invite after decline is one pending document'
         )),
     );
     assertEquals(organizationView, [
-        expected(invitee.id, 'pending', at),
+        {
+            ...expected(invitee.id, 'pending', at),
+            identity_kind: 'person',
+        },
     ]);
     const identityView = await partBodiesOf<
         MembershipEntity

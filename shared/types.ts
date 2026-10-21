@@ -1415,6 +1415,14 @@ export type MembershipEntity =
         state: Exclude<InvitationState, 'pending'>;
     });
 
+// A membership as the organization nest serves it: the
+// stored body and its identity's kind, derived when served
+// and never stored. A member is human if and only if that
+// kind is 'person'.
+export type MembershipReadEntity = MembershipEntity & {
+    identity_kind: IdentityKind;
+};
+
 // An invitation binding an identity to an organization, awaiting the holder's
 // answer. Immutable like a membership, but its lifecycle is derived from the
 // invitation document's own PUT history (INVITATION_STATES,

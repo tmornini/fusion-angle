@@ -10,6 +10,7 @@ import {
     ValidationError,
     nowUtc,
     type Id,
+    type IdentityKind,
     type InvitationState,
     type MembershipEntity,
     type MessagePairEntity,
@@ -45,6 +46,7 @@ import type {
 import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityKind,
+    deriveIdentityKinds,
     deriveIdentityPiiRows,
     identityPrefixFor,
 } from './derive-identity-spine.ts';
@@ -81,6 +83,7 @@ import {
     envelopeOf,
     responseOfWire,
     servedResponse,
+    type Reader,
 } from './served-response.ts';
 
 const ADMIN_WRITE =
@@ -473,6 +476,29 @@ export async function getInvitationOnIdentityNest(
     );
 }
 
+// A membership read on the organization nest joins each
+// seat's identity kind, the one rule every roster reader
+// sorts members by. A seat whose identity has no document
+// is a person: a service identity is always written with
+// its document.
+function identityKindJoin(
+    heads: readonly MessagePairEntity[],
+    kinds: ReadonlyMap<Id, IdentityKind>,
+): Reader {
+    return {
+        sees: 'joined',
+        joined: new Map(heads.map((head) => {
+            const membership = membershipOfHead(head);
+            const kind = kinds.get(membership.identity_id);
+            return [membership.id, {
+                identity_kind: kind === undefined
+                    ? 'person'
+                    : kind,
+            }];
+        })),
+    };
+}
+
 // GET /organizations/:id/invitations/
 export async function getOrganizationInvitations(
     db: DbAdapter,
@@ -482,12 +508,16 @@ export async function getOrganizationInvitations(
     _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
-    return wholeCollectionSelection(
-        await organizationMembershipHeads(
+    const [heads, kinds] = await Promise.all([
+        organizationMembershipHeads(
             db, param(params, 0), askedQuery(query),
         ),
-        'stateless',
-    );
+        deriveIdentityKinds(db),
+    ]);
+    return {
+        ...wholeCollectionSelection(heads, 'stateless'),
+        reader: identityKindJoin(heads, kinds),
+    };
 }
 
 // GET /organizations/:id/invitations/:membership-id
@@ -499,12 +529,16 @@ export async function getInvitationOnOrganizationNest(
     roles: readonly string[],
 ): Promise<HeadSelection> {
     const name = membershipName(params);
-    const head = await visibleHead(
-        db, name, roles, 'organization',
-    );
-    return wholeHeadSelection(
-        head, 'stateless', 'invitations', name,
-    );
+    const [head, kinds] = await Promise.all([
+        visibleHead(db, name, roles, 'organization'),
+        deriveIdentityKinds(db),
+    ]);
+    return {
+        ...wholeHeadSelection(
+            head, 'stateless', 'invitations', name,
+        ),
+        reader: identityKindJoin([head], kinds),
+    };
 }
 
 // GET .../versions/

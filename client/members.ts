@@ -7,8 +7,7 @@ import type {
     IdentityPiiEntity,
     MemberPii,
     MembershipEntity,
-    AIAgentEntity,
-    ServiceEntity,
+    MembershipReadEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -131,39 +130,24 @@ export function buildHumanMemberMap(
     return map;
 }
 
-// A membership's kind test, not a roster: the ids of the
-// organization's AI and service members, an aggregate
-// that drops the responses it was built from.
-export async function getNonHumanMemberIds(
-    ctx: RequestContext,
-): Promise<ReadonlySet<MemberId>> {
-    const organization = requireOrganization(ctx);
-    const [agents, services] = await Promise.all([
-        ctx.GETCollection<AIAgentEntity>(
-            'organizations/' + organization + '/ai-agents/',
-        ),
-        ctx.GETCollection<ServiceEntity>(
-            'organizations/' + organization + '/services/',
-        ),
-    ]);
-    return new Set([
-        ...agents.map(part => part.body().toValue().id),
-        ...services.map(part => part.body().toValue().id),
-    ]);
+// The one member-kind rule: a member is human if and only
+// if its identity's kind is 'person', which a membership
+// read carries.
+export function isHumanSeat(
+    seat: HttpMessage<MembershipReadEntity>,
+): boolean {
+    return seat.body().toValue().identity_kind === 'person';
 }
 
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const [memberships, nonHuman] = await Promise.all([
-        ctx.GETCollection<MembershipEntity>(
-            acceptedMemberships(ctx),
-        ),
-        getNonHumanMemberIds(ctx),
-    ]);
-    const map = buildHumanMemberMap(memberships.filter(
-        part => !nonHuman.has(part.body().toValue().identity_id),
-    ));
+    const memberships = await ctx.GETCollection<
+        MembershipReadEntity
+    >(acceptedMemberships(ctx));
+    const map = buildHumanMemberMap(
+        memberships.filter(isHumanSeat),
+    );
     const filled = await Promise.all(
         [...map.entries()].map(async ([id, member]) => {
             const pii = await getMemberPii(ctx, id);
@@ -208,9 +192,9 @@ export async function getHumanMember(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMember | null> {
-    let membership: HttpMessage<MembershipEntity>;
+    let membership: HttpMessage<MembershipReadEntity>;
     try {
-        membership = await ctx.GET<MembershipEntity>(
+        membership = await ctx.GET<MembershipReadEntity>(
             membershipItem(ctx, id),
         );
     } catch (err) {
@@ -223,14 +207,15 @@ export async function getHumanMember(
         throw err;
     }
     const body = membership.body().toValue();
-    if (body.state !== 'accepted') return null;
+    if (body.state !== 'accepted' || !isHumanSeat(membership)) {
+        return null;
+    }
     const [identity, pii] = await Promise.all([
         ctx.GET<IdentityEntity>(
             `identities/${id}`,
         ).then(read => read.body().toValue()),
         getMemberPii(ctx, id),
     ]);
-    if (identity.kind !== 'person') return null;
     return new HumanMember(
         seatedHumanParent(id),
         profileOf(identity),

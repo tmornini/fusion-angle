@@ -19,6 +19,8 @@ import {
     organizationMembershipHeads,
 } from '../api/memberships.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
+import { deriveIdentityKinds } from
+    '../api/derive-identity-spine.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -28,6 +30,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
+    membershipJoinReader,
     pairIdOf,
     partBodiesOf,
     partsOf,
@@ -112,6 +115,18 @@ async function acceptedMemberships(
     return heads.map(membershipOfHead);
 }
 
+// The wire joins each seat's identity kind to the stored
+// membership; every seeded seat's identity has a document.
+function withIdentityKind(
+    rows: readonly MembershipEntity[],
+    kinds: ReadonlyMap<Id, string>,
+) {
+    return rows.map((row) => ({
+        ...row,
+        identity_kind: kinds.get(row.identity_id),
+    }));
+}
+
 // -- shared live-write body builders -----------------------------
 
 function aiMemberDocumentBody(
@@ -132,6 +147,7 @@ Deno.test('seeded GET memberships wire equals the accepted'
 + ' organization leg',
 async () => {
     const db = await seededDb();
+    const kinds = await deriveIdentityKinds(db);
 
     const tokenStark = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -149,10 +165,12 @@ async () => {
         db, STARK_ORGANIZATION,
     );
     const starkParts = await partsOf<MembershipEntity>(resStark);
-    await assertPartsAreHeads(db, starkParts, { sees: 'whole' });
+    await assertPartsAreHeads(
+        db, starkParts, await membershipJoinReader(db, starkParts),
+    );
     assertEquals(
         sortById(starkParts.map((part) => part.body().toValue())),
-        sortById(stark),
+        sortById(withIdentityKind(stark, kinds)),
     );
     assertStrictEquals(stark.length, 10);
     const starkSeats = await handleRequest(
@@ -181,10 +199,12 @@ async () => {
         db, ORGANIZATION_TWO,
     );
     const twoParts = await partsOf<MembershipEntity>(resTwo);
-    await assertPartsAreHeads(db, twoParts, { sees: 'whole' });
+    await assertPartsAreHeads(
+        db, twoParts, await membershipJoinReader(db, twoParts),
+    );
     assertEquals(
         sortById(twoParts.map((part) => part.body().toValue())),
-        sortById(org2),
+        sortById(withIdentityKind(org2, kinds)),
     );
     assertStrictEquals(org2.length, 6);
 

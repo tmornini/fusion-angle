@@ -2,7 +2,7 @@ import {
     ideaIsVisible,
     assertIdeaState,
     type OrganizationEntity,
-    type MembershipEntity,
+    type MembershipReadEntity,
 } from '../shared/types.ts';
 import { byAtThenIdAscending } from '../shared/identifier.ts';
 import type { HttpMessage } from
@@ -19,7 +19,7 @@ import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
 import {
     getHumanMembers,
-    getNonHumanMemberIds,
+    isHumanSeat,
 } from './members.ts';
 
 export function getOrganizationEntity(
@@ -33,7 +33,7 @@ export function getOrganizationEntity(
 
 export async function getOrganizationSeats(
     ctx: RequestContext,
-): Promise<HttpMessage<MembershipEntity>[]> {
+): Promise<HttpMessage<MembershipReadEntity>[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
     if (organization === undefined) {
@@ -43,7 +43,7 @@ export async function getOrganizationSeats(
     // in grant order (at, then identity), the one order a
     // member list has (see buildHumanMemberMap), though
     // today's readers only count them.
-    return (await ctx.GETCollection<MembershipEntity>(
+    return (await ctx.GETCollection<MembershipReadEntity>(
         'organizations/' + organization
             + '/memberships/?state=accepted',
     )).toSorted((a, b) => {
@@ -73,7 +73,7 @@ export interface OrganizationStats {
 export async function getOrganizationStats(
     ctx: RequestContext,
     seatsP?: Promise<
-        readonly HttpMessage<MembershipEntity>[]
+        readonly HttpMessage<MembershipReadEntity>[]
     >,
 ): Promise<OrganizationStats> {
     const [projects, ideaMessages, activePeopleCount] =
@@ -81,12 +81,9 @@ export async function getOrganizationStats(
             getProjects(ctx),
             getIdeaEntities(ctx),
             seatsP !== undefined
-                ? Promise.all([
-                    seatsP, getNonHumanMemberIds(ctx),
-                ]).then(([seats, nonHuman]) => new Set(
-                    seats
-                        .map(m => m.body().toValue().identity_id)
-                        .filter(id => !nonHuman.has(id)),
+                ? seatsP.then(seats => new Set(
+                    seats.filter(isHumanSeat)
+                        .map(m => m.body().toValue().identity_id),
                 ).size)
                 : getHumanMembers(ctx).then(
                     humans => humans.length,

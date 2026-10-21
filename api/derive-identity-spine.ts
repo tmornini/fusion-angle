@@ -427,13 +427,23 @@ export async function deriveIdentityKind(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityKind | undefined> {
+    return (await deriveIdentityKinds(db)).get(identityId);
+}
+
+// Every identity document's kind by id, from the one
+// identities collection read: a membership read joins
+// these to its seats.
+export async function deriveIdentityKinds(
+    db: DbAdapter,
+): Promise<ReadonlyMap<Id, IdentityKind>> {
     const messagePairs = await db.messagePairs.getCollectionPairs(
         IDENTITIES_PREFIX,
     );
-    const document = deriveDocumentsAt(
-        messagePairs, IDENTITIES_PREFIX,
-    ).get(identityId);
-    return document === undefined
-        ? undefined
-        : pickString(document.body, 'kind') as IdentityKind;
+    return new Map(
+        [...deriveDocumentsAt(messagePairs, IDENTITIES_PREFIX)]
+            .map(([id, document]): [Id, IdentityKind] => [
+                id,
+                pickString(document.body, 'kind') as IdentityKind,
+            ]),
+    );
 }
