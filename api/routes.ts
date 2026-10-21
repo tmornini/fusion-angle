@@ -2611,8 +2611,9 @@ export async function postIdentityDocumentOp(
     return entity;
 }
 
-// AI-agent document write — message-plane only. Not a
-// member and not an identity. `messagePair` is optional so a
+// AI-agent document write — message-plane only. It writes
+// the AI member document alone; the statement writes its
+// identity and membership. `messagePair` is optional so a
 // below-facade caller keeps compiling.
 export async function postAiAgentDocumentOp(
     db: DbAdapter,

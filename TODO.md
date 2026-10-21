@@ -3382,11 +3382,11 @@ Off the critical path; each with its oracle.
   or none, and the page check is the one gate.
 - Tests: no client-verb pin that a second
   `postAIMemberCreation` of one id is 409;
-  `tests/api-memberships.test.ts:724-810` asserts no
-  unchanged pair count after its refused retype,
-  reinstatement and direct seat. Oracle: both pins
+  `tests/api-memberships.test.ts:727-810` never
+  asserts the pair count is unchanged after its
+  refused retype, reinstatement and direct seat. Oracle: both pins
   exist and are red when the refusal writes a pair.
-- `postServiceDocumentOp` (`api/routes.ts:2639-2654`)
+- `postServiceDocumentOp` (`api/routes.ts:2640-2657`)
   and the AI op answer an entity and write nothing when
   given no pair; `tests/mock-data-pairs.test.ts:84-170`'s
   count addends do not sum to 1889. Oracle: the ops

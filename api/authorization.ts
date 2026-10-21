@@ -81,13 +81,15 @@ export function matchesOnSegmentBoundary(
 
 // The verbs the `member` role may use, per content prefix.
 // Admin surfaces — identities, credentials,
-// providers, memberships, organization and
-// member WRITES — are absent: deny-by-default
-// keeps them at the root admin entries. Seats appear
-// read-only here for author and roster display; their
-// writes stay admin (member management). The ai-agents
-// and services families carry no row: absence keeps them
-// at the root admin entries.
+// providers, organization, member and membership
+// WRITES — are absent: deny-by-default keeps them at
+// the root admin entries. Seats appear read-only here
+// for author and roster display; their writes stay
+// admin (member management). The ai-agents and services
+// families carry no row of their own: the
+// '/organizations/:id' GET row lets a member read them,
+// and absence keeps their writes at the root admin
+// entries.
 // identities/:id/tokens POST covers only its rotation/
 // revocation sub-routes — session management any member
 // performs. Do not add GET.

@@ -434,9 +434,11 @@ export async function deriveIdentityKind(
 
 // The given identities' document kinds by id: ONE head read
 // per identity inside one readonly transaction, never the
-// identities collection, so a membership read joins its
-// seats' kinds from the snapshot its seats came from. An
-// identity with no document, or a DELETE head, is absent.
+// identities collection. Under READ COMMITTED the reads
+// are not one snapshot: a membership read takes its seats
+// before their kinds, and a seat lands in the same commit
+// as its identity document. An identity with no
+// document, or a DELETE head, is absent.
 // The transaction awaits only the head reads; the bodies
 // decode after it.
 export async function deriveIdentityKindsOf(
