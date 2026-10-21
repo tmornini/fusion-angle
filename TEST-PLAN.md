@@ -5298,9 +5298,6 @@ FSM, unlike `flows/detail`).
        'getIdentityRoster omits a membership-less service'
        (decides there is no service row);
        exploratory — the live named-row census
-       (no test pins the mock seed's exact named/hidden/
-       service split as a single assertion) and the
-       shield-avatar/service-badge styling
 - [ ] **G14** Return to `members/index.html` (G43 left
   the explorer on Identities). Click `+ Add Member`. PASS:
   dialog opens with the Kind toggle defaulting to Human,
