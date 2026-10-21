@@ -971,13 +971,21 @@ async function putMembership(
         return servedHead(head, received.requestId);
     }
     const next = settledMembership(outcome.next);
-    // an identity that signs in by client credentials is
-    // never an organization admin (spec decision 11)
-    if (
-        next.type === 'admin'
-        && (await deriveIdentityKind(db, parsed.identityId))
-            === 'service'
-    ) {
+    // One identity read serves two refusals. A seat names
+    // an identity with its document (memberGeneses and
+    // postBootstrapIn write both), so a genesis naming an
+    // unknown identity is absent (RFC 9110 §15.5.5); and an
+    // identity that signs in by client credentials is never
+    // an organization admin (spec decision 11).
+    const identityKind = await deriveIdentityKind(
+        db, parsed.identityId,
+    );
+    if (from === null && identityKind === undefined) {
+        throw new EntityNotFoundError(
+            'identities', parsed.identityId,
+        );
+    }
+    if (next.type === 'admin' && identityKind === 'service') {
         throw new ApiError(SERVICE_ADMIN_REFUSAL, HTTP_CONFLICT);
     }
     if (from !== null) {
