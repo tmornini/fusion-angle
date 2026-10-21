@@ -269,6 +269,27 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'POST identities (service) is 400 and stores nothing',
+    async () => {
+        const db = await freshDb();
+        const id = generateIdentifier();
+        const res = await handleRequest(db, req(
+            'POST', '/identities/', DEV_TOKEN,
+            { id, kind: 'service' },
+        ));
+        assertStrictEquals(res.status, 400);
+        assertEquals(await res.json(), {
+            error: 'invalid identity kind "service" on'
+                + ' IdentityCreateBody',
+        });
+        assertStrictEquals(
+            await db.messagePairs.getHeadPair('/identities/', id),
+            null,
+        );
+    },
+);
+
 Deno.test('identity creation stores identityDocumentEntityOf',
 async () => {
     const db = await freshDb();
