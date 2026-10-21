@@ -169,7 +169,7 @@ function messagePairJsonOf(message: string): {
 // invitation's operation + document, granted by
 // postOrganizationInvitation). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1881;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1889;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -330,6 +330,45 @@ Deno.test('a seeded AI agent pair sits at its organization\'s'
         Object.keys(embedded.body).sort(),
         ['description', 'id', 'model', 'name', 'skill_focus'],
     );
+});
+
+Deno.test('each seeded AI is a service identity with an'
++ ' accepted Stark membership', async () => {
+    const db = await sharedMockDb();
+    const requests = await db.messagePairs.getAll();
+    for (const m of buildAiMembers()) {
+        const identity = requests.find(
+            r => r.path === '/identities/' && r.name === m.id,
+        );
+        assert(identity, 'no identity pair for ' + m.id);
+        assertEquals(
+            messagePairJsonOf(identity.response).body,
+            { id: m.id, kind: 'service' },
+        );
+        const membership = requests.find(
+            r => r.path === '/invitations/'
+                && r.name === membershipNameOf(
+                    STARK_ORGANIZATION, m.id,
+                ),
+        );
+        assert(membership, 'no Stark membership for ' + m.id);
+        const membershipBody = messagePairJsonOf(
+            membership.response,
+        ).body;
+        assertStrictEquals(membershipBody['type'], 'member');
+        assertStrictEquals(
+            membershipBody['state'], 'accepted',
+        );
+        assertStrictEquals(
+            requests.find(
+                r => r.path === '/invitations/'
+                    && r.name === membershipNameOf(
+                        ORGANIZATION_TWO, m.id,
+                    ),
+            ),
+            undefined,
+        );
+    }
 });
 
 Deno.test('a seeded membership sits at invitations'

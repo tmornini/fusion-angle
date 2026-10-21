@@ -211,7 +211,7 @@ async () => {
     const derived = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,
     );
-    assertStrictEquals(derived.length, 13);
+    assertStrictEquals(derived.length, 17);
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
     );
