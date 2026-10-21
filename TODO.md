@@ -2158,11 +2158,10 @@ Off the critical path; each with its oracle.
   - The painted colour ramp — yellow/red hot, warm,
     cool/no-data (FS3) — Layer 2, reading the colour
     `--heat-t` resolves to
-  - The hover and mouse-out wiring that opens and hides
-    the stat card (Layer 2, inline in `flows/stats.ts`),
-    and that card carrying no inputs and no Save button
-    (Layer 1, over `FlowStatsPresenter.buildCard`'s
-    output) (FS4)
+  - The mouse-out wiring that hides the stat card
+    (Layer 2, inline in `flows/stats.ts`), and that card
+    carrying no inputs and no Save button (Layer 1, over
+    `FlowStatsPresenter.buildCard`'s output) (FS4)
   - Review's card subtitle naming its two seeded
     reviewers (FS4) — Layer 1, extending
     `tests/mock-data-stats-window.test.ts:20`, a

@@ -5004,9 +5004,13 @@ FSM, unlike `flows/detail`).
   Pin: tests/presenter-flow-stats.test.ts 'rich card
        renders all stat blocks for a regular node';
        tests/presenter-flow-stats.test.ts 'top producer
-       not in clan is flagged'; exploratory — the live
-       hover/mouse-out interaction, and the card's lack
-       of inputs and a Save button
+       not in clan is flagged';
+       tests/browser/flow-stats.test.ts 'a hovered stats
+       node keeps its card open' (decides the card shows
+       and stays open while the pointer rests on the
+       node, and that the node, not the card, takes the
+       hit); exploratory — the mouse-out hide, and the
+       card's lack of inputs and a Save button
 - [ ] **FS5** Click a node → the card pins (stays open on
   mouse-out). Click empty canvas → unpins. Click another
   node → re-pins to it.

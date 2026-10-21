@@ -238,6 +238,15 @@ export class Page {
         );
     }
 
+    hover(pt: Point): Promise<unknown> {
+        return this.session.send(
+            'Input.dispatchMouseEvent', {
+                type: 'mouseMoved', x: pt.x, y: pt.y,
+                button: 'none', buttons: 0, modifiers: 0,
+            },
+        );
+    }
+
     release(pt: Point, modifiers = 0): Promise<unknown> {
         return this.session.send(
             'Input.dispatchMouseEvent', {
