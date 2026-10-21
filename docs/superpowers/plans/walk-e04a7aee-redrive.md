@@ -35,7 +35,7 @@ under Findings.
 
 Task R1 replaces the old Task C1 for F52. The old plan's
 Task C3 is replaced by Task R2. Its F52 bullet described a
-marquee that was never delivered, and the 2026-10-21
+marquee that was never delivered, and the 4b332f58
 re-drive never got that far. Its F75 bullet does not
 apply, because F75 passed. The old plan stays as
 committed. TEST-PLAN.md is not re-run.
@@ -83,7 +83,7 @@ committed. TEST-PLAN.md is not re-run.
    is any point that hits inside `svg.flow-canvas` with
    no `[data-node-id]` or `[data-edge-id]` ancestor.
 3. **The point exists, and the explorer already has
-   it.** At P = (341,222), the 2026-10-21 re-drive hit
+   it.** At P = (341,222), the 4b332f58 re-drive hit
    `rect.flow-grid-dots`. That hit satisfies the
    corrected check, so P is kept as it is: the canvas
    rect read fresh, plus (4, 4). The green Layer 2 pin
@@ -255,7 +255,7 @@ Append after the last bullet.
     moves); score BLOCKED on one attempt — the reducer
     and scenario pins decide it.`
 
-  Neither bullet cites the 2026-10-21 Step 2
+  Neither bullet cites the 4b332f58 re-drive's Step 2
   BLOCKED. That result came from the old check, not
   from a driver limit (Finding 1).
 - [ ] **Step 2:** Run `./test validate`. Expected:
