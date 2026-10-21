@@ -1,7 +1,10 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
 import { GET, GETCollection, PUT } from './in-page-facade.ts';
-import { memoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     claimToken,
     DEV_TOKEN,
@@ -18,9 +21,12 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const REMOVED_AT = '2026-01-01T00:00:01.000000Z';
 
 function agentFields(name: string) {
     return {
@@ -328,4 +334,112 @@ Deno.test('a flow write with agentIds naming a live'
         .body().toValue();
     const node = flow.graph.nodes[0]!;
     assertEquals(node.agentIds, ['UxpkDaNMmbWLvCTkyrFfGA']);
+});
+
+// The statement's answer names the membership head its
+// removal latches.
+async function postMember(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<string> {
+    const response = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK + '/memberships/',
+        token: await organizationToken(),
+        body,
+    }));
+    assertStrictEquals(response.status, 201);
+    await response.body?.cancel();
+    const etag = response.headers.get('ETag');
+    assert(etag !== null);
+    return etag;
+}
+
+// An AI is live while its membership is accepted. Removal
+// is one membership write: the document stays, the AI
+// leaves agentIds, and its id stays refused in memberIds.
+Deno.test('a flow write naming a removed AI member in'
++ ' agentIds is 400', async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const etag = await postMember(db, {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Removed agent'),
+    });
+    const removed = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/invitations/'
+            + membershipNameOf(STARK, id),
+        token: await organizationToken(),
+        body: { state: 'removed', at: REMOVED_AT },
+        headers: { 'If-Match': etag },
+    }));
+    assertStrictEquals(removed.status, 200);
+    await removed.body?.cancel();
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/flows/'
+            + generateIdentifier(),
+        token: await organizationToken(),
+        body: flowDocument(
+            'Removed agent',
+            generateIdentifier(),
+            {
+                nodes: [graphNode([], [id])],
+                edges: [],
+            },
+        ),
+        headers: { 'if-none-match': '*' },
+    }));
+    assertStrictEquals(res.status, 400);
+    await res.body?.cancel();
+    const got = await handleRequest(db, req(
+        'GET', aiPath(STARK, id), DEV_TOKEN,
+    ));
+    assertStrictEquals(got.status, 200);
+    await got.body?.cancel();
+});
+
+Deno.test('a flow write naming a removed AI member in'
++ ' memberIds is 400', async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const etag = await postMember(db, {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Removed agent'),
+    });
+    const removed = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/invitations/'
+            + membershipNameOf(STARK, id),
+        token: await organizationToken(),
+        body: { state: 'removed', at: REMOVED_AT },
+        headers: { 'If-Match': etag },
+    }));
+    assertStrictEquals(removed.status, 200);
+    await removed.body?.cancel();
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/flows/'
+            + generateIdentifier(),
+        token: await organizationToken(),
+        body: flowDocument(
+            'Removed member',
+            generateIdentifier(),
+            {
+                nodes: [graphNode([id])],
+                edges: [],
+            },
+        ),
+        headers: { 'if-none-match': '*' },
+    }));
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
+        error: 'memberIds may name person identities only,'
+            + ' not AI agents or services',
+    });
 });

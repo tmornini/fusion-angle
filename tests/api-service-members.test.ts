@@ -19,6 +19,9 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
+import { messageStore } from '../api/message-store.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -124,4 +127,77 @@ Deno.test('a service member token carries its membership'
     const claims = decodeAccessToken(access_token);
     assertStrictEquals(claims.sub, id);
     assertEquals(claims.organizations, [STARK]);
+});
+
+function graphNode(memberIds: string[]) {
+    return {
+        id: generateIdentifier(),
+        name: 'Step',
+        positionX: 0,
+        positionY: 0,
+        isCreate: false,
+        isArchive: false,
+        memberIds,
+        attributes: [],
+        taskInstructions: '',
+    };
+}
+
+function flowDocument(
+    name: string,
+    stateEventId: string,
+    graph: { nodes: unknown[]; edges: unknown[] },
+) {
+    return {
+        name,
+        is_locked: false,
+        is_auto_layout: false,
+        is_auto_fit: false,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        state: 'active',
+        state_at: AT,
+        state_event_id: stateEventId,
+        graph,
+        graphDelta: {
+            nodes: [],
+            edges: [],
+            deletions: [],
+            memberEvents: [],
+            attributeEvents: [],
+        },
+        revivals: [],
+    };
+}
+
+// A service member is a program: memberIds names person
+// identities only, so the law refuses its id as an AI's.
+Deno.test('a flow write naming a service member in'
++ ' memberIds is 400', async () => {
+    const { db, admin, id } = await serviceMember();
+    const flowId = generateIdentifier();
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/flows/' + flowId,
+        token: admin,
+        body: flowDocument(
+            'Blocked',
+            generateIdentifier(),
+            {
+                nodes: [graphNode([id])],
+                edges: [],
+            },
+        ),
+        headers: { 'if-none-match': '*' },
+    }));
+    assertStrictEquals(res.status, 400);
+    assertEquals(await res.json(), {
+        error: 'memberIds may name person identities only,'
+            + ' not AI agents or services',
+    });
+    assertStrictEquals(
+        await messageStore(db).getDocumentHead(
+            canonicalPath(STARK, '/flows/'), flowId,
+        ),
+        null,
+    );
 });

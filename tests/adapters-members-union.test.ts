@@ -517,10 +517,12 @@ Deno.test(
     }),
 );
 
+// The statement's answer names the membership head its
+// removal latches.
 async function postMember(
     db: MemoryDbAdapter,
     body: Record<string, unknown>,
-): Promise<void> {
+): Promise<string> {
     const response = await handleRequest(db, apiRequest({
         method: 'POST',
         path: '/organizations/AjdvjuECVZEgZoFajaIEkg'
@@ -530,6 +532,9 @@ async function postMember(
     }));
     assertStrictEquals(response.status, 201);
     await response.body?.cancel();
+    const etag = response.headers.get('ETag');
+    assert(etag !== null);
+    return etag;
 }
 
 Deno.test(
@@ -567,6 +572,44 @@ Deno.test(
                     || m.idForLink() === serviceId)
             ),
             'an AI or service member reads as a human',
+        );
+    }),
+);
+
+Deno.test(
+    'getMembers omits an AI whose membership is removed',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await adminContext();
+        const organization = 'AjdvjuECVZEgZoFajaIEkg';
+        const aiId = generateIdentifier();
+        const etag = await postMember(db, {
+            id: aiId,
+            kind: 'ai',
+            membership: { type: 'member', at: nowUtc() },
+            ai: {
+                name: 'Ops Assistant',
+                description: 'Triage',
+                skill_focus: 'routing',
+                model: firstProviderModel().id,
+            },
+        });
+        const removed = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + organization
+                + '/invitations/'
+                + membershipNameOf(organization, aiId),
+            token: await organizationToken(),
+            body: { state: 'removed', at: nowUtc() },
+            headers: { 'If-Match': etag },
+        }));
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+        const members = await getMembers(ctx);
+        assert(
+            !members.some(m =>
+                isAIMember(m) && m.idForLink() === aiId
+            ),
+            'a removed AI is not a roster row',
         );
     }),
 );
