@@ -508,9 +508,7 @@ export interface IdentityPiiEntity {
     bio: string;
 }
 
-export type IdentityCredentialKind =
-    | 'password'        // person: interactive secret
-    | 'client_secret';  // service: shared secret
+export type IdentityCredentialKind = 'password';
 
 export type IdentityCredentialStatus =
     | 'set' | 'rotated' | 'revoked';

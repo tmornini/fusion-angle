@@ -91,7 +91,6 @@ function personPresenter() {
             }),
         },
         service: { named: false },
-        activeCredentialKinds: [],
         registration: { registered: false as const },
     });
 }
@@ -131,7 +130,6 @@ Deno.test(
             }),
             pii: { erased: true },
             service: { named: false },
-            activeCredentialKinds: [],
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
@@ -156,7 +154,6 @@ Deno.test(
                 named: true, name: 'Grok 4.3',
                 detail: 'Fast reasoning model',
             },
-            activeCredentialKinds: [],
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
@@ -188,7 +185,6 @@ Deno.test(
             }),
             pii: { erased: true },
             service: { named: false },
-            activeCredentialKinds: [],
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
@@ -214,7 +210,6 @@ Deno.test(
             pii: { erased: true },
             service: { named: true, name: 'Robo',
                 detail: 'bot' },
-            activeCredentialKinds: [],
             registration: { registered: false },
         }).renderShell(container);
         assertMatch(allHtml(), /Client registration/);
@@ -235,7 +230,6 @@ Deno.test(
             pii: { erased: true },
             service: { named: true, name: 'Robo',
                 detail: 'bot' },
-            activeCredentialKinds: [],
             registration: {
                 registered: true,
                 grantTypes: 'client_credentials',

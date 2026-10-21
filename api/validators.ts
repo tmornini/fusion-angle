@@ -594,7 +594,7 @@ export function validateIdentityCredentialEntity(
         'IdentityCredentialEntity',
     );
     const kind = validateEnumField(
-        body, 'kind', ['password', 'client_secret'],
+        body, 'kind', ['password'],
         'credential kind', 'IdentityCredentialEntity',
     );
     const status = validateEnumField(

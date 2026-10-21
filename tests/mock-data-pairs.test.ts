@@ -138,9 +138,9 @@ function messagePairJsonOf(message: string): {
 // (Phase 10 Task 6: the 4 AI members + the system member each
 // form their OWN identities/:id document message pair too — a
 // standalone invocation, not a bundle-widening, since neither
-// create-time bundle ever carried one) + 13 identity-credential
+// create-time bundle ever carried one) + 12 identity-credential
 // document message pairs (Phase 10 Task 6: 12 human password
-// credentials + the system client-secret credential, one
+// credentials, one
 // identities/:id/credentials/:cid pair per row — formed by
 // formSeedCredentialMessagePairs from the hashes
 // hashSeedCredentials (api/mock-data.ts) computes first,
@@ -168,7 +168,7 @@ function messagePairJsonOf(message: string): {
 // invitation pairs (the seeded pending Stark
 // invitation's operation + document, granted by
 // postOrganizationInvitation). Measure after
-// seed — do not invent. Bootstrap absolute is 9.
+// seed — do not invent. Bootstrap absolute is 8.
 const EXPECTED_MESSAGE_PAIR_COUNT = 1881;
 
 Deno.test('a mock-data seed populates pairs',

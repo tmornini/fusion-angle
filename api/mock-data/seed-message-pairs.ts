@@ -1074,8 +1074,8 @@ export function roleGrantSeedBody(
 // The wire body a live PUT identities/:id/credentials/:cid would
 // carry for this SAME write: {identity_id, kind, status, secret,
 // at} — the ONE shape every seeded credential (12 human
-// passwords + the system client secret, both mock-data and
-// bootstrap) shares. Hoisted (Phase 10 Task 6) so
+// passwords, both mock-data and bootstrap) shares.
+// Hoisted (Phase 10 Task 6) so
 // formSeedCredentialMessagePairs (this file) and
 // postSeedCredentialsIn (mock-data.ts) share the SAME
 // construction — the
@@ -2411,7 +2411,7 @@ export async function formMockDataMessagePairs(
 
 // Pass 1 for the credential documents, called by BOTH seed
 // paths (rehearseMockData / rehearseBootstrap, mock-data.ts):
-// the 13 (mock-data) / 2 (bootstrap) identity-credential
+// the 12 (mock-data) / 1 (bootstrap) identity-credential
 // document message pairs, formed from their OWN post-hash
 // bodies. The secrets are hashed first, in
 // hashSeedCredentials, before pass 1; these pairs form
@@ -2430,10 +2430,6 @@ export async function formSeedCredentialMessagePairs(
         readonly identityId: Id;
         readonly secret: string;
     }[],
-    systemCredential: {
-        readonly id: Id;
-        readonly secret: string;
-    },
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
     const messagePairs = new Map<string, MessagePair>();
@@ -2457,25 +2453,6 @@ export async function formSeedCredentialMessagePairs(
             generateIdentifier(),
         ));
     }
-    const systemKey = seedMessagePairKey(
-        'identities/:id/credentials/:cid', systemCredential.id,
-    );
-    messagePairs.set(systemKey, await formSeedMessagePair(
-        {
-            key: systemKey,
-            routePattern: 'identities/:id/credentials/:cid',
-            idParams: [SYSTEM_MEMBER_ID, systemCredential.id],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: identityCredentialSeedBody(
-                SYSTEM_MEMBER_ID, 'client_secret',
-                systemCredential.secret,
-            ),
-            operation: systemKey,
-        },
-        requestAt,
-        generateIdentifier(),
-    ));
     return messagePairs;
 }
 
