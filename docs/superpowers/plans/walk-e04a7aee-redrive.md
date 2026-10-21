@@ -243,12 +243,19 @@ master edits it; an explorer never does
 Append after the last bullet.
 
 - [ ] **Step 1:** Add this bullet, with `<date>` and
-  `<sha>` taken from the scored line:
-  - `- F52: CDP delivered no in-flight marquee
-    on the <date> re-drive on <sha> (a press on empty
+  `<sha>` taken from the scored line. The e04a7aee walk
+  was the first undelivered marquee: line 191 of
+  `/tmp/fusion-angle-walk-e04a7aee.txt` records one drag
+  from (361,242) that left `.flow-marquee` width 0. R1's
+  Step 3 BLOCKED is the repeat that makes the limit
+  durable.
+  - `- F52: CDP delivered no in-flight marquee on the
+    e04a7aee walk (one drag from (361,242)) or on the
+    <date> re-drive on <sha> (a press on empty
     background at the canvas inset, then \`buttons: 1\`
-    moves); score BLOCKED on one attempt — the reducer
-    and scenario pins decide it.`
+    moves); \`.flow-marquee\` width stayed 0 both times.
+    Score BLOCKED on one attempt — the reducer and
+    scenario pins decide it.`
 
   The bullet does not cite the 4b332f58 re-drive's
   Step 2 BLOCKED. That result came from the old check,
