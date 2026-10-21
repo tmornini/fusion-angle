@@ -169,6 +169,44 @@ async () => {
     );
 });
 
+// A Stark AI made by the statement is a seated identity
+// too: its id still does not exist under Wayne's own path
+// (404), and Stark's path is the fence (403). The AI PUT
+// still creates, so only its GET is pinned here.
+Deno.test('a foreign AI member id is absent under our path',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const created = await handleRequest(db, req(
+        'POST',
+        '/organizations/' + STARK + '/memberships/',
+        DEV_TOKEN,
+        {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: AT },
+            ai: agentFields('Stark member'),
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const wayne = await claimToken({
+        organization: WAYNE,
+        organizations: [WAYNE],
+        roles: ['admin:' + WAYNE],
+    });
+    const foreignId = await handleRequest(db, req(
+        'GET', aiPath(WAYNE, id), wayne,
+    ));
+    assertStrictEquals(foreignId.status, 404);
+    await foreignId.body?.cancel();
+    const foreignPath = await handleRequest(db, req(
+        'GET', aiPath(STARK, id), wayne,
+    ));
+    assertStrictEquals(foreignPath.status, 403);
+    await foreignPath.body?.cancel();
+});
+
 Deno.test('the global ai-agents routes are gone',
 async () => {
     const db = await freshDb();

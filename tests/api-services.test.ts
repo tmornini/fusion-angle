@@ -10,6 +10,7 @@ import { generateIdentifier } from
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
+const AT = '2026-01-01T00:00:00.000000Z';
 const BODY = {
     name: 'Nightly import',
     description: 'Loads the ledger export',
@@ -84,4 +85,54 @@ async () => {
     }));
     assertStrictEquals(res.status, 403);
     await res.body?.cancel();
+});
+
+// A Stark service does not exist under Wayne's own path
+// (AGENTS.md § Foreign ids 404), and Stark's path is the
+// fence (403): no cross-tenant oracle either way.
+Deno.test('a foreign service id is absent under our path',
+async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    const created = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK + '/memberships/',
+        token: DEV_TOKEN,
+        body: {
+            id,
+            kind: 'service',
+            membership: { type: 'member', at: AT },
+            service: BODY,
+        },
+    }));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const wayne = await claimToken({
+        organization: WAYNE,
+        organizations: [WAYNE],
+        roles: ['admin:' + WAYNE],
+    });
+    const got = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: servicePath(WAYNE, id),
+        token: wayne,
+    }));
+    assertStrictEquals(got.status, 404);
+    await got.body?.cancel();
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: servicePath(WAYNE, id),
+        token: wayne,
+        body: BODY,
+        headers: { 'If-Match': '"' + generateIdentifier() + '"' },
+    }));
+    assertStrictEquals(put.status, 404);
+    await put.body?.cancel();
+    const fenced = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: servicePath(STARK, id),
+        token: wayne,
+    }));
+    assertStrictEquals(fenced.status, 403);
+    await fenced.body?.cancel();
 });
