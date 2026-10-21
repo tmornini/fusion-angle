@@ -144,6 +144,16 @@
                     />
                     AI
                 </label>
+                <label
+                    class="flex items-center gap-1"
+                >
+                    <input
+                        type="radio"
+                        name="member-kind"
+                        value="service"
+                    />
+                    Service
+                </label>
             </fieldset>
 
             <div
@@ -288,6 +298,37 @@
                         rows="2"
                         id="ai-skill-focus"
                         placeholder="Skill focus…"
+                    ></textarea>
+                </div>
+            </div>
+
+            <div
+                id="add-member-service-form"
+                class="flex flex-col gap-3 hidden"
+            >
+                <div>
+                    <label
+                        class="label mb-1 block"
+                        for="service-name"
+                    >Name</label>
+                    <input
+                        class="input"
+                        id="service-name"
+                        placeholder="e.g. CI bot"
+                        required
+                    />
+                </div>
+                <div>
+                    <label
+                        class="label mb-1 block"
+                        for="service-description"
+                    >Description</label>
+                    <textarea
+                        class="textarea"
+                        rows="2"
+                        id="service-description"
+                        placeholder="Short description..."
+                        required
                     ></textarea>
                 </div>
             </div>
