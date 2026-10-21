@@ -19,7 +19,7 @@ import {
     organizationMembershipHeads,
 } from '../api/memberships.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
-import { deriveIdentityKinds } from
+import { deriveIdentityKindsOf } from
     '../api/derive-identity-spine.ts';
 import {
     STARK_ORGANIZATION,
@@ -117,10 +117,13 @@ async function acceptedMemberships(
 
 // The wire joins each seat's identity kind to the stored
 // membership; every seeded seat's identity has a document.
-function withIdentityKind(
+async function withIdentityKind(
+    db: DbAdapter,
     rows: readonly MembershipEntity[],
-    kinds: ReadonlyMap<Id, string>,
 ) {
+    const kinds = await deriveIdentityKindsOf(db, new Set(
+        rows.map((row) => row.identity_id),
+    ));
     return rows.map((row) => ({
         ...row,
         identity_kind: kinds.get(row.identity_id),
@@ -147,7 +150,6 @@ Deno.test('seeded GET memberships wire equals the accepted'
 + ' organization leg',
 async () => {
     const db = await seededDb();
-    const kinds = await deriveIdentityKinds(db);
 
     const tokenStark = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -170,7 +172,7 @@ async () => {
     );
     assertEquals(
         sortById(starkParts.map((part) => part.body().toValue())),
-        sortById(withIdentityKind(stark, kinds)),
+        sortById(await withIdentityKind(db, stark)),
     );
     assertStrictEquals(stark.length, 10);
     const starkSeats = await handleRequest(
@@ -204,7 +206,7 @@ async () => {
     );
     assertEquals(
         sortById(twoParts.map((part) => part.body().toValue())),
-        sortById(withIdentityKind(org2, kinds)),
+        sortById(await withIdentityKind(db, org2)),
     );
     assertStrictEquals(org2.length, 6);
 

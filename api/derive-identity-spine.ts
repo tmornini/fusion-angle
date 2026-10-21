@@ -12,6 +12,7 @@ import type {
     IdentityTokenRevocationEntity,
     ClientRegistrationEntity,
     IdentityKind,
+    MessagePairEntity,
 } from '../shared/types.ts';
 import {
     pickString,
@@ -26,6 +27,7 @@ import {
 } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
+    bodyOf,
     deriveDocumentsAt,
     byIdAscending,
     type DerivedDocument,
@@ -420,30 +422,46 @@ export async function deriveClientRegistration(
 
 // One identity's document kind, or undefined when no identity
 // document exists — the registration route's kind gate reads
-// this (absent -> 404, person -> 400) before every verb. The
-// identities collection read is the one
-// deriveIdentityPiiRows begins with.
+// this (absent -> 404, person -> 400) before every verb.
 export async function deriveIdentityKind(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityKind | undefined> {
-    return (await deriveIdentityKinds(db)).get(identityId);
+    return (
+        await deriveIdentityKindsOf(db, new Set([identityId]))
+    ).get(identityId);
 }
 
-// Every identity document's kind by id, from the one
-// identities collection read: a membership read joins
-// these to its seats.
-export async function deriveIdentityKinds(
+// The given identities' document kinds by id: ONE head read
+// per identity inside one readonly transaction, never the
+// identities collection, so a membership read joins its
+// seats' kinds from the snapshot its seats came from. An
+// identity with no document, or a DELETE head, is absent.
+// The transaction awaits only the head reads; the bodies
+// decode after it.
+export async function deriveIdentityKindsOf(
     db: DbAdapter,
+    identityIds: ReadonlySet<Id>,
 ): Promise<ReadonlyMap<Id, IdentityKind>> {
-    const messagePairs = await db.messagePairs.getCollectionPairs(
-        IDENTITIES_PREFIX,
-    );
-    return new Map(
-        [...deriveDocumentsAt(messagePairs, IDENTITIES_PREFIX)]
-            .map(([id, document]): [Id, IdentityKind] => [
-                id,
-                pickString(document.body, 'kind') as IdentityKind,
-            ]),
-    );
+    const heads = await db.readTransaction(async (view) => {
+        const read: [Id, MessagePairEntity | null][] = [];
+        for (const identityId of identityIds) {
+            read.push([
+                identityId,
+                await view.messagePairs.getHeadPair(
+                    IDENTITIES_PREFIX, identityId,
+                ),
+            ]);
+        }
+        return read;
+    });
+    const kinds = new Map<Id, IdentityKind>();
+    for (const [identityId, head] of heads) {
+        if (head === null || head.method !== 'PUT') continue;
+        kinds.set(
+            identityId,
+            pickString(bodyOf(head.response), 'kind') as IdentityKind,
+        );
+    }
+    return kinds;
 }

@@ -46,7 +46,7 @@ import type {
 import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityKind,
-    deriveIdentityKinds,
+    deriveIdentityKindsOf,
     deriveIdentityPiiRows,
     identityPrefixFor,
 } from './derive-identity-spine.ts';
@@ -501,6 +501,19 @@ function identityKindJoin(
     };
 }
 
+// The seats' identity kinds, read in the caller's
+// transaction: a seat and its kind are one snapshot, so a
+// service member landing between the two reads is never
+// read as a person.
+function seatedIdentityKinds(
+    view: DbAdapter,
+    heads: readonly MessagePairEntity[],
+): Promise<ReadonlyMap<Id, IdentityKind>> {
+    return deriveIdentityKindsOf(view, new Set(
+        heads.map((head) => membershipOfHead(head).identity_id),
+    ));
+}
+
 // GET /organizations/:id/invitations/
 export async function getOrganizationInvitations(
     db: DbAdapter,
@@ -510,12 +523,17 @@ export async function getOrganizationInvitations(
     _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
-    const [heads, kinds] = await Promise.all([
-        organizationMembershipHeads(
-            db, param(params, 0), askedQuery(query),
-        ),
-        deriveIdentityKinds(db),
-    ]);
+    const { heads, kinds } = await db.readTransaction(
+        async (view) => {
+            const heads = await organizationMembershipHeads(
+                view, param(params, 0), askedQuery(query),
+            );
+            return {
+                heads,
+                kinds: await seatedIdentityKinds(view, heads),
+            };
+        },
+    );
     return {
         ...wholeCollectionSelection(heads, 'stateless'),
         reader: identityKindJoin(heads, kinds),
@@ -531,10 +549,17 @@ export async function getInvitationOnOrganizationNest(
     roles: readonly string[],
 ): Promise<HeadSelection> {
     const name = membershipName(params);
-    const [head, kinds] = await Promise.all([
-        visibleHead(db, name, roles, 'organization'),
-        deriveIdentityKinds(db),
-    ]);
+    const { head, kinds } = await db.readTransaction(
+        async (view) => {
+            const head = await visibleHead(
+                view, name, roles, 'organization',
+            );
+            return {
+                head,
+                kinds: await seatedIdentityKinds(view, [head]),
+            };
+        },
+    );
     return {
         ...wholeHeadSelection(
             head, 'stateless', 'invitations', name,

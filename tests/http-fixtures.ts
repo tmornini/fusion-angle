@@ -26,7 +26,7 @@ import {
     type Reader,
 } from '../api/served-response.ts';
 import { imfFixdate } from '../shared/pair-root.ts';
-import { deriveIdentityKinds } from
+import { deriveIdentityKindsOf } from
     '../api/derive-identity-spine.ts';
 
 const BASE = 'http://localhost';
@@ -393,7 +393,9 @@ export async function membershipJoinReader(
         identity_id: string;
     }>[],
 ): Promise<Reader> {
-    const kinds = await deriveIdentityKinds(db);
+    const kinds = await deriveIdentityKindsOf(db, new Set(
+        parts.map((part) => part.body().toValue().identity_id),
+    ));
     return {
         sees: 'joined',
         joined: new Map(parts.map((part) => {
