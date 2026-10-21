@@ -14,7 +14,8 @@ const browser = useBrowser();
 const ADD_MEMBER_FIELDS = [
     '#hw-name', '#hw-email', '#hw-title', '#hw-phone',
     '#hw-bio', '#ai-name', '#ai-description',
-    '#ai-skill-focus',
+    '#ai-skill-focus', '#service-name',
+    '#service-description',
 ];
 
 async function openDialog(

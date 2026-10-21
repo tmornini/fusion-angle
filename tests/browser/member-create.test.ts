@@ -84,3 +84,66 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'adding a service member toasts success and lists it',
+    async () => {
+        await withAdminPage(
+            browser.get(),
+            async (page, origin) => {
+                await openAddMember(
+                    page, origin.baseUrl,
+                );
+                await page.click(
+                    '#add-member-kind-toggle'
+                    + ' input[value="service"]',
+                );
+                await page.until(
+                    `document.querySelector(`
+                    + `'#add-member-service-form')`
+                    + `?.checkVisibility() === true`,
+                    'service form visible',
+                );
+                await page.evaluate(`(() => {
+                    window.__faStay = true;
+                    document.querySelector(
+                        '#service-name',
+                    ).value = 'CI bot';
+                    document.querySelector(
+                        '#service-description',
+                    ).value = 'Builds every commit';
+                    return true;
+                })()`);
+                await page.click('#add-member-submit');
+                await page.until(
+                    `[...document.querySelectorAll(`
+                    + `'.toast')].some(t => t.textContent`
+                    + `.includes('Service member added'))`,
+                    'Service member added toast',
+                );
+                await page.until(
+                    `!document.querySelector(`
+                    + `'#add-member-dialog[open]')`,
+                    'dialog closed',
+                );
+                await page.until(
+                    `document.body.textContent`
+                    + `.includes('CI bot')`,
+                    'roster shows CI bot',
+                );
+                await stays(page, MARKER, STAY_MS);
+                await stays(page, ERROR_TOASTS, STAY_MS);
+                assertStrictEquals(
+                    await page.evaluate<number>(
+                        ERROR_TOASTS,
+                    ),
+                    0,
+                );
+                assertEquals(
+                    await page.evaluate<boolean>(MARKER),
+                    true,
+                );
+            },
+        );
+    },
+);
