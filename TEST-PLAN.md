@@ -1636,7 +1636,7 @@ the second organization.
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Member detail's Remove, `postMembershipRemoval`, puts an accepted membership to `removed` but not the last accepted admin, so a zero-membership identity can also be MADE: remove a seeded member's accepted membership, then sign in as them. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (G43, V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The mock seed provides that identity: Riley Okafor, `riley.okafor@example.net` — login-capable (its `username<TAB>password` line prints on crank stdout with the other demo sign-ins), holder of ZERO membership rows, with one seeded PENDING invitation from Stark Industries. Sign in as Riley with the stdout credentials to enter the zero-membership state. Member detail's Remove, `postMembershipRemoval`, puts an accepted membership to `removed` but not the last accepted admin, so a zero-membership identity can also be MADE: remove a seeded member's accepted membership, then sign in as them. Do NOT accept (or decline) the pending invitation while B25–B29 are in flight — accepting grants the first membership and breaks B26/B29 on the same pass — and leave it pending for the rest of the walk (V8). `getOrganizations` is fenced to the derived membership ledger, so an identity that truly reaches no org lands here regardless of how it got there.
 
 - [ ] **B25** From the zero-membership state, click "Sign out", then sign in again with that member's credentials. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`) — sign-out is not org-fenced; a zero-membership identity must still revoke. Lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher. Navigating Back after sign-out does not boot into the account.
   Pin: tests/api-identity-token-revocations-self.test.ts
@@ -5266,22 +5266,18 @@ FSM, unlike `flows/detail`).
   (`#add-identity-btn`); `#identity-list` renders one
   `.card[data-identity-id]` per identity — a person row
   shows an initials avatar + name + email sub-line + a
-  "Person" badge; a service row shows a shield avatar
-  plus "Service account" + "—" (agents are not
-  identities), then a "Service" badge. The nested PII
-  fence (viaMembership, need-to-know) hides Wayne-only
-  members from Stark admin Tony: the list renders 7
-  named person rows (Emily Rodriguez, Sarah Chen, Lisa
-  Wang, Marcus Johnson, Tony Stark, Jessica Park, and
-  Riley Okafor — the zero-membership identity is a
-  genuine ORPHAN, and the viaMembership fence hides only
-  identities that belong to a DIFFERENT org, so an
-  orphan's PII is visible), plus an 8th, Jordan Rivera,
-  if AA5's create held; 5 "Identity
-  without PII" person rows (the Wayne-only members:
-  David Martinez, Alex Kim, Mike Thompson, David Kim,
-  James Miller); and 1 service row (the system service
-  identity). `getIdentityRoster` GETs identities only —
+  "Person" badge. For Stark organization admin Tony, the
+  list is one person row for each identity that holds an
+  accepted Stark membership: Emily Rodriguez, Sarah Chen,
+  Lisa Wang, Marcus Johnson, Tony Stark, and Jessica
+  Park. Jordan Rivera is added if AA5's create held, and
+  any seat an earlier case removed drops out (B28
+  removes Lisa Wang). Riley Okafor holds no membership
+  and the Wayne-only members hold no Stark seat, so the
+  identity fence lists neither, and no "Identity without
+  PII" row stands in for them. No service row appears,
+  because a service holds no membership (G47).
+  `getIdentityRoster` GETs identities only —
   AA7a's "Ops Assistant" is an `ai-agents/:id` document,
   not an identity row, so it does not appear on this
   list either. An empty roster renders "No identities
@@ -5292,22 +5288,16 @@ FSM, unlike `flows/detail`).
        shows name, email, and Person badge';
        tests/presenter-identity-list.test.ts 'renders an
        empty state when no identities';
-       tests/presenter-identity-list.test.ts 'unnamed
-       service redacts to a label, not the id' (decides
-       the "Service account" label —
-       `UNNAMED_SERVICE_NAME` — for the unnamed system
-       service row); tests/presenter-identity-list.test.ts
-       'erased person falls back to the named constant'
-       (decides the "Identity without PII" label —
-       `IDENTITY_WITHOUT_PII_NAME` — the same fallback
-       the 5 Wayne-only rows render);
-       tests/api-organization-isolation.test.ts 'flat
-       identity-pii is 404; nested foreign GET 403s'
-       (decides the exact fence: an admin scoped to one
-       org reading a foreign-org-only identity's PII gets 403
-       "belongs to a different organization" — the
-       mechanism behind the 5 "Identity without PII"
-       rows); exploratory — the live named-row census
+       tests/api-identity-fence.test.ts 'GET identities/
+       lists only the claim organization' (decides the
+       list is the claim organization's accepted seats);
+       tests/adapters-identity-roster.test.ts
+       'getIdentityRoster omits a membership-less person'
+       (decides Riley's absence);
+       tests/adapters-identity-roster.test.ts
+       'getIdentityRoster omits a membership-less service'
+       (decides there is no service row);
+       exploratory — the live named-row census
        (no test pins the mock seed's exact named/hidden/
        service split as a single assertion) and the
        shield-avatar/service-badge styling
