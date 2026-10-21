@@ -18,6 +18,7 @@ import type {
     Id,
     AIMemberEntity,
     AIAgentEntity,
+    ServiceEntity,
     FlowEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
@@ -50,6 +51,7 @@ import { hashPassword } from
     '../shared/password-hash.ts';
 import {
     validateAiAgentDocumentBody,
+    validateServiceDocumentBody,
     assertFlowGraphWriteLaw,
     validateFlowCreateBody,
     validateFlowDocumentBody,
@@ -276,6 +278,7 @@ import {
     withoutId,
     collectionSelect,
     documentCollectionRoute,
+    documentEditHandler,
     documentEntityRoute,
     documentPutHandler,
     documentSelect,
@@ -523,6 +526,27 @@ const AI_AGENTS_WIRING: DocumentFamilyWiring = {
     documentOp: postAiAgentDocumentOp,
     entityOf: aiAgentDocumentEntityOf,
 };
+export function serviceDocumentEntityOf(
+    document: DerivedDocument,
+    _organization: Id,
+): object {
+    return {
+        id: document.name,
+        ...document.body,
+    };
+}
+// The services wiring row: an organization's service member
+// document; its identity is a `service` identity. Stateless:
+// no lifecycle state. notFoundTable matches the family name.
+const SERVICES_WIRING: DocumentFamilyWiring = {
+    family: 'services',
+    httpNest: 'organization',
+    lifecycle: 'stateless',
+    notFoundTable: 'services',
+    validateDocument: validateServiceDocumentBody,
+    documentOp: postServiceDocumentOp,
+    entityOf: serviceDocumentEntityOf,
+};
 registerDocumentFamilyWiring(IDEAS_WIRING);
 registerDocumentFamilyWiring(PROJECTS_WIRING);
 registerDocumentFamilyWiring(FLOWS_WIRING);
@@ -530,6 +554,7 @@ registerDocumentFamilyWiring(WORK_ORDERS_WIRING);
 registerDocumentFamilyWiring(OBJECTIVES_WIRING);
 registerDocumentFamilyWiring(IDENTITIES_WIRING);
 registerDocumentFamilyWiring(AI_AGENTS_WIRING);
+registerDocumentFamilyWiring(SERVICES_WIRING);
 
 // Every handler receives the verified caller's id (actor) as
 // its final argument — the one place authorship is sourced.
@@ -2592,6 +2617,28 @@ export async function postAiAgentDocumentOp(
     return entity;
 }
 
+// Service document write — message-plane only. Not a member
+// and not an identity. `messagePair` is optional so a
+// below-facade caller keeps compiling.
+export async function postServiceDocumentOp(
+    db: DbAdapter,
+    _id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    messagePair?: MessagePair,
+): Promise<Omit<ServiceEntity, 'id'>> {
+    const entity = withoutId(body) as unknown as
+        Omit<ServiceEntity, 'id'>;
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
+}
+
 // Identity credential document write — Phase Final Task 2:
 // the identity_credentials ROW half is stripped — pure
 // message-plane write. No states interaction. A below-facade
@@ -2983,6 +3030,12 @@ export const WRITE_RESPONSE_SPECS:
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
     'organizations/:id/ai-agents/:id':
         documentWriteResponseSpec(AI_AGENTS_WIRING),
+    // Only the members statement creates a service, so its
+    // PUT is class B: it names the head it replaces.
+    'organizations/:id/services/:id': {
+        ...documentWriteResponseSpec(SERVICES_WIRING),
+        conditional: 'required',
+    },
     // G5: piiEntityOf (GET derive). DELETE is a marked
     // tombstone pair; PUT appends.
     'identities/:id/pii': {
@@ -5244,6 +5297,13 @@ export const routes: Route[] = [
     documentEntityRoute(AI_AGENTS_WIRING),
     documentVersionsSelectRoute(AI_AGENTS_WIRING),
     documentVersionSelectRoute(AI_AGENTS_WIRING),
+    documentCollectionRoute(SERVICES_WIRING),
+    route('organizations/:id/services/:id', {
+        select: documentSelect(SERVICES_WIRING),
+        put: documentEditHandler(SERVICES_WIRING),
+    }),
+    documentVersionsSelectRoute(SERVICES_WIRING),
+    documentVersionSelectRoute(SERVICES_WIRING),
     // Objective revisions nest under their parent objective:
     // param 0 is the path org, param 1 is the objective, so
     // the SERVER filters the collection to that objective

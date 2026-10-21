@@ -16,6 +16,7 @@ import type {
     HumanMemberEntity,
     AIMemberEntity,
     AIAgentEntity,
+    ServiceEntity,
     IdeaEntity,
     IdeaState,
     ProjectEntity,
@@ -1046,6 +1047,30 @@ export function validateAiAgentDocumentBody(
                 body, 'skill_focus',
             ),
             model,
+        },
+    };
+}
+
+const SERVICE_DOCUMENT_BODY_KEYS:
+    readonly string[] = ['name', 'description'];
+
+// The HTTP-body gate for PUT
+// /organizations/:id/services/:id. THE LABEL MANDATE:
+// assertOnlyKeys speaks 'ServiceEntity'.
+export function validateServiceDocumentBody(
+    body: Record<string, unknown>,
+): { readonly entity: Omit<ServiceEntity, 'id'> } {
+    assertOnlyKeys(
+        body,
+        SERVICE_DOCUMENT_BODY_KEYS,
+        'ServiceEntity',
+    );
+    return {
+        entity: {
+            name: pickString(body, 'name'),
+            description: pickString(
+                body, 'description',
+            ),
         },
     };
 }

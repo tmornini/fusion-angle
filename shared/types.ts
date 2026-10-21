@@ -805,6 +805,14 @@ export interface AIAgentEntity {
     model: ModelId;
 }
 
+// An organization's service member document: a non-AI
+// program acting through the API by a `service` identity.
+export interface ServiceEntity {
+    id: Id;
+    name: string;
+    description: string;
+}
+
 export class AIMember {
     readonly kind = 'ai' as const;
     readonly #id: MemberId;

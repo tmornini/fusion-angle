@@ -334,6 +334,36 @@ export function documentPutHandler(
         );
 }
 
+// Only a statement creates this family, so its PUT edits a
+// live head: a miss is the family's own 404 whatever
+// conditional the request carries (RFC 9110 §13.2.1).
+export function documentEditHandler(
+    wiring: DocumentFamilyWiring,
+): PutHandler {
+    return async (
+        db, params, body, actor, messagePair, organization,
+    ) => {
+        const organizationId = requireOrganization(
+            organization,
+        );
+        const id = entityIdParam(wiring, params);
+        const head = await db.messagePairs.getHeadPair(
+            canonicalPath(
+                organizationId, '/' + wiring.family + '/',
+            ),
+            id,
+        );
+        if (head === null) {
+            throw await throwDocumentMiss(
+                wiring, db, organizationId, id,
+            );
+        }
+        return wiring.documentOp(
+            db, id, body, actor, messagePair, organization,
+        );
+    };
+}
+
 export function documentEntityRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
@@ -486,6 +516,7 @@ const STREAM_FAMILIES: ReadonlySet<string> = new Set([
     'objectives',
     'identities',
     'ai-agents',
+    'services',
 ]);
 
 function documentFromBody(

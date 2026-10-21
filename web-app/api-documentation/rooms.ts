@@ -1475,6 +1475,97 @@ export const API_DOC_ROOMS:
         ],
     },
     {
+        hash: 'get/organizations/id/services',
+        verb: 'GET',
+        uri: '/api/organizations/:id/services/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '204',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/services/id',
+        verb: 'GET',
+        uri: '/api/organizations/:id/services/:id',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/services/id/versions',
+        verb: 'GET',
+        uri: '/api/organizations/:id/services/:id/versions/',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+            '410',
+        ],
+    },
+    {
+        hash: 'get/organizations/id/services/id/versions/etag',
+        verb: 'GET',
+        uri: '/api/organizations/:id/services/:id/versions/:etag',
+        body: 'none',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '401',
+            '403',
+            '404',
+            '410',
+        ],
+    },
+    {
         hash: 'get/organizations/id/versions',
         verb: 'GET',
         uri: '/api/organizations/:id/versions/',
@@ -3001,6 +3092,34 @@ export const API_DOC_ROOMS:
             '403',
             '404',
             '412',
+        ],
+    },
+    {
+        hash: 'put/organizations/id/services/id',
+        verb: 'PUT',
+        uri: '/api/organizations/:id/services/:id',
+        body: '{\n  "name": "name",\n  "description": "description"\n}',
+        headers:
+        [
+            'Authorization: Bearer …',
+            'Operation-ID: on every request',
+            'If-Match or If-None-Match: *',
+        ],
+        responseHeaders:
+        [
+            'last-modified: on 2xx',
+            'requester-identity-id: on 2xx',
+            'response-at: on 2xx',
+        ],
+        statuses:
+        [
+            '200',
+            '400',
+            '401',
+            '403',
+            '404',
+            '412',
+            '428',
         ],
     },
     {

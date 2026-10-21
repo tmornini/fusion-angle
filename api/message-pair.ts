@@ -1814,6 +1814,7 @@ export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'organizations/:id/projects/:id'
         + '/objective-actual-scores/:sid',
     'organizations/:id/ai-agents/:id',
+    'organizations/:id/services/:id',
     'identities/',
     'identities/:id',
     'identities/:id/pii',

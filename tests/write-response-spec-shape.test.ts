@@ -118,6 +118,7 @@ const DUMMY_BODIES: Readonly<
         model: 'nqNVXnBkUBLoKlenbyPIZQ',
         skill_focus: 's',
     },
+    'organizations/:id/services/:id': { name: 'S', description: 'd' },
     'identities/:id/pii': {
         name: 'N', email: 'e@x', phone: 'AjdvjuECVZEgZoFajaIEkg',
         bio: 'b',

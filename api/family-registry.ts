@@ -92,6 +92,14 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
             // statement (Task 6).
     },
     {
+        family: 'services',
+        organizationNested: true, // organization plane:
+            // one document per organization.
+        createBodyIdField: 'id', // INERT — no collection
+            // POST exists; genesis is the members
+            // statement.
+    },
+    {
         family: 'invitations',
         organizationNested: false, // GLOBAL plane:
             // one document per membership, never
