@@ -16,6 +16,7 @@ import {
 } from '../shared/types.ts';
 import {
     assertOnlyKeys,
+    type MembershipCreate,
     validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
@@ -37,6 +38,7 @@ import type {
     ReceivedRequest,
     SiblingCondition,
     StateAnswerKind,
+    StateSibling,
     WriteAnswer,
 } from './message-pair.ts';
 import { bodyOf } from './derive-documents.ts';
@@ -680,7 +682,8 @@ export async function postOrganizationInvitation(
 }
 
 // POST /organizations/:id/memberships/ — one accepted
-// person. The handler declares the three geneses.
+// member of any kind; the handler declares the three
+// geneses.
 export async function postOrganizationMembership(
     db: DbAdapter,
     params: string[],
@@ -703,7 +706,6 @@ export async function postOrganizationMembership(
     const name = membershipNameOf(
         organizationId, created.id,
     );
-    const profile = created.identity;
     const receivedPair = await formWriteMessagePair({
         method: 'POST',
         pathname: received.target,
@@ -744,37 +746,7 @@ export async function postOrganizationMembership(
                     declarer: 'handler',
                 },
             },
-            {
-                method: 'PUT',
-                path: canonicalPath(
-                    undefined, '/identities/',
-                ),
-                name: created.id,
-                state: {
-                    id: created.id,
-                    kind: 'person',
-                    ...profile,
-                },
-                condition: {
-                    kind: 'genesis',
-                    declarer: 'handler',
-                },
-            },
-            {
-                method: 'PUT',
-                path: identityPrefixFor(created.id),
-                name: PII_DOCUMENT_NAME,
-                state: {
-                    name: created.pii.name,
-                    email: created.pii.email,
-                    phone: created.pii.phone,
-                    bio: created.pii.bio,
-                },
-                condition: {
-                    kind: 'genesis',
-                    declarer: 'handler',
-                },
-            },
+            ...memberGeneses(organizationId, created),
         ],
         reader: { sees: 'whole' },
         answer: {
@@ -788,6 +760,96 @@ export async function postOrganizationMembership(
         notify(db, organizationId, created.id);
     }
     return answer.response;
+}
+
+// The identity and the member document: the two geneses
+// beside the membership, one pair per kind. A human's
+// document is its PII; an AI's or a service's is the
+// organization-scoped document its family's PUT edits.
+function memberGeneses(
+    organizationId: Id,
+    created: MembershipCreate,
+): StateSibling[] {
+    const genesis: SiblingCondition = {
+        kind: 'genesis',
+        declarer: 'handler',
+    };
+    const identities = canonicalPath(
+        undefined, '/identities/',
+    );
+    switch (created.kind) {
+        case 'human':
+            return [
+                {
+                    method: 'PUT',
+                    path: identities,
+                    name: created.id,
+                    state: {
+                        id: created.id,
+                        kind: 'person',
+                        ...created.identity,
+                    },
+                    condition: genesis,
+                },
+                {
+                    method: 'PUT',
+                    path: identityPrefixFor(created.id),
+                    name: PII_DOCUMENT_NAME,
+                    state: {
+                        name: created.pii.name,
+                        email: created.pii.email,
+                        phone: created.pii.phone,
+                        bio: created.pii.bio,
+                    },
+                    condition: genesis,
+                },
+            ];
+        case 'ai':
+            return [
+                {
+                    method: 'PUT',
+                    path: identities,
+                    name: created.id,
+                    state: { id: created.id, kind: 'service' },
+                    condition: genesis,
+                },
+                {
+                    method: 'PUT',
+                    path: canonicalPath(
+                        organizationId, '/ai-agents/',
+                    ),
+                    name: created.id,
+                    state: { id: created.id, ...created.ai },
+                    condition: genesis,
+                },
+            ];
+        case 'service':
+            return [
+                {
+                    method: 'PUT',
+                    path: identities,
+                    name: created.id,
+                    state: { id: created.id, kind: 'service' },
+                    condition: genesis,
+                },
+                {
+                    method: 'PUT',
+                    path: canonicalPath(
+                        organizationId, '/services/',
+                    ),
+                    name: created.id,
+                    state: {
+                        id: created.id,
+                        ...created.service,
+                    },
+                    condition: genesis,
+                },
+            ];
+        default: {
+            const unreachable: never = created;
+            return unreachable;
+        }
+    }
 }
 
 async function putMembership(

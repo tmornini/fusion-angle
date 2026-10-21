@@ -106,6 +106,7 @@ Deno.test(
         assertStrictEquals(wrote.ifNoneMatch, null);
         assertEquals(JSON.parse(wrote.body ?? 'null'), {
             id: ALICE,
+            kind: 'human',
             membership: {
                 type: 'member',
                 at: membership.at,

@@ -1940,33 +1940,52 @@ export function validateInvitationEntity(
     };
 }
 
-const MEMBERSHIP_CREATE_KEYS: readonly string[] = [
-    'id', 'membership', 'identity', 'pii',
+const MEMBERSHIP_CREATE_HUMAN_KEYS: readonly string[] = [
+    'id', 'kind', 'membership', 'identity', 'pii',
+];
+const MEMBERSHIP_CREATE_AI_KEYS: readonly string[] = [
+    'id', 'kind', 'membership', 'ai',
+];
+const MEMBERSHIP_CREATE_SERVICE_KEYS: readonly string[] = [
+    'id', 'kind', 'membership', 'service',
 ];
 const MEMBERSHIP_CREATE_MEMBERSHIP_KEYS:
     readonly string[] = ['type', 'at'];
 
-export function validateMembershipCreateBody(
+export interface MembershipCreateSeat {
+    readonly type: MembershipType;
+    readonly at: string;
+}
+
+export type MembershipCreate =
+    | {
+        readonly kind: 'human';
+        readonly id: string;
+        readonly membership: MembershipCreateSeat;
+        readonly identity: {
+            readonly title: string;
+            readonly department: string;
+            readonly strengths: string[];
+            readonly team_dimensions: Record<string, number>;
+        };
+        readonly pii: Omit<IdentityPiiEntity, 'id'>;
+    }
+    | {
+        readonly kind: 'ai';
+        readonly id: string;
+        readonly membership: MembershipCreateSeat;
+        readonly ai: Omit<AIAgentEntity, 'id'>;
+    }
+    | {
+        readonly kind: 'service';
+        readonly id: string;
+        readonly membership: MembershipCreateSeat;
+        readonly service: Omit<ServiceEntity, 'id'>;
+    };
+
+function membershipCreateSeat(
     body: Record<string, unknown>,
-): {
-    readonly id: string;
-    readonly membership: {
-        readonly type: MembershipType;
-        readonly at: string;
-    };
-    readonly identity: {
-        readonly title: string;
-        readonly department: string;
-        readonly strengths: string[];
-        readonly team_dimensions: Record<string, number>;
-    };
-    readonly pii: Omit<IdentityPiiEntity, 'id'>;
-} {
-    assertOnlyKeys(
-        body, MEMBERSHIP_CREATE_KEYS,
-        'MembershipCreate',
-    );
-    const id = pickIdentifier(body, 'id');
+): MembershipCreateSeat {
     const membershipRaw = body['membership'];
     if (
         membershipRaw === null
@@ -1983,6 +2002,83 @@ export function validateMembershipCreateBody(
         membershipBody, MEMBERSHIP_CREATE_MEMBERSHIP_KEYS,
         'MembershipCreate.membership',
     );
+    return {
+        type: validateEnumField(
+            membershipBody, 'type',
+            ['admin', 'member'],
+            'membership type',
+            'MembershipCreate.membership',
+        ),
+        at: validateTimestampField(
+            membershipBody, 'at',
+            'MembershipCreate.membership',
+        ),
+    };
+}
+
+// The kind is read first and never defaulted: a body that
+// names none is refused, not read as a human.
+export function validateMembershipCreateBody(
+    body: Record<string, unknown>,
+): MembershipCreate {
+    const kind = validateEnumField(
+        body, 'kind', ['human', 'ai', 'service'],
+        'member kind', 'MembershipCreate',
+    );
+    if (kind === 'ai') {
+        assertOnlyKeys(
+            body, MEMBERSHIP_CREATE_AI_KEYS,
+            'MembershipCreate',
+        );
+        const aiRaw = body['ai'];
+        if (
+            aiRaw === null
+            || typeof aiRaw !== 'object'
+            || Array.isArray(aiRaw)
+        ) {
+            throw new ValidationError(
+                'ai must be an object',
+            );
+        }
+        return {
+            kind,
+            id: pickIdentifier(body, 'id'),
+            membership: membershipCreateSeat(body),
+            ai: validateAiAgentDocumentBody(
+                aiRaw as Record<string, unknown>,
+            ).entity,
+        };
+    }
+    if (kind === 'service') {
+        assertOnlyKeys(
+            body, MEMBERSHIP_CREATE_SERVICE_KEYS,
+            'MembershipCreate',
+        );
+        const serviceRaw = body['service'];
+        if (
+            serviceRaw === null
+            || typeof serviceRaw !== 'object'
+            || Array.isArray(serviceRaw)
+        ) {
+            throw new ValidationError(
+                'service must be an object',
+            );
+        }
+        return {
+            kind,
+            id: pickIdentifier(body, 'id'),
+            membership: membershipCreateSeat(body),
+            service: validateServiceDocumentBody(
+                serviceRaw as Record<string, unknown>,
+            ).entity,
+        };
+    }
+    assertOnlyKeys(
+        body, MEMBERSHIP_CREATE_HUMAN_KEYS,
+        'MembershipCreate',
+    );
+    const id = pickIdentifier(body, 'id');
+    const membership = membershipCreateSeat(body);
     const identityRaw = body['identity'];
     if (
         identityRaw === null
@@ -2020,19 +2116,9 @@ export function validateMembershipCreateBody(
         );
     }
     return {
+        kind,
         id,
-        membership: {
-            type: validateEnumField(
-                membershipBody, 'type',
-                ['admin', 'member'],
-                'membership type',
-                'MembershipCreate.membership',
-            ),
-            at: validateTimestampField(
-                membershipBody, 'at',
-                'MembershipCreate.membership',
-            ),
-        },
+        membership,
         identity: {
             title: identity.title,
             department: identity.department,

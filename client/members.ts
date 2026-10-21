@@ -271,6 +271,7 @@ export async function postHumanMemberCreation(
             + '/memberships/',
         {
             id,
+            kind: 'human',
             membership: {
                 type: 'member',
                 at: nowUtc(),
