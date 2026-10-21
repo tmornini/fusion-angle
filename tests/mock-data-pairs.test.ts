@@ -169,7 +169,7 @@ function messagePairJsonOf(message: string): {
 // invitation's operation + document, granted by
 // postOrganizationInvitation). Measure after
 // seed — do not invent. Bootstrap absolute is 9.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1882;
+const EXPECTED_MESSAGE_PAIR_COUNT = 1881;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -949,7 +949,7 @@ Deno.test('a seeded credential\'s response body carries the full'
 + ' nondeterministic per reseed, finding 13, so only the'
 + ' key set is falsifiable here)', async () => {
     const db = await sharedMockDb();
-    const id = 'cFiyyRHxbIEVqeVFNPmDnw';
+    const id = 'hRFubvlhanwDtFRwinlFCA';
     const requests = await db.messagePairs.getAll();
     const requestRow = requests.find(r => r.name === id);
     assert(requestRow, 'no request row for ' + id);
@@ -1005,7 +1005,7 @@ Deno.test('seed pairs verify against their hashes', async () => {
     }
 });
 
-Deno.test('a bootstrap seed populates exactly nine balanced,'
+Deno.test('a bootstrap seed populates exactly eight balanced,'
 + ' hash-verified pairs for the current identity and the'
 + ' system identity', async () => {
     const db = memoryDbAdapter();
@@ -1013,7 +1013,7 @@ Deno.test('a bootstrap seed populates exactly nine balanced,'
         hashPassword: testHashPassword,
     });
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 8);
     const atIdentity = requests.filter(
         r => r.path === '/identities/'
             && r.name === 'XXZruirZyAOoRpNxaDnpSA',

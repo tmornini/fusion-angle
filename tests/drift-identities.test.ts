@@ -516,7 +516,7 @@ async () => {
 // -- 3. credentials parity per identity + per cid + the ---------
 // -- served collection lacks only the secret + 404 bytes ---------
 
-Deno.test('credentials per identity + per cid (13 seeded) + the'
+Deno.test('credentials per identity + per cid (12 seeded) + the'
 + ' served collection lacks only the secret + 404 bytes',
 async () => {
     const db = await seededDb();
@@ -579,7 +579,7 @@ async () => {
             await assertServedWithoutSecret(db, part);
         }
     }
-    assertStrictEquals(allDerived.length, 13);
+    assertStrictEquals(allDerived.length, 12);
 
     const someIdentityId = allDerived[0]!.identity_id;
     const missingCid = generateIdentifier();
