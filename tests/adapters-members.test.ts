@@ -50,6 +50,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
     HTTP_CONFLICT,
+    HTTP_NOT_FOUND,
     RequestError,
 } from '../shared/http-errors.ts';
 import { membershipNameOf } from
@@ -588,6 +589,11 @@ Deno.test(
                 .query('status').toNumber(),
             200,
         );
+        const aiRead = await assertRejects(
+            () => getAIMember(ctx, aiId),
+            RequestError,
+        );
+        assertStrictEquals(aiRead.status, HTTP_NOT_FOUND);
 
         const service = await getServiceMember(ctx, serviceId);
         await postMembershipRemoval(ctx, service);
@@ -603,6 +609,11 @@ Deno.test(
                 .query('status').toNumber(),
             200,
         );
+        const serviceRead = await assertRejects(
+            () => getServiceMember(ctx, serviceId),
+            RequestError,
+        );
+        assertStrictEquals(serviceRead.status, HTTP_NOT_FOUND);
     },
 );
 
