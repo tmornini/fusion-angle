@@ -4,7 +4,7 @@ import type {
     AIAgentEntity,
     MembershipEntity,
 } from '../shared/types.ts';
-import { AIMember } from '../shared/types.ts';
+import { AIMember, nowUtc } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
@@ -12,6 +12,8 @@ import {
     createSubscriptionChannel,
 } from './channels.ts';
 import { requireOrganization } from './members.ts';
+import { notifyMembershipChanges } from
+    './membership-changes.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
@@ -172,11 +174,24 @@ export async function postAIMemberCreation(
     id: MemberId,
     input: AIMemberDraft,
 ): Promise<void> {
-    await ctx.PUT(aiAgentsPath(ctx) + id, {
-        name: input.name,
-        description: input.description,
-        skill_focus: input.skill_focus,
-        model: input.model,
-    });
+    await ctx.POST(
+        'organizations/' + requireOrganization(ctx)
+            + '/memberships/',
+        {
+            id,
+            kind: 'ai',
+            membership: {
+                type: 'member',
+                at: nowUtc(),
+            },
+            ai: {
+                name: input.name,
+                description: input.description,
+                skill_focus: input.skill_focus,
+                model: input.model,
+            },
+        },
+    );
+    notifyMembershipChanges();
     aiMemberChanges.notify();
 }
