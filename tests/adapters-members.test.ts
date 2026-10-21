@@ -4,6 +4,9 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
+import { apiRequest } from './http-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import { recordedContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -16,12 +19,14 @@ import {
     getAdminSeatIds,
     getHumanMember,
     getHumanMemberProfile,
+    getHumanMembers,
     postHumanMemberCreation,
     postMembershipRemoval,
     putHumanMember,
     type HumanMemberDraft,
 } from '../client/members.ts';
 import {
+    nowUtc,
     type HumanMember,
     type MembershipEntity,
 } from '../shared/types.ts';
@@ -34,6 +39,7 @@ import {
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
+    firstProviderModel,
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -448,3 +454,78 @@ Deno.test(
         );
     },
 );
+
+async function postMember(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const response = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK + '/memberships/',
+        token: await organizationToken(),
+        body,
+    }));
+    assertStrictEquals(response.status, 201);
+    await response.body?.cancel();
+}
+
+Deno.test('getHumanMembers lists no AI or service member',
+async () => {
+    const { db, ctx } = await adminContext();
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'ai',
+        membership: { type: 'member', at: nowUtc() },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    });
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'service',
+        membership: { type: 'member', at: nowUtc() },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    });
+    assertEquals(
+        (await getHumanMembers(ctx)).map((m) => m.idForLink()),
+        ['XXZruirZyAOoRpNxaDnpSA'],
+    );
+});
+
+Deno.test('getHumanMember reads an AI or service member as'
+    + ' absent',
+async () => {
+    const { db, ctx } = await adminContext();
+    const aiId = generateIdentifier();
+    const serviceId = generateIdentifier();
+    await postMember(db, {
+        id: aiId,
+        kind: 'ai',
+        membership: { type: 'member', at: nowUtc() },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    });
+    await postMember(db, {
+        id: serviceId,
+        kind: 'service',
+        membership: { type: 'member', at: nowUtc() },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    });
+    assertStrictEquals(await getHumanMember(ctx, aiId), null);
+    assertStrictEquals(
+        await getHumanMember(ctx, serviceId), null,
+    );
+});

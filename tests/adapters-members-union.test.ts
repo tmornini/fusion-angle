@@ -17,6 +17,8 @@ import {
     inProcessFetch,
 } from './in-page-facade.ts';
 import { createHttpFacade } from '../client/http-facade.ts';
+import { handleRequest } from '../api/api.ts';
+import { apiRequest } from './http-fixtures.ts';
 import { createAppClient } from
     '../web-app/app/client.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -48,6 +50,7 @@ import {
 import {
     seedHumanMember,
     seedAIMember,
+    firstProviderModel,
 } from './member-fixtures.ts';
 import {
     seedAdminSchema,
@@ -510,6 +513,60 @@ Deno.test(
         assertStrictEquals(url.search, '?state=removed');
         assertStrictEquals(
             url.search.match(/state=/g)?.length, 1,
+        );
+    }),
+);
+
+async function postMember(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const response = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/memberships/',
+        token: await organizationToken(),
+        body,
+    }));
+    assertStrictEquals(response.status, 201);
+    await response.body?.cancel();
+}
+
+Deno.test(
+    'getMembers never reads an AI or service member'
+    + ' as a human',
+    () => withLocalStorageAsync(NULL_STORAGE, async () => {
+        const { db, ctx } = await adminContext();
+        const aiId = generateIdentifier();
+        const serviceId = generateIdentifier();
+        await postMember(db, {
+            id: aiId,
+            kind: 'ai',
+            membership: { type: 'member', at: nowUtc() },
+            ai: {
+                name: 'Ops Assistant',
+                description: 'Triage',
+                skill_focus: 'routing',
+                model: firstProviderModel().id,
+            },
+        });
+        await postMember(db, {
+            id: serviceId,
+            kind: 'service',
+            membership: { type: 'member', at: nowUtc() },
+            service: {
+                name: 'Nightly import',
+                description: 'Loads the ledger export',
+            },
+        });
+        const members = await getMembers(ctx);
+        assert(
+            !members.some(m =>
+                isHumanMember(m)
+                && (m.idForLink() === aiId
+                    || m.idForLink() === serviceId)
+            ),
+            'an AI or service member reads as a human',
         );
     }),
 );
