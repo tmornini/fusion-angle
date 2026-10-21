@@ -2016,6 +2016,10 @@ function membershipCreateSeat(
     };
 }
 
+export const SERVICE_ADMIN_REFUSAL =
+    'an AI or service member cannot be an organization'
+    + ' admin';
+
 // The kind is read first and never defaulted: a body that
 // names none is refused, not read as a human.
 export function validateMembershipCreateBody(
@@ -2040,10 +2044,15 @@ export function validateMembershipCreateBody(
                 'ai must be an object',
             );
         }
+        const id = pickIdentifier(body, 'id');
+        const membership = membershipCreateSeat(body);
+        if (membership.type === 'admin') {
+            throw new ValidationError(SERVICE_ADMIN_REFUSAL);
+        }
         return {
             kind,
-            id: pickIdentifier(body, 'id'),
-            membership: membershipCreateSeat(body),
+            id,
+            membership,
             ai: validateAiAgentDocumentBody(
                 aiRaw as Record<string, unknown>,
             ).entity,
@@ -2064,10 +2073,15 @@ export function validateMembershipCreateBody(
                 'service must be an object',
             );
         }
+        const id = pickIdentifier(body, 'id');
+        const membership = membershipCreateSeat(body);
+        if (membership.type === 'admin') {
+            throw new ValidationError(SERVICE_ADMIN_REFUSAL);
+        }
         return {
             kind,
-            id: pickIdentifier(body, 'id'),
-            membership: membershipCreateSeat(body),
+            id,
+            membership,
             service: validateServiceDocumentBody(
                 serviceRaw as Record<string, unknown>,
             ).entity,

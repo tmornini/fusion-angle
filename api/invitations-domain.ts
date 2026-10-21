@@ -17,6 +17,7 @@ import {
 import {
     assertOnlyKeys,
     type MembershipCreate,
+    SERVICE_ADMIN_REFUSAL,
     validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
@@ -43,6 +44,7 @@ import type {
 } from './message-pair.ts';
 import { bodyOf } from './derive-documents.ts';
 import {
+    deriveIdentityKind,
     deriveIdentityPiiRows,
     identityPrefixFor,
 } from './derive-identity-spine.ts';
@@ -933,6 +935,15 @@ async function putMembership(
         return servedHead(head, received.requestId);
     }
     const next = settledMembership(outcome.next);
+    // an identity that signs in by client credentials is
+    // never an organization admin (spec decision 11)
+    if (
+        next.type === 'admin'
+        && (await deriveIdentityKind(db, parsed.identityId))
+            === 'service'
+    ) {
+        throw new ApiError(SERVICE_ADMIN_REFUSAL, HTTP_CONFLICT);
+    }
     if (from !== null) {
         await refuseLastAdmin(db, from, next);
     }
