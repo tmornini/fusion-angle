@@ -177,8 +177,7 @@ async () => {
 
 // A Stark AI made by the statement is a seated identity
 // too: its id still does not exist under Wayne's own path
-// (404), and Stark's path is the fence (403). The AI PUT
-// still creates, so only its GET is pinned here.
+// (404), and Stark's path is the fence (403).
 Deno.test('a foreign AI member id is absent under our path',
 async () => {
     const db = await freshDb();
@@ -206,6 +205,15 @@ async () => {
     ));
     assertStrictEquals(foreignId.status, 404);
     await foreignId.body?.cancel();
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: aiPath(WAYNE, id),
+        token: wayne,
+        body: agentFields('Wayne member'),
+        headers: { 'If-Match': '"' + generateIdentifier() + '"' },
+    }));
+    assertStrictEquals(put.status, 404);
+    await put.body?.cancel();
     const foreignPath = await handleRequest(db, req(
         'GET', aiPath(STARK, id), wayne,
     ));
@@ -228,6 +236,45 @@ async () => {
         assertStrictEquals(res.status, 404, method + path);
         await res.body?.cancel();
     }
+});
+
+// Only the members statement creates an AI, so the PUT is
+// class B: it rewrites a live head or nothing (RFC 6585 §3;
+// RFC 9110 §13.2.1).
+Deno.test('an AI PUT with no precondition is 428',
+async () => {
+    const db = await freshDb();
+    const res = await handleRequest(db, req(
+        'PUT', aiPath(STARK, generateIdentifier()), DEV_TOKEN,
+        agentFields('Unconditional'),
+    ));
+    assertStrictEquals(res.status, 428);
+    await res.body?.cancel();
+});
+
+Deno.test('an AI PUT never creates', async () => {
+    const db = await freshDb();
+    const id = generateIdentifier();
+    for (const headers of [
+        { 'If-None-Match': '*' },
+        { 'If-Match': '"' + generateIdentifier() + '"' },
+    ]) {
+        const res = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: aiPath(STARK, id),
+            token: DEV_TOKEN,
+            body: agentFields('Absent agent'),
+            headers,
+        }));
+        assertStrictEquals(res.status, 404);
+        assertEquals(await res.json(), {
+            error: 'Not found: ai-agents/' + id,
+        });
+    }
+    assertStrictEquals(
+        await db.messagePairs.getHeadPair(aiPath(STARK), id),
+        null,
+    );
 });
 
 Deno.test('PUT /ai-agents/:id writes the four fields; GET'
