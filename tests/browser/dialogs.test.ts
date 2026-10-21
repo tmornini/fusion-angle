@@ -53,6 +53,26 @@ function fieldValues(fields: readonly string[]): string {
     return `[${reads}]`;
 }
 
+Deno.test('the identities page offers no create',
+async () => {
+    await withAdminPage(browser.get(), async (page, origin) => {
+        await page.navigate(
+            registryUrl(origin.baseUrl, 'identities'),
+        );
+        await page.ready('identities');
+        assertEquals(
+            await page.evaluate<boolean>(
+                `document.querySelector(`
+                + `'[data-dialog-open="add-identity"]')`
+                + ` === null`
+                + ` && document.querySelector(`
+                + `'#add-identity-dialog') === null`,
+            ),
+            true,
+        );
+    });
+});
+
 Deno.test('the add-identity dialog reopens with every field empty',
 async () => {
     await withAdminPage(browser.get(), async (page, origin) => {
