@@ -563,7 +563,7 @@ async function seatServiceIdentity(
 // 'person', so the palette's and the people picker's
 // roster, member detail, the members page, and the people
 // count all read a documentless service member as no
-// human.
+// human, while its seat still counts.
 Deno.test('a documentless service member is no reader\'s'
     + ' human',
 async () => {
@@ -581,10 +581,12 @@ async () => {
         activePeopleCount: (
             await getOrganizationStats(ctx, seatsP)
         ).activePeopleCount,
+        seats: (await seatsP).length,
     }, {
         humanMembers: ['XXZruirZyAOoRpNxaDnpSA'],
         humanMember: null,
         members: ['XXZruirZyAOoRpNxaDnpSA'],
         activePeopleCount: 1,
+        seats: 2,
     });
 });
