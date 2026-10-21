@@ -42,18 +42,11 @@ export async function getOrganizationSeats(
     // The roster serves in write order; memberships read
     // in grant order (at, then identity), the one order a
     // member list has (see buildHumanMemberMap), though
-    // today's readers only count them. People only: the
-    // AI and service members drop out.
-    const [seats, nonHuman] = await Promise.all([
-        ctx.GETCollection<MembershipEntity>(
-            'organizations/' + organization
-                + '/memberships/?state=accepted',
-        ),
-        getNonHumanMemberIds(ctx),
-    ]);
-    return seats.filter(
-        seat => !nonHuman.has(seat.body().toValue().identity_id),
-    ).toSorted((a, b) => {
+    // today's readers only count them.
+    return (await ctx.GETCollection<MembershipEntity>(
+        'organizations/' + organization
+            + '/memberships/?state=accepted',
+    )).toSorted((a, b) => {
         const left = a.body().toValue();
         const right = b.body().toValue();
         return byAtThenIdAscending(
@@ -71,10 +64,12 @@ export interface OrganizationStats {
 
 // Live counts from the source collections. getProjects
 // drops deleted rows; we further exclude declined
-// projects, non-visible ideas, and (when seats are not
-// already in hand) count humans. The log is the truth —
-// no stale denormalized counter sits between this
-// reader and the entities it counts.
+// projects, non-visible ideas, and the AI and service
+// seats (every member kind uses a seat; only a person
+// is a person), or count the human roster when seats
+// are not already in hand. The log is the truth — no
+// stale denormalized counter sits between this reader
+// and the entities it counts.
 export async function getOrganizationStats(
     ctx: RequestContext,
     seatsP?: Promise<
@@ -86,8 +81,12 @@ export async function getOrganizationStats(
             getProjects(ctx),
             getIdeaEntities(ctx),
             seatsP !== undefined
-                ? seatsP.then(seats => new Set(
-                    seats.map(m => m.body().toValue().identity_id),
+                ? Promise.all([
+                    seatsP, getNonHumanMemberIds(ctx),
+                ]).then(([seats, nonHuman]) => new Set(
+                    seats
+                        .map(m => m.body().toValue().identity_id)
+                        .filter(id => !nonHuman.has(id)),
                 ).size)
                 : getHumanMembers(ctx).then(
                     humans => humans.length,
