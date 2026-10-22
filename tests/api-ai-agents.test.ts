@@ -24,6 +24,16 @@ import { operationIdHeader } from
     './operation-id-header.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
+import { BackedDbAdapter } from '../api/db-backed.ts';
+import { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
+import type {
+    CollectionHeadRead,
+    StorageBackend,
+    Tx,
+} from '../api/db.ts';
+import { MEMBERSHIPS_PATH } from '../api/memberships.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -514,4 +524,149 @@ Deno.test('a flow write naming a removed AI member in'
         error: 'memberIds may name person identities only,'
             + ' not AI agents or services',
     });
+});
+
+// A memory backend that fires one armed hook right after a
+// standalone read of `organization`'s memberships answers,
+// alone or in a head batch: the window a law read outside
+// its write's transaction leaves open. Keyed on the
+// organization half alone, so a read of the caller's own
+// membership, by name or by identity, passes untouched.
+function membershipReadHooked(organization: string): {
+    readonly backend: StorageBackend;
+    readonly arm: (hook: () => Promise<void>) => void;
+    readonly take: () => (() => Promise<void>) | undefined;
+} {
+    const inner = new MemoryStorageBackend();
+    let armed: (() => Promise<void>) | undefined;
+    const take = () => {
+        const hook = armed;
+        armed = undefined;
+        return hook;
+    };
+    const organizationRead = (
+        path: string,
+        contains: Readonly<Record<string, string>>,
+    ): boolean => path === MEMBERSHIPS_PATH
+        && Object.keys(contains).length === 1
+        && contains['organization_id'] === organization;
+    const hooked = (tx: Tx): Tx => ({
+        ...tx,
+        getCollectionHeadPairsContaining: async <
+            T extends { id: string },
+        >(
+            path: string,
+            contains: Readonly<Record<string, string>>,
+        ): Promise<T[]> => {
+            const heads = await tx
+                .getCollectionHeadPairsContaining<T>(
+                    path, contains,
+                );
+            const hook = organizationRead(path, contains)
+                ? take()
+                : undefined;
+            if (hook !== undefined) await hook();
+            return heads;
+        },
+        getCollectionHeadPairsBatch: async <
+            T extends { id: string },
+        >(reads: readonly CollectionHeadRead[]): Promise<T[][]> => {
+            const answers = await tx
+                .getCollectionHeadPairsBatch<T>(reads);
+            const hook = reads.some((read) => 'contains' in read
+                && organizationRead(read.path, read.contains))
+                ? take()
+                : undefined;
+            if (hook !== undefined) await hook();
+            return answers;
+        },
+    });
+    const backend: StorageBackend = {
+        read: (fn) => inner.read((tx) => fn(hooked(tx))),
+        transaction: (mode, fn) => inner.transaction(mode, fn),
+        seedTransaction: (fn) => inner.seedTransaction(fn),
+        ensureTable: () => inner.ensureTable(),
+        executeLedger: (attempt, rows, now, tx) =>
+            inner.executeLedger(attempt, rows, now, tx),
+        hasSchema: () => inner.hasSchema(),
+        postSchemaCreation: () => inner.postSchemaCreation(),
+        deleteSchema: () => inner.deleteSchema(),
+    };
+    return {
+        backend,
+        arm: (hook) => {
+            armed = hook;
+        },
+        take,
+    };
+}
+
+// The law's reads share the write's transaction, so a
+// removal cannot land between the law and the write: the
+// PUT is refused, or its flow head precedes the removal.
+Deno.test('a flow PUT reads its agents in the transaction'
++ ' it writes in', async () => {
+    const hooked = membershipReadHooked(STARK);
+    const db = new BackedDbAdapter(
+        hooked.backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await seedAdminSchema(db);
+    const id = generateIdentifier();
+    const etag = await postMember(db, {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Raced agent'),
+    });
+    const token = await organizationToken();
+    const membership = membershipNameOf(STARK, id);
+    const removal = async () => {
+        const removed = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + STARK + '/invitations/'
+                + membership,
+            token,
+            body: { state: 'removed', at: REMOVED_AT },
+            headers: { 'If-Match': etag },
+        }));
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+    };
+    hooked.arm(removal);
+    const flowId = generateIdentifier();
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/flows/' + flowId,
+        token,
+        body: flowDocument(
+            'Raced agent',
+            generateIdentifier(),
+            {
+                nodes: [graphNode([], [id])],
+                edges: [],
+            },
+        ),
+        headers: { 'if-none-match': '*' },
+    }));
+    await res.body?.cancel();
+    // Unfired, the removal follows the PUT, as it would
+    // had it arrived after the write.
+    await hooked.take()?.();
+    const rows = await db.messagePairs.getAll();
+    const flowAt = rows.findIndex((row) =>
+        row.path === canonicalPath(STARK, '/flows/')
+        && row.name === flowId);
+    const removalAt = rows.findLastIndex((row) =>
+        row.path === MEMBERSHIPS_PATH
+        && row.name === membership
+        && row.method === 'PUT');
+    assert(
+        res.status === 400
+            || (flowAt >= 0 && flowAt < removalAt),
+        'flow PUT answered ' + res.status + ' and landed at '
+            + flowAt + ', after the removal at ' + removalAt,
+    );
 });
