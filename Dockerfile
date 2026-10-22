@@ -1,4 +1,4 @@
-FROM denoland/deno:2.9.6 AS builder
+FROM denoland/deno:2.9.8 AS builder
 WORKDIR /srv
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
@@ -6,7 +6,7 @@ RUN apt-get update \
 COPY . .
 RUN ./bin/build --no-zip render-out/
 
-FROM denoland/deno:2.9.6 AS runtime
+FROM denoland/deno:2.9.8 AS runtime
 WORKDIR /srv
 COPY --from=builder /srv/render-out ./render-out
 USER deno

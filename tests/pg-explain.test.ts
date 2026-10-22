@@ -7,8 +7,14 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import {
     COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
+    COLLECTION_HEAD_PAIRS_SQL,
+    ORGANIZATION_ROW_FOR_SHARE_SQL,
+    ORGANIZATION_ROW_FOR_UPDATE_SQL,
     PostgresBackend,
+    collectionHeadBatchStatement,
 } from '../api/backend-postgres.ts';
+import { ORGANIZATIONS_PATH } from
+    '../api/organization-hold.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
 import type { Tx } from '../api/db.ts';
@@ -16,8 +22,10 @@ import { serializeWire } from
     '../shared/http-message/wire-codec.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
-import { decodeIdentifier } from
-    '../shared/identifier.ts';
+import {
+    decodeIdentifier,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';
 
 // Live EXPLAIN pins for schema indexes. ./validate stays
@@ -336,6 +344,22 @@ function assertNoSortBeneath(
     }
 }
 
+// The skip walk: one probe of the document index per
+// name, then one backward walk to each name's head.
+function assertDocumentWalkPlan(text: string): void {
+    assertMatch(text, /Recursive Union/);
+    assertMatch(
+        text,
+        /Index (Only )?Scan using fa_message_pairs_document/,
+    );
+    assertMatch(
+        text,
+        /Index Scan Backward using fa_message_pairs_document/,
+    );
+    assertNoSortBeneath(text, 'Recursive Union');
+    assertNotMatch(text, /Seq Scan/);
+}
+
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     Deno.test(
         'postgres explain skipped without POSTGRES_URL',
@@ -464,54 +488,27 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
 
     Deno.test('collection head pairs walk the document'
     + ' index one name at a time', async () => {
-        const plans = await sql.query<
+        const plans = await sql.unsafe<
             Record<string, unknown>
-        >`
-            EXPLAIN
-            WITH RECURSIVE names AS (
-                (
-                    SELECT name FROM fa_message_pairs
-                    WHERE path = ${VERSION_COLLECTION}
-                    ORDER BY name
-                    LIMIT 1
-                )
-                UNION ALL
-                SELECT (
-                    SELECT later.name FROM fa_message_pairs later
-                    WHERE later.path = ${VERSION_COLLECTION}
-                      AND later.name > names.name
-                    ORDER BY later.name
-                    LIMIT 1
-                )
-                FROM names
-                WHERE names.name IS NOT NULL
-            )
-            SELECT heads.*
-            FROM names
-            CROSS JOIN LATERAL (
-                SELECT * FROM fa_message_pairs head
-                WHERE head.path = ${VERSION_COLLECTION}
-                  AND head.name = names.name
-                  AND head.method IN ('PUT', 'DELETE')
-                ORDER BY head.response_at DESC, head.id DESC
-                LIMIT 1
-            ) heads
-            WHERE names.name IS NOT NULL
-              AND heads.method = 'PUT'
-            ORDER BY heads.response_at, heads.id
-        `;
-        const text = explainText(plans);
-        assertMatch(text, /Recursive Union/);
-        assertMatch(
-            text,
-            /Index (Only )?Scan using fa_message_pairs_document/,
+        >(
+            'EXPLAIN\n' + COLLECTION_HEAD_PAIRS_SQL,
+            [VERSION_COLLECTION],
         );
-        assertMatch(
-            text,
-            /Index Scan Backward using fa_message_pairs_document/,
+        assertDocumentWalkPlan(explainText(plans));
+    });
+
+    // The read is prepared, so after five runs it may run
+    // a generic plan, the path unknown to the planner.
+    Deno.test('collection head pairs walk the document'
+    + ' index under a generic plan', async () => {
+        const plans = await sql.unsafe<
+            Record<string, unknown>
+        >(
+            'EXPLAIN (GENERIC_PLAN)\n'
+                + COLLECTION_HEAD_PAIRS_SQL,
+            [VERSION_COLLECTION],
         );
-        assertNoSortBeneath(text, 'Recursive Union');
-        assertNotMatch(text, /Seq Scan/);
+        assertDocumentWalkPlan(explainText(plans));
     });
 
     Deno.test(
@@ -569,6 +566,42 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         },
     );
 
+    // The containing entry goes first, so every line
+    // after Recursive Union is the plain entry's branch;
+    // the containing branch sorts for DISTINCT ON.
+    Deno.test('a head batch keeps each branch on its'
+    + ' single read\'s index', async () => {
+        const statement = collectionHeadBatchStatement([
+            {
+                path: BODY_INDEXED_PATH,
+                contains: {
+                    organization_id: organizationIdFor(0),
+                },
+            },
+            { path: VERSION_COLLECTION },
+        ]);
+        const plans = await sql.unsafe<
+            Record<string, unknown>
+        >('EXPLAIN\n' + statement.text, statement.parameters);
+        const text = explainText(plans);
+        assertMatch(text, /Append/);
+        assertMatch(
+            text,
+            /Bitmap Index Scan on fa_message_pairs_body/,
+        );
+        assertMatch(text, /Recursive Union/);
+        assertMatch(
+            text,
+            /Index (Only )?Scan using fa_message_pairs_document/,
+        );
+        assertMatch(
+            text,
+            /Index Scan Backward using fa_message_pairs_document/,
+        );
+        assertNoSortBeneath(text, 'Recursive Union');
+        assertNotMatch(text, /Seq Scan/);
+    });
+
     Deno.test('head pair is one backward walk under a Limit',
     async () => {
         const plans = await sql.query<
@@ -607,22 +640,40 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         },
     );
 
-    Deno.test(
-        'the head lock rows the primary key',
-        async () => {
-            const plans = await sql.query<
-                Record<string, unknown>
-            >`
-                EXPLAIN
-                SELECT id FROM fa_message_pairs
-                WHERE id = ${uuidTextOfIdentifier(ideaId)}
-                FOR UPDATE
-            `;
-            const text = explainText(plans);
-            assertMatch(text, /LockRows/);
-            assertIndexPlan(text, ['fa_message_pairs_pkey']);
-        },
-    );
+    // A lock must reach its row through an index, never a
+    // walk of the ledger. Three indexes lead on path, and
+    // the planner takes fa_message_pairs_collection and
+    // filters name, supersedes, and method (measured), so
+    // the pin holds the index probe on path, not the
+    // planner's choice among them. The texts run unprepared,
+    // so the custom plan with the product's own binds is the
+    // plan.
+    for (const [mode, text] of [
+        ['share', ORGANIZATION_ROW_FOR_SHARE_SQL],
+        ['update', ORGANIZATION_ROW_FOR_UPDATE_SQL],
+    ] as const) {
+        Deno.test(
+            'the organization row ' + mode
+                + ' lock finds its row through a path index',
+            async () => {
+                const plans = await sql.unsafe<
+                    Record<string, unknown>
+                >('EXPLAIN\n' + text, [
+                    ORGANIZATIONS_PATH,
+                    organizationIdFor(0),
+                    uuidTextOfIdentifier(NIL_IDENTIFIER),
+                ]);
+                const plan = explainText(plans);
+                assertMatch(plan, /LockRows/);
+                assertMatch(
+                    plan,
+                    /Index Scan using \w+ on fa_message_pairs/,
+                );
+                assertMatch(plan, /Index Cond: \(+path = /);
+                assertNotMatch(plan, /Seq Scan/);
+            },
+        );
+    }
 
     Deno.test(
         'insert resolves an id conflict by doing nothing',

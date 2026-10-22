@@ -167,6 +167,12 @@ and the wipe. The operator is not an identity, holds
 no token, and never acts over HTTP. Organizations come
 only from the operator's seed; no request creates one.
 
+Every actor is an identity with an accepted membership,
+so a service is a co-member like a person or an AI. The
+identity fence, the roster, and the token claims need no
+rule of their own for it. A service or an AI is never an
+organization admin.
+
 A foreign id under the caller's own organization path
 is absent there: a write geneses or 404s, a read 404s.
 Global-plane reads of an organization document answer
@@ -197,8 +203,14 @@ the document: one row at `/invitations/`, named
 `declined`, `revoked`, `removed`. There is no seat
 document and no `former-members/` route. `accepted`
 grants the role. The members roster is accepted
-memberships plus `/ai-agents` (not a members
-collection, not identities).
+memberships (not a members collection, not identities).
+A membership read serves the stored body plus a derived
+`identity_kind`, `person` or `service`, and a member is
+human if and only if it is `person`. A service identity
+is an AI member when it names a document in the
+organization's `ai-agents/`, and a service member when it
+names one in `services/`. An AI or a service is live
+while its membership is accepted.
 
 | View | States | Default | Who reads |
 | --- | --- | --- | --- |
@@ -216,9 +228,9 @@ versions, and `identities/:id/organizations/`) is
 self-only. An admin reads the organization nest, not
 another identity's nest.
 
-Removal is a PUT to
-`removed`. The last accepted admin refuses (409), and
-a removed member's access ends at the next mint,
+Removal of a member of any kind is a membership write,
+a PUT to `removed`. The last accepted admin refuses
+(409), and a removed member's access ends at the next mint,
 refresh, or expiry per the named covenant. The system
 member is the constant `SYSTEM_MEMBER_ID`
 (`shared/types.ts`), not a membership. A removed

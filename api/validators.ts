@@ -1018,10 +1018,10 @@ export interface AiAgentDocumentBody {
     readonly entity: Omit<AIAgentEntity, 'id'>;
 }
 
-// The HTTP-body gate for PUT /ai-agents/:id: a
-// standalone global-plane family, not a member and
-// not an identity. THE LABEL MANDATE: assertOnlyKeys
-// speaks 'AIAgentEntity', matching
+// The HTTP-body gate for the organization-nested AI
+// member document, edited by the PUT on
+// organizations/:id/ai-agents/:id. THE LABEL MANDATE:
+// assertOnlyKeys speaks 'AIAgentEntity', matching
 // validateAIAgentEntity byte-for-byte. model uses
 // the SAME catalog-membership gate.
 export function validateAiAgentDocumentBody(
@@ -2021,6 +2021,9 @@ function membershipCreateSeat(
 export const SERVICE_ADMIN_REFUSAL =
     'an AI or service member cannot be an organization'
     + ' admin';
+
+export const SYSTEM_SEAT_REFUSAL =
+    'the system identity cannot hold a seat';
 
 // The kind is read first and never defaulted: a body that
 // names none is refused, not read as a human.

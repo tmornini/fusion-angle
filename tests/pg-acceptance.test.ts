@@ -3,6 +3,7 @@ import { connectPostgres } from
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
+import { POOL_MAX } from '../api/advisory-lock.ts';
 import { defineStoreAcceptance } from
     './store-acceptance.ts';
 
@@ -60,6 +61,16 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await sql.unsafe(
             'CREATE SCHEMA ' + quoteIdent(schema),
         );
+        // Open the pool to its full width here: a
+        // pooled connection starts a max_lifetime
+        // timer when its socket connects, and the ops
+        // sanitizer blames whichever test first widens
+        // the pool. Every timer must predate test one
+        // (see pg-races.test.ts).
+        await Promise.all(Array.from(
+            { length: POOL_MAX },
+            () => sql.query`SELECT 1`,
+        ));
     });
 
     Deno.test.afterAll(async () => {
@@ -75,9 +86,15 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     });
 
     defineStoreAcceptance('postgres', async () => {
-        // Fresh tables each case. hasSchema after
-        // deleteSchema throws (loud miss) — do not probe.
-        await backend.deleteSchema();
+        // Fresh tables each case: drop and recreate this
+        // file's private schema. backend.deleteSchema()
+        // resets the public schema, not this one.
+        await sql.unsafe(
+            'DROP SCHEMA ' + quoteIdent(schema) + ' CASCADE',
+        );
+        await sql.unsafe(
+            'CREATE SCHEMA ' + quoteIdent(schema),
+        );
         await backend.ensureTable();
         return new BackedDbAdapter(
             backend,

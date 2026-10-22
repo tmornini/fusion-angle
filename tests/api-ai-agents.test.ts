@@ -12,6 +12,7 @@ import {
 } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
+import { getModelsByProvider } from '../api/provider-models.ts';
 import {
     apiRequest,
     partBodiesOf,
@@ -23,6 +24,16 @@ import { operationIdHeader } from
     './operation-id-header.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
+import { BackedDbAdapter } from '../api/db-backed.ts';
+import { MemoryStorageBackend } from
+    '../api/backend-memory.ts';
+import type {
+    CollectionHeadRead,
+    StorageBackend,
+    Tx,
+} from '../api/db.ts';
+import { MEMBERSHIPS_PATH } from '../api/memberships.ts';
+import { canonicalPath } from '../api/message-pair.ts';
 
 
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -281,11 +292,14 @@ Deno.test('an AI PUT never creates', async () => {
 Deno.test('an AI PUT rewrites the four fields; GET'
 + ' returns them', async () => {
     const db = await freshDb();
+    const seatedModel = [...getModelsByProvider().values()]
+        .flat()[1]!;
+    assert(seatedModel.id !== firstProviderModel().id);
     await postMember(db, {
         id: 'UuvoBhQJUSEsiJwscXPkUg',
         kind: 'ai',
         membership: { type: 'member', at: AT },
-        ai: agentFields('Seated agent'),
+        ai: { ...agentFields('Seated agent'), model: seatedModel.id },
     });
     const head = await handleRequest(db, req(
         'GET', aiPath(STARK, 'UuvoBhQJUSEsiJwscXPkUg'), DEV_TOKEN,
@@ -306,10 +320,7 @@ Deno.test('an AI PUT rewrites the four fields; GET'
         body,
         headers: { 'If-Match': etag },
     }));
-    assert(
-        put.status === 201 || put.status === 200,
-        'expected 201 or 200, got ' + put.status,
-    );
+    assertStrictEquals(put.status, 200);
     const written = await put.json() as {
         id: string;
         name: string;
@@ -513,4 +524,449 @@ Deno.test('a flow write naming a removed AI member in'
         error: 'memberIds may name person identities only,'
             + ' not AI agents or services',
     });
+});
+
+// A memory backend that fires one armed hook right after a
+// standalone read of `organization`'s memberships answers,
+// alone or in a head batch: the window a law read outside
+// its write's transaction leaves open. Keyed on the
+// organization half alone, so a read of the caller's own
+// membership, by name or by identity, passes untouched. A
+// transaction's head batches fire nothing; it counts them,
+// and holds the handle the last one ran on, so a statement
+// shows whether it landed on the law's own transaction.
+function lawTransactionWatched(organization: string): {
+    readonly backend: StorageBackend;
+    readonly arm: (hook: () => Promise<void>) => void;
+    readonly take: () => (() => Promise<void>) | undefined;
+    readonly transactionBatches: () => number;
+    readonly statementOnLawTx: () => boolean;
+} {
+    const inner = new MemoryStorageBackend();
+    let armed: (() => Promise<void>) | undefined;
+    let batches = 0;
+    let lawTx: Tx | undefined;
+    let statementTx: Tx | undefined;
+    const take = () => {
+        const hook = armed;
+        armed = undefined;
+        return hook;
+    };
+    const organizationRead = (
+        path: string,
+        contains: Readonly<Record<string, string>>,
+    ): boolean => path === MEMBERSHIPS_PATH
+        && Object.keys(contains).length === 1
+        && contains['organization_id'] === organization;
+    const hooked = (tx: Tx): Tx => ({
+        ...tx,
+        getCollectionHeadPairsContaining: async <
+            T extends { id: string },
+        >(
+            path: string,
+            contains: Readonly<Record<string, string>>,
+        ): Promise<T[]> => {
+            const heads = await tx
+                .getCollectionHeadPairsContaining<T>(
+                    path, contains,
+                );
+            const hook = organizationRead(path, contains)
+                ? take()
+                : undefined;
+            if (hook !== undefined) await hook();
+            return heads;
+        },
+        getCollectionHeadPairsBatch: async <
+            T extends { id: string },
+        >(reads: readonly CollectionHeadRead[]): Promise<T[][]> => {
+            const answers = await tx
+                .getCollectionHeadPairsBatch<T>(reads);
+            const hook = reads.some((read) => 'contains' in read
+                && organizationRead(read.path, read.contains))
+                ? take()
+                : undefined;
+            if (hook !== undefined) await hook();
+            return answers;
+        },
+    });
+    const counted = (tx: Tx): Tx => {
+        const view: Tx = {
+            ...tx,
+            getCollectionHeadPairsBatch: <
+                T extends { id: string },
+            >(
+                reads: readonly CollectionHeadRead[],
+            ): Promise<T[][]> => {
+                batches += 1;
+                lawTx = view;
+                return tx.getCollectionHeadPairsBatch<T>(reads);
+            },
+        };
+        return view;
+    };
+    const backend: StorageBackend = {
+        read: (fn) => inner.read((tx) => fn(hooked(tx))),
+        transaction: (mode, fn) => inner.transaction(
+            mode, (tx) => fn(counted(tx)),
+        ),
+        seedTransaction: (fn) => inner.seedTransaction(fn),
+        ensureTable: () => inner.ensureTable(),
+        executeLedger: (attempt, rows, now, tx) => {
+            statementTx = tx;
+            return inner.executeLedger(attempt, rows, now, tx);
+        },
+        hasSchema: () => inner.hasSchema(),
+        postSchemaCreation: () => inner.postSchemaCreation(),
+        deleteSchema: () => inner.deleteSchema(),
+    };
+    return {
+        backend,
+        arm: (hook) => {
+            armed = hook;
+        },
+        take,
+        transactionBatches: () => batches,
+        statementOnLawTx: () => statementTx !== undefined
+            && statementTx === lawTx,
+    };
+}
+
+// The law's reads share the write's transaction, so a
+// removal cannot land between the law and the write: the
+// PUT is refused, or its flow head precedes the removal.
+Deno.test('a flow PUT reads its agents in the transaction'
++ ' it writes in', async () => {
+    const hooked = lawTransactionWatched(STARK);
+    const db = new BackedDbAdapter(
+        hooked.backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await seedAdminSchema(db);
+    const id = generateIdentifier();
+    const etag = await postMember(db, {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Raced agent'),
+    });
+    const token = await organizationToken();
+    const membership = membershipNameOf(STARK, id);
+    const removal = async () => {
+        const removed = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/' + STARK + '/invitations/'
+                + membership,
+            token,
+            body: { state: 'removed', at: REMOVED_AT },
+            headers: { 'If-Match': etag },
+        }));
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+    };
+    hooked.arm(removal);
+    const flowId = generateIdentifier();
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/flows/' + flowId,
+        token,
+        body: flowDocument(
+            'Raced agent',
+            generateIdentifier(),
+            {
+                nodes: [graphNode([], [id])],
+                edges: [],
+            },
+        ),
+        headers: { 'if-none-match': '*' },
+    }));
+    await res.body?.cancel();
+    const onLawTx = hooked.statementOnLawTx();
+    // Unfired, the removal follows the PUT, as it would
+    // had it arrived after the write.
+    await hooked.take()?.();
+    const rows = await db.messagePairs.getAll();
+    const flowAt = rows.findIndex((row) =>
+        row.path === canonicalPath(STARK, '/flows/')
+        && row.name === flowId);
+    const removalAt = rows.findLastIndex((row) =>
+        row.path === MEMBERSHIPS_PATH
+        && row.name === membership
+        && row.method === 'PUT');
+    assert(
+        res.status === 400
+            || (flowAt >= 0 && flowAt < removalAt),
+        'flow PUT answered ' + res.status + ' and landed at '
+            + flowAt + ', after the removal at ' + removalAt,
+    );
+    assert(
+        res.status === 400 || onLawTx,
+        'flow PUT wrote outside the transaction its law read in',
+    );
+});
+
+// A create body whose one node seats `memberId`: a create
+// graph carries no agentIds, so its law reads only whether
+// a memberIds entry names a program.
+function flowCreateBody(flowId: string, memberId: string) {
+    const nodeId = generateIdentifier();
+    return {
+        id: flowId,
+        flow: {
+            name: 'Raced create',
+            is_locked: false,
+            is_auto_layout: false,
+            is_auto_fit: false,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        },
+        projectFlowId: generateIdentifier(),
+        projectFlow: {
+            project_id: 'pnXmXrxOWayANgDLdCjuBw',
+            flow_id: flowId,
+            at: AT,
+        },
+        initialState: 'active',
+        initialStateEventId: generateIdentifier(),
+        initialStateAt: AT,
+        graphDelta: {
+            ...emptyDelta(),
+            nodes: [{
+                id: nodeId,
+                flow_id: flowId,
+                name: 'Step',
+                position_x: 0,
+                position_y: 0,
+                is_create: true,
+                is_archive: false,
+                task_instructions: '',
+                at: AT,
+            }],
+            memberEvents: [{
+                id: generateIdentifier(),
+                flow_node_id: nodeId,
+                member_id: memberId,
+                action: 'added',
+                at: AT,
+            }],
+        },
+    };
+}
+
+// The create's law reads share its write's transaction, so
+// an AI made in that window cannot slip into memberIds: the
+// POST is refused, or its flow head precedes the AI.
+Deno.test('a flow create reads its programs in the'
++ ' transaction it writes in', async () => {
+    const hooked = lawTransactionWatched(STARK);
+    const db = new BackedDbAdapter(
+        hooked.backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await seedAdminSchema(db);
+    const id = generateIdentifier();
+    const creation = async () => {
+        await postMember(db, {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: AT },
+            ai: agentFields('Raced program'),
+        });
+    };
+    hooked.arm(creation);
+    const flowId = generateIdentifier();
+    const res = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK + '/flows/',
+        token: await organizationToken(),
+        body: flowCreateBody(flowId, id),
+    }));
+    await res.body?.cancel();
+    const onLawTx = hooked.statementOnLawTx();
+    // Unfired, the AI follows the POST, as it would had it
+    // arrived after the write.
+    await hooked.take()?.();
+    const rows = await db.messagePairs.getAll();
+    const flowAt = rows.findIndex((row) =>
+        row.path === canonicalPath(STARK, '/flows/')
+        && row.name === flowId);
+    const programAt = rows.findIndex((row) =>
+        row.path === canonicalPath(STARK, '/ai-agents/')
+        && row.name === id);
+    assert(
+        res.status === 400
+            || (flowAt >= 0 && flowAt < programAt),
+        'flow POST answered ' + res.status + ' and landed at '
+            + flowAt + ', after the AI at ' + programAt,
+    );
+    assert(
+        res.status === 400 || onLawTx,
+        'flow POST wrote outside the transaction its law read in',
+    );
+});
+
+// A hooked memory db holding one AI member. A lawless graph
+// seats that AI in memberIds; batches counts the roster
+// reads the law runs in a write's transaction.
+async function flowLawFixture(): Promise<{
+    readonly put: (
+        flowId: string,
+        nodes: unknown[],
+        headers: Record<string, string>,
+    ) => Promise<Response>;
+    readonly lawless: () => unknown[];
+    readonly batches: () => number;
+}> {
+    const hooked = lawTransactionWatched(STARK);
+    const db = new BackedDbAdapter(
+        hooked.backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const agentId = generateIdentifier();
+    await postMember(db, {
+        id: agentId,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Lawless agent'),
+    });
+    return {
+        put: (flowId, nodes, headers) => handleRequest(
+            db,
+            apiRequest({
+                method: 'PUT',
+                path: '/organizations/' + STARK + '/flows/'
+                    + flowId,
+                token,
+                body: flowDocument(
+                    'Flow', generateIdentifier(), {
+                        nodes,
+                        edges: [],
+                    },
+                ),
+                headers,
+            }),
+        ),
+        lawless: () => [graphNode([agentId])],
+        batches: hooked.transactionBatches,
+    };
+}
+
+async function etagOf(
+    response: Response,
+    status: number,
+): Promise<string> {
+    assertStrictEquals(response.status, status);
+    await response.body?.cancel();
+    const etag = response.headers.get('ETag');
+    assert(etag !== null);
+    return etag;
+}
+
+// Preconditions come before the content (RFC 9110 §13.2.2):
+// a latch the head refuses answers 412 whatever the graph
+// says, and the law's roster read never runs for it.
+Deno.test('a stale flow PUT answers 412 before the'
++ ' law', async () => {
+    const fixture = await flowLawFixture();
+    const flowId = generateIdentifier();
+    const old = await etagOf(await fixture.put(
+        flowId, [], { 'if-none-match': '*' },
+    ), 201);
+    await etagOf(await fixture.put(
+        flowId, [], { 'If-Match': old },
+    ), 200);
+    const before = fixture.batches();
+    const stale = await fixture.put(
+        flowId, fixture.lawless(), { 'If-Match': old },
+    );
+    await stale.body?.cancel();
+    assertStrictEquals(stale.status, 412);
+    assertStrictEquals(fixture.batches(), before);
+});
+
+Deno.test('a flow PUT latching a flow never written'
++ ' answers 412 before the law', async () => {
+    const fixture = await flowLawFixture();
+    const before = fixture.batches();
+    const absent = await fixture.put(
+        generateIdentifier(),
+        fixture.lawless(),
+        { 'If-Match': '"' + generateIdentifier() + '"' },
+    );
+    await absent.body?.cancel();
+    assertStrictEquals(absent.status, 412);
+    assertStrictEquals(fixture.batches(), before);
+});
+
+Deno.test('a flow genesis over a live flow answers 412'
++ ' before the law', async () => {
+    const fixture = await flowLawFixture();
+    const flowId = generateIdentifier();
+    await etagOf(await fixture.put(
+        flowId, [], { 'if-none-match': '*' },
+    ), 201);
+    const before = fixture.batches();
+    const genesis = await fixture.put(
+        flowId, fixture.lawless(), { 'if-none-match': '*' },
+    );
+    await genesis.body?.cancel();
+    assertStrictEquals(genesis.status, 412);
+    assertStrictEquals(fixture.batches(), before);
+});
+
+// The skip's other side: a latch naming the live head
+// lands, so the law runs once and refuses the graph.
+Deno.test('a current flow PUT still answers the'
++ ' law', async () => {
+    const fixture = await flowLawFixture();
+    const flowId = generateIdentifier();
+    const live = await etagOf(await fixture.put(
+        flowId, [], { 'if-none-match': '*' },
+    ), 201);
+    const before = fixture.batches();
+    const current = await fixture.put(
+        flowId, fixture.lawless(), { 'If-Match': live },
+    );
+    assertStrictEquals(current.status, 400);
+    assertEquals(await current.json(), {
+        error: 'memberIds may name person identities only,'
+            + ' not AI agents or services',
+    });
+    assertStrictEquals(fixture.batches(), before + 1);
+});
+
+// postFlowDocumentOp skips the law for an If-None-Match: *
+// PUT over a PUT head, a verdict that stays stale only while
+// no DELETE can land at a flow. A flow DELETE breaks this
+// pin: revisit that skip before landing one.
+Deno.test('a flow takes no DELETE, which the'
++ ' If-None-Match: * skip relies on', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const path = '/organizations/' + STARK + '/flows/'
+        + generateIdentifier();
+    const live = await etagOf(await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path,
+        token,
+        body: flowDocument('Flow', generateIdentifier(), {
+            nodes: [],
+            edges: [],
+        }),
+        headers: { 'if-none-match': '*' },
+    })), 201);
+    const deleted = await handleRequest(db, apiRequest({
+        method: 'DELETE',
+        path,
+        token,
+        headers: { 'If-Match': live },
+    }));
+    await deleted.body?.cancel();
+    assertStrictEquals(deleted.status, 405);
 });

@@ -22,7 +22,7 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./bin/measure
 ```
 
-Deno 2.9.6 runs `./test`, `./test validate`,
+Deno 2.9.8 runs `./test`, `./test validate`,
 `./bin/build`, `./test browser`, `./bin/measure`,
 and both generators, each invoking the `deno` CLI
 directly. `postgres-lib`'s eight inline programs
@@ -449,10 +449,12 @@ The seed's rehearsal is the one exception: it holds a
 transaction on its scratch memory backend for its
 whole run, on an instance nothing else uses, so the
 ops' validators and hashes run inside it.
-A transaction holds its pooled connection and its
-advisory locks for its whole body; the memory backend
-serializes whole transactions, so a long body stalls
-every other op.
+A transaction holds its pooled connection and the row
+locks it takes — its organization's genesis row, FOR
+SHARE in a flow write and FOR UPDATE in a roster write
+— for its whole body; the memory backend serializes
+whole transactions, so a long body stalls every other
+op.
 
 ## Read next
 

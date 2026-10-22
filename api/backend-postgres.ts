@@ -4,6 +4,7 @@
 // abort the caller. Notify stays on the write client.
 
 import {
+    type CollectionHeadRead,
     type StorageBackend,
     type Tx,
     type TxMode,
@@ -24,8 +25,15 @@ import {
 } from './advisory-lock.ts';
 import {
     identifierOfUuidText,
+    NIL_IDENTIFIER,
     uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
+import {
+    noOrganizationDocument,
+    ORGANIZATIONS_PATH,
+    ownOrganizationDocumentsOf,
+    rosterOrganizationsOf,
+} from './organization-hold.ts';
 import {
     isInserted,
     type Attempt,
@@ -44,6 +52,22 @@ export const POSTGRES_DROP_SCHEMA =
     + 'CREATE SCHEMA public;\n'
     + 'GRANT ALL ON SCHEMA public TO CURRENT_USER;\n'
     + 'GRANT ALL ON SCHEMA public TO public;';
+
+// The organization's genesis row for $1 the organizations
+// path, $2 the organization, $3 the nil predecessor. One
+// text per lock mode, so an EXPLAIN reads the product's
+// own statement.
+const ORGANIZATION_ROW_SQL =
+    'SELECT id FROM fa_message_pairs\n'
+    + 'WHERE path = $1\n'
+    + '  AND name = $2\n'
+    + '  AND supersedes = $3\n'
+    + "  AND method = 'PUT'\n";
+export const ORGANIZATION_ROW_FOR_SHARE_SQL =
+    ORGANIZATION_ROW_SQL + 'FOR SHARE';
+export const ORGANIZATION_ROW_FOR_UPDATE_SQL =
+    ORGANIZATION_ROW_SQL + 'FOR UPDATE';
+const NIL_UUID = uuidTextOfIdentifier(NIL_IDENTIFIER);
 
 export interface PostgresTx extends Tx {
     getDocumentHistory<T extends { id: string }>(
@@ -140,19 +164,32 @@ export class PostgresBackend implements StorageBackend {
         _now: string | undefined,
         tx: Tx | undefined,
     ): Promise<StatementAnswer[]> {
-        const sql = tx === undefined
-            ? this.#sql
-            : clientOf(tx);
+        const organizations = rosterOrganizationsOf(rows);
+        const own = ownOrganizationDocumentsOf(rows);
         try {
+            if (tx === undefined) {
+                if (organizations.length === 0) {
+                    return await queryStatement(
+                        this.#sql, attempt, rows,
+                    );
+                }
+                // A roster write's take must outlive its
+                // statement, so a bare one gets a
+                // transaction of its own.
+                return await this.#sql.begin(async (sql) => {
+                    await takeOrganizations(
+                        sql, organizations, own,
+                    );
+                    return queryStatement(sql, attempt, rows);
+                });
+            }
             // A 23505 aborts the surrounding transaction,
             // and postgres.js rethrows that error after
             // the caller catches it. A savepoint keeps
-            // the refusal on the statement.
-            if (tx === undefined) {
-                return await queryStatement(
-                    sql, attempt, rows,
-                );
-            }
+            // the refusal on the statement; the take runs
+            // before it, on the transaction itself.
+            const sql = clientOf(tx);
+            await takeOrganizations(sql, organizations, own);
             return await sql.begin((sp) =>
                 queryStatement(sp, attempt, rows),
             );
@@ -276,9 +313,7 @@ function postgresTx(
             path: string,
             contains: Readonly<Record<string, string>>,
         ): Promise<T[]> {
-            if (path !== BODY_INDEXED_PATH) {
-                throw new Error('no body index at ' + path);
-            }
+            assertBodyIndexed(path);
             // npm:postgres describes $2::jsonb, then
             // JSON.stringifies the value. A string is
             // encoded twice and matches nothing.
@@ -289,6 +324,18 @@ function postgresTx(
                 [path, contains],
             );
             return rows.map((row) => entityOf<T>(row));
+        },
+        async getCollectionHeadPairsBatch<
+            T extends { id: string },
+        >(reads: readonly CollectionHeadRead[]): Promise<T[][]> {
+            if (reads.length === 0) {
+                return [];
+            }
+            const statement = collectionHeadBatchStatement(reads);
+            const rows = await sql.unsafe<
+                Record<string, unknown>
+            >(statement.text, statement.parameters);
+            return batchAnswers<T>(reads.length, rows);
         },
         async append<T extends { id: string }>(
             row: T,
@@ -332,9 +379,43 @@ function postgresTx(
                 method: row.method,
             };
         },
+        async holdOrganization(
+            organizationId: string,
+        ): Promise<void> {
+            assertWritable();
+            const rows = await sql.unsafe<{ id: string }>(
+                ORGANIZATION_ROW_FOR_SHARE_SQL,
+                [ORGANIZATIONS_PATH, organizationId, NIL_UUID],
+            );
+            if (rows.length === 0) {
+                throw noOrganizationDocument(organizationId);
+            }
+        },
     };
     clients.set(tx, sql);
     return tx;
+}
+
+// FOR UPDATE on each organization's genesis row, in the
+// order given, before the roster statement: two roster
+// writers queue, and a flow write's share waits or is
+// waited on. An absent row refuses the write unless the
+// statement itself PUTs that organization's document — then
+// the statement is the genesis, and no one else can see it.
+async function takeOrganizations(
+    sql: SqlClient,
+    organizations: readonly string[],
+    own: ReadonlySet<string>,
+): Promise<void> {
+    for (const organizationId of organizations) {
+        const rows = await sql.unsafe<{ id: string }>(
+            ORGANIZATION_ROW_FOR_UPDATE_SQL,
+            [ORGANIZATIONS_PATH, organizationId, NIL_UUID],
+        );
+        if (rows.length === 0 && !own.has(organizationId)) {
+            throw noOrganizationDocument(organizationId);
+        }
+    }
 }
 
 function entityOf<T extends { id: string }>(
@@ -565,75 +646,10 @@ async function selectHeadPair(
     `;
 }
 
-// A skip walk of the document index (spec §6): one probe
-// per document, however many versions it holds. A name
-// with no PUT or DELETE pair has no head. The walked
-// heads, a small set, sort in memory.
-async function selectCollectionHeadPairs(
-    sql: SqlClient,
-    path: string,
-): Promise<Record<string, unknown>[]> {
-    return sql.query`
-        WITH RECURSIVE names AS (
-            (
-                SELECT name FROM fa_message_pairs
-                WHERE path = ${path}
-                ORDER BY name
-                LIMIT 1
-            )
-            UNION ALL
-            SELECT (
-                SELECT later.name FROM fa_message_pairs later
-                WHERE later.path = ${path}
-                  AND later.name > names.name
-                ORDER BY later.name
-                LIMIT 1
-            )
-            FROM names
-            WHERE names.name IS NOT NULL
-        )
-        SELECT heads.id, heads.operation_id, heads.path,
-            heads.name, heads.supersedes,
-            heads.requester_identity_id, heads.method,
-            to_char(response_at AT TIME ZONE 'UTC',
-                'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-                AS response_at,
-            heads.request, heads.request_salt,
-            heads.request_hash,
-            heads.request_secrets, heads.request_secrets_hash,
-            heads.response, heads.response_salt,
-            heads.response_hash,
-            heads.response_secrets,
-            heads.response_secrets_hash,
-            heads.pair_hash
-        FROM names
-        CROSS JOIN LATERAL (
-            SELECT * FROM fa_message_pairs head
-            WHERE head.path = ${path}
-              AND head.name = names.name
-              AND head.method IN ('PUT', 'DELETE')
-            ORDER BY head.response_at DESC, head.id DESC
-            LIMIT 1
-        ) heads
-        WHERE names.name IS NOT NULL
-          AND heads.method = 'PUT'
-        ORDER BY heads.response_at, heads.id
-    `;
-}
-
-// '/invitations/' is the partial index's predicate,
-// written in the statement. A bound path alone cannot
-// prove it, so a generic plan would not use the index.
-// $1 is the caller's path, bound. $2 is the containment
-// object, bound. Neither value is written into the SQL.
-if (BODY_INDEXED_PATH !== '/invitations/') {
-    throw new Error(
-        'BODY_INDEXED_PATH and its index predicate differ',
-    );
-}
-
-export const COLLECTION_HEAD_PAIRS_CONTAINING_SQL = [
-    'SELECT heads.id, heads.operation_id, heads.path,',
+// The collection head reads' projection: the pair's
+// columns, its stamp rendered as RFC 3339 text in UTC.
+const HEAD_COLUMNS: readonly string[] = [
+    'heads.id, heads.operation_id, heads.path,',
     '    heads.name, heads.supersedes,',
     '    heads.requester_identity_id, heads.method,',
     "    to_char(response_at AT TIME ZONE 'UTC',",
@@ -647,26 +663,186 @@ export const COLLECTION_HEAD_PAIRS_CONTAINING_SQL = [
     '    heads.response_secrets,',
     '    heads.response_secrets_hash,',
     '    heads.pair_hash',
-    'FROM (',
-    '    SELECT DISTINCT ON (head.name) head.*',
-    '    FROM fa_message_pairs head',
-    "    WHERE head.path = '/invitations/'",
-    '      AND head.path = $1',
-    "      AND head.method IN ('PUT', 'DELETE')",
-    '      AND head.name IN (',
-    '          SELECT version.name',
-    '          FROM fa_message_pairs version',
-    "          WHERE version.path = '/invitations/'",
-    '            AND version.path = $1',
-    '            AND fa_message_body_json(version.response)',
-    '                @> $2::jsonb',
-    '      )',
-    '    ORDER BY head.name, head.response_at DESC,',
-    '        head.id DESC',
-    ') heads',
-    "WHERE heads.method = 'PUT'",
-    'ORDER BY heads.response_at, heads.id',
-].join('\n');
+];
+
+const HEADS_ORDER = 'ORDER BY heads.response_at, heads.id';
+
+// A skip walk of the document index (spec §6): one probe
+// per document, however many versions it holds. A name
+// with no PUT or DELETE pair has no head. `path` is the
+// placeholder its value binds to; `columns` the
+// projection. Unordered: the reader orders the heads.
+function collectionHeadsSelect(
+    path: string,
+    columns: readonly string[],
+): string {
+    return [
+        'WITH RECURSIVE names AS (',
+        '    (',
+        '        SELECT name FROM fa_message_pairs',
+        '        WHERE path = ' + path,
+        '        ORDER BY name',
+        '        LIMIT 1',
+        '    )',
+        '    UNION ALL',
+        '    SELECT (',
+        '        SELECT later.name FROM fa_message_pairs later',
+        '        WHERE later.path = ' + path,
+        '          AND later.name > names.name',
+        '        ORDER BY later.name',
+        '        LIMIT 1',
+        '    )',
+        '    FROM names',
+        '    WHERE names.name IS NOT NULL',
+        ')',
+        'SELECT ' + columns.join('\n'),
+        'FROM names',
+        'CROSS JOIN LATERAL (',
+        '    SELECT * FROM fa_message_pairs head',
+        '    WHERE head.path = ' + path,
+        '      AND head.name = names.name',
+        "      AND head.method IN ('PUT', 'DELETE')",
+        '    ORDER BY head.response_at DESC, head.id DESC',
+        '    LIMIT 1',
+        ') heads',
+        'WHERE names.name IS NOT NULL',
+        "  AND heads.method = 'PUT'",
+    ].join('\n');
+}
+
+// The walked heads, a small set, sort in memory.
+export const COLLECTION_HEAD_PAIRS_SQL = collectionHeadsSelect(
+    '$1', HEAD_COLUMNS,
+) + '\n' + HEADS_ORDER;
+
+// Prepared, as the tagged query it replaced was: one
+// round trip against the cached statement.
+async function selectCollectionHeadPairs(
+    sql: SqlClient,
+    path: string,
+): Promise<Record<string, unknown>[]> {
+    return sql.unsafe<Record<string, unknown>>(
+        COLLECTION_HEAD_PAIRS_SQL, [path], { prepare: true },
+    );
+}
+
+// '/invitations/' is the partial index's predicate,
+// written in the statement. A bound path alone cannot
+// prove it, so a generic plan would not use the index.
+if (BODY_INDEXED_PATH !== '/invitations/') {
+    throw new Error(
+        'BODY_INDEXED_PATH and its index predicate differ',
+    );
+}
+
+function assertBodyIndexed(path: string): void {
+    if (path !== BODY_INDEXED_PATH) {
+        throw new Error('no body index at ' + path);
+    }
+}
+
+// `path` is the caller's path's placeholder; `contains`
+// the containment object's. Neither value is written into
+// the SQL. `columns` is the projection. Unordered: the
+// reader orders the heads.
+function containingHeadsSelect(
+    path: string,
+    contains: string,
+    columns: readonly string[],
+): string {
+    return [
+        'SELECT ' + columns.join('\n'),
+        'FROM (',
+        '    SELECT DISTINCT ON (head.name) head.*',
+        '    FROM fa_message_pairs head',
+        "    WHERE head.path = '/invitations/'",
+        '      AND head.path = ' + path,
+        "      AND head.method IN ('PUT', 'DELETE')",
+        '      AND head.name IN (',
+        '          SELECT version.name',
+        '          FROM fa_message_pairs version',
+        "          WHERE version.path = '/invitations/'",
+        '            AND version.path = ' + path,
+        '            AND fa_message_body_json(version.response)',
+        '                @> ' + contains + '::jsonb',
+        '      )',
+        '    ORDER BY head.name, head.response_at DESC,',
+        '        head.id DESC',
+        ') heads',
+        "WHERE heads.method = 'PUT'",
+    ].join('\n');
+}
+
+export const COLLECTION_HEAD_PAIRS_CONTAINING_SQL =
+    containingHeadsSelect('$1', '$2', HEAD_COLUMNS)
+    + '\n' + HEADS_ORDER;
+
+// Each entry is its single read's statement, tagged with
+// its index and its raw stamp, under UNION ALL: one
+// statement, one snapshot. Each branch keeps its single
+// read's plan; the result sorts by (entry, the single
+// read's order).
+export function collectionHeadBatchStatement(
+    reads: readonly CollectionHeadRead[],
+): {
+    readonly text: string;
+    readonly parameters: readonly unknown[];
+} {
+    const parameters: unknown[] = [];
+    const bind = (value: unknown): string => {
+        parameters.push(value);
+        return '$' + String(parameters.length);
+    };
+    const branches = reads.map((read, entry) => {
+        const columns = [
+            String(entry) + ' AS batch_entry,',
+            'heads.response_at AS batch_at,',
+            ...HEAD_COLUMNS,
+        ];
+        if (!('contains' in read)) {
+            return collectionHeadsSelect(
+                bind(read.path), columns,
+            );
+        }
+        assertBodyIndexed(read.path);
+        // The object itself, as the single read binds it:
+        // a JSON string would be encoded twice.
+        return containingHeadsSelect(
+            bind(read.path), bind(read.contains), columns,
+        );
+    });
+    return {
+        text: branches.map((branch) => '(' + branch + ')')
+            .join('\nUNION ALL\n')
+            + '\nORDER BY batch_entry, batch_at, id',
+        parameters,
+    };
+}
+
+// One answer per entry; a row names its entry.
+function batchAnswers<T extends { id: string }>(
+    count: number,
+    rows: readonly Record<string, unknown>[],
+): T[][] {
+    const answers: T[][] = Array.from(
+        { length: count }, () => [],
+    );
+    for (const row of rows) {
+        const {
+            batch_entry: entry,
+            batch_at: _at,
+            ...pair
+        } = row;
+        const answer = typeof entry === 'number'
+            ? answers[entry]
+            : undefined;
+        if (answer === undefined) {
+            throw new Error('head batch row outside its entries');
+        }
+        answer.push(entityOf<T>(pair));
+    }
+    return answers;
+}
 
 async function insertPair(
     sql: SqlClient,

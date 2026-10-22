@@ -5,6 +5,14 @@
 import postgres from 'postgres';
 import { POOL_MAX } from './advisory-lock.ts';
 
+// postgres.js's per-statement switch for `unsafe`. With
+// prepare, the text is a named statement cached per
+// connection, as a tagged query's is; without, every call
+// parses and plans afresh.
+export interface UnsafeOptions {
+    readonly prepare: boolean;
+}
+
 export interface SqlClient {
     query<T>(
         strings: TemplateStringsArray,
@@ -17,6 +25,7 @@ export interface SqlClient {
     unsafe<T>(
         query: string,
         parameters?: readonly unknown[],
+        options?: UnsafeOptions,
     ): Promise<T[]>;
     end(): Promise<void>;
 }
@@ -40,6 +49,7 @@ type Tagged = {
     unsafe: (
         query: string,
         parameters?: readonly unknown[],
+        options?: UnsafeOptions,
     ) => Promise<unknown[]>;
     end?: () => Promise<void>;
 };
@@ -71,8 +81,9 @@ function wrap(sql: Tagged): SqlClient {
         unsafe<T>(
             query: string,
             parameters?: readonly unknown[],
+            options?: UnsafeOptions,
         ): Promise<T[]> {
-            return sql.unsafe(query, parameters) as
+            return sql.unsafe(query, parameters, options) as
                 unknown as Promise<T[]>;
         },
         end(): Promise<void> {

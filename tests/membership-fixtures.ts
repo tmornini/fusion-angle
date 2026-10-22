@@ -17,6 +17,8 @@ import {
     type MembershipType,
     type MessagePairEntity,
 } from '../shared/types.ts';
+import { seedOrganizationDocument } from
+    './root-admin-fixture.ts';
 
 const ITEM_ROUTE =
     'organizations/:organization-id/invitations/:membership-id';
@@ -25,7 +27,9 @@ const PENDING_EXPIRES_AT =
 
 // A membership PUT landed below the gate and below any
 // mirror: no seat moves. In order on the head when one
-// exists, genesis otherwise.
+// exists, genesis otherwise. The ledger refuses a roster
+// row for an organization with no document, so the
+// organization's document lands first when it is absent.
 export async function landMembership(
     db: DbAdapter,
     organizationId: Id,
@@ -34,6 +38,9 @@ export async function landMembership(
     type: MembershipType,
     at: string,
 ): Promise<MessagePairEntity> {
+    await seedOrganizationDocument(
+        db, organizationId, 'Organization ' + organizationId,
+    );
     const name = membershipNameOf(organizationId, identityId);
     const body: Record<string, unknown> = {
         id: name,

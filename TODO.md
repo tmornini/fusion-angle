@@ -240,7 +240,31 @@ code comments cite; specs and plans written before the
   arrays today. After the reduction a member of `fa_api`
   connects, uses the schema, inserts into the table,
   reads its unfenced columns, and may LISTEN and NOTIFY,
-  which are commands and not grants — nothing else. One
+  which are commands and not grants — nothing else. Two
+  row locks outgrow those grants: a flow write holds its
+  organization's genesis row `FOR SHARE` and a roster
+  write takes it `FOR UPDATE`
+  (`ORGANIZATION_ROW_FOR_SHARE_SQL` and
+  `ORGANIZATION_ROW_FOR_UPDATE_SQL`,
+  `api/backend-postgres.ts:66-69`; `holdOrganization`,
+  `:382`, and `takeOrganizations`, `:405`), and Postgres
+  locks a row only for a role holding UPDATE on a column
+  of its table (the `SELECT` reference's Description,
+  https://www.postgresql.org/docs/18/sql-select.html;
+  not yet measured here). Both move behind a function
+  `fa_owner` owns and runs with its own rights, `fa_api`
+  holding only EXECUTE on it, or an equivalent that
+  leaves `fa_api` no UPDATE: a row lock lasts to its
+  transaction's end, so the lock outlives the call. The
+  move keeps both modes, and with them an accepted
+  residual: a `FOR SHARE` locker does not queue behind a
+  waiting `FOR UPDATE`, so flow saves that overlap in
+  one organization can keep its row shared without a gap
+  and starve a roster write until `statement_timeout`
+  (`STATEMENT_TIMEOUT_MS`, 30 s,
+  `server/postgres-gate.ts:10`) ends it as 504 (`57014`,
+  `api/errors-postgres.ts:25`); and every flow save marks
+  the genesis row, a MultiXact when two overlap. One
   owner verb, `migrate`, makes a cluster and its database
   match this
   build's fence, as `fa_owner`: fixed SQL beside the DDL,
@@ -297,9 +321,11 @@ code comments cite; specs and plans written before the
   does not order this item. This item changes no row and
   no column, and a test says so. Oracle: a Postgres test
   logs in as a member of `fa_api` and is refused every
-  verb but its two. KNOWN seams "A raw dump still has
-  verbatim auth messages" and "Erased PII persists as
-  superseded pairs" are reworded, not closed: the bytes
+  verb but its two, and `tests/pg-races.test.ts`'s
+  paused-flow pins pass as that member. KNOWN seams
+  "A raw dump still has verbatim auth messages" and
+  "Erased PII persists as superseded pairs" are
+  reworded, not closed: the bytes
   persist in the owner-only ledger, and `fa_api` reads
   none of them. Today: one role,
   `fusion`, owns and reads everything, and compose,
@@ -550,14 +576,13 @@ code comments cite; specs and plans written before the
   whether it logs. Replaces the compose healthcheck's
   `fetch('/')`, which proves static serving only. Item
   6's health probe; item 13 answers it per process.
-- **5.** A person's first sign-in — no page mints a human
+- **5.** A person's first sign-in — no page mints a
   credential: the seed does
   (`formSeedCredentialMessagePairs`,
-  `api/mock-data/seed-message-pairs.ts:2421`), only
-  services get a secret from the UI
-  (`postIdentityCreation`, `client/identities.ts:284`),
-  and `postHumanMemberCreation`
-  (`client/members.ts:276`) lands the identity, its
+  `api/mock-data/seed-message-pairs.ts:2458`), and a
+  service signs in by `client_credentials` and holds
+  none; `postHumanMemberCreation`
+  (`client/members.ts:278`) lands the identity, its
   PII, and a membership, and no credential, for a
   member who cannot sign in. One primitive, two flows:
   a single-use, expiring, emailed link whose holder
@@ -767,7 +792,9 @@ code comments cite; specs and plans written before the
   every node is an AI seat; record content treated as
   data, never as instruction. Consumes items 9, 10, and
   11. Includes: roster seat naming an AI agent
-  (`tests/family-registry.test.ts:97-105`);
+  (`tests/family-registry.test.ts:98-105`); an AI seat's
+  identity is a `service` identity with an accepted
+  membership;
   FLOW-CANVAS.md's display-only AI checkboxes
   (`## Members and attributes`).
 - **13.** Two processes — high availability for the app and
@@ -1726,6 +1753,31 @@ Off the critical path; each with its oracle.
   machines, and `./test browser` has been green on one
   machine only. Add it if two machines disagree.
   Oracle: `./test browser` green on two machines
+- Browser profile removal races Chrome's exit —
+  `Browser.close()` (`tests/browser/fixtures.ts`,
+  ~:480-498) closes the CDP socket, calls
+  `killProcessTree(this.chrome)`
+  (`web-app/app/cdp-client.ts:115`, SIGTERM then
+  SIGKILL to the descendants and the child; it never
+  awaits exit), then `Deno.removeSync(this.userDataDir,
+  { recursive: true })`. A Chrome still exiting writes
+  into the profile mid-removal, which throws
+  `Directory not empty (os error 66)` as an uncaught
+  error from `useBrowser`'s `afterAll` and fails the
+  file though every test in it passed. Seen 2026-10-22
+  on Deno 2.9.8: `./test browser` 54 passed, 1 failed
+  (`tests/browser/canvas-keyboard.test.ts`), then 54/0
+  on an immediate re-run at the same commit. Two
+  `fusion-browser-*` profiles sat in `$TMPDIR`: that
+  run's (174 files, the removal aborted early) and one
+  dated 2026-09-16, so the race predates the 2.9.8
+  bump; the removal took this shape in `6378558e`
+  (node's `rmSync` raced the same way). Fix: `close()`
+  awaits the child's exit status after the kill and
+  before the removal, and a failed removal leaves no
+  profile behind or is reported, never silent. Oracle:
+  N consecutive `./test browser` runs green with no
+  `fusion-browser-*` profile left in `$TMPDIR`.
 - No error-message allowlist. `safeErrorMessage`
   (`server/postgres-gate.ts:101-121`) prints a message
   only if a set names it, else `seed failed` (seed,
@@ -2527,7 +2579,7 @@ Off the critical path; each with its oracle.
   a missing stamp throws
 - Roster map mints `{ erased: true }` before the PII
   fill. `buildHumanMemberMap` plants a tombstone on
-  every seat (`client/members.ts:125`);
+  every seat (`client/members.ts:128`);
   `getHumanMemberMap` then overwrites it: a sentinel
   standing in for absence. A fill that throws leaves seats looking
   erased. Oracle: `buildHumanMemberMap` carries no
@@ -2579,11 +2631,125 @@ Off the critical path; each with its oracle.
   payload, and `POOL_MAX`; its `advisoryKey` and
   `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have no
   product caller, and 'two first-writers: one 201, not
-  a double insert' (`tests/pg-races.test.ts:241-258`)
+  a double insert' (`tests/pg-races.test.ts:622-679`)
   holds a lock the product never takes, so its hold
   bites nothing. Oracle: the module's name says what it holds,
   `advisoryKey` leaves with its tests, and the race test
   holds only what the product holds
+- The If-Match race holds a row the product never locks.
+  'If-Match race: one 200, one 412'
+  (`tests/pg-races.test.ts:681-760`) takes `SELECT … FOR
+  UPDATE` on the flow's live head (`:715-721`), a row no
+  product statement locks — a flow write locks only its
+  organization's genesis row, and two writers on one head
+  part at the ledger statement — so its hold bites
+  nothing, and `delay(300)` (`:744`) is a timer that only
+  hopes both PUTs reach their head read while it holds.
+  The one 200 and one 412 come from the ledger statement
+  whatever the hold does. Oracle: the pin forces both PUTs
+  to read the head before either statement lands, through
+  a seam and a count-bound probe as the paused-flow pins
+  do, with no timer and no lock the product does not take
+- Undo restores a graph the flow write law never sees.
+  `postFlowUndoOp` (`api/routes.ts:1447-1495`) lands an
+  earlier version's graph through `runStateWrite` with
+  neither `tx.holdOrganization` nor
+  `assertLiveFlowGraphWriteLaw`; only the flow PUT
+  (`:1418`) and the flow create (`:4324`) run them. An
+  undo to a version that named an AI agent whose seat has
+  since been removed, or a program whose document is
+  gone, lands that graph on both backends. Read from the
+  code, not yet pinned; it predates the service-members
+  branch. Fix: the undo holds the organization first and
+  runs the law on the restored graph in one transaction,
+  as the PUT does; what a refused undo answers is the
+  owner's call. Oracle: a memory pin that an undo to a
+  graph naming a removed agent is refused, and a race pin
+  in `tests/pg-races.test.ts` that a seat removal under a
+  paused undo lands after it or refuses it
+- The no-bypass guard names sites, not calls. 'every
+  product append is a named site'
+  (`tests/ledger-writers.test.ts:105-134`) keys each
+  sanctioned `.append` by file and receiver name, so a
+  second `tx.append` in `api/store-history-entity.ts`
+  (sanctioned once, `:134`), or a `Tx` named `headers` or
+  `params` in a file whose `Headers` or `URLSearchParams`
+  append is sanctioned (`:36-60`), passes, and
+  `const { append } = tx` is never matched. A roster row
+  landed that way takes no `FOR UPDATE` and reopens the
+  flow write law's race. Two looser edges: the INSERT
+  check sanctions all of `api/ledger-statement-sql.ts`,
+  and a comment that spells an append fails the guard
+  (loud, never silent). Oracle: each site carries its
+  occurrence count, a destructured or aliased `append` is
+  an offender, and a scratch second `tx.append` in
+  `store-history-entity.ts` turns the pin red
+- The genesis tolerance trusts any organization PUT.
+  `ownOrganizationDocumentsOf`
+  (`api/organization-hold.ts:93-112`) names every
+  organization a statement PUTs, and both twins excuse a
+  roster row whose organization has no genesis row when
+  it is named there (`takeOrganizations`,
+  `api/backend-postgres.ts:405-419`; memory `#apply`,
+  `api/backend-memory.ts:172-183`); the seed's blind
+  organization PUTs leave the latch unable to say which
+  PUT creates. A genesis row that exists is still locked,
+  so the excuse reaches only an organization no committed
+  row shows yet, and no flow can name it. Only the seed's
+  first batch composes an organization PUT with roster
+  rows today; `putLiveOrganizationDocumentOp` PUTs alone.
+  Oracle: the excuse admits only a PUT that creates the
+  genesis (supersedes the nil uuid), pinned on both twins
+  when a live writer first composes the two
+- Three names spell the organizations path.
+  `ORGANIZATIONS_PATH` (`api/organization-hold.ts:19`),
+  `ORGANIZATIONS_PREFIX` (`api/derive-organizations.ts:66`)
+  and `ORGANIZATIONS_PATH_PREFIX`
+  (`api/derive-states.ts:88`) each hold
+  `/organizations/`, and `api/routes.ts` forms it again
+  with `canonicalPath(undefined, '/organizations/')`. The
+  hold's own constant stayed because importing either
+  derive module into the hold inverts the dependency
+  direction. Oracle: one exported constant in a module
+  all four import, and no other literal of the path
+- The hold's program path parse takes any organization.
+  `programOrganizationOf` (`api/organization-hold.ts:76-91`)
+  returns the path's organization segment unchecked,
+  where the membership branch checks its half with
+  `isIdentifier`. A malformed segment fails loud at the
+  lock, as `noOrganizationDocument`, never silently.
+  Oracle: the parse returns only an identifier, pinned
+  in `tests/organization-hold.test.ts`, with a case for a
+  path of the wrong segment count
+- A race pin's probe cap leaves its requests in flight.
+  When `racedUnderPausedFlow`
+  (`tests/pg-races.test.ts:522-590`) or the paused-take
+  runner (`:930-1003`) throws at `PROBE_LIMIT`, the flow
+  and roster requests are still pending as `finally`
+  ends their clients, so a red pin can report their late
+  failure or a sanitizer leak beside its own message.
+  Red-only noise. Oracle: on the cap, each runner
+  releases its seams and settles both requests before it
+  ends a client, and a capped run reports the probe
+  message alone
+- The paused-flow seam pauses one read.
+  `pausedAfterRosterRead` (`tests/pg-races.test.ts:302-345`)
+  intercepts only `getCollectionHeadPairsBatch`, the
+  law's one roster read today, and its `read:` handle is
+  not paused. A law that reads the roster another way
+  never pauses, and every paused-flow pin fails loud
+  ('the flow write answered … before its roster read',
+  `:545-549`) though the product is right. Oracle: the
+  seam pauses after whichever roster read the law makes
+- The organization fixture would PUT over a deleted one.
+  `seedOrganizationDocument`
+  (`tests/root-admin-fixture.ts:72-112`) skips an
+  organization only when `deriveOrganizations` lists it
+  live, so for a deleted one it forms a blind PUT on a
+  chain that already has a head. No test does that
+  today. Oracle: the fixture skips any organization with
+  a head, live or deleted, or refuses a deleted one
+  loudly
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
@@ -2892,7 +3058,9 @@ Off the critical path; each with its oracle.
   `api/request-context.ts:42-45` keeps `requestAt` in
   a requests row,
   `api/postgres-client.ts:2-3` taking advisory locks
-  inside `begin`, and ARCHITECTURE.md:230-235 calling
+  inside `begin`, `api/backend-memory.ts:47` and
+  `api/store-serializer.ts:7` ordering cross-process by
+  advisory locks, and ARCHITECTURE.md:230-235 calling
   reads an open write-gate transaction's; and one
   comment appears twice (`api/mock-data.ts:179-183`,
   `:190-194`). Reword each to the
@@ -3325,16 +3493,14 @@ Off the critical path; each with its oracle.
   default organization, since PRIMARY takes the
   earliest join and the personal organization would be
   every person's earliest.
-- Remove the never-verified `client_secret`: the
-  credential kind, the seed row, the dialog field, and
-  the service's Credentials card. OAuth's
-  `client_credentials` `grant_type` with
-  `private_key_jwt` covers the need. Before the
-  service-identity rule (G47).
+- A members-page control to reinstate a removed member.
+  The API already reinstates one through the item PUT
+  (`removed` → `accepted`); the page offers Remove only.
+  Oracle: a removed AI, service, or human member
+  restores from the Former members view, as `type:
+  'member'`.
 - Rewrite bare prose "admin" in the living docs as
   "organization admin" or "operator".
-- A service-identity rule: membership or a fence of
-  its own (G47).
 - Move items and versions under `memberships/`, with
   `identities/:id/memberships/` subsuming
   `identities/:id/organizations/`.
@@ -3342,6 +3508,51 @@ Off the critical path; each with its oracle.
   `--check`.
 - Retire the leftover role-grant identifiers.
 - Delete a pending invitation after `expires_at`.
+- A whitespace-only name passes the members page check
+  (`web-app/members/index.ts:682` tests the untrimmed
+  value, then trims), and `validateServiceDocumentBody`
+  and `validateAiAgentDocumentBody` accept `''`
+  (`asString`, `shared/json-assert.ts:54`). Oracle: both
+  gates refuse an empty name, and the page checks the
+  trimmed values.
+- Membership reads make 1+N sequential identity head
+  reads (`api/derive-identity-spine.ts:448-455`); the
+  memory median went 0.432 to 0.563 ms, and Postgres is
+  unmeasured. Oracle: measure on Postgres before
+  batching.
+- `buildShell` and the action-button builders are
+  byte-identical in `human-member-detail.ts`,
+  `ai-member-detail.ts` and `service-member-detail.ts`
+  (`web-app/app/presenters/`, `buildShell` at
+  `service-member-detail.ts:62`). Share the member
+  detail chrome. Oracle: one definition of each
+  remains under `web-app/app/presenters/`.
+- The accepted-memberships path is built four times
+  (`client/admin.ts:48`, `ai-members.ts:42`,
+  `members.ts:66`, `members-union.ts:57`). Export one
+  builder from `client/members.ts`. Oracle: `grep -rn
+  "state=accepted" client/` finds one line.
+- Unreachable `isHumanSeat` checks:
+  `client/service-members.ts:78` and the no-op filter at
+  `client/members-union.ts:78`. Oracle: both removed,
+  `./test validate` green.
+- `required` sits on the service fields only
+  (`web-app/members/index.html:318,331`); the dialog
+  has no form submit, and the siblings carry none.
+  Oracle: the attribute is on all the dialogs' fields
+  or none, and the page check is the one gate.
+- Tests: no client-verb pin that a second
+  `postAIMemberCreation` of one id is 409;
+  `tests/api-memberships.test.ts:727-810` never
+  asserts the pair count is unchanged after its
+  refused retype, reinstatement and direct seat. Oracle: both pins
+  exist and are red when the refusal writes a pair.
+- `postServiceDocumentOp` (`api/routes.ts:2640-2657`)
+  and the AI op answer an entity and write nothing when
+  given no pair; `tests/mock-data-pairs.test.ts:84-170`'s
+  count addends do not sum to 1889. Oracle: the ops
+  refuse a missing pair, and the addends sum to
+  `EXPECTED_MESSAGE_PAIR_COUNT`.
 
 ## Sequencing
 

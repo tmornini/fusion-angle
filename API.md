@@ -56,10 +56,11 @@ every request (`incomingContext`), then `dispatched`:
    names an identity outside this organization`.
    Self stays self: the seat check is skipped.
    Absent, orphan, and foreign are that same 403,
-   not 404. `POST identities/` is not this fence.
+   not 404. `POST identities/` is not this fence; it
+   creates a person only, and `kind: 'service'` is 400.
    `GET identities/` is the accepted-membership
    roster: it lists co-members of the claim
-   organization.
+   organization, AI and service members included.
 6. **Body parse** for PUT/POST/PATCH, then **the
    conditional** (`preconditionRefusal`): its
    presence and form, per route and verb, with no
@@ -270,7 +271,7 @@ through E are the write shapes the spec audits
 | Conditional | Takes | Routes |
 |---|---|---|
 | `optional` | If-Match, If-None-Match: *, or neither; a DELETE's useful one is If-Match (If-None-Match: * passes the gate, but a live head refuses it 412) | class A document PUTs; every DELETE but the release |
-| `required` | If-Match or If-None-Match: * | class B: the flow, work-order, and organization document PUTs; the instance PATCH; the organization-nest membership item `organizations/:id/invitations/:membership-id` |
+| `required` | If-Match or If-None-Match: * | class B: the flow, work-order, and organization document PUTs; the organization's AI and service member document PUTs; the instance PATCH; the organization-nest membership item `organizations/:id/invitations/:membership-id` |
 | `in-order` | If-Match, one tag per document the operation derives from | class C operations: conversion, undo, claim and release, transition, binding, and the identity-nest membership PUTs (accept and decline) |
 | `none` | no conditional | class D POST creates; class E operations: the invitation POST, token rotation and revocation |
 
@@ -388,11 +389,43 @@ one document, `<organization-id>:<identity-id>`.
 
 **Membership statement.**
 `POST organizations/:id/memberships/` →
-`postOrganizationMembership`. One statement, three
-handler-declared geneses (the accepted membership at
-`/invitations/`, the person identity, and its PII).
+`postOrganizationMembership`. The body carries a
+required `kind`: `human`, `ai`, or `service`. A missing
+or unknown kind is 400. One statement, three
+handler-declared geneses, and the kind picks the last
+two:
+- human: the accepted membership at `/invitations/`, the
+  `person` identity, and its PII
+- ai: the accepted membership, a `service` identity, and
+  the `organizations/<organization-id>/ai-agents/<id>`
+  document
+- service: the accepted membership, a `service`
+  identity, and the
+  `organizations/<organization-id>/services/<id>`
+  document
+
 201 the membership. Location the invitation item. A
-resend is 409. A member token is 403.
+resend is 409. A member token is 403. An `ai` or
+`service` body with `type: 'admin'` is 400.
+
+**Organization member documents.**
+`organizations/:id/ai-agents/` and
+`organizations/:id/services/` hold an AI member's and a
+service member's descriptive document, one per
+organization: the same id at two organizations is two
+documents. GET is a member's; PUT is class B
+(`required`) and edits only. An absent id is 404 whatever
+conditional the PUT carries, and a PUT with neither
+precondition is 428. A foreign AI or service member id
+under the caller's own path is 404, never 403. The
+global `ai-agents/` routes are gone. The statement
+creates the document; the item PUT does not.
+
+**Flow write law.** A node's `memberIds` refuses any of
+the organization's AI or service member ids, accepted or
+removed, with 400: a program stays a program after its
+membership ends. A node's `agentIds` must name AI members
+whose membership is accepted, or it is 400.
 
 **Idea conversion.**
 `POST organizations/:id/ideas/:id/conversion` in
@@ -442,6 +475,22 @@ GET of a co-member's identity nest is 403. Self is
 200. A bad query is 400. A view that selects none is
 204.
 
+A read of the organization nest (`memberships/`,
+`invitations/`, and `invitations/:membership-id`)
+serves the stored body plus `identity_kind`, `'person'`
+or `'service'`, derived from the seat's identity
+document in the transaction that read the seat and
+never stored. A member is human if and only if its
+`identity_kind` is `'person'`. The item PUT genesis
+(`If-None-Match: *`) on
+`organizations/:id/invitations/:membership-id` naming
+an identity with no identity document answers 404, and a
+read of a seat with no identity document answers 500,
+which signals a store bug. Every member kind, human, AI,
+and service, uses a seat on the organization's Seats
+bar. The organization page's Active People stat counts
+person seats only.
+
 The identity-nest item is `in-order`. Accept
 (`pending` → `accepted`) and decline
 (`pending` → `declined`) are the invitee's PUTs.
@@ -452,7 +501,11 @@ never written. Revoke, removal (`accepted` →
 `removed`), a type change, and a direct `accepted`
 write are the admin's PUTs there. A transition that
 is not in the table is 409, and so is removing or
-demoting the last accepted admin. A stale latch is
+demoting the last accepted admin. Promoting an AI or
+service member to `admin`, by retype, direct seat, or
+reinstatement, is 409. The item PUT reinstates a
+removed member (`removed` → `accepted`) of any kind. A
+stale latch is
 412. DELETE on a membership is 405. A membership is
 never `deleted`, so its GET is never 410.
 
@@ -520,8 +573,8 @@ HTTP nest. Validators, crypto, hash, and
 
 ## Seed pair formation
 
-Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1882`, root
-included; bootstrap nine, root included. Pinned by
+Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1889`, root
+included; bootstrap eight, root included. Pinned by
 `tests/mock-data-pairs.test.ts`. A pair's request holds
 what was received, or nothing. A seeded row was never
 received, so every seeded row stores an empty request,

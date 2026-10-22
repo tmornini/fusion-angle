@@ -47,11 +47,13 @@ import type { NotificationEvent } from
     '../shared/notifications.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
-import type {
-    Attempt,
-    Outcome,
-    StatementAnswer,
-    StatementBind,
+import {
+    type Attempt,
+    type Head,
+    isStaleLatch,
+    type Outcome,
+    type StatementAnswer,
+    type StatementBind,
 } from '../shared/ledger-statement.ts';
 import {
     SuccessionConflict,
@@ -738,6 +740,16 @@ export function attemptFor(
         return 'in-order';
     }
     return 'blind';
+}
+
+// The statement's own latch judgment, run ahead against a
+// head the write's transaction read: true when its lone
+// row would answer stale.
+export function isStalePairLatch(
+    pair: MessagePair,
+    head: Pick<Head, 'id' | 'method'> | null,
+): boolean {
+    return isStaleLatch(ifMatchOf(attemptFor([pair]), pair), head);
 }
 
 export async function runWrite(

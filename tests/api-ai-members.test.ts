@@ -43,7 +43,8 @@ async function freshDb() {
     return db;
 }
 
-Deno.test('PUT /ai-agents/:id writes the agent', async () => {
+Deno.test('PUT /organizations/:id/ai-agents/:id writes'
++ ' the agent', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await seedAIMember(db, 'UQTJZvCoKlFjEoDlDUwekw', 'Seated');
@@ -62,7 +63,7 @@ Deno.test('PUT /ai-agents/:id writes the agent', async () => {
         body: agentFields('Claude'),
         headers: { 'If-Match': etag },
     }));
-    assert(put.status === 201 || put.status === 200);
+    assertStrictEquals(put.status, 200);
     const got = (await GET<{ name: string }>(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
             + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,

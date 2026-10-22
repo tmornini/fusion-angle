@@ -159,7 +159,10 @@ shim.
 Regular nodes (not start/end) carry a
 `memberIds: MemberId[]` field (zero or more person
 members / identities) and an optional
-`agentIds: AgentId[]` field (live `/ai-agents` ids). The
+`agentIds: AgentId[]` field (the organization's live AI
+members, those whose membership is accepted). The write
+law refuses an AI or service member id in `memberIds`,
+accepted or removed. The
 panel body renders a `<fieldset>` with two
 `<div class="member-group">` children — HUMANS and AIs —
 each holding a labeled `<input type="checkbox">`. Humans

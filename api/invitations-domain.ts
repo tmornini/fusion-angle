@@ -7,6 +7,7 @@ import {
     HTTP_NOT_FOUND,
 } from '../shared/http-errors.ts';
 import {
+    SYSTEM_MEMBER_ID,
     ValidationError,
     nowUtc,
     type Id,
@@ -19,6 +20,7 @@ import {
     assertOnlyKeys,
     type MembershipCreate,
     SERVICE_ADMIN_REFUSAL,
+    SYSTEM_SEAT_REFUSAL,
     validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
@@ -502,9 +504,11 @@ function identityKindJoin(
 }
 
 // The seats' identity kinds, read in the caller's
-// transaction: a seat and its kind are one snapshot, so a
-// service member landing between the two reads is never
-// read as a person.
+// transaction. Under READ COMMITTED the reads are not one
+// snapshot; the order closes the race: seats are read
+// before kinds, and a seat lands in the same commit as its
+// identity document, so a service member landing between
+// the two reads is never read as a person.
 function seatedIdentityKinds(
     view: DbAdapter,
     heads: readonly MessagePairEntity[],
@@ -766,6 +770,14 @@ export async function postOrganizationMembership(
     }
     const organizationId = param(params, 0);
     const created = validateMembershipCreateBody(payload);
+    // The system identity authors the seed and holds no
+    // seat. The statement's own identity genesis would
+    // collide with the seed's document; the rule answers
+    // first, so the refusal names it and depends on no
+    // seed.
+    if (created.id === SYSTEM_MEMBER_ID) {
+        throw new ApiError(SYSTEM_SEAT_REFUSAL, HTTP_CONFLICT);
+    }
     const name = membershipNameOf(
         organizationId, created.id,
     );
@@ -996,6 +1008,18 @@ async function putMembership(
         return servedHead(head, received.requestId);
     }
     const next = settledMembership(outcome.next);
+    // The system identity authors the seed and holds no
+    // seat in any organization. Its document is the seed's,
+    // so the absent-identity rule below would not speak;
+    // a genesis or a reinstatement to accepted is a
+    // conflict, refused before the identity read. A
+    // removal stays open, so such a seat can be cleared.
+    if (
+        next.state === 'accepted'
+        && parsed.identityId === SYSTEM_MEMBER_ID
+    ) {
+        throw new ApiError(SYSTEM_SEAT_REFUSAL, HTTP_CONFLICT);
+    }
     // One identity read serves two refusals. A seat names
     // an identity with its document (memberGeneses and
     // postBootstrapIn write both), so a genesis naming an

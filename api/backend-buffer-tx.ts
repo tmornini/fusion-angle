@@ -4,12 +4,19 @@ import {
 import {
     UniqueConstraintError,
     uniqueColumns,
+    type CollectionHeadRead,
     type Tx,
     type TxMode,
 } from './db.ts';
 import { BODY_INDEXED_PATH } from './schema-postgres.ts';
-import { compareIdentifiers } from
-    '../shared/identifier.ts';
+import {
+    noOrganizationDocument,
+    ORGANIZATIONS_PATH,
+} from './organization-hold.ts';
+import {
+    compareIdentifiers,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import { Octets } from '../shared/http-message/octets.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
@@ -114,6 +121,21 @@ function bodyContains(
     return true;
 }
 
+// The organization's genesis row, as the Postgres hold
+// selects it: path, name, the nil predecessor, PUT.
+export function hasOrganizationGenesis(
+    buffer: readonly { id: string }[],
+    organizationId: string,
+): boolean {
+    return buffer.some((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === ORGANIZATIONS_PATH
+            && rec['name'] === organizationId
+            && rec['method'] === PUT_METHOD
+            && rec['supersedes'] === NIL_IDENTIFIER;
+    });
+}
+
 function documentRows(
     buffer: readonly { id: string }[],
     path: string,
@@ -125,6 +147,60 @@ function documentRows(
             && rec['name'] === name
             && isDocumentMethod(rec['method']);
     });
+}
+
+// The live PUT heads among a collection's PUT and DELETE
+// rows, one per name, as copies in (response_at, id) order.
+function liveHeadsOf(
+    documents: readonly { id: string }[],
+): { id: string }[] {
+    const heads = latestByKey(
+        documents.map(keyedByResponseAt),
+        (keyed) => String(keyed.row['name']),
+    );
+    const live: { id: string }[] = [];
+    for (const head of heads.values()) {
+        if (head.row['method'] === PUT_METHOD) {
+            live.push(head.row);
+        }
+    }
+    return live
+        .sort(byResponseAtThenId)
+        .map((row) => ({ ...row }));
+}
+
+function collectionHeadPairs(
+    buffer: readonly { id: string }[],
+    path: string,
+): { id: string }[] {
+    return liveHeadsOf(buffer.filter((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === path
+            && isDocumentMethod(rec['method']);
+    }));
+}
+
+function collectionHeadPairsContaining(
+    buffer: readonly { id: string }[],
+    path: string,
+    contains: Readonly<Record<string, string>>,
+): { id: string }[] {
+    if (path !== BODY_INDEXED_PATH) {
+        throw new Error('no body index at ' + path);
+    }
+    const names = new Set<string>();
+    for (const row of buffer) {
+        const rec = row as Record<string, unknown>;
+        if (rec['path'] !== path) continue;
+        if (!bodyContains(row, contains)) continue;
+        names.add(String(rec['name']));
+    }
+    return liveHeadsOf(buffer.filter((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === path
+            && names.has(String(rec['name']))
+            && isDocumentMethod(rec['method']);
+    }));
 }
 
 // Builds a row-granular Tx handle over a pre-loaded copy
@@ -216,24 +292,7 @@ export function bufferTx(
         async getCollectionHeadPairs<
             T extends { id: string },
         >(path: string): Promise<T[]> {
-            const documents = buffer.filter((row) => {
-                const rec = row as Record<string, unknown>;
-                return rec['path'] === path
-                    && isDocumentMethod(rec['method']);
-            });
-            const heads = latestByKey(
-                documents.map(keyedByResponseAt),
-                (keyed) => String(keyed.row['name']),
-            );
-            const live: { id: string }[] = [];
-            for (const head of heads.values()) {
-                if (head.row['method'] === PUT_METHOD) {
-                    live.push(head.row);
-                }
-            }
-            return live
-                .sort(byResponseAtThenId)
-                .map((row) => ({ ...row })) as T[];
+            return collectionHeadPairs(buffer, path) as T[];
         },
         async getCollectionHeadPairsContaining<
             T extends { id: string },
@@ -241,35 +300,20 @@ export function bufferTx(
             path: string,
             contains: Readonly<Record<string, string>>,
         ): Promise<T[]> {
-            if (path !== BODY_INDEXED_PATH) {
-                throw new Error('no body index at ' + path);
-            }
-            const names = new Set<string>();
-            for (const row of buffer) {
-                const rec = row as Record<string, unknown>;
-                if (rec['path'] !== path) continue;
-                if (!bodyContains(row, contains)) continue;
-                names.add(String(rec['name']));
-            }
-            const documents = buffer.filter((row) => {
-                const rec = row as Record<string, unknown>;
-                return rec['path'] === path
-                    && names.has(String(rec['name']))
-                    && isDocumentMethod(rec['method']);
-            });
-            const heads = latestByKey(
-                documents.map(keyedByResponseAt),
-                (keyed) => String(keyed.row['name']),
-            );
-            const live: { id: string }[] = [];
-            for (const head of heads.values()) {
-                if (head.row['method'] === PUT_METHOD) {
-                    live.push(head.row);
-                }
-            }
-            return live
-                .sort(byResponseAtThenId)
-                .map((row) => ({ ...row })) as T[];
+            return collectionHeadPairsContaining(
+                buffer, path, contains,
+            ) as T[];
+        },
+        async getCollectionHeadPairsBatch<
+            T extends { id: string },
+        >(reads: readonly CollectionHeadRead[]): Promise<T[][]> {
+            return reads.map((read) => (
+                'contains' in read
+                    ? collectionHeadPairsContaining(
+                        buffer, read.path, read.contains,
+                    )
+                    : collectionHeadPairs(buffer, read.path)
+            ) as T[]);
         },
         async append<T extends { id: string }>(
             row: T,
@@ -314,6 +358,17 @@ export function bufferTx(
             } as { id: string };
             buffer.push(written);
             return true;
+        },
+        // Memory transactions are already serial, so the hold
+        // is the existence check alone — the twin of the
+        // Postgres row share.
+        async holdOrganization(
+            organizationId: string,
+        ): Promise<void> {
+            assertWritable();
+            if (!hasOrganizationGenesis(buffer, organizationId)) {
+                throw noOrganizationDocument(organizationId);
+            }
         },
         ledgerBuffer(): { id: string }[] {
             return buffer;

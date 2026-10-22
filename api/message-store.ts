@@ -56,7 +56,7 @@ function jsonBodyOf(message: string): unknown | undefined {
     return JSON.parse(body.toText());
 }
 
-function entitiesOf(
+export function entitiesOf(
     messagePairs: readonly MessagePairEntity[],
 ): unknown[] {
     const entities: unknown[] = [];

@@ -7,8 +7,10 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { seedPersonIdentity } from
-    './identity-fixtures.ts';
+import {
+    seedPersonIdentity,
+    seedServiceIdentity,
+} from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { landMembership } from './membership-fixtures.ts';
@@ -21,6 +23,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
+import { SYSTEM_MEMBER_ID } from '../shared/types.ts';
 
 const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
@@ -31,6 +34,8 @@ const INVITATION_ALPHABET =
     'state must be one of pending, declined, revoked';
 const MEMBERSHIP_ALPHABET =
     'state must be one of accepted, removed';
+const SYSTEM_SEAT =
+    'the system identity cannot hold a seat';
 
 function nest(
     view: 'memberships' | 'invitations',
@@ -643,9 +648,121 @@ async () => {
     );
 });
 
+// The system identity authors the seed and holds no seat
+// in any organization. Its document is the seed's (kind
+// service), so the unknown-identity 404 does not speak;
+// an organization admin's genesis naming it is refused as
+// a conflict, appends nothing, and leaves no item to read.
+Deno.test('a seat for the system identity is refused',
+async () => {
+    const { db, admin } = await seeded();
+    await seedServiceIdentity(db, SYSTEM_MEMBER_ID);
+    const name = membershipNameOf(STARK, SYSTEM_MEMBER_ID);
+    const before = (await db.messagePairs.getAll()).length;
+    const seated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: nest('invitations') + name,
+        token: admin,
+        body: { state: 'accepted', type: 'member', at: AT },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(seated.status, 409);
+    assertEquals(await seated.json(), { error: SYSTEM_SEAT });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    const item = await read(
+        db, admin, nest('invitations') + name,
+    );
+    assertStrictEquals(item.status, 404);
+    await item.body?.cancel();
+});
+
+// Below the gate a store bug can leave the system identity
+// a removed seat. The table moves a removed seat back to
+// accepted for an organization admin; the rule refuses
+// any accepted seat for it, so the reinstatement is the
+// same conflict and appends nothing.
+Deno.test('a removed system seat is never reinstated',
+async () => {
+    const { db, admin } = await seeded();
+    await seedServiceIdentity(db, SYSTEM_MEMBER_ID);
+    await landMembership(
+        db, STARK, SYSTEM_MEMBER_ID, 'removed', 'member', AT,
+    );
+    const path = nest('invitations')
+        + membershipNameOf(STARK, SYSTEM_MEMBER_ID);
+    const held = await read(db, admin, path);
+    assertStrictEquals(held.status, 200);
+    await held.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const reinstated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path,
+        token: admin,
+        body: { state: 'accepted', type: 'member', at: AT },
+        headers: { 'If-Match': held.headers.get('ETag')! },
+    }));
+    assertStrictEquals(reinstated.status, 409);
+    assertEquals(
+        await reinstated.json(), { error: SYSTEM_SEAT },
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+// The statement declares its own identity genesis, so on
+// a seeded db it would collide with the seed's document;
+// the refusal is the rule, not the collision, and answers
+// the same conflict before any write.
+Deno.test('the memberships statement refuses the system'
+    + ' identity', async () => {
+    const { db, admin } = await seeded();
+    await seedServiceIdentity(db, SYSTEM_MEMBER_ID);
+    const before = (await db.messagePairs.getAll()).length;
+    const created = await post(
+        db, admin, serviceBody(SYSTEM_MEMBER_ID),
+    );
+    assertStrictEquals(created.status, 409);
+    assertEquals(await created.json(), { error: SYSTEM_SEAT });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
+// On the seeded state — the system identity's document
+// present, no seat — no organization-nest read names it:
+// a seat row by its identity_id, an identity row by its id.
+Deno.test('no organization-nest read lists the system'
+    + ' identity', async () => {
+    const { db, admin } = await seeded();
+    await seedServiceIdentity(db, SYSTEM_MEMBER_ID);
+    for (const path of [
+        nest('memberships', '?state=accepted'),
+        nest('invitations'),
+        '/identities/',
+    ]) {
+        const listed = await read(db, admin, path);
+        assertStrictEquals(listed.status, 200, path);
+        const rows = await partBodiesOf<{
+            id: string;
+            identity_id?: string;
+        }>(listed);
+        assert(rows.length > 0, path);
+        assert(
+            rows.every((row) =>
+                row.id !== SYSTEM_MEMBER_ID
+                && row.identity_id !== SYSTEM_MEMBER_ID),
+            path,
+        );
+    }
+});
+
 // Below the gate a store bug can still seat an identity with
-// no document; every membership read then fails loudly,
-// never reading the seat as a person.
+// no document; an organization-nest roster read then fails
+// loudly, never reading the seat as a person. Identity-nest
+// reads serve as stored.
 Deno.test('a read of a seat with no identity fails loudly',
 async () => {
     const { db, admin } = await seeded();

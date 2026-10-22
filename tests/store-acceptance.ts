@@ -2,8 +2,12 @@ import {
     assert, assertEquals, assertRejects, assertStrictEquals,
 } from '@std/assert';
 import type { DbAdapter } from '../api/db.ts';
+import { backedWrite } from '../api/db-backed.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
+import { MEMBERSHIPS_PATH } from '../api/memberships.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { handleRequest } from '../api/api.ts';
 import { messageStore } from '../api/message-store.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -33,6 +37,7 @@ import { ledgerFields } from './ledger-row.ts';
 // covering the cases without Postgres.
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
 
@@ -174,6 +179,9 @@ function orderRow(
 }
 
 const HEAD_PATH = '/head-pin/';
+const OTHER_HEAD_PATH = '/head-batch-pin-other/';
+const EMPTY_HEAD_PATH = '/head-batch-pin-empty/';
+const FRESH_PATH = '/fresh-open-pin/';
 
 function pairRow(
     id: string,
@@ -236,15 +244,25 @@ function stamp(k: number): string {
 const ENVELOPE_PATH = '/envelope-pin/';
 const ENVELOPE_NAME = 'doc';
 
-// Same date split bindOf uses: the statement splices
-// the stamp into the value and matches on the body.
-function envelopeBind(fields: {
+type BindFields = {
     id: string,
     operationId: string,
     requesterIdentityId: string,
     body: string,
     ifMatch: string | null,
-}): StatementBind {
+};
+
+function envelopeBind(fields: BindFields): StatementBind {
+    return bindAt(ENVELOPE_PATH, ENVELOPE_NAME, fields);
+}
+
+// Same date split bindOf uses: the statement splices
+// the stamp into the value and matches on the body.
+function bindAt(
+    path: string,
+    name: string,
+    fields: BindFields,
+): StatementBind {
     const wire = 'HTTP/1.1 201 \r\n'
         + 'date: ' + DATE_PLACEHOLDER + '\r\n'
         + '\r\n'
@@ -256,8 +274,8 @@ function envelopeBind(fields: {
     return {
         id: fields.id,
         operationId: fields.operationId,
-        path: ENVELOPE_PATH,
-        name: ENVELOPE_NAME,
+        path,
+        name,
         requesterIdentityId: fields.requesterIdentityId,
         method: 'PUT',
         request: new TextEncoder().encode('req'),
@@ -271,7 +289,7 @@ function envelopeBind(fields: {
         responseSecrets: new Uint8Array(0),
         ifMatch: fields.ifMatch,
         notify: notifyPayload(eventForMessagePair({
-            path: ENVELOPE_PATH,
+            path,
             requesterIdentityId:
                 fields.requesterIdentityId,
         })),
@@ -641,6 +659,133 @@ export function defineStoreAcceptance(
         );
     });
 
+    Deno.test(name + ': a head batch answers each entry as'
+    + ' its single read, in entry order', async () => {
+        const { db } = await ready();
+        const json = 'application/json';
+        const id = (): string => generateIdentifier();
+        const [kept, gone1, revised1, gone2, revised2] =
+            [id(), id(), id(), id(), id()];
+        const other = id();
+        const headRows: [string, string, string, number][] = [
+            [kept, 'kept', 'PUT', 1],
+            [gone1, 'gone', 'PUT', 2],
+            [revised1, 'revised', 'PUT', 3],
+            [gone2, 'gone', 'DELETE', 4],
+            [revised2, 'revised', 'PUT', 5],
+        ];
+        for (const [rowId, docName, method, k] of headRows) {
+            await db.messagePairs.append(
+                rowId,
+                await pairRow(
+                    rowId, HEAD_PATH, docName, method,
+                    stamp(k), k,
+                ),
+            );
+        }
+        await db.messagePairs.append(
+            other,
+            await pairRow(
+                other, OTHER_HEAD_PATH, 'other', 'PUT',
+                stamp(6), 6,
+            ),
+        );
+        const [a1, b1, c1, c2] = [id(), id(), id(), id()];
+        const bodyRows: [string, string, string, string][] = [
+            [a1, 'batch-a', 'PUT', '{"batch":"v"}'],
+            [b1, 'batch-b', 'PUT', '{"batch":"x"}'],
+            // Matches, then a DELETE head: not live.
+            [c1, 'batch-c', 'PUT', '{"batch":"v"}'],
+            [c2, 'batch-c', 'DELETE', ''],
+        ];
+        let k = 1;
+        for (const [rowId, docName, method, body] of bodyRows) {
+            await db.messagePairs.append(
+                rowId,
+                await bodyPairRow(
+                    rowId, docName, method, stamp(k), k,
+                    body, json,
+                ),
+            );
+            k += 1;
+        }
+        const contains = { batch: 'v' };
+        const batch = await db.messagePairs
+            .getCollectionHeadPairsBatch([
+                { path: HEAD_PATH },
+                { path: BODY_INDEXED_PATH, contains },
+                { path: OTHER_HEAD_PATH },
+                { path: EMPTY_HEAD_PATH },
+            ]);
+        assertEquals(
+            batch.map((entry) => entry.map((row) => row.id)),
+            [[kept, revised2], [a1], [other], []],
+        );
+        assertEquals(batch, [
+            await db.messagePairs
+                .getCollectionHeadPairs(HEAD_PATH),
+            await db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    BODY_INDEXED_PATH, contains,
+                ),
+            await db.messagePairs
+                .getCollectionHeadPairs(OTHER_HEAD_PATH),
+            await db.messagePairs
+                .getCollectionHeadPairs(EMPTY_HEAD_PATH),
+        ]);
+    });
+
+    Deno.test(name + ': an empty head batch answers no'
+    + ' entries', async () => {
+        const { db } = await ready();
+        assertEquals(
+            await db.messagePairs.getCollectionHeadPairsBatch([]),
+            [],
+        );
+    });
+
+    Deno.test(name + ': each open is a fresh store', async () => {
+        const { db: first } = await ready();
+        const id = generateIdentifier();
+        await first.messagePairs.append(
+            id,
+            await pairRow(
+                id, FRESH_PATH, 'doc', 'PUT', stamp(1), 1,
+            ),
+        );
+        assertStrictEquals(
+            (await first.messagePairs.getHeadPair(
+                FRESH_PATH, 'doc',
+            ))?.id,
+            id,
+        );
+        const { db: second } = await ready();
+        assertStrictEquals(
+            await second.messagePairs.getHeadPair(
+                FRESH_PATH, 'doc',
+            ),
+            null,
+        );
+        assertEquals(
+            await second.messagePairs
+                .getCollectionHeadPairs(FRESH_PATH),
+            [],
+        );
+    });
+
+    Deno.test(name + ': a head batch refuses a containing'
+    + ' entry with no body index', async () => {
+        const { db } = await ready();
+        await assertRejects(
+            () => db.messagePairs.getCollectionHeadPairsBatch([
+                { path: OTHER_HEAD_PATH },
+                { path: HEAD_PATH, contains: { k: 'v' } },
+            ]),
+            Error,
+            'no body index at ' + HEAD_PATH,
+        );
+    });
+
     Deno.test(name + ': head pair is the latest PUT or'
     + ' DELETE; POST and PATCH never displace it', async () => {
         const { db } = await ready();
@@ -850,6 +995,67 @@ export function defineStoreAcceptance(
                 db, ENVELOPE_PATH, ENVELOPE_NAME,
             ),
             before,
+        );
+    });
+
+    // An organization with no document cannot be held: the
+    // hold refuses it by name, never silently holding
+    // nothing. The seeded organization holds.
+    Deno.test(name + ': holding an absent organization is'
+    + ' refused', async () => {
+        const { db } = await ready();
+        const absent = generateIdentifier();
+        await backedWrite(db).backend.transaction(
+            'readwrite',
+            async (tx) => {
+                await tx.holdOrganization(ORGANIZATION);
+                await assertRejects(
+                    () => tx.holdOrganization(absent),
+                    Error,
+                    absent,
+                );
+            },
+        );
+    });
+
+    // The writer's half of the hold: a roster statement for an
+    // organization with no document is refused by name and
+    // lands nothing. The same row seats the seeded one.
+    Deno.test(name + ': a roster write for an absent'
+    + ' organization is refused', async () => {
+        const { db } = await ready();
+        const identity = generateIdentifier();
+        const absent = generateIdentifier();
+        const now = '2026-10-01T00:00:00.000000Z';
+        const seatOf = (organization: string): StatementBind =>
+            bindAt(
+                MEMBERSHIPS_PATH,
+                membershipNameOf(organization, identity),
+                {
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    requesterIdentityId: identity,
+                    body: 'seat',
+                    ifMatch: NIL_IDENTIFIER,
+                },
+            );
+        const seated = await db.executeLedger(
+            'in-order', [seatOf(ORGANIZATION)], now,
+        );
+        assertStrictEquals(seated[0]!.outcome, 'land');
+        await assertRejects(
+            () => db.executeLedger(
+                'in-order', [seatOf(absent)], now,
+            ),
+            Error,
+            absent,
+        );
+        assertStrictEquals(
+            await db.messagePairs.getHeadPair(
+                MEMBERSHIPS_PATH,
+                membershipNameOf(absent, identity),
+            ),
+            null,
         );
     });
 }

@@ -188,20 +188,22 @@ These are the spec's "Left to the builder" items.
   document (`putLiveOrganizationDocumentOp`) and work
   orders (`requireWorkOrderHead`) keep their own checks.
   This plan does not refactor them.
-- **The roster's member kind.** A membership is an AI
-  member when its identity id names a document in the
-  organization's `ai-agents/`. It is a service member
-  when that id names one in `services/`. Otherwise it is
-  human. This needs no new stored field and no
-  per-identity read. `getHumanMember` already reads the
-  identity, so it also answers absent for an identity
-  whose kind is not `person`.
-- **Count only people as active people.**
-  `getOrganizationSeats` (`client/admin.ts:31-53`) feeds
-  the organization page's `activePeopleCount`. It counts
-  human members only (Task 16). This was not named in the
-  spec. It is needed so that no AI or service reads as a
-  human.
+- **The roster's member kind.** A member is human if and
+  only if its identity's kind is `'person'`. The
+  memberships read carries a server-derived
+  `identity_kind` (`person` | `service`), which is not
+  stored. Every reader classifies with one predicate,
+  `isHumanSeat` (`client/members.ts`). One rule
+  everywhere.
+- **Every member kind uses a seat; only people count as
+  active people.** `usedSeats`
+  (`web-app/app/organization-view.ts`,
+  `deriveOrganizationFacts`) counts every accepted
+  membership's identity, AI and service included.
+  `activePeopleCount` (`client/admin.ts`,
+  `getOrganizationStats`) counts person seats only
+  (`seats.filter(isHumanSeat)`), so no AI or service
+  reads as a human.
 - **No role control to hide.** Spec decision 11 says the
   members page shows no role control for an AI or service
   member. The page shows none for anyone today: no
@@ -2191,31 +2193,23 @@ Generalization, Internal Defense, Scattered Context.
 
 **Files:**
 - `client/members.ts`:
-  - add one exported
-    `getNonHumanMemberIds(ctx: RequestContext): Promise<ReadonlySet<MemberId>>`
-  - `getHumanMemberMap` (`:132-155`) drops those ids
-    before `buildHumanMemberMap`
-  - `getHumanMember` (`:180-212`) returns `null` when
-    `identity.kind !== 'person'`
-- `client/members-union.ts:41-64`: `getMembers` drops the
-  non-human ids from the human map.
-- `client/admin.ts:31-53`: `getOrganizationSeats` drops
-  them from the people count.
+  - one exported
+    `isHumanSeat(seat: HttpMessage<MembershipReadEntity>): boolean`
+    that tests `identity_kind === 'person'`
+  - `getHumanMemberMap` filters the accepted memberships
+    with it before `buildHumanMemberMap`
+  - `getHumanMember` refuses a seat that is not accepted
+    or not `isHumanSeat`
+- `client/members-union.ts`: `getMembers` splits the
+  memberships by `isHumanSeat` (humans vs AI and service).
+- `client/admin.ts`: `getOrganizationStats`'s
+  `activePeopleCount` counts `isHumanSeat` seats only.
+  `usedSeats` counts every member kind; it does not
+  change.
 
 **Interfaces:**
-- `getNonHumanMemberIds` GETs
-  `organizations/<org>/ai-agents/` and
-  `organizations/<org>/services/` in parallel. It returns
-  the union of their document ids. The org comes from
-  `requireOrganization(ctx)`.
-- The value returned is a plain set of ids, which drops
-  the `HttpMessage`. That is the "aggregates" exception
-  `AGENTS.md` names. Put a one-line comment on it saying
-  so, and saying it is a membership's kind test, not a
-  roster.
-- `getMembers` already GETs `ai-agents/`. It reuses that
-  read for the AI ids and GETs only `services/` for the
-  rest, so it adds no second AI read.
+- No extra GET: the kind rides the memberships read as
+  `identity_kind`.
 
 - [ ] **Step 1: The three readers**
 

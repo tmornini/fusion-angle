@@ -251,8 +251,8 @@ function outside(method: string, path: string): string {
         + ' organization';
 }
 
-Deno.test('ai-agents wire is global; identities wire is'
-+ ' the accepted roster', async () => {
+Deno.test('ai-agents wire is organization-nested;'
++ ' identities wire is the accepted roster', async () => {
     const db = await seededDb();
     const token = await organizationToken();
 
@@ -646,8 +646,8 @@ async () => {
 // -- create ---------------------------------------------------------
 
 Deno.test('the AI statement and PUT identities land exactly'
-+ ' one document message pair at each document — no composing'
-+ ' POST',
++ ' one document message pair at each document — the'
++ ' statement\'s POST lands no ai-agents document pair',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -703,8 +703,8 @@ async () => {
 // -- 8. resend idempotency at drift altitude --------------------
 
 Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
-+ ' resend replays the stored response and appends NO second'
-+ ' pair (the E6 fast-path at drift altitude)', async () => {
++ ' resend answers 412 on its stale latch and appends NO second'
++ ' pair', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const aiId = generateIdentifier();
@@ -738,17 +738,27 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const afterFirst = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterFirst, beforeCount + 1);
 
-    // The resend names the head the first PUT wrote: the
-    // first latch is now stale (412), as for flows.
+    // The resend latches the head the first PUT superseded:
+    // stale, so 412 (RFC 9110 §13.1.1), and nothing stored.
+    const stale = await handleRequest(db, resend(headTag));
+    assertStrictEquals(stale.status, 412);
+    await stale.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, afterFirst,
+    );
+
+    const reput = 'a re-PUT of the head\'s body on its own'
+        + ' latch appends no pair';
     const firstTag = first.headers.get('ETag');
     assert(firstTag !== null);
     const second = await handleRequest(db, resend(firstTag));
-    assertStrictEquals(second.status, 200);
+    assertStrictEquals(second.status, 200, reput);
     const afterSecond = (await db.messagePairs.getAll()).length;
-    assertStrictEquals(afterSecond, afterFirst);
+    assertStrictEquals(afterSecond, afterFirst, reput);
     assertStrictEquals(
         pairIdOf(first),
         pairIdOf(second),
+        reput,
     );
 
     const got = await handleRequest(
