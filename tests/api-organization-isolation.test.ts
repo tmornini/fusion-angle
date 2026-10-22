@@ -81,11 +81,10 @@ async function twoOrganizations(): Promise<{
     const organizationA = generateIdentifier();
     const organizationB = generateIdentifier();
     await seedAdminSchema(db);
-    // A real organizations/:id document (Phase 13 Task 3's fixture
-    // prerequisite): deriveMembershipsForIdentity enumerates via
-    // deriveOrganizations before probing an org's own membership
-    // prefix, so an org referenced only by a membership/role-grant
-    // pair stays derivation-invisible without its own document.
+    // The organization's own document, named here: the ledger
+    // seats no one in an organization without one, so the seat
+    // fixture below would otherwise seed it under a placeholder
+    // name.
     await seedOrganizationDocument(db, organizationA, 'Acme');
     await seedMembershipPair(
         db, generateIdentifier(), organizationA, 'XXZruirZyAOoRpNxaDnpSA',
