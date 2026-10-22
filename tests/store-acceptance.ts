@@ -1,7 +1,9 @@
 import {
     assert, assertEquals, assertRejects, assertStrictEquals,
+    fail,
 } from '@std/assert';
-import type { DbAdapter } from '../api/db.ts';
+import type { DbAdapter, Tx } from '../api/db.ts';
+import { backedWrite } from '../api/db-backed.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
 import { handleRequest } from '../api/api.ts';
@@ -33,6 +35,7 @@ import { ledgerFields } from './ledger-row.ts';
 // covering the cases without Postgres.
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
 
@@ -279,6 +282,25 @@ function envelopeBind(fields: {
                 fields.requesterIdentityId,
         })),
     };
+}
+
+// The hold a flow write takes on its organization for the
+// length of its transaction, reached by name: a Tx without
+// it fails here naming the method, and deno check stays
+// green on the red pin.
+function organizationHoldOf(
+    tx: Tx,
+): (organization: string) => Promise<void> {
+    const hold: unknown = Reflect.get(tx, 'holdOrganization');
+    if (typeof hold !== 'function') {
+        fail(
+            'Tx has no holdOrganization: a flow write'
+            + ' cannot hold its organization',
+        );
+    }
+    return (organization) => (
+        hold as (organization: string) => Promise<void>
+    ).call(tx, organization);
 }
 
 export function defineStoreAcceptance(
@@ -980,6 +1002,25 @@ export function defineStoreAcceptance(
                 db, ENVELOPE_PATH, ENVELOPE_NAME,
             ),
             before,
+        );
+    });
+
+    // An organization with no document cannot be held: the
+    // hold refuses it by name, never silently holding
+    // nothing. The seeded organization holds.
+    Deno.test(name + ': holding an absent organization is'
+    + ' refused', async () => {
+        const { db } = await ready();
+        const absent = generateIdentifier();
+        await backedWrite(db).backend.transaction(
+            'readwrite',
+            async (tx) => {
+                const hold = organizationHoldOf(tx);
+                await hold(ORGANIZATION);
+                await assertRejects(
+                    () => hold(absent), Error, absent,
+                );
+            },
         );
     });
 }
