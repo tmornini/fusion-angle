@@ -8,9 +8,13 @@ import { connectPostgres } from
 import {
     COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
     COLLECTION_HEAD_PAIRS_SQL,
+    ORGANIZATION_ROW_FOR_SHARE_SQL,
+    ORGANIZATION_ROW_FOR_UPDATE_SQL,
     PostgresBackend,
     collectionHeadBatchStatement,
 } from '../api/backend-postgres.ts';
+import { ORGANIZATIONS_PATH } from
+    '../api/organization-hold.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
 import type { Tx } from '../api/db.ts';
@@ -18,8 +22,10 @@ import { serializeWire } from
     '../shared/http-message/wire-codec.ts';
 import { Octets } from
     '../shared/http-message/octets.ts';
-import { decodeIdentifier } from
-    '../shared/identifier.ts';
+import {
+    decodeIdentifier,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';
 
 // Live EXPLAIN pins for schema indexes. ./validate stays
@@ -634,22 +640,40 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         },
     );
 
-    Deno.test(
-        'the head lock rows the primary key',
-        async () => {
-            const plans = await sql.query<
-                Record<string, unknown>
-            >`
-                EXPLAIN
-                SELECT id FROM fa_message_pairs
-                WHERE id = ${uuidTextOfIdentifier(ideaId)}
-                FOR UPDATE
-            `;
-            const text = explainText(plans);
-            assertMatch(text, /LockRows/);
-            assertIndexPlan(text, ['fa_message_pairs_pkey']);
-        },
-    );
+    // A lock must reach its row through an index, never a
+    // walk of the ledger. Three indexes lead on path, and
+    // the planner takes fa_message_pairs_collection and
+    // filters name, supersedes, and method (measured), so
+    // the pin holds the index probe on path, not the
+    // planner's choice among them. The texts run unprepared,
+    // so the custom plan with the product's own binds is the
+    // plan.
+    for (const [mode, text] of [
+        ['share', ORGANIZATION_ROW_FOR_SHARE_SQL],
+        ['update', ORGANIZATION_ROW_FOR_UPDATE_SQL],
+    ] as const) {
+        Deno.test(
+            'the organization row ' + mode
+                + ' lock finds its row through a path index',
+            async () => {
+                const plans = await sql.unsafe<
+                    Record<string, unknown>
+                >('EXPLAIN\n' + text, [
+                    ORGANIZATIONS_PATH,
+                    organizationIdFor(0),
+                    uuidTextOfIdentifier(NIL_IDENTIFIER),
+                ]);
+                const plan = explainText(plans);
+                assertMatch(plan, /LockRows/);
+                assertMatch(
+                    plan,
+                    /Index Scan using \w+ on fa_message_pairs/,
+                );
+                assertMatch(plan, /Index Cond: \(+path = /);
+                assertNotMatch(plan, /Seq Scan/);
+            },
+        );
+    }
 
     Deno.test(
         'insert resolves an id conflict by doing nothing',
