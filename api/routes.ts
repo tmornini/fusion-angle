@@ -1322,20 +1322,6 @@ export async function postFlowCreationOp(
     await runWrite(db, attemptFor(rows), rows);
 }
 
-// Flow document write (Decision 7, class B). Phase
-// Final Task 2: flows + graph relation ROW halves stripped —
-// the graph law's reads and the pair commit as ONE
-// transaction. graphDelta/revivals stay in the
-// document-pair body (SIDECAR-KEEP → deriveFlowGraphStates);
-// graph is the client-authored snapshot carried on the pair
-// for GET reassembly via flowEntityOf. UNLIKE ideas/projects,
-// this op carries NO member_id ternary: flows mint a FRESH
-// trio on every PUT (design decision 2). version-publish
-// (flow_versions) is NOT part of this op — no writers remain.
-// WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
-// reconstructed return is for below-facade callers and type
-// parity. `messagePair` is optional so a below-facade caller with no
-// pair keeps compiling; the live route always supplies one.
 // `view` is the write's transaction: one statement reads the
 // three collections, so the law judges one snapshot. A
 // removal committed after it leaves the state a removal
@@ -1371,6 +1357,20 @@ function flowGraphOf(graph: unknown): StoredGraph {
     return asStoredGraph(graph, 'FlowDocumentBody.graph');
 }
 
+// Flow document write (Decision 7, class B). Phase
+// Final Task 2: flows + graph relation ROW halves stripped —
+// the graph law's reads and the pair commit as ONE
+// transaction. graphDelta/revivals stay in the
+// document-pair body (SIDECAR-KEEP → deriveFlowGraphStates);
+// graph is the client-authored snapshot carried on the pair
+// for GET reassembly via flowEntityOf. UNLIKE ideas/projects,
+// this op carries NO member_id ternary: flows mint a FRESH
+// trio on every PUT (design decision 2). version-publish
+// (flow_versions) is NOT part of this op — no writers remain.
+// WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
+// reconstructed return is for below-facade callers and type
+// parity. `messagePair` is optional so a below-facade caller with no
+// pair keeps compiling; the live route always supplies one.
 export async function postFlowDocumentOp(
     db: DbAdapter,
     id: Id,
