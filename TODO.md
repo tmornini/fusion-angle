@@ -2611,6 +2611,20 @@ Off the critical path; each with its oracle.
   bites nothing. Oracle: the module's name says what it holds,
   `advisoryKey` leaves with its tests, and the race test
   holds only what the product holds
+- The If-Match race holds a row the product never locks.
+  'If-Match race: one 200, one 412'
+  (`tests/pg-races.test.ts:681-760`) takes `SELECT … FOR
+  UPDATE` on the flow's live head (`:715-721`), a row no
+  product statement locks — a flow write locks only its
+  organization's genesis row, and two writers on one head
+  part at the ledger statement — so its hold bites
+  nothing, and `delay(300)` (`:744`) is a timer that only
+  hopes both PUTs reach their head read while it holds.
+  The one 200 and one 412 come from the ledger statement
+  whatever the hold does. Oracle: the pin forces both PUTs
+  to read the head before either statement lands, through
+  a seam and a count-bound probe as the paused-flow pins
+  do, with no timer and no lock the product does not take
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
