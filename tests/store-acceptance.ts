@@ -6,6 +6,9 @@ import type { DbAdapter, Tx } from '../api/db.ts';
 import { backedWrite } from '../api/db-backed.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
+import { MEMBERSHIPS_PATH } from '../api/memberships.ts';
+import { membershipNameOf } from
+    '../shared/membership-name.ts';
 import { handleRequest } from '../api/api.ts';
 import { messageStore } from '../api/message-store.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -242,15 +245,25 @@ function stamp(k: number): string {
 const ENVELOPE_PATH = '/envelope-pin/';
 const ENVELOPE_NAME = 'doc';
 
-// Same date split bindOf uses: the statement splices
-// the stamp into the value and matches on the body.
-function envelopeBind(fields: {
+type BindFields = {
     id: string,
     operationId: string,
     requesterIdentityId: string,
     body: string,
     ifMatch: string | null,
-}): StatementBind {
+};
+
+function envelopeBind(fields: BindFields): StatementBind {
+    return bindAt(ENVELOPE_PATH, ENVELOPE_NAME, fields);
+}
+
+// Same date split bindOf uses: the statement splices
+// the stamp into the value and matches on the body.
+function bindAt(
+    path: string,
+    name: string,
+    fields: BindFields,
+): StatementBind {
     const wire = 'HTTP/1.1 201 \r\n'
         + 'date: ' + DATE_PLACEHOLDER + '\r\n'
         + '\r\n'
@@ -262,8 +275,8 @@ function envelopeBind(fields: {
     return {
         id: fields.id,
         operationId: fields.operationId,
-        path: ENVELOPE_PATH,
-        name: ENVELOPE_NAME,
+        path,
+        name,
         requesterIdentityId: fields.requesterIdentityId,
         method: 'PUT',
         request: new TextEncoder().encode('req'),
@@ -277,7 +290,7 @@ function envelopeBind(fields: {
         responseSecrets: new Uint8Array(0),
         ifMatch: fields.ifMatch,
         notify: notifyPayload(eventForMessagePair({
-            path: ENVELOPE_PATH,
+            path,
             requesterIdentityId:
                 fields.requesterIdentityId,
         })),
@@ -1021,6 +1034,47 @@ export function defineStoreAcceptance(
                     () => hold(absent), Error, absent,
                 );
             },
+        );
+    });
+
+    // The writer's half of the hold: a roster statement for an
+    // organization with no document is refused by name and
+    // lands nothing. The same row seats the seeded one.
+    Deno.test(name + ': a roster write for an absent'
+    + ' organization is refused', async () => {
+        const { db } = await ready();
+        const identity = generateIdentifier();
+        const absent = generateIdentifier();
+        const now = '2026-10-01T00:00:00.000000Z';
+        const seatOf = (organization: string): StatementBind =>
+            bindAt(
+                MEMBERSHIPS_PATH,
+                membershipNameOf(organization, identity),
+                {
+                    id: generateIdentifier(),
+                    operationId: generateIdentifier(),
+                    requesterIdentityId: identity,
+                    body: 'seat',
+                    ifMatch: NIL_IDENTIFIER,
+                },
+            );
+        const seated = await db.executeLedger(
+            'in-order', [seatOf(ORGANIZATION)], now,
+        );
+        assertStrictEquals(seated[0]!.outcome, 'land');
+        await assertRejects(
+            () => db.executeLedger(
+                'in-order', [seatOf(absent)], now,
+            ),
+            Error,
+            absent,
+        );
+        assertStrictEquals(
+            await db.messagePairs.getHeadPair(
+                MEMBERSHIPS_PATH,
+                membershipNameOf(absent, identity),
+            ),
+            null,
         );
     });
 }
