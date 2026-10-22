@@ -2958,7 +2958,9 @@ Off the critical path; each with its oracle.
   `api/request-context.ts:42-45` keeps `requestAt` in
   a requests row,
   `api/postgres-client.ts:2-3` taking advisory locks
-  inside `begin`, and ARCHITECTURE.md:230-235 calling
+  inside `begin`, `api/backend-memory.ts:47` and
+  `api/store-serializer.ts:7` ordering cross-process by
+  advisory locks, and ARCHITECTURE.md:230-235 calling
   reads an open write-gate transaction's; and one
   comment appears twice (`api/mock-data.ts:179-183`,
   `:190-194`). Reword each to the
