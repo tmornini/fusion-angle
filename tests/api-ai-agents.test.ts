@@ -531,14 +531,17 @@ Deno.test('a flow write naming a removed AI member in'
 // alone or in a head batch: the window a law read outside
 // its write's transaction leaves open. Keyed on the
 // organization half alone, so a read of the caller's own
-// membership, by name or by identity, passes untouched.
+// membership, by name or by identity, passes untouched. A
+// transaction's head batches fire nothing; it counts them.
 function membershipReadHooked(organization: string): {
     readonly backend: StorageBackend;
     readonly arm: (hook: () => Promise<void>) => void;
     readonly take: () => (() => Promise<void>) | undefined;
+    readonly transactionBatches: () => number;
 } {
     const inner = new MemoryStorageBackend();
     let armed: (() => Promise<void>) | undefined;
+    let batches = 0;
     const take = () => {
         const hook = armed;
         armed = undefined;
@@ -581,9 +584,20 @@ function membershipReadHooked(organization: string): {
             return answers;
         },
     });
+    const counted = (tx: Tx): Tx => ({
+        ...tx,
+        getCollectionHeadPairsBatch: <T extends { id: string }>(
+            reads: readonly CollectionHeadRead[],
+        ): Promise<T[][]> => {
+            batches += 1;
+            return tx.getCollectionHeadPairsBatch<T>(reads);
+        },
+    });
     const backend: StorageBackend = {
         read: (fn) => inner.read((tx) => fn(hooked(tx))),
-        transaction: (mode, fn) => inner.transaction(mode, fn),
+        transaction: (mode, fn) => inner.transaction(
+            mode, (tx) => fn(counted(tx)),
+        ),
         seedTransaction: (fn) => inner.seedTransaction(fn),
         ensureTable: () => inner.ensureTable(),
         executeLedger: (attempt, rows, now, tx) =>
@@ -598,6 +612,7 @@ function membershipReadHooked(organization: string): {
             armed = hook;
         },
         take,
+        transactionBatches: () => batches,
     };
 }
 
@@ -765,4 +780,138 @@ Deno.test('a flow create reads its programs in the'
         'flow POST answered ' + res.status + ' and landed at '
             + flowAt + ', after the AI at ' + programAt,
     );
+});
+
+// A hooked memory db holding one AI member. A lawless graph
+// seats that AI in memberIds; batches counts the roster
+// reads the law runs in a write's transaction.
+async function flowLawFixture(): Promise<{
+    readonly put: (
+        flowId: string,
+        nodes: unknown[],
+        headers: Record<string, string>,
+    ) => Promise<Response>;
+    readonly lawless: () => unknown[];
+    readonly batches: () => number;
+}> {
+    const hooked = membershipReadHooked(STARK);
+    const db = new BackedDbAdapter(
+        hooked.backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const agentId = generateIdentifier();
+    await postMember(db, {
+        id: agentId,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields('Lawless agent'),
+    });
+    return {
+        put: (flowId, nodes, headers) => handleRequest(
+            db,
+            apiRequest({
+                method: 'PUT',
+                path: '/organizations/' + STARK + '/flows/'
+                    + flowId,
+                token,
+                body: flowDocument(
+                    'Flow', generateIdentifier(), {
+                        nodes,
+                        edges: [],
+                    },
+                ),
+                headers,
+            }),
+        ),
+        lawless: () => [graphNode([agentId])],
+        batches: hooked.transactionBatches,
+    };
+}
+
+async function etagOf(
+    response: Response,
+    status: number,
+): Promise<string> {
+    assertStrictEquals(response.status, status);
+    await response.body?.cancel();
+    const etag = response.headers.get('ETag');
+    assert(etag !== null);
+    return etag;
+}
+
+// Preconditions come before the content (RFC 9110 §13.2.2):
+// a latch the head refuses answers 412 whatever the graph
+// says, and the law's roster read never runs for it.
+Deno.test('a stale flow PUT answers 412 before the'
++ ' law', async () => {
+    const fixture = await flowLawFixture();
+    const flowId = generateIdentifier();
+    const old = await etagOf(await fixture.put(
+        flowId, [], { 'if-none-match': '*' },
+    ), 201);
+    await etagOf(await fixture.put(
+        flowId, [], { 'If-Match': old },
+    ), 200);
+    const before = fixture.batches();
+    const stale = await fixture.put(
+        flowId, fixture.lawless(), { 'If-Match': old },
+    );
+    await stale.body?.cancel();
+    assertStrictEquals(stale.status, 412);
+    assertStrictEquals(fixture.batches(), before);
+});
+
+Deno.test('a flow PUT latching a flow never written'
++ ' answers 412 before the law', async () => {
+    const fixture = await flowLawFixture();
+    const before = fixture.batches();
+    const absent = await fixture.put(
+        generateIdentifier(),
+        fixture.lawless(),
+        { 'If-Match': '"' + generateIdentifier() + '"' },
+    );
+    await absent.body?.cancel();
+    assertStrictEquals(absent.status, 412);
+    assertStrictEquals(fixture.batches(), before);
+});
+
+Deno.test('a flow genesis over a live flow answers 412'
++ ' before the law', async () => {
+    const fixture = await flowLawFixture();
+    const flowId = generateIdentifier();
+    await etagOf(await fixture.put(
+        flowId, [], { 'if-none-match': '*' },
+    ), 201);
+    const before = fixture.batches();
+    const genesis = await fixture.put(
+        flowId, fixture.lawless(), { 'if-none-match': '*' },
+    );
+    await genesis.body?.cancel();
+    assertStrictEquals(genesis.status, 412);
+    assertStrictEquals(fixture.batches(), before);
+});
+
+// The skip's other side: a latch naming the live head
+// lands, so the law runs once and refuses the graph.
+Deno.test('a current flow PUT still answers the'
++ ' law', async () => {
+    const fixture = await flowLawFixture();
+    const flowId = generateIdentifier();
+    const live = await etagOf(await fixture.put(
+        flowId, [], { 'if-none-match': '*' },
+    ), 201);
+    const before = fixture.batches();
+    const current = await fixture.put(
+        flowId, fixture.lawless(), { 'If-Match': live },
+    );
+    assertStrictEquals(current.status, 400);
+    assertEquals(await current.json(), {
+        error: 'memberIds may name person identities only,'
+            + ' not AI agents or services',
+    });
+    assertStrictEquals(fixture.batches(), before + 1);
 });
