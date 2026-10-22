@@ -240,7 +240,31 @@ code comments cite; specs and plans written before the
   arrays today. After the reduction a member of `fa_api`
   connects, uses the schema, inserts into the table,
   reads its unfenced columns, and may LISTEN and NOTIFY,
-  which are commands and not grants — nothing else. One
+  which are commands and not grants — nothing else. Two
+  row locks outgrow those grants: a flow write holds its
+  organization's genesis row `FOR SHARE` and a roster
+  write takes it `FOR UPDATE`
+  (`ORGANIZATION_ROW_FOR_SHARE_SQL` and
+  `ORGANIZATION_ROW_FOR_UPDATE_SQL`,
+  `api/backend-postgres.ts:66-69`; `holdOrganization`,
+  `:382`, and `takeOrganizations`, `:405`), and Postgres
+  locks a row only for a role holding UPDATE on a column
+  of its table (the `SELECT` reference's Description,
+  https://www.postgresql.org/docs/18/sql-select.html;
+  not yet measured here). Both move behind a function
+  `fa_owner` owns and runs with its own rights, `fa_api`
+  holding only EXECUTE on it, or an equivalent that
+  leaves `fa_api` no UPDATE: a row lock lasts to its
+  transaction's end, so the lock outlives the call. The
+  move keeps both modes, and with them an accepted
+  residual: a `FOR SHARE` locker does not queue behind a
+  waiting `FOR UPDATE`, so flow saves that overlap in
+  one organization can keep its row shared without a gap
+  and starve a roster write until `statement_timeout`
+  (`STATEMENT_TIMEOUT_MS`, 30 s,
+  `server/postgres-gate.ts:10`) ends it as 504 (`57014`,
+  `api/errors-postgres.ts:25`); and every flow save marks
+  the genesis row, a MultiXact when two overlap. One
   owner verb, `migrate`, makes a cluster and its database
   match this
   build's fence, as `fa_owner`: fixed SQL beside the DDL,
@@ -297,9 +321,11 @@ code comments cite; specs and plans written before the
   does not order this item. This item changes no row and
   no column, and a test says so. Oracle: a Postgres test
   logs in as a member of `fa_api` and is refused every
-  verb but its two. KNOWN seams "A raw dump still has
-  verbatim auth messages" and "Erased PII persists as
-  superseded pairs" are reworded, not closed: the bytes
+  verb but its two, and `tests/pg-races.test.ts`'s
+  paused-flow pins pass as that member. KNOWN seams
+  "A raw dump still has verbatim auth messages" and
+  "Erased PII persists as superseded pairs" are
+  reworded, not closed: the bytes
   persist in the owner-only ledger, and `fa_api` reads
   none of them. Today: one role,
   `fusion`, owns and reads everything, and compose,
