@@ -2701,6 +2701,17 @@ Off the critical path; each with its oracle.
   Oracle: the excuse admits only a PUT that creates the
   genesis (supersedes the nil uuid), pinned on both twins
   when a live writer first composes the two
+- Three names spell the organizations path.
+  `ORGANIZATIONS_PATH` (`api/organization-hold.ts:19`),
+  `ORGANIZATIONS_PREFIX` (`api/derive-organizations.ts:66`)
+  and `ORGANIZATIONS_PATH_PREFIX`
+  (`api/derive-states.ts:88`) each hold
+  `/organizations/`, and `api/routes.ts` forms it again
+  with `canonicalPath(undefined, '/organizations/')`. The
+  hold's own constant stayed because importing either
+  derive module into the hold inverts the dependency
+  direction. Oracle: one exported constant in a module
+  all four import, and no other literal of the path
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
