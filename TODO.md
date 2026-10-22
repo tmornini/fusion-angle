@@ -2606,7 +2606,7 @@ Off the critical path; each with its oracle.
   payload, and `POOL_MAX`; its `advisoryKey` and
   `ADVISORY_KEY_HEX_DIGITS` (`:9`, `:28-35`) have no
   product caller, and 'two first-writers: one 201, not
-  a double insert' (`tests/pg-races.test.ts:241-258`)
+  a double insert' (`tests/pg-races.test.ts:622-679`)
   holds a lock the product never takes, so its hold
   bites nothing. Oracle: the module's name says what it holds,
   `advisoryKey` leaves with its tests, and the race test
