@@ -2732,6 +2732,15 @@ Off the critical path; each with its oracle.
   releases its seams and settles both requests before it
   ends a client, and a capped run reports the probe
   message alone
+- The paused-flow seam pauses one read.
+  `pausedAfterRosterRead` (`tests/pg-races.test.ts:302-345`)
+  intercepts only `getCollectionHeadPairsBatch`, the
+  law's one roster read today, and its `read:` handle is
+  not paused. A law that reads the roster another way
+  never pauses, and every paused-flow pin fails loud
+  ('the flow write answered … before its roster read',
+  `:545-549`) though the product is right. Oracle: the
+  seam pauses after whichever roster read the law makes
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
