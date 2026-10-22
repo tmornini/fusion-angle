@@ -956,10 +956,11 @@ export async function rotateRefreshJti(
     return { kind: 'contended' as const };
 }
 
-// Rotation and revocation open the client beneath the
-// adapter. A view has no backend of its own; callers pass the
-// backed adapter the route already holds.
-function backedWrite(
+// A write that reads and lands in one transaction opens the
+// client beneath the adapter. A view has no backend of its
+// own; callers pass the backed adapter the route already
+// holds.
+export function backedWrite(
     adapter: DbAdapter,
 ): {
     readonly backend: StorageBackend;
@@ -970,7 +971,8 @@ function backedWrite(
         || !('clientOn' in adapter)
     ) {
         throw new Error(
-            'token write requires a backed adapter',
+            'a transactional write requires a backed'
+                + ' adapter',
         );
     }
     return adapter as DbAdapter & {

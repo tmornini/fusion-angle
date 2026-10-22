@@ -1,6 +1,6 @@
-import type { DbAdapter } from './db.ts';
+import type { CollectionHeadRead, DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type { Id } from '../shared/types.ts';
+import type { Id, MessagePairEntity } from '../shared/types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalPath } from './message-pair.ts';
 import { familyRegistration } from './family-registry.ts';
@@ -17,7 +17,7 @@ import type {
     SelectHandler,
     WriteResponseSpec,
 } from './routes.ts';
-import { liveHeadId, messageStore } from
+import { entitiesOf, liveHeadId, messageStore } from
     './message-store.ts';
 import { flowStoredEntityOf } from './derive-flows.ts';
 import {
@@ -168,24 +168,26 @@ export function documentFamilyWiring(
     return DOCUMENT_FAMILY_WIRINGS[family];
 }
 
-// Live document ids at an organization's family prefix
-// (/organizations/<organization>/<family>/). Used by the
-// flow write-path graph law, which reads the ai-agents and
-// services families and the accepted seats to tell program
-// ids from person members and to confirm an agentId names
-// a seated, live AI document.
-export async function liveOrganizationDocumentIds(
-    db: DbAdapter,
+// The read of an organization's family prefix
+// (/organizations/<organization>/<family>/), and the live
+// document ids its heads name. The flow write-path graph
+// law reads the ai-agents and services families and the
+// accepted seats to tell program ids from person members
+// and to confirm an agentId names a seated, live AI
+// document.
+export function organizationDocumentsRead(
     organization: Id,
     family: string,
-): Promise<Set<string>> {
-    const prefix = canonicalPath(
-        organization, '/' + family + '/',
-    );
-    const live = await messageStore(db).getCollection(
-        prefix,
-    );
-    return new Set(live.map(liveHeadId));
+): CollectionHeadRead {
+    return {
+        path: canonicalPath(organization, '/' + family + '/'),
+    };
+}
+
+export function liveDocumentIdsOf(
+    heads: readonly MessagePairEntity[],
+): Set<string> {
+    return new Set(entitiesOf(heads).map(liveHeadId));
 }
 
 // Organization-nested miss path: probe the bound

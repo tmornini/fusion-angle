@@ -1,5 +1,5 @@
 import { bodyOf } from './derive-documents.ts';
-import type { DbAdapter } from './db.ts';
+import type { CollectionHeadRead, DbAdapter } from './db.ts';
 import type { ViewQuery } from './membership-gate.ts';
 import { BODY_INDEXED_PATH } from './schema-postgres.ts';
 import {
@@ -304,7 +304,7 @@ export async function membershipsOfIdentity(
     return accepted;
 }
 
-function headsAdmitting(
+export function headsAdmitting(
     heads: readonly MessagePairEntity[],
     query: ViewQuery,
 ): MessagePairEntity[] {
@@ -318,16 +318,25 @@ function headsAdmitting(
     return admitted;
 }
 
+export function organizationMembershipsRead(
+    organizationId: Id,
+): Extract<CollectionHeadRead, { readonly contains: unknown }> {
+    return {
+        path: MEMBERSHIPS_PATH,
+        contains: { organization_id: organizationId },
+    };
+}
+
 export async function organizationMembershipHeads(
     db: DbAdapter,
     organizationId: Id,
     query: ViewQuery,
 ): Promise<MessagePairEntity[]> {
+    const { path, contains } = organizationMembershipsRead(
+        organizationId,
+    );
     const heads = await db.messagePairs
-        .getCollectionHeadPairsContaining(
-            MEMBERSHIPS_PATH,
-            { organization_id: organizationId },
-        );
+        .getCollectionHeadPairsContaining(path, contains);
     return headsAdmitting(heads, query);
 }
 

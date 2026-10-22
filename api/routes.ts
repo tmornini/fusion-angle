@@ -42,6 +42,7 @@ import type {
     MemberEntity,
     AttributeType,
     Constraint,
+    StoredGraph,
 } from '../shared/types.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
@@ -94,6 +95,8 @@ import {
     attemptFor,
     runWrite,
     runStateWrite,
+    formStateWrite,
+    landStateWrite,
     sameAsHead,
     entityTagsOf,
     latchesOf,
@@ -136,6 +139,7 @@ import {
     describeTypeReferrers,
 } from './record-type-refs.ts';
 import {
+    backedWrite,
     rotateRefreshJti,
     revokeTokenChain,
 } from './authentication.ts';
@@ -284,7 +288,8 @@ import {
     documentVersionsSelectRoute,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
-    liveOrganizationDocumentIds,
+    liveDocumentIdsOf,
+    organizationDocumentsRead,
     type DocumentFamilyWiring,
 } from './document-family.ts';
 import {
@@ -307,8 +312,10 @@ import {
     getInvitationVersionOnIdentityNest,
 } from './invitations-domain.ts';
 import {
+    headsAdmitting,
     membershipOfHead,
     organizationMembershipHeads,
+    organizationMembershipsRead,
 } from './memberships.ts';
 import {
     invitationsViewQueryOf,
@@ -1316,8 +1323,8 @@ export async function postFlowCreationOp(
 
 // Flow document write (Decision 7, class B). Phase
 // Final Task 2: flows + graph relation ROW halves stripped —
-// the pair + states.postEvent (flow lifecycle + revivals)
-// commit as ONE transaction. graphDelta/revivals stay in the
+// the graph law's reads and the pair commit as ONE
+// transaction. graphDelta/revivals stay in the
 // document-pair body (SIDECAR-KEEP → deriveFlowGraphStates);
 // graph is the client-authored snapshot carried on the pair
 // for GET reassembly via flowEntityOf. UNLIKE ideas/projects,
@@ -1328,34 +1335,39 @@ export async function postFlowCreationOp(
 // reconstructed return is for below-facade callers and type
 // parity. `messagePair` is optional so a below-facade caller with no
 // pair keeps compiling; the live route always supplies one.
+// `view` is the write's transaction: one statement reads the
+// three collections, so the law judges one snapshot. A
+// removal committed after it leaves the state a removal
+// after the write leaves.
 async function assertLiveFlowGraphWriteLaw(
-    db: DbAdapter,
+    view: DbAdapter,
     organization: Id,
-    graph: Record<string, unknown>,
+    graph: StoredGraph,
 ): Promise<void> {
-    const parsed = asStoredGraph(
-        graph, 'FlowDocumentBody.graph',
-    );
-    const [aiIds, serviceIds, accepted] = await Promise.all([
-        liveOrganizationDocumentIds(
-            db, organization, 'ai-agents',
-        ),
-        liveOrganizationDocumentIds(
-            db, organization, 'services',
-        ),
-        organizationMembershipHeads(
-            db, organization,
-            { kind: 'state', state: 'accepted' },
-        ),
+    const [aiHeads, serviceHeads, membershipHeads] =
+        await view.messagePairs.getCollectionHeadPairsBatch([
+            organizationDocumentsRead(organization, 'ai-agents'),
+            organizationDocumentsRead(organization, 'services'),
+            organizationMembershipsRead(organization),
+        ]);
+    const aiIds = liveDocumentIdsOf(aiHeads!);
+    const programIds = new Set([
+        ...aiIds, ...liveDocumentIdsOf(serviceHeads!),
     ]);
-    const programIds = new Set([...aiIds, ...serviceIds]);
+    const accepted = headsAdmitting(
+        membershipHeads!, { kind: 'state', state: 'accepted' },
+    );
     const seated = new Set(accepted.map(
         (head) => membershipOfHead(head).identity_id,
     ));
     const liveAgentIds = new Set(
         [...aiIds].filter((id) => seated.has(id)),
     );
-    assertFlowGraphWriteLaw(parsed, programIds, liveAgentIds);
+    assertFlowGraphWriteLaw(graph, programIds, liveAgentIds);
+}
+
+function flowGraphOf(graph: unknown): StoredGraph {
+    return asStoredGraph(graph, 'FlowDocumentBody.graph');
 }
 
 export async function postFlowDocumentOp(
@@ -1367,9 +1379,9 @@ export async function postFlowDocumentOp(
     organization?: Id,
 ): Promise<FlowEntity> {
     const doc = validateFlowDocumentBody(withoutId(body));
-    await assertLiveFlowGraphWriteLaw(
-        db, requireOrganization(organization), doc.graph,
-    );
+    const graph = flowGraphOf(doc.graph);
+    const organizationId = requireOrganization(organization);
+    const backed = backedWrite(db);
     const entity = {
         ...doc.entity,
         ...documentOperationOrganization(body),
@@ -1380,13 +1392,19 @@ export async function postFlowDocumentOp(
     // states-trace strip; pair body also carries
     // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
     // The statement judges the received PUT's own tag.
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
+    await backed.backend.transaction('readwrite', async (tx) => {
+        const view = backed.clientOn(tx);
+        await assertLiveFlowGraphWriteLaw(
+            view, organizationId, graph,
         );
-    }
+        if (messagePair !== undefined) {
+            await runWrite(
+                view,
+                attemptFor([messagePair]),
+                [messagePair],
+            );
+        }
+    });
     return { id, ...entity };
 }
 
@@ -4218,10 +4236,7 @@ export const routes: Route[] = [
             const b = validateFlowCreateBody(body);
             const documentBody = flowCreateDocumentBody(b);
             validateFlowDocumentBody(documentBody);
-            await assertLiveFlowGraphWriteLaw(
-                db, org, documentBody.graph as
-                    Record<string, unknown>,
-            );
+            const graph = flowGraphOf(documentBody.graph);
             // validateProjectFlowEntity accepts EXACTLY
             // project_id/flow_id/at — the keys b.projectFlow
             // already carries, so it is the join's body
@@ -4230,7 +4245,7 @@ export const routes: Route[] = [
             const projectId = pickString(
                 b.projectFlow, 'project_id',
             );
-            await runStateWrite(db, {
+            const formed = await formStateWrite({
                 kind: 'siblings',
                 received: requirePair(messagePair),
                 siblings: [
@@ -4270,6 +4285,17 @@ export const routes: Route[] = [
                 reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
+            const backed = backedWrite(db);
+            await backed.backend.transaction(
+                'readwrite',
+                async (tx) => {
+                    const view = backed.clientOn(tx);
+                    await assertLiveFlowGraphWriteLaw(
+                        view, org, graph,
+                    );
+                    return landStateWrite(view, formed);
+                },
+            );
         },
     }),
     // flows/:id takes a conditional PUT ('required'); the

@@ -3341,12 +3341,6 @@ Off the critical path; each with its oracle.
   `--check`.
 - Retire the leftover role-grant identifiers.
 - Delete a pending invitation after `expires_at`.
-- The flow write law's three liveness reads
-  (`api/routes.ts:1339-1358`) run outside the write
-  transaction, so a removal in that window admits a
-  just-removed AI, the same state a removal after the
-  write leaves. Oracle: the law's reads run on the
-  write transaction's view.
 - A whitespace-only name passes the members page check
   (`web-app/members/index.ts:682` tests the untrimmed
   value, then trims), and `validateServiceDocumentBody`
