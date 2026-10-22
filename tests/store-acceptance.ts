@@ -174,8 +174,6 @@ function orderRow(
 }
 
 const HEAD_PATH = '/head-pin/';
-// The batch pin's own paths: Postgres cases share a table.
-const BATCH_HEAD_PATH = '/head-batch-pin/';
 const OTHER_HEAD_PATH = '/head-batch-pin-other/';
 const EMPTY_HEAD_PATH = '/head-batch-pin-empty/';
 const FRESH_PATH = '/fresh-open-pin/';
@@ -665,7 +663,7 @@ export function defineStoreAcceptance(
             await db.messagePairs.append(
                 rowId,
                 await pairRow(
-                    rowId, BATCH_HEAD_PATH, docName, method,
+                    rowId, HEAD_PATH, docName, method,
                     stamp(k), k,
                 ),
             );
@@ -699,7 +697,7 @@ export function defineStoreAcceptance(
         const contains = { batch: 'v' };
         const batch = await db.messagePairs
             .getCollectionHeadPairsBatch([
-                { path: BATCH_HEAD_PATH },
+                { path: HEAD_PATH },
                 { path: BODY_INDEXED_PATH, contains },
                 { path: OTHER_HEAD_PATH },
                 { path: EMPTY_HEAD_PATH },
@@ -710,7 +708,7 @@ export function defineStoreAcceptance(
         );
         assertEquals(batch, [
             await db.messagePairs
-                .getCollectionHeadPairs(BATCH_HEAD_PATH),
+                .getCollectionHeadPairs(HEAD_PATH),
             await db.messagePairs
                 .getCollectionHeadPairsContaining(
                     BODY_INDEXED_PATH, contains,
