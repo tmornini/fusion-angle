@@ -1399,6 +1399,9 @@ export async function postFlowDocumentOp(
     // pair ids are minted fresh, and a flow takes no DELETE
     // (pinned by that name in tests/api-ai-agents.test.ts).
     await backed.backend.transaction('readwrite', async (tx) => {
+        // First: a roster write of this organization then
+        // lands before the law's read or after this commit.
+        await tx.holdOrganization(organizationId);
         const view = backed.clientOn(tx);
         if (messagePair === undefined) {
             await assertLiveFlowGraphWriteLaw(
@@ -4304,6 +4307,7 @@ export const routes: Route[] = [
             await backed.backend.transaction(
                 'readwrite',
                 async (tx) => {
+                    await tx.holdOrganization(org);
                     const view = backed.clientOn(tx);
                     await assertLiveFlowGraphWriteLaw(
                         view, org, graph,

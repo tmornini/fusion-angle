@@ -212,6 +212,12 @@ export interface Tx {
     getCollectionHeadPairsBatch<T extends { id: string }>(
         reads: readonly CollectionHeadRead[],
     ): Promise<T[][]>;
+    // Hold the organization still for this transaction, on
+    // its genesis row (organization-hold.ts): a flow write
+    // takes it first, so a roster write of that organization
+    // lands before the hold or after the commit. Throws when
+    // the organization has no document; a writer refuses it.
+    holdOrganization(organizationId: string): Promise<void>;
     // In-transaction notify. A read handle omits it.
     // The statement is the api's bell; this stays for a
     // caller that already holds the client.

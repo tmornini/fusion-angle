@@ -9,8 +9,14 @@ import {
     type TxMode,
 } from './db.ts';
 import { BODY_INDEXED_PATH } from './schema-postgres.ts';
-import { compareIdentifiers } from
-    '../shared/identifier.ts';
+import {
+    noOrganizationDocument,
+    ORGANIZATIONS_PATH,
+} from './organization-hold.ts';
+import {
+    compareIdentifiers,
+    NIL_IDENTIFIER,
+} from '../shared/identifier.ts';
 import { Octets } from '../shared/http-message/octets.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
@@ -113,6 +119,21 @@ function bodyContains(
         if (record[key] !== value) return false;
     }
     return true;
+}
+
+// The organization's genesis row, as the Postgres hold
+// selects it: path, name, the nil predecessor, PUT.
+function hasOrganizationGenesis(
+    buffer: readonly { id: string }[],
+    organizationId: string,
+): boolean {
+    return buffer.some((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === ORGANIZATIONS_PATH
+            && rec['name'] === organizationId
+            && rec['method'] === PUT_METHOD
+            && rec['supersedes'] === NIL_IDENTIFIER;
+    });
 }
 
 function documentRows(
@@ -337,6 +358,17 @@ export function bufferTx(
             } as { id: string };
             buffer.push(written);
             return true;
+        },
+        // Memory transactions are already serial, so the hold
+        // is the existence check alone — the twin of the
+        // Postgres row share.
+        async holdOrganization(
+            organizationId: string,
+        ): Promise<void> {
+            assertWritable();
+            if (!hasOrganizationGenesis(buffer, organizationId)) {
+                throw noOrganizationDocument(organizationId);
+            }
         },
         ledgerBuffer(): { id: string }[] {
             return buffer;

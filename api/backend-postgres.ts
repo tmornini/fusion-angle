@@ -25,8 +25,15 @@ import {
 } from './advisory-lock.ts';
 import {
     identifierOfUuidText,
+    NIL_IDENTIFIER,
     uuidTextOfIdentifier,
 } from '../shared/identifier.ts';
+import {
+    noOrganizationDocument,
+    ORGANIZATIONS_PATH,
+    ownOrganizationDocumentsOf,
+    rosterOrganizationsOf,
+} from './organization-hold.ts';
 import {
     isInserted,
     type Attempt,
@@ -45,6 +52,22 @@ export const POSTGRES_DROP_SCHEMA =
     + 'CREATE SCHEMA public;\n'
     + 'GRANT ALL ON SCHEMA public TO CURRENT_USER;\n'
     + 'GRANT ALL ON SCHEMA public TO public;';
+
+// The organization's genesis row for $1 the organizations
+// path, $2 the organization, $3 the nil predecessor. One
+// text per lock mode, so an EXPLAIN reads the product's
+// own statement.
+const ORGANIZATION_ROW_SQL =
+    'SELECT id FROM fa_message_pairs\n'
+    + 'WHERE path = $1\n'
+    + '  AND name = $2\n'
+    + '  AND supersedes = $3\n'
+    + "  AND method = 'PUT'\n";
+export const ORGANIZATION_ROW_FOR_SHARE_SQL =
+    ORGANIZATION_ROW_SQL + 'FOR SHARE';
+export const ORGANIZATION_ROW_FOR_UPDATE_SQL =
+    ORGANIZATION_ROW_SQL + 'FOR UPDATE';
+const NIL_UUID = uuidTextOfIdentifier(NIL_IDENTIFIER);
 
 export interface PostgresTx extends Tx {
     getDocumentHistory<T extends { id: string }>(
@@ -141,19 +164,32 @@ export class PostgresBackend implements StorageBackend {
         _now: string | undefined,
         tx: Tx | undefined,
     ): Promise<StatementAnswer[]> {
-        const sql = tx === undefined
-            ? this.#sql
-            : clientOf(tx);
+        const organizations = rosterOrganizationsOf(rows);
+        const own = ownOrganizationDocumentsOf(rows);
         try {
+            if (tx === undefined) {
+                if (organizations.length === 0) {
+                    return await queryStatement(
+                        this.#sql, attempt, rows,
+                    );
+                }
+                // A roster write's take must outlive its
+                // statement, so a bare one gets a
+                // transaction of its own.
+                return await this.#sql.begin(async (sql) => {
+                    await takeOrganizations(
+                        sql, organizations, own,
+                    );
+                    return queryStatement(sql, attempt, rows);
+                });
+            }
             // A 23505 aborts the surrounding transaction,
             // and postgres.js rethrows that error after
             // the caller catches it. A savepoint keeps
-            // the refusal on the statement.
-            if (tx === undefined) {
-                return await queryStatement(
-                    sql, attempt, rows,
-                );
-            }
+            // the refusal on the statement; the take runs
+            // before it, on the transaction itself.
+            const sql = clientOf(tx);
+            await takeOrganizations(sql, organizations, own);
             return await sql.begin((sp) =>
                 queryStatement(sp, attempt, rows),
             );
@@ -343,9 +379,43 @@ function postgresTx(
                 method: row.method,
             };
         },
+        async holdOrganization(
+            organizationId: string,
+        ): Promise<void> {
+            assertWritable();
+            const rows = await sql.unsafe<{ id: string }>(
+                ORGANIZATION_ROW_FOR_SHARE_SQL,
+                [ORGANIZATIONS_PATH, organizationId, NIL_UUID],
+            );
+            if (rows.length === 0) {
+                throw noOrganizationDocument(organizationId);
+            }
+        },
     };
     clients.set(tx, sql);
     return tx;
+}
+
+// FOR UPDATE on each organization's genesis row, in the
+// order given, before the roster statement: two roster
+// writers queue, and a flow write's share waits or is
+// waited on. An absent row refuses the write unless the
+// statement itself PUTs that organization's document — then
+// the statement is the genesis, and no one else can see it.
+async function takeOrganizations(
+    sql: SqlClient,
+    organizations: readonly string[],
+    own: ReadonlySet<string>,
+): Promise<void> {
+    for (const organizationId of organizations) {
+        const rows = await sql.unsafe<{ id: string }>(
+            ORGANIZATION_ROW_FOR_UPDATE_SQL,
+            [ORGANIZATIONS_PATH, organizationId, NIL_UUID],
+        );
+        if (rows.length === 0 && !own.has(organizationId)) {
+            throw noOrganizationDocument(organizationId);
+        }
+    }
 }
 
 function entityOf<T extends { id: string }>(
