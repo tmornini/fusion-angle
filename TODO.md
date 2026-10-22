@@ -2650,6 +2650,23 @@ Off the critical path; each with its oracle.
   to read the head before either statement lands, through
   a seam and a count-bound probe as the paused-flow pins
   do, with no timer and no lock the product does not take
+- Undo restores a graph the flow write law never sees.
+  `postFlowUndoOp` (`api/routes.ts:1447-1495`) lands an
+  earlier version's graph through `runStateWrite` with
+  neither `tx.holdOrganization` nor
+  `assertLiveFlowGraphWriteLaw`; only the flow PUT
+  (`:1418`) and the flow create (`:4324`) run them. An
+  undo to a version that named an AI agent whose seat has
+  since been removed, or a program whose document is
+  gone, lands that graph on both backends. Read from the
+  code, not yet pinned; it predates the service-members
+  branch. Fix: the undo holds the organization first and
+  runs the law on the restored graph in one transaction,
+  as the PUT does; what a refused undo answers is the
+  owner's call. Oracle: a memory pin that an undo to a
+  graph naming a removed agent is refused, and a race pin
+  in `tests/pg-races.test.ts` that a seat removal under a
+  paused undo lands after it or refuses it
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
