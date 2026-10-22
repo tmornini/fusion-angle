@@ -178,6 +178,7 @@ const HEAD_PATH = '/head-pin/';
 const BATCH_HEAD_PATH = '/head-batch-pin/';
 const OTHER_HEAD_PATH = '/head-batch-pin-other/';
 const EMPTY_HEAD_PATH = '/head-batch-pin-empty/';
+const FRESH_PATH = '/fresh-open-pin/';
 
 function pairRow(
     id: string,
@@ -726,6 +727,35 @@ export function defineStoreAcceptance(
         const { db } = await ready();
         assertEquals(
             await db.messagePairs.getCollectionHeadPairsBatch([]),
+            [],
+        );
+    });
+
+    Deno.test(name + ': each open is a fresh store', async () => {
+        const { db: first } = await ready();
+        const id = generateIdentifier();
+        await first.messagePairs.append(
+            id,
+            await pairRow(
+                id, FRESH_PATH, 'doc', 'PUT', stamp(1), 1,
+            ),
+        );
+        assertStrictEquals(
+            (await first.messagePairs.getHeadPair(
+                FRESH_PATH, 'doc',
+            ))?.id,
+            id,
+        );
+        const { db: second } = await ready();
+        assertStrictEquals(
+            await second.messagePairs.getHeadPair(
+                FRESH_PATH, 'doc',
+            ),
+            null,
+        );
+        assertEquals(
+            await second.messagePairs
+                .getCollectionHeadPairs(FRESH_PATH),
             [],
         );
     });
