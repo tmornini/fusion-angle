@@ -532,16 +532,21 @@ Deno.test('a flow write naming a removed AI member in'
 // its write's transaction leaves open. Keyed on the
 // organization half alone, so a read of the caller's own
 // membership, by name or by identity, passes untouched. A
-// transaction's head batches fire nothing; it counts them.
-function membershipReadHooked(organization: string): {
+// transaction's head batches fire nothing; it counts them,
+// and holds the handle the last one ran on, so a statement
+// shows whether it landed on the law's own transaction.
+function lawTransactionWatched(organization: string): {
     readonly backend: StorageBackend;
     readonly arm: (hook: () => Promise<void>) => void;
     readonly take: () => (() => Promise<void>) | undefined;
     readonly transactionBatches: () => number;
+    readonly statementOnLawTx: () => boolean;
 } {
     const inner = new MemoryStorageBackend();
     let armed: (() => Promise<void>) | undefined;
     let batches = 0;
+    let lawTx: Tx | undefined;
+    let statementTx: Tx | undefined;
     const take = () => {
         const hook = armed;
         armed = undefined;
@@ -584,15 +589,21 @@ function membershipReadHooked(organization: string): {
             return answers;
         },
     });
-    const counted = (tx: Tx): Tx => ({
-        ...tx,
-        getCollectionHeadPairsBatch: <T extends { id: string }>(
-            reads: readonly CollectionHeadRead[],
-        ): Promise<T[][]> => {
-            batches += 1;
-            return tx.getCollectionHeadPairsBatch<T>(reads);
-        },
-    });
+    const counted = (tx: Tx): Tx => {
+        const view: Tx = {
+            ...tx,
+            getCollectionHeadPairsBatch: <
+                T extends { id: string },
+            >(
+                reads: readonly CollectionHeadRead[],
+            ): Promise<T[][]> => {
+                batches += 1;
+                lawTx = view;
+                return tx.getCollectionHeadPairsBatch<T>(reads);
+            },
+        };
+        return view;
+    };
     const backend: StorageBackend = {
         read: (fn) => inner.read((tx) => fn(hooked(tx))),
         transaction: (mode, fn) => inner.transaction(
@@ -600,8 +611,10 @@ function membershipReadHooked(organization: string): {
         ),
         seedTransaction: (fn) => inner.seedTransaction(fn),
         ensureTable: () => inner.ensureTable(),
-        executeLedger: (attempt, rows, now, tx) =>
-            inner.executeLedger(attempt, rows, now, tx),
+        executeLedger: (attempt, rows, now, tx) => {
+            statementTx = tx;
+            return inner.executeLedger(attempt, rows, now, tx);
+        },
         hasSchema: () => inner.hasSchema(),
         postSchemaCreation: () => inner.postSchemaCreation(),
         deleteSchema: () => inner.deleteSchema(),
@@ -613,6 +626,8 @@ function membershipReadHooked(organization: string): {
         },
         take,
         transactionBatches: () => batches,
+        statementOnLawTx: () => statementTx !== undefined
+            && statementTx === lawTx,
     };
 }
 
@@ -621,7 +636,7 @@ function membershipReadHooked(organization: string): {
 // PUT is refused, or its flow head precedes the removal.
 Deno.test('a flow PUT reads its agents in the transaction'
 + ' it writes in', async () => {
-    const hooked = membershipReadHooked(STARK);
+    const hooked = lawTransactionWatched(STARK);
     const db = new BackedDbAdapter(
         hooked.backend,
         async () => {},
@@ -667,6 +682,7 @@ Deno.test('a flow PUT reads its agents in the transaction'
         headers: { 'if-none-match': '*' },
     }));
     await res.body?.cancel();
+    const onLawTx = hooked.statementOnLawTx();
     // Unfired, the removal follows the PUT, as it would
     // had it arrived after the write.
     await hooked.take()?.();
@@ -683,6 +699,10 @@ Deno.test('a flow PUT reads its agents in the transaction'
             || (flowAt >= 0 && flowAt < removalAt),
         'flow PUT answered ' + res.status + ' and landed at '
             + flowAt + ', after the removal at ' + removalAt,
+    );
+    assert(
+        res.status === 400 || onLawTx,
+        'flow PUT wrote outside the transaction its law read in',
     );
 });
 
@@ -738,7 +758,7 @@ function flowCreateBody(flowId: string, memberId: string) {
 // POST is refused, or its flow head precedes the AI.
 Deno.test('a flow create reads its programs in the'
 + ' transaction it writes in', async () => {
-    const hooked = membershipReadHooked(STARK);
+    const hooked = lawTransactionWatched(STARK);
     const db = new BackedDbAdapter(
         hooked.backend,
         async () => {},
@@ -764,6 +784,7 @@ Deno.test('a flow create reads its programs in the'
         body: flowCreateBody(flowId, id),
     }));
     await res.body?.cancel();
+    const onLawTx = hooked.statementOnLawTx();
     // Unfired, the AI follows the POST, as it would had it
     // arrived after the write.
     await hooked.take()?.();
@@ -780,6 +801,10 @@ Deno.test('a flow create reads its programs in the'
         'flow POST answered ' + res.status + ' and landed at '
             + flowAt + ', after the AI at ' + programAt,
     );
+    assert(
+        res.status === 400 || onLawTx,
+        'flow POST wrote outside the transaction its law read in',
+    );
 });
 
 // A hooked memory db holding one AI member. A lawless graph
@@ -794,7 +819,7 @@ async function flowLawFixture(): Promise<{
     readonly lawless: () => unknown[];
     readonly batches: () => number;
 }> {
-    const hooked = membershipReadHooked(STARK);
+    const hooked = lawTransactionWatched(STARK);
     const db = new BackedDbAdapter(
         hooked.backend,
         async () => {},
