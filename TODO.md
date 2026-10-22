@@ -2667,6 +2667,23 @@ Off the critical path; each with its oracle.
   graph naming a removed agent is refused, and a race pin
   in `tests/pg-races.test.ts` that a seat removal under a
   paused undo lands after it or refuses it
+- The no-bypass guard names sites, not calls. 'every
+  product append is a named site'
+  (`tests/ledger-writers.test.ts:105-134`) keys each
+  sanctioned `.append` by file and receiver name, so a
+  second `tx.append` in `api/store-history-entity.ts`
+  (sanctioned once, `:134`), or a `Tx` named `headers` or
+  `params` in a file whose `Headers` or `URLSearchParams`
+  append is sanctioned (`:36-60`), passes, and
+  `const { append } = tx` is never matched. A roster row
+  landed that way takes no `FOR UPDATE` and reopens the
+  flow write law's race. Two looser edges: the INSERT
+  check sanctions all of `api/ledger-statement-sql.ts`,
+  and a comment that spells an append fails the guard
+  (loud, never silent). Oracle: each site carries its
+  occurrence count, a destructured or aliased `append` is
+  an offender, and a scratch second `tx.append` in
+  `store-history-entity.ts` turns the pin red
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
