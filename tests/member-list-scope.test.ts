@@ -1,4 +1,8 @@
-import { assertEquals, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertEquals,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -215,6 +219,14 @@ async () => {
         [],
         'B lists its own members',
     );
+    for (const reader of [
+        'getIdentityRoster', 'getOrganizationSeats',
+    ]) {
+        assert(
+            theirs[reader]!.includes(fx.bPerson),
+            reader + ' lists B\'s own person',
+        );
+    }
     const ours = await listedBy(
         inPageContext(fx.db, await organizationToken()),
     );
