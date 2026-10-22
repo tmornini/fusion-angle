@@ -304,7 +304,9 @@ async () => {
 // No request creates an organization: a claim organization
 // with no document is the head read's miss, 404, whichever
 // conditional the PUT carries (RFC 9110 §13.2.1), and
-// nothing is stored.
+// nothing is stored. The fence reads the token's claims, so
+// no seat is needed — and none can exist: the ledger seats
+// no one in an organization without its document.
 for (const [precondition, headers] of [
     ['If-None-Match: *', { 'if-none-match': '*' }],
     ['If-Match', { 'if-match': '"' + generateIdentifier() + '"' }],
@@ -312,10 +314,6 @@ for (const [precondition, headers] of [
     Deno.test('a PUT with ' + precondition + ' on an absent claim'
     + ' organization is 404', async () => {
         const { db, organizationB } = await twoOrganizations();
-        await seedMembershipPair(
-            db, generateIdentifier(), organizationB,
-            'XXZruirZyAOoRpNxaDnpSA',
-        );
         const res = await handleRequest(db, apiRequest({
             method: 'PUT',
             path: '/organizations/' + organizationB,

@@ -114,7 +114,9 @@ export async function seedOrganizationDocument(
 // (memberGeneses and postBootstrapIn write both), and a
 // membership read refuses a seat whose identity has none.
 // A seat seeded bare is a person's; one whose identity
-// already has a document keeps that document's kind.
+// already has a document keeps that document's kind. Nor
+// does the ledger seat anyone in an organization without
+// its document, so one lands first when it is absent.
 export async function seedSeat(
     db: DbAdapter,
     organization: Id,
@@ -125,6 +127,9 @@ export async function seedSeat(
     if (await deriveIdentityKind(db, identityId) === undefined) {
         await seedIdentityDocument(db, identityId, 'person');
     }
+    await seedOrganizationDocument(
+        db, organization, 'Organization ' + organization,
+    );
     const requestAt = nowUtc();
     const name = membershipNameOf(organization, identityId);
     const body = membershipSeedBody(

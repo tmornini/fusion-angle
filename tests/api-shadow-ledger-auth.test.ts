@@ -588,15 +588,16 @@ Deno.test('a client_credentials grant stores its own pair with live'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 10: dbWithPasswordUser's own identity + pii + credential
+    // 11: dbWithPasswordUser's own identity + pii + credential
     // pairs (3) + the service's identity document + the
+    // organization document its seat requires + the
     // fixture's own membership pair (Phase 13 Task 1) + the
     // registration-facet pair the fixture seeds (clients
     // elimination) precede the token
     // grant's spent-jti ticket, its own event pair (Phase 13
     // Task 5: the issued root's pair at the row's document),
     // and its operation message pair.
-    assertStrictEquals(requests.length, 10);
+    assertStrictEquals(requests.length, 11);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request_secrets.includes(assertion),
