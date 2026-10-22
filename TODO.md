@@ -2741,6 +2741,15 @@ Off the critical path; each with its oracle.
   ('the flow write answered … before its roster read',
   `:545-549`) though the product is right. Oracle: the
   seam pauses after whichever roster read the law makes
+- The organization fixture would PUT over a deleted one.
+  `seedOrganizationDocument`
+  (`tests/root-admin-fixture.ts:72-112`) skips an
+  organization only when `deriveOrganizations` lists it
+  live, so for a deleted one it forms a blind PUT on a
+  chain that already has a head. No test does that
+  today. Oracle: the fixture skips any organization with
+  a head, live or deleted, or refuses a deleted one
+  loudly
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
