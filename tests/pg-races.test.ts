@@ -41,8 +41,9 @@ import {
 
 // Live Postgres races: first-writer, If-Match, a second
 // genesis, a seat removal under a flow PUT, a flow PUT
-// under a seat removal, and a program member created under
-// a flow write. Skip when POSTGRES_URL is unset so
+// under a seat removal, a program member created under a
+// flow write, and two flow writes that do not wait on each
+// other. Skip when POSTGRES_URL is unset so
 // ./validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
@@ -1130,5 +1131,39 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         await assertProgramFollowsFlow(
             raced, flowId, SERVICES_PREFIX, memberId,
         );
+    });
+
+    // Flow writes share the organization row, so a second
+    // flow lands while the first is paused holding it; the
+    // runner's raced write is that second flow here. A flow
+    // hold that took the row exclusive would queue every flow
+    // save in the organization behind the slowest one.
+    Deno.test('a flow PUT under a paused flow PUT of the same'
+    + ' organization lands without waiting', async () => {
+        const token = await organizationToken();
+        const pausedId = generateIdentifier();
+        const racingId = generateIdentifier();
+        const raced = await racedUnderPausedFlow(
+            (paused) => handleRequest(paused, req(
+                'PUT', FLOW_PREFIX + pausedId, token,
+                flowDocument('Paused', generateIdentifier()),
+                { 'if-none-match': '*' },
+                generateIdentifier(),
+            )),
+            () => handleRequest(db, req(
+                'PUT', FLOW_PREFIX + racingId, token,
+                flowDocument('Racing', generateIdentifier()),
+                { 'if-none-match': '*' },
+                generateIdentifier(),
+            )),
+        );
+        assert(
+            raced.settledDuringPause,
+            'the racing flow PUT waited on the paused one'
+                + ' (it waited on the paused flow: '
+                + String(raced.blocked) + ')',
+        );
+        assertStrictEquals(raced.rosterResponse.status, 201);
+        assertStrictEquals(raced.flowResponse.status, 201);
     });
 }
