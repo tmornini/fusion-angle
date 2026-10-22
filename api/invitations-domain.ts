@@ -10,12 +10,15 @@ import {
     ValidationError,
     nowUtc,
     type Id,
+    type IdentityKind,
     type InvitationState,
     type MembershipEntity,
     type MessagePairEntity,
 } from '../shared/types.ts';
 import {
     assertOnlyKeys,
+    type MembershipCreate,
+    SERVICE_ADMIN_REFUSAL,
     validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
@@ -37,10 +40,13 @@ import type {
     ReceivedRequest,
     SiblingCondition,
     StateAnswerKind,
+    StateSibling,
     WriteAnswer,
 } from './message-pair.ts';
 import { bodyOf } from './derive-documents.ts';
 import {
+    deriveIdentityKind,
+    deriveIdentityKindsOf,
     deriveIdentityPiiRows,
     identityPrefixFor,
 } from './derive-identity-spine.ts';
@@ -77,6 +83,7 @@ import {
     envelopeOf,
     responseOfWire,
     servedResponse,
+    type Reader,
 } from './served-response.ts';
 
 const ADMIN_WRITE =
@@ -469,6 +476,44 @@ export async function getInvitationOnIdentityNest(
     );
 }
 
+// A membership read on the organization nest joins each
+// seat's identity kind, the one rule every roster reader
+// sorts members by. Every seat's identity has a document
+// (memberGeneses and postBootstrapIn write both), so a
+// seat without one is the store's bug, never served bare.
+function identityKindJoin(
+    heads: readonly MessagePairEntity[],
+    kinds: ReadonlyMap<Id, IdentityKind>,
+): Reader {
+    return {
+        sees: 'joined',
+        joined: new Map(heads.map((head) => {
+            const membership = membershipOfHead(head);
+            const kind = kinds.get(membership.identity_id);
+            if (kind === undefined) {
+                throw new Error(
+                    'no identity document for '
+                        + membership.identity_id,
+                );
+            }
+            return [membership.id, { identity_kind: kind }];
+        })),
+    };
+}
+
+// The seats' identity kinds, read in the caller's
+// transaction: a seat and its kind are one snapshot, so a
+// service member landing between the two reads is never
+// read as a person.
+function seatedIdentityKinds(
+    view: DbAdapter,
+    heads: readonly MessagePairEntity[],
+): Promise<ReadonlyMap<Id, IdentityKind>> {
+    return deriveIdentityKindsOf(view, new Set(
+        heads.map((head) => membershipOfHead(head).identity_id),
+    ));
+}
+
 // GET /organizations/:id/invitations/
 export async function getOrganizationInvitations(
     db: DbAdapter,
@@ -478,12 +523,21 @@ export async function getOrganizationInvitations(
     _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
-    return wholeCollectionSelection(
-        await organizationMembershipHeads(
-            db, param(params, 0), askedQuery(query),
-        ),
-        'stateless',
+    const { heads, kinds } = await db.readTransaction(
+        async (view) => {
+            const heads = await organizationMembershipHeads(
+                view, param(params, 0), askedQuery(query),
+            );
+            return {
+                heads,
+                kinds: await seatedIdentityKinds(view, heads),
+            };
+        },
     );
+    return {
+        ...wholeCollectionSelection(heads, 'stateless'),
+        reader: identityKindJoin(heads, kinds),
+    };
 }
 
 // GET /organizations/:id/invitations/:membership-id
@@ -495,12 +549,23 @@ export async function getInvitationOnOrganizationNest(
     roles: readonly string[],
 ): Promise<HeadSelection> {
     const name = membershipName(params);
-    const head = await visibleHead(
-        db, name, roles, 'organization',
+    const { head, kinds } = await db.readTransaction(
+        async (view) => {
+            const head = await visibleHead(
+                view, name, roles, 'organization',
+            );
+            return {
+                head,
+                kinds: await seatedIdentityKinds(view, [head]),
+            };
+        },
     );
-    return wholeHeadSelection(
-        head, 'stateless', 'invitations', name,
-    );
+    return {
+        ...wholeHeadSelection(
+            head, 'stateless', 'invitations', name,
+        ),
+        reader: identityKindJoin([head], kinds),
+    };
 }
 
 // GET .../versions/
@@ -680,7 +745,8 @@ export async function postOrganizationInvitation(
 }
 
 // POST /organizations/:id/memberships/ — one accepted
-// person. The handler declares the three geneses.
+// member of any kind; the handler declares the three
+// geneses.
 export async function postOrganizationMembership(
     db: DbAdapter,
     params: string[],
@@ -703,7 +769,6 @@ export async function postOrganizationMembership(
     const name = membershipNameOf(
         organizationId, created.id,
     );
-    const profile = created.identity;
     const receivedPair = await formWriteMessagePair({
         method: 'POST',
         pathname: received.target,
@@ -744,37 +809,7 @@ export async function postOrganizationMembership(
                     declarer: 'handler',
                 },
             },
-            {
-                method: 'PUT',
-                path: canonicalPath(
-                    undefined, '/identities/',
-                ),
-                name: created.id,
-                state: {
-                    id: created.id,
-                    kind: 'person',
-                    ...profile,
-                },
-                condition: {
-                    kind: 'genesis',
-                    declarer: 'handler',
-                },
-            },
-            {
-                method: 'PUT',
-                path: identityPrefixFor(created.id),
-                name: PII_DOCUMENT_NAME,
-                state: {
-                    name: created.pii.name,
-                    email: created.pii.email,
-                    phone: created.pii.phone,
-                    bio: created.pii.bio,
-                },
-                condition: {
-                    kind: 'genesis',
-                    declarer: 'handler',
-                },
-            },
+            ...memberGeneses(organizationId, created),
         ],
         reader: { sees: 'whole' },
         answer: {
@@ -788,6 +823,96 @@ export async function postOrganizationMembership(
         notify(db, organizationId, created.id);
     }
     return answer.response;
+}
+
+// The identity and the member document: the two geneses
+// beside the membership, one pair per kind. A human's
+// document is its PII; an AI's or a service's is the
+// organization-scoped document its family's PUT edits.
+function memberGeneses(
+    organizationId: Id,
+    created: MembershipCreate,
+): StateSibling[] {
+    const genesis: SiblingCondition = {
+        kind: 'genesis',
+        declarer: 'handler',
+    };
+    const identities = canonicalPath(
+        undefined, '/identities/',
+    );
+    switch (created.kind) {
+        case 'human':
+            return [
+                {
+                    method: 'PUT',
+                    path: identities,
+                    name: created.id,
+                    state: {
+                        id: created.id,
+                        kind: 'person',
+                        ...created.identity,
+                    },
+                    condition: genesis,
+                },
+                {
+                    method: 'PUT',
+                    path: identityPrefixFor(created.id),
+                    name: PII_DOCUMENT_NAME,
+                    state: {
+                        name: created.pii.name,
+                        email: created.pii.email,
+                        phone: created.pii.phone,
+                        bio: created.pii.bio,
+                    },
+                    condition: genesis,
+                },
+            ];
+        case 'ai':
+            return [
+                {
+                    method: 'PUT',
+                    path: identities,
+                    name: created.id,
+                    state: { id: created.id, kind: 'service' },
+                    condition: genesis,
+                },
+                {
+                    method: 'PUT',
+                    path: canonicalPath(
+                        organizationId, '/ai-agents/',
+                    ),
+                    name: created.id,
+                    state: { id: created.id, ...created.ai },
+                    condition: genesis,
+                },
+            ];
+        case 'service':
+            return [
+                {
+                    method: 'PUT',
+                    path: identities,
+                    name: created.id,
+                    state: { id: created.id, kind: 'service' },
+                    condition: genesis,
+                },
+                {
+                    method: 'PUT',
+                    path: canonicalPath(
+                        organizationId, '/services/',
+                    ),
+                    name: created.id,
+                    state: {
+                        id: created.id,
+                        ...created.service,
+                    },
+                    condition: genesis,
+                },
+            ];
+        default: {
+            const unreachable: never = created;
+            return unreachable;
+        }
+    }
 }
 
 async function putMembership(
@@ -871,6 +996,23 @@ async function putMembership(
         return servedHead(head, received.requestId);
     }
     const next = settledMembership(outcome.next);
+    // One identity read serves two refusals. A seat names
+    // an identity with its document (memberGeneses and
+    // postBootstrapIn write both), so a genesis naming an
+    // unknown identity is absent (RFC 9110 §15.5.5); and an
+    // identity that signs in by client credentials is never
+    // an organization admin (spec decision 11).
+    const identityKind = await deriveIdentityKind(
+        db, parsed.identityId,
+    );
+    if (from === null && identityKind === undefined) {
+        throw new EntityNotFoundError(
+            'identities', parsed.identityId,
+        );
+    }
+    if (next.type === 'admin' && identityKind === 'service') {
+        throw new ApiError(SERVICE_ADMIN_REFUSAL, HTTP_CONFLICT);
+    }
     if (from !== null) {
         await refuseLastAdmin(db, from, next);
     }

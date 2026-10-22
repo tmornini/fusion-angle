@@ -11,6 +11,7 @@ import {
 } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 import { firstProviderModel } from './member-fixtures.ts';
+import { buildPageUrl } from '../web-app/app/navigation.ts';
 import {
     HumanMemberDetailPresenter,
     HumanMemberDetailEditPresenter,
@@ -142,6 +143,14 @@ function makeAIMember() {
                 'Deep reasoning over long docs.',
             model: firstProviderModel().id,
         },
+        responseMessage<MembershipEntity>({
+            id: 'ai_1',
+            organization_id: 'AjdvjuECVZEgZoFajaIEkg',
+            identity_id: 'ai_1',
+            type: 'member',
+            state: 'accepted',
+            at: '2026-01-01T00:00:00.000000Z',
+        }),
     );
 }
 
@@ -184,7 +193,7 @@ Deno.test(
     () => {
         const rec = makeRecordingContainer();
         new AIMemberDetailPresenter(
-            makeAIMember(),
+            makeAIMember(), REMOVABLE,
         ).renderShell(rec.container);
         const out = rec.allHtml();
         const model = firstProviderModel();
@@ -307,6 +316,27 @@ Deno.test(
         assertMatch(out, /data-dialog-cancel="confirm-remove"/);
         assertMatch(out, /next token refresh/);
         assertMatch(out, /Their access/);
+    },
+);
+
+Deno.test(
+    'AI member detail links its identity and offers Remove',
+    () => {
+        const rec = makeRecordingContainer();
+        new AIMemberDetailPresenter(
+            makeAIMember(), REMOVABLE,
+        ).renderShell(rec.container);
+        const out = rec.allHtml();
+        assertStrictEquals(
+            out.includes(
+                'href="' + buildPageUrl(
+                    'identity-detail', { identityId: 'ai_1' },
+                ) + '"',
+            ),
+            true,
+        );
+        assertMatch(out, /data-dialog-open="confirm-remove"/);
+        assertMatch(out, /id="member-edit-btn"/);
     },
 );
 

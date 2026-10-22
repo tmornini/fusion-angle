@@ -113,11 +113,12 @@ const DUMMY_BODIES: Readonly<
         score: 0, member_id: ID, at: AT,
     },
     'identities/:id': { kind: 'person' },
-    'ai-agents/:id': {
+    'organizations/:id/ai-agents/:id': {
         name: 'A', description: 'd',
         model: 'nqNVXnBkUBLoKlenbyPIZQ',
         skill_focus: 's',
     },
+    'organizations/:id/services/:id': { name: 'S', description: 'd' },
     'identities/:id/pii': {
         name: 'N', email: 'e@x', phone: 'AjdvjuECVZEgZoFajaIEkg',
         bio: 'b',

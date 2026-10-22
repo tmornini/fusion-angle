@@ -95,12 +95,11 @@ Deno.test('organizations is the tenant root — global-plane'
     });
 });
 
-Deno.test('ai-agents is a live global-plane family,'
-+ ' not a member and not an identity',
+Deno.test('ai-agents is an organization-plane family',
 () => {
     assertEquals(familyRegistration('ai-agents'), {
         family: 'ai-agents',
-        organizationNested: false,
+        organizationNested: true,
         createBodyIdField: 'id',
     });
 });

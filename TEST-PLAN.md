@@ -5816,27 +5816,14 @@ FSM, unlike `flows/detail`).
 
 ### Identities (list & detail) (`identities/`, `identities/detail.html`)
 
-- [ ] **G44** Navigate to `identities/index.html`. Click
-  "Add Identity". PASS: the `add-identity` dialog opens
-  on the service form (`#svc-secret`, "Client Secret"),
-  with no Kind toggle and no person form. Click "Create"
-  (`#add-identity-submit`) with the secret empty → "A
-  client secret is required" and the dialog stays open.
-  Enter a secret, Create → a "Service identity added"
-  toast and the dialog closes. The roster append fails
-  until G47's line lands: `GET identities/` omits
-  services, so the new service is not listed (see G47).
-  Source: `web-app/identities/index.ts`
-  (`handleAddIdentitySubmit`).
-  Pin: tests/browser/dialogs.test.ts 'the add-identity
-       dialog opens on the service form' (decides no
-       Kind toggle, no person form, and a visible
-       `#svc-secret`);
-       tests/adapters-identity-creation.test.ts
-       'postIdentityCreation mints a service identity
-       with a hashed client_secret' (decides the
-       credential sub-object is hashed, never the
-       plaintext secret); exploratory — the toast text
+- [ ] **G44** Navigate to `identities/index.html`. PASS:
+  the page lists identities and offers no create: no
+  "Add Identity" button and no `add-identity` dialog.
+  People join through the members page's statement;
+  services and AIs are created there too (G14b).
+  Source: `web-app/identities/index.ts`.
+  Pin: tests/browser/dialogs.test.ts 'the identities
+       page offers no create'.
 - [ ] **G45** From the roster, click a person row
   (`.card[data-identity-id]`). PASS: navigates to
   `identities/detail.html?identityId=<id>`, which

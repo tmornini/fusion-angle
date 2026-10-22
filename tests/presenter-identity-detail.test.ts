@@ -91,7 +91,6 @@ function personPresenter() {
             }),
         },
         service: { named: false },
-        activeCredentialKinds: [],
         registration: { registered: false as const },
     });
 }
@@ -131,7 +130,6 @@ Deno.test(
             }),
             pii: { erased: true },
             service: { named: false },
-            activeCredentialKinds: [],
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
@@ -156,14 +154,12 @@ Deno.test(
                 named: true, name: 'Grok 4.3',
                 detail: 'Fast reasoning model',
             },
-            activeCredentialKinds: ['client_secret'],
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
         assertMatch(out, /Grok 4\.3/);
         assertMatch(out, /Service/);
-        assertMatch(out, /Credentials/);
-        assertMatch(out, /client_secret/);
+        assertNotMatch(out, /Credentials/);
         // The secret value never appears.
         assertStrictEquals(out.includes('secret-v'), false);
         // No personal-info card for a service.
@@ -189,11 +185,11 @@ Deno.test(
             }),
             pii: { erased: true },
             service: { named: false },
-            activeCredentialKinds: ['client_secret'],
             registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
         assertMatch(out, new RegExp(UNNAMED_SERVICE_NAME));
+        assertNotMatch(out, /Credentials/);
         // The id is the subtitle, never the heading.
         assertNotMatch(
             out, /<h1[^>]*>\s*BhdhBLQPyktOCbdJzGsggg/,
@@ -214,7 +210,6 @@ Deno.test(
             pii: { erased: true },
             service: { named: true, name: 'Robo',
                 detail: 'bot' },
-            activeCredentialKinds: [],
             registration: { registered: false },
         }).renderShell(container);
         assertMatch(allHtml(), /Client registration/);
@@ -235,7 +230,6 @@ Deno.test(
             pii: { erased: true },
             service: { named: true, name: 'Robo',
                 detail: 'bot' },
-            activeCredentialKinds: [],
             registration: {
                 registered: true,
                 grantTypes: 'client_credentials',

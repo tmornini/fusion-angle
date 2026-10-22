@@ -26,6 +26,8 @@ import {
     type Reader,
 } from '../api/served-response.ts';
 import { imfFixdate } from '../shared/pair-root.ts';
+import { deriveIdentityKindsOf } from
+    '../api/derive-identity-spine.ts';
 
 const BASE = 'http://localhost';
 
@@ -378,4 +380,33 @@ export async function assertPartIsDocumentGet(
         withoutTransmission(await messageOfResponse(got)),
         withoutTransmission(part),
     );
+}
+
+// The reader a membership read on the organization nest
+// serves with: each seat's identity kind from the identity
+// ledger. Every seat's identity has a document; a seat
+// without one is the fixture's bug.
+export async function membershipJoinReader(
+    db: DbAdapter,
+    parts: readonly HttpMessage<{
+        id: string;
+        identity_id: string;
+    }>[],
+): Promise<Reader> {
+    const kinds = await deriveIdentityKindsOf(db, new Set(
+        parts.map((part) => part.body().toValue().identity_id),
+    ));
+    return {
+        sees: 'joined',
+        joined: new Map(parts.map((part) => {
+            const { id, identity_id } = part.body().toValue();
+            const kind = kinds.get(identity_id);
+            if (kind === undefined) {
+                throw new Error(
+                    'no identity document for ' + identity_id,
+                );
+            }
+            return [id, { identity_kind: kind }];
+        })),
+    };
 }

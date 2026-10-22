@@ -18,7 +18,7 @@ export interface ProviderModel {
     api_name: string;
 }
 
-export type MemberKind = 'human' | 'ai' | 'system';
+export type MemberKind = 'human' | 'ai' | 'service' | 'system';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
@@ -508,9 +508,7 @@ export interface IdentityPiiEntity {
     bio: string;
 }
 
-export type IdentityCredentialKind =
-    | 'password'        // person: interactive secret
-    | 'client_secret';  // service: shared secret
+export type IdentityCredentialKind = 'password';
 
 export type IdentityCredentialStatus =
     | 'set' | 'rotated' | 'revoked';
@@ -805,8 +803,19 @@ export interface AIAgentEntity {
     model: ModelId;
 }
 
+// An organization's service member document: a non-AI
+// program acting through the API by a `service` identity.
+export interface ServiceEntity {
+    id: Id;
+    name: string;
+    description: string;
+}
+
 export class AIMember {
     readonly kind = 'ai' as const;
+    // The membership this member was read through: its
+    // removal names the head it replaces.
+    readonly membership: HttpMessage<MembershipEntity>;
     readonly #id: MemberId;
     readonly #name: string;
     readonly #description: string;
@@ -816,7 +825,9 @@ export class AIMember {
     constructor(
         parent: MemberEntity,
         detail: AIMemberEntity,
+        membership: HttpMessage<MembershipEntity>,
     ) {
+        this.membership = membership;
         this.#id = parent.id;
         this.#name = detail.name;
         this.#description =
@@ -848,6 +859,54 @@ export class AIMember {
 
     modelId(): ModelId {
         return this.#model;
+    }
+
+    matchesSearch(term: string): boolean {
+        const lowerTerm = term.toLowerCase();
+        return (
+            this.#name
+                .toLowerCase()
+                .includes(lowerTerm)
+            || this.#description
+                .toLowerCase()
+                .includes(lowerTerm)
+        );
+    }
+}
+
+export class ServiceMember {
+    readonly kind = 'service' as const;
+    // The membership this member was read through: its
+    // removal names the head it replaces.
+    readonly membership: HttpMessage<MembershipEntity>;
+    readonly #id: MemberId;
+    readonly #name: string;
+    readonly #description: string;
+
+    constructor(
+        detail: ServiceEntity,
+        membership: HttpMessage<MembershipEntity>,
+    ) {
+        this.membership = membership;
+        this.#id = detail.id;
+        this.#name = detail.name;
+        this.#description = detail.description;
+    }
+
+    idForLink(): string {
+        return this.#id;
+    }
+
+    nameText(): string {
+        return this.#name;
+    }
+
+    name(): string {
+        return this.nameText();
+    }
+
+    descriptionText(): string {
+        return this.#description;
     }
 
     matchesSearch(term: string): boolean {
@@ -933,9 +992,14 @@ export class FormerMember {
     }
 }
 
+// A member holding a seat the roster manages: what a
+// removal reads.
+export type SeatedMember = HumanMember | AIMember | ServiceMember;
+
 export type Member =
     | HumanMember
     | AIMember
+    | ServiceMember
     | SystemMember
     | FormerMember;
 
@@ -949,6 +1013,12 @@ export function isAIMember(
     w: Member,
 ): w is AIMember {
     return w.kind === 'ai';
+}
+
+export function isServiceMember(
+    w: Member,
+): w is ServiceMember {
+    return w.kind === 'service';
 }
 
 export function isSystemMember(
@@ -1408,6 +1478,14 @@ export type MembershipEntity =
     | (MembershipFields & {
         state: Exclude<InvitationState, 'pending'>;
     });
+
+// A membership as the organization nest serves it: the
+// stored body and its identity's kind, derived when served
+// and never stored. A member is human if and only if that
+// kind is 'person'.
+export type MembershipReadEntity = MembershipEntity & {
+    identity_kind: IdentityKind;
+};
 
 // An invitation binding an identity to an organization, awaiting the holder's
 // answer. Immutable like a membership, but its lifecycle is derived from the

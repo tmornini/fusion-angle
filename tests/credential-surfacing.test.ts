@@ -65,8 +65,7 @@ async () => {
 // Phase Final Task 1(d): SeededCredentials count is
 // row-independent — 12 human passwords (buildMembers +
 // buildUnaffiliatedIdentity) for mock-data; 1 for
-// bootstrap. System client_secret is not surfaced in
-// the reveal list.
+// bootstrap.
 Deno.test('mock-data surfaces exactly twelve human credentials',
 async () => {
     const db = memoryDbAdapter();

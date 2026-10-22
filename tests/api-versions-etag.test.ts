@@ -148,7 +148,8 @@ Deno.test('registered families offer versions/ and :etag',
 () => {
     const lists = [
         '/identities/abc/versions/',
-        '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+            + 'UQTJZvCoKlFjEoDlDUwekw/versions/',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw/versions/',
         '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/',
@@ -168,7 +169,8 @@ Deno.test('registered families offer versions/ and :etag',
     ];
     const snapshots = [
         '/identities/abc/versions/YiJPbufDpkyrZcZCYbUJpg',
-        '/ai-agents/UQTJZvCoKlFjEoDlDUwekw/versions/YiJPbufDpkyrZcZCYbUJpg',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+            + 'UQTJZvCoKlFjEoDlDUwekw/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/organizations/AjdvjuECVZEgZoFajaIEkg/invitations/'
             + 'fndCYAsXazdzMUlEGMNIZw/versions/YiJPbufDpkyrZcZCYbUJpg',
         '/identities/abc/invitations/fndCYAsXazdzMUlEGMNIZw/versions/'
@@ -573,14 +575,13 @@ Deno.test(
         const db = await seedInviteeWorld();
         const token = await organizationToken();
         const id = await seatCoMember(db);
-        const created = await handleRequest(db, req(
-            'PUT', '/identities/' + id, token,
-            { kind: 'person' },
+        const head = await handleRequest(db, req(
+            'GET', '/identities/' + id, token,
         ));
-        assertStrictEquals(created.status, 201);
-        const tag = pairIdOf(created);
+        assertStrictEquals(head.status, 200);
+        const tag = pairIdOf(head);
         assert(tag !== null);
-        await created.body?.cancel();
+        await head.body?.cancel();
         await deleteIdentityDocument(db, id);
         const listPath = '/identities/' + id + '/versions/';
         const list = await handleRequest(
@@ -608,11 +609,7 @@ Deno.test(
         const token = await organizationToken();
         const id = await seatCoMember(db);
         const path = '/identities/' + id;
-        const first = await handleRequest(db, req(
-            'PUT', path, token, { kind: 'person' },
-        ));
-        assertStrictEquals(first.status, 201);
-        await first.body?.cancel();
+        // The seat's own person document is the first PUT.
         const second = await handleRequest(db, req(
             'PUT', path, token, { kind: 'service' },
         ));
@@ -671,15 +668,17 @@ async function deleteAiAgentDocument(
 ): Promise<void> {
     const messagePair = await formWriteMessagePair({
         method: 'DELETE',
-        pathname: '/ai-agents/' + id,
-        routePattern: 'ai-agents/:id',
-        routeSegments: ['ai-agents', ':id'],
-        pathSegments: ['ai-agents', id],
+        pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/' + id,
+        routePattern: 'organizations/:id/ai-agents/:id',
+        routeSegments: ['organizations', ':id', 'ai-agents', ':id'],
+        pathSegments: [
+            'organizations', 'AjdvjuECVZEgZoFajaIEkg', 'ai-agents', id,
+        ],
         headerFields: [],
         body: {},
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
         requestAt: '2026-08-01T00:00:00.000000Z',
-        organization: undefined,
+        organization: 'AjdvjuECVZEgZoFajaIEkg',
         responseBody: undefined,
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
@@ -691,6 +690,28 @@ async function deleteAiAgentDocument(
     );
 }
 
+// Only the members statement creates an AI agent document;
+// the agent's PUT edits the head the statement wrote.
+async function postAiMember(
+    db: DbAdapter,
+    token: string,
+    id: string,
+    document: ReturnType<typeof aiAgentDocument>,
+): Promise<void> {
+    const created = await handleRequest(db, req(
+        'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/memberships/',
+        token,
+        {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: AT },
+            ai: document,
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+}
+
 Deno.test(
     'a deleted AI agent answers 410 on both version'
         + ' routes',
@@ -698,16 +719,18 @@ Deno.test(
         const db = await seedInviteeWorld();
         const token = await organizationToken();
         const id = generateIdentifier();
+        await postAiMember(db, token, id, aiAgentDocument('First'));
         const created = await handleRequest(db, req(
-            'PUT', '/ai-agents/' + id, token,
-            aiAgentDocument('First'),
+            'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/ai-agents/'
+                + id, token,
         ));
-        assertStrictEquals(created.status, 201);
+        assertStrictEquals(created.status, 200);
         const tag = pairIdOf(created);
         assert(tag !== null);
         await created.body?.cancel();
         await deleteAiAgentDocument(db, id);
-        const listPath = '/ai-agents/' + id + '/versions/';
+        const listPath = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/' + id + '/versions/';
         const list = await handleRequest(
             db, req('GET', listPath, token),
         );
@@ -732,17 +755,37 @@ Deno.test(
         const db = await seedInviteeWorld();
         const token = await organizationToken();
         const id = generateIdentifier();
-        const path = '/ai-agents/' + id;
+        const path = '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/' + id;
+        const genesisBody = aiAgentDocument('Genesis');
         const firstBody = aiAgentDocument('First');
         const secondBody = aiAgentDocument('Second');
-        const first = await handleRequest(db, req(
-            'PUT', path, token, firstBody,
+        await postAiMember(db, token, id, genesisBody);
+        const genesis = await handleRequest(db, req(
+            'GET', path, token,
         ));
-        assertStrictEquals(first.status, 201);
+        assertStrictEquals(genesis.status, 200);
+        await genesis.body?.cancel();
+        const genesisTag = genesis.headers.get('ETag');
+        assert(genesisTag !== null);
+        const first = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path,
+            token,
+            body: firstBody,
+            headers: { 'If-Match': genesisTag },
+        }));
+        assertStrictEquals(first.status, 200);
         await first.body?.cancel();
-        const second = await handleRequest(db, req(
-            'PUT', path, token, secondBody,
-        ));
+        const firstTag = first.headers.get('ETag');
+        assert(firstTag !== null);
+        const second = await handleRequest(db, apiRequest({
+            method: 'PUT',
+            path,
+            token,
+            body: secondBody,
+            headers: { 'If-Match': firstTag },
+        }));
         assertStrictEquals(second.status, 200);
         await second.body?.cancel();
         const list = await handleRequest(db, req(
@@ -756,11 +799,14 @@ Deno.test(
             skill_focus: string;
             model: string;
         }>(list);
-        assertStrictEquals(versions.length, 2);
+        assertStrictEquals(versions.length, 3);
         assertEquals(versions[0]!.body().toValue(), {
-            id, ...firstBody,
+            id, ...genesisBody,
         });
         assertEquals(versions[1]!.body().toValue(), {
+            id, ...firstBody,
+        });
+        assertEquals(versions[2]!.body().toValue(), {
             id, ...secondBody,
         });
         for (const part of versions) {

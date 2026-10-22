@@ -32,10 +32,12 @@ import {
     fillHumanMemberProfile,
     postHumanMemberCreation,
     postAIMemberCreation,
+    postServiceMemberCreation,
     postInvitation,
     type InvitationOutcome,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
+    subscribeServiceMemberChanges,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from '../../shared/identifier.ts';
@@ -151,6 +153,9 @@ export async function init(): Promise<void> {
                 () => void refresh(),
             );
             subscribeAIMemberChanges(
+                () => void refresh(),
+            );
+            subscribeServiceMemberChanges(
                 () => void refresh(),
             );
         },
@@ -331,6 +336,7 @@ function onKindChipClick(e: Event): void {
         kind !== 'all'
         && kind !== 'human'
         && kind !== 'ai'
+        && kind !== 'service'
     ) return;
     membersState = applyManagedMembersKind(
         membersState, kind as MemberKindFilter,
@@ -411,6 +417,8 @@ function clearAddMemberFields(): void {
     $input('#ai-name', document)!.value = '';
     $textarea('#ai-description', document)!.value = '';
     $textarea('#ai-skill-focus', document)!.value = '';
+    $input('#service-name', document)!.value = '';
+    $textarea('#service-description', document)!.value = '';
 }
 
 function bindInviteMemberDialog(): void {
@@ -516,14 +524,15 @@ function onKindRadioChange(e: Event): void {
     const aiForm = $(
         '#add-member-ai-form', document,
     );
-    if (!humanForm || !aiForm) return;
-    if (kind === 'human') {
-        humanForm.classList.remove('hidden');
-        aiForm.classList.add('hidden');
-    } else {
-        humanForm.classList.add('hidden');
-        aiForm.classList.remove('hidden');
-    }
+    const serviceForm = $(
+        '#add-member-service-form', document,
+    );
+    if (!humanForm || !aiForm || !serviceForm) return;
+    humanForm.classList.toggle('hidden', kind !== 'human');
+    aiForm.classList.toggle('hidden', kind !== 'ai');
+    serviceForm.classList.toggle(
+        'hidden', kind !== 'service',
+    );
 }
 
 function onDialogKeydown(e: KeyboardEvent): void {
@@ -535,7 +544,7 @@ function onDialogKeydown(e: KeyboardEvent): void {
     $('#add-member-submit', document)?.click();
 }
 
-function selectedKind(): 'human' | 'ai' {
+function selectedKind(): 'human' | 'ai' | 'service' {
     const checked = $input(
         '#add-member-kind-toggle'
         + ' input[name="member-kind"]:checked',
@@ -543,6 +552,9 @@ function selectedKind(): 'human' | 'ai' {
     );
     if (checked && checked.value === 'ai') {
         return 'ai';
+    }
+    if (checked && checked.value === 'service') {
+        return 'service';
     }
     return 'human';
 }
@@ -552,8 +564,10 @@ async function handleAddMemberSubmit(
     const kind = selectedKind();
     if (kind === 'human') {
         await submitHumanForm();
-    } else {
+    } else if (kind === 'ai') {
         await submitAIForm();
+    } else {
+        await submitServiceForm();
     }
 }
 
@@ -655,5 +669,37 @@ async function submitAIForm(): Promise<void> {
         return;
     }
     showToast('AI member added', 'success');
+    closeDialog('add-member');
+}
+
+async function submitServiceForm(): Promise<void> {
+    const name = $input(
+        '#service-name', document,
+    )!.value;
+    const description = $textarea(
+        '#service-description', document,
+    )!.value;
+    if (!name || !description) {
+        showToast(
+            'Name and description are required',
+            'error',
+        );
+        return;
+    }
+    const id = currentMemberId();
+    const ctx = sessionContext();
+    try {
+        await postServiceMemberCreation(
+            ctx,
+            id,
+            trimStrings({ name, description }),
+        );
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to add service member', err,
+        );
+        return;
+    }
+    showToast('Service member added', 'success');
     closeDialog('add-member');
 }

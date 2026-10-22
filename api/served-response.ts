@@ -23,7 +23,8 @@ import { rolesCanRead } from './attribute-acl.ts';
 // A read serves what was stored (spec §6): status 200,
 // this transmission's date and request-id, the pair's
 // three lines, every other stored line as stored, and
-// the body untouched but for the reader's projection.
+// the body untouched but for the reader's projection or
+// join.
 // Hoisted credential lines are never spliced back. The
 // caller hands it everything; it reads no clock and no row.
 
@@ -54,10 +55,19 @@ export type KeyReadRoles = ReadonlyMap<
 >;
 
 // What a reader sees of a body: all of it, the keys its
-// roles admit, or an instance's values its roles may read
-// by attribute (admin bypass included, as rolesCanRead).
+// roles admit, an instance's values its roles may read
+// by attribute (admin bypass included, as rolesCanRead),
+// or all of it joined with keys the selector derived.
 export type Reader =
     | { readonly sees: 'whole' }
+    | {
+        readonly sees: 'joined',
+        // By the stored body's `id`: keys served beside
+        // it, derived when served and never stored.
+        readonly joined: ReadonlyMap<
+            string, Readonly<Record<string, unknown>>
+        >,
+    }
     | {
         readonly sees: 'keys',
         readonly readRoles: KeyReadRoles,
@@ -174,10 +184,11 @@ export function placedLines(
 }
 
 // The only place a body is transformed (§3). It drops what
-// the reader may not see and nothing else; when it drops
-// nothing it returns the octets it was given. A body whose
-// shape the projection does not declare is refused, never
-// served whole: the guard on `secret` must not fail open.
+// the reader may not see, or joins what the selector
+// derived, and nothing else; when it changes nothing it
+// returns the octets it was given. A body whose shape the
+// projection does not declare is refused, never served
+// whole: the guard on `secret` must not fail open.
 export function projectedBody(
     body: string,
     reader: Reader,
@@ -200,9 +211,11 @@ export function projectedBody(
     const record = value as Record<string, unknown>;
     const kept = reader.sees === 'keys'
         ? keptKeys(record, reader.readRoles, reader.roles)
-        : keptValues(
-            record, reader.attributesById, reader.roles,
-        );
+        : reader.sees === 'values'
+            ? keptValues(
+                record, reader.attributesById, reader.roles,
+            )
+            : joinedKeys(record, reader.joined);
     if (kept === undefined) return body;
     return Octets.fromBytes(new TextEncoder().encode(
         JSON.stringify(sortJsonKeys(kept)),
@@ -247,6 +260,23 @@ function keptValues(
     });
     if (readable.length === values.length) return undefined;
     return { ...record, values: readable };
+}
+
+// A selector that joins promises every body it serves its
+// keys; a body it missed is its bug, never served bare.
+function joinedKeys(
+    record: Record<string, unknown>,
+    joined: ReadonlyMap<string, Readonly<Record<string, unknown>>>,
+): Record<string, unknown> {
+    const id = record['id'];
+    if (typeof id !== 'string') {
+        throw new Error('joined body has no id');
+    }
+    const keys = joined.get(id);
+    if (keys === undefined) {
+        throw new Error('no joined keys for ' + id);
+    }
+    return { ...record, ...keys };
 }
 
 // Our wire to the platform's Response: status, lines, and

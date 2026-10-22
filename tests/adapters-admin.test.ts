@@ -16,6 +16,8 @@ import {
     recordedContext,
 } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { handleRequest } from '../api/api.ts';
+import { apiRequest } from './http-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getOrganizationEntity,
@@ -30,11 +32,15 @@ import {
     putProject,
 } from '../client/projects.ts';
 import {
+    nowUtc,
     type ProjectEntity, type IdeaEntity,
     type IdeaState,
     type ProjectState,
 } from '../shared/types.ts';
-import { seedHumanMember } from './member-fixtures.ts';
+import {
+    firstProviderModel,
+    seedHumanMember,
+} from './member-fixtures.ts';
 import {
     seedAdminSchema,
     organizationRow,
@@ -329,4 +335,81 @@ async () => {
             .filter((id) => id === earlier || id === later),
         [earlier, later],
     );
+});
+
+async function postMember(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const response = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/memberships/',
+        token: await organizationToken(),
+        body,
+    }));
+    assertStrictEquals(response.status, 201);
+    await response.body?.cancel();
+}
+
+Deno.test('activePeopleCount counts people only', async () => {
+    const { db, ctx } = await adminContext();
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'ai',
+        membership: { type: 'member', at: nowUtc() },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    });
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'service',
+        membership: { type: 'member', at: nowUtc() },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    });
+    const stats = await getOrganizationStats(
+        ctx, getOrganizationSeats(ctx),
+    );
+    assertStrictEquals(stats.activePeopleCount, 1);
+});
+
+// The organization page reads its seats once and hands
+// them to both derivations: an AI or service member uses
+// a seat, and is no person.
+Deno.test('usedSeats counts every member kind', async () => {
+    const { db, ctx } = await adminContext();
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'ai',
+        membership: { type: 'member', at: nowUtc() },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    });
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'service',
+        membership: { type: 'member', at: nowUtc() },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    });
+    const seatsP = getOrganizationSeats(ctx);
+    const [organization, stats] = await Promise.all([
+        getOrganization(ctx, seatsP),
+        getOrganizationStats(ctx, seatsP),
+    ]);
+    assertStrictEquals(organization.usedSeats(), 3);
+    assertStrictEquals(stats.activePeopleCount, 1);
 });

@@ -368,6 +368,7 @@ Deno.test('the document body carries state/state_at/graph while'
     // reconstructs the return entity from the body.
     const flow = await postFlowDocumentOp(
         db, generateIdentifier(), body, 'XXZruirZyAOoRpNxaDnpSA',
+        undefined, 'AjdvjuECVZEgZoFajaIEkg',
     );
     for (const key of [
         'state', 'state_at', 'state_event_id',
@@ -704,7 +705,7 @@ async () => {
     assertStrictEquals(created.status, 201);
 
     const messagePairs = await db.messagePairs.getAll();
-    assertStrictEquals(messagePairs.length, 6);
+    assertStrictEquals(messagePairs.length, 7);
 
     const flowPairs = messagePairs.filter(
         r => r.path === '/organizations/AjdvjuECVZEgZoFajaIEkg/'

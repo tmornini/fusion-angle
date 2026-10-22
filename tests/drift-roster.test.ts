@@ -19,6 +19,8 @@ import {
     organizationMembershipHeads,
 } from '../api/memberships.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
+import { deriveIdentityKindsOf } from
+    '../api/derive-identity-spine.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -28,6 +30,7 @@ import { seededMockDb } from './mock-seed.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
+    membershipJoinReader,
     pairIdOf,
     partBodiesOf,
     partsOf,
@@ -112,6 +115,21 @@ async function acceptedMemberships(
     return heads.map(membershipOfHead);
 }
 
+// The wire joins each seat's identity kind to the stored
+// membership; every seeded seat's identity has a document.
+async function withIdentityKind(
+    db: DbAdapter,
+    rows: readonly MembershipEntity[],
+) {
+    const kinds = await deriveIdentityKindsOf(db, new Set(
+        rows.map((row) => row.identity_id),
+    ));
+    return rows.map((row) => ({
+        ...row,
+        identity_kind: kinds.get(row.identity_id),
+    }));
+}
+
 // -- shared live-write body builders -----------------------------
 
 function aiMemberDocumentBody(
@@ -123,6 +141,32 @@ function aiMemberDocumentBody(
         skill_focus: 'sf3',
         model: 'nqNVXnBkUBLoKlenbyPIZQ',
     };
+}
+
+// Only the members statement creates an AI member: four
+// pairs, the received POST and its three geneses (the
+// membership, the identity, the ai-agents document).
+const STATEMENT_PAIR_COUNT = 4;
+
+function postAiMember(
+    id: string,
+    token: string,
+    name: string,
+): Request {
+    return req(
+        'POST',
+        '/organizations/' + STARK_ORGANIZATION + '/memberships/',
+        token,
+        {
+            id,
+            kind: 'ai',
+            membership: {
+                type: 'member',
+                at: '2026-06-01T00:00:00.000000Z',
+            },
+            ai: aiMemberDocumentBody(name),
+        },
+    );
 }
 
 // -- 1. seeded memberships wire equals derive ------------------
@@ -149,12 +193,14 @@ async () => {
         db, STARK_ORGANIZATION,
     );
     const starkParts = await partsOf<MembershipEntity>(resStark);
-    await assertPartsAreHeads(db, starkParts, { sees: 'whole' });
+    await assertPartsAreHeads(
+        db, starkParts, await membershipJoinReader(db, starkParts),
+    );
     assertEquals(
         sortById(starkParts.map((part) => part.body().toValue())),
-        sortById(stark),
+        sortById(await withIdentityKind(db, stark)),
     );
-    assertStrictEquals(stark.length, 6);
+    assertStrictEquals(stark.length, 10);
     const starkSeats = await handleRequest(
         db, req(
             'GET',
@@ -181,10 +227,12 @@ async () => {
         db, ORGANIZATION_TWO,
     );
     const twoParts = await partsOf<MembershipEntity>(resTwo);
-    await assertPartsAreHeads(db, twoParts, { sees: 'whole' });
+    await assertPartsAreHeads(
+        db, twoParts, await membershipJoinReader(db, twoParts),
+    );
     assertEquals(
         sortById(twoParts.map((part) => part.body().toValue())),
-        sortById(org2),
+        sortById(await withIdentityKind(db, org2)),
     );
     assertStrictEquals(org2.length, 6);
 
@@ -209,7 +257,10 @@ Deno.test('ai-agents wire is global; identities wire is'
     const token = await organizationToken();
 
     const resAi = await handleRequest(
-        db, req('GET', '/ai-agents/', token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION + '/ai-agents/',
+            token,
+        ),
     );
     assertStrictEquals(resAi.status, 200);
     const agents = await partBodiesOf<{ id: string }>(resAi);
@@ -239,7 +290,11 @@ Deno.test('ai-agents wire is global; identities wire is'
 
     for (const row of agents) {
         const res = await handleRequest(
-            db, req('GET', '/ai-agents/' + row.id, token),
+            db, req(
+                'GET', '/organizations/' + STARK_ORGANIZATION
+                    + '/ai-agents/' + row.id,
+                token,
+            ),
         );
         assertStrictEquals(res.status, 200);
         const got = await res.json() as { id: string };
@@ -258,7 +313,11 @@ Deno.test('ai-agents wire is global; identities wire is'
     const expectedAiMessage =
         'Not found: ai-agents/' + missingId;
     const aiMissingRes = await handleRequest(
-        db, req('GET', '/ai-agents/' + missingId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + missingId,
+            token,
+        ),
     );
     assertStrictEquals(aiMissingRes.status, 404);
     assertStrictEquals(
@@ -308,30 +367,44 @@ async () => {
     const aiId = generateIdentifier();
 
     const beforeCreate = (await db.messagePairs.getAll()).length;
-    const created = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token,
-        aiMemberDocumentBody('Chain AI'),
-    ));
+    const created = await handleRequest(
+        db, postAiMember(aiId, token, 'Chain AI'),
+    );
     assertStrictEquals(created.status, 201);
     assertStrictEquals(
-        (await db.messagePairs.getAll()).length, beforeCreate + 1,
+        (await db.messagePairs.getAll()).length,
+        beforeCreate + STATEMENT_PAIR_COUNT,
     );
     const agent1 = await handleRequest(
-        db, req('GET', '/ai-agents/' + aiId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiId,
+            token,
+        ),
     );
     assertStrictEquals(agent1.status, 200);
+    const agent1Tag = agent1.headers.get('ETag');
+    assert(agent1Tag !== null);
     assertStrictEquals(
         ((await agent1.json()) as { name: string }).name,
         'Chain AI',
     );
 
-    const facetPut = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token,
-        aiMemberDocumentBody('Chain AI Facet'),
-    ));
+    const facetPut = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId,
+        token,
+        body: aiMemberDocumentBody('Chain AI Facet'),
+        headers: { 'If-Match': agent1Tag },
+    }));
     assertStrictEquals(facetPut.status, 200);
     const agent2 = await handleRequest(
-        db, req('GET', '/ai-agents/' + aiId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiId,
+            token,
+        ),
     );
     assertStrictEquals(
         ((await agent2.json()) as { name: string }).name,
@@ -572,22 +645,22 @@ async () => {
 // -- derived heads; exactly one document head per document after -
 // -- create ---------------------------------------------------------
 
-Deno.test('PUT ai-agents and PUT identities land exactly one'
-+ ' document message pair at each document — no composing POST',
+Deno.test('the AI statement and PUT identities land exactly'
++ ' one document message pair at each document — no composing'
++ ' POST',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const aiId = AI_DRIFT_METHOD_FILTER_1;
     const humanId = HUMAN_DRIFT_METHOD_FILTER_1;
 
-    const aiCreated = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token,
-        aiMemberDocumentBody('Filter AI'),
-    ));
+    const aiCreated = await handleRequest(
+        db, postAiMember(aiId, token, 'Filter AI'),
+    );
     assertStrictEquals(aiCreated.status, 201);
 
     const aiPrefix = canonicalPath(
-        undefined, '/ai-agents/',
+        STARK_ORGANIZATION, '/ai-agents/',
     );
     const [aiRequests] = await Promise.all([
         db.messagePairs.getCollectionPairs(aiPrefix),
@@ -635,22 +708,41 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const db = await seededDb();
     const token = await organizationToken();
     const aiId = generateIdentifier();
+    const seated = await handleRequest(
+        db, postAiMember(aiId, token, 'Resend AI'),
+    );
+    assertStrictEquals(seated.status, 201);
+    await seated.body?.cancel();
+    const head = await handleRequest(db, req(
+        'GET', '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId, token,
+    ));
+    await head.body?.cancel();
+    const headTag = head.headers.get('ETag');
+    assert(headTag !== null);
 
     const beforeCount = (await db.messagePairs.getAll()).length;
     const body = aiMemberDocumentBody('Resend AI Facet');
     const operationId = generateIdentifier();
-    const first = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token, body,
+    const resend = (latch: string) => apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK_ORGANIZATION
+            + '/ai-agents/' + aiId,
+        token,
+        body,
         operationId,
-    ));
-    assertStrictEquals(first.status, 201);
+        headers: { 'If-Match': latch },
+    });
+    const first = await handleRequest(db, resend(headTag));
+    assertStrictEquals(first.status, 200);
     const afterFirst = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterFirst, beforeCount + 1);
 
-    const second = await handleRequest(db, req(
-        'PUT', '/ai-agents/' + aiId, token, body,
-        operationId,
-    ));
+    // The resend names the head the first PUT wrote: the
+    // first latch is now stale (412), as for flows.
+    const firstTag = first.headers.get('ETag');
+    assert(firstTag !== null);
+    const second = await handleRequest(db, resend(firstTag));
     assertStrictEquals(second.status, 200);
     const afterSecond = (await db.messagePairs.getAll()).length;
     assertStrictEquals(afterSecond, afterFirst);
@@ -660,7 +752,11 @@ Deno.test('resend idempotency: a byte-identical ai-agents/:id PUT'
     );
 
     const got = await handleRequest(
-        db, req('GET', '/ai-agents/' + aiId, token),
+        db, req(
+            'GET', '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/' + aiId,
+            token,
+        ),
     );
     assertStrictEquals(
         ((await got.json()) as { name: string }).name,

@@ -34,6 +34,7 @@ import {
     seedClientRegistration,
     seedIdentityCredential,
     seedPersonIdentity,
+    seedServiceIdentity,
 } from './identity-fixtures.ts';
 import {
     pairIdOf,
@@ -551,6 +552,7 @@ async function seedMembershipMessagePair(
 Deno.test('a client_credentials grant stores its own pair with live'
 + ' secrets', async () => {
     const db = await dbWithPasswordUser();
+    await seedServiceIdentity(db, 'uYaHKbNeVUcsFjuooOjMew');
     await seedMembershipMessagePair(db, 'm-svc', {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: 'uYaHKbNeVUcsFjuooOjMew',
@@ -586,14 +588,15 @@ Deno.test('a client_credentials grant stores its own pair with live'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 8: dbWithPasswordUser's own identity + pii + credential
-    // pairs (3) + the fixture's own membership pair
-    // (Phase 13 Task 1) + the registration-facet pair the
-    // fixture seeds (clients elimination) precede the token
+    // 10: dbWithPasswordUser's own identity + pii + credential
+    // pairs (3) + the service's identity document + the
+    // fixture's own membership pair (Phase 13 Task 1) + the
+    // registration-facet pair the fixture seeds (clients
+    // elimination) precede the token
     // grant's spent-jti ticket, its own event pair (Phase 13
     // Task 5: the issued root's pair at the row's document),
     // and its operation message pair.
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 10);
     const credRequest = requests.find(
         r => r.path === '/authentication/token/'
             && r.request_secrets.includes(assertion),

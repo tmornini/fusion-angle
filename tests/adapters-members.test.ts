@@ -4,7 +4,11 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
+import { apiRequest } from './http-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
+import { seedServiceIdentity } from './identity-fixtures.ts';
 import { recordedContext } from './in-page-facade.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { responseMessage } from './fixtures/response-message.ts';
@@ -16,24 +20,43 @@ import {
     getAdminSeatIds,
     getHumanMember,
     getHumanMemberProfile,
+    getHumanMembers,
     postHumanMemberCreation,
     postMembershipRemoval,
     putHumanMember,
     type HumanMemberDraft,
 } from '../client/members.ts';
 import {
+    getAIMember,
+    getAIMemberEntity,
+} from '../client/ai-members.ts';
+import {
+    getServiceMember,
+    getServiceMemberEntity,
+} from '../client/service-members.ts';
+import { getMembers } from '../client/members-union.ts';
+import {
+    getOrganizationSeats,
+    getOrganizationStats,
+} from '../client/admin.ts';
+import {
+    isHumanMember,
+    nowUtc,
     type HumanMember,
     type MembershipEntity,
+    type MembershipReadEntity,
 } from '../shared/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
     HTTP_CONFLICT,
+    HTTP_NOT_FOUND,
     RequestError,
 } from '../shared/http-errors.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import {
+    firstProviderModel,
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -106,6 +129,7 @@ Deno.test(
         assertStrictEquals(wrote.ifNoneMatch, null);
         assertEquals(JSON.parse(wrote.body ?? 'null'), {
             id: ALICE,
+            kind: 'human',
             membership: {
                 type: 'member',
                 at: membership.at,
@@ -447,3 +471,202 @@ Deno.test(
         );
     },
 );
+
+async function postMember(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const response = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK + '/memberships/',
+        token: await organizationToken(),
+        body,
+    }));
+    assertStrictEquals(response.status, 201);
+    await response.body?.cancel();
+}
+
+Deno.test('getHumanMembers lists no AI or service member',
+async () => {
+    const { db, ctx } = await adminContext();
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'ai',
+        membership: { type: 'member', at: nowUtc() },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    });
+    await postMember(db, {
+        id: generateIdentifier(),
+        kind: 'service',
+        membership: { type: 'member', at: nowUtc() },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    });
+    assertEquals(
+        (await getHumanMembers(ctx)).map((m) => m.idForLink()),
+        ['XXZruirZyAOoRpNxaDnpSA'],
+    );
+});
+
+Deno.test('getHumanMember reads an AI or service member as'
+    + ' absent',
+async () => {
+    const { db, ctx } = await adminContext();
+    const aiId = generateIdentifier();
+    const serviceId = generateIdentifier();
+    await postMember(db, {
+        id: aiId,
+        kind: 'ai',
+        membership: { type: 'member', at: nowUtc() },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    });
+    await postMember(db, {
+        id: serviceId,
+        kind: 'service',
+        membership: { type: 'member', at: nowUtc() },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    });
+    assertStrictEquals(await getHumanMember(ctx, aiId), null);
+    assertStrictEquals(
+        await getHumanMember(ctx, serviceId), null,
+    );
+});
+
+// Removal ends the seat and nothing else: the member's
+// document stays, and so does its identity, which the
+// membership read still joins by kind.
+Deno.test(
+    'postMembershipRemoval removes an AI or service member',
+    async () => {
+        const { db, ctx } = await adminContext();
+        const aiId = generateIdentifier();
+        const serviceId = generateIdentifier();
+        await postMember(db, {
+            id: aiId,
+            kind: 'ai',
+            membership: { type: 'member', at: nowUtc() },
+            ai: {
+                name: 'Ops Assistant',
+                description: 'Triage',
+                skill_focus: 'routing',
+                model: firstProviderModel().id,
+            },
+        });
+        await postMember(db, {
+            id: serviceId,
+            kind: 'service',
+            membership: { type: 'member', at: nowUtc() },
+            service: {
+                name: 'Nightly import',
+                description: 'Loads the ledger export',
+            },
+        });
+
+        const ai = await getAIMember(ctx, aiId);
+        await postMembershipRemoval(ctx, ai);
+        const aiSeat = (await ctx.GET<MembershipReadEntity>(
+            membershipResource(aiId),
+        )).body().toValue();
+        assertStrictEquals(aiSeat.state, 'removed');
+        assertStrictEquals(aiSeat.identity_kind, 'service');
+        assertStrictEquals(
+            (await getAIMemberEntity(ctx, aiId))
+                .query('status').toNumber(),
+            200,
+        );
+        const aiRead = await assertRejects(
+            () => getAIMember(ctx, aiId),
+            RequestError,
+        );
+        assertStrictEquals(aiRead.status, HTTP_NOT_FOUND);
+
+        const service = await getServiceMember(ctx, serviceId);
+        await postMembershipRemoval(ctx, service);
+        const serviceSeat = (
+            await ctx.GET<MembershipReadEntity>(
+                membershipResource(serviceId),
+            )
+        ).body().toValue();
+        assertStrictEquals(serviceSeat.state, 'removed');
+        assertStrictEquals(serviceSeat.identity_kind, 'service');
+        assertStrictEquals(
+            (await getServiceMemberEntity(ctx, serviceId))
+                .query('status').toNumber(),
+            200,
+        );
+        const serviceRead = await assertRejects(
+            () => getServiceMember(ctx, serviceId),
+            RequestError,
+        );
+        assertStrictEquals(serviceRead.status, HTTP_NOT_FOUND);
+    },
+);
+
+// A service identity, written first, then seated through
+// the item PUT, with no ai-agents/ or services/ document in
+// the organization.
+async function seatServiceIdentity(
+    db: MemoryDbAdapter,
+    id: string,
+): Promise<void> {
+    await seedServiceIdentity(db, id);
+    const token = await organizationToken();
+    const seated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/' + STARK + '/invitations/'
+            + membershipNameOf(STARK, id),
+        token,
+        body: { state: 'accepted', type: 'member', at: nowUtc() },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(seated.status, 201);
+    await seated.body?.cancel();
+}
+
+// One member-kind rule for every reader (Review Focus 1):
+// a member is human if and only if its identity's kind is
+// 'person', so the palette's and the people picker's
+// roster, member detail, the members page, and the people
+// count all read a documentless service member as no
+// human, while its seat still counts.
+Deno.test('a documentless service member is no reader\'s'
+    + ' human',
+async () => {
+    const { db, ctx } = await adminContext();
+    const id = generateIdentifier();
+    await seatServiceIdentity(db, id);
+    const seatsP = getOrganizationSeats(ctx);
+    assertEquals({
+        humanMembers: (await getHumanMembers(ctx))
+            .map((m) => m.idForLink()),
+        humanMember: await getHumanMember(ctx, id),
+        members: (await getMembers(ctx))
+            .filter(isHumanMember)
+            .map((m) => m.idForLink()),
+        activePeopleCount: (
+            await getOrganizationStats(ctx, seatsP)
+        ).activePeopleCount,
+        seats: (await seatsP).length,
+    }, {
+        humanMembers: ['XXZruirZyAOoRpNxaDnpSA'],
+        humanMember: null,
+        members: ['XXZruirZyAOoRpNxaDnpSA'],
+        activePeopleCount: 1,
+        seats: 2,
+    });
+});

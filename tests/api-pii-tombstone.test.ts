@@ -74,15 +74,6 @@ function humanPii(name: string) {
     };
 }
 
-function humanDetail() {
-    return {
-        title: 'Engineer',
-        department: 'Product',
-        strengths: [],
-        team_dimensions: {},
-    };
-}
-
 function piiPath(id: string): string {
     return '/identities/' + id + '/';
 }
@@ -320,11 +311,6 @@ Deno.test('erased PII remains in superseded pairs; login is 401',
 async () => {
     const db = await freshDb();
     const id = SELF;
-    const create = await handleRequest(db, req(
-        'PUT', '/identities/' + id, DEV_TOKEN,
-        { kind: 'person', ...humanDetail() },
-    ));
-    assertStrictEquals(create.status, 201);
     const intake = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         {

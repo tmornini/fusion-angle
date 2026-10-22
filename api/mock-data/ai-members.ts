@@ -1,8 +1,8 @@
 import type { AIMemberEntity } from '../../shared/types.ts';
 
 // The seeded AI members — the demo's model roster. Fixed
-// data; the composition root writes each one's member,
-// membership, AI-detail, and identity rows.
+// data; the seed writes each one's organization document
+// in Stark.
 export function buildAiMembers(): AIMemberEntity[] {
     return [
         {

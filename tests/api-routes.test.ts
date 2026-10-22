@@ -34,7 +34,8 @@ function outside(method: string, path: string): string {
 }
 
 const SERVED_COLLECTIONS: readonly string[] = [
-    'ai-agents/',
+    'organizations/' + STARK + '/ai-agents/',
+    'organizations/' + STARK + '/services/',
     'organizations/' + STARK + '/ideas/',
     'organizations/' + STARK + '/projects/',
     'organizations/' + STARK + '/work-orders/',

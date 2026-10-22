@@ -187,8 +187,10 @@ Deno.test('documentWriteResponseSpec produces the ai-agents'
         skill_focus: 's',
     };
     const actual = documentWriteResponseSpec(wiring)
-        .successBody!([AG_1], body, 'XXZruirZyAOoRpNxaDnpSA'
-            , 'AjdvjuECVZEgZoFajaIEkg');
+        .successBody!(
+            ['AjdvjuECVZEgZoFajaIEkg', AG_1], body,
+            'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg',
+        );
     assertEquals(actual, { id: AG_1, ...body });
 });
 
@@ -822,7 +824,7 @@ async () => {
         assertStrictEquals(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assertStrictEquals(messagePairs.length, 5);
+        assertStrictEquals(messagePairs.length, 6);
     });
 });
 

@@ -223,6 +223,20 @@ export async function seedIdentityCredential(
     );
 }
 
+// The identities/:id document of one kind: the write every
+// seated identity has.
+export async function seedIdentityDocument(
+    db: DbAdapter,
+    id: string,
+    kind: 'person' | 'service',
+): Promise<void> {
+    await postIdentityDocumentOp(
+        db, id, identityDocumentBodyOf(kind),
+        SYSTEM_MEMBER_ID,
+        await identityDocumentMessagePair(id, kind, nowUtc()),
+    );
+}
+
 export async function seedPersonIdentity(
     db: DbAdapter,
     id: string,
@@ -231,12 +245,7 @@ export async function seedPersonIdentity(
         phone: string; bio: string;
     },
 ): Promise<void> {
-    const requestAt = nowUtc();
-    await postIdentityDocumentOp(
-        db, id, identityDocumentBodyOf('person'),
-        SYSTEM_MEMBER_ID,
-        await identityDocumentMessagePair(id, 'person', requestAt),
-    );
+    await seedIdentityDocument(db, id, 'person');
     await seedIdentityPii(db, id, pii);
 }
 
@@ -244,12 +253,7 @@ export async function seedServiceIdentity(
     db: DbAdapter,
     id: string,
 ): Promise<void> {
-    const requestAt = nowUtc();
-    await postIdentityDocumentOp(
-        db, id, identityDocumentBodyOf('service'),
-        SYSTEM_MEMBER_ID,
-        await identityDocumentMessagePair(id, 'service', requestAt),
-    );
+    await seedIdentityDocument(db, id, 'service');
 }
 
 // One identities/:id/registration document message pair — the

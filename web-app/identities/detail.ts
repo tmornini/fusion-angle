@@ -14,7 +14,6 @@ import {
     getMemberPii,
     getServiceFacet,
     deleteIdentityPii,
-    getIdentityCredentialState,
     getClientRegistration,
     putClientRegistration,
     deleteClientRegistration,
@@ -26,7 +25,6 @@ import { sessionContext } from '../app/client.ts';
 import {
     Identity,
     type MemberPii,
-    type IdentityCredentialKind,
 } from '../../shared/types.ts';
 import {
     IdentityDetailPresenter,
@@ -43,8 +41,6 @@ interface LoadedIdentity {
     identity: Identity;
     pii: MemberPii;
     service: ServiceFacet;
-    activeCredentialKinds:
-        readonly IdentityCredentialKind[];
     registration: ClientRegistration;
 }
 
@@ -63,23 +59,18 @@ async function loadIdentity(
             identity,
             pii,
             service: { named: false },
-            activeCredentialKinds: [],
             registration: { registered: false },
         };
     }
-    const [service, credentialState, registration] =
+    const [service, registration] =
         await Promise.all([
             getServiceFacet(ctx, identityId),
-            getIdentityCredentialState(
-                ctx, identityId,
-            ),
             getClientRegistration(ctx, identityId),
         ]);
     return {
         identity,
         pii,
         service,
-        activeCredentialKinds: credentialState.active,
         registration,
     };
 }
@@ -91,8 +82,6 @@ function buildView(
         identity: loaded.identity,
         pii: loaded.pii,
         service: loaded.service,
-        activeCredentialKinds:
-            loaded.activeCredentialKinds,
         registration: loaded.registration,
     };
 }

@@ -10,10 +10,12 @@ import {
     ICON_SIZE,
     iconArrowLeft,
     iconEdit,
+    iconExternalLink,
     iconSave,
     iconX,
     iconBrain,
 } from '../icons.ts';
+import { buildPageUrl } from '../navigation.ts';
 import { type AIMemberDraft } from '../../../client/index.ts';
 import { AIMember } from '../../../shared/types.ts';
 import {
@@ -21,6 +23,10 @@ import {
     getModelsByProvider,
 } from '../../../api/provider-models.ts';
 import { buildReadonlyField } from './detail-field.ts';
+import {
+    buildRemoveAffordance,
+    type SeatRemoval,
+} from './human-member-detail.ts';
 
 export interface AIMemberDraftFields {
     name: string;
@@ -302,6 +308,22 @@ function buildEditableModel(
         </div>`;
 }
 
+// The identity the member signs in as; its client
+// registration lives on the identity page.
+function buildIdentityLink(
+    member: AIMember,
+): SafeHtml {
+    return html`
+        <a class="btn btn-outline gap-2"
+            href="${buildPageUrl(
+                'identity-detail',
+                { identityId: member.idForLink() },
+            )}">
+            ${iconExternalLink(ICON_SIZE.base, '')}
+            Identity
+        </a>`;
+}
+
 function buildIdentityCard(
     body: SafeHtml,
 ): SafeHtml {
@@ -344,7 +366,10 @@ function buildReadonlyIdentityBody(
         </div>
         ${buildReadonlySkillFocus(
             member.skillFocusText(),
-        )}`;
+        )}
+        <div class="mt-6">
+            ${buildIdentityLink(member)}
+        </div>`;
 }
 
 function buildEditableIdentityBody(
@@ -381,6 +406,7 @@ function buildEditableIdentityBody(
 }
 
 function buildReadonlyActionButtons(
+    removal: SeatRemoval,
 ): SafeHtml {
     return html`
         <button
@@ -390,7 +416,8 @@ function buildReadonlyActionButtons(
             id="member-edit-btn"
             data-member-action="edit">
             ${iconEdit(ICON_SIZE.base, '')} Edit
-        </button>`;
+        </button>
+        ${buildRemoveAffordance(removal)}`;
 }
 
 function buildEditableActionButtons(
@@ -416,9 +443,11 @@ function buildEditableActionButtons(
 
 export class AIMemberDetailPresenter {
     readonly #member: AIMember;
+    readonly #removal: SeatRemoval;
 
-    constructor(member: AIMember) {
+    constructor(member: AIMember, removal: SeatRemoval) {
         this.#member = member;
+        this.#removal = removal;
     }
 
     idForLink(): string {
@@ -445,7 +474,7 @@ export class AIMemberDetailPresenter {
         mutateSlot(
             container,
             '.member-actions-slot',
-            buildReadonlyActionButtons(),
+            buildReadonlyActionButtons(this.#removal),
         );
         mutateSlot(
             container,

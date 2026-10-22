@@ -1,11 +1,14 @@
 import { assert, assertStrictEquals } from '@std/assert';
 import { handleRequest } from '../api/api.ts';
-import { GET, PUT } from './in-page-facade.ts';
+import { GET } from './in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { firstProviderModel } from './member-fixtures.ts';
+import {
+    firstProviderModel,
+    seedAIMember,
+} from './member-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
@@ -43,13 +46,26 @@ async function freshDb() {
 Deno.test('PUT /ai-agents/:id writes the agent', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const put = await handleRequest(db, req(
-        'PUT', '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
-        agentFields('Claude'),
+    await seedAIMember(db, 'UQTJZvCoKlFjEoDlDUwekw', 'Seated');
+    const head = await handleRequest(db, req(
+        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
     ));
+    await head.body?.cancel();
+    const etag = head.headers.get('ETag');
+    assert(etag !== null);
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw',
+        token,
+        body: agentFields('Claude'),
+        headers: { 'If-Match': etag },
+    }));
     assert(put.status === 201 || put.status === 200);
     const got = (await GET<{ name: string }>(
-        db, 'ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
+        db, 'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/ai-agents/UQTJZvCoKlFjEoDlDUwekw', token,
         operationIdHeader())).body().toValue();
     assertStrictEquals(got.name, 'Claude');
 });
@@ -69,9 +85,22 @@ Deno.test('a flow write with an AI agent id in memberIds'
 + ' is 400', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    await PUT(db, 'ai-agents/UuvoBhQJUSEsiJwscXPkUg',
-        agentFields('Bot'), token,
-        operationIdHeader());
+    const created = await handleRequest(db, req(
+        'POST',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/memberships/',
+        token,
+        {
+            id: 'UuvoBhQJUSEsiJwscXPkUg',
+            kind: 'ai',
+            membership: {
+                type: 'member',
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+            ai: agentFields('Bot'),
+        },
+    ));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
     const { DEFAULT_LOCK_TIMEOUT } = await import(
         '../shared/types.ts'
     );

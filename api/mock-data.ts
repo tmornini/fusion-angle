@@ -198,8 +198,7 @@ export interface SeededCredentials {
 }
 
 // Mint a password for every login-capable person
-// identity and a client secret for the system identity,
-// and hash them all first: the credential documents
+// identity, and hash them all first: the credential documents
 // embed the hashes (Sequence, step 1). A placeholder
 // would not verify through /authentication/authorize.
 // Recipients are the in-memory person list, never a
@@ -270,10 +269,6 @@ interface SeedCredentialPlan {
         readonly password: string;
         readonly secret: string;
     }[];
-    readonly system: {
-        readonly id: string;
-        readonly secret: string;
-    };
 }
 
 async function hashSeedCredentials(
@@ -292,14 +287,7 @@ async function hashSeedCredentials(
                 secret: await hash(password),
             };
         }));
-    const systemCredentialId = 'cFiyyRHxbIEVqeVFNPmDnw';
-    return {
-        humans,
-        system: {
-            id: systemCredentialId,
-            secret: await hash(generateSecret()),
-        },
-    };
+    return { humans };
 }
 
 // Pass 2's last wave: the credential documents, through
@@ -310,8 +298,8 @@ async function postSeedCredentialsIn(
     plan: SeedCredentialPlan,
     credentialPairs: ReadonlyMap<string, MessagePair>,
 ): Promise<void> {
-    await Promise.all([
-        ...plan.humans.map((cred) =>
+    await Promise.all(
+        plan.humans.map((cred) =>
             postIdentityCredentialDocumentOp(
                 adapter,
                 cred.id,
@@ -329,24 +317,7 @@ async function postSeedCredentialsIn(
                 ),
                 { sees: 'whole' },
             )),
-        postIdentityCredentialDocumentOp(
-            adapter,
-            plan.system.id,
-            identityCredentialSeedBody(
-                SYSTEM_MEMBER_ID, 'client_secret',
-                plan.system.secret,
-            ),
-            SYSTEM_MEMBER_ID,
-            requireMessagePair(
-                credentialPairs,
-                seedMessagePairKey(
-                    'identities/:id/credentials/:cid',
-                    plan.system.id,
-                ),
-            ),
-            { sees: 'whole' },
-        ),
-    ]);
+    );
 }
 
 function revealedCredentials(
@@ -407,8 +378,7 @@ export async function rehearseMockData(
         await formMockDataMessagePairs(requestAt);
     const credentialPairs =
         await formSeedCredentialMessagePairs(
-            credentials.humans, credentials.system,
-            requestAt,
+            credentials.humans, requestAt,
         );
     const input: MockDataSeedInput = {
         messagePairs,
@@ -597,6 +567,7 @@ async function postMockDataLoadIn(
 ): Promise<void> {
     const messagePairs = input.messagePairs;
     const members = buildMembers();
+    const aiMembers = buildAiMembers();
     const unaffiliated = buildUnaffiliatedIdentity();
 
     await Promise.all([
@@ -662,6 +633,30 @@ async function postMockDataLoadIn(
                 ),
             ];
         }),
+        ...aiMembers.map((m) => {
+            const messagePair = requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
+                    MEMBERSHIP_ITEM_ROUTE, m.id + '-0',
+                ),
+            );
+            return putInvitationOnOrganizationNest(
+                adapter,
+                [
+                    STARK_ORGANIZATION,
+                    membershipNameOf(STARK_ORGANIZATION, m.id),
+                ],
+                membershipSeedBody(
+                    STARK_ORGANIZATION, m.id, 'member',
+                ),
+                SYSTEM_MEMBER_ID,
+                messagePair,
+                STARK_ORGANIZATION,
+                ['admin'],
+                messagePair.requestAt,
+                messagePair.operationId,
+            );
+        }),
         postIdentityDocumentOp(
             adapter,
             SYSTEM_MEMBER_ID,
@@ -672,6 +667,17 @@ async function postMockDataLoadIn(
                 seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
             ),
         ),
+        ...aiMembers.map((m) =>
+            postIdentityDocumentOp(
+                adapter,
+                m.id,
+                identityDocumentBodyOf('service'),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey('identities/:id', m.id),
+                ),
+            )),
         postIdentityDocumentOp(
             adapter,
             unaffiliated.id,
@@ -955,12 +961,11 @@ async function postMockDataLoadIn(
                     seedIdentifier('seed-flow-org2'),
                 ),
             ),
+            ORGANIZATION_TWO,
         ),
     ]);
 
     const ideaSubmissions = buildIdeaSubmissions();
-
-    const aiMembers = buildAiMembers();
 
     const workOrderTraces = seedWorkOrderTraces([
         ...mockStateEvents, ...leadToCloseData.stateEvents,
@@ -1008,7 +1013,10 @@ async function postMockDataLoadIn(
                 fields,
                 SYSTEM_MEMBER_ID,
                 requireMessagePair(
-                    messagePairs, seedMessagePairKey('ai-agents/:id', m.id),
+                    messagePairs,
+                    seedMessagePairKey(
+                        'organizations/:id/ai-agents/:id', m.id,
+                    ),
                 ),
             );
         }),
@@ -1245,8 +1253,7 @@ export async function rehearseBootstrap(
         await formBootstrapMessagePair(requestAt);
     const credentialPairs =
         await formSeedCredentialMessagePairs(
-            credentials.humans, credentials.system,
-            requestAt,
+            credentials.humans, requestAt,
         );
     const statements = await rehearse(
         new MemoryStorageBackend(),

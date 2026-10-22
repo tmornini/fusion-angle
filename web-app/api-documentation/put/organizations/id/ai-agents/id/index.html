@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PUT /api/organizations/:id/ai-agents/:id</title>
+<h1>PUT /api/organizations/:id/ai-agents/:id</h1>
+<h2>Request body</h2>
+<pre>
+{
+  "name": "name",
+  "description": "description",
+  "model": "nqNVXnBkUBLoKlenbyPIZQ",
+  "skill_focus": "skill_focus"
+}
+</pre>
+<h2>Headers</h2>
+<ul>
+  <li>Authorization: Bearer …</li>
+  <li>Operation-ID: on every request</li>
+  <li>If-Match or If-None-Match: *</li>
+</ul>
+<h2>Response headers</h2>
+<ul>
+  <li>last-modified: on 2xx</li>
+  <li>requester-identity-id: on 2xx</li>
+  <li>response-at: on 2xx</li>
+</ul>
+<h2>Status</h2>
+<ul>
+  <li><a href="../../../../../statuses/200/">200</a></li>
+  <li><a href="../../../../../statuses/400/">400</a></li>
+  <li><a href="../../../../../statuses/401/">401</a></li>
+  <li><a href="../../../../../statuses/403/">403</a></li>
+  <li><a href="../../../../../statuses/404/">404</a></li>
+  <li><a href="../../../../../statuses/412/">412</a></li>
+  <li><a href="../../../../../statuses/428/">428</a></li>
+</ul>

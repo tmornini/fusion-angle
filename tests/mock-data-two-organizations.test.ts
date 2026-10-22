@@ -42,6 +42,7 @@ import { membershipsOfIdentity } from
     '../api/memberships.ts';
 import {
     deriveCredentialsFor,
+    deriveIdentityKind,
 } from '../api/derive-identity-spine.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
@@ -549,7 +550,9 @@ async () => {
     const ids = await liveIdentityIds(db);
     let passwordCount = 0;
     for (const id of ids) {
-        if (id === SYSTEM_MEMBER_ID) continue;
+        if (await deriveIdentityKind(db, id) === 'service') {
+            continue;
+        }
         const rows = await deriveCredentialsFor(
             db, id,
         );

@@ -1,6 +1,5 @@
 import {
     Identity,
-    nowUtc,
     type AIMemberEntity,
     type ClientRegistrationEntity,
     type ClientStatus,
@@ -264,41 +263,5 @@ export async function deleteClientRegistration(
         `identities/${id}/registration`,
         current.registered ? [current.message] : undefined,
     );
-    identityChanges.notify();
-}
-
-// A service identity carries a hashed client_secret
-// credential and no PII. The kind mirrors
-// IdentityEntity.kind.
-export type IdentityCreationSpec = {
-    readonly kind: 'service';
-    readonly secret: string;
-};
-
-// Mint a service identity by client-minted id + named POST
-// (Commandment VII — no server INSERT). The identity stores
-// carry no organization_id, so creation rides the GLOBAL
-// spine, OFF the org facade. The identity and its hashed
-// client_secret credential land in one POST /identities
-// statement; the secret is hashed on the server write.
-export async function postIdentityCreation(
-    ctx: RequestContext,
-    id: Id,
-    spec: IdentityCreationSpec,
-): Promise<void> {
-    // The credential id derives from the identity id, so a
-    // resent create names the same rows and answers 409.
-    await ctx.POST('identities/', {
-        id,
-        kind: 'service',
-        credential: {
-            id: `${id}-client-secret`,
-            identity_id: id,
-            kind: 'client_secret',
-            status: 'set',
-            secret: spec.secret,
-            at: nowUtc(),
-        },
-    });
     identityChanges.notify();
 }

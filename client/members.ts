@@ -7,6 +7,8 @@ import type {
     IdentityPiiEntity,
     MemberPii,
     MembershipEntity,
+    MembershipReadEntity,
+    SeatedMember,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -20,8 +22,10 @@ import { membershipNameOf } from
     '../shared/membership-name.ts';
 import { getMemberPii } from './identities.ts';
 import {
+    notifyAIMemberChanges,
     notifyHumanMemberChanges,
     notifyMembershipChanges,
+    notifyServiceMemberChanges,
 } from './membership-changes.ts';
 export {
     subscribeHumanMemberChanges,
@@ -47,7 +51,7 @@ function sessionOrganization(
         ?? ctx.identity.organizations?.[0];
 }
 
-function requireOrganization(ctx: RequestContext): string {
+export function requireOrganization(ctx: RequestContext): string {
     const organization = sessionOrganization(ctx);
     if (organization === undefined) {
         throw new Error(
@@ -129,13 +133,23 @@ export function buildHumanMemberMap(
     return map;
 }
 
+// The one member-kind rule: a member is human if and only
+// if its identity's kind is 'person', which a membership
+// read carries.
+export function isHumanSeat(
+    seat: HttpMessage<MembershipReadEntity>,
+): boolean {
+    return seat.body().toValue().identity_kind === 'person';
+}
+
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
+    const memberships = await ctx.GETCollection<
+        MembershipReadEntity
+    >(acceptedMemberships(ctx));
     const map = buildHumanMemberMap(
-        await ctx.GETCollection<MembershipEntity>(
-            acceptedMemberships(ctx),
-        ),
+        memberships.filter(isHumanSeat),
     );
     const filled = await Promise.all(
         [...map.entries()].map(async ([id, member]) => {
@@ -181,9 +195,9 @@ export async function getHumanMember(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMember | null> {
-    let membership: HttpMessage<MembershipEntity>;
+    let membership: HttpMessage<MembershipReadEntity>;
     try {
-        membership = await ctx.GET<MembershipEntity>(
+        membership = await ctx.GET<MembershipReadEntity>(
             membershipItem(ctx, id),
         );
     } catch (err) {
@@ -196,7 +210,9 @@ export async function getHumanMember(
         throw err;
     }
     const body = membership.body().toValue();
-    if (body.state !== 'accepted') return null;
+    if (body.state !== 'accepted' || !isHumanSeat(membership)) {
+        return null;
+    }
     const [identity, pii] = await Promise.all([
         ctx.GET<IdentityEntity>(
             `identities/${id}`,
@@ -271,6 +287,7 @@ export async function postHumanMemberCreation(
             + '/memberships/',
         {
             id,
+            kind: 'human',
             membership: {
                 type: 'member',
                 at: nowUtc(),
@@ -287,14 +304,16 @@ export async function postHumanMemberCreation(
     notifyMembershipChanges();
 }
 
-// The membership PUT that ends the place — the identity
-// survives. The API refuses the last admin (409); the page
-// mirrors that guard through getAdminSeatIds rather than
-// discovering it here. The removal names the membership
-// the member was read through.
+// The membership PUT that ends the seat — the identity
+// and the member's document survive. The API refuses the
+// last admin (409); the page mirrors that guard through
+// getAdminSeatIds rather than discovering it here. The
+// removal names the membership the member was read
+// through, then rings the member's own kind; the
+// membership bell already carries the human channel.
 export async function postMembershipRemoval(
     ctx: RequestContext,
-    member: HumanMember,
+    member: SeatedMember,
 ): Promise<void> {
     await ctx.PUT(
         membershipItem(ctx, member.idForLink()),
@@ -302,6 +321,8 @@ export async function postMembershipRemoval(
         [member.membership],
     );
     notifyMembershipChanges();
+    if (member.kind === 'ai') notifyAIMemberChanges();
+    if (member.kind === 'service') notifyServiceMemberChanges();
 }
 
 export async function getAdminSeatIds(

@@ -253,11 +253,15 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
         '/identities/:id/invitations/:membership-id',
         invitationTransition('accepted'),
     ),
-    writeExample('put', '/ai-agents/:id', {
+    writeExample('put', '/organizations/:id/ai-agents/:id', {
         name: 'name',
         description: 'description',
         model: 'nqNVXnBkUBLoKlenbyPIZQ',
         skill_focus: 'skill_focus',
+    }),
+    writeExample('put', '/organizations/:id/services/:id', {
+        name: 'name',
+        description: 'description',
     }),
     writeExample('put', '/identities/:id/pii', {
         name: 'name',

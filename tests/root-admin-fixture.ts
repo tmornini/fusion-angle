@@ -19,8 +19,11 @@ import {
     formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { deriveOrganizations } from '../api/derive-organizations.ts';
+import { deriveIdentityKind } from
+    '../api/derive-identity-spine.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { seedIdentityDocument } from './identity-fixtures.ts';
 
 // Below-facade pair formation for the membership write below:
 // every row rides the SAME exported api/routes.ts op a live PUT
@@ -107,6 +110,11 @@ export async function seedOrganizationDocument(
     );
 }
 
+// The product seats no identity without its document
+// (memberGeneses and postBootstrapIn write both), and a
+// membership read refuses a seat whose identity has none.
+// A seat seeded bare is a person's; one whose identity
+// already has a document keeps that document's kind.
 export async function seedSeat(
     db: DbAdapter,
     organization: Id,
@@ -114,6 +122,9 @@ export async function seedSeat(
     type: 'admin' | 'member',
     at: string = '2020-01-01T00:00:00.000000Z',
 ): Promise<void> {
+    if (await deriveIdentityKind(db, identityId) === undefined) {
+        await seedIdentityDocument(db, identityId, 'person');
+    }
     const requestAt = nowUtc();
     const name = membershipNameOf(organization, identityId);
     const body = membershipSeedBody(

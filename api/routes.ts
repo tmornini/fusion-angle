@@ -18,6 +18,7 @@ import type {
     Id,
     AIMemberEntity,
     AIAgentEntity,
+    ServiceEntity,
     FlowEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
@@ -46,10 +47,9 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     ValidationError,
 } from '../shared/types.ts';
-import { hashPassword } from
-    '../shared/password-hash.ts';
 import {
     validateAiAgentDocumentBody,
+    validateServiceDocumentBody,
     assertFlowGraphWriteLaw,
     validateFlowCreateBody,
     validateFlowDocumentBody,
@@ -276,6 +276,7 @@ import {
     withoutId,
     collectionSelect,
     documentCollectionRoute,
+    documentEditHandler,
     documentEntityRoute,
     documentPutHandler,
     documentSelect,
@@ -283,7 +284,7 @@ import {
     documentVersionsSelectRoute,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
-    liveGlobalDocumentIds,
+    liveOrganizationDocumentIds,
     type DocumentFamilyWiring,
 } from './document-family.ts';
 import {
@@ -511,17 +512,40 @@ export function aiAgentDocumentEntityOf(
     };
 }
 // The ai-agents wiring row — the FOURTEENTH registered
-// family. Not a member and not an identity: a standing
-// agent document on the global plane. Stateless: no
-// lifecycle state. notFoundTable matches the family name.
+// family: an organization's AI member document; its
+// identity is a `service` identity (Task 6). The members
+// statement creates; the PUT edits a live head. Stateless:
+// no lifecycle state. notFoundTable matches the family
+// name.
 const AI_AGENTS_WIRING: DocumentFamilyWiring = {
     family: 'ai-agents',
-    httpNest: 'global',
+    httpNest: 'organization',
     lifecycle: 'stateless',
     notFoundTable: 'ai-agents',
     validateDocument: validateAiAgentDocumentBody,
     documentOp: postAiAgentDocumentOp,
     entityOf: aiAgentDocumentEntityOf,
+};
+export function serviceDocumentEntityOf(
+    document: DerivedDocument,
+    _organization: Id,
+): object {
+    return {
+        id: document.name,
+        ...document.body,
+    };
+}
+// The services wiring row: an organization's service member
+// document; its identity is a `service` identity. Stateless:
+// no lifecycle state. notFoundTable matches the family name.
+const SERVICES_WIRING: DocumentFamilyWiring = {
+    family: 'services',
+    httpNest: 'organization',
+    lifecycle: 'stateless',
+    notFoundTable: 'services',
+    validateDocument: validateServiceDocumentBody,
+    documentOp: postServiceDocumentOp,
+    entityOf: serviceDocumentEntityOf,
 };
 registerDocumentFamilyWiring(IDEAS_WIRING);
 registerDocumentFamilyWiring(PROJECTS_WIRING);
@@ -530,6 +554,7 @@ registerDocumentFamilyWiring(WORK_ORDERS_WIRING);
 registerDocumentFamilyWiring(OBJECTIVES_WIRING);
 registerDocumentFamilyWiring(IDENTITIES_WIRING);
 registerDocumentFamilyWiring(AI_AGENTS_WIRING);
+registerDocumentFamilyWiring(SERVICES_WIRING);
 
 // Every handler receives the verified caller's id (actor) as
 // its final argument — the one place authorship is sourced.
@@ -1305,15 +1330,32 @@ export async function postFlowCreationOp(
 // pair keeps compiling; the live route always supplies one.
 async function assertLiveFlowGraphWriteLaw(
     db: DbAdapter,
+    organization: Id,
     graph: Record<string, unknown>,
 ): Promise<void> {
     const parsed = asStoredGraph(
         graph, 'FlowDocumentBody.graph',
     );
-    const liveAgentIds = await liveGlobalDocumentIds(
-        db, 'ai-agents',
+    const [aiIds, serviceIds, accepted] = await Promise.all([
+        liveOrganizationDocumentIds(
+            db, organization, 'ai-agents',
+        ),
+        liveOrganizationDocumentIds(
+            db, organization, 'services',
+        ),
+        organizationMembershipHeads(
+            db, organization,
+            { kind: 'state', state: 'accepted' },
+        ),
+    ]);
+    const programIds = new Set([...aiIds, ...serviceIds]);
+    const seated = new Set(accepted.map(
+        (head) => membershipOfHead(head).identity_id,
+    ));
+    const liveAgentIds = new Set(
+        [...aiIds].filter((id) => seated.has(id)),
     );
-    assertFlowGraphWriteLaw(parsed, liveAgentIds);
+    assertFlowGraphWriteLaw(parsed, programIds, liveAgentIds);
 }
 
 export async function postFlowDocumentOp(
@@ -1322,9 +1364,12 @@ export async function postFlowDocumentOp(
     body: Record<string, unknown>,
     _actor: Id,
     messagePair?: MessagePair,
+    organization?: Id,
 ): Promise<FlowEntity> {
     const doc = validateFlowDocumentBody(withoutId(body));
-    await assertLiveFlowGraphWriteLaw(db, doc.graph);
+    await assertLiveFlowGraphWriteLaw(
+        db, requireOrganization(organization), doc.graph,
+    );
     const entity = {
         ...doc.entity,
         ...documentOperationOrganization(body),
@@ -2588,6 +2633,28 @@ export async function postAiAgentDocumentOp(
     return entity;
 }
 
+// Service document write — message-plane only. Not a member
+// and not an identity. `messagePair` is optional so a
+// below-facade caller keeps compiling.
+export async function postServiceDocumentOp(
+    db: DbAdapter,
+    _id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    messagePair?: MessagePair,
+): Promise<Omit<ServiceEntity, 'id'>> {
+    const entity = withoutId(body) as unknown as
+        Omit<ServiceEntity, 'id'>;
+    if (messagePair !== undefined) {
+        await runWrite(
+            db,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
+    }
+    return entity;
+}
+
 // Identity credential document write — Phase Final Task 2:
 // the identity_credentials ROW half is stripped — pure
 // message-plane write. No states interaction. A below-facade
@@ -2977,7 +3044,17 @@ export const WRITE_RESPONSE_SPECS:
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive).
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
-    'ai-agents/:id': documentWriteResponseSpec(AI_AGENTS_WIRING),
+    // Only the members statement creates an AI or a
+    // service, so each PUT is class B: it names the head
+    // it replaces.
+    'organizations/:id/ai-agents/:id': {
+        ...documentWriteResponseSpec(AI_AGENTS_WIRING),
+        conditional: 'required',
+    },
+    'organizations/:id/services/:id': {
+        ...documentWriteResponseSpec(SERVICES_WIRING),
+        conditional: 'required',
+    },
     // G5: piiEntityOf (GET derive). DELETE is a marked
     // tombstone pair; PUT appends.
     'identities/:id/pii': {
@@ -3542,13 +3619,6 @@ export const routes: Route[] = [
                 'stateless',
             );
         },
-        // Organization admin only — POST /identities has no
-        // member-tier entry, so it falls to the organization
-        // admin's `/` rows in ROUTE_POLICY. The identity and,
-        // for a service, its client_secret credential are
-        // declared geneses in one statement, so a resent
-        // create answers 409 and stores nothing. A person's
-        // PII enters later via PUT identities/:id/pii.
         post: async (
             db, _p, body, _actor, messagePair, organization,
         ) => {
@@ -3570,45 +3640,10 @@ export const routes: Route[] = [
                     kind: 'genesis', declarer: 'handler',
                 },
             };
-            const credentials: StateSibling[] = [];
-            if (b.kind === 'service') {
-                const { id: credId, ...fields } =
-                    b.credential as {
-                        id: string;
-                        secret: string;
-                    } & Record<string, unknown>;
-                if (typeof fields.secret !== 'string'
-                    || fields.secret === '') {
-                    throw new ValidationError(
-                        'IdentityCreateServiceBody'
-                        + '.credential.secret must'
-                        + ' be a non-empty string',
-                    );
-                }
-                const credential = {
-                    id: credId,
-                    ...validateIdentityCredentialEntity({
-                        ...fields,
-                        secret: await hashPassword(fields.secret),
-                    }),
-                };
-                credentials.push({
-                    method: 'PUT',
-                    path: canonicalPath(
-                        org,
-                        '/identities/' + b.id + '/credentials/',
-                    ),
-                    name: credId,
-                    state: credential,
-                    condition: {
-                        kind: 'genesis', declarer: 'handler',
-                    },
-                });
-            }
             await runStateWrite(db, {
                 kind: 'siblings',
                 received: requirePair(messagePair),
-                siblings: [identity, ...credentials],
+                siblings: [identity],
                 reader: { sees: 'whole' },
                 answer: { kind: 'created', location: b.id },
             });
@@ -3659,15 +3694,8 @@ export const routes: Route[] = [
             select: getInvitationVersionOnIdentityNest,
         },
     ),
-    documentCollectionRoute(AI_AGENTS_WIRING),
-    route('ai-agents/:id', {
-        select: documentSelect(AI_AGENTS_WIRING),
-        put: documentPutHandler(AI_AGENTS_WIRING),
-    }),
     documentVersionsSelectRoute(IDENTITIES_WIRING),
     documentVersionSelectRoute(IDENTITIES_WIRING),
-    documentVersionsSelectRoute(AI_AGENTS_WIRING),
-    documentVersionSelectRoute(AI_AGENTS_WIRING),
     // PII is a facet of the identity's own subtree: GET is
     // self-or-admin, PUT/DELETE self-or-admin (enforced in
     // the request gate, mirroring
@@ -4189,7 +4217,7 @@ export const routes: Route[] = [
             const documentBody = flowCreateDocumentBody(b);
             validateFlowDocumentBody(documentBody);
             await assertLiveFlowGraphWriteLaw(
-                db, documentBody.graph as
+                db, org, documentBody.graph as
                     Record<string, unknown>,
             );
             // validateProjectFlowEntity accepts EXACTLY
@@ -5242,6 +5270,20 @@ export const routes: Route[] = [
     documentEntityRoute(OBJECTIVES_WIRING),
     documentVersionsSelectRoute(OBJECTIVES_WIRING),
     documentVersionSelectRoute(OBJECTIVES_WIRING),
+    documentCollectionRoute(AI_AGENTS_WIRING),
+    route('organizations/:id/ai-agents/:id', {
+        select: documentSelect(AI_AGENTS_WIRING),
+        put: documentEditHandler(AI_AGENTS_WIRING),
+    }),
+    documentVersionsSelectRoute(AI_AGENTS_WIRING),
+    documentVersionSelectRoute(AI_AGENTS_WIRING),
+    documentCollectionRoute(SERVICES_WIRING),
+    route('organizations/:id/services/:id', {
+        select: documentSelect(SERVICES_WIRING),
+        put: documentEditHandler(SERVICES_WIRING),
+    }),
+    documentVersionsSelectRoute(SERVICES_WIRING),
+    documentVersionSelectRoute(SERVICES_WIRING),
     // Objective revisions nest under their parent objective:
     // param 0 is the path org, param 1 is the objective, so
     // the SERVER filters the collection to that objective

@@ -16,6 +16,7 @@ import type {
     HumanMemberEntity,
     AIMemberEntity,
     AIAgentEntity,
+    ServiceEntity,
     IdeaEntity,
     IdeaState,
     ProjectEntity,
@@ -196,19 +197,21 @@ export function asConstraint(
 }
 
 // Write-path graph law: memberIds may name person
-// identities only. agentIds must name live /ai-agents
-// documents.
+// identities only: an AI or service member is a program,
+// whether or not its membership is accepted. agentIds
+// must name the organization's live AI members.
 export function assertFlowGraphWriteLaw(
     graph: StoredGraph,
+    programIds: ReadonlySet<string>,
     liveAgentIds: ReadonlySet<string>,
 ): void {
     for (const node of graph.nodes) {
         for (const id of node.memberIds) {
-            if (liveAgentIds.has(id)) {
+            if (programIds.has(id)) {
                 throw new ValidationError(
                     'memberIds may name person'
                     + ' identities only, not AI'
-                    + ' agents',
+                    + ' agents or services',
                 );
             }
         }
@@ -469,7 +472,7 @@ export function validateMemberEntity(
         body, MEMBER_BODY_KEYS, 'MemberEntity',
     );
     const type = validateEnumField(
-        body, 'type', ['human', 'ai', 'system'],
+        body, 'type', ['human', 'ai', 'service', 'system'],
         'member type', 'MemberEntity',
     );
     return {
@@ -593,7 +596,7 @@ export function validateIdentityCredentialEntity(
         'IdentityCredentialEntity',
     );
     const kind = validateEnumField(
-        body, 'kind', ['password', 'client_secret'],
+        body, 'kind', ['password'],
         'credential kind', 'IdentityCredentialEntity',
     );
     const status = validateEnumField(
@@ -1046,6 +1049,30 @@ export function validateAiAgentDocumentBody(
                 body, 'skill_focus',
             ),
             model,
+        },
+    };
+}
+
+const SERVICE_DOCUMENT_BODY_KEYS:
+    readonly string[] = ['name', 'description'];
+
+// The HTTP-body gate for PUT
+// /organizations/:id/services/:id. THE LABEL MANDATE:
+// assertOnlyKeys speaks 'ServiceEntity'.
+export function validateServiceDocumentBody(
+    body: Record<string, unknown>,
+): { readonly entity: Omit<ServiceEntity, 'id'> } {
+    assertOnlyKeys(
+        body,
+        SERVICE_DOCUMENT_BODY_KEYS,
+        'ServiceEntity',
+    );
+    return {
+        entity: {
+            name: pickString(body, 'name'),
+            description: pickString(
+                body, 'description',
+            ),
         },
     };
 }
@@ -1915,33 +1942,52 @@ export function validateInvitationEntity(
     };
 }
 
-const MEMBERSHIP_CREATE_KEYS: readonly string[] = [
-    'id', 'membership', 'identity', 'pii',
+const MEMBERSHIP_CREATE_HUMAN_KEYS: readonly string[] = [
+    'id', 'kind', 'membership', 'identity', 'pii',
+];
+const MEMBERSHIP_CREATE_AI_KEYS: readonly string[] = [
+    'id', 'kind', 'membership', 'ai',
+];
+const MEMBERSHIP_CREATE_SERVICE_KEYS: readonly string[] = [
+    'id', 'kind', 'membership', 'service',
 ];
 const MEMBERSHIP_CREATE_MEMBERSHIP_KEYS:
     readonly string[] = ['type', 'at'];
 
-export function validateMembershipCreateBody(
+export interface MembershipCreateSeat {
+    readonly type: MembershipType;
+    readonly at: string;
+}
+
+export type MembershipCreate =
+    | {
+        readonly kind: 'human';
+        readonly id: string;
+        readonly membership: MembershipCreateSeat;
+        readonly identity: {
+            readonly title: string;
+            readonly department: string;
+            readonly strengths: string[];
+            readonly team_dimensions: Record<string, number>;
+        };
+        readonly pii: Omit<IdentityPiiEntity, 'id'>;
+    }
+    | {
+        readonly kind: 'ai';
+        readonly id: string;
+        readonly membership: MembershipCreateSeat;
+        readonly ai: Omit<AIAgentEntity, 'id'>;
+    }
+    | {
+        readonly kind: 'service';
+        readonly id: string;
+        readonly membership: MembershipCreateSeat;
+        readonly service: Omit<ServiceEntity, 'id'>;
+    };
+
+function membershipCreateSeat(
     body: Record<string, unknown>,
-): {
-    readonly id: string;
-    readonly membership: {
-        readonly type: MembershipType;
-        readonly at: string;
-    };
-    readonly identity: {
-        readonly title: string;
-        readonly department: string;
-        readonly strengths: string[];
-        readonly team_dimensions: Record<string, number>;
-    };
-    readonly pii: Omit<IdentityPiiEntity, 'id'>;
-} {
-    assertOnlyKeys(
-        body, MEMBERSHIP_CREATE_KEYS,
-        'MembershipCreate',
-    );
-    const id = pickIdentifier(body, 'id');
+): MembershipCreateSeat {
     const membershipRaw = body['membership'];
     if (
         membershipRaw === null
@@ -1958,6 +2004,97 @@ export function validateMembershipCreateBody(
         membershipBody, MEMBERSHIP_CREATE_MEMBERSHIP_KEYS,
         'MembershipCreate.membership',
     );
+    return {
+        type: validateEnumField(
+            membershipBody, 'type',
+            ['admin', 'member'],
+            'membership type',
+            'MembershipCreate.membership',
+        ),
+        at: validateTimestampField(
+            membershipBody, 'at',
+            'MembershipCreate.membership',
+        ),
+    };
+}
+
+export const SERVICE_ADMIN_REFUSAL =
+    'an AI or service member cannot be an organization'
+    + ' admin';
+
+// The kind is read first and never defaulted: a body that
+// names none is refused, not read as a human.
+export function validateMembershipCreateBody(
+    body: Record<string, unknown>,
+): MembershipCreate {
+    const kind = validateEnumField(
+        body, 'kind', ['human', 'ai', 'service'],
+        'member kind', 'MembershipCreate',
+    );
+    if (kind === 'ai') {
+        assertOnlyKeys(
+            body, MEMBERSHIP_CREATE_AI_KEYS,
+            'MembershipCreate',
+        );
+        const aiRaw = body['ai'];
+        if (
+            aiRaw === null
+            || typeof aiRaw !== 'object'
+            || Array.isArray(aiRaw)
+        ) {
+            throw new ValidationError(
+                'ai must be an object',
+            );
+        }
+        const id = pickIdentifier(body, 'id');
+        const membership = membershipCreateSeat(body);
+        if (membership.type === 'admin') {
+            throw new ValidationError(SERVICE_ADMIN_REFUSAL);
+        }
+        return {
+            kind,
+            id,
+            membership,
+            ai: validateAiAgentDocumentBody(
+                aiRaw as Record<string, unknown>,
+            ).entity,
+        };
+    }
+    if (kind === 'service') {
+        assertOnlyKeys(
+            body, MEMBERSHIP_CREATE_SERVICE_KEYS,
+            'MembershipCreate',
+        );
+        const serviceRaw = body['service'];
+        if (
+            serviceRaw === null
+            || typeof serviceRaw !== 'object'
+            || Array.isArray(serviceRaw)
+        ) {
+            throw new ValidationError(
+                'service must be an object',
+            );
+        }
+        const id = pickIdentifier(body, 'id');
+        const membership = membershipCreateSeat(body);
+        if (membership.type === 'admin') {
+            throw new ValidationError(SERVICE_ADMIN_REFUSAL);
+        }
+        return {
+            kind,
+            id,
+            membership,
+            service: validateServiceDocumentBody(
+                serviceRaw as Record<string, unknown>,
+            ).entity,
+        };
+    }
+    assertOnlyKeys(
+        body, MEMBERSHIP_CREATE_HUMAN_KEYS,
+        'MembershipCreate',
+    );
+    const id = pickIdentifier(body, 'id');
+    const membership = membershipCreateSeat(body);
     const identityRaw = body['identity'];
     if (
         identityRaw === null
@@ -1995,19 +2132,9 @@ export function validateMembershipCreateBody(
         );
     }
     return {
+        kind,
         id,
-        membership: {
-            type: validateEnumField(
-                membershipBody, 'type',
-                ['admin', 'member'],
-                'membership type',
-                'MembershipCreate.membership',
-            ),
-            at: validateTimestampField(
-                membershipBody, 'at',
-                'MembershipCreate.membership',
-            ),
-        },
+        membership,
         identity: {
             title: identity.title,
             department: identity.department,
@@ -3565,51 +3692,31 @@ export function validateFlowUndoBody(
     return { eventId, at };
 }
 
-// Identity creation, discriminated by kind. A person carries
-// only {id, kind} — its PII enters later via the separate PUT
-// identities/:id/pii (Phase 10 Task 2's intake decomposition);
-// a service carries its credential sub-object (a deterministic-
-// id'd client_secret row whose secret is hashed client-side
-// before it crosses the gate). The route pins the identity kind.
-export interface IdentityCreatePersonBody {
+// Identity creation. A person carries only {id, kind} — its
+// PII enters later via the separate PUT identities/:id/pii
+// (Phase 10 Task 2's intake decomposition). A service is
+// created only by the memberships statement, never here.
+// The route pins the identity kind.
+export interface IdentityCreateBody {
     readonly id: string;
     readonly kind: 'person';
 }
 
-export interface IdentityCreateServiceBody {
-    readonly id: string;
-    readonly kind: 'service';
-    readonly credential: Record<string, unknown>;
-}
-
-export type IdentityCreateBody =
-    | IdentityCreatePersonBody
-    | IdentityCreateServiceBody;
-
-const IDENTITY_CREATE_PERSON_KEYS: readonly string[] = [
+const IDENTITY_CREATE_KEYS: readonly string[] = [
     'id', 'kind',
 ];
 
-const IDENTITY_CREATE_SERVICE_KEYS: readonly string[] = [
-    'id', 'kind', 'credential',
-];
-
 // The HTTP-body gate for POST /identities: a bare person
-// identity (its PII lands later via PUT identities/:id/pii), OR
-// a service identity + its client_secret credential row, written
-// atomically. The credential sub-object is NOT fully validated
-// here — the parent-scoped identity_credentials store re-
-// validates its own body (validateIdentityCredentialEntity) when
-// the composing put lands, and the identities store pins the
-// kind through validateIdentityEntity. The credential's secret
-// is hashed client-side; the route never touches crypto.
-// Identity creation writes NO state event — identities carry no
-// lifecycle event at creation — so the handler needs no actor.
+// identity (its PII lands later via PUT identities/:id/pii).
+// The identities store pins the kind through
+// validateIdentityEntity. Identity creation writes NO state
+// event — identities carry no lifecycle event at creation —
+// so the handler needs no actor.
 export function validateIdentityCreateBody(
     body: Record<string, unknown>,
 ): IdentityCreateBody {
     const kind = validateEnumField(
-        body, 'kind', ['person', 'service'],
+        body, 'kind', ['person'],
         'identity kind', 'IdentityCreateBody',
     );
     const id = pickIdentifier(body, 'id');
@@ -3618,27 +3725,12 @@ export function validateIdentityCreateBody(
             'IdentityCreateBody.id must be non-empty',
         );
     }
-    if (kind === 'person') {
-        assertOnlyKeys(
-            body,
-            IDENTITY_CREATE_PERSON_KEYS,
-            'IdentityCreatePersonBody',
-        );
-        return { id, kind };
-    }
     assertOnlyKeys(
         body,
-        IDENTITY_CREATE_SERVICE_KEYS,
-        'IdentityCreateServiceBody',
+        IDENTITY_CREATE_KEYS,
+        'IdentityCreateBody',
     );
-    return {
-        id,
-        kind,
-        credential: asObject(
-            body['credential'],
-            'IdentityCreateServiceBody.credential',
-        ),
-    };
+    return { id, kind };
 }
 
 export interface WorkOrderCreateBody {

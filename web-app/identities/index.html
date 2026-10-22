@@ -7,80 +7,10 @@
                 platform
             </p>
         </div>
-        <button
-            class="btn btn-primary gap-2"
-            id="add-identity-btn"
-            data-dialog-open="add-identity"
-        >
-            <span id="add-identity-btn-icon"></span>
-            Add Identity
-        </button>
     </div>
 
     <div
         id="identity-list"
         class="flex flex-col gap-3"
     ></div>
-
-    <dialog
-        id="add-identity-dialog"
-        class="dialog dialog-wide"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-identity-title"
-    >
-        <div class="dialog-header">
-            <h3
-                id="add-identity-title"
-                class="dialog-title flex
-                    items-center gap-2"
-            >
-                <span
-                    id="add-identity-dialog-icon"
-                ></span>
-                Add Identity
-            </h3>
-        </div>
-        <div
-            class="flex flex-col gap-3 py-4
-                dialog-scroll"
-        >
-            <div
-                id="add-identity-service-form"
-                class="flex flex-col gap-3"
-            >
-                <div>
-                    <label
-                        class="label mb-1 block"
-                        for="svc-secret"
-                    >Client Secret</label>
-                    <input
-                        class="input"
-                        id="svc-secret"
-                        placeholder="Enter a client
-                            secret"
-                    />
-                    <p class="text-xs text-muted mt-1">
-                        Required. Shown only here and
-                        not recoverable — store it now.
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div class="dialog-footer">
-            <button
-                class="btn btn-outline"
-                data-dialog-cancel="add-identity"
-            >Cancel</button>
-            <button
-                class="btn btn-primary gap-2"
-                id="add-identity-submit"
-            >
-                <span
-                    id="add-identity-submit-icon"
-                ></span>
-                Create
-            </button>
-        </div>
-    </dialog>
 </div>

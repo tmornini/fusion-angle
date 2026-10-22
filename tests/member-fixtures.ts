@@ -2,6 +2,7 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     HumanMember,
     AIMember,
+    ServiceMember,
     SYSTEM_MEMBER_ID,
     nowUtc,
     type Id,
@@ -14,7 +15,6 @@ import {
 import {
     postIdentityDocumentOp,
     postIdentityPiiDocumentOp,
-    postAiAgentDocumentOp,
     identityDocumentBodyOf,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
@@ -22,12 +22,17 @@ import {
     formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
+import { handleRequest } from '../api/api.ts';
+import { apiRequest } from './http-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
 import { responseMessage } from './fixtures/response-message.ts';
+import type { HttpMessage } from
+    '../shared/http-message/http-message.ts';
 
 // The catalog's first model — the fixture default.
 export function firstProviderModel() {
@@ -65,6 +70,22 @@ function memberParentEntity(
     return { id, type };
 }
 
+// The accepted membership a built member was read through.
+function seatedMembership(
+    id: string,
+): HttpMessage<MembershipEntity> {
+    return responseMessage<MembershipEntity>({
+        id: membershipNameOf(
+            MEMBER_ORGANIZATION, id,
+        ),
+        organization_id: MEMBER_ORGANIZATION,
+        identity_id: id,
+        type: 'member',
+        state: 'accepted',
+        at: '2026-01-01T00:00:00.000000Z',
+    });
+}
+
 export function makeHumanMember(
     id: string,
     name: string,
@@ -85,16 +106,7 @@ export function makeHumanMember(
                 id, ...pii,
             }),
         },
-        responseMessage<MembershipEntity>({
-            id: membershipNameOf(
-                MEMBER_ORGANIZATION, id,
-            ),
-            organization_id: MEMBER_ORGANIZATION,
-            identity_id: id,
-            type: 'member',
-            state: 'accepted',
-            at: '2026-01-01T00:00:00.000000Z',
-        }),
+        seatedMembership(id),
     );
 }
 
@@ -105,6 +117,17 @@ export function makeAIMember(
     return new AIMember(
         memberParentEntity(id, 'ai'),
         { id, name, ...aiDetail() },
+        seatedMembership(id),
+    );
+}
+
+export function makeServiceMember(
+    id: string,
+    name: string,
+): ServiceMember {
+    return new ServiceMember(
+        { id, name, description: '' },
+        seatedMembership(id),
     );
 }
 
@@ -171,36 +194,6 @@ async function identityPiiDocumentMessagePair(
     });
 }
 
-async function aiAgentDocumentMessagePair(
-    id: Id,
-    body: Record<string, unknown>,
-    requestAt: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['ai-agents/:id'];
-    if (spec === undefined || !('conditional' in spec)) {
-        throw new Error(
-            'no per-write response spec for ai-agents/:id',
-        );
-    }
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: `/ai-agents/${id}`,
-        routePattern: 'ai-agents/:id',
-        routeSegments: ['ai-agents', ':id'],
-        pathSegments: ['ai-agents', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt,
-        organization: undefined,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, undefined,
-        ),
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-}
-
 export async function seedHumanMember(
     db: MemoryDbAdapter,
     id: string,
@@ -230,17 +223,33 @@ export async function seedHumanMember(
     await seedSeat(db, MEMBER_ORGANIZATION, id, 'member');
 }
 
+// An AI lands through the statement, as Tony would seat
+// one: a service identity, an accepted membership, and the
+// organization's AI document under one id.
 export async function seedAIMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
 ): Promise<void> {
-    const requestAt = nowUtc();
-    const body = { name, ...aiDetail() };
-    await postAiAgentDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID,
-        await aiAgentDocumentMessagePair(id, body, requestAt),
-    );
+    const created = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + MEMBER_ORGANIZATION
+            + '/memberships/',
+        token: await organizationToken(),
+        body: {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: nowUtc() },
+            ai: { name, ...aiDetail() },
+        },
+    }));
+    if (created.status !== 201) {
+        throw new Error(
+            'seedAIMember: ' + created.status + ' '
+            + await created.text(),
+        );
+    }
+    await created.body?.cancel();
 }
 
 export async function seedCurrentMember(

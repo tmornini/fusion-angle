@@ -1074,8 +1074,8 @@ export function roleGrantSeedBody(
 // The wire body a live PUT identities/:id/credentials/:cid would
 // carry for this SAME write: {identity_id, kind, status, secret,
 // at} — the ONE shape every seeded credential (12 human
-// passwords + the system client secret, both mock-data and
-// bootstrap) shares. Hoisted (Phase 10 Task 6) so
+// passwords, both mock-data and bootstrap) shares.
+// Hoisted (Phase 10 Task 6) so
 // formSeedCredentialMessagePairs (this file) and
 // postSeedCredentialsIn (mock-data.ts) share the SAME
 // construction — the
@@ -1350,7 +1350,9 @@ export function buildMockDataInvocations():
         // on the organization-nest item route, ordered
         // before the human-member triple below — the SAME
         // write order postMockDataLoadIn uses (memberships
-        // land before the member they join is created).
+        // land before the member they join is created). Each
+        // AI member's accepted Stark membership is formed the
+        // same way, beside its organization document below.
         const organizations = member.id === 'XXZruirZyAOoRpNxaDnpSA'
             ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
             : [assignOrganization(index)];
@@ -1687,14 +1689,47 @@ export function buildMockDataInvocations():
             });
         }
     }
+    // Every seeded AI belongs to Stark: no seeded flow names
+    // one in Wayne (spec decision 10).
     for (const m of aiMembers) {
-        const { id: _id, ...fields } = m;
-        const key = seedMessagePairKey('ai-agents/:id', m.id);
+        const identityKey = seedMessagePairKey(
+            'identities/:id', m.id,
+        );
         invocations.push({
-            key,
-            routePattern: 'ai-agents/:id',
+            key: identityKey,
+            routePattern: 'identities/:id',
             idParams: [m.id],
             organization: undefined,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            body: identityDocumentBodyOf('service'),
+            operation: identityKey,
+        });
+        const membershipKey = seedMessagePairKey(
+            MEMBERSHIP_ITEM_ROUTE, m.id + '-0',
+        );
+        invocations.push({
+            key: membershipKey,
+            routePattern: MEMBERSHIP_ITEM_ROUTE,
+            idParams: [
+                STARK_ORGANIZATION,
+                membershipNameOf(STARK_ORGANIZATION, m.id),
+            ],
+            organization: STARK_ORGANIZATION,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            body: membershipSeedBody(
+                STARK_ORGANIZATION, m.id, 'member',
+            ),
+            operation: membershipKey,
+        });
+        const { id: _id, ...fields } = m;
+        const key = seedMessagePairKey(
+            'organizations/:id/ai-agents/:id', m.id,
+        );
+        invocations.push({
+            key,
+            routePattern: 'organizations/:id/ai-agents/:id',
+            idParams: [STARK_ORGANIZATION, m.id],
+            organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: fields,
             operation: key,
@@ -2407,7 +2442,7 @@ export async function formMockDataMessagePairs(
 
 // Pass 1 for the credential documents, called by BOTH seed
 // paths (rehearseMockData / rehearseBootstrap, mock-data.ts):
-// the 13 (mock-data) / 2 (bootstrap) identity-credential
+// the 12 (mock-data) / 1 (bootstrap) identity-credential
 // document message pairs, formed from their OWN post-hash
 // bodies. The secrets are hashed first, in
 // hashSeedCredentials, before pass 1; these pairs form
@@ -2426,10 +2461,6 @@ export async function formSeedCredentialMessagePairs(
         readonly identityId: Id;
         readonly secret: string;
     }[],
-    systemCredential: {
-        readonly id: Id;
-        readonly secret: string;
-    },
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
     const messagePairs = new Map<string, MessagePair>();
@@ -2453,25 +2484,6 @@ export async function formSeedCredentialMessagePairs(
             generateIdentifier(),
         ));
     }
-    const systemKey = seedMessagePairKey(
-        'identities/:id/credentials/:cid', systemCredential.id,
-    );
-    messagePairs.set(systemKey, await formSeedMessagePair(
-        {
-            key: systemKey,
-            routePattern: 'identities/:id/credentials/:cid',
-            idParams: [SYSTEM_MEMBER_ID, systemCredential.id],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: identityCredentialSeedBody(
-                SYSTEM_MEMBER_ID, 'client_secret',
-                systemCredential.secret,
-            ),
-            operation: systemKey,
-        },
-        requestAt,
-        generateIdentifier(),
-    ));
     return messagePairs;
 }
 

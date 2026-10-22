@@ -10,6 +10,9 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedPersonIdentity } from
     './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { firstProviderModel } from './member-fixtures.ts';
+import { landMembership } from './membership-fixtures.ts';
+import { captureConsole } from './fixtures/console-capture.ts';
 import {
     apiRequest,
     partBodiesOf,
@@ -96,6 +99,49 @@ async function statesOf(
         status: response.status,
         states: rows.map((row) => row.state),
     };
+}
+
+function aiBody(id: string) {
+    return {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: {
+            name: 'Ops Assistant',
+            description: 'Triage',
+            skill_focus: 'routing',
+            model: firstProviderModel().id,
+        },
+    };
+}
+
+function serviceBody(id: string) {
+    return {
+        id,
+        kind: 'service',
+        membership: { type: 'member', at: AT },
+        service: {
+            name: 'Nightly import',
+            description: 'Loads the ledger export',
+        },
+    };
+}
+
+async function post(
+    db: MemoryDbAdapter, token: string, body: unknown,
+): Promise<Response> {
+    return handleRequest(db, apiRequest({
+        method: 'POST', path: nest('memberships'),
+        token, body,
+    }));
+}
+
+async function read(
+    db: MemoryDbAdapter, token: string, path: string,
+): Promise<Response> {
+    return handleRequest(db, apiRequest({
+        method: 'GET', path, token,
+    }));
 }
 
 Deno.test('admin GET memberships defaults to accepted',
@@ -230,6 +276,7 @@ Deno.test(
         const name = membershipNameOf(STARK, id);
         const body = {
             id,
+            kind: 'human',
             membership: { type: 'member', at: AT },
             identity: {
                 title: 'Engineer',
@@ -345,3 +392,284 @@ Deno.test(
         ));
     },
 );
+
+Deno.test('admin POST memberships creates one accepted AI',
+async () => {
+    const { db, admin, member } = await seeded();
+    const id = generateIdentifier();
+    const name = membershipNameOf(STARK, id);
+    const body = aiBody(id);
+    const created = await post(db, admin, body);
+    assertStrictEquals(created.status, 201);
+    assertStrictEquals(
+        created.headers.get('location'),
+        '/organizations/' + STARK + '/invitations/' + name,
+    );
+    assertEquals(await created.json(), {
+        id: name, organization_id: STARK, identity_id: id,
+        type: 'member', state: 'accepted', at: AT,
+    });
+    const identity = await read(
+        db, admin, '/identities/' + id,
+    );
+    assertStrictEquals(identity.status, 200);
+    assertEquals(
+        await identity.json(), { id, kind: 'service' },
+    );
+    const agent = await read(
+        db, admin,
+        '/organizations/' + STARK + '/ai-agents/' + id,
+    );
+    assertStrictEquals(agent.status, 200);
+    assertEquals(await agent.json(), { id, ...body.ai });
+    assertStrictEquals(
+        await db.messagePairs.getHeadPair(
+            '/identities/' + id + '/', 'pii',
+        ),
+        null,
+    );
+    const count = (await db.messagePairs.getAll()).length;
+    const resent = await post(db, admin, body);
+    assertStrictEquals(resent.status, 409);
+    await resent.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, count,
+    );
+    const forbidden = await post(
+        db, member, aiBody(generateIdentifier()),
+    );
+    assertStrictEquals(forbidden.status, 403);
+    await forbidden.body?.cancel();
+});
+
+Deno.test('admin POST memberships creates one accepted service',
+async () => {
+    const { db, admin, member } = await seeded();
+    const id = generateIdentifier();
+    const name = membershipNameOf(STARK, id);
+    const body = serviceBody(id);
+    const created = await post(db, admin, body);
+    assertStrictEquals(created.status, 201);
+    assertStrictEquals(
+        created.headers.get('location'),
+        '/organizations/' + STARK + '/invitations/' + name,
+    );
+    assertEquals(await created.json(), {
+        id: name, organization_id: STARK, identity_id: id,
+        type: 'member', state: 'accepted', at: AT,
+    });
+    const identity = await read(
+        db, admin, '/identities/' + id,
+    );
+    assertStrictEquals(identity.status, 200);
+    assertEquals(
+        await identity.json(), { id, kind: 'service' },
+    );
+    const service = await read(
+        db, admin,
+        '/organizations/' + STARK + '/services/' + id,
+    );
+    assertStrictEquals(service.status, 200);
+    assertEquals(
+        await service.json(), { id, ...body.service },
+    );
+    assertStrictEquals(
+        await db.messagePairs.getHeadPair(
+            '/identities/' + id + '/', 'pii',
+        ),
+        null,
+    );
+    const count = (await db.messagePairs.getAll()).length;
+    const resent = await post(db, admin, body);
+    assertStrictEquals(resent.status, 409);
+    await resent.body?.cancel();
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, count,
+    );
+    const forbidden = await post(
+        db, member, serviceBody(generateIdentifier()),
+    );
+    assertStrictEquals(forbidden.status, 403);
+    await forbidden.body?.cancel();
+});
+
+// No default member kind: a body that names none is
+// refused, never read as a human.
+Deno.test('a memberships POST names its member kind',
+async () => {
+    const { db, admin } = await seeded();
+    const { kind: _kind, ...kindless } = aiBody(
+        generateIdentifier(),
+    );
+    for (const body of [
+        kindless,
+        { ...aiBody(generateIdentifier()), kind: 'robot' },
+        { ...aiBody(generateIdentifier()), kind: 'service' },
+    ]) {
+        const res = await post(db, admin, body);
+        assertStrictEquals(res.status, 400);
+        await res.body?.cancel();
+    }
+});
+
+Deno.test('a service member PUT edits its live document',
+async () => {
+    const { db, admin } = await seeded();
+    const id = generateIdentifier();
+    const created = await post(db, admin, serviceBody(id));
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const path = '/organizations/' + STARK + '/services/' + id;
+    const held = await read(db, admin, path);
+    assertStrictEquals(held.status, 200);
+    await held.body?.cancel();
+    const edited = { name: 'Nightly import', description: 'v2' };
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT', path, token: admin, body: edited,
+        headers: { 'If-Match': held.headers.get('ETag')! },
+    }));
+    assertStrictEquals(put.status, 200);
+    assertEquals(await put.json(), { id, ...edited });
+});
+
+Deno.test('an AI or service member is never created an'
+    + ' organization admin', async () => {
+    const { db, admin } = await seeded();
+    for (const body of [
+        aiBody(generateIdentifier()),
+        serviceBody(generateIdentifier()),
+    ]) {
+        const res = await post(db, admin, {
+            ...body, membership: { type: 'admin', at: AT },
+        });
+        assertStrictEquals(res.status, 400);
+        assertEquals(await res.json(), {
+            error: 'an AI or service member cannot be an'
+                + ' organization admin',
+        });
+        assertStrictEquals(
+            await db.messagePairs.getHeadPair(
+                '/invitations/',
+                membershipNameOf(STARK, body.id),
+            ),
+            null,
+        );
+    }
+});
+
+// A membership read carries its identity's kind, derived
+// when served and never stored: the one rule every roster
+// reader sorts members by.
+Deno.test('a membership read carries its identity\'s kind',
+async () => {
+    const { db, admin } = await seeded();
+    const id = generateIdentifier();
+    const name = membershipNameOf(STARK, id);
+    const created = await post(db, admin, serviceBody(id));
+    assertStrictEquals(created.status, 201);
+    const stored = await created.json() as Record<
+        string, unknown
+    >;
+    assertStrictEquals(stored['identity_kind'], undefined);
+    const listed = await read(db, admin, nest('memberships'));
+    assertStrictEquals(listed.status, 200);
+    const rows = await partBodiesOf<{
+        identity_id: string;
+        identity_kind?: string;
+    }>(listed);
+    assertEquals(
+        Object.fromEntries(rows.map(
+            (row) => [row.identity_id, row.identity_kind],
+        )),
+        {
+            XXZruirZyAOoRpNxaDnpSA: 'person',
+            [SARAH]: 'person',
+            [id]: 'service',
+        },
+    );
+    const item = await read(
+        db, admin, nest('invitations') + name,
+    );
+    assertStrictEquals(item.status, 200);
+    const seat = await item.json() as Record<string, unknown>;
+    assertStrictEquals(seat['identity_kind'], 'service');
+});
+
+// A seat names an identity with its document (memberGeneses
+// and postBootstrapIn write both), so an organization
+// admin's genesis naming an unknown identity is refused as
+// absent (RFC 9110 §15.5.5): it appends nothing, and every
+// membership read of the organization still answers.
+Deno.test('a seat for an identity with no document is'
+    + ' refused',
+async () => {
+    const { db, admin } = await seeded();
+    const ghost = generateIdentifier();
+    const name = membershipNameOf(STARK, ghost);
+    const before = (await db.messagePairs.getAll()).length;
+    const seated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: nest('invitations') + name,
+        token: admin,
+        body: { state: 'accepted', type: 'member', at: AT },
+        headers: { 'If-None-Match': '*' },
+    }));
+    assertStrictEquals(seated.status, 404);
+    assertEquals(await seated.json(), {
+        error: 'Not found: identities/' + ghost,
+    });
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+    const item = await read(
+        db, admin, nest('invitations') + name,
+    );
+    assertStrictEquals(item.status, 404);
+    await item.body?.cancel();
+    const listed = await read(db, admin, nest('memberships'));
+    assertStrictEquals(listed.status, 200);
+    const rows = await partBodiesOf<{
+        identity_id: string;
+        identity_kind?: string;
+    }>(listed);
+    assertEquals(
+        Object.fromEntries(rows.map(
+            (row) => [row.identity_id, row.identity_kind],
+        )),
+        {
+            XXZruirZyAOoRpNxaDnpSA: 'person',
+            [SARAH]: 'person',
+        },
+    );
+});
+
+// Below the gate a store bug can still seat an identity with
+// no document; every membership read then fails loudly,
+// never reading the seat as a person.
+Deno.test('a read of a seat with no identity fails loudly',
+async () => {
+    const { db, admin } = await seeded();
+    const ghost = generateIdentifier();
+    await landMembership(
+        db, STARK, ghost, 'accepted', 'member', AT,
+    );
+    for (const path of [
+        nest('memberships'),
+        nest('invitations') + membershipNameOf(STARK, ghost),
+    ]) {
+        const { result: got, calls } = await captureConsole(
+            'error', () => read(db, admin, path),
+        );
+        assertStrictEquals(got.status, 500, path);
+        assertEquals(
+            await got.json(), { error: 'internal error' },
+        );
+        assertStrictEquals(calls.length, 1, path);
+        const [event, , error] = calls[0]!;
+        assertStrictEquals(event, 'request failed');
+        assertStrictEquals(
+            (error as Error).message,
+            'no identity document for ' + ghost,
+        );
+    }
+});

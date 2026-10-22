@@ -821,7 +821,7 @@ Deno.test(
         );
         assertThrows(
             () => assertFlowGraphWriteLaw(
-                graph, new Set([AI_1]),
+                graph, new Set([AI_1]), new Set([AI_1]),
             ),
             Error, 'not AI agents',
         );
@@ -846,7 +846,9 @@ Deno.test(
             'graph',
         );
         assertFlowGraphWriteLaw(
-            graph, new Set(['UuvoBhQJUSEsiJwscXPkUg']),
+            graph,
+            new Set(['UuvoBhQJUSEsiJwscXPkUg']),
+            new Set(['UuvoBhQJUSEsiJwscXPkUg']),
         );
     },
 );

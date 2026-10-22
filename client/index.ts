@@ -33,6 +33,7 @@ export * from './record-attributes.ts';
 export * from './record-instances.ts';
 export * from './record-transitions.ts';
 export * from './records.ts';
+export * from './service-members.ts';
 export * from './session-credentials.ts';
 export * from './session-logout.ts';
 export * from './session-refresh-mutex.ts';

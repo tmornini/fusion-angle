@@ -11,12 +11,16 @@ import { handleRequest } from '../api/api.ts';
 import { bodyOf } from '../api/derive-documents.ts';
 import { seedOrganizationDocument } from
     './test-fixtures.ts';
-import { seedPersonIdentity } from
-    './identity-fixtures.ts';
+import {
+    seedPersonIdentity,
+    seedServiceIdentity,
+} from './identity-fixtures.ts';
+import { firstProviderModel } from './member-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     apiRequest,
     assertPartsAreHeads,
+    membershipJoinReader,
     invitationLatched,
     partBodiesOf,
     partsOf,
@@ -25,7 +29,10 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
     '../shared/membership-name.ts';
-import type { MembershipEntity } from '../shared/types.ts';
+import type {
+    MembershipEntity,
+    MembershipReadEntity,
+} from '../shared/types.ts';
 
 const TONY = 'XXZruirZyAOoRpNxaDnpSA';
 const ORG = 'AjdvjuECVZEgZoFajaIEkg';
@@ -35,6 +42,9 @@ const MALFORMED =
 const LAST_ADMIN =
     'the last accepted admin cannot be removed'
     + ' or demoted';
+const SERVICE_ADMIN =
+    'an AI or service member cannot be an organization'
+    + ' admin';
 const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
 
 function itemPath(
@@ -118,6 +128,14 @@ async function membershipOf(
     response: Response,
 ): Promise<MembershipEntity> {
     return await response.json() as MembershipEntity;
+}
+
+// A read on the organization nest: the stored membership
+// joined with its identity's kind.
+async function membershipReadOf(
+    response: Response,
+): Promise<MembershipReadEntity> {
+    return await response.json() as MembershipReadEntity;
 }
 
 function expected(
@@ -368,8 +386,11 @@ Deno.test('an admin pending PUT on a declined head'
     ));
     assertStrictEquals(head.status, 200);
     assertEquals(
-        await membershipOf(head),
-        expected(invitee.id, 'declined', declineAt),
+        await membershipReadOf(head),
+        {
+            ...expected(invitee.id, 'declined', declineAt),
+            identity_kind: 'person',
+        },
     );
 });
 
@@ -701,6 +722,91 @@ async () => {
         await seatHead(db, invitee.id),
         { method: 'PUT', type: 'member' },
     );
+});
+
+Deno.test('an AI or service member is never made an'
+    + ' organization admin', async () => {
+    const { db, admin } = await basis();
+    const kinds = [
+        {
+            kind: 'ai',
+            ai: {
+                name: 'Ops Assistant',
+                description: 'Triage',
+                skill_focus: 'routing',
+                model: firstProviderModel().id,
+            },
+        },
+        {
+            kind: 'service',
+            service: {
+                name: 'Nightly import',
+                description: 'Loads the ledger export',
+            },
+        },
+    ];
+    for (const member of kinds) {
+        const id = generateIdentifier();
+        const name = membershipNameOf(ORG, id);
+        const created = await handleRequest(db, req(
+            'POST', '/organizations/' + ORG + '/memberships/',
+            admin,
+            {
+                id,
+                ...member,
+                membership: {
+                    type: 'member',
+                    at: '2026-04-01T00:00:00.000000Z',
+                },
+            },
+        ));
+        assertStrictEquals(created.status, 201);
+        await created.body?.cancel();
+        const retyped = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'accepted',
+                type: 'admin',
+                at: '2026-04-01T00:00:01.000000Z',
+            },
+        );
+        await assertError(retyped, 409, SERVICE_ADMIN);
+        assertEquals(
+            await seatHead(db, id),
+            { method: 'PUT', type: 'member' },
+        );
+        const removed = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'removed',
+                at: '2026-04-01T00:00:02.000000Z',
+            },
+        );
+        assertStrictEquals(removed.status, 200);
+        await removed.body?.cancel();
+        const promoted = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'accepted',
+                type: 'admin',
+                at: '2026-04-01T00:00:03.000000Z',
+            },
+        );
+        await assertError(promoted, 409, SERVICE_ADMIN);
+        const restored = await putState(
+            db, 'organizations', ORG, name, admin, {
+                state: 'accepted',
+                type: 'member',
+                at: '2026-04-01T00:00:04.000000Z',
+            },
+        );
+        assertStrictEquals(restored.status, 200);
+        await restored.body?.cancel();
+        const seatless = generateIdentifier();
+        await seedServiceIdentity(db, seatless);
+        const seated = await directSeat(
+            db, admin, seatless, 'admin',
+            '2026-04-01T00:00:05.000000Z',
+        );
+        await assertError(seated, 409, SERVICE_ADMIN);
+    }
 });
 
 Deno.test('re-invite after decline, revoke, or removal'
@@ -1110,7 +1216,8 @@ async () => {
         pendingView,
     );
     await assertPartsAreHeads(
-        db, pendingParts, { sees: 'whole' },
+        db, pendingParts,
+        await membershipJoinReader(db, pendingParts),
     );
     assertEquals(
         pendingParts.map(
@@ -1126,7 +1233,8 @@ async () => {
         acceptedDefault,
     );
     await assertPartsAreHeads(
-        db, acceptedParts, { sees: 'whole' },
+        db, acceptedParts,
+        await membershipJoinReader(db, acceptedParts),
     );
     assertEquals(
         acceptedParts.map(
@@ -1355,11 +1463,14 @@ Deno.test('a member reads accepted and removed, and a'
     ));
     assertStrictEquals(adminItem.status, 200);
     assertEquals(
-        await membershipOf(adminItem),
-        expected(
-            pending.id, 'pending',
-            '2026-04-01T00:00:01.000000Z',
-        ),
+        await membershipReadOf(adminItem),
+        {
+            ...expected(
+                pending.id, 'pending',
+                '2026-04-01T00:00:01.000000Z',
+            ),
+            identity_kind: 'person',
+        },
     );
 });
 
@@ -1388,7 +1499,9 @@ Deno.test('re-invite after decline is one pending document'
         expected(invitee.id, 'pending', at),
     );
     assertStrictEquals(await putCount(db, name), 3);
-    const organizationView = await partBodiesOf<MembershipEntity>(
+    const organizationView = await partBodiesOf<
+        MembershipReadEntity
+    >(
         await handleRequest(db, req(
             'GET',
             '/organizations/' + ORG
@@ -1397,7 +1510,10 @@ Deno.test('re-invite after decline is one pending document'
         )),
     );
     assertEquals(organizationView, [
-        expected(invitee.id, 'pending', at),
+        {
+            ...expected(invitee.id, 'pending', at),
+            identity_kind: 'person',
+        },
     ]);
     const identityView = await partBodiesOf<
         MembershipEntity

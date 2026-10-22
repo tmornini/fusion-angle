@@ -2,7 +2,9 @@ import type {
     MemberId,
     Member,
     MembershipEntity,
+    MembershipReadEntity,
     AIAgentEntity,
+    ServiceEntity,
 } from '../shared/types.ts';
 import {
     HumanMember,
@@ -16,10 +18,12 @@ import type { HttpMessage } from
 import {
     buildHumanMemberMap,
     getHumanMemberProfile,
+    isHumanSeat,
 } from './members.ts';
 import {
     buildAIAgentMap,
 } from './ai-members.ts';
+import { buildServiceMembers } from './service-members.ts';
 import { getMemberPii } from './identities.ts';
 import {
     RequestError,
@@ -43,23 +47,40 @@ export async function getMembers(
 ): Promise<Member[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
-    const [memberships, agents] = await Promise.all([
+    const [memberships, agents, services] = await Promise.all([
         organization === undefined
             ? Promise.resolve(
-                [] as HttpMessage<MembershipEntity>[],
+                [] as HttpMessage<MembershipReadEntity>[],
             )
-            : ctx.GETCollection<MembershipEntity>(
+            : ctx.GETCollection<MembershipReadEntity>(
                 'organizations/' + organization
                     + '/memberships/?state=accepted',
             ),
-        ctx.GETCollection<AIAgentEntity>('ai-agents/')
-            .then(parts => parts.map((m) => m.body().toValue())),
+        organization === undefined
+            ? Promise.resolve([] as AIAgentEntity[])
+            : ctx.GETCollection<AIAgentEntity>(
+                'organizations/' + organization
+                    + '/ai-agents/',
+            ).then(parts => parts.map((m) => m.body().toValue())),
+        organization === undefined
+            ? Promise.resolve([] as ServiceEntity[])
+            : ctx.GETCollection<ServiceEntity>(
+                'organizations/' + organization
+                    + '/services/',
+            ).then(parts => parts.map((m) => m.body().toValue())),
     ]);
-    const humans = buildHumanMemberMap(memberships);
-    const ais = buildAIAgentMap(agents);
+    const humans = buildHumanMemberMap(
+        memberships.filter(isHumanSeat),
+    );
+    const ais = buildAIAgentMap(agents, memberships);
+    const serviceMembers = buildServiceMembers(
+        services,
+        memberships.filter((seat) => !isHumanSeat(seat)),
+    );
     return fillHumanMemberPii(ctx, [
         ...humans.values(),
         ...ais.values(),
+        ...serviceMembers,
     ]);
 }
 

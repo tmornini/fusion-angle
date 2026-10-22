@@ -10,7 +10,6 @@ import {
     iconExternalLink,
     iconMail,
     iconPhone,
-    iconShield,
 } from '../icons.ts';
 import {
     IDENTITY_WITHOUT_PII_NAME,
@@ -21,7 +20,6 @@ import {
 import {
     Identity,
     type MemberPii,
-    type IdentityCredentialKind,
     type IdentityKind,
     type ClientStatus,
 } from '../../../shared/types.ts';
@@ -38,8 +36,6 @@ export interface IdentityDetailView {
     readonly identity: Identity;
     readonly pii: MemberPii;
     readonly service: ServiceFacet;
-    readonly activeCredentialKinds:
-        readonly IdentityCredentialKind[];
     readonly registration: ClientRegistration;
 }
 
@@ -227,34 +223,6 @@ function buildRegistrationCard(
         </div>`;
 }
 
-function buildCredentialsCard(
-    view: IdentityDetailView,
-): SafeHtml {
-    const kinds = view.activeCredentialKinds;
-    return html`
-        <div class="card p-6">
-            <h3 class="${
-                'font-display font-semibold mb-4'
-                + ' flex items-center gap-2'
-            }">${
-                iconShield(ICON_SIZE.xl, 'text-primary')
-            } Credentials</h3>
-            ${
-                kinds.length === 0
-                    ? html`<p class="${
-                        'text-sm text-muted'
-                    }">No active credentials.</p>`
-                    : html`<div class="${
-                        'flex flex-wrap gap-2'
-                    }">${kinds.map(k =>
-                        html`<span class="${
-                            'badge badge-secondary'
-                        }">${k}</span>`,
-                    )}</div>`
-            }
-        </div>`;
-}
-
 function buildLinksCard(
     view: IdentityDetailView,
 ): SafeHtml {
@@ -331,7 +299,6 @@ export class IdentityDetailPresenter {
                     ${buildLinksCard(this.#view)}`
                 : html`
                     ${buildRegistrationCard(this.#view)}
-                    ${buildCredentialsCard(this.#view)}
                     ${buildLinksCard(this.#view)}`,
         );
     }

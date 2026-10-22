@@ -13,6 +13,7 @@ import {
     apiRequest,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
+import { seedIdentityDocument } from './identity-fixtures.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
@@ -111,6 +112,7 @@ async () => {
     const { db, organizationA, organizationB } =
         await memberOfBothAdminInA();
     const identity = generateIdentifier();
+    await seedIdentityDocument(db, identity, 'person');
     const res = await handleRequest(db, req(
         'PUT', '/organizations/' + organizationA
             + '/invitations/'

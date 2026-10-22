@@ -103,7 +103,6 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'CdPfPQIpnEisUxonuclHxw': 'd-edge-approve',
     'cdXozzKWLQMNCetkBTpDDA': 'g-project-approved-state',
     'ceASjkMRvdGADMFoSgGqHw': 'h-project-approved-2',
-    'cFiyyRHxbIEVqeVFNPmDnw': 'seed-cred-system-client-secret',
     'CGJGvTHcUqNYlEILWXigEw': '4z9uXoChh9HjMTEHfZQhAk',
     'cGVtCERtMGxhyNGAsQBBuQ': 'flow-tag-3',
     'CHekPYKmopdmcKTuHxquaw': '4zi5yzNsiA89SzrcEityhr',

@@ -81,15 +81,17 @@ function messagePairJsonOf(message: string): {
 // two message tables (mock-data-fingerprint.test.ts).
 
 // The exact op-invocation count postMockDataLoad drives through
-// a pair-capable op: 45 member-family pairs (Phase 8 Task 4's
-// create-time bundle: 11 human-members + 4 ai-members, each now
-// an operation/member-document/detail-document triple — the
+// a pair-capable op: 33 human-member pairs (Phase 8 Task 4's
+// create-time bundle: 11 human-members, each an
+// operation/member-document/detail-document triple — the
 // objectives-family 1+1+1 precedent generalized to the roster —
-// 15 ops + 15 member documents + 15 detail documents) +
-// 12 membership documents (eleven humans; the current
+// 11 ops + 11 member documents + 11 detail documents) +
+// 12 AI-member pairs (4 AI members, each forming its
+// organizations/:id/ai-agents/:id document, its `service`
+// identities/:id document, and its accepted Stark membership) +
+// 12 human membership documents (eleven humans; the current
 // identity is a member of both organizations), each a
-// membership PUT that also lands its seat sibling — AI
-// agents are not memberships +
+// membership PUT that also lands its seat sibling +
 // 11 ideas +
 // 2 organizations documents (Phase 12 Task 3: the tenant root's
 // own family onboards — Stark Industries + Wayne Enterprises,
@@ -132,15 +134,13 @@ function messagePairJsonOf(message: string): {
 // 11 identities-document message pairs (Phase 10 Task 5: each
 // seeded human-member create ALSO forms its own identities/:id
 // document message pair — the create-time bundle widens from a
-// triple to a quadruple for human members only; an AI member
-// forms no identities row — finding 10 — so its own bundle
-// stays a triple) + 5 identities-document message pairs
-// (Phase 10 Task 6: the 4 AI members + the system member each
-// form their OWN identities/:id document message pair too — a
-// standalone invocation, not a bundle-widening, since neither
-// create-time bundle ever carried one) + 13 identity-credential
+// triple to a quadruple for human members only) + 1
+// identities-document message pair (the system member's
+// `service` identity, a standalone invocation with no
+// membership and no credential; each AI's identity counts
+// with its AI-member pairs above) + 12 identity-credential
 // document message pairs (Phase 10 Task 6: 12 human password
-// credentials + the system client-secret credential, one
+// credentials, one
 // identities/:id/credentials/:cid pair per row — formed by
 // formSeedCredentialMessagePairs from the hashes
 // hashSeedCredentials (api/mock-data.ts) computes first,
@@ -168,8 +168,8 @@ function messagePairJsonOf(message: string): {
 // invitation pairs (the seeded pending Stark
 // invitation's operation + document, granted by
 // postOrganizationInvitation). Measure after
-// seed — do not invent. Bootstrap absolute is 9.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1882;
+// seed — do not invent. Bootstrap absolute is 8.
+const EXPECTED_MESSAGE_PAIR_COUNT = 1889;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {
@@ -312,14 +312,15 @@ Deno.test('a seeded flow create pair sits at its org-nested'
         , '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/');
 });
 
-Deno.test('a seeded AI agent pair sits at the global'
+Deno.test('a seeded AI agent pair sits at its organization\'s'
 + ' ai-agents document', async () => {
     const db = await sharedMockDb();
     const firstAgent = buildAiMembers()[0]!;
     const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.name === firstAgent.id
-            && r.path === '/ai-agents/',
+            && r.path === '/organizations/' + STARK_ORGANIZATION
+                + '/ai-agents/',
     );
     assert(row, 'no request row for the seeded agent');
     const embedded = messagePairJsonOf(row!.response) as {
@@ -329,6 +330,45 @@ Deno.test('a seeded AI agent pair sits at the global'
         Object.keys(embedded.body).sort(),
         ['description', 'id', 'model', 'name', 'skill_focus'],
     );
+});
+
+Deno.test('each seeded AI is a service identity with an'
++ ' accepted Stark membership', async () => {
+    const db = await sharedMockDb();
+    const requests = await db.messagePairs.getAll();
+    for (const m of buildAiMembers()) {
+        const identity = requests.find(
+            r => r.path === '/identities/' && r.name === m.id,
+        );
+        assert(identity, 'no identity pair for ' + m.id);
+        assertEquals(
+            messagePairJsonOf(identity.response).body,
+            { id: m.id, kind: 'service' },
+        );
+        const membership = requests.find(
+            r => r.path === '/invitations/'
+                && r.name === membershipNameOf(
+                    STARK_ORGANIZATION, m.id,
+                ),
+        );
+        assert(membership, 'no Stark membership for ' + m.id);
+        const membershipBody = messagePairJsonOf(
+            membership.response,
+        ).body;
+        assertStrictEquals(membershipBody['type'], 'member');
+        assertStrictEquals(
+            membershipBody['state'], 'accepted',
+        );
+        assertStrictEquals(
+            requests.find(
+                r => r.path === '/invitations/'
+                    && r.name === membershipNameOf(
+                        ORGANIZATION_TWO, m.id,
+                    ),
+            ),
+            undefined,
+        );
+    }
 });
 
 Deno.test('a seeded membership sits at invitations'
@@ -948,7 +988,7 @@ Deno.test('a seeded credential\'s response body carries the full'
 + ' nondeterministic per reseed, finding 13, so only the'
 + ' key set is falsifiable here)', async () => {
     const db = await sharedMockDb();
-    const id = 'cFiyyRHxbIEVqeVFNPmDnw';
+    const id = 'hRFubvlhanwDtFRwinlFCA';
     const requests = await db.messagePairs.getAll();
     const requestRow = requests.find(r => r.name === id);
     assert(requestRow, 'no request row for ' + id);
@@ -1004,7 +1044,7 @@ Deno.test('seed pairs verify against their hashes', async () => {
     }
 });
 
-Deno.test('a bootstrap seed populates exactly nine balanced,'
+Deno.test('a bootstrap seed populates exactly eight balanced,'
 + ' hash-verified pairs for the current identity and the'
 + ' system identity', async () => {
     const db = memoryDbAdapter();
@@ -1012,7 +1052,7 @@ Deno.test('a bootstrap seed populates exactly nine balanced,'
         hashPassword: testHashPassword,
     });
     const requests = await db.messagePairs.getAll();
-    assertStrictEquals(requests.length, 9);
+    assertStrictEquals(requests.length, 8);
     const atIdentity = requests.filter(
         r => r.path === '/identities/'
             && r.name === 'XXZruirZyAOoRpNxaDnpSA',

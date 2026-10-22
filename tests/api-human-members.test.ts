@@ -46,6 +46,7 @@ Deno.test(
             token,
             {
                 id: identity,
+                kind: 'human',
                 membership: {
                     type: 'member',
                     at: AT,

@@ -19,6 +19,7 @@ import {
     apiRequest,
     assertPartIsDocumentGet,
     assertPartsAreHeads,
+    membershipJoinReader,
     partsOf,
 } from './http-fixtures.ts';
 import {
@@ -46,8 +47,7 @@ const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 
 const STREAM: readonly [string, (id: string) => string][] = [
     ['/identities/', (id) => '/identities/' + id],
-    ['/ai-agents/', (id) => '/ai-agents/' + id],
-    ...['ideas', 'projects', 'work-orders', 'objectives'].map(
+    ...['ideas', 'projects', 'work-orders', 'objectives', 'ai-agents'].map(
         (family) => [
             '/organizations/' + STARK + '/' + family + '/',
             (id: string) => '/organizations/' + STARK + '/'
@@ -831,8 +831,13 @@ Deno.test(ACCEPTED + ' serves its accepted heads as parts,'
         /^multipart\/mixed; boundary=[0-9a-f-]{36}$/,
     );
     assertStrictEquals(got.headers.get('etag'), null);
-    const parts = await partsOf<{ id: string }>(got);
-    await assertPartsAreHeads(db, parts, { sees: 'whole' });
+    const parts = await partsOf<{
+        id: string;
+        identity_id: string;
+    }>(got);
+    await assertPartsAreHeads(
+        db, parts, await membershipJoinReader(db, parts),
+    );
     for (const part of parts) {
         await assertPartIsDocumentGet(
             db, token, part,
@@ -849,12 +854,17 @@ Deno.test('a removed membership is no part of the'
     await seedSeat(db, STARK, id, 'member');
     const token = await organizationToken();
     const acceptedOf = async (): Promise<string[]> => {
-        const parts = await partsOf<{ identity_id: string }>(
+        const parts = await partsOf<{
+            id: string;
+            identity_id: string;
+        }>(
             await handleRequest(db, apiRequest({
                 method: 'GET', path: ACCEPTED, token,
             })),
         );
-        await assertPartsAreHeads(db, parts, { sees: 'whole' });
+        await assertPartsAreHeads(
+            db, parts, await membershipJoinReader(db, parts),
+        );
         return parts
             .map((part) => part.body().toValue().identity_id)
             .filter((seated) => seated === id);

@@ -214,8 +214,8 @@ Deno.test(
             // A collection read records its path, then answers
             // the flow's one work-order join, the one work
             // order, and empty members, former members, agents,
-            // and versions; any other collection path is a
-            // fault.
+            // services, and versions; any other collection
+            // path is a fault.
             GETCollection: async (path: string) => {
                 paths.push(path);
                 if (
@@ -239,7 +239,10 @@ Deno.test(
                     || path.endsWith(
                         '/memberships/?state=removed',
                     )
-                    || path === 'ai-agents/'
+                    || path === 'organizations/' + organization
+                        + '/ai-agents/'
+                    || path === 'organizations/' + organization
+                        + '/services/'
                 ) {
                     return [];
                 }
