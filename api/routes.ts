@@ -1322,10 +1322,10 @@ export async function postFlowCreationOp(
     await runWrite(db, attemptFor(rows), rows);
 }
 
-// `view` is the write's transaction: one statement reads the
-// three collections, so the law judges one snapshot. A
-// removal committed after it leaves the state a removal
-// after the write leaves.
+// `view` is the write's transaction, which holds the
+// organization row shared; every roster write takes it
+// exclusive first, so the roster the law reads is the one
+// the write lands against.
 async function assertLiveFlowGraphWriteLaw(
     view: DbAdapter,
     organization: Id,
