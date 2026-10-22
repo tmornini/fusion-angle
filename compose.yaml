@@ -3,7 +3,7 @@ x-postgres-url: &postgres-url
 
 services:
     postgres:
-        image: postgres:18
+        image: postgres:18.6
         environment:
             POSTGRES_USER: fusion
             POSTGRES_DB: fusion
