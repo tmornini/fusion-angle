@@ -678,6 +678,40 @@ async () => {
     await item.body?.cancel();
 });
 
+// Below the gate a store bug can leave the system identity
+// a removed seat. The table moves a removed seat back to
+// accepted for an organization admin; the rule refuses
+// any accepted seat for it, so the reinstatement is the
+// same conflict and appends nothing.
+Deno.test('a removed system seat is never reinstated',
+async () => {
+    const { db, admin } = await seeded();
+    await seedServiceIdentity(db, SYSTEM_MEMBER_ID);
+    await landMembership(
+        db, STARK, SYSTEM_MEMBER_ID, 'removed', 'member', AT,
+    );
+    const path = nest('invitations')
+        + membershipNameOf(STARK, SYSTEM_MEMBER_ID);
+    const held = await read(db, admin, path);
+    assertStrictEquals(held.status, 200);
+    await held.body?.cancel();
+    const before = (await db.messagePairs.getAll()).length;
+    const reinstated = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path,
+        token: admin,
+        body: { state: 'accepted', type: 'member', at: AT },
+        headers: { 'If-Match': held.headers.get('ETag')! },
+    }));
+    assertStrictEquals(reinstated.status, 409);
+    assertEquals(
+        await reinstated.json(), { error: SYSTEM_SEAT },
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before,
+    );
+});
+
 // The statement declares its own identity genesis, so on
 // a seeded db it would collide with the seed's document;
 // the refusal is the rule, not the collision, and answers
