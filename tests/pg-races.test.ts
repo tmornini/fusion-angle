@@ -383,6 +383,17 @@ async function lockWaitersBlockedBy(
     return rows.map((row) => row.application_name);
 }
 
+// The two answers of a roster write raced under a flow
+// write paused after its roster read, and what ended the
+// pause: the roster write settled, or it waited on the
+// paused flow.
+interface RacedUnderPausedFlow {
+    readonly flowResponse: Response;
+    readonly rosterResponse: Response;
+    readonly settledDuringPause: boolean;
+    readonly blocked: boolean;
+}
+
 async function messagePairsAt(
     db: DbAdapter,
     collection: string,
@@ -437,6 +448,82 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const url = new URL(urlWithSearchPath(POSTGRES_URL, schema));
         url.searchParams.set('application_name', application);
         return connectPostgres(url.href);
+    };
+
+    // `flow` runs on a client of its own, paused right after
+    // its roster read; `roster` then runs on the shared pool.
+    // The pause ends when the roster write settles or waits
+    // on the paused flow, whichever the code decides; then
+    // both answer.
+    const racedUnderPausedFlow = async (
+        flow: (paused: DbAdapter) => Promise<Response>,
+        roster: () => Promise<Response>,
+    ): Promise<RacedUnderPausedFlow> => {
+        const flowSql = clientNamed(PAUSED_FLOW);
+        const probe = connectPostgres(
+            urlWithSearchPath(POSTGRES_URL, schema),
+        );
+        const seam = pausedAfterRosterRead(
+            new PostgresBackend(flowSql), ORGANIZATION,
+        );
+        const paused = new BackedDbAdapter(
+            seam.backend,
+            async () => {},
+            async () => {},
+            () => {},
+        );
+        try {
+            const flowAnswer = flow(paused);
+            const early = await Promise.race([
+                seam.readDone.then(() => undefined),
+                flowAnswer,
+            ]);
+            if (early !== undefined) {
+                throw new Error(
+                    'the flow write answered ' + early.status
+                    + ' before its roster read',
+                );
+            }
+            const rosterAnswer = roster();
+            let settled = false;
+            rosterAnswer.then(
+                () => {
+                    settled = true;
+                },
+                () => {
+                    settled = true;
+                },
+            );
+            let blocked = false;
+            let probes = 0;
+            while (!settled && !blocked) {
+                if (probes === PROBE_LIMIT) {
+                    throw new Error(
+                        'the roster write neither settled nor'
+                        + ' waited on the paused flow within '
+                        + String(PROBE_LIMIT) + ' probes',
+                    );
+                }
+                probes += 1;
+                blocked = (
+                    await lockWaitersBlockedBy(probe, PAUSED_FLOW)
+                ).length > 0;
+            }
+            const settledDuringPause = settled;
+            seam.release();
+            const [flowResponse, rosterResponse] =
+                await Promise.all([flowAnswer, rosterAnswer]);
+            return {
+                flowResponse,
+                rosterResponse,
+                settledDuringPause,
+                blocked,
+            };
+        } finally {
+            seam.release();
+            await flowSql.end();
+            await probe.end();
+        }
     };
 
     Deno.test.beforeAll(async () => {
@@ -642,10 +729,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
     });
 
-    // The flow PUT pauses right after its roster read, on a
-    // client of its own; the seat removal then runs on the
-    // shared pool. The pause ends when the removal settles or
-    // waits on the paused flow, whichever the code decides.
     // Either history is serializable: the law refused the
     // flow, or the flow's head precedes the removal's.
     Deno.test('a seat removal under a paused flow PUT lands'
@@ -667,22 +750,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const membership = membershipNameOf(
             ORGANIZATION, agentId,
         );
-        const flowSql = clientNamed(PAUSED_FLOW);
-        const probe = connectPostgres(
-            urlWithSearchPath(POSTGRES_URL, schema),
-        );
-        const seam = pausedAfterRosterRead(
-            new PostgresBackend(flowSql), ORGANIZATION,
-        );
-        const paused = new BackedDbAdapter(
-            seam.backend,
-            async () => {},
-            async () => {},
-            () => {},
-        );
         const flowId = generateIdentifier();
-        try {
-            const flow = handleRequest(paused, req(
+        const raced = await racedUnderPausedFlow(
+            (paused) => handleRequest(paused, req(
                 'PUT', FLOW_PREFIX + flowId, token,
                 flowDocumentOf(
                     'Raced agent',
@@ -691,83 +761,41 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 ),
                 { 'if-none-match': '*' },
                 generateIdentifier(),
-            ));
-            const early = await Promise.race([
-                seam.readDone.then(() => undefined),
-                flow,
-            ]);
-            if (early !== undefined) {
-                throw new Error(
-                    'flow PUT answered ' + early.status
-                    + ' before its roster read',
-                );
-            }
-            const removal = handleRequest(db, req(
+            )),
+            () => handleRequest(db, req(
                 'PUT', INVITATIONS_PREFIX + membership, token,
                 { state: 'removed', at: REMOVED_AT },
                 { 'if-match': etag },
                 generateIdentifier(),
-            ));
-            let settled = false;
-            removal.then(
-                () => {
-                    settled = true;
-                },
-                () => {
-                    settled = true;
-                },
-            );
-            let blocked = false;
-            let probes = 0;
-            while (!settled && !blocked) {
-                if (probes === PROBE_LIMIT) {
-                    throw new Error(
-                        'the removal neither settled nor waited'
-                        + ' on the paused flow within '
-                        + String(PROBE_LIMIT) + ' probes',
-                    );
-                }
-                probes += 1;
-                blocked = (
-                    await lockWaitersBlockedBy(probe, PAUSED_FLOW)
-                ).length > 0;
-            }
-            const settledDuringPause = settled;
-            seam.release();
-            const [flowResponse, removalResponse] =
-                await Promise.all([flow, removal]);
-            assertStrictEquals(removalResponse.status, 200);
-            const removalHead = await db.messagePairs
-                .getHeadPair(MEMBERSHIPS_PATH, membership);
-            assert(removalHead !== null);
-            const flowHead = await db.messagePairs
-                .getHeadPair(FLOW_PREFIX, flowId);
-            if (flowResponse.status === 400) {
-                assertEquals(await flowResponse.json(), {
-                    error: 'agentIds must name a live AI agent',
-                });
-                assertStrictEquals(flowHead, null);
-                return;
-            }
-            assertStrictEquals(flowResponse.status, 201);
-            assert(flowHead !== null);
-            assert(
-                flowHead.response_at < removalHead.response_at,
-                'flow PUT landed at ' + flowHead.response_at
-                    + ', after the seat removal at '
-                    + removalHead.response_at
-                    + ': the law judged a roster the removal'
-                    + ' had already left (the removal settled'
-                    + ' during the pause: '
-                    + String(settledDuringPause)
-                    + '; it waited on the paused flow: '
-                    + String(blocked) + ')',
-            );
-        } finally {
-            seam.release();
-            await flowSql.end();
-            await probe.end();
+            )),
+        );
+        assertStrictEquals(raced.rosterResponse.status, 200);
+        const removalHead = await db.messagePairs
+            .getHeadPair(MEMBERSHIPS_PATH, membership);
+        assert(removalHead !== null);
+        const flowHead = await db.messagePairs
+            .getHeadPair(FLOW_PREFIX, flowId);
+        if (raced.flowResponse.status === 400) {
+            assertEquals(await raced.flowResponse.json(), {
+                error: 'agentIds must name a live AI agent',
+            });
+            assertStrictEquals(flowHead, null);
+            return;
         }
+        assertStrictEquals(raced.flowResponse.status, 201);
+        assert(flowHead !== null);
+        assert(
+            flowHead.response_at < removalHead.response_at,
+            'flow PUT landed at ' + flowHead.response_at
+                + ', after the seat removal at '
+                + removalHead.response_at
+                + ': the law judged a roster the removal'
+                + ' had already left (the removal settled'
+                + ' during the pause: '
+                + String(raced.settledDuringPause)
+                + '; it waited on the paused flow: '
+                + String(raced.blocked) + ')',
+        );
     });
 
     // The seat removal pauses right after taking its
