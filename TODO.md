@@ -1753,6 +1753,31 @@ Off the critical path; each with its oracle.
   machines, and `./test browser` has been green on one
   machine only. Add it if two machines disagree.
   Oracle: `./test browser` green on two machines
+- Browser profile removal races Chrome's exit —
+  `Browser.close()` (`tests/browser/fixtures.ts`,
+  ~:480-498) closes the CDP socket, calls
+  `killProcessTree(this.chrome)`
+  (`web-app/app/cdp-client.ts:115`, SIGTERM then
+  SIGKILL to the descendants and the child; it never
+  awaits exit), then `Deno.removeSync(this.userDataDir,
+  { recursive: true })`. A Chrome still exiting writes
+  into the profile mid-removal, which throws
+  `Directory not empty (os error 66)` as an uncaught
+  error from `useBrowser`'s `afterAll` and fails the
+  file though every test in it passed. Seen 2026-10-22
+  on Deno 2.9.8: `./test browser` 54 passed, 1 failed
+  (`tests/browser/canvas-keyboard.test.ts`), then 54/0
+  on an immediate re-run at the same commit. Two
+  `fusion-browser-*` profiles sat in `$TMPDIR`: that
+  run's (174 files, the removal aborted early) and one
+  dated 2026-09-16, so the race predates the 2.9.8
+  bump; the removal took this shape in `6378558e`
+  (node's `rmSync` raced the same way). Fix: `close()`
+  awaits the child's exit status after the kill and
+  before the removal, and a failed removal leaves no
+  profile behind or is reported, never silent. Oracle:
+  N consecutive `./test browser` runs green with no
+  `fusion-browser-*` profile left in `$TMPDIR`.
 - No error-message allowlist. `safeErrorMessage`
   (`server/postgres-gate.ts:101-121`) prints a message
   only if a set names it, else `seed failed` (seed,
