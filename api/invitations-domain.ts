@@ -7,6 +7,7 @@ import {
     HTTP_NOT_FOUND,
 } from '../shared/http-errors.ts';
 import {
+    SYSTEM_MEMBER_ID,
     ValidationError,
     nowUtc,
     type Id,
@@ -19,6 +20,7 @@ import {
     assertOnlyKeys,
     type MembershipCreate,
     SERVICE_ADMIN_REFUSAL,
+    SYSTEM_SEAT_REFUSAL,
     validateMembershipCreateBody,
     validateMembershipRequest,
     validateTimestampField,
@@ -768,6 +770,14 @@ export async function postOrganizationMembership(
     }
     const organizationId = param(params, 0);
     const created = validateMembershipCreateBody(payload);
+    // The system identity authors the seed and holds no
+    // seat. The statement's own identity genesis would
+    // collide with the seed's document; the rule answers
+    // first, so the refusal names it and depends on no
+    // seed.
+    if (created.id === SYSTEM_MEMBER_ID) {
+        throw new ApiError(SYSTEM_SEAT_REFUSAL, HTTP_CONFLICT);
+    }
     const name = membershipNameOf(
         organizationId, created.id,
     );
@@ -998,6 +1008,16 @@ async function putMembership(
         return servedHead(head, received.requestId);
     }
     const next = settledMembership(outcome.next);
+    // The system identity authors the seed and holds no
+    // seat in any organization. Its document is the seed's,
+    // so the absent-identity rule below would not speak;
+    // its genesis is a conflict, refused before any read.
+    if (
+        from === null
+        && parsed.identityId === SYSTEM_MEMBER_ID
+    ) {
+        throw new ApiError(SYSTEM_SEAT_REFUSAL, HTTP_CONFLICT);
+    }
     // One identity read serves two refusals. A seat names
     // an identity with its document (memberGeneses and
     // postBootstrapIn write both), so a genesis naming an

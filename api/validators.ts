@@ -2022,6 +2022,9 @@ export const SERVICE_ADMIN_REFUSAL =
     'an AI or service member cannot be an organization'
     + ' admin';
 
+export const SYSTEM_SEAT_REFUSAL =
+    'the system identity cannot hold a seat';
+
 // The kind is read first and never defaulted: a body that
 // names none is refused, not read as a human.
 export function validateMembershipCreateBody(

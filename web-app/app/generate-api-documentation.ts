@@ -699,7 +699,8 @@ function statusCodesFor(
     // DELETE room. The item still answers 405.
     if (isMembershipItem(uri)) codes.push(405);
     // A transition outside the table, the last accepted
-    // admin, and a repeated accept, decline, or revoke.
+    // admin, a repeated accept, decline, or revoke, a seat
+    // for the system identity, and the statement's resend.
     if (isMembershipConflict(verb, uri)) codes.push(409);
     const family = versionFamily(row);
     // State families, and any family whose document route
@@ -772,7 +773,10 @@ function isMembershipConflict(
         return true;
     }
     return verb === 'post'
-        && uri === '/organizations/:id/invitations/';
+        && (
+            uri === '/organizations/:id/invitations/'
+            || uri === '/organizations/:id/memberships/'
+        );
 }
 
 // The three lines of one stored pair, on a 2xx. A
