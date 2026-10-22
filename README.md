@@ -37,12 +37,12 @@ Deno + Postgres, pages and API on one origin,
 ## Getting Started
 
 ```sh
-curl -fsSL https://deno.land/install.sh | sh -s v2.9.6
+curl -fsSL https://deno.land/install.sh | sh -s v2.9.8
 git clone <repo-url>
 cd fusion-angle
 ```
 
-[Deno](https://deno.com) 2.9.6 runs `./test`,
+[Deno](https://deno.com) 2.9.8 runs `./test`,
 `./test validate`, `./bin/build`, `./test browser`,
 `./bin/measure`, and both generators, resolving its
 own dependencies from `deno.json` and `deno.lock`.

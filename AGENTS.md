@@ -22,7 +22,7 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./bin/measure
 ```
 
-Deno 2.9.6 runs `./test`, `./test validate`,
+Deno 2.9.8 runs `./test`, `./test validate`,
 `./bin/build`, `./test browser`, `./bin/measure`,
 and both generators, each invoking the `deno` CLI
 directly. `postgres-lib`'s eight inline programs
