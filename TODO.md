@@ -2684,6 +2684,23 @@ Off the critical path; each with its oracle.
   occurrence count, a destructured or aliased `append` is
   an offender, and a scratch second `tx.append` in
   `store-history-entity.ts` turns the pin red
+- The genesis tolerance trusts any organization PUT.
+  `ownOrganizationDocumentsOf`
+  (`api/organization-hold.ts:93-112`) names every
+  organization a statement PUTs, and both twins excuse a
+  roster row whose organization has no genesis row when
+  it is named there (`takeOrganizations`,
+  `api/backend-postgres.ts:405-419`; memory `#apply`,
+  `api/backend-memory.ts:172-183`); the seed's blind
+  organization PUTs leave the latch unable to say which
+  PUT creates. A genesis row that exists is still locked,
+  so the excuse reaches only an organization no committed
+  row shows yet, and no flow can name it. Only the seed's
+  first batch composes an organization PUT with roster
+  rows today; `putLiveOrganizationDocumentOp` PUTs alone.
+  Oracle: the excuse admits only a PUT that creates the
+  genesis (supersedes the nil uuid), pinned on both twins
+  when a live writer first composes the two
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
