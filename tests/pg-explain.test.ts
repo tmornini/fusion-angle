@@ -8,6 +8,7 @@ import { connectPostgres } from
 import {
     COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
     PostgresBackend,
+    collectionHeadBatchStatement,
 } from '../api/backend-postgres.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
@@ -568,6 +569,42 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             ]);
         },
     );
+
+    // The containing entry goes first, so every line
+    // after Recursive Union is the plain entry's branch;
+    // the containing branch sorts for DISTINCT ON.
+    Deno.test('a head batch keeps each branch on its'
+    + ' single read\'s index', async () => {
+        const statement = collectionHeadBatchStatement([
+            {
+                path: BODY_INDEXED_PATH,
+                contains: {
+                    organization_id: organizationIdFor(0),
+                },
+            },
+            { path: VERSION_COLLECTION },
+        ]);
+        const plans = await sql.unsafe<
+            Record<string, unknown>
+        >('EXPLAIN\n' + statement.text, statement.parameters);
+        const text = explainText(plans);
+        assertMatch(text, /Append/);
+        assertMatch(
+            text,
+            /Bitmap Index Scan on fa_message_pairs_body/,
+        );
+        assertMatch(text, /Recursive Union/);
+        assertMatch(
+            text,
+            /Index (Only )?Scan using fa_message_pairs_document/,
+        );
+        assertMatch(
+            text,
+            /Index Scan Backward using fa_message_pairs_document/,
+        );
+        assertNoSortBeneath(text, 'Recursive Union');
+        assertNotMatch(text, /Seq Scan/);
+    });
 
     Deno.test('head pair is one backward walk under a Limit',
     async () => {

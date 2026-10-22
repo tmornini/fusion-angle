@@ -1,9 +1,11 @@
-import { assert } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
+import { BODY_INDEXED_PATH } from
+    '../api/schema-postgres.ts';
 import { ledgerFields } from './ledger-row.ts';
 
 // Live pin: a standalone store read issues one SELECT
@@ -130,6 +132,30 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 ),
                 'standalone read must SELECT',
             );
+        },
+    );
+
+    // One statement is one snapshot: a batch that looped
+    // its single reads would answer the same rows here.
+    Deno.test(
+        'a head batch reads in one statement',
+        async () => {
+            queries.length = 0;
+            const answers = await backend.read(
+                (tx) => tx.getCollectionHeadPairsBatch([
+                    { path: '/x/' },
+                    { path: '/y/' },
+                    {
+                        path: BODY_INDEXED_PATH,
+                        contains: { k: 'v' },
+                    },
+                ]),
+            );
+            assertEquals(
+                answers.map((answer) => answer.length),
+                [1, 0, 0],
+            );
+            assertEquals(queries.length, 1);
         },
     );
 }

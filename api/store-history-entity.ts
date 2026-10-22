@@ -1,5 +1,6 @@
 import {
     EntityNotFoundError,
+    type CollectionHeadRead,
     type EntityStore as EntityStoreInterface,
     type EntityValidator,
     type TxRunner,
@@ -91,6 +92,15 @@ export class HistoryEntityStore<
             (tx) => tx.getCollectionHeadPairsContaining<T>(
                 path, contains,
             ),
+        );
+    }
+
+    async getCollectionHeadPairsBatch(
+        reads: readonly CollectionHeadRead[],
+    ): Promise<T[][]> {
+        return this.#run(
+            'readonly',
+            (tx) => tx.getCollectionHeadPairsBatch<T>(reads),
         );
     }
 

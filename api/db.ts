@@ -97,6 +97,16 @@ export class UniqueConstraintError extends Error {
     }
 }
 
+// One entry of a head batch: a collection's live PUT heads,
+// or, with contains, those of its documents with a matching
+// version. Each entry keeps its single read's contract.
+export type CollectionHeadRead =
+    | { readonly path: string }
+    | {
+        readonly path: string;
+        readonly contains: Readonly<Record<string, string>>;
+    };
+
 export interface EntityStore<
     T extends { id: string },
 > {
@@ -127,6 +137,12 @@ export interface EntityStore<
         path: string,
         contains: Readonly<Record<string, string>>,
     ): Promise<T[]>;
+    // Several head reads answered by one statement, so every
+    // entry sees one snapshot: one answer per entry, in entry
+    // order, each what its single read would return.
+    getCollectionHeadPairsBatch(
+        reads: readonly CollectionHeadRead[],
+    ): Promise<T[][]>;
     getById(id: string): Promise<T>;
     // Writes the row if its id is absent and reports whether
     // it did. A later append of the same id changes nothing.
@@ -191,6 +207,11 @@ export interface Tx {
         path: string,
         contains: Readonly<Record<string, string>>,
     ): Promise<T[]>;
+    // Same contract as EntityStore: one statement, so one
+    // snapshot, however many entries.
+    getCollectionHeadPairsBatch<T extends { id: string }>(
+        reads: readonly CollectionHeadRead[],
+    ): Promise<T[][]>;
     // In-transaction notify. A read handle omits it.
     // The statement is the api's bell; this stays for a
     // caller that already holds the client.

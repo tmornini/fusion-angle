@@ -4,6 +4,7 @@ import {
 import {
     UniqueConstraintError,
     uniqueColumns,
+    type CollectionHeadRead,
     type Tx,
     type TxMode,
 } from './db.ts';
@@ -127,6 +128,60 @@ function documentRows(
     });
 }
 
+// The live PUT heads among a collection's PUT and DELETE
+// rows, one per name, as copies in (response_at, id) order.
+function liveHeadsOf(
+    documents: readonly { id: string }[],
+): { id: string }[] {
+    const heads = latestByKey(
+        documents.map(keyedByResponseAt),
+        (keyed) => String(keyed.row['name']),
+    );
+    const live: { id: string }[] = [];
+    for (const head of heads.values()) {
+        if (head.row['method'] === PUT_METHOD) {
+            live.push(head.row);
+        }
+    }
+    return live
+        .sort(byResponseAtThenId)
+        .map((row) => ({ ...row }));
+}
+
+function collectionHeadPairs(
+    buffer: readonly { id: string }[],
+    path: string,
+): { id: string }[] {
+    return liveHeadsOf(buffer.filter((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === path
+            && isDocumentMethod(rec['method']);
+    }));
+}
+
+function collectionHeadPairsContaining(
+    buffer: readonly { id: string }[],
+    path: string,
+    contains: Readonly<Record<string, string>>,
+): { id: string }[] {
+    if (path !== BODY_INDEXED_PATH) {
+        throw new Error('no body index at ' + path);
+    }
+    const names = new Set<string>();
+    for (const row of buffer) {
+        const rec = row as Record<string, unknown>;
+        if (rec['path'] !== path) continue;
+        if (!bodyContains(row, contains)) continue;
+        names.add(String(rec['name']));
+    }
+    return liveHeadsOf(buffer.filter((row) => {
+        const rec = row as Record<string, unknown>;
+        return rec['path'] === path
+            && names.has(String(rec['name']))
+            && isDocumentMethod(rec['method']);
+    }));
+}
+
 // Builds a row-granular Tx handle over a pre-loaded copy
 // of the table. The buffer IS the unit of atomicity: every
 // op mutates only the buffer, so a backend commits by
@@ -216,24 +271,7 @@ export function bufferTx(
         async getCollectionHeadPairs<
             T extends { id: string },
         >(path: string): Promise<T[]> {
-            const documents = buffer.filter((row) => {
-                const rec = row as Record<string, unknown>;
-                return rec['path'] === path
-                    && isDocumentMethod(rec['method']);
-            });
-            const heads = latestByKey(
-                documents.map(keyedByResponseAt),
-                (keyed) => String(keyed.row['name']),
-            );
-            const live: { id: string }[] = [];
-            for (const head of heads.values()) {
-                if (head.row['method'] === PUT_METHOD) {
-                    live.push(head.row);
-                }
-            }
-            return live
-                .sort(byResponseAtThenId)
-                .map((row) => ({ ...row })) as T[];
+            return collectionHeadPairs(buffer, path) as T[];
         },
         async getCollectionHeadPairsContaining<
             T extends { id: string },
@@ -241,35 +279,20 @@ export function bufferTx(
             path: string,
             contains: Readonly<Record<string, string>>,
         ): Promise<T[]> {
-            if (path !== BODY_INDEXED_PATH) {
-                throw new Error('no body index at ' + path);
-            }
-            const names = new Set<string>();
-            for (const row of buffer) {
-                const rec = row as Record<string, unknown>;
-                if (rec['path'] !== path) continue;
-                if (!bodyContains(row, contains)) continue;
-                names.add(String(rec['name']));
-            }
-            const documents = buffer.filter((row) => {
-                const rec = row as Record<string, unknown>;
-                return rec['path'] === path
-                    && names.has(String(rec['name']))
-                    && isDocumentMethod(rec['method']);
-            });
-            const heads = latestByKey(
-                documents.map(keyedByResponseAt),
-                (keyed) => String(keyed.row['name']),
-            );
-            const live: { id: string }[] = [];
-            for (const head of heads.values()) {
-                if (head.row['method'] === PUT_METHOD) {
-                    live.push(head.row);
-                }
-            }
-            return live
-                .sort(byResponseAtThenId)
-                .map((row) => ({ ...row })) as T[];
+            return collectionHeadPairsContaining(
+                buffer, path, contains,
+            ) as T[];
+        },
+        async getCollectionHeadPairsBatch<
+            T extends { id: string },
+        >(reads: readonly CollectionHeadRead[]): Promise<T[][]> {
+            return reads.map((read) => (
+                'contains' in read
+                    ? collectionHeadPairsContaining(
+                        buffer, read.path, read.contains,
+                    )
+                    : collectionHeadPairs(buffer, read.path)
+            ) as T[]);
         },
         async append<T extends { id: string }>(
             row: T,

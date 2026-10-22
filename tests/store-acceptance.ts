@@ -174,6 +174,10 @@ function orderRow(
 }
 
 const HEAD_PATH = '/head-pin/';
+// The batch pin's own paths: Postgres cases share a table.
+const BATCH_HEAD_PATH = '/head-batch-pin/';
+const OTHER_HEAD_PATH = '/head-batch-pin-other/';
+const EMPTY_HEAD_PATH = '/head-batch-pin-empty/';
 
 function pairRow(
     id: string,
@@ -636,6 +640,104 @@ export function defineStoreAcceptance(
                 .getCollectionHeadPairsContaining(
                     HEAD_PATH, { k: 'v' },
                 ),
+            Error,
+            'no body index at ' + HEAD_PATH,
+        );
+    });
+
+    Deno.test(name + ': a head batch answers each entry as'
+    + ' its single read, in entry order', async () => {
+        const { db } = await ready();
+        const json = 'application/json';
+        const id = (): string => generateIdentifier();
+        const [kept, gone1, revised1, gone2, revised2] =
+            [id(), id(), id(), id(), id()];
+        const other = id();
+        const headRows: [string, string, string, number][] = [
+            [kept, 'kept', 'PUT', 1],
+            [gone1, 'gone', 'PUT', 2],
+            [revised1, 'revised', 'PUT', 3],
+            [gone2, 'gone', 'DELETE', 4],
+            [revised2, 'revised', 'PUT', 5],
+        ];
+        for (const [rowId, docName, method, k] of headRows) {
+            await db.messagePairs.append(
+                rowId,
+                await pairRow(
+                    rowId, BATCH_HEAD_PATH, docName, method,
+                    stamp(k), k,
+                ),
+            );
+        }
+        await db.messagePairs.append(
+            other,
+            await pairRow(
+                other, OTHER_HEAD_PATH, 'other', 'PUT',
+                stamp(6), 6,
+            ),
+        );
+        const [a1, b1, c1, c2] = [id(), id(), id(), id()];
+        const bodyRows: [string, string, string, string][] = [
+            [a1, 'batch-a', 'PUT', '{"batch":"v"}'],
+            [b1, 'batch-b', 'PUT', '{"batch":"x"}'],
+            // Matches, then a DELETE head: not live.
+            [c1, 'batch-c', 'PUT', '{"batch":"v"}'],
+            [c2, 'batch-c', 'DELETE', ''],
+        ];
+        let k = 1;
+        for (const [rowId, docName, method, body] of bodyRows) {
+            await db.messagePairs.append(
+                rowId,
+                await bodyPairRow(
+                    rowId, docName, method, stamp(k), k,
+                    body, json,
+                ),
+            );
+            k += 1;
+        }
+        const contains = { batch: 'v' };
+        const batch = await db.messagePairs
+            .getCollectionHeadPairsBatch([
+                { path: BATCH_HEAD_PATH },
+                { path: BODY_INDEXED_PATH, contains },
+                { path: OTHER_HEAD_PATH },
+                { path: EMPTY_HEAD_PATH },
+            ]);
+        assertEquals(
+            batch.map((entry) => entry.map((row) => row.id)),
+            [[kept, revised2], [a1], [other], []],
+        );
+        assertEquals(batch, [
+            await db.messagePairs
+                .getCollectionHeadPairs(BATCH_HEAD_PATH),
+            await db.messagePairs
+                .getCollectionHeadPairsContaining(
+                    BODY_INDEXED_PATH, contains,
+                ),
+            await db.messagePairs
+                .getCollectionHeadPairs(OTHER_HEAD_PATH),
+            await db.messagePairs
+                .getCollectionHeadPairs(EMPTY_HEAD_PATH),
+        ]);
+    });
+
+    Deno.test(name + ': an empty head batch answers no'
+    + ' entries', async () => {
+        const { db } = await ready();
+        assertEquals(
+            await db.messagePairs.getCollectionHeadPairsBatch([]),
+            [],
+        );
+    });
+
+    Deno.test(name + ': a head batch refuses a containing'
+    + ' entry with no body index', async () => {
+        const { db } = await ready();
+        await assertRejects(
+            () => db.messagePairs.getCollectionHeadPairsBatch([
+                { path: OTHER_HEAD_PATH },
+                { path: HEAD_PATH, contains: { k: 'v' } },
+            ]),
             Error,
             'no body index at ' + HEAD_PATH,
         );
