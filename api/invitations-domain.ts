@@ -1011,9 +1011,11 @@ async function putMembership(
     // The system identity authors the seed and holds no
     // seat in any organization. Its document is the seed's,
     // so the absent-identity rule below would not speak;
-    // its genesis is a conflict, refused before any read.
+    // a genesis or a reinstatement to accepted is a
+    // conflict, refused before the identity read. A
+    // removal stays open, so such a seat can be cleared.
     if (
-        from === null
+        next.state === 'accepted'
         && parsed.identityId === SYSTEM_MEMBER_ID
     ) {
         throw new ApiError(SYSTEM_SEAT_REFUSAL, HTTP_CONFLICT);
