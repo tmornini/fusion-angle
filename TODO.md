@@ -2712,6 +2712,15 @@ Off the critical path; each with its oracle.
   derive module into the hold inverts the dependency
   direction. Oracle: one exported constant in a module
   all four import, and no other literal of the path
+- The hold's program path parse takes any organization.
+  `programOrganizationOf` (`api/organization-hold.ts:76-91`)
+  returns the path's organization segment unchecked,
+  where the membership branch checks its half with
+  `isIdentifier`. A malformed segment fails loud at the
+  lock, as `noOrganizationDocument`, never silently.
+  Oracle: the parse returns only an identifier, pinned
+  in `tests/organization-hold.test.ts`, with a case for a
+  path of the wrong segment count
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
