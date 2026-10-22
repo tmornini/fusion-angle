@@ -40,8 +40,9 @@ import {
 } from '../api/advisory-lock.ts';
 
 // Live Postgres races: first-writer, If-Match, a second
-// genesis, a seat removal under a flow PUT, and a flow PUT
-// under a seat removal. Skip when POSTGRES_URL is unset so
+// genesis, a seat removal under a flow PUT, a flow PUT
+// under a seat removal, and a program member created under
+// a flow write. Skip when POSTGRES_URL is unset so
 // ./validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
@@ -51,6 +52,10 @@ const REMOVED_AT = '2026-01-01T00:00:01.000000Z';
 const ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 const IDEA_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FLOW_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/';
+const AI_AGENTS_PREFIX =
+    '/organizations/' + ORGANIZATION + '/ai-agents/';
+const SERVICES_PREFIX =
+    '/organizations/' + ORGANIZATION + '/services/';
 const MEMBERSHIPS_ROUTE =
     '/organizations/' + ORGANIZATION + '/memberships/';
 const INVITATIONS_PREFIX =
@@ -203,7 +208,41 @@ function flowDocumentOf(
     };
 }
 
+// A create whose one node seats `memberId`: the graph the
+// law judges is reduced from the delta.
+function flowCreateSeating(
+    id: string,
+    memberId: string,
+): Record<string, unknown> {
+    const nodeId = generateIdentifier();
+    return {
+        ...flowCreate(id),
+        graphDelta: {
+            ...emptyDelta(),
+            nodes: [{
+                id: nodeId,
+                flow_id: id,
+                name: 'Step',
+                position_x: 0,
+                position_y: 0,
+                is_create: true,
+                is_archive: false,
+                task_instructions: '',
+                at: AT,
+            }],
+            memberEvents: [{
+                id: generateIdentifier(),
+                flow_node_id: nodeId,
+                member_id: memberId,
+                action: 'added',
+                at: AT,
+            }],
+        },
+    };
+}
+
 function graphNode(
+    memberIds: readonly string[],
     agentIds: readonly string[],
 ): Record<string, unknown> {
     return {
@@ -213,7 +252,7 @@ function graphNode(
         positionY: 0,
         isCreate: false,
         isArchive: false,
-        memberIds: [],
+        memberIds,
         agentIds,
         attributes: [],
         taskInstructions: '',
@@ -226,6 +265,30 @@ function agentFields(name: string): Record<string, unknown> {
         description: 'A standing agent',
         skill_focus: 'drafting',
         model: firstProviderModel().id,
+    };
+}
+
+function aiMember(
+    id: string,
+    name: string,
+): Record<string, unknown> {
+    return {
+        id,
+        kind: 'ai',
+        membership: { type: 'member', at: AT },
+        ai: agentFields(name),
+    };
+}
+
+function serviceMember(id: string): Record<string, unknown> {
+    return {
+        id,
+        kind: 'service',
+        membership: { type: 'member', at: AT },
+        service: {
+            name: 'Raced service',
+            description: 'A standing service',
+        },
     };
 }
 
@@ -737,12 +800,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const agentId = generateIdentifier();
         const created = await handleRequest(db, req(
             'POST', MEMBERSHIPS_ROUTE, token,
-            {
-                id: agentId,
-                kind: 'ai',
-                membership: { type: 'member', at: AT },
-                ai: agentFields('Raced agent'),
-            },
+            aiMember(agentId, 'Raced agent'),
         ));
         assertStrictEquals(created.status, 201);
         const etag = created.headers.get('ETag');
@@ -757,7 +815,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 flowDocumentOf(
                     'Raced agent',
                     generateIdentifier(),
-                    { nodes: [graphNode([agentId])], edges: [] },
+                    {
+                        nodes: [graphNode([], [agentId])],
+                        edges: [],
+                    },
                 ),
                 { 'if-none-match': '*' },
                 generateIdentifier(),
@@ -811,12 +872,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const agentId = generateIdentifier();
         const created = await handleRequest(db, req(
             'POST', MEMBERSHIPS_ROUTE, token,
-            {
-                id: agentId,
-                kind: 'ai',
-                membership: { type: 'member', at: AT },
-                ai: agentFields('Taken agent'),
-            },
+            aiMember(agentId, 'Taken agent'),
         ));
         assertStrictEquals(created.status, 201);
         const etag = created.headers.get('ETag');
@@ -868,7 +924,10 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 flowDocumentOf(
                     'Taken agent',
                     generateIdentifier(),
-                    { nodes: [graphNode([agentId])], edges: [] },
+                    {
+                        nodes: [graphNode([], [agentId])],
+                        edges: [],
+                    },
                 ),
                 { 'if-none-match': '*' },
                 generateIdentifier(),
@@ -947,5 +1006,129 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             await flowSql.end();
             await probe.end();
         }
+    });
+
+    // The serializable histories of a program member created
+    // under a paused flow write: the law refused the flow, or
+    // the flow's head precedes the program's document.
+    const assertProgramFollowsFlow = async (
+        raced: RacedUnderPausedFlow,
+        flowId: string,
+        programPath: string,
+        programId: string,
+    ): Promise<void> => {
+        assertStrictEquals(raced.rosterResponse.status, 201);
+        const programHead = await db.messagePairs
+            .getHeadPair(programPath, programId);
+        assert(programHead !== null);
+        const flowHead = await db.messagePairs
+            .getHeadPair(FLOW_PREFIX, flowId);
+        if (raced.flowResponse.status === 400) {
+            assertEquals(await raced.flowResponse.json(), {
+                error: 'memberIds may name person identities'
+                    + ' only, not AI agents or services',
+            });
+            assertStrictEquals(flowHead, null);
+            return;
+        }
+        assertStrictEquals(raced.flowResponse.status, 201);
+        assert(flowHead !== null);
+        assert(
+            flowHead.response_at < programHead.response_at,
+            'flow write landed at ' + flowHead.response_at
+                + ', after the program document at '
+                + programHead.response_at
+                + ': the law judged a roster the program had'
+                + ' not yet joined (the creation settled'
+                + ' during the pause: '
+                + String(raced.settledDuringPause)
+                + '; it waited on the paused flow: '
+                + String(raced.blocked) + ')',
+        );
+    };
+
+    // A fresh id in memberIds names no program, so the law
+    // admits it; the membership POST then makes it an AI
+    // member in one statement with its seat.
+    Deno.test('an AI member created under a paused flow PUT'
+    + ' follows it or refuses it', async () => {
+        const token = await organizationToken();
+        const memberId = generateIdentifier();
+        const flowId = generateIdentifier();
+        const raced = await racedUnderPausedFlow(
+            (paused) => handleRequest(paused, req(
+                'PUT', FLOW_PREFIX + flowId, token,
+                flowDocumentOf(
+                    'Raced member',
+                    generateIdentifier(),
+                    {
+                        nodes: [graphNode([memberId], [])],
+                        edges: [],
+                    },
+                ),
+                { 'if-none-match': '*' },
+                generateIdentifier(),
+            )),
+            () => handleRequest(db, req(
+                'POST', MEMBERSHIPS_ROUTE, token,
+                aiMember(memberId, 'Raced member'),
+            )),
+        );
+        await assertProgramFollowsFlow(
+            raced, flowId, AI_AGENTS_PREFIX, memberId,
+        );
+    });
+
+    // The create reads the same three collections in its
+    // own transaction, so the same window would open there.
+    Deno.test('an AI member created under a paused flow create'
+    + ' follows it or refuses it', async () => {
+        const token = await organizationToken();
+        const memberId = generateIdentifier();
+        const flowId = generateIdentifier();
+        const raced = await racedUnderPausedFlow(
+            (paused) => handleRequest(paused, req(
+                'POST', FLOW_PREFIX, token,
+                flowCreateSeating(flowId, memberId),
+            )),
+            () => handleRequest(db, req(
+                'POST', MEMBERSHIPS_ROUTE, token,
+                aiMember(memberId, 'Raced member'),
+            )),
+        );
+        await assertProgramFollowsFlow(
+            raced, flowId, AI_AGENTS_PREFIX, memberId,
+        );
+    });
+
+    // A service member is the other program the law bars
+    // from memberIds; its document lives under services/.
+    Deno.test('a service member created under a paused flow'
+    + ' PUT follows it or refuses it', async () => {
+        const token = await organizationToken();
+        const memberId = generateIdentifier();
+        const flowId = generateIdentifier();
+        const raced = await racedUnderPausedFlow(
+            (paused) => handleRequest(paused, req(
+                'PUT', FLOW_PREFIX + flowId, token,
+                flowDocumentOf(
+                    'Raced service',
+                    generateIdentifier(),
+                    {
+                        nodes: [graphNode([memberId], [])],
+                        edges: [],
+                    },
+                ),
+                { 'if-none-match': '*' },
+                generateIdentifier(),
+            )),
+            () => handleRequest(db, req(
+                'POST', MEMBERSHIPS_ROUTE, token,
+                serviceMember(memberId),
+            )),
+        );
+        await assertProgramFollowsFlow(
+            raced, flowId, SERVICES_PREFIX, memberId,
+        );
     });
 }
