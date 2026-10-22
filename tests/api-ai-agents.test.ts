@@ -670,3 +670,99 @@ Deno.test('a flow PUT reads its agents in the transaction'
             + flowAt + ', after the removal at ' + removalAt,
     );
 });
+
+// A create body whose one node seats `memberId`: a create
+// graph carries no agentIds, so its law reads only whether
+// a memberIds entry names a program.
+function flowCreateBody(flowId: string, memberId: string) {
+    const nodeId = generateIdentifier();
+    return {
+        id: flowId,
+        flow: {
+            name: 'Raced create',
+            is_locked: false,
+            is_auto_layout: false,
+            is_auto_fit: false,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        },
+        projectFlowId: generateIdentifier(),
+        projectFlow: {
+            project_id: 'pnXmXrxOWayANgDLdCjuBw',
+            flow_id: flowId,
+            at: AT,
+        },
+        initialState: 'active',
+        initialStateEventId: generateIdentifier(),
+        initialStateAt: AT,
+        graphDelta: {
+            ...emptyDelta(),
+            nodes: [{
+                id: nodeId,
+                flow_id: flowId,
+                name: 'Step',
+                position_x: 0,
+                position_y: 0,
+                is_create: true,
+                is_archive: false,
+                task_instructions: '',
+                at: AT,
+            }],
+            memberEvents: [{
+                id: generateIdentifier(),
+                flow_node_id: nodeId,
+                member_id: memberId,
+                action: 'added',
+                at: AT,
+            }],
+        },
+    };
+}
+
+// The create's law reads share its write's transaction, so
+// an AI made in that window cannot slip into memberIds: the
+// POST is refused, or its flow head precedes the AI.
+Deno.test('a flow create reads its programs in the'
++ ' transaction it writes in', async () => {
+    const hooked = membershipReadHooked(STARK);
+    const db = new BackedDbAdapter(
+        hooked.backend,
+        async () => {},
+        async () => {},
+        () => {},
+    );
+    await seedAdminSchema(db);
+    const id = generateIdentifier();
+    const creation = async () => {
+        await postMember(db, {
+            id,
+            kind: 'ai',
+            membership: { type: 'member', at: AT },
+            ai: agentFields('Raced program'),
+        });
+    };
+    hooked.arm(creation);
+    const flowId = generateIdentifier();
+    const res = await handleRequest(db, apiRequest({
+        method: 'POST',
+        path: '/organizations/' + STARK + '/flows/',
+        token: await organizationToken(),
+        body: flowCreateBody(flowId, id),
+    }));
+    await res.body?.cancel();
+    // Unfired, the AI follows the POST, as it would had it
+    // arrived after the write.
+    await hooked.take()?.();
+    const rows = await db.messagePairs.getAll();
+    const flowAt = rows.findIndex((row) =>
+        row.path === canonicalPath(STARK, '/flows/')
+        && row.name === flowId);
+    const programAt = rows.findIndex((row) =>
+        row.path === canonicalPath(STARK, '/ai-agents/')
+        && row.name === id);
+    assert(
+        res.status === 400
+            || (flowAt >= 0 && flowAt < programAt),
+        'flow POST answered ' + res.status + ' and landed at '
+            + flowAt + ', after the AI at ' + programAt,
+    );
+});
