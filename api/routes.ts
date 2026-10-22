@@ -93,6 +93,7 @@ import {
 import { asObject } from '../shared/json-assert.ts';
 import {
     attemptFor,
+    isStalePairLatch,
     runWrite,
     runStateWrite,
     formStateWrite,
@@ -1392,18 +1393,32 @@ export async function postFlowDocumentOp(
     // states-trace strip; pair body also carries
     // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
     // The statement judges the received PUT's own tag.
+    // Preconditions precede the content (RFC 9110 §13.2.2):
+    // a latch the head already refuses skips the law, and
+    // the statement answers it. A stale verdict stays stale:
+    // pair ids are minted fresh, and a flow takes no DELETE
+    // (pinned by that name in tests/api-ai-agents.test.ts).
     await backed.backend.transaction('readwrite', async (tx) => {
         const view = backed.clientOn(tx);
-        await assertLiveFlowGraphWriteLaw(
-            view, organizationId, graph,
+        if (messagePair === undefined) {
+            await assertLiveFlowGraphWriteLaw(
+                view, organizationId, graph,
+            );
+            return;
+        }
+        const head = await view.messagePairs.getHead(
+            messagePair.path, messagePair.name,
         );
-        if (messagePair !== undefined) {
-            await runWrite(
-                view,
-                attemptFor([messagePair]),
-                [messagePair],
+        if (!isStalePairLatch(messagePair, head)) {
+            await assertLiveFlowGraphWriteLaw(
+                view, organizationId, graph,
             );
         }
+        await runWrite(
+            view,
+            attemptFor([messagePair]),
+            [messagePair],
+        );
     });
     return { id, ...entity };
 }

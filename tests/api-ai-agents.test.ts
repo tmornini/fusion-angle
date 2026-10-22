@@ -915,3 +915,33 @@ Deno.test('a current flow PUT still answers the'
     });
     assertStrictEquals(fixture.batches(), before + 1);
 });
+
+// postFlowDocumentOp skips the law for an If-None-Match: *
+// PUT over a PUT head, a verdict that stays stale only while
+// no DELETE can land at a flow. A flow DELETE breaks this
+// pin: revisit that skip before landing one.
+Deno.test('a flow takes no DELETE, which the'
++ ' If-None-Match: * skip relies on', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const path = '/organizations/' + STARK + '/flows/'
+        + generateIdentifier();
+    const live = await etagOf(await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path,
+        token,
+        body: flowDocument('Flow', generateIdentifier(), {
+            nodes: [],
+            edges: [],
+        }),
+        headers: { 'if-none-match': '*' },
+    })), 201);
+    const deleted = await handleRequest(db, apiRequest({
+        method: 'DELETE',
+        path,
+        token,
+        headers: { 'If-Match': live },
+    }));
+    await deleted.body?.cancel();
+    assertStrictEquals(deleted.status, 405);
+});

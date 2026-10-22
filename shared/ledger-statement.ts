@@ -192,28 +192,39 @@ function supersedesOf(head: Head | null): string {
 }
 
 // A nil latch is a declared genesis: it may not land over
-// a live document, and it never matches one. A
-// never-written latch may not land over a tombstone either:
-// the name is spent. Only a PUT or DELETE is a version of
-// its document, so only it can match the head.
+// a live document. A never-written latch may not land over
+// a tombstone either: the name is spent. Any other latch
+// holds only while it names the head.
+export function isStaleLatch(
+    ifMatch: string | null,
+    head: Pick<Head, 'id' | 'method'> | null,
+): boolean {
+    if (ifMatch === NEVER_WRITTEN_IDENTIFIER) {
+        return head !== null;
+    }
+    if (ifMatch === NIL_IDENTIFIER) {
+        return head !== null && head.method === 'PUT';
+    }
+    return ifMatch !== null
+        && (head === null || head.id !== ifMatch);
+}
+
+// A genesis latch never matches the head. Only a PUT or
+// DELETE is a version of its document, so only it can
+// match the head.
 function rawOutcome(
     row: StatementRow,
     head: Head | null,
     response: Uint8Array,
 ): Outcome {
-    if (row.ifMatch === NEVER_WRITTEN_IDENTIFIER) {
-        return head === null ? 'land' : 'stale';
-    }
-    if (row.ifMatch === NIL_IDENTIFIER) {
-        return head !== null && head.method === 'PUT'
-            ? 'stale'
-            : 'land';
+    if (isStaleLatch(row.ifMatch, head)) {
+        return 'stale';
     }
     if (
-        row.ifMatch !== null
-        && (head === null || head.id !== row.ifMatch)
+        row.ifMatch === NEVER_WRITTEN_IDENTIFIER
+        || row.ifMatch === NIL_IDENTIFIER
     ) {
-        return 'stale';
+        return 'land';
     }
     if (
         head !== null
