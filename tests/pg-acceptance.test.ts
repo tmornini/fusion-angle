@@ -86,9 +86,15 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     });
 
     defineStoreAcceptance('postgres', async () => {
-        // Fresh tables each case. hasSchema after
-        // deleteSchema throws (loud miss) — do not probe.
-        await backend.deleteSchema();
+        // Fresh tables each case: drop and recreate this
+        // file's private schema. backend.deleteSchema()
+        // resets the public schema, not this one.
+        await sql.unsafe(
+            'DROP SCHEMA ' + quoteIdent(schema) + ' CASCADE',
+        );
+        await sql.unsafe(
+            'CREATE SCHEMA ' + quoteIdent(schema),
+        );
         await backend.ensureTable();
         return new BackedDbAdapter(
             backend,
