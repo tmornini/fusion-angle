@@ -641,7 +641,7 @@ function collectionHeadsSelect(
 }
 
 // The walked heads, a small set, sort in memory.
-const COLLECTION_HEAD_PAIRS_SQL = collectionHeadsSelect(
+export const COLLECTION_HEAD_PAIRS_SQL = collectionHeadsSelect(
     '$1', HEAD_COLUMNS,
 ) + '\n' + HEADS_ORDER;
 

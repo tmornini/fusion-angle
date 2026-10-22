@@ -7,6 +7,7 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import {
     COLLECTION_HEAD_PAIRS_CONTAINING_SQL,
+    COLLECTION_HEAD_PAIRS_SQL,
     PostgresBackend,
     collectionHeadBatchStatement,
 } from '../api/backend-postgres.ts';
@@ -337,6 +338,22 @@ function assertNoSortBeneath(
     }
 }
 
+// The skip walk: one probe of the document index per
+// name, then one backward walk to each name's head.
+function assertDocumentWalkPlan(text: string): void {
+    assertMatch(text, /Recursive Union/);
+    assertMatch(
+        text,
+        /Index (Only )?Scan using fa_message_pairs_document/,
+    );
+    assertMatch(
+        text,
+        /Index Scan Backward using fa_message_pairs_document/,
+    );
+    assertNoSortBeneath(text, 'Recursive Union');
+    assertNotMatch(text, /Seq Scan/);
+}
+
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     Deno.test(
         'postgres explain skipped without POSTGRES_URL',
@@ -465,54 +482,27 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
 
     Deno.test('collection head pairs walk the document'
     + ' index one name at a time', async () => {
-        const plans = await sql.query<
+        const plans = await sql.unsafe<
             Record<string, unknown>
-        >`
-            EXPLAIN
-            WITH RECURSIVE names AS (
-                (
-                    SELECT name FROM fa_message_pairs
-                    WHERE path = ${VERSION_COLLECTION}
-                    ORDER BY name
-                    LIMIT 1
-                )
-                UNION ALL
-                SELECT (
-                    SELECT later.name FROM fa_message_pairs later
-                    WHERE later.path = ${VERSION_COLLECTION}
-                      AND later.name > names.name
-                    ORDER BY later.name
-                    LIMIT 1
-                )
-                FROM names
-                WHERE names.name IS NOT NULL
-            )
-            SELECT heads.*
-            FROM names
-            CROSS JOIN LATERAL (
-                SELECT * FROM fa_message_pairs head
-                WHERE head.path = ${VERSION_COLLECTION}
-                  AND head.name = names.name
-                  AND head.method IN ('PUT', 'DELETE')
-                ORDER BY head.response_at DESC, head.id DESC
-                LIMIT 1
-            ) heads
-            WHERE names.name IS NOT NULL
-              AND heads.method = 'PUT'
-            ORDER BY heads.response_at, heads.id
-        `;
-        const text = explainText(plans);
-        assertMatch(text, /Recursive Union/);
-        assertMatch(
-            text,
-            /Index (Only )?Scan using fa_message_pairs_document/,
+        >(
+            'EXPLAIN\n' + COLLECTION_HEAD_PAIRS_SQL,
+            [VERSION_COLLECTION],
         );
-        assertMatch(
-            text,
-            /Index Scan Backward using fa_message_pairs_document/,
+        assertDocumentWalkPlan(explainText(plans));
+    });
+
+    // The read is prepared, so after five runs it may run
+    // a generic plan, the path unknown to the planner.
+    Deno.test('collection head pairs walk the document'
+    + ' index under a generic plan', async () => {
+        const plans = await sql.unsafe<
+            Record<string, unknown>
+        >(
+            'EXPLAIN (GENERIC_PLAN)\n'
+                + COLLECTION_HEAD_PAIRS_SQL,
+            [VERSION_COLLECTION],
         );
-        assertNoSortBeneath(text, 'Recursive Union');
-        assertNotMatch(text, /Seq Scan/);
+        assertDocumentWalkPlan(explainText(plans));
     });
 
     Deno.test(
