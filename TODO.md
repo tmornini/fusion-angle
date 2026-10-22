@@ -2721,6 +2721,17 @@ Off the critical path; each with its oracle.
   Oracle: the parse returns only an identifier, pinned
   in `tests/organization-hold.test.ts`, with a case for a
   path of the wrong segment count
+- A race pin's probe cap leaves its requests in flight.
+  When `racedUnderPausedFlow`
+  (`tests/pg-races.test.ts:522-590`) or the paused-take
+  runner (`:930-1003`) throws at `PROBE_LIMIT`, the flow
+  and roster requests are still pending as `finally`
+  ends their clients, so a red pin can report their late
+  failure or a sanitizer leak beside its own message.
+  Red-only noise. Oracle: on the cap, each runner
+  releases its seams and settles both requests before it
+  ends a client, and a capped run reports the probe
+  message alone
 - The ledger root's body is JSON. `/migrations/0000-root`
   (`api/ledger-root.ts:16-17`) is the one head whose
   response body is not a JSON object: 64 hex characters of
