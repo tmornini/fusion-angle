@@ -139,10 +139,10 @@ import {
     describeTypeReferrers,
 } from './record-type-refs.ts';
 import {
-    backedWrite,
     rotateRefreshJti,
     revokeTokenChain,
 } from './authentication.ts';
+import { backedWrite } from './db-backed.ts';
 import {
     ApiError,
     HTTP_BAD_REQUEST,

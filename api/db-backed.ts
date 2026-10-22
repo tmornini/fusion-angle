@@ -167,3 +167,28 @@ export class BackedDbAdapter
         };
     }
 }
+
+// A write that reads and lands in one transaction opens the
+// client beneath the adapter. A view has no backend of its
+// own; callers pass the backed adapter the route already
+// holds.
+export function backedWrite(
+    adapter: DbAdapter,
+): {
+    readonly backend: StorageBackend;
+    readonly clientOn: (tx: Tx) => DbAdapter;
+} {
+    if (
+        !('backend' in adapter)
+        || !('clientOn' in adapter)
+    ) {
+        throw new Error(
+            'a transactional write requires a backed'
+                + ' adapter',
+        );
+    }
+    return adapter as DbAdapter & {
+        backend: StorageBackend;
+        clientOn: (tx: Tx) => DbAdapter;
+    };
+}

@@ -3,9 +3,8 @@ import {
 } from './db.ts';
 import type {
     DbAdapter,
-    StorageBackend,
-    Tx,
 } from './db.ts';
+import { backedWrite } from './db-backed.ts';
 import {
     verifyClientAssertion,
 } from './client-assertion.ts';
@@ -954,31 +953,6 @@ export async function rotateRefreshJti(
             : { kind: 'fail' as const };
     }
     return { kind: 'contended' as const };
-}
-
-// A write that reads and lands in one transaction opens the
-// client beneath the adapter. A view has no backend of its
-// own; callers pass the backed adapter the route already
-// holds.
-export function backedWrite(
-    adapter: DbAdapter,
-): {
-    readonly backend: StorageBackend;
-    readonly clientOn: (tx: Tx) => DbAdapter;
-} {
-    if (
-        !('backend' in adapter)
-        || !('clientOn' in adapter)
-    ) {
-        throw new Error(
-            'a transactional write requires a backed'
-                + ' adapter',
-        );
-    }
-    return adapter as DbAdapter & {
-        backend: StorageBackend;
-        clientOn: (tx: Tx) => DbAdapter;
-    };
 }
 
 // One revocation attempt's groundwork, outside any
