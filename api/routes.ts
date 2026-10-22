@@ -293,6 +293,7 @@ import {
     organizationDocumentsRead,
     type DocumentFamilyWiring,
 } from './document-family.ts';
+import { PROGRAM_FAMILIES } from './organization-hold.ts';
 import {
     selectIdentityOrganizations,
     putIdentityDefaultOrganization,
@@ -1332,10 +1333,12 @@ async function assertLiveFlowGraphWriteLaw(
     organization: Id,
     graph: StoredGraph,
 ): Promise<void> {
+    // PROGRAM_FAMILIES order is ai-agents, services.
     const [aiHeads, serviceHeads, membershipHeads] =
         await view.messagePairs.getCollectionHeadPairsBatch([
-            organizationDocumentsRead(organization, 'ai-agents'),
-            organizationDocumentsRead(organization, 'services'),
+            ...PROGRAM_FAMILIES.map((family) =>
+                organizationDocumentsRead(organization, family)
+            ),
             organizationMembershipsRead(organization),
         ]);
     const aiIds = liveDocumentIdsOf(aiHeads!);

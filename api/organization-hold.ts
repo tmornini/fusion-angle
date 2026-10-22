@@ -20,10 +20,14 @@ export const ORGANIZATIONS_PATH = '/organizations/';
 
 // The program families the flow law reads beside the seats;
 // their documents live at /organizations/<org>/<family>/.
-const PROGRAM_FAMILIES: ReadonlySet<string> = new Set([
+// One list serves the law's read and the roster lock, so a
+// family added here is both read and locked, never one.
+export const PROGRAM_FAMILIES: readonly string[] = [
     'ai-agents',
     'services',
-]);
+];
+const PROGRAM_FAMILY_SET: ReadonlySet<string> =
+    new Set(PROGRAM_FAMILIES);
 
 // A hold that found no row would be no hold at all.
 export function noOrganizationDocument(
@@ -78,7 +82,7 @@ function programOrganizationOf(path: string): string | undefined {
         return undefined;
     }
     const family = segments[3]!;
-    if (!PROGRAM_FAMILIES.has(family)) {
+    if (!PROGRAM_FAMILY_SET.has(family)) {
         return undefined;
     }
     return segments[2]!;
