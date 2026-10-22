@@ -123,7 +123,7 @@ function bodyContains(
 
 // The organization's genesis row, as the Postgres hold
 // selects it: path, name, the nil predecessor, PUT.
-function hasOrganizationGenesis(
+export function hasOrganizationGenesis(
     buffer: readonly { id: string }[],
     organizationId: string,
 ): boolean {

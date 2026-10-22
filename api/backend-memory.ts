@@ -4,7 +4,15 @@ import {
     type Tx,
     type TxMode,
 } from './db.ts';
-import { bufferTx } from './backend-buffer-tx.ts';
+import {
+    bufferTx,
+    hasOrganizationGenesis,
+} from './backend-buffer-tx.ts';
+import {
+    noOrganizationDocument,
+    ownOrganizationDocumentsOf,
+    rosterOrganizationsOf,
+} from './organization-hold.ts';
 import { createSerializer } from './store-serializer.ts';
 import { mintRootBind } from './ledger-root.ts';
 import { SuccessionConflict }
@@ -160,6 +168,18 @@ export class MemoryStorageBackend
         if (this.#refusals > 0) {
             this.#refusals -= 1;
             throw new SuccessionConflict();
+        }
+        // The writer's half of the organization hold, as
+        // Postgres takes it before the statement: a roster
+        // row's organization has its genesis row, or this
+        // statement is that genesis.
+        const own = ownOrganizationDocumentsOf(rows);
+        for (const organizationId of rosterOrganizationsOf(rows)) {
+            if (hasOrganizationGenesis(buffer, organizationId)) {
+                continue;
+            }
+            if (own.has(organizationId)) continue;
+            throw noOrganizationDocument(organizationId);
         }
         const clock = this.#clock(now);
         const classified = await classifyStatement(
