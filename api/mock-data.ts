@@ -570,6 +570,27 @@ async function postMockDataLoadIn(
     const aiMembers = buildAiMembers();
     const unaffiliated = buildUnaffiliatedIdentity();
 
+    // The organizations first: a seat's write refuses an
+    // organization with no document. Phase Final Task 2:
+    // organizations ROW half stripped — message-plane only
+    // (seededOrganizationBody still shapes the pair body in
+    // seed-message-pairs.ts).
+    await Promise.all(
+        [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
+            (organization) => postOrganizationDocumentOp(
+                adapter,
+                [organization],
+                seededOrganizationBody(organization),
+                SYSTEM_MEMBER_ID,
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'organizations/:id', organization,
+                    ),
+                ),
+            )),
+    );
+
     await Promise.all([
         ...members.flatMap((member, index) => {
             // 'XXZruirZyAOoRpNxaDnpSA' (the admin) joins BOTH orgs; every
@@ -759,8 +780,8 @@ async function postMockDataLoadIn(
         ideaGenesis.map(g => [g.entityId, g]),
     );
 
-    await Promise.all([
-        ...ideas.map((idea, i) => {
+    await Promise.all(
+        ideas.map((idea, i) => {
             const genesis = ideaGenesisById.get(idea.id)!;
             return postIdeaDocumentOp(
                 adapter,
@@ -772,23 +793,7 @@ async function postMockDataLoadIn(
                 ),
             );
         }),
-        // Phase Final Task 2: organizations ROW half stripped —
-        // message-plane only (seededOrganizationBody still
-        // shapes the pair body in seed-message-pairs.ts).
-        ...[STARK_ORGANIZATION, ORGANIZATION_TWO].map(
-            (organization) => postOrganizationDocumentOp(
-                adapter,
-                [organization],
-                seededOrganizationBody(organization),
-                SYSTEM_MEMBER_ID,
-                requireMessagePair(
-                    messagePairs,
-                    seedMessagePairKey(
-                        'organizations/:id', organization,
-                    ),
-                ),
-            )),
-    ]);
+    );
 
     const projects = buildProjects();
 
@@ -1296,6 +1301,15 @@ export async function postBootstrapIn(
     defaultOrganizationMessagePair: MessagePair,
     organizationMessagePair: MessagePair,
 ): Promise<void> {
+    // The organization first: its seat's write refuses an
+    // organization with no document.
+    await postOrganizationDocumentOp(
+        adapter,
+        [STARK_ORGANIZATION],
+        seededOrganizationBody(STARK_ORGANIZATION),
+        SYSTEM_MEMBER_ID,
+        organizationMessagePair,
+    );
     await Promise.all([
         postIdentityDocumentOp(
             adapter,
@@ -1339,20 +1353,11 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID, piiMessagePair,
         ),
     ]);
-    await Promise.all([
-        putIdentityDefaultOrganization(
-            adapter,
-            ['XXZruirZyAOoRpNxaDnpSA'],
-            defaultOrganizationSeedBody(STARK_ORGANIZATION),
-            'XXZruirZyAOoRpNxaDnpSA',
-            defaultOrganizationMessagePair,
-        ),
-        postOrganizationDocumentOp(
-            adapter,
-            [STARK_ORGANIZATION],
-            seededOrganizationBody(STARK_ORGANIZATION),
-            SYSTEM_MEMBER_ID,
-            organizationMessagePair,
-        ),
-    ]);
+    await putIdentityDefaultOrganization(
+        adapter,
+        ['XXZruirZyAOoRpNxaDnpSA'],
+        defaultOrganizationSeedBody(STARK_ORGANIZATION),
+        'XXZruirZyAOoRpNxaDnpSA',
+        defaultOrganizationMessagePair,
+    );
 }
