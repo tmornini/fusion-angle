@@ -293,7 +293,10 @@ import {
     organizationDocumentsRead,
     type DocumentFamilyWiring,
 } from './document-family.ts';
-import { PROGRAM_FAMILIES } from './organization-hold.ts';
+import {
+    AI_AGENTS_FAMILY,
+    PROGRAM_FAMILIES,
+} from './organization-hold.ts';
 import {
     selectIdentityOrganizations,
     putIdentityDefaultOrganization,
@@ -1333,18 +1336,25 @@ async function assertLiveFlowGraphWriteLaw(
     organization: Id,
     graph: StoredGraph,
 ): Promise<void> {
-    // PROGRAM_FAMILIES order is ai-agents, services.
-    const [aiHeads, serviceHeads, membershipHeads] =
+    const [membershipHeads, ...programHeads] =
         await view.messagePairs.getCollectionHeadPairsBatch([
+            organizationMembershipsRead(organization),
             ...PROGRAM_FAMILIES.map((family) =>
                 organizationDocumentsRead(organization, family)
             ),
-            organizationMembershipsRead(organization),
         ]);
-    const aiIds = liveDocumentIdsOf(aiHeads!);
-    const programIds = new Set([
-        ...aiIds, ...liveDocumentIdsOf(serviceHeads!),
-    ]);
+    const aiHeads = programHeads[
+        PROGRAM_FAMILIES.indexOf(AI_AGENTS_FAMILY)
+    ];
+    if (aiHeads === undefined) {
+        throw new Error('no ai-agents program family');
+    }
+    const aiIds = liveDocumentIdsOf(aiHeads);
+    const programIds = new Set(
+        programHeads.flatMap((heads) => [
+            ...liveDocumentIdsOf(heads),
+        ]),
+    );
     const accepted = headsAdmitting(
         membershipHeads!, { kind: 'state', state: 'accepted' },
     );

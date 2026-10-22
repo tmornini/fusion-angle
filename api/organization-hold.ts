@@ -22,9 +22,11 @@ export const ORGANIZATIONS_PATH = '/organizations/';
 // their documents live at /organizations/<org>/<family>/.
 // One list serves the law's read and the roster lock, so a
 // family added here is both read and locked, never one.
+export const AI_AGENTS_FAMILY = 'ai-agents';
+export const SERVICES_FAMILY = 'services';
 export const PROGRAM_FAMILIES: readonly string[] = [
-    'ai-agents',
-    'services',
+    AI_AGENTS_FAMILY,
+    SERVICES_FAMILY,
 ];
 const PROGRAM_FAMILY_SET: ReadonlySet<string> =
     new Set(PROGRAM_FAMILIES);
