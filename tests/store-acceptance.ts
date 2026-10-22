@@ -1,8 +1,7 @@
 import {
     assert, assertEquals, assertRejects, assertStrictEquals,
-    fail,
 } from '@std/assert';
-import type { DbAdapter, Tx } from '../api/db.ts';
+import type { DbAdapter } from '../api/db.ts';
 import { backedWrite } from '../api/db-backed.ts';
 import { BODY_INDEXED_PATH } from
     '../api/schema-postgres.ts';
@@ -295,25 +294,6 @@ function bindAt(
                 fields.requesterIdentityId,
         })),
     };
-}
-
-// The hold a flow write takes on its organization for the
-// length of its transaction, reached by name: a Tx without
-// it fails here naming the method, and deno check stays
-// green on the red pin.
-function organizationHoldOf(
-    tx: Tx,
-): (organization: string) => Promise<void> {
-    const hold: unknown = Reflect.get(tx, 'holdOrganization');
-    if (typeof hold !== 'function') {
-        fail(
-            'Tx has no holdOrganization: a flow write'
-            + ' cannot hold its organization',
-        );
-    }
-    return (organization) => (
-        hold as (organization: string) => Promise<void>
-    ).call(tx, organization);
 }
 
 export function defineStoreAcceptance(
@@ -1028,10 +1008,11 @@ export function defineStoreAcceptance(
         await backedWrite(db).backend.transaction(
             'readwrite',
             async (tx) => {
-                const hold = organizationHoldOf(tx);
-                await hold(ORGANIZATION);
+                await tx.holdOrganization(ORGANIZATION);
                 await assertRejects(
-                    () => hold(absent), Error, absent,
+                    () => tx.holdOrganization(absent),
+                    Error,
+                    absent,
                 );
             },
         );
