@@ -16,9 +16,8 @@ import {
 } from '../api/db.ts';
 import type {
     DbAdapter,
-    StorageBackend,
-    Tx,
 } from '../api/db.ts';
+import { backedWrite } from '../api/db-backed.ts';
 import type { Id } from '../shared/types.ts';
 import { handleRequest } from '../api/api.ts';
 import {
@@ -296,18 +295,7 @@ async function testDocumentOp(
         // steps, so two racers can both pass the gate. The
         // re-read has to share the write's transaction or
         // the statement answers first, with the stored path.
-        if (
-            !('backend' in db)
-            || !('clientOn' in db)
-        ) {
-            throw new Error(
-                'a racing write requires a backed adapter',
-            );
-        }
-        const backed = db as DbAdapter & {
-            backend: StorageBackend;
-            clientOn: (tx: Tx) => DbAdapter;
-        };
+        const backed = backedWrite(db);
         await backed.backend.transaction(
             'readwrite',
             async (tx) => {
