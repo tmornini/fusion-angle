@@ -6,9 +6,12 @@ import {
 import {
     connectPostgres,
     type SqlClient,
+    type UnsafeOptions,
 } from '../api/postgres-client.ts';
-import { PostgresBackend } from
-    '../api/backend-postgres.ts';
+import {
+    ORGANIZATION_ROW_FOR_UPDATE_SQL,
+    PostgresBackend,
+} from '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import type {
     CollectionHeadRead,
@@ -37,8 +40,9 @@ import {
 } from '../api/advisory-lock.ts';
 
 // Live Postgres races: first-writer, If-Match, a second
-// genesis, and a seat removal under a flow PUT. Skip when
-// POSTGRES_URL is unset so ./validate stays Postgres-free.
+// genesis, a seat removal under a flow PUT, and a flow PUT
+// under a seat removal. Skip when POSTGRES_URL is unset so
+// ./validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -55,6 +59,8 @@ const INVITATIONS_PREFIX =
 // probe below can tell a waiter the flow blocks from any
 // other lock wait in this database.
 const PAUSED_FLOW = 'fusion-angle-paused-flow';
+// Likewise the paused seat removal's.
+const PAUSED_ROSTER = 'fusion-angle-paused-roster';
 // A cap only a hang reaches: each probe is one round trip
 // and the code decides the outcome, so the bound is a count
 // of probes, never a timer.
@@ -304,29 +310,77 @@ function pausedAfterRosterRead(
     return { backend, readDone: read, release };
 }
 
-// Whether a backend in this database waits on a lock the
-// paused flow's backend holds. pg_stat_activity decides,
-// never elapsed time.
-async function waitsOnPausedFlow(
+// A client over `inner` that pauses once: after the query
+// whose text is the product's FOR UPDATE on an organization
+// row answers, its caller waits — its transaction, if any,
+// still open — until `release`. A transaction hands out the
+// same pausing face, so a take inside BEGIN pauses inside it.
+function pausedAfterTake(inner: SqlClient): {
+    readonly client: SqlClient;
+    readonly takeDone: Promise<void>;
+    readonly release: () => void;
+} {
+    let takeDone!: () => void;
+    const taken = new Promise<void>((resolve) => {
+        takeDone = resolve;
+    });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => {
+        release = resolve;
+    });
+    let armed = true;
+    const pausing = (client: SqlClient): SqlClient => ({
+        query: <T>(
+            strings: TemplateStringsArray,
+            ...values: readonly unknown[]
+        ): Promise<T[]> => client.query<T>(strings, ...values),
+        begin: <T>(
+            fn: (sql: SqlClient) => Promise<T>,
+            options?: string,
+        ): Promise<T> => client.begin(
+            (sql) => fn(pausing(sql)), options,
+        ),
+        unsafe: async <T>(
+            text: string,
+            parameters?: readonly unknown[],
+            options?: UnsafeOptions,
+        ): Promise<T[]> => {
+            const rows = await client.unsafe<T>(
+                text, parameters, options,
+            );
+            if (armed && text === ORGANIZATION_ROW_FOR_UPDATE_SQL) {
+                armed = false;
+                takeDone();
+                await released;
+            }
+            return rows;
+        },
+        end: () => client.end(),
+    });
+    return { client: pausing(inner), takeDone: taken, release };
+}
+
+// The application names of the backends in this database
+// waiting on a lock a backend named `holder` holds.
+// pg_stat_activity decides, never elapsed time.
+async function lockWaitersBlockedBy(
     probe: SqlClient,
-): Promise<boolean> {
-    const [row] = await probe.query<{ waiting: number }>`
-        SELECT count(*)::int AS waiting
+    holder: string,
+): Promise<string[]> {
+    const rows = await probe.query<{ application_name: string }>`
+        SELECT waiter.application_name
         FROM pg_stat_activity AS waiter
         WHERE waiter.datname = current_database()
           AND waiter.wait_event_type = 'Lock'
           AND EXISTS (
-              SELECT 1 FROM pg_stat_activity AS holder
-              WHERE holder.pid = ANY (
+              SELECT 1 FROM pg_stat_activity AS holding
+              WHERE holding.pid = ANY (
                   pg_blocking_pids(waiter.pid)
               )
-                AND holder.application_name = ${PAUSED_FLOW}
+                AND holding.application_name = ${holder}
           )
     `;
-    if (row === undefined) {
-        throw new Error('pg_stat_activity answered no row');
-    }
-    return row.waiting > 0;
+    return rows.map((row) => row.application_name);
 }
 
 async function messagePairsAt(
@@ -376,6 +430,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         async () => {},
         () => {},
     );
+
+    // A client of this schema whose backends carry
+    // `application`, for the probe to name.
+    const clientNamed = (application: string): SqlClient => {
+        const url = new URL(urlWithSearchPath(POSTGRES_URL, schema));
+        url.searchParams.set('application_name', application);
+        return connectPostgres(url.href);
+    };
 
     Deno.test.beforeAll(async () => {
         await sql.unsafe(
@@ -605,11 +667,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const membership = membershipNameOf(
             ORGANIZATION, agentId,
         );
-        const flowUrl = new URL(
-            urlWithSearchPath(POSTGRES_URL, schema),
-        );
-        flowUrl.searchParams.set('application_name', PAUSED_FLOW);
-        const flowSql = connectPostgres(flowUrl.href);
+        const flowSql = clientNamed(PAUSED_FLOW);
         const probe = connectPostgres(
             urlWithSearchPath(POSTGRES_URL, schema),
         );
@@ -670,7 +728,9 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     );
                 }
                 probes += 1;
-                blocked = await waitsOnPausedFlow(probe);
+                blocked = (
+                    await lockWaitersBlockedBy(probe, PAUSED_FLOW)
+                ).length > 0;
             }
             const settledDuringPause = settled;
             seam.release();
@@ -705,6 +765,157 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             );
         } finally {
             seam.release();
+            await flowSql.end();
+            await probe.end();
+        }
+    });
+
+    // The seat removal pauses right after taking its
+    // organization row, on a client of its own; the flow PUT
+    // then starts on another. The pause ends when the flow
+    // waits on the removal or reads its roster, whichever
+    // the code decides. A take whose statement runs outside
+    // the take's transaction holds nothing, and the flow
+    // reads a roster the removal is about to leave.
+    Deno.test('a flow PUT under a paused seat removal is'
+    + ' refused or precedes it', async () => {
+        const token = await organizationToken();
+        const agentId = generateIdentifier();
+        const created = await handleRequest(db, req(
+            'POST', MEMBERSHIPS_ROUTE, token,
+            {
+                id: agentId,
+                kind: 'ai',
+                membership: { type: 'member', at: AT },
+                ai: agentFields('Taken agent'),
+            },
+        ));
+        assertStrictEquals(created.status, 201);
+        const etag = created.headers.get('ETag');
+        assert(etag !== null);
+        const membership = membershipNameOf(
+            ORGANIZATION, agentId,
+        );
+        const rosterSql = clientNamed(PAUSED_ROSTER);
+        const rosterSeam = pausedAfterTake(rosterSql);
+        const rosterDb = new BackedDbAdapter(
+            new PostgresBackend(rosterSeam.client),
+            async () => {},
+            async () => {},
+            () => {},
+        );
+        const flowSql = clientNamed(PAUSED_FLOW);
+        const flowSeam = pausedAfterRosterRead(
+            new PostgresBackend(flowSql), ORGANIZATION,
+        );
+        const flowDb = new BackedDbAdapter(
+            flowSeam.backend,
+            async () => {},
+            async () => {},
+            () => {},
+        );
+        const probe = connectPostgres(
+            urlWithSearchPath(POSTGRES_URL, schema),
+        );
+        const flowId = generateIdentifier();
+        try {
+            const removal = handleRequest(rosterDb, req(
+                'PUT', INVITATIONS_PREFIX + membership, token,
+                { state: 'removed', at: REMOVED_AT },
+                { 'if-match': etag },
+                generateIdentifier(),
+            ));
+            const earlyRemoval = await Promise.race([
+                rosterSeam.takeDone.then(() => undefined),
+                removal,
+            ]);
+            if (earlyRemoval !== undefined) {
+                throw new Error(
+                    'seat removal answered ' + earlyRemoval.status
+                    + ' before taking its organization',
+                );
+            }
+            const flow = handleRequest(flowDb, req(
+                'PUT', FLOW_PREFIX + flowId, token,
+                flowDocumentOf(
+                    'Taken agent',
+                    generateIdentifier(),
+                    { nodes: [graphNode([agentId])], edges: [] },
+                ),
+                { 'if-none-match': '*' },
+                generateIdentifier(),
+            ));
+            let read = false;
+            flowSeam.readDone.then(() => {
+                read = true;
+            });
+            let answered = false;
+            flow.then(
+                () => {
+                    answered = true;
+                },
+                () => {
+                    answered = true;
+                },
+            );
+            let blocked = false;
+            let probes = 0;
+            while (!read && !answered && !blocked) {
+                if (probes === PROBE_LIMIT) {
+                    throw new Error(
+                        'the flow neither read its roster nor'
+                        + ' waited on the paused removal within '
+                        + String(PROBE_LIMIT) + ' probes',
+                    );
+                }
+                probes += 1;
+                blocked = (
+                    await lockWaitersBlockedBy(probe, PAUSED_ROSTER)
+                ).includes(PAUSED_FLOW);
+            }
+            if (answered) {
+                throw new Error(
+                    'flow PUT answered ' + (await flow).status
+                    + ' before its roster read',
+                );
+            }
+            const readDuringTake = read;
+            rosterSeam.release();
+            const removalResponse = await removal;
+            assertStrictEquals(removalResponse.status, 200);
+            await Promise.race([flowSeam.readDone, flow]);
+            flowSeam.release();
+            const flowResponse = await flow;
+            const removalHead = await db.messagePairs
+                .getHeadPair(MEMBERSHIPS_PATH, membership);
+            assert(removalHead !== null);
+            const flowHead = await db.messagePairs
+                .getHeadPair(FLOW_PREFIX, flowId);
+            if (flowResponse.status === 400) {
+                assertEquals(await flowResponse.json(), {
+                    error: 'agentIds must name a live AI agent',
+                });
+                assertStrictEquals(flowHead, null);
+                return;
+            }
+            assertStrictEquals(flowResponse.status, 201);
+            assert(flowHead !== null);
+            assert(
+                flowHead.response_at < removalHead.response_at,
+                'flow PUT landed at ' + flowHead.response_at
+                    + ', after the seat removal at '
+                    + removalHead.response_at
+                    + ': the removal took its organization row,'
+                    + ' but its statement ran outside the take'
+                    + ' (the flow read the roster during the'
+                    + ' take: ' + String(readDuringTake)
+                    + '; it waited on the paused removal: '
+                    + String(blocked) + ')',
+            );
+        } finally {
+            rosterSeam.release();
+            flowSeam.release();
+            await rosterSql.end();
             await flowSql.end();
             await probe.end();
         }
