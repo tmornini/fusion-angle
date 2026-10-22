@@ -1322,10 +1322,11 @@ export async function postFlowCreationOp(
     await runWrite(db, attemptFor(rows), rows);
 }
 
-// `view` is the write's transaction, which holds the
-// organization row shared; every roster write takes it
-// exclusive first, so the roster the law reads is the one
-// the write lands against.
+// `view` is the write's transaction. On Postgres it holds
+// the organization row shared, and every roster write takes
+// it exclusive first, so the roster the law reads is the one
+// the write lands against. Memory transactions run one at a
+// time, so there the hold is only the existence check.
 async function assertLiveFlowGraphWriteLaw(
     view: DbAdapter,
     organization: Id,

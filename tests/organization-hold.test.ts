@@ -5,9 +5,9 @@ import type { StatementBind } from
     '../shared/ledger-statement.ts';
 import { generateIdentifier } from '../shared/identifier.ts';
 
-// The derivation both twins hold by reads a row's path,
-// name, and method alone; the rest of a bind is bytes it
-// never looks at.
+// Both backends derive a roster write's organizations from
+// a row's path, name, and method alone; the rest of a bind
+// is bytes the derivation never reads.
 function rowAt(
     path: string,
     name: string,
