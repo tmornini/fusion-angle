@@ -78,8 +78,10 @@ not mid-walk.
    summary (`## Summary Format`) and one stub per
    FAIL cluster. Do not summarize an incomplete
    checkpoint.
-5. Run **K8** (wipe and reseed — explorers have
-   returned), then **J1–J3**.
+5. Run **K8** (restart through owned deploy tasks —
+   explorers have returned), then **J1–J3**. J1
+   stops the `./deploy` task K8's restore launched.
+   Wait for `Removed` before any relaunch.
 
 The master does not drive the product and does not
 patch. The master does not invent deploy scripts;
@@ -6639,23 +6641,24 @@ document order with the rest of this section.
        test drags an objective row;
        tests/browser/list-reorder.test.ts drags projects,
        a different list)
-- [ ] **K8** Empty state: stop the A3 process.
-  `./postgres-wipe --postgres local` then
-  `./postgres-seed --postgres local --bootstrap` then
-  start `./fusion-angle serve`. Sign in with the stdout
-  admin credential. Open Organization. PASS: the empty-state
-  copy "No objectives yet. Add one to get started."
-  renders (bootstrap seeds org 1 with no objectives).
-  Restore the mock garden by stopping again,
-  `./postgres-wipe --postgres local`, then
-  `./postgres-seed --postgres local --mock-data`, then
-  start. This is the one case that seeds `--bootstrap`
-  rather than `--mock-data`; do not skip it. `crank`
-  mints `POSTGRES_URL`/`JWT_HMAC_SIGNING_KEY` and never
-  prints them, so this manual restart needs them already
-  set in the master's own shell (e.g. from a prior
-  `./serve` session) — a pre-existing limitation of this
-  case, not one this audit can resolve.
+- [ ] **K8** Empty state: stop the A3 task with the
+  harness-native task stop. Wait for its output to
+  show the server, postgres, and network `Removed`.
+  Launch `./deploy --local 8080 --postgres bootstrap`
+  as a new owned task, under step 2's rules. Sign in
+  with the one admin line from its seed reveal. Open
+  Organization. PASS: the empty-state copy "No
+  objectives yet. Add one to get started." renders
+  (bootstrap seeds org 1 with no objectives).
+  Restore the mock garden: harness-stop that task,
+  wait for `Removed` in the same way, then launch
+  `./deploy --local 8080 --postgres mock-data` as the
+  next owned task and record its id. This is the one
+  case that seeds `--bootstrap` rather than
+  `--mock-data`; do not skip it. A K8 stop that
+  reports the task already exited is J1's failure
+  arriving early: score J1 FAIL then, and do not
+  continue K8 by hand.
   Pin: tests/presenter-organization-objectives.test.ts
        'empty state when no objectives'; exploratory —
        the live wipe/bootstrap/restore ceremony
