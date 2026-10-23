@@ -3540,6 +3540,42 @@ Off the critical path; each with its oracle.
   count addends do not sum to 1889. Oracle: the ops
   refuse a missing pair, and the addends sum to
   `EXPECTED_MESSAGE_PAIR_COUNT`.
+- A mouse-focused `select.input` glows at 0.3, not
+  0.2. The dark-only fold moved the dark 0.3 glow
+  from `.input:focus-visible` onto `.input:focus`
+  (`web-app/app/styles/components-inputs.css:21-25`,
+  `8abbfd4b`); a text input matches `:focus-visible`
+  on a click, a select does not
+  (`web-app/identities/detail.html:74`). Oracle: the
+  owner keeps 0.3 and deletes this bullet, or a
+  `.input:focus-visible` rule carries 0.3 and
+  `.input:focus` 0.2.
+- A disabled hero button can never be hovered.
+  `.btn:disabled` sets `pointer-events: none`
+  (`web-app/app/styles/components-buttons.css:59-62`),
+  so `.btn-hero:disabled`'s `cursor: not-allowed`
+  (`:164-168`) never shows, and the dark-only
+  hover-glow fold changes nothing visible. Oracle: the
+  dead `cursor` declaration is gone, or
+  `pointer-events: none` is, with the hover glow
+  guarded by `:not(:disabled)`.
+- `.tooltip` (`web-app/app/styles/components-menus.css:51`)
+  styles nothing: no page renders the class, and the
+  dark-only parity check injected one by hand. The
+  app's tooltips are `title` attributes
+  (`web-app/app/presenters/project-action-bar.ts:92`).
+  Oracle: a page renders `.tooltip`, or the rule and
+  `--z-tooltip` (`web-app/app/styles/tokens.css:177`)
+  are gone.
+- DESIGN-SYSTEM.md:170 names the cascade's builder
+  `./build`; the script is `./bin/build`. Oracle:
+  `grep -n '\./build' DESIGN-SYSTEM.md` is empty.
+- Three dark-only changes no screenshot compared: the
+  skeleton shimmer, now animating
+  (`web-app/app/styles/components-feedback.css:36-52`);
+  the select glow above; and the design-system do/don't
+  card borders at 390px, below the 8000px capture cap.
+  Oracle: the walk scores each by eye.
 
 ## Sequencing
 
