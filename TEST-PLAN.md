@@ -50,8 +50,17 @@ not mid-walk.
    Deploy runs Layer 1, `./test postgres` (AT4), and
    `./test browser` (AT5) before it serves. Red
    anywhere aborts the walk — no explorer is
-   dispatched. Read the seed reveal from stdout;
-   it is shown once. A3 **is** SV1.
+   dispatched. Launch A3 as the harness's own
+   background task. The task's command is
+   `./deploy --local 8080 --postgres mock-data`
+   and nothing else: no `&`, `nohup`, `setsid`,
+   `disown`, pid file, or wrapper that returns
+   before deploy does. Read the seed reveal from
+   the task's output; it is shown once. Record
+   the task id in the master's notes. A launch
+   that backgrounds deploy ends the harness task
+   at once, leaves deploy reparented and parked,
+   and leaves J1 nothing to stop. A3 **is** SV1.
 3. Dispatch explorers until every case from **A4**
    through the end of `## SV` except **K8** has a
    scored line in the checkpoint
@@ -588,10 +597,12 @@ any AT red.
   `demo@example.com` and
   `sarah.chen@company.com`); listen stdout has
   no passwords; seed does not travel over
-  HTTP. A3 is SV1.
+  HTTP; the harness lists the A3 task as
+  running after the listen. A3 is SV1.
   Pin: tests/pg-seed.test.ts 'mock-data seed
        prints every human sign-in'; exploratory
-       — the live process listening, the
+       — the live process listening, the A3
+       task running under the harness, the
        stdout/HTTP boundary, and that
        `demo@example.com` and
        `sarah.chen@company.com` are specifically
