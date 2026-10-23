@@ -15,7 +15,6 @@ import {
     responseRecordOf,
 } from './message-pair.ts';
 import {
-    bodyOf,
     documentMessagePairsAt,
     deriveDocumentsAt,
     byIdAscending,
@@ -335,9 +334,7 @@ export async function resolveOwningOrganization(
 // 404. The probe reads the bound organization's own
 // collection, so a foreign id in an organization-nested
 // family is a miss there: 404. Only the global plane
-// (organizations, invitations, role grants) can 403.
-const ROLE_GRANTS_URI_PREFIX =
-    canonicalPath(undefined, '/role-grants/');
+// (organizations) can 403.
 
 // Organization-nested path prefixes:
 // /organizations/{id}/...
@@ -371,12 +368,6 @@ function ownerProbeCollection(
     if (table === 'organizations') {
         return ORGANIZATIONS_PATH_PREFIX;
     }
-    if (table === 'invitations') {
-        return INVITATIONS_PREFIX;
-    }
-    if (table === 'role_grants') {
-        return ROLE_GRANTS_URI_PREFIX;
-    }
     const family = OWNER_PROBE_FAMILY[table];
     if (family === undefined) return undefined;
     return canonicalPath(
@@ -387,7 +378,6 @@ function ownerProbeCollection(
 function ownerFromPath(
     path: string,
     name: Id,
-    message: string,
 ): Id | null {
     if (path === ORGANIZATIONS_PATH_PREFIX) {
         return name;
@@ -396,16 +386,6 @@ function ownerFromPath(
         path,
     );
     if (nested !== null) return nested[1]!;
-    if (
-        path === ROLE_GRANTS_URI_PREFIX
-        || path === INVITATIONS_PREFIX
-    ) {
-        const body = bodyOf(message);
-        const organizationId = body['organization_id'];
-        if (typeof organizationId === 'string') {
-            return organizationId;
-        }
-    }
     return null;
 }
 
@@ -428,7 +408,6 @@ export async function resolveGlobalOwner(
             const owner = ownerFromPath(
                 messagePair.path,
                 entityId,
-                messagePair.response,
             );
             if (owner !== null) return owner;
         }
@@ -446,9 +425,8 @@ export async function resolveGlobalOwner(
 // the bound organization's own (resolveGlobalOwner →
 // ownerProbeCollection), so an organization-nested
 // family's foreign id is owner-null: 404. Only the global
-// plane (organizations, invitations, role grants) can
-// reach 403. probeId defaults to id;
-// pass a parent id when the miss is on a nested child
+// plane (organizations) can reach 403. probeId defaults to
+// id; pass a parent id when the miss is on a nested child
 // (e.g. flow records probe the parent flow).
 export async function missedReadError(
     db: DbAdapter,

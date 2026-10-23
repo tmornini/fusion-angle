@@ -22,7 +22,6 @@ import type {
     RecordState,
     StateEntity,
     StateFieldValueEntity,
-    AIMemberEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
     ProjectEntity,
@@ -971,21 +970,6 @@ export function flowRecordOrganizationFor(
         : STARK_ORGANIZATION;
 }
 
-export function aiMemberSeedBody(
-    m: AIMemberEntity,
-): Record<string, unknown> {
-    const { id: _id, ...detail } = m;
-    return {
-        id: m.id,
-        detail,
-        initialState: 'active',
-        initialStateEventId: seedIdentifier(
-            `seed-member-${m.id}-active`,
-        ),
-        initialStateAt: MOCK_SEED_TIMESTAMP,
-    };
-}
-
 // The stored membership document a live organization-nest
 // PUT lands for a direct accept: the six keys
 // validateMembershipBody requires, state accepted. The
@@ -1048,27 +1032,6 @@ export function bootstrapCurrentIdentityBody():
             amiable: 80,
         },
     });
-}
-
-// The wire body a live PUT role-grants/:id would carry for this
-// SAME write: {organization_id, identity_id, role, action,
-// by_member_id, at} — the ONE shape every seeded role grant
-// (the two `current` admin grants, one per-member grant, and
-// bootstrap's own) shares. Hoisted (Phase 10 Task 6) so pass 1
-// (this file) and pass 2 (mock-data.ts) share the SAME
-// construction — the membershipSeedBody precedent above, for the
-// role ledger.
-export function roleGrantSeedBody(
-    organizationId: Id, identityId: Id, role: string,
-): Record<string, unknown> {
-    return {
-        organization_id: organizationId,
-        identity_id: identityId,
-        role,
-        action: 'granted',
-        by_member_id: SYSTEM_MEMBER_ID,
-        at: MOCK_SEED_TIMESTAMP,
-    };
 }
 
 // The wire body a live PUT identities/:id/credentials/:cid would
@@ -1184,17 +1147,6 @@ export const ORGANIZATION_TWO_OBJECTIVE: ObjectiveSeed = {
     description: 'Second-org demo objective.',
 };
 
-// The bootstrap membership's own id — exported so pass 1 (this
-// file) and pass 2 (mock-data.ts's postBootstrapIn) compare
-// against the SAME string rather than each re-typing it, the
-// secondOrganizationProjectId precedent above.
-export const bootstrapMembershipId = 'bootstrap-membership-current';
-
-// The bootstrap role grant's own id — the SAME
-// bootstrapMembershipId precedent above, for the admin grant
-// Task 6 re-points onto postRoleGrantDocumentOp.
-export const bootstrapRoleGrantId = 'bootstrap-role-current-admin';
-
 // Every member's PRIMARY organization: 'XXZruirZyAOoRpNxaDnpSA' orders Stark
 // first (alongside org Two, in postMockDataLoadIn's own
 // membership loop); every other human has exactly one, via
@@ -1210,38 +1162,9 @@ export function memberPrimaryOrganization(
         : assignOrganization(index);
 }
 
-export function bootstrapCurrentMemberBody(
-    initialStateAt: string,
-): Record<string, unknown> {
-    return {
-        id: 'XXZruirZyAOoRpNxaDnpSA',
-        detail: {
-            title: 'Admin',
-            department: 'Product',
-            strengths: [
-                'Strategic Planning',
-                'Data Analysis',
-                'Stakeholder Management',
-            ],
-            team_dimensions: {
-                driver: 80,
-                analytical: 80,
-                expressive: 80,
-                amiable: 80,
-            },
-        },
-        initialState: 'active',
-        initialStateEventId: seedIdentifier(
-            'bootstrap-current-active',
-        ),
-        initialStateAt,
-    };
-}
-
 // The bootstrap XeNICvLNKhXddnTKnszfpQ's PII facet, split into its own
 // PUT identities/:id/pii write (Phase 10 Task 2's intake
-// decomposition) — the SAME fields bootstrapCurrentMemberBody
-// once embedded in its own `pii` key. The ONE construction both
+// decomposition). The ONE construction both
 // pass 1 (this file's invocation body) and pass 2 (mock-data.ts's
 // postIdentityPiiDocumentOp call) share.
 export function bootstrapCurrentMemberPiiBody():
