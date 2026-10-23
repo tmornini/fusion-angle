@@ -76,7 +76,7 @@ dialog.dialog {
 }
 
 dialog.dialog::backdrop {
-    background-color: hsl(var(--backdrop) / 0.5);
+    background-color: hsl(var(--backdrop) / 0.7);
     animation: fade-in var(--duration-normal) var(--ease-out);
 }
 
@@ -109,7 +109,7 @@ dialog.dialog::backdrop {
 .sheet-backdrop {
     position: fixed;
     inset: 0;
-    background-color: hsl(var(--backdrop) / 0.5);
+    background-color: hsl(var(--backdrop) / 0.7);
     z-index: var(--z-modal-backdrop);
     animation: fade-in var(--duration-normal) var(--ease-out);
 }
