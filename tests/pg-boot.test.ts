@@ -200,7 +200,7 @@ async () => {
     assertStrictEquals(error.message, MISSING_MARKER);
     assertStrictEquals(
         MISSING_MARKER,
-        'schema_marker absent; seed with ./postgres-seed',
+        'schema_marker absent; seed with ./bin/postgres-seed',
     );
 });
 
