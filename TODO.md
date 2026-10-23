@@ -1695,6 +1695,38 @@ Off the critical path; each with its oracle.
   names the selectors). A Layer 2 test under
   `tests/browser/` asserting one click after reload
   reaches the element is still unwritten.
+- The walk's stop path still has gaps a FAIL can
+  slip through. J2's DEFERRED branch says the master
+  tears the stack down "out of band"
+  (`TEST-PLAN.md:7555`) and names no method, so the
+  master may reach for the `kill` the walk bans; name
+  `docker compose down` for the walk's project. K8's
+  already-exited branch scores J1 FAIL (`:6742`) and
+  leaves K8's own score unstated; mark it DEFERRED.
+  J1 blames "a detached launch (A3)" (`:7545`), but a
+  detached K8 restore fails the same way; name both.
+  J1's EPERM sentence is circular (`:7546`, "FAIL if
+  the harness stop itself fails"); say a sandbox
+  EPERM that fails the harness stop is FAIL. J1's
+  output "ends with `Terminated: 15`, then" the
+  `Removed` lines (`:7542`); say it shows the one and
+  ends with the other. Oracle: a walk scores J1 and
+  J2 from the text alone, with no `kill` in the
+  master's transcript.
+- Walk wording left over from `walk-b2-j1`. B2 says
+  the "See how it works" scroll twice (`:1498`,
+  `:1500`) and leaves an 18-column line, "origin.
+  Drive by" (`:1503`). Step 2 names the A3 launch
+  after "Red anywhere aborts the walk" (`:51`), not
+  first, and quotes the deploy command twice (`:49`,
+  `:55`; the second makes "and nothing else"
+  checkable). Step 5 adds "Wait for `Removed` before
+  any relaunch." (`:84`), which K8 already says and
+  J1 never needs. K8 drops the hand restarts with no
+  why (the ZIP's binary is a Linux ELF; they need
+  secrets the master never holds), and its Pin still
+  says "wipe/bootstrap/restore ceremony" (`:6746`).
+  Oracle: no cite above still reads as described.
 - No browser type fence exists. Ambient
   Node globals unlock per `deno check` invocation: one
   `node:` specifier anywhere in the checked graph gives
