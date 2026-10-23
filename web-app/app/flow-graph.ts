@@ -42,7 +42,7 @@ function canShowPort(
 
 // Flow-canvas palette, centralized so one edit reskins the
 // whole SVG. hsl(var(--token)) resolves inside SVG exactly as
-// in CSS — theme-reactive, no raw hex. BLUE stays exported for
+// in CSS — token-driven, no raw hex. BLUE stays exported for
 // the designer presenter.
 export const BLUE = 'hsl(var(--primary))';
 const WARN = 'hsl(var(--warning))';
