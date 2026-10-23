@@ -2,9 +2,8 @@
 
 This file is composition and wire law, not a catalog.
 Families, verbs, and rooms live in `routes[]`
-(`api/routes.ts`); browse them at `/api-documentation/`
-(134 rooms, derived from the table). On disagreement,
-the table wins. Dispatch is `handleRequest`
+(`api/routes.ts`); browse them at `/api-documentation/`.
+On disagreement, the table wins. Dispatch is `handleRequest`
 (`api/api.ts`). Pair formation is `api/message-pair.ts`.
 Each write route's conditional is its entry in
 `WRITE_RESPONSE_SPECS` (`api/routes.ts`).

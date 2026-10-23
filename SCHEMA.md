@@ -2,7 +2,7 @@
 
 This file is the capability map of the one table. Columns,
 keys, and indexes live in `SCHEMA.svg` (generated from
-`api/db.ts`, `api/types.ts`, and `api/schema-postgres.ts`;
+`api/db.ts`, `shared/types.ts`, and `api/schema-postgres.ts`;
 `./test validate` fails on drift). Families, routes, and
 alphabets live in code; this file does not restate them.
 
@@ -115,7 +115,7 @@ same rows in an in-process Map keyed by table name.
 
 Native nested JSON on the wire and in the pair body, never
 JSON-encoded strings. Domain booleans are typed `boolean`
-in `api/types.ts` and persist natively. `serializeValue`
+in `shared/types.ts` and persist natively. `serializeValue`
 (`api/storage-serialize.ts`) is the NOT-NULL gate on
 present keys. The stored graph shape (`positionX`,
 `fromNodeId`, `attribute_id`, `isRequired`) is a pinned
@@ -187,7 +187,7 @@ tombstone.
 
 ## State alphabets
 
-`grep -n '_STATES = ' api/types.ts`
+`grep -n '_STATES = ' shared/types.ts`
 
 ## Operator tools
 
