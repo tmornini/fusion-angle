@@ -142,6 +142,7 @@
     font-weight: var(--font-weight-semibold);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-full);
+    border: 1px solid hsl(var(--border) / 0.5);
     white-space: nowrap;
     text-transform: uppercase;
     letter-spacing: 0.025em;
@@ -169,14 +170,17 @@
 .pill[data-tone="success"] {
     background: hsl(var(--success-soft));
     color: hsl(var(--success-text));
+    border-color: hsl(var(--success) / 0.3);
 }
 .pill[data-tone="warning"] {
     background: hsl(var(--warning-soft));
     color: hsl(var(--warning-text));
+    border-color: hsl(var(--warning) / 0.3);
 }
 .pill[data-tone="error"] {
     background: hsl(var(--error-soft));
     color: hsl(var(--error-text));
+    border-color: hsl(var(--error) / 0.3);
 }
 
 /* Stat cell tinted card (used by organization, idea, project) */
