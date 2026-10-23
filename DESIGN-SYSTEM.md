@@ -37,10 +37,8 @@ truth. Tones: `primary`, `success`, `warning`, `error`,
 
 Buttons: `btn-primary`, `secondary`, `outline`, `ghost`,
 `destructive`, `success`, `hero`,
-`outline-light`, `outline-error`,
-`.link`. Cards: `.card`, `.card-flat`. Badges:
-`.status-badge-success`, `.status-badge-warning`,
-`.status-badge-error`.
+`outline-error`, `.link`. Cards:
+`.card`, `.card-flat`.
 
 **Dialog pattern.** Native `<dialog>` driven by `openDialog(id)`
 / `closeDialog(id)` from `dialog.ts`. The element is
@@ -59,9 +57,7 @@ across every dialog. Submit/confirm stay page-specific (a
 **Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel',
 'active')` from `dialog.ts` — the third arg is the
 active-state class. Tab buttons use `data-tab="{name}"`
-attribute, panels use `id="tab-{name}"`. `.tab` and
-`.tab.active` live in `components-tabs.css`. That is
-not this control.
+attribute, panels use `id="tab-{name}"`.
 
 **Segmented control.** A `role="group"` of
 `btn btn-secondary btn-sm` buttons. Each carries
