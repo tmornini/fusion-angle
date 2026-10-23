@@ -1,18 +1,19 @@
 import { assert } from '@std/assert';
 
-// C4 / K27 covenant: the Objectives box is one gauge
-// column wide on desktop and full-width only under
-// 768px. The TEST-PLAN copy states it; this pin keeps
-// the CSS honest.
+// C4 / K27 covenant: the Objectives box is two gauge
+// columns wide on desktop, its right edge under Cost's,
+// and full-width only under 768px. The TEST-PLAN copy
+// states it; this pin keeps the CSS honest.
 
-Deno.test('the Objectives card is one gauge column wide',
+Deno.test('the Objectives card is two gauge columns wide',
 () => {
     const src = Deno.readTextFileSync(
         'web-app/app/styles/components-metrics.css',
     );
     const rule = '.objective-aggregates-card {\n'
         + '    width:'
-        + ' calc((100% - 2 * var(--space-6)) / 3);';
+        + ' calc((100% - 2 * var(--space-6)) / 3 * 2\n'
+        + '        + var(--space-6));';
     assert(src.includes(rule));
 });
 

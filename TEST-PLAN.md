@@ -1780,10 +1780,11 @@ the second organization.
   baseline track + inner actual fill; Impact is a bipolar
   arc — left/right split from a center apex; all three
   share the same card chrome) and, below the grid, an
-  Objectives box one gauge column wide
-  (`.objective-aggregates-card`,
-  `calc((100% - 2 * var(--space-6)) / 3)`; full width
-  only under 768px; card title "Objectives"). Sign in as
+  Objectives box two gauge columns wide, its right edge
+  under the Cost card's (`.objective-aggregates-card`,
+  `calc((100% - 2 * var(--space-6)) / 3 * 2
+  + var(--space-6))`; full width only under 768px; card
+  title "Objectives"). Sign in as
   the demo admin (`demo@example.com`, Tony Stark) with
   Stark Industries active — surfaces carry seeded scores,
   not zeros. PASS: all 4 render with baseline and current
@@ -1808,7 +1809,7 @@ the second organization.
        tests/presenter-dashboard-objective-aggregates.test.ts
        'heading reads "Objectives"';
        tests/objectives-card-width.test.ts 'the
-       Objectives card is one gauge column wide';
+       Objectives card is two gauge columns wide';
        tests/objectives-card-width.test.ts 'the
        Objectives card is full-width under 768px';
        exploratory — the visual order/layout of the 4
@@ -6969,8 +6970,9 @@ NPS", and "Improve employee morale" are not.
 - [ ] **K27** Open dashboard; PASS if four surfaces
   render: three arc-gauge cards sharing one card shell
   (Time and Cost are ratio arc-gauges; Impact is a
-  bipolar arc) and an Objectives box (below the grid, one
-  gauge column wide; card title "Objectives").
+  bipolar arc) and an Objectives box (below the grid, two
+  gauge columns wide, its right edge under Cost's; card
+  title "Objectives").
   Pin: tests/adapters-dashboard.test.ts
        'getDashboardGauges returns the three sibling
        gauges'; tests/adapters-dashboard.test.ts
@@ -6982,7 +6984,7 @@ NPS", and "Improve employee morale" are not.
        tests/presenter-dashboard-objective-aggregates.test.ts
        'heading reads "Objectives"';
        tests/objectives-card-width.test.ts 'the
-       Objectives card is one gauge column wide';
+       Objectives card is two gauge columns wide';
        exploratory — the live grid placement below the
        three gauge cards
 - [ ] **K28** Inspect the Impact gauge. PASS if:
