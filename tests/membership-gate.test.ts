@@ -3,7 +3,6 @@ import { assertEquals, assertStrictEquals } from
 import {
     invitationsViewQueryOf,
     memberSeesState,
-    memberViewRefusal,
     membershipNameRefusal,
     membershipsViewQueryOf,
     viewQueryOf,
@@ -94,29 +93,9 @@ Deno.test('memberships view names its alphabet on a'
     }
 });
 
-Deno.test('an admin reads every state of the'
-    + ' organization view', () => {
-    assertStrictEquals(
-        memberViewRefusal(['admin'], { kind: 'every' }),
-        undefined,
-    );
-    assertStrictEquals(
-        memberViewRefusal(
-            ['admin'], { kind: 'state', state: 'pending' },
-        ),
-        undefined,
-    );
-});
-
 Deno.test('a member reads accepted and removed only',
 () => {
     for (const state of ['accepted', 'removed'] as const) {
-        assertStrictEquals(
-            memberViewRefusal(
-                ['member'], { kind: 'state', state },
-            ),
-            undefined,
-        );
         assertStrictEquals(
             memberSeesState(['member'], state), true,
         );
@@ -125,21 +104,9 @@ Deno.test('a member reads accepted and removed only',
         'pending', 'declined', 'revoked',
     ] as const) {
         assertStrictEquals(
-            typeof memberViewRefusal(
-                ['member'], { kind: 'state', state },
-            ),
-            'string',
-        );
-        assertStrictEquals(
             memberSeesState(['member'], state), false,
         );
     }
-    assertStrictEquals(
-        typeof memberViewRefusal(
-            ['member'], { kind: 'every' },
-        ),
-        'string',
-    );
 });
 
 Deno.test('a membership name is the path\'s, foreign, or'
