@@ -462,12 +462,12 @@ limit that note already names.
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 41 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 30 |
+| I. Cross-Cutting Concerns | 24 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 26 |
 | J. Teardown | 3 |
 | SV. Server (Deno + Postgres) | 9 |
-| **Total** | **405** |
+| **Total** | **399** |
 
 A3 **is** SV1 — counted once, in A. The explorer
 skips SV1. F is 80 (F1–F75 plus F37a, F37b, F38a,
@@ -475,7 +475,7 @@ F38b, F57a).
 
 ### Combined Totals (CLI + Browser)
 
-The per-section table above counts 405 distinct
+The per-section table above counts 399 distinct
 TEST-PLAN cases (A3 is SV1; not counted twice). The
 CLI count is the most recent `./test` (AT2)
 report — the main `tests/*.test.ts` suite plus the
@@ -6268,74 +6268,6 @@ works; functional billing is tracked in `TODO.md`.
 
 ## I. Cross-Cutting Concerns
 
-### Theme
-
-- [ ] **I1** Click the theme toggle (sun/moon icon) in the header, select "Dark". PASS: page switches to dark theme — background darkens, text lightens, CSS custom properties update.
-  Pin: exploratory — the live toggle click and the
-       dark-theme repaint
-- [ ] **I2** Navigate to another page. PASS: dark theme persists across navigation.
-  Pin: exploratory — the live cross-page persistence
-       and repaint; a similarly-named existing test
-       does not decide this — it stubs `matchMedia`
-       to `matches: true` and never distinguishes the
-       module's own `'system'`-default fallback
-       (which independently computes 'dark' from that
-       same stub) from an actual hydration of the
-       stored value, so it stays green even with
-       hydration deleted entirely
-- [ ] **I3** Select "Light" theme. PASS: page returns to light theme.
-  Pin: exploratory — the live toggle click and the
-       light-theme repaint
-- [ ] **I4** Select "System" theme. PASS: theme follows OS preference (matches `prefers-color-scheme`).
-  Pin: tests/state-theme-icon.test.ts 'a
-       prefers-color-scheme change event applies
-       data-theme while preference is system';
-       exploratory — the live System selection and
-       the OS-preference match
-- [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-angle:theme`).
-  Pin: tests/fusion-angle-identifiers.test.ts
-       'storage keys use the fusion-angle prefix'
-       (decides the exact key name
-       `fusion-angle:theme`); exploratory — the live
-       reload persistence; a similarly-named existing
-       test does not decide the hydration itself — see
-       I2's Pin for the confound
-- [ ] **I6** Open the app in a second browser
-  tab. Change theme in the first tab. PASS:
-  second tab updates to the new theme without
-  manual reload (cross-tab sync via
-  StorageEvent), including the sun / moon /
-  system toggle icon — not only `data-theme`
-  on `<html>`. An OS `prefers-color-scheme`
-  change while preference is System fires the
-  `MediaQueryList` `change` event and updates
-  `data-theme` without reload; the toggle
-  glyph stays the system icon. CDP
-  `Emulation.setEmulatedMedia` that mutates
-  `matches` without `change` is not this case
-  — after emulate, dispatch
-  `new MediaQueryListEvent('change', {
-  matches: mq.matches })` on
-  `window.matchMedia('(prefers-color-scheme:
-  dark)')` (one interned list per query), or
-  use a real OS toggle.
-  Pin: tests/state-theme-icon.test.ts 'a cross-tab
-       theme storage event repaints the toggle icon'
-       (a synthetic `storage` event repaints both the
-       desktop and mobile toggle icons, not only
-       `data-theme`); tests/state-theme-icon.test.ts
-       'a prefers-color-scheme change event applies
-       data-theme while preference is system';
-       tests/state-theme-icon.test.ts 'a
-       MediaQueryList change on a later matchMedia
-       call applies data-theme while preference is
-       system' (a listener registered at init still
-       fires from a MediaQueryList obtained by a later
-       `matchMedia()` call — the interned-list
-       precondition this case's CDP workaround
-       depends on); exploratory — the live second tab
-       and the dispatched `MediaQueryListEvent`
-
 ### Sidebar
 
 - [ ] **I7** Click the sidebar collapse button. PASS: sidebar collapses to icon-only view, main content area expands.
@@ -7776,7 +7708,7 @@ Total: <N> cases — PASS X · FAIL Y · BLOCKED Z · DEFERRED D · DRIFT R
 | FS | 9 | | | | | |
 | G | 38 | | | | | |
 | H | 2 | | | | | |
-| I | 30 | | | | | |
+| I | 24 | | | | | |
 | K | 29 (skip K8) | | | | | |
 | R | 25 | | | | | |
 | SV | 9 (A3=SV1) | | | | | |
