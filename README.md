@@ -69,7 +69,7 @@ neither calls `deno` itself.
 
 - TypeScript on ES2024, strict mode
 - Build-time HTML composition (shared layout + per-page content)
-- CSS custom properties with light/dark theme support
+- CSS custom properties for one dark palette
 - SVG charts and ~70 inline SVG icons
 - Command palette (Cmd+K) with keyboard navigation
 - Self-hosted IBM Plex Sans, Inter, and IBM Plex Mono fonts
