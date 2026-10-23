@@ -340,20 +340,6 @@ Deno.test('leg 4b: PUT /organizations/:id with no precondition'
     );
 });
 
-// ---- leg 5: no organizations states event (precondition) -----
-
-Deno.test('leg 5: SEED-STATE — no organizations states event'
-+ ' exists for either seeded organization', async () => {
-    await seededDb();
-    for (const _organizationId of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        assertEquals(
-            [], [], // states table retired
-        );
-    }
-});
-
 // ---- leg 6: the key-order pin -----------------------------------
 
 Deno.test('leg 6: key-order pin — derived entity JSON key order is'
