@@ -2,7 +2,6 @@ import { assertNotStrictEquals, assertStrictEquals } from '@std/assert';
 import { TOKEN_AUDIENCE } from
     '../api/access-token.ts';
 import {
-    STORAGE_KEY_THEME,
     STORAGE_KEY_SIDEBAR,
     STORAGE_KEY_LOG_LEVEL,
     STORAGE_KEY_PENDING_TOAST,
@@ -29,10 +28,6 @@ Deno.test('storage keys use the fusion-angle prefix',
     assertStrictEquals(
         STORAGE_KEY_ACTIVE_ORGANIZATION_ID,
         'fusion-angle:active-organization-id',
-    );
-    assertStrictEquals(
-        STORAGE_KEY_THEME,
-        'fusion-angle:theme',
     );
     assertStrictEquals(
         STORAGE_KEY_SIDEBAR,
