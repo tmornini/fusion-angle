@@ -94,11 +94,6 @@ Deno.test(
         >;
         const host = makeHostStub();
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {

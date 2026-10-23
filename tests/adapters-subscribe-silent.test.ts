@@ -22,11 +22,6 @@ Deno.test(
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const g = globalThis as Record<string, unknown>;
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['document'] = { addEventListener: () => {} };

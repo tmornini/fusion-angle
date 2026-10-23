@@ -84,11 +84,6 @@ Deno.test(
         // list element so the assertion can read it.
         let listGone = false;
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {

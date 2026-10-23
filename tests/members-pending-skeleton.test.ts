@@ -66,11 +66,6 @@ Deno.test(
         const g = globalThis as Record<string, unknown>;
         const elements = new Map<string, ElementStub>();
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {

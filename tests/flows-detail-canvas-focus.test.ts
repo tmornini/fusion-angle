@@ -23,7 +23,6 @@ import { reduceFsm } from
 // `instanceof SVGElement` before calling focus(). The
 // fake class IS the stub, so its instances pass the check.
 globalThis.window = {
-    matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub

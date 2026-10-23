@@ -107,11 +107,6 @@ Deno.test(
         const createButton = makeCreateButtonStub();
         const win = {
             fusionAngleDataChannel: CHANNEL_NAME,
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         const doc = {

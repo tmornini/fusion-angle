@@ -14,7 +14,6 @@ import { responseMessage } from './fixtures/response-message.ts';
 // these pure-function tests but the presenter module graph
 // still expects the globals to exist.
 globalThis.window = {
-    matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub

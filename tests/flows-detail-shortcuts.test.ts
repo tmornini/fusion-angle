@@ -13,7 +13,6 @@ import type { FlowSnapshot } from
 // stubbed for the HTMLInputElement/HTMLTextAreaElement/
 // HTMLSelectElement fakes below.
 globalThis.window = {
-    matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub

@@ -63,11 +63,6 @@ Deno.test(
             addEventListener: () => {},
         };
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {
