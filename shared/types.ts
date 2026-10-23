@@ -20,8 +20,6 @@ export interface ProviderModel {
 
 export type MemberKind = 'human' | 'ai' | 'service' | 'system';
 
-export type ConfidenceLevel = 'high' | 'medium' | 'low';
-
 export type RecordId = Id;
 export type RecordAttributeId = Id;
 export type FlowRecordId = Id;
@@ -152,8 +150,6 @@ export const INVITATION_STATES = [
 
 export type InvitationState =
     typeof INVITATION_STATES[number];
-
-export type StoredBoolean = 0 | 1;
 
 function includes<T extends string>(
     values: readonly T[],
@@ -555,28 +551,6 @@ export interface IdentityDefaultOrganizationEntity {
     id: Id;
     identity_id: Id;
     organization_id: Id;
-    at: string;
-}
-
-export type RoleGrantAction = 'granted' | 'revoked';
-
-// Append-only role-assignment ledger event. One row per
-// grant or revoke; the roles an identity CURRENTLY holds =
-// the latest action per (identity_id, role) — a 'granted'
-// with no later 'revoked'. Append-only: a revoke is a NEW
-// 'revoked' row, never a splice (mirrors
-// identity_credentials / identity_token_revocations).
-// `by_member_id` is the actor (== their identity id, per
-// member.id === identity.id). `at` is the RFC-3339 zulu
-// moment. Authorization derives roles from THIS ledger
-// fresh at the gate — never from a token claim.
-export interface RoleGrantEntity {
-    id: Id;
-    organization_id: Id;
-    identity_id: Id;
-    role: string;
-    action: RoleGrantAction;
-    by_member_id: Id;
     at: string;
 }
 
@@ -1019,12 +993,6 @@ export function isServiceMember(
     w: Member,
 ): w is ServiceMember {
     return w.kind === 'service';
-}
-
-export function isSystemMember(
-    w: Member,
-): w is SystemMember {
-    return w.kind === 'system';
 }
 
 export function isFormerMember(
