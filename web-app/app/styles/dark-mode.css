@@ -1,9 +1,0 @@
-/* Badges: visible borders */
-[data-theme="dark"] .badge {
-    border-color:
-        hsl(var(--border) / 0.5);
-}
-[data-theme="dark"] .status-badge {
-    border-color:
-        hsl(var(--border) / 0.5);
-}
