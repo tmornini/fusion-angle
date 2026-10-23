@@ -72,7 +72,7 @@ bundle_client() {
 
     cat web-app/app/styles/tokens.css \
         web-app/app/styles/fonts.css \
-        web-app/app/styles/light-mode.css \
+        web-app/app/styles/palette.css \
         web-app/app/styles/base.css \
         web-app/app/styles/components-*.css \
         web-app/app/styles/layout.css \
