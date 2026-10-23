@@ -1,14 +1,5 @@
-/* Product mark: white-on-transparent PNG.
-   Light theme (no data-theme=dark) inverts to ink. */
+/* Product mark: white-on-transparent PNG. */
 .brand-mark {
     display: block;
     object-fit: contain;
-}
-
-html:not([data-theme="dark"]) .brand-mark {
-    filter: invert(1);
-}
-
-html:not([data-theme="dark"]) .auth-branding .brand-mark {
-    filter: none;
 }
