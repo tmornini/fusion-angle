@@ -93,12 +93,6 @@
     color: hsl(var(--muted-foreground));
 }
 
-.project-objectives-footer {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: var(--space-4);
-}
-
 @media (max-width: 768px) {
     .project-objective-row {
         grid-template-columns: 1fr;

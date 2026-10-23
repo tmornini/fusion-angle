@@ -112,21 +112,6 @@
     border: 1px solid hsl(var(--border) / 0.5);
 }
 
-.status-badge-success {
-    background-color: hsl(var(--success-soft));
-    border-color: hsl(var(--success-border));
-    color: hsl(var(--success-text));
-}
-.status-badge-warning {
-    background-color: hsl(var(--warning-soft));
-    border-color: hsl(var(--warning-border));
-    color: hsl(var(--warning-text));
-}
-.status-badge-error {
-    background-color: hsl(var(--error-soft));
-    border-color: hsl(var(--error-border));
-    color: hsl(var(--error-text));
-}
 .status-badge-info {
     background-color: hsl(var(--info-soft));
     border-color: hsl(var(--info-border));
