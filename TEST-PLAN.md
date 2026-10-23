@@ -5692,9 +5692,14 @@ FSM, unlike `flows/detail`).
   the member tier (`api/authorization.ts`), so `getOrganization`
   succeeds. The sent box starts `hidden`
   (`web-app/organization/index.html`). The default sent state is
-  `pending`. A member's read of `pending` is 403,
-  `forbidden: members read accepted or removed memberships`
-  (`memberViewRefusal`). The rejection is logged and
+  `pending`. A member's read of the organization's
+  invitations is 403 at the route policy, whatever the
+  `state` — `api/authorization.ts` grants a member no
+  `/organizations/:id/invitations` row — with the body
+  `forbidden: GET /organizations/:id/invitations/
+  requires a role this principal lacks` (the real
+  organization id in place of `:id`). The rejection is
+  logged and
   `paintSentInvitations` does not run, so the box stays hidden
   and no Revoke is offered. "Admin access required" paints only
   when the organization pair itself rejects 403
@@ -5702,9 +5707,11 @@ FSM, unlike `flows/detail`).
   organization GET does not. (Pairs with V7's grant/revoke 403s.)
   Pin: tests/api-memberships.test.ts 'a member reads
        accepted and removed, and a pending item is 404'
-       (decides a member's unfiltered, `pending`,
-       `declined`, and `revoked` reads of the sent list
-       answer 403 `MEMBER_VIEW`); exploratory — the
+       (decides a member's read of the sent list answers
+       403 with that route-policy body under every
+       `state`, while the member's `accepted` and
+       `removed` membership reads answer 200);
+       exploratory — the
        section staying hidden
 - [ ] **V10 — Accept an invitation revoked in another
   tab** As the admin, open the Organization page's
