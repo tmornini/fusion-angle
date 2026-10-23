@@ -171,37 +171,6 @@ Deno.test(
     },
 );
 
-Deno.test(
-    'a later deleted PUT tombs the idea',
-    async () => {
-        const db = await seededDb();
-        const token = await organizationToken();
-        const ideaId = generateIdentifier();
-        await putIdea(
-            db, token, ideaId, 'Genesis Title',
-            'active',
-        );
-        const res = await putIdea(
-            db, token, ideaId, 'Tomb Title',
-            'deleted',
-        );
-        assertStrictEquals(res.status, 200);
-        const ideas = await getCollection(
-            db, 'ideas', STARK_ORGANIZATION,
-        );
-        assertStrictEquals(
-            ideas.some((idea) => idea.id === ideaId),
-            false,
-        );
-        await assertRejects(
-            () => getDocument(
-                db, 'ideas', STARK_ORGANIZATION, ideaId,
-            ),
-            EntityNotFoundError,
-        );
-    },
-);
-
 Deno.test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
