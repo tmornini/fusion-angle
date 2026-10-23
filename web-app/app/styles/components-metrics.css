@@ -81,11 +81,13 @@
     grid-template-columns: 140px 110px 1fr;
 }
 
-/* Width of one top-row gauge column: the grid is
-    repeat(3, 1fr) with a --space-6 gap. Full-width on
-    mobile via responsive.css. */
+/* Width of two top-row gauge columns and the gap
+    between them, so the right edge sits under Cost's:
+    the grid is repeat(3, 1fr) with a --space-6 gap.
+    Full-width on mobile via responsive.css. */
 .objective-aggregates-card {
-    width: calc((100% - 2 * var(--space-6)) / 3);
+    width: calc((100% - 2 * var(--space-6)) / 3 * 2
+        + var(--space-6));
 }
 
 .gauge-card.objective-aggregates-card {
