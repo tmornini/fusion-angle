@@ -7453,20 +7453,26 @@ K30 only describes.
 J1–J3 are the master's: `## The walk` step 5 runs
 them after K8, once the explorer has returned.
 
-- [ ] **J1** Stop the `./deploy` process started
-  in A3 via the harness-native task stop (not
-  `kill`). PASS: process terminates; the trap
-  ran `compose down --remove-orphans`. Sandbox
-  EPERM on `kill` is FAIL if the harness stop
-  itself fails; do not score BLOCKED.
-  Pin: exploratory — the live process actually
+- [ ] **J1** Stop the live `./deploy` task (K8's
+  restore, or A3's when K8 did not run) with the
+  harness-native task stop. No shell signal of any
+  kind. PASS: the harness reports the task stopped,
+  not already-exited; its output ends with
+  `Terminated: 15`, then server, postgres, and
+  network `Removed`. Already-exited is FAIL, and its
+  cause is a detached launch (A3). Sandbox EPERM on
+  the stop is FAIL if the harness stop itself
+  fails; do not score BLOCKED.
+  Pin: exploratory — the live task actually
        terminating under the harness stop
 - [ ] **J2** After J1 PASS, verify there is no
   leftover compose project and no `.env`.
   There is no temp bundle — there is no host
   `--no-zip` dir. PASS: no leftover compose
-  project, no `.env`. DEFERRED only if deploy
-  is still up.
+  project, no `.env`. DEFERRED when J1 is not PASS:
+  the master tears the stack down out of band and
+  records that in J1's FAIL detail. J2 is never
+  scored against a hand teardown.
   Pin: exploratory — no leftover compose
        project and no `.env` after teardown
 - [ ] **J3** Verify the ZIP file remains on
