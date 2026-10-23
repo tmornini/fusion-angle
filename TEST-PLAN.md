@@ -1477,11 +1477,17 @@ the second organization.
        'unsigned landing stays, books, and signs in'
 - [ ] **B2** "Book a pilot call" appears four times
   (navbar, mobile menu, hero, pilot section) as
-  anchors carrying `data-book-pilot` whose `href` is
-  the scheduling URL; "See how it works" scrolls to
-  `#how-it-works`. PASS: the four hrefs match and the
-  anchor scrolls. Do not click a `data-book-pilot`
-  anchor in the walk: it leaves the origin. Drive by
+  anchors carrying `data-book-pilot`. Their `href`
+  attribute is `PILOT_SCHEDULING_URL` from
+  `web-app/landing/index.ts`, the empty string until
+  the operator names a scheduling URL. Read it with
+  `getAttribute('href')`: the `href` property resolves
+  `''` to the page's own URL. "See how it works"
+  scrolls to `#how-it-works`. PASS: four anchors, each
+  `getAttribute('href')` is `''`, and "See how it
+  works" scrolls to `#how-it-works`. Do not click a
+  `data-book-pilot` anchor in the walk: it leaves the
+  origin. Drive by
   selector, never `.navbar-logo` (Apple menu).
   Pin: tests/browser/landing.test.ts 'unsigned landing
        stays, books, and signs in'
