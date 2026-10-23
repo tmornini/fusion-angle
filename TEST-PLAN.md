@@ -6121,9 +6121,11 @@ FSM, unlike `flows/detail`).
   and Members lists for Stark. Select "Wayne
   Enterprises" → the page does a FULL reload onto
   Wayne: Ideas shows Wayne's ideas and Members shows
-  Wayne's humans; Stark's humans and Stark's ideas
-  are gone (organization-fenced); AI rows stay because
-  the catalog is global; and the switch paints no
+  Wayne's humans and Wayne's AI members — none in the
+  mock seed, which seats every AI at Stark; Stark's
+  humans, Stark's AIs, and Stark's ideas are gone (AI
+  agents are organization documents, fenced like the
+  rest); and the switch paints no
   `Something went wrong` card. Reload the page again WITHOUT
   changing the select → Wayne stays active (the choice
   is stored under `fusion-angle:active-organization-id`
