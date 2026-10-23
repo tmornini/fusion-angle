@@ -29,12 +29,6 @@ export function recordApiRequest(
     hits.push({ method, resource });
 }
 
-/** Snapshot of hits since navigation (module re-init). */
-export function snapshotApiRequests(
-): readonly ApiRequestHit[] {
-    return hits.slice();
-}
-
 // CDP harvest surface — installed only in the browser.
 if (isBrowserDocument()) {
     (

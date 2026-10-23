@@ -13,16 +13,6 @@ function initials(name: string): string {
         .join('');
 }
 
-const NOON_HOUR = 12;
-const EVENING_HOUR = 18;
-
-function getTimeOfDay(): string {
-    const hour = new Date().getHours();
-    if (hour < NOON_HOUR) return 'morning';
-    if (hour < EVENING_HOUR) return 'afternoon';
-    return 'evening';
-}
-
 // An instant (a moment that happened) renders to LOCAL time —
 // the viewer sees it in their own zone (Office of Time).
 // Timestamps are gate-validated; a corrupt one renders as the
@@ -105,7 +95,6 @@ export {
     formatDate,
     formatCalendarDate,
     formatDateTime,
-    getTimeOfDay,
     initials,
     pluralize,
     toDateInputValue,

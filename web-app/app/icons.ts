@@ -774,18 +774,6 @@ export function iconGripVertical(
     );
 }
 
-export function iconLineChart(
-    size: IconSize,
-    cssClass: string,
-) {
-    return icon(
-        '<path d="M3 3v18h18"/>'
-        + '<path d="m19 9-5 5-4-4-3 3"/>',
-        size,
-        cssClass,
-    );
-}
-
 export function iconArrowUpRight(
     size: IconSize,
     cssClass: string,
@@ -857,20 +845,6 @@ export function iconPersonPlus(
         + ' y2="14"/>'
         + '<line x1="22" x2="16" y1="11"'
         + ' y2="11"/>',
-        size,
-        cssClass,
-    );
-}
-
-export function iconPersonX(size: IconSize, cssClass: string) {
-    return icon(
-        '<path d="M16 21v-2a4 4 0 0 0-4-4H6a'
-        + '4 4 0 0 0-4 4v2"/>'
-        + '<circle cx="9" cy="7" r="4"/>'
-        + '<line x1="17" x2="22" y1="8"'
-        + ' y2="13"/>'
-        + '<line x1="22" x2="17" y1="8"'
-        + ' y2="13"/>',
         size,
         cssClass,
     );

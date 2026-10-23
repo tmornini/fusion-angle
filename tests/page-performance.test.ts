@@ -1,6 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import {
-    MEASURE_BOOT_DB_OPEN,
     MEASURE_BOOT_AUTH_GATE,
     MEASURE_BOOT_ORGANIZATION_SCOPE,
     MEASURE_BOOT_SIDEBAR_CHROME,
@@ -82,9 +81,6 @@ Deno.test(
     'phase-name constants equal wire-stable strings',
     () => {
         assertStrictEquals(
-            MEASURE_BOOT_DB_OPEN, 'boot:db-open',
-        );
-        assertStrictEquals(
             MEASURE_BOOT_AUTH_GATE,
             'boot:auth-gate',
         );
@@ -114,7 +110,6 @@ Deno.test(
         assertEquals(
             [...BOOT_PHASE_MEASURE_NAMES],
             [
-                'boot:db-open',
                 'boot:auth-gate',
                 'boot:organization-scope',
                 'boot:sidebar-chrome',
@@ -245,9 +240,9 @@ Deno.test(
     + ' page-performance context',
     () => withLocalStorage(INFO_LEVEL_STORAGE, () => {
         // Seed one boot phase so phases is non-empty.
-        markStart(MEASURE_BOOT_DB_OPEN);
+        markStart(MEASURE_BOOT_AUTH_GATE);
         busyWaitMs(1);
-        markEnd(MEASURE_BOOT_DB_OPEN);
+        markEnd(MEASURE_BOOT_AUTH_GATE);
 
         const calls = capture(
             'info',
@@ -277,7 +272,7 @@ Deno.test(
             && typeof phases === 'object',
         );
         assert(
-            typeof phases['boot:db-open']
+            typeof phases['boot:auth-gate']
                 === 'number',
             'measured boot phase must appear',
         );

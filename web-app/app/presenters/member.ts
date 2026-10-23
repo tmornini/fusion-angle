@@ -362,14 +362,6 @@ export class ManagedMembersPresenter {
         this.#membership = state.membership;
     }
 
-    humanCount(): number {
-        return this.#humans.length;
-    }
-
-    aiCount(): number {
-        return this.#ais.length;
-    }
-
     serviceCount(): number {
         return this.#services.length;
     }

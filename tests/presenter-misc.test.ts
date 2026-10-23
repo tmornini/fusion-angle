@@ -30,8 +30,6 @@ import {
     '../web-app/app/presenters/flow-designer-view.ts';
 import { toggleStatusFilter } from
     '../web-app/app/presenters/list-filter.ts';
-import { orderedKeys } from
-    '../web-app/app/presenters/ordered-keys.ts';
 import {
     HumanMember, AIMember,
 } from '../shared/types.ts';
@@ -1063,59 +1061,6 @@ Deno.test(
         assertEquals(
             toggleStatusFilter(filtered, 'archived'),
             { kind: 'filtered', status: 'archived' },
-        );
-    },
-);
-
-// ordered-keys: orderedKeys
-
-Deno.test(
-    'orderedKeys returns present keys in the'
-    + ' supplied order',
-    () => {
-        const groups = { b: 1, a: 1, c: 1 };
-        assertEquals(
-            orderedKeys(groups, ['a', 'b', 'c']),
-            ['a', 'b', 'c'],
-        );
-    },
-);
-
-Deno.test(
-    'orderedKeys skips ordered keys absent from'
-    + ' the group object',
-    () => {
-        const groups = { a: 1, c: 1 };
-        assertEquals(
-            orderedKeys(groups, ['a', 'b', 'c']),
-            ['a', 'c'],
-        );
-    },
-);
-
-Deno.test(
-    'orderedKeys appends keys not named in the'
-    + ' order list after the ordered ones',
-    () => {
-        const groups = { z: 1, a: 1, m: 1 };
-        assertEquals(
-            orderedKeys(groups, ['a']),
-            ['a', 'z', 'm'],
-        );
-    },
-);
-
-Deno.test(
-    'orderedKeys treats falsy group values as'
-    + ' absent',
-    () => {
-        const groups = { a: 0, b: 1, c: undefined };
-        assertEquals(
-            orderedKeys(
-                groups as Record<string, unknown>,
-                ['a', 'b', 'c'],
-            ),
-            ['b'],
         );
     },
 );
