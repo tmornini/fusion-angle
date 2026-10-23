@@ -23,7 +23,7 @@ roles:
 - **background** / **foreground** / **card** /
   **border** / **input** / **ring**
 
-Theme HSL lives in `light-mode.css` and `dark-mode.css`.
+Palette HSL lives in `palette.css`, under one `:root`.
 
 ## Variants
 
@@ -94,12 +94,12 @@ node's share of trailing-90-day flow time. Stop positions are
 *non-uniform* — the top quarter of the value range compresses
 yellow → red, making a "bottleneck zone" visually salient:
 
-| Token              | Position | Light          | Dark           |
-|--------------------|----------|----------------|----------------|
-| `--heat-stop-low`  | 0%       | `210 85% 55%`  | `210 60% 60%`  |
-| `--heat-stop-mid`  | 50%      | `145 65% 50%`  | `145 50% 55%`  |
-| `--heat-stop-high` | 75%      | `48 95% 55%`   | `48 80% 60%`   |
-| `--heat-stop-peak` | 100%     | `0 80% 55%`    | `0 65% 60%`    |
+| Token              | Position | Value          |
+|--------------------|----------|----------------|
+| `--heat-stop-low`  | 0%       | `210 60% 60%`  |
+| `--heat-stop-mid`  | 50%      | `145 50% 55%`  |
+| `--heat-stop-high` | 75%      | `48 80% 60%`   |
+| `--heat-stop-peak` | 100%     | `0 65% 60%`    |
 
 **Mechanism.** Each node carries `style="--heat-t:${t}"` (a number in
 `[0, 1]` — the raw share of flow time). The fill is computed in CSS by
@@ -108,8 +108,7 @@ segment, with each segment's mix fraction expressed as
 `clamp(0%, calc((var(--heat-t) - <lo>) / <span> * 100%), 100%)` so
 the segment activates over its t-range and saturates outside it.
 Result: the palette stays in design tokens, the per-element data is a
-single number, dark mode follows automatically, and there is *no*
-color math in TypeScript.
+single number, and there is *no* color math in TypeScript.
 
 **Legend.** A plain CSS `linear-gradient(to right, ...)` referencing
 the same four tokens at the same four positions; end labels read `0%`
@@ -172,16 +171,15 @@ Cascade (`./build`; alpha within globs):
 
 1. `tokens.css`
 2. `fonts.css`
-3. `light-mode.css`
-4. `dark-mode.css`
-5. `base.css`
-6. `components-*.css`
-7. `layout.css`
-8. `utilities.css`
-9. `responsive.css`
-10. `command-palette.css`
+3. `palette.css`
+4. `base.css`
+5. `components-*.css`
+6. `layout.css`
+7. `utilities.css`
+8. `responsive.css`
+9. `command-palette.css`
 
-Those ten are `assets/styles.css`. Then
+Those nine are `assets/styles.css`. Then
 `pages-*.css` per `cssBundles` on `page-registry.ts`;
 compose fills `{{PAGE_CSS_LINKS}}`.
 
@@ -192,7 +190,7 @@ compose fills `{{PAGE_CSS_LINKS}}`.
 | Single-property | `utilities.css` |
 | Reset / html | `base.css` |
 | Token | `tokens.css` |
-| Theme HSL | `light-mode.css` / `dark-mode.css` |
+| Palette HSL | `palette.css` |
 | Shell | `layout.css` |
 | Mobile override | `responsive.css` |
 
