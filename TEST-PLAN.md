@@ -5699,9 +5699,9 @@ FSM, unlike `flows/detail`).
   `forbidden: GET /organizations/:id/invitations/
   requires a role this principal lacks` (the real
   organization id in place of `:id`). The rejection is
-  logged and
-  `paintSentInvitations` does not run, so the box stays hidden
-  and no Revoke is offered. "Admin access required" paints only
+  logged and `paintSentInvitations` does not run, so the
+  box stays hidden and no Revoke is offered.
+  "Admin access required" paints only
   when the organization pair itself rejects 403
   (`web-app/organization/index.ts`), which this member's
   organization GET does not. (Pairs with V7's grant/revoke 403s.)
