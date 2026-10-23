@@ -96,26 +96,4 @@ export function initMobileDrawer(
             }
         },
     );
-
-    const searchBar = $(
-        '#mobile-search-bar', document,
-    );
-    if (searchBar) {
-        $required(
-            '#mobile-search-toggle',
-            document,
-        ).addEventListener(
-            'click',
-            () => searchBar.classList
-                .remove('hidden'),
-        );
-        $required(
-            '#mobile-search-close',
-            document,
-        ).addEventListener(
-            'click',
-            () => searchBar.classList
-                .add('hidden'),
-        );
-    }
 }
