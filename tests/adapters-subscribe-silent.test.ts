@@ -15,7 +15,7 @@ const NULL_STORAGE: Partial<Storage> = {
 // be a TDZ ReferenceError under a synchronous replay, so
 // this pin reads every such export from the adapter index —
 // a fourteenth is covered the day it lands. Stubs land
-// before the import: the module graph reads theme/session
+// before the import: the module graph reads session
 // state at load.
 Deno.test(
     'every adapter subscription is silent until a bell',

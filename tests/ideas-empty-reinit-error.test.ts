@@ -17,7 +17,7 @@ const MEMBER_ID = 'XXZruirZyAOoRpNxaDnpSA';
 // boot's failure does through handlePageLoadError, and must
 // never leak to the global unhandledrejection handler. Stubs
 // land before any web-app import — the module graph reads
-// theme/session state at load.
+// session state at load.
 
 function makeListStub(): {
     innerHTML: string;

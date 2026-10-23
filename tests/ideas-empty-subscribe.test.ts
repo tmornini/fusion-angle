@@ -22,7 +22,7 @@ const SUBMITTED_AT = '2026-08-25T00:00:00.000000Z';
 // SV8b: a list page whose initial fetch is EMPTY must
 // still hear the cross-tab fusion-angle:data bell and
 // come alive. Stubs land before any web-app import —
-// the module graph reads theme/session state at load.
+// the module graph reads session state at load.
 
 function makeListStub(): {
     innerHTML: string;

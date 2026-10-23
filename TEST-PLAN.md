@@ -6482,12 +6482,9 @@ layout.
   `fusion-angle:sidebar-collapsed`).
   Drive `#sidebar-toggle` by selector in tab 1,
   not screenshot-xy on the brand (Apple menu).
-  Pin: exploratory — the live cross-tab sync; only
-       the `STORAGE_KEY_THEME` branch of `state.ts`'s
-       shared storage-event listener is tested (a
-       sibling test in `tests/state-theme-icon.test.ts`)
-       — its `STORAGE_KEY_SIDEBAR` sibling branch
-       carries no CLI test today
+  Pin: exploratory — the live cross-tab sync;
+       `state.ts`'s storage-event listener carries no
+       CLI test today
 
 ### Accessibility
 
