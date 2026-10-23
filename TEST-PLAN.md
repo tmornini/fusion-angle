@@ -5351,9 +5351,12 @@ FSM, unlike `flows/detail`).
        hide/show (`bindAddMemberDialog` in
        web-app/members/index.ts carries no CLI or
        browser test)
-- [ ] **G14a** With Kind=AI selected, leave the Model
-  pulldown on its placeholder and click Create. PASS: a
-  toast "Model is required" fires and no POST happens.
+- [ ] **G14a** With Kind=AI selected, leave every field
+  empty and click Create. PASS: a toast "Name is
+  required" fires and no POST happens. Fill Name, leave
+  the Model pulldown on its placeholder, and click
+  Create. PASS: a toast "Model is required" fires and no
+  POST happens.
   Pick a Model (Driving notes: native `<select>`),
   fill the other AI fields, click Create.
   PASS: toast confirms and the AI is created by the
@@ -5364,8 +5367,9 @@ FSM, unlike `flows/detail`).
   Pin: tests/adapters-ai-members.test.ts
        'postAIMemberCreation posts the memberships
        statement' (decides the one POST this Create
-       triggers); exploratory — the live "Model is
-       required" toast and the no-POST-until-chosen gate
+       triggers); exploratory — the live "Name is
+       required" and "Model is required" toasts and the
+       no-POST gate until a name and a model are given
 - [ ] **G14b** With Kind=Service selected, leave Name
   and Description empty and click Create. PASS: a toast
   "Name and description are required" fires and no POST
