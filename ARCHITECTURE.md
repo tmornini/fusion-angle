@@ -52,8 +52,8 @@ with no env copy.
 
 postgres.js 3.4.9 is embedded behind
 `api/postgres-client.ts` only (named exception).
-localStorage holds UI preferences only — theme, sidebar,
-log level, active organization id — never data.
+localStorage holds UI preferences only — sidebar, log
+level, active organization id — never data.
 
 Measured (do not round away): retired Node start-up
 0.065s, 674741 bytes; host `fusion-angle` median

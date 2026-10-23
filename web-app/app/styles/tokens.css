@@ -1,4 +1,4 @@
-/* Theme-neutral design tokens. */
+/* Design tokens. */
 
 :root {
     /* Core Brand Colors */
@@ -38,11 +38,11 @@
     --gray-800: 217 16% 22%;
     --gray-900: 217 20% 15%;
 
-    /* Accent base (yellow theming, theme-neutral) */
+    /* Accent base (yellow) */
     --accent: var(--yellow-400);
     --accent-foreground: var(--blue-900);
 
-    /* Destructive foreground (white in both themes) */
+    /* Destructive foreground (white) */
     --destructive-foreground: 0 0% 100%;
 
     /* Focus ring color */
@@ -60,7 +60,7 @@
     --focus-ring-offset: 2px;
     --focus-ring-color: var(--blue-500);
 
-    /* Shadows (base — theme-neutral) */
+    /* Shadows (base) */
     --shadow-xs: 0 1px 2px 0 hsl(var(--blue-900) / 0.04);
     --shadow-sm:
         0 1px 3px 0 hsl(var(--blue-900) / 0.06),
@@ -150,7 +150,7 @@
         background-color var(--duration-fast)
         var(--ease-default);
 
-    /* Theme-neutral gradients */
+    /* Gradients */
     --gradient-primary:
         linear-gradient(135deg,
         hsl(var(--blue-500)) 0%,

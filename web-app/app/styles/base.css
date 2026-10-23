@@ -13,7 +13,7 @@ html {
     line-height: var(--leading-normal);
     font-size: 16px;
     tab-size: 4;
-    color-scheme: light;
+    color-scheme: dark;
 }
 
 body {

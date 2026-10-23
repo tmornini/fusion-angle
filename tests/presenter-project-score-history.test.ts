@@ -10,11 +10,6 @@ import {
 // element.
 const g = globalThis as Record<string, unknown>;
 g['window'] = {
-    matchMedia: () => ({
-        matches: false,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-    }),
     addEventListener: () => {},
 };
 g['document'] = { addEventListener: () => {} };

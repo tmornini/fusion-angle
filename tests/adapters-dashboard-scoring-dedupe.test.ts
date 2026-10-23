@@ -68,11 +68,6 @@ Deno.test(
             'objective-aggregates-card',
         );
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {

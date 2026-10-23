@@ -19,8 +19,8 @@ const DRAIN_TURNS = 5;
 // latency hook, which every client verb awaits before its
 // simulated network hop: the members boot runs up to its
 // pending read and stops there. Stubs land before any
-// web-app import — the module graph reads theme and
-// session state at load.
+// web-app import — the module graph reads session
+// state at load.
 
 type ElementStub = {
     innerHTML: string;
@@ -66,11 +66,6 @@ Deno.test(
         const g = globalThis as Record<string, unknown>;
         const elements = new Map<string, ElementStub>();
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {

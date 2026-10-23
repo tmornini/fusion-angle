@@ -24,7 +24,7 @@ const RENAMED = 'Stats flow, renamed in another tab';
 // can ever see is another tab's: it must hear the cross-tab
 // fusion-angle:data bell and re-read the server. Stubs land
 // before any web-app import — the module graph reads
-// theme/session state at load.
+// session state at load.
 
 function makeHostStub(): {
     id: string;
@@ -94,11 +94,6 @@ Deno.test(
         >;
         const host = makeHostStub();
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['MutationObserver'] = class {

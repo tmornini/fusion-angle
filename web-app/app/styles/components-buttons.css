@@ -154,12 +154,12 @@
     color: hsl(var(--primary-foreground));
     font-weight: var(--font-weight-semibold);
     box-shadow:
-        0 2px 8px hsl(var(--primary) / 0.3);
+        0 2px 8px hsl(var(--primary) / 0.2);
 }
 .btn-hero:hover {
     opacity: 0.9;
     box-shadow:
-        0 4px 12px hsl(var(--primary) / 0.4);
+        0 4px 12px hsl(var(--primary) / 0.3);
 }
 .btn-hero:disabled {
     opacity: 0.5;

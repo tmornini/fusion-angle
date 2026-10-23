@@ -1,8 +1,5 @@
 import { log } from '../logger.ts';
-import {
-    STORAGE_KEY_THEME,
-    STORAGE_KEY_SIDEBAR,
-} from '../storage-keys.ts';
+import { STORAGE_KEY_SIDEBAR } from '../storage-keys.ts';
 
 function getPreference(
     key: string,
@@ -10,35 +7,14 @@ function getPreference(
     return localStorage.getItem(key);
 }
 
-type StoredTheme = 'light' | 'dark' | 'system';
-
 const BOOL_STRING_TRUE = 'true';
 const BOOL_STRING_FALSE = 'false';
 
-function isStoredTheme(
-    value: string | null,
-): value is StoredTheme {
-    return value === 'light'
-        || value === 'dark'
-        || value === 'system';
-}
-
-// The validated theme/sidebar readers — ONE truth for the
-// pre-paint module (theme-init.ts) and state.ts, so a
-// corrupt persisted value fails identically (loudly) at
-// every reader. Absence reads as the documented default:
-// system theme, expanded sidebar.
-function getStoredTheme(): StoredTheme {
-    const raw = getPreference(
-        STORAGE_KEY_THEME,
-    );
-    if (raw === null) return 'system';
-    if (isStoredTheme(raw)) return raw;
-    throw new Error(
-        'corrupt stored theme: ' + raw,
-    );
-}
-
+// The validated sidebar reader — ONE truth for the
+// pre-paint script and state.ts, so a corrupt persisted
+// value fails identically (loudly) at every reader.
+// Absence reads as the documented default: expanded
+// sidebar.
 function getStoredSidebarCollapsed(): boolean {
     const raw = getPreference(
         STORAGE_KEY_SIDEBAR,
@@ -57,8 +33,8 @@ function deletePreference(key: string): void {
 }
 
 // Preference writes are non-critical:
-// theme and sidebar state are observable
-// fallbacks if persistence fails (the app
+// sidebar state is an observable
+// fallback if persistence fails (the app
 // just renders the default on next load).
 // Quota-exceeded is expected and reported
 // via the false return; other errors
@@ -91,14 +67,11 @@ function putPreference(
     }
 }
 
-export type { StoredTheme };
 export {
     getPreference,
     putPreference,
     deletePreference,
-    getStoredTheme,
     getStoredSidebarCollapsed,
-    isStoredTheme,
     BOOL_STRING_TRUE,
     BOOL_STRING_FALSE,
 };

@@ -1929,9 +1929,9 @@ Off the critical path; each with its oracle.
     `inSidebarNav` titles equal the 12-item order
     verbatim; one exclusion is checked today, never the
     order or the full set
-  - The header's search bar, stats tiles, and theme
-    toggle, and the retired greeting and org `<select>`
-    being truly absent from the live DOM (C3) — Layer 2;
+  - The header's search bar and stats tiles, and the
+    retired greeting and org `<select>` being truly
+    absent from the live DOM (C3) — Layer 2;
     `mutateHeaderInfo` mutates `document` directly and
     has no pure-function seam
   - The visual order of the four dashboard surfaces and
@@ -2236,9 +2236,8 @@ Off the critical path; each with its oracle.
   - The live click advancing the stepper, the accent
     stroke, and the dimmed opacity's painted ~30% (FS7) —
     Layer 2
-  - The painted contrast of tints and card text in both
-    themes (FS8) — Layer 2, toggling dark mode and
-    reading computed contrast
+  - The painted contrast of tints and card text
+    (FS8) — Layer 2, reading computed contrast
   - The redirect to `flows/index.html` when `flowId` is
     absent (Layer 2; `init()` in `web-app/flows/stats.ts`
     is exported but untested) and the "Here now" WIP
@@ -2300,24 +2299,12 @@ Off the critical path; each with its oracle.
     and revoked badges are pinned (`:152`, `:170`)
   - The not-found page's rendered message and link (H2) —
     Layer 2, a CDP test navigating to an unknown route
-  - The live dark/light repaint — background, text, CSS
-    custom properties — from a toggle click (I1, I3) —
-    Layer 2; the CLI tests prove `data-theme` and icon
-    state, never that the variables repaint
-  - The theme choice actually persisting across a
-    navigation or reload (I2, I5, FS8) — Layer 1,
-    `tests/state-init.test.ts`; its `matchMedia` stub
-    returns `matches: true`, which the module's own
-    `'system'` default already satisfies, so the
-    assertion holds with `initState()` never called.
-    Flipping that one value to `false` closes it
   - `initState` hydrating a VALID stored
     `fusion-angle:sidebar-collapsed` value, and the
-    `STORAGE_KEY_SIDEBAR` branch of the shared
-    storage-event listener (I8, I28) — Layer 1,
+    sidebar storage-event listener (I8, I28) — Layer 1,
     `tests/state-init.test.ts` (only the corrupt-value
-    rejection is tested) and a sidebar sibling of
-    `tests/state-theme-icon.test.ts`'s cross-tab test
+    rejection is tested) and a synthetic `storage`
+    event for `STORAGE_KEY_SIDEBAR` after `initListeners`
   - `.mobile-header` going hidden again after the
     viewport is restored to ≥768px (I10) — Layer 2, one
     more assertion beside the `#desktop-sidebar` restore
@@ -3553,6 +3540,42 @@ Off the critical path; each with its oracle.
   count addends do not sum to 1889. Oracle: the ops
   refuse a missing pair, and the addends sum to
   `EXPECTED_MESSAGE_PAIR_COUNT`.
+- A mouse-focused `select.input` glows at 0.3, not
+  0.2. The dark-only fold moved the dark 0.3 glow
+  from `.input:focus-visible` onto `.input:focus`
+  (`web-app/app/styles/components-inputs.css:21-25`,
+  `8abbfd4b`); a text input matches `:focus-visible`
+  on a click, a select does not
+  (`web-app/identities/detail.html:74`). Oracle: the
+  owner keeps 0.3 and deletes this bullet, or a
+  `.input:focus-visible` rule carries 0.3 and
+  `.input:focus` 0.2.
+- A disabled hero button can never be hovered.
+  `.btn:disabled` sets `pointer-events: none`
+  (`web-app/app/styles/components-buttons.css:59-62`),
+  so `.btn-hero:disabled`'s `cursor: not-allowed`
+  (`:164-168`) never shows, and the dark-only
+  hover-glow fold changes nothing visible. Oracle: the
+  dead `cursor` declaration is gone, or
+  `pointer-events: none` is, with the hover glow
+  guarded by `:not(:disabled)`.
+- `.tooltip` (`web-app/app/styles/components-menus.css:51`)
+  styles nothing: no page renders the class, and the
+  dark-only parity check injected one by hand. The
+  app's tooltips are `title` attributes
+  (`web-app/app/presenters/project-action-bar.ts:92`).
+  Oracle: a page renders `.tooltip`, or the rule and
+  `--z-tooltip` (`web-app/app/styles/tokens.css:177`)
+  are gone.
+- DESIGN-SYSTEM.md:170 names the cascade's builder
+  `./build`; the script is `./bin/build`. Oracle:
+  `grep -n '\./build' DESIGN-SYSTEM.md` is empty.
+- Three dark-only changes no screenshot compared: the
+  skeleton shimmer, now animating
+  (`web-app/app/styles/components-feedback.css:36-52`);
+  the select glow above; and the design-system do/don't
+  card borders at 390px, below the 8000px capture cap.
+  Oracle: the walk scores each by eye.
 
 ## Sequencing
 

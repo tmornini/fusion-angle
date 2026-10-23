@@ -21,7 +21,6 @@ import { responseMessage } from './fixtures/response-message.ts';
 // stubbed because the detail presenters below walk a real
 // DOM tree via renderShell/mutateSlot.
 globalThis.window = {
-    matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub

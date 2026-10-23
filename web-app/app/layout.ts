@@ -9,10 +9,6 @@ import {
     initActiveNavItem,
 } from './nav-highlight.ts';
 import {
-    mutateThemeToggleIcon,
-    initThemeAndDropdowns,
-} from './theme-toggle.ts';
-import {
     mutateSidebarMember,
 } from './sidebar-member.ts';
 import {
@@ -95,9 +91,7 @@ async function initSidebarLayout(
     initActiveNavItem();
     initSidebar();
     initSignOut();
-    initThemeAndDropdowns();
     initMobileDrawer();
-    mutateThemeToggleIcon();
     // The identity-scoped widgets — the member chip name and the
     // invitations bell — render for any logged-in visitor, even a
     // zero-membership identity on its invitations page. The header

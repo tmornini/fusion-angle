@@ -1,0 +1,112 @@
+/* Semantic HSL assignments. */
+
+:root {
+    /* Semantic: Background */
+    --background: var(--gray-900);
+    --foreground: var(--gray-100);
+
+    /* Semantic: Surfaces */
+    --card: var(--gray-800);
+    --color-card-bg: hsl(var(--card));
+    --color-surface: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-muted-foreground:
+        hsl(var(--muted-foreground));
+    --card-foreground: var(--gray-100);
+    --popover: var(--gray-800);
+    --popover-foreground: var(--gray-100);
+
+    /* Semantic: Primary */
+    --primary: 217 45% 60%;
+    --primary-foreground: var(--gray-900);
+    --primary-hover: 217 45% 55%;
+    --primary-active: 217 45% 50%;
+
+    /* Semantic: Secondary */
+    --secondary: var(--gray-700);
+    --secondary-foreground: var(--gray-200);
+    --secondary-hover: var(--gray-600);
+
+    /* Semantic: Muted */
+    --muted: var(--gray-700);
+    --muted-foreground: var(--gray-400);
+
+    /* Accent variants (tinted backgrounds and text).
+        --accent-text on --accent-soft measures 8.76:1
+        (WCAG AA >= 4.5). */
+    --accent-soft: 48 40% 15%;
+    --accent-text: 48 80% 65%;
+
+    /* Semantic: Destructive */
+    --destructive: 0 65% 55%;
+    --destructive-hover: 0 72% 55%;
+
+    /* Semantic: Interactive */
+    --border: var(--gray-700);
+    --border-strong: var(--gray-600);
+    --input: var(--gray-700);
+
+    /* Status: Success. Dark-on-green button text: the
+        foreground measures 7.11:1 on --success and
+        5.78:1 on --success-hover (WCAG AA >= 4.5);
+        white measured 2.20:1 and failed. */
+    --success: 152 55% 50%;
+    --success-hover: 152 55% 45%;
+    --success-foreground: 152 60% 10%;
+    --success-soft: 152 40% 15%;
+    --success-border: 152 40% 30%;
+    --success-text: 152 55% 65%;
+
+    /* Status: Warning */
+    --warning: 38 85% 55%;
+    --warning-foreground: 38 90% 10%;
+    --warning-soft: 38 40% 15%;
+    --warning-border: 38 40% 30%;
+    --warning-text: 38 80% 65%;
+
+    /* Status: Danger (escalation above warning) */
+    --danger: 0 75% 60%;
+
+    /* Status: Error */
+    --error: 0 65% 58%;
+    --error-foreground: 0 0% 100%;
+    --error-soft: 0 40% 15%;
+    --error-border: 0 40% 30%;
+    --error-text: 0 65% 70%;
+
+    /* Status: Info */
+    --info: 217 45% 60%;
+    --info-foreground: 0 0% 100%;
+    --info-soft: 217 40% 15%;
+    --info-border: 217 40% 30%;
+    --info-text: 217 45% 70%;
+
+    /* Soft variants for primary and muted */
+    --primary-soft: 217 40% 15%;
+    --muted-soft: var(--gray-800);
+
+    /* Card shadows */
+    --shadow-card:
+        0 1px 3px 0 hsl(0 0% 0% / 0.2),
+        0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-card-hover:
+        0 8px 16px -4px hsl(0 0% 0% / 0.3),
+        0 4px 6px -2px hsl(0 0% 0% / 0.2);
+
+    /* Subtle gradient */
+    --gradient-subtle:
+        linear-gradient(180deg,
+        hsl(var(--gray-900)) 0%,
+        hsl(var(--gray-800)) 100%);
+
+    /* Chart Colors (extended palette) */
+    --chart-5: 217 71% 63%;
+    --chart-6: 280 65% 70%;
+
+    /* Heat-map ramp (flow-stats page) -- four fixed stops, non-uniform */
+    /* positions: blue @0% -> green @50% -> yellow @75% -> red @100%.   */
+    --heat-stop-low:  210 60% 60%;
+    --heat-stop-mid:  145 50% 55%;
+    --heat-stop-high:  48 80% 60%;
+    --heat-stop-peak:   0 65% 60%;
+}

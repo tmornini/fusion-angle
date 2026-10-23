@@ -11,7 +11,6 @@ import { responseMessage } from './fixtures/response-message.ts';
 // because ProjectListPresenter.render walks a real DOM
 // element.
 globalThis.window = {
-    matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub

@@ -19,7 +19,7 @@ import {
 } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import { initTabs } from '../app/dialog.ts';
-import { initDropdown } from '../app/theme-toggle.ts';
+import { initDropdown } from '../app/dropdown.ts';
 import {
     getFlowsForCreation,
     type NotReadyFlowEntry,

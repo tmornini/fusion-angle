@@ -32,13 +32,12 @@ Deno.test('sidebars use the PNG mark', () => {
     }
 });
 
-Deno.test('brand CSS inverts the mark in light theme',
+Deno.test('brand CSS styles the PNG mark, not the atom',
 () => {
     const src = Deno.readTextFileSync(
         'web-app/app/styles/components-brand.css',
     );
     assertMatch(src, /\.brand-mark/);
-    assertMatch(src, /invert\(1\)/);
     assertNotMatch(src, /logo-orbital/);
     assertNotMatch(src, /logo-nucleus/);
 });
@@ -72,16 +71,4 @@ Deno.test('server declares image/png for .png', () => {
         'server/http-server.ts',
     );
     assertMatch(src, /'\.png': 'image\/png'/);
-});
-
-Deno.test('auth branding does not invert the mark',
-() => {
-    const src = Deno.readTextFileSync(
-        'web-app/app/styles/components-brand.css',
-    );
-    assertMatch(
-        src,
-        /html:not\(\[data-theme="dark"\]\) \.auth-branding \.brand-mark/,
-    );
-    assertMatch(src, /filter:\s*none/);
 });

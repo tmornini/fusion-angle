@@ -15,18 +15,13 @@ const NULL_STORAGE: Partial<Storage> = {
 // be a TDZ ReferenceError under a synchronous replay, so
 // this pin reads every such export from the adapter index —
 // a fourteenth is covered the day it lands. Stubs land
-// before the import: the module graph reads theme/session
+// before the import: the module graph reads session
 // state at load.
 Deno.test(
     'every adapter subscription is silent until a bell',
     () => withLocalStorageAsync(NULL_STORAGE, async () => {
         const g = globalThis as Record<string, unknown>;
         g['window'] = {
-            matchMedia: () => ({
-                matches: false,
-                addEventListener: () => {},
-                removeEventListener: () => {},
-            }),
             addEventListener: () => {},
         };
         g['document'] = { addEventListener: () => {} };

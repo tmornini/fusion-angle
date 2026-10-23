@@ -7,7 +7,6 @@ import * as presenters from
 // stubbed because some re-exported presenters walk a real
 // DOM element.
 globalThis.window = {
-    matchMedia: () => ({ matches: false }),
     addEventListener: () => {},
 } as unknown as Window & typeof globalThis;
 // @ts-expect-error — Node global stub

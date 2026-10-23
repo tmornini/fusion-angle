@@ -51,10 +51,10 @@ bundle_client() {
         --platform browser \
         --format iife \
         --minify \
-        -o "$dest/assets/theme-init.js" \
-        web-app/app/theme-init.ts
+        -o "$dest/assets/sidebar-restore.js" \
+        web-app/app/sidebar-restore.ts
 
-    emitted "Bundle created" "$dest/assets/theme-init.js"
+    emitted "Bundle created" "$dest/assets/sidebar-restore.js"
 
     deno bundle --frozen \
         --platform browser \
@@ -72,8 +72,7 @@ bundle_client() {
 
     cat web-app/app/styles/tokens.css \
         web-app/app/styles/fonts.css \
-        web-app/app/styles/light-mode.css \
-        web-app/app/styles/dark-mode.css \
+        web-app/app/styles/palette.css \
         web-app/app/styles/base.css \
         web-app/app/styles/components-*.css \
         web-app/app/styles/layout.css \
