@@ -50,8 +50,17 @@ not mid-walk.
    Deploy runs Layer 1, `./test postgres` (AT4), and
    `./test browser` (AT5) before it serves. Red
    anywhere aborts the walk — no explorer is
-   dispatched. Read the seed reveal from stdout;
-   it is shown once. A3 **is** SV1.
+   dispatched. Launch A3 as the harness's own
+   background task. The task's command is
+   `./deploy --local 8080 --postgres mock-data`
+   and nothing else: no `&`, `nohup`, `setsid`,
+   `disown`, pid file, or wrapper that returns
+   before deploy does. Read the seed reveal from
+   the task's output; it is shown once. Record
+   the task id in the master's notes. A launch
+   that backgrounds deploy ends the harness task
+   at once, leaves deploy reparented and parked,
+   and leaves J1 nothing to stop. A3 **is** SV1.
 3. Dispatch explorers until every case from **A4**
    through the end of `## SV` except **K8** has a
    scored line in the checkpoint
@@ -69,8 +78,10 @@ not mid-walk.
    summary (`## Summary Format`) and one stub per
    FAIL cluster. Do not summarize an incomplete
    checkpoint.
-5. Run **K8** (wipe and reseed — explorers have
-   returned), then **J1–J3**.
+5. Run **K8** (restart through owned deploy tasks —
+   explorers have returned), then **J1–J3**. J1
+   stops the `./deploy` task K8's restore launched.
+   Wait for `Removed` before any relaunch.
 
 The master does not drive the product and does not
 patch. The master does not invent deploy scripts;
@@ -588,10 +599,12 @@ any AT red.
   `demo@example.com` and
   `sarah.chen@company.com`); listen stdout has
   no passwords; seed does not travel over
-  HTTP. A3 is SV1.
+  HTTP; the harness lists the A3 task as
+  running after the listen. A3 is SV1.
   Pin: tests/pg-seed.test.ts 'mock-data seed
        prints every human sign-in'; exploratory
-       — the live process listening, the
+       — the live process listening, the A3
+       task running under the harness, the
        stdout/HTTP boundary, and that
        `demo@example.com` and
        `sarah.chen@company.com` are specifically
@@ -1477,11 +1490,17 @@ the second organization.
        'unsigned landing stays, books, and signs in'
 - [ ] **B2** "Book a pilot call" appears four times
   (navbar, mobile menu, hero, pilot section) as
-  anchors carrying `data-book-pilot` whose `href` is
-  the scheduling URL; "See how it works" scrolls to
-  `#how-it-works`. PASS: the four hrefs match and the
-  anchor scrolls. Do not click a `data-book-pilot`
-  anchor in the walk: it leaves the origin. Drive by
+  anchors carrying `data-book-pilot`. Their `href`
+  attribute is `PILOT_SCHEDULING_URL` from
+  `web-app/landing/index.ts`, the empty string until
+  the operator names a scheduling URL. Read it with
+  `getAttribute('href')`: the `href` property resolves
+  `''` to the page's own URL. "See how it works"
+  scrolls to `#how-it-works`. PASS: four anchors, each
+  `getAttribute('href')` is `''`, and "See how it
+  works" scrolls to `#how-it-works`. Do not click a
+  `data-book-pilot` anchor in the walk: it leaves the
+  origin. Drive by
   selector, never `.navbar-logo` (Apple menu).
   Pin: tests/browser/landing.test.ts 'unsigned landing
        stays, books, and signs in'
@@ -6622,23 +6641,24 @@ document order with the rest of this section.
        test drags an objective row;
        tests/browser/list-reorder.test.ts drags projects,
        a different list)
-- [ ] **K8** Empty state: stop the A3 process.
-  `./postgres-wipe --postgres local` then
-  `./postgres-seed --postgres local --bootstrap` then
-  start `./fusion-angle serve`. Sign in with the stdout
-  admin credential. Open Organization. PASS: the empty-state
-  copy "No objectives yet. Add one to get started."
-  renders (bootstrap seeds org 1 with no objectives).
-  Restore the mock garden by stopping again,
-  `./postgres-wipe --postgres local`, then
-  `./postgres-seed --postgres local --mock-data`, then
-  start. This is the one case that seeds `--bootstrap`
-  rather than `--mock-data`; do not skip it. `crank`
-  mints `POSTGRES_URL`/`JWT_HMAC_SIGNING_KEY` and never
-  prints them, so this manual restart needs them already
-  set in the master's own shell (e.g. from a prior
-  `./serve` session) — a pre-existing limitation of this
-  case, not one this audit can resolve.
+- [ ] **K8** Empty state: stop the A3 task with the
+  harness-native task stop. Wait for its output to
+  show the server, postgres, and network `Removed`.
+  Launch `./deploy --local 8080 --postgres bootstrap`
+  as a new owned task, under step 2's rules. Sign in
+  with the one admin line from its seed reveal. Open
+  Organization. PASS: the empty-state copy "No
+  objectives yet. Add one to get started." renders
+  (bootstrap seeds org 1 with no objectives).
+  Restore the mock garden: harness-stop that task,
+  wait for `Removed` in the same way, then launch
+  `./deploy --local 8080 --postgres mock-data` as the
+  next owned task and record its id. This is the one
+  case that seeds `--bootstrap` rather than
+  `--mock-data`; do not skip it. A K8 stop that
+  reports the task already exited is J1's failure
+  arriving early: score J1 FAIL then, and do not
+  continue K8 by hand.
   Pin: tests/presenter-organization-objectives.test.ts
        'empty state when no objectives'; exploratory —
        the live wipe/bootstrap/restore ceremony
@@ -7433,20 +7453,26 @@ K30 only describes.
 J1–J3 are the master's: `## The walk` step 5 runs
 them after K8, once the explorer has returned.
 
-- [ ] **J1** Stop the `./deploy` process started
-  in A3 via the harness-native task stop (not
-  `kill`). PASS: process terminates; the trap
-  ran `compose down --remove-orphans`. Sandbox
-  EPERM on `kill` is FAIL if the harness stop
-  itself fails; do not score BLOCKED.
-  Pin: exploratory — the live process actually
+- [ ] **J1** Stop the live `./deploy` task (K8's
+  restore, or A3's when K8 did not run) with the
+  harness-native task stop. No shell signal of any
+  kind. PASS: the harness reports the task stopped,
+  not already-exited; its output ends with
+  `Terminated: 15`, then server, postgres, and
+  network `Removed`. Already-exited is FAIL, and its
+  cause is a detached launch (A3). Sandbox EPERM on
+  the stop is FAIL if the harness stop itself
+  fails; do not score BLOCKED.
+  Pin: exploratory — the live task actually
        terminating under the harness stop
 - [ ] **J2** After J1 PASS, verify there is no
   leftover compose project and no `.env`.
   There is no temp bundle — there is no host
   `--no-zip` dir. PASS: no leftover compose
-  project, no `.env`. DEFERRED only if deploy
-  is still up.
+  project, no `.env`. DEFERRED when J1 is not PASS:
+  the master tears the stack down out of band and
+  records that in J1's FAIL detail. J2 is never
+  scored against a hand teardown.
   Pin: exploratory — no leftover compose
        project and no `.env` after teardown
 - [ ] **J3** Verify the ZIP file remains on
