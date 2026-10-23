@@ -5709,10 +5709,10 @@ FSM, unlike `flows/detail`).
        accepted and removed, and a pending item is 404'
        (decides a member's read of the sent list answers
        403 with that route-policy body under every
-       `state`, while the member's `accepted` and
-       `removed` membership reads answer 200);
-       exploratory — the
-       section staying hidden
+       `state`, the member's `accepted` and `removed`
+       membership reads answer 200, and a member's GET of
+       a pending invitation item or its versions is 404);
+       exploratory — the section staying hidden
 - [ ] **V10 — Accept an invitation revoked in another
   tab** As the admin, open the Organization page's
   Sent invitations in one tab; as the invitee, in a
