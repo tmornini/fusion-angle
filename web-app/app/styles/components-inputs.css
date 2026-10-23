@@ -21,7 +21,7 @@
 .input:focus {
     outline: none;
     border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.3);
 }
 .input:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-error { border-color: hsl(var(--destructive)); }
@@ -53,7 +53,7 @@
 .textarea:focus {
     outline: none;
     border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.3);
 }
 
 .label {
