@@ -7,15 +7,3 @@
     border-color:
         hsl(var(--border) / 0.5);
 }
-
-/* Hero button: softer glow in dark */
-[data-theme="dark"] .btn-hero {
-    box-shadow:
-        0 2px 8px hsl(var(--primary) / 0.2);
-}
-[data-theme="dark"]
-.btn-hero:hover {
-    box-shadow:
-        0 4px 12px
-        hsl(var(--primary) / 0.3);
-}
