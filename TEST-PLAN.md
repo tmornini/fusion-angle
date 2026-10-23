@@ -277,10 +277,37 @@ not repeat the note in every case.
   `document.visibilityState === 'visible'` before
   the port-drag. Driving the hidden tab is BLOCKED,
   not FAIL.
-- WB16: snapshot Performance *before* inbox
-  navigation. A transition POST dropped by navigation
-  is BLOCKED, not FAIL. The Layer 1 pins decide the
-  instance-shape body and If-Match.
+- WB11/WB16: one explorer's turn. Arm the network
+  read on the action-screen document before `submit`
+  navigates, by either (a) CDP `Network` enabled on
+  that target before the click, or (b) a `pagehide`
+  listener installed on that document before the
+  click that copies
+  `performance.getEntriesByType('resource')` into
+  `sessionStorage`, read back on the inbox. Arming
+  (a) records only requests issued after it is
+  enabled, so enable it before bind to see the
+  binding PUT. Arming (b) holds the whole document
+  buffer, PUT included, so it may be installed after
+  fill; it witnesses URL and status only, and the
+  Layer 1 pins decide the body and `If-Match`. A
+  `getEntries()` call made on the inbox document is
+  not the read, and `js()` fetch of the API is not a
+  read: the bearer is memory-only. A successor who
+  finds the inbox already loaded does not call
+  `getEntries()` there. They witness the pair once,
+  in this order: one fresh unbound Data Capture work
+  order, bind, fill, arm the read, click `submit`,
+  and snapshot before the inbox document commits
+  (with arming (a), enabled before bind). One
+  attempt. Append WB16's line after WB15's, out of
+  document order, holding the witnessed read until
+  then; a resume at the first ID after the last
+  scored line must not skip WB12 through WB15. A
+  transition POST missing because navigation dropped
+  an unarmed buffer is BLOCKED, not FAIL. The Layer 1
+  pins decide the instance-shape body and If-Match.
+  The live network-log read is the exploratory half.
 - Canvas `viewBox`: read `svg.getAttribute('viewBox')`,
   never `clientWidth` / `clientHeight`. 1102×549 is the
   wrap's pixel size, not a camera value.
@@ -345,6 +372,8 @@ not repeat the note in every case.
   'bind, fill, and submit navigates to the inbox
   (WB11)' decides the inbox navigation. If bind
   cannot be driven, record BLOCKED. Do not FAIL.
+  WB16's read is armed before this `submit`, in the
+  same turn (Driving notes, WB11/WB16).
 - WB19a/WB19b: drive while the bound WO is still
   Active, before WB14. If WB14 already archived it,
   DEFERRED on WB14, not FAIL. Layer 1 pins decide
@@ -4638,13 +4667,18 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        exploratory — the live keystroke fill
 - [ ] **WB16** Read the network log across WB11's bind
   and transition (never `js()` fetch — the bearer is
-  memory-only, per the explorer prompt). Snapshot
-  Performance *before* the inbox navigation lands;
-  a later `getEntries()` after navigation is not
-  this case. If the transition POST is missing from
-  the buffer because navigation dropped it, record
-  BLOCKED naming that — an honest BLOCKED costs
-  nothing. PASS: the
+  memory-only, per the explorer prompt). Drive WB16
+  in WB11's turn, on the action-screen document, with
+  the read armed before `submit`: CDP `Network`
+  enabled before bind, or a `pagehide` copy installed
+  after fill, before the `submit` click (Driving
+  notes, WB11/WB16). A
+  `getEntries()` on the inbox document
+  is not this case; a successor re-witnesses the pair
+  once, per that note. If the transition POST is
+  missing because navigation dropped an unarmed
+  buffer, record BLOCKED naming that — an honest
+  BLOCKED costs nothing. PASS: the
   binding PUT lands at `work-orders/:id/binding` with
   `{instance_id, record_type_id}` (200); the transition
   POST is `work-orders/:id/transition` (200) whose body
@@ -5351,9 +5385,12 @@ FSM, unlike `flows/detail`).
        hide/show (`bindAddMemberDialog` in
        web-app/members/index.ts carries no CLI or
        browser test)
-- [ ] **G14a** With Kind=AI selected, leave the Model
-  pulldown on its placeholder and click Create. PASS: a
-  toast "Model is required" fires and no POST happens.
+- [ ] **G14a** With Kind=AI selected, leave every field
+  empty and click Create. PASS: a toast "Name is
+  required" fires and no POST happens. Fill Name, leave
+  the Model pulldown on its placeholder, and click
+  Create. PASS: a toast "Model is required" fires and no
+  POST happens.
   Pick a Model (Driving notes: native `<select>`),
   fill the other AI fields, click Create.
   PASS: toast confirms and the AI is created by the
@@ -5364,8 +5401,9 @@ FSM, unlike `flows/detail`).
   Pin: tests/adapters-ai-members.test.ts
        'postAIMemberCreation posts the memberships
        statement' (decides the one POST this Create
-       triggers); exploratory — the live "Model is
-       required" toast and the no-POST-until-chosen gate
+       triggers); exploratory — the live "Name is
+       required" and "Model is required" toasts and the
+       no-POST gate until a name and a model are given
 - [ ] **G14b** With Kind=Service selected, leave Name
   and Description empty and click Create. PASS: a toast
   "Name and description are required" fires and no POST
@@ -5688,20 +5726,27 @@ FSM, unlike `flows/detail`).
   the member tier (`api/authorization.ts`), so `getOrganization`
   succeeds. The sent box starts `hidden`
   (`web-app/organization/index.html`). The default sent state is
-  `pending`. A member's read of `pending` is 403,
-  `forbidden: members read accepted or removed memberships`
-  (`memberViewRefusal`). The rejection is logged and
-  `paintSentInvitations` does not run, so the box stays hidden
-  and no Revoke is offered. "Admin access required" paints only
+  `pending`. A member's read of the organization's
+  invitations is 403 at the route policy, whatever the
+  `state` — `api/authorization.ts` grants a member no
+  `/organizations/:id/invitations` row — with the body
+  `forbidden: GET /organizations/:id/invitations/
+  requires a role this principal lacks` (the real
+  organization id in place of `:id`). The rejection is
+  logged and `paintSentInvitations` does not run, so the
+  box stays hidden and no Revoke is offered.
+  "Admin access required" paints only
   when the organization pair itself rejects 403
   (`web-app/organization/index.ts`), which this member's
   organization GET does not. (Pairs with V7's grant/revoke 403s.)
   Pin: tests/api-memberships.test.ts 'a member reads
        accepted and removed, and a pending item is 404'
-       (decides a member's unfiltered, `pending`,
-       `declined`, and `revoked` reads of the sent list
-       answer 403 `MEMBER_VIEW`); exploratory — the
-       section staying hidden
+       (decides a member's read of the sent list answers
+       403 with that route-policy body under every
+       `state`, the member's `accepted` and `removed`
+       membership reads answer 200, and a member's GET of
+       a pending invitation item or its versions is 404);
+       exploratory — the section staying hidden
 - [ ] **V10 — Accept an invitation revoked in another
   tab** As the admin, open the Organization page's
   Sent invitations in one tab; as the invitee, in a
@@ -6110,9 +6155,11 @@ FSM, unlike `flows/detail`).
   and Members lists for Stark. Select "Wayne
   Enterprises" → the page does a FULL reload onto
   Wayne: Ideas shows Wayne's ideas and Members shows
-  Wayne's humans; Stark's humans and Stark's ideas
-  are gone (organization-fenced); AI rows stay because
-  the catalog is global; and the switch paints no
+  Wayne's humans and Wayne's AI members — none in the
+  mock seed, which seats every AI at Stark; Stark's
+  humans, Stark's AIs, and Stark's ideas are gone (AI
+  agents are organization documents, fenced like the
+  rest); and the switch paints no
   `Something went wrong` card. Reload the page again WITHOUT
   changing the select → Wayne stays active (the choice
   is stored under `fusion-angle:active-organization-id`
@@ -6146,6 +6193,10 @@ FSM, unlike `flows/detail`).
        'switching the active org re-scopes members and
        ideas' (decides Members/Ideas re-scope on switch
        and org-1 rows are fenced from org-2);
+       tests/member-list-scope.test.ts 'an A-scoped
+       context lists none of B's members' (decides an
+       AI member, like a human or a service, lists only
+       under its own organization);
        tests/adapters-organization-session-exchange.test.ts
        'resolveActiveOrganization prefers a reachable
        persisted choice' (decides the persisted-choice-

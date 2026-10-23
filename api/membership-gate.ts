@@ -106,22 +106,6 @@ export function memberSeesState(
         || MEMBER_VISIBLE_STATES.includes(state);
 }
 
-// undefined: admitted. A string: the 403 error.
-export function memberViewRefusal(
-    roles: readonly string[],
-    query: ViewQuery,
-): string | undefined {
-    if (roles.includes('admin')) return undefined;
-    if (
-        query.kind === 'state'
-        && memberSeesState(roles, query.state)
-    ) {
-        return undefined;
-    }
-    return 'forbidden: members read accepted or'
-        + ' removed memberships';
-}
-
 export type MembershipNest = 'organization' | 'identity';
 
 // 'foreign': 403. 'absent': 404. undefined: the path's.
