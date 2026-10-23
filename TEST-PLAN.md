@@ -277,10 +277,37 @@ not repeat the note in every case.
   `document.visibilityState === 'visible'` before
   the port-drag. Driving the hidden tab is BLOCKED,
   not FAIL.
-- WB16: snapshot Performance *before* inbox
-  navigation. A transition POST dropped by navigation
-  is BLOCKED, not FAIL. The Layer 1 pins decide the
-  instance-shape body and If-Match.
+- WB11/WB16: one explorer's turn. Arm the network
+  read on the action-screen document before `submit`
+  navigates, by either (a) CDP `Network` enabled on
+  that target before the click, or (b) a `pagehide`
+  listener installed on that document before the
+  click that copies
+  `performance.getEntriesByType('resource')` into
+  `sessionStorage`, read back on the inbox. Arming
+  (a) records only requests issued after it is
+  enabled, so enable it before bind to see the
+  binding PUT. Arming (b) holds the whole document
+  buffer, PUT included, so it may be installed after
+  fill; it witnesses URL and status only, and the
+  Layer 1 pins decide the body and `If-Match`. A
+  `getEntries()` call made on the inbox document is
+  not the read, and `js()` fetch of the API is not a
+  read: the bearer is memory-only. A successor who
+  finds the inbox already loaded does not call
+  `getEntries()` there. They witness the pair once,
+  in this order: one fresh unbound Data Capture work
+  order, bind, fill, arm the read, click `submit`,
+  and snapshot before the inbox document commits
+  (with arming (a), enabled before bind). One
+  attempt. Append WB16's line after WB15's, out of
+  document order, holding the witnessed read until
+  then; a resume at the first ID after the last
+  scored line must not skip WB12 through WB15. A
+  transition POST missing because navigation dropped
+  an unarmed buffer is BLOCKED, not FAIL. The Layer 1
+  pins decide the instance-shape body and If-Match.
+  The live network-log read is the exploratory half.
 - Canvas `viewBox`: read `svg.getAttribute('viewBox')`,
   never `clientWidth` / `clientHeight`. 1102×549 is the
   wrap's pixel size, not a camera value.
@@ -345,6 +372,8 @@ not repeat the note in every case.
   'bind, fill, and submit navigates to the inbox
   (WB11)' decides the inbox navigation. If bind
   cannot be driven, record BLOCKED. Do not FAIL.
+  WB16's read is armed before this `submit`, in the
+  same turn (Driving notes, WB11/WB16).
 - WB19a/WB19b: drive while the bound WO is still
   Active, before WB14. If WB14 already archived it,
   DEFERRED on WB14, not FAIL. Layer 1 pins decide
@@ -4638,13 +4667,18 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        exploratory — the live keystroke fill
 - [ ] **WB16** Read the network log across WB11's bind
   and transition (never `js()` fetch — the bearer is
-  memory-only, per the explorer prompt). Snapshot
-  Performance *before* the inbox navigation lands;
-  a later `getEntries()` after navigation is not
-  this case. If the transition POST is missing from
-  the buffer because navigation dropped it, record
-  BLOCKED naming that — an honest BLOCKED costs
-  nothing. PASS: the
+  memory-only, per the explorer prompt). Drive WB16
+  in WB11's turn, on the action-screen document, with
+  the read armed before `submit`: CDP `Network`
+  enabled before bind, or a `pagehide` copy installed
+  after fill, before the `submit` click (Driving
+  notes, WB11/WB16). A
+  `getEntries()` on the inbox document
+  is not this case; a successor re-witnesses the pair
+  once, per that note. If the transition POST is
+  missing because navigation dropped an unarmed
+  buffer, record BLOCKED naming that — an honest
+  BLOCKED costs nothing. PASS: the
   binding PUT lands at `work-orders/:id/binding` with
   `{instance_id, record_type_id}` (200); the transition
   POST is `work-orders/:id/transition` (200) whose body
