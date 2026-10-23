@@ -4,8 +4,8 @@
 // page paints in the correct state. Inline-script equivalent
 // of FOUC prevention; extracted to a same-origin file so a
 // strict Content-Security-Policy (script-src 'self') can
-// forbid inline scripts. esbuild bundles the imports below
-// into a self-contained IIFE per ./build.
+// forbid inline scripts. `deno bundle` folds the imports
+// below into a self-contained IIFE at build time.
 
 import { getStoredSidebarCollapsed } from './adapters/preferences.ts';
 
