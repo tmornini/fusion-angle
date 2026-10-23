@@ -3094,9 +3094,7 @@ Off the critical path; each with its oracle.
   Buffer path does
 - Stale-history comment cleanup as one pass — comments
   still describe a past state as present. Sampled:
-  `web-app/app/measure-cli.ts` names a Node harness;
-  `web-app/app/page-request-profile.ts` says "No-op in
-  Node"; `tests/drift-states.test.ts` says derive-states
+  `tests/drift-states.test.ts` says derive-states
   is unread in production while `api/routes.ts` imports
   it; `api/routes.ts` claims a revival dual-write, though
   no states row half exists; `states.postEvent`,

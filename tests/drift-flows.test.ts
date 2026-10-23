@@ -1024,9 +1024,7 @@ Deno.test('sidecar insensitivity: graphDelta/revivals disagreeing '
     // validateFlowDocumentBody never cross-checks the sidecars
     // against `graph` (they are independent fields), so this is
     // a legal below-gate write. Phase Final Task 2: derive and
-    // wire both track `graph` alone; graphDelta only feeds
-    // deriveFlowGraphStates (SIDECAR-KEEP), not the working
-    // graph.
+    // wire both track `graph` alone.
     const graph = graphJson(
         [wireNode(SIDECAR_GRAPH_NODE, 'Graph Node')], [],
     );

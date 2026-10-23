@@ -92,12 +92,6 @@ function snapToSave(
     };
 }
 
-// Undo-as-replay (Phase 14 Task 8): no longer archives the
-// PRE-edit state through postFlowVersion first — that archive
-// existed solely to give the OLD undo mechanism a flow_versions
-// row to consume. putFlow's own document message pair (written on every
-// call, always) is now what a LATER undo's message-plane walk finds
-// as "the state before this edit," so the archive write is dead.
 // Routed through enqueueFlowSave (same per-flowId chain as the
 // designer's #queueSave) so graph-edit commits cannot race
 // presenter-originated puts against the same baseline.
@@ -789,12 +783,10 @@ export async function performUndo(
     // Undo-as-replay (Phase 14 Task 8): exhaustion is a CLIENT-
     // side short-circuit against the session's hasUndoHistory
     // flag — no flow_versions fetch, no server round-trip at
-    // all, mirroring today's UX shape with the source swapped
-    // (see the PINNED Step 0 block,
-    // .superpowers/sdd/phase14-task-8-report.md). A direct-API
-    // caller that bypasses this gate still gets a graceful
-    // server-side no-op — the route performs zero domain writes
-    // when its own message-plane walk finds no target.
+    // all. A direct-API caller that bypasses this gate still
+    // gets a graceful server-side no-op — the route performs
+    // zero domain writes when its own message-plane walk
+    // finds no target.
     if (!history.hasUndoHistory) {
         return {
             kind: 'ok',

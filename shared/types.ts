@@ -522,9 +522,7 @@ export type IdentityCredentialStatus =
 // (contrast identity_pii). The client-assertion crypto is
 // REAL (RFC 7523 JWS, RS256/ES256) and the OAuth spine
 // (client registrations, identity-tokens,
-// identity_providers) is live; the remaining SP-5 items
-// are the ones access-token.ts names: per-client
-// multi-audience, DPoP cnf binding, jti reuse-detection.
+// identity_providers) is live.
 export interface IdentityCredentialEntity {
     id: Id;
     identity_id: Id;
@@ -1197,13 +1195,7 @@ export type FlowWithGraph = FlowEntity & {
 export type FlowNodeId = Id;
 export type FlowEdgeId = Id;
 
-// A flow-graph node as its own relation — the node is an
-// entity, not an array element welded into the flow's graph
-// blob (Commandment IX). The id IS the canvas node id: the
-// real FK target for flow_edges and the node-relationship
-// ledgers. EntityStore — an edit is a PUT by stable id, a
-// removal a 'deleted' states-log event, never a splice. `at`
-// is the client-minted moment of the last write.
+// `at` is the client-minted moment of the last write.
 export interface FlowNodeEntity {
     id: FlowNodeId;
     flow_id: Id;
@@ -1216,9 +1208,8 @@ export interface FlowNodeEntity {
     at: string;
 }
 
-// A named transition between two nodes, its own relation. The
-// id IS the canvas edge id; from_node_id / to_node_id are real
-// FKs to flow_nodes. EntityStore, same removal idiom as nodes.
+// A named transition between two nodes. The id IS the
+// canvas edge id.
 export interface FlowEdgeEntity {
     id: FlowEdgeId;
     flow_id: Id;
@@ -1228,18 +1219,13 @@ export interface FlowEdgeEntity {
     at: string;
 }
 
-// The relationship-ledger action vocabulary shared by both
-// node-relationship ledgers: a union is 'added', its
-// dissolution a NEW 'removed' row — never a splice. Current
-// state derives via latestByKey keeping the latest 'added'; a
-// same-`at` tie fails closed ('removed' outranks 'added',
-// mirroring role_grants' revoke-beats-grant).
+// A union is 'added' and its dissolution a new 'removed',
+// never a splice. Current state derives via latestByKey
+// keeping the latest 'added'; a same-`at` tie fails closed
+// ('removed' outranks 'added', mirroring role_grants'
+// revoke-beats-grant).
 export type FlowNodeRelationAction = 'added' | 'removed';
 
-// node↔member as its own relation with a moment of union — a
-// pure join (Codd) plus `at`. HistoryEntityStore (append-only
-// ledger); removal is a new 'removed' row. The members a node
-// currently holds derive from this ledger, never a stored set.
 export interface FlowNodeMemberEntity {
     id: Id;
     flow_node_id: FlowNodeId;

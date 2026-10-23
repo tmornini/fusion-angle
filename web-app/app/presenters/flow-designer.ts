@@ -219,16 +219,6 @@ export class FlowDesignerPresenter {
     // the FIRST user edit). Demo-tier concession: single-
     // flow-per-tab; not correctness-load-bearing for multi-
     // tab (putFlow's 412 retry still absorbs that).
-    //
-    // Undo-as-replay (Phase 14 Task 8) drops the versioned/
-    // non-versioned split: every save used to OPTIONALLY
-    // archive the pre-edit state through postFlowVersion
-    // first (feeding the OLD undo mechanism's flow_versions
-    // consume) — undo now resolves its target from the
-    // flows/:id document-message-pair history instead, so that
-    // archive write served no purpose once its one reader
-    // (the undo route's own consume) was retired, whichever
-    // call site queued it.
     #queueSave(snap: FlowSnapshot): void {
         void enqueueFlowSave(snap.flowId, async () => {
             const ctx = sessionContext();

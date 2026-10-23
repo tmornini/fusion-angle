@@ -24,18 +24,6 @@ import type {
 // below the rule-of-three; duplicating a pure function here is
 // sanctioned, not a shortcut (Article: never generalize before
 // exploratory duplication).
-//
-// Undo-as-replay (Phase 14 Task 8): restore-target resolution
-// moved server-side (documentMessagePairsAt walk,
-// api/derive-flows.ts), so the SERVER — not the client —
-// now holds both the CURRENT graph and the TARGET graph
-// at diff time; these two functions are what it uses to
-// keep feeding the SAME graphDelta/revivals
-// sidecars deriveFlowGraphStates already depends on
-// (SIDECAR-KEEP — the mechanism persists; see the PINNED Step 0
-// block in .superpowers/sdd/phase14-task-8-report.md for the
-// full rationale on why "client-owned" could not be read
-// literally here).
 
 // Pure diff: baseline vs working StoredGraph → FlowGraphDelta.
 // Every working node/edge emits an upsert row (idempotent

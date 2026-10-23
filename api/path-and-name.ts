@@ -4,8 +4,7 @@
 // an individual id: exactly when the pattern's final
 // segment is a :param. The prefix always keeps its trailing
 // slash; a collection or operation target stores the empty
-// name (a structural key, not an absence sentinel — see
-// the spec's two-table key).
+// name (a structural key, not an absence sentinel).
 export interface PathAndName {
     readonly path: string;
     readonly name: string;

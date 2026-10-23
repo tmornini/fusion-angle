@@ -1,6 +1,6 @@
 // Browser-only API request hit log for ./measure --profile.
 // Records every RequestContext verb (method + resource).
-// Node tests never record (no document). Global harvest
+// Deno tests never record (no document). Global harvest
 // for CDP: globalThis.__fusionApiRequestHits().
 
 export type ApiRequestHit = {
@@ -17,7 +17,7 @@ function isBrowserDocument(): boolean {
 
 /**
  * Append one verb when running under a document.
- * No-op in Node (adapter unit tests).
+ * No-op under Deno (adapter unit tests).
  */
 export function recordApiRequest(
     method: string,

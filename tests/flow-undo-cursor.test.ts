@@ -96,9 +96,7 @@ const FLOWID_UNDO_EV = generateIdentifier();
 const FLOWID_RECONCILE = generateIdentifier();
 
 // Phase 14 Task 8 (undo-as-replay): the hard constraint's FIVE
-// pinned sequences, plus the SIDECAR-KEEP proof — see the PINNED
-// Step 0 block and its hand trace in
-// .superpowers/sdd/phase14-task-8-report.md. Route-level
+// pinned sequences, plus the SIDECAR-KEEP proof. Route-level
 // (handleRequest) for the cursor-algorithm sequences 1-4 and 6,
 // since the cursor lives entirely server-side; client-level
 // (performUndo) for sequence 5, the ONE piece that is genuinely

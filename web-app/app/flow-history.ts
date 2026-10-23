@@ -3,9 +3,8 @@ import type {
     GraphEdge,
 } from '../../shared/types.ts';
 
-// Client redo-stack snapshot shape. Relocated here from
-// adapters/flow-versions.ts (Phase 15 Task 7): the type is LIVE
-// via the redo stack; the versions routes/adapters retire.
+// Client redo-stack snapshot shape. The type is live
+// via the redo stack.
 export interface FlowVersion {
     id: string;
     flowId: string;

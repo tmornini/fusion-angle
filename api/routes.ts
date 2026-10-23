@@ -1054,10 +1054,8 @@ async function postRecordTypeEditOp(
 }
 
 // Phase Final Task 2: writeFlowGraphDelta RETIRED. The four
-// graph relation tables no longer receive dual-write puts;
-// graphDelta/revivals stay in document-pair bodies
-// (SIDECAR-KEEP) feeding deriveFlowGraphStates. Flow lifecycle
-// Phase Final Task 2: states ROW half stripped.
+// graph relation tables no longer receive dual-write puts.
+// Flow lifecycle Phase Final Task 2: states ROW half stripped.
 
 // The organization_id extraction/merge shape every document op
 // below needs: the org-scoped store stamps organization_id from
@@ -1508,9 +1506,6 @@ function undoneFlowBody(
         target.body['graph'],
         'flows/:id/undo target.graph',
     );
-    // graphDelta/revivals still computed for the document-pair
-    // body (SIDECAR-KEEP → deriveFlowGraphStates); no row-plane
-    // graph writer remains after writeFlowGraphDelta's strip.
     const delta = buildFlowGraphDelta(
         currentGraph, targetGraph, id,
         generateIdentifier, b.at,
@@ -4345,11 +4340,8 @@ export const routes: Route[] = [
     },
     documentVersionsSelectRoute(FLOWS_WIRING),
     documentVersionSelectRoute(FLOWS_WIRING),
-    // Undo-as-replay (Phase 14 Task 8): the restored state,
-    // graphDelta/revivals server-computed into it
-    // (SIDECAR-KEEP → deriveFlowGraphStates), lands through
-    // the former on the client's tag. No flow_versions row
-    // is read or written.
+    // The restored state lands on the client's tag. No
+    // flow_versions row is read or written.
     route('organizations/:id/flows/:id/undo', {
         post: async (
             db, p, body, _actor, messagePair, organization,

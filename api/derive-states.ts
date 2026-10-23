@@ -66,12 +66,9 @@ import type { WorkOrderVersion } from './work-order-version.ts';
 // ---- resolveOwningOrganization — the MESSAGE-PLANE fence (gate 4) -
 
 // The org-owned, org-nested document families whose OWN id can
-// appear as a states.entity_id — mirrors
-// api/store-parent-scoped.ts's rawOrganizationOwnedProbes table
-// exactly (ideas, projects, flows, records, objectives,
-// work-orders); invitations is handled separately below (its
-// path is flat, never organization-nested — message-pair.ts's
-// canonicalPath / family-registry.ts has no entry for it).
+// appear as a states.entity_id. invitations is handled
+// separately below (its path is flat, never
+// organization-nested).
 const ORGANIZATION_NESTED_ENTITY_FAMILIES = [
     'ideas', 'projects', 'flows',
     'work-orders', 'record-types', 'objectives',
@@ -186,17 +183,11 @@ async function resolveFlowGraphOwner(
 // other row from membershipsOfIdentity.
 //
 // ASKER-RELATIVE BY NECESSITY: an identity can hold memberships in
-// MULTIPLE organizations at once. api/store-parent-scoped.ts's own
-// viaMembership resolver is (necessarily) closed over the ASKING
-// org for exactly this reason — a co-member of the asking org must
-// read as visible even when the SAME identity also belongs
-// elsewhere. boundOrganization is checked first (co-membership is
-// the common, cheap case); only when that misses does this widen
-// to every other organization, purely to distinguish "belongs
-// elsewhere" (hidden) from "belongs nowhere" (a genuine orphan,
-// visible) — which OTHER org it resolves to in that case is never
-// observed by fenceStatesByOwner's isVisible check, so no further
-// tie-break is needed.
+// MULTIPLE organizations at once. boundOrganization is checked
+// first (co-membership is the common, cheap case); only when
+// that misses does this widen to every other organization,
+// purely to distinguish "belongs elsewhere" (hidden) from
+// "belongs nowhere" (a genuine orphan, visible).
 async function organizationHasMemberMessagePair(
     db: DbAdapter,
     organization: Id,
@@ -301,20 +292,17 @@ async function computeOwningOrganization(
 // genuine orphan (no pair anywhere names the entity).
 //
 // MEMOIZATION SCOPE: memoized per distinct entityId WITHIN one
-// derivation pass — `memo` is a Map created per call chain (a
-// fresh one per fenceStatesByOwner call below), NEVER a
-// module-global cache (module-global memoization is the Cache
-// abomination: cross-request staleness across writes). A caller
-// invoking this standalone (as several tests below do) gets a
-// fresh, one-shot memo by default — still correct, merely
-// unmemoized across calls.
+// derivation pass — `memo` is a Map created per call chain,
+// NEVER a module-global cache (module-global memoization is
+// the Cache abomination: cross-request staleness across
+// writes). A caller invoking this standalone gets a fresh,
+// one-shot memo by default — still correct, merely unmemoized
+// across calls.
 //
-// boundOrganization is a required argument, not merely
-// fenceStatesByOwner's own concern: the membership-message-plane leg
-// is intrinsically asker-relative (see
-// resolveViaMembershipPairPlane's own header), exactly like
-// api/store-parent-scoped.ts's ownerOrganizationOfEntity already
-// threads boundOrganization through to its own viaMembership call.
+// boundOrganization is a required argument: the
+// membership-message-plane leg is intrinsically
+// asker-relative (see resolveViaMembershipPairPlane's own
+// header).
 export async function resolveOwningOrganization(
     db: DbAdapter,
     entityId: Id,

@@ -36,15 +36,9 @@ import { liveHeadId, messageStore } from
 // Flows' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
 // derivation, per family document) plus the entity/lifecycle
-// knowledge only this family has. Read-only and additive — no
-// route, adapter, or seed row reads any of this yet (Task 8
-// wires the route); tests/drift-flows.test.ts is the proof of
-// equality against the old plane. Structurally mirrors
-// derive-ideas.ts/derive-projects.ts (same private helper
-// shapes, renamed for flows) through the shared Task 2 helpers;
-// the graph re-sort (normalizedStoredGraph, flow-graph-
-// relations.ts) is the ONE flows-novel piece a flat document
-// family never needed.
+// knowledge only this family has. The graph re-sort
+// (normalizedStoredGraph, flow-graph-relations.ts) is the ONE
+// flows-novel piece a flat document family never needed.
 //
 // THREE HEAD notions coexist over a flow's message-plane rows
 // and must never be conflated (IV Logic):
@@ -272,8 +266,7 @@ export async function deriveFlow(
 // an UNDO-correlated pair only moves the pointer
 // back — it never adds a new logical state (the fix that
 // makes undo-save-undo target the SAVE's own baseline,
-// never a discarded future — see the PINNED Step 0 trace,
-// .superpowers/sdd/phase14-task-8-report.md). Correlation is
+// never a discarded future). Correlation is
 // the shared operation id: the undo operation pair and the
 // document pair of that write copy one operationId.
 // `target: undefined` means

@@ -1,7 +1,7 @@
 // The /notifications contract: org- and identity-scoped
 // change events replacing the table-name broadcast. The
 // transport is an adapter (BroadcastChannel at the browser
-// tier, LISTEN/NOTIFY at the server tier); this module owns
+// tier, NOTIFY at the server tier); this module owns
 // only the event shape and target derivation — Decision 5.
 export type NotificationEvent =
     | {

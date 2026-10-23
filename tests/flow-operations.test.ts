@@ -1691,14 +1691,10 @@ function faultingPostCtx(
     return { ctx: wrapped, posts: () => count };
 }
 
-// The PUT-side sibling of faultingPostCtx. Task 4's redo
-// composes postFlowVersion (a POST) then putFlow (a PUT) as
-// two INDEPENDENT writes — this lets a test fault the SECOND
-// write specifically, after the first has already landed,
-// proving the fold is no longer atomic across both writes
-// (the named R1/E5 trade-off). GET/POST/DELETE pass through
-// to the real db; PUT to any OTHER resource passes through
-// too, so only the operation under test is faulted.
+// The PUT-side sibling of faultingPostCtx. Redo is one
+// putFlow. GET/POST/DELETE pass through to the real db; PUT
+// to any OTHER resource passes through too, so only the
+// operation under test is faulted.
 function faultingPutCtx(
     ctx: RequestContext,
     faultResource: string,

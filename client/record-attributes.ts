@@ -87,8 +87,7 @@ function attributesPath(
         + '/attributes/';
 }
 
-// Per-type nested collection — the server filters; the
-// client-side filterByField walk is retired (Task 21).
+// Per-type nested collection — the server filters.
 export async function getRecordAttributesByRecord(
     ctx: RequestContext,
     recordId: RecordId,
