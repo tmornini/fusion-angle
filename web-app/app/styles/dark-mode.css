@@ -14,13 +14,6 @@
     border-color: hsl(var(--gray-600));
 }
 
-/* Tables: subtle hover row */
-[data-theme="dark"]
-.table tbody tr:hover {
-    background-color:
-        hsl(var(--gray-700) / 0.5);
-}
-
 /* Inputs: focus glow in dark */
 [data-theme="dark"]
 .input:focus-visible,
@@ -44,12 +37,6 @@
     color: hsl(var(--gray-900));
 }
 
-/* Progress bar: visible track */
-[data-theme="dark"] .progress {
-    background-color:
-        hsl(var(--gray-700));
-}
-
 /* Switch: visible track/thumb */
 [data-theme="dark"] .switch {
     background-color:
@@ -68,26 +55,6 @@
 [data-theme="dark"] .status-badge {
     border-color:
         hsl(var(--border) / 0.5);
-}
-
-/* Flow designer: dark surfaces */
-[data-theme="dark"]
-.flow-toolbar {
-    background-color:
-        hsl(var(--gray-800));
-    border-color: hsl(var(--gray-700));
-}
-[data-theme="dark"]
-.flow-canvas-wrap {
-    background-color:
-        hsl(var(--gray-900));
-    border-color: hsl(var(--gray-700));
-}
-[data-theme="dark"]
-.flow-props-panel {
-    background-color:
-        hsl(var(--gray-800));
-    border-color: hsl(var(--gray-700));
 }
 
 /* Hero button: softer glow in dark */
