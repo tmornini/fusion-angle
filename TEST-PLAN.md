@@ -1739,15 +1739,15 @@ the second organization.
   non-empty; the pane is not blank.
   Pin: tests/browser/api-documentation.test.ts
        'circle click paints a room'
-- [ ] **C3** Header shows search bar, company
+- [ ] **C3** Header shows search bar and company
   stats as structured tiles (org name as a
   `header-stat-label`, then per-stat value +
   Ideas / Projects / Flows labels separated by
   `header-stat-divider` dividers — the counts track
   the current working data and change as you create
-  or convert, so don't assert exact numbers),
-  and theme toggle. PASS: elements visible and
-  styled. The old "Good {morning/afternoon/
+  or convert, so don't assert exact numbers).
+  PASS: elements visible and styled. The old
+  "Good {morning/afternoon/
   evening}, {name}" greeting and the top-bar org
   `<select>` have both been REMOVED; the top bar
   shows neither. (The org switcher moved to the
@@ -2762,9 +2762,9 @@ opens and renders.)
 - [ ] **F7** Open the Layout Test: Proposal Review Cycle
   designer. PASS: the page wears the standard sidebar +
   top-bar layout — left sidebar with the global nav, top
-  bar with search / organization stats / theme toggle and
-  no greeting — with the designer occupying the remaining
-  content area. The toolbar runs vertically along the left
+  bar with search / organization stats and no greeting —
+  with the designer occupying the remaining content
+  area. The toolbar runs vertically along the left
   edge of the canvas (inside the content area, not the
   global sidebar): Undo/Redo, Zoom −/+, Copy Mermaid,
   Export ZIP, and Delete (trash), top to bottom. The header
@@ -5081,22 +5081,11 @@ FSM, unlike `flows/detail`).
        advancing the stepper, the accent stroke's
        painted appearance, and the dimmed opacity's
        painted value
-- [ ] **FS8** Dark-mode toggle persists across navigation to
-  the stats page; the heat tints and the card remain legible
-  in both themes. The face number text contrasts adequately
+- [ ] **FS8** On the stats page the heat tints and the card
+  remain legible. The face number text contrasts adequately
   at all heat levels.
   Pin: exploratory — the painted contrast of tints
-       and card text in both themes, and that the
-       theme choice itself persists across
-       navigation to the stats page; a similarly-
-       named existing test does not decide the
-       persistence — it stubs `matchMedia` to
-       `matches: true` and never distinguishes the
-       theme module's own `'system'`-default
-       fallback (which independently computes
-       'dark' from that same stub) from an actual
-       hydration of the stored value, so it stays
-       green even with hydration deleted entirely
+       and card text
 - [ ] **FS9** Data-shape regression: heat fractions sum to
   ~100% across non-special nodes on the flagship flow. WIP
   counts in the card match the WOs currently sitting in each
