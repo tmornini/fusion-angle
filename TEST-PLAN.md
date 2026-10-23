@@ -6159,6 +6159,10 @@ FSM, unlike `flows/detail`).
        'switching the active org re-scopes members and
        ideas' (decides Members/Ideas re-scope on switch
        and org-1 rows are fenced from org-2);
+       tests/member-list-scope.test.ts 'an A-scoped
+       context lists none of B's members' (decides an
+       AI member, like a human or a service, lists only
+       under its own organization);
        tests/adapters-organization-session-exchange.test.ts
        'resolveActiveOrganization prefers a reachable
        persisted choice' (decides the persisted-choice-
