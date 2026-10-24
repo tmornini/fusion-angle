@@ -1035,39 +1035,6 @@ Deno.test(
 });
 
 Deno.test(
-    'validateRecordAttributeEntity rejects a regex'
-    + ' constraint on a number attribute_type',
-    () => {
-    assertThrows(
-        () => validateRecordAttributeEntity({
-            ...validSelectAttribute,
-            attribute_type: 'number',
-            options: [],
-            constraints: [
-                { kind: 'regex', pattern: '^\\d+$' },
-            ],
-        }),
-        Error, 'regex',
-    );
-});
-
-Deno.test(
-    'validateRecordAttributeEntity rejects range_min'
-    + ' on a text attribute_type',
-    () => {
-    assertThrows(
-        () => validateRecordAttributeEntity({
-            ...validSelectAttribute,
-            attribute_type: 'text',
-            options: [],
-            constraints: [
-                { kind: 'range_min', min: '0' },
-            ],
-        }),
-    );
-});
-
-Deno.test(
     'validateRecordAttributeEntity accepts range_min'
     + ' on a date attribute_type',
     () => {

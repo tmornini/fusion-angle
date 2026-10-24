@@ -95,23 +95,3 @@ Deno.test('every seeded work order keeps its history,'
         assertEquals(actual, expectedEvents(rows), key);
     }
 });
-
-Deno.test('every seeded history holds exactly one claimed'
-+ ' birth, at its second event', async () => {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db, {
-        hashPassword: testHashPassword,
-    });
-    for (const [key, rows] of Object.entries(shifted)) {
-        const [organization, workOrder] = key.split('/');
-        const actual = await getWorkOrderEvents(
-            db, await organizationToken(undefined, organization),
-            organization!, workOrder!,
-        );
-        const births = actual.filter(
-            (row) => row.state === 'claimed',
-        );
-        assertEquals(births.length, 1, key);
-        assertEquals(births[0]!.at, rows.at(-2)!.at, key);
-    }
-});

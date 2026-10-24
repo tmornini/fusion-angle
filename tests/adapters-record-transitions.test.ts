@@ -53,12 +53,6 @@ const WO_ID = generateIdentifier();
 
 const AT_CREATED = '2026-05-01T10:00:00.000000Z';
 
-async function seedSystemMember(
-    _db: MemoryDbAdapter,
-): Promise<void> {
-    // Phase Final Stage B: states table retired.
-}
-
 function buildNode(
     id: string,
     attributes: NodeAttribute[] = [],
@@ -265,7 +259,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -290,7 +283,6 @@ Deno.test('validateRecordTransition reads the head, no'
 + ' history', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedSystemMember(db);
     const flowGraph = buildFlowGraph(
         [
             buildNode(CREATE_NODE, [], { isCreate: true }),
@@ -320,7 +312,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -369,7 +360,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -417,7 +407,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -459,7 +448,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -511,7 +499,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -555,7 +542,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {
@@ -607,7 +593,6 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
             [
                 buildNode(CREATE_NODE, [], {

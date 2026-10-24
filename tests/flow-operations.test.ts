@@ -271,14 +271,6 @@ async function persistedGraph(
     return flow.graph as unknown as StoredGraph;
 }
 
-// Phase Final Stage B: flow_versions table retired with flows.
-// Live ops leave no residual version table; pin always 0.
-async function flowVersionCount(
-    _db: MemoryDbAdapter,
-): Promise<number> {
-    return 0;
-}
-
 // Save a graph through the real route (putFlow) so the four
 // relation tables hold exactly this state — the read source
 // GET /organizations/:id/flows/:id reassembles from, and (Phase 14 Task 8)
@@ -323,16 +315,6 @@ Deno.test(
         assertStrictEquals(op.advanceHistory, true);
         const g = await persistedGraph(db);
         assertStrictEquals(g.edges.length, 1);
-        // Undo-as-replay (Phase 14 Task 8): commitFlowMutation
-        // no longer archives the pre-edit state through
-        // postFlowVersion — undo resolves its target from the
-        // organizations/:id/flows/:id document-message-pair
-        // history instead, so this save's own putFlow
-        // document message pair is now sufficient;
-        // flow_versions stays untouched.
-        assertStrictEquals(
-            await flowVersionCount(db), 0,
-        );
     }),
 );
 
@@ -1304,13 +1286,6 @@ Deno.test(
                 .nodes.length,
             3,
         );
-        // flow_versions is never written OR read by the live
-        // undo path any more (Step 0: publish/consume both
-        // stop) — this stays a meaningful regression guard,
-        // not a tautology.
-        assertStrictEquals(
-            await flowVersionCount(db), 0,
-        );
         const g = await persistedGraph(db);
         assertStrictEquals(g.nodes.length, 2);
     }),
@@ -1603,14 +1578,6 @@ Deno.test(
         assertStrictEquals(
             op.newHistory.redoStack.length, 0,
         );
-        // Undo-as-replay (Phase 14 Task 8): redo no longer
-        // archives the pre-redo state through postFlowVersion —
-        // its own putFlow write is what a LATER undo's
-        // message-plane walk would find instead. flow_versions
-        // stays untouched by the live redo path.
-        assertStrictEquals(
-            await flowVersionCount(db), 0,
-        );
         const g = await persistedGraph(db);
         assertStrictEquals(g.nodes.length, 2);
     }),
@@ -1730,9 +1697,7 @@ function faultingPutCtx(
 // fires at the client's own ctx.POST call site, before any
 // network activity — the server-side resolution (does a target
 // even exist) never enters into it, so the flow_versions seed
-// this test used to need is dropped entirely; the assertion it
-// fed becomes "flow_versions stays untouched", not "the
-// consumed row survives".
+// this test used to need is dropped entirely.
 Deno.test(
     'performUndo: a faulted POST /organizations/:id/flows/:id/undo'
     + ' applies nothing',
@@ -1759,14 +1724,10 @@ Deno.test(
         if (op.kind !== 'fail') return;
         assertMatch(op.toast, /undo failed/i);
         assertStrictEquals(faulting.posts(), 1);
-        // nothing applied: flow_versions is never touched by
-        // the live undo path, and the persisted graph keeps
-        // the seeded start + complete pair (the revert never
+        // nothing applied: the persisted graph keeps the
+        // seeded start + complete pair (the revert never
         // landed; the 3-node snap was only ever the client's
         // view, never persisted).
-        assertStrictEquals(
-            await flowVersionCount(db), 0,
-        );
         const g = await persistedGraph(db);
         assertStrictEquals(g.nodes.length, 2);
     }),
@@ -1821,13 +1782,8 @@ Deno.test(
         if (op.kind !== 'fail') return;
         assertMatch(op.toast, /redo failed/i);
         assertStrictEquals(faulting.puts(), 1);
-        // nothing applied: flow_versions is never touched by
-        // the live redo path, and the document PUT never
-        // landed — the graph stays the seeded start + complete
-        // pair.
-        assertStrictEquals(
-            await flowVersionCount(db), 0,
-        );
+        // nothing applied: the document PUT never landed —
+        // the graph stays the seeded start + complete pair.
         const g = await persistedGraph(db);
         assertStrictEquals(g.nodes.length, 2);
     }),

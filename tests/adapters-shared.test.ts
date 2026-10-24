@@ -120,9 +120,6 @@ Deno.test(
         const db = memoryDbAdapter();
         const a = inPageContext(db, DEV_TOKEN);
         const b = inPageContext(db, DEV_TOKEN);
-        assertStrictEquals(
-            a.operationId, a.operationId,
-        );
         assertNotStrictEquals(
             a.operationId, b.operationId,
         );

@@ -193,7 +193,6 @@ async () => {
             operationId),
     );
     assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 
 Deno.test('same-body second PUT on a simple document is 200'

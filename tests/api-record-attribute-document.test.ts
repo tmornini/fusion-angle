@@ -165,7 +165,6 @@ Deno.test('postRecordAttributeDocumentOp writes exactly the'
     } as RecordAttributeEntity);
     // Phase Final Stage B: record_attributes table retired.
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -213,7 +212,6 @@ async () => {
     )).body().toValue();
     assertEquals(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
-    assertStrictEquals((await db.messagePairs.getAll()).length, 6);
     assertStrictEquals((await db.messagePairs.getAll()).length, 6);
 });
 

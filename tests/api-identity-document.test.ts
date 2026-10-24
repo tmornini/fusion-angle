@@ -175,7 +175,6 @@ async () => {
     assertEquals(written, body);
     // Phase Final Stage B: identity spine tables retired.
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -195,7 +194,6 @@ Deno.test('a byte-identical PUT resend to identities/:id converges'
         db, 'identities/' + id, body, DEV_TOKEN,
         operationIdHeader())).body().toValue();
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 

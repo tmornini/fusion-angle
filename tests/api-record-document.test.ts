@@ -106,7 +106,6 @@ Deno.test('validateRecordDocumentBody accepts entity fields plus'
         name: 'Fresh', description: 'd', position: 1,
     });
     assertStrictEquals(doc.state, 'active');
-    assertStrictEquals(doc.state, 'active');
     assertStrictEquals('state_at' in doc, false);
 });
 
@@ -284,6 +283,5 @@ async () => {
             token, body, operationId,
         ),
     );
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
     assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });

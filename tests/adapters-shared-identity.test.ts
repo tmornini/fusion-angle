@@ -21,7 +21,6 @@ Deno.test('identity is resolved once from the token', async () => {
     const ctx = inPageContext(
         memoryDbAdapter(), await tokenFor('XXZruirZyAOoRpNxaDnpSA'));
     assertStrictEquals(ctx.identity.id, 'XXZruirZyAOoRpNxaDnpSA');
-    assertStrictEquals(ctx.identity, ctx.identity);
 });
 
 Deno.test('an anonymous token yields the anonymous principal',

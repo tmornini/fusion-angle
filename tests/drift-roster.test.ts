@@ -623,8 +623,6 @@ async () => {
     );
 
     // F: a repeated accept latched on the accepted head is 409.
-    const statesBefore =
-        0 /* states table retired */;
     const jessicaReaccept = await acceptAs(
         jessicaId, '2026-06-01T00:00:08.000000Z',
     );
@@ -634,10 +632,6 @@ async () => {
             (row) => row.id === jessicaName,
         )!.state,
         'accepted',
-    );
-    assertStrictEquals(
-        0 /* states table retired */,
-        statesBefore,
     );
 });
 

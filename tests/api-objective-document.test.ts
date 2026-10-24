@@ -244,7 +244,6 @@ async () => {
     } as ObjectiveEntity);
     // Phase Final Stage B: objectives table retired.
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -269,7 +268,6 @@ Deno.test('a byte-identical PUT resend to'
             , body, DEV_TOKEN,
         operationIdHeader())).body().toValue();
     assertEquals(first, second);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
     assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 

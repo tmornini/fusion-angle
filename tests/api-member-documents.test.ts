@@ -337,7 +337,6 @@ async () => {
     assertEquals(written, body);
     // Phase Final Stage B: roster tables retired.
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 Deno.test('postAiMemberDocumentOp writes exactly the pair and'
@@ -367,7 +366,6 @@ async () => {
     assertEquals(written, body);
     // Phase Final Stage B: roster tables retired.
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 
 Deno.test('postHumanMemberDocumentOp writes exactly the pair and'
@@ -396,7 +394,6 @@ Deno.test('postHumanMemberDocumentOp writes exactly the pair and'
     );
     assertEquals(written, body);
     // Phase Final Stage B: roster tables retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
     assertStrictEquals((await db.messagePairs.getAll()).length, 2);
 });
 

@@ -316,7 +316,6 @@ async () => {
     // root admin's identity + seededDb's own pair-forming
     // PUT = 5; the 409 itself appends nothing further.
     assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 5);
 });
 
 // ── identity-tokens/:jti/revocation — operation path ──

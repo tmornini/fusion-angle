@@ -8,7 +8,6 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { TABLE_NAMES } from '../api/db.ts';
 import { nowUtc } from '../shared/types.ts';
 import {
     workOrderHeadFor,
@@ -26,9 +25,6 @@ import {
 } from '../api/flow-graph-relations.ts';
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
-import type {
-    GraphEdge,
-} from '../shared/types.ts';
 import {
     collectAttributeReferrers,
     type AttributeReferrers,
@@ -625,39 +621,6 @@ Deno.test('flowGraphBindingsFromMessagePairs: seed attribute + member'
         relationFailClosed,
     );
     assert(derivedLatest.size > 0);
-});
-
-// GraphEdge carries no attributes field and no
-// flow_edge_attributes table exists — prove-impossible so
-// RESTRICT never grows an edges leg (Author gate 5).
-Deno.test('prove-impossible: attribute bindings cannot reach'
-+ ' flow edges (GraphEdge has no attributes; no'
-+ ' flow_edge_attributes table)', () => {
-    type GraphEdgeHasNoAttributes =
-        'attributes' extends keyof GraphEdge
-            ? never
-            : true;
-    const typeProof: GraphEdgeHasNoAttributes = true;
-    assertStrictEquals(typeProof, true);
-
-    const edgeKeys: readonly (keyof GraphEdge)[] = [
-        'id', 'name', 'fromNodeId', 'toNodeId',
-    ];
-    assertEquals(
-        edgeKeys.slice().sort(),
-        (['id', 'name', 'fromNodeId', 'toNodeId'] as const)
-            .slice().sort(),
-    );
-    assertStrictEquals(
-        (edgeKeys as readonly string[])
-            .includes('attributes'),
-        false,
-    );
-    assertStrictEquals(
-        (TABLE_NAMES as readonly string[])
-            .includes('flow_edge_attributes'),
-        false,
-    );
 });
 
 // -- residual cross-core pins (Phase 15 Task 1 final) ----------

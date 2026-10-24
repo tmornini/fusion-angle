@@ -360,7 +360,6 @@ Deno.test('a wrong password stores no NEW pair beyond the'
     // (seedPersonIdentity/seedIdentityCredential) — the failed
     // attempt itself appends no further pair.
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 4);
 });
 
 Deno.test('a double-spent authorization code stores nothing on'

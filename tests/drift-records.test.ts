@@ -847,9 +847,7 @@ async () => {
     );
     await assertRecordWire();
 
-    // Step 4: echoed PUT — no new states row.
-    const beforeStatesCount =
-        0 /* states table retired */;
+    // Step 4: echoed PUT.
     const echoed = await handleRequest(db, req(
         'PUT', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token, {
@@ -860,10 +858,6 @@ async () => {
         },
     ));
     assertStrictEquals(echoed.status, 200);
-    assertStrictEquals(
-        0 /* states table retired */,
-        beforeStatesCount,
-    );
     await assertRecordWire();
     const afterEcho = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,

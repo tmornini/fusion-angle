@@ -185,15 +185,6 @@ Deno.test(
                 : true;
         const edgeTypeProof: GraphEdgeHasNoAttributes = true;
         assertStrictEquals(edgeTypeProof, true);
-
-        const edgeKeys: readonly (keyof GraphEdge)[] = [
-            'id', 'name', 'fromNodeId', 'toNodeId',
-        ];
-        assertStrictEquals(
-            (edgeKeys as readonly string[])
-                .includes('attributes'),
-            false,
-        );
         assertStrictEquals(
             (TABLE_NAMES as readonly string[])
                 .includes('flow_edge_attributes'),

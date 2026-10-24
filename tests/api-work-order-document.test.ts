@@ -283,7 +283,6 @@ Deno.test('a same-body PUT resend under the head\'s tag to'
     // The schema's rows and the create's three: the fields
     // equal the head's, so the statement stores nothing.
     assertStrictEquals((await db.messagePairs.getAll()).length, 7);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
 });
 
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
@@ -515,7 +514,6 @@ Deno.test('a work-order create ignores a raw colliding states'
     await res.body?.cancel();
     // The fixture's pairs + 3 create pairs (operation,
     // version, join).
-    assertStrictEquals((await db.messagePairs.getAll()).length, 7);
     assertStrictEquals((await db.messagePairs.getAll()).length, 7);
 });
 

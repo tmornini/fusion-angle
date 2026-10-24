@@ -168,7 +168,6 @@ Deno.test(
             pairIdOf(first),
         );
         assertStrictEquals((await db.messagePairs.getAll()).length, 5);
-        assertStrictEquals((await db.messagePairs.getAll()).length, 5);
     },
 );
 
