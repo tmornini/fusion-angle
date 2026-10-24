@@ -18,6 +18,7 @@ import {
 import { getProjects } from './projects.ts';
 import { getIdeaEntities } from './ideas.ts';
 import {
+    acceptedMemberships,
     getHumanMembers,
     isHumanSeat,
 } from './members.ts';
@@ -44,8 +45,7 @@ export async function getOrganizationSeats(
     // member list has (see buildHumanMemberMap), though
     // today's readers only count them.
     return (await ctx.GETCollection<MembershipReadEntity>(
-        'organizations/' + organization
-            + '/memberships/?state=accepted',
+        acceptedMemberships(ctx),
     )).toSorted((a, b) => {
         const left = a.body().toValue();
         const right = b.body().toValue();
