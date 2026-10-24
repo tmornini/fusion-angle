@@ -45,11 +45,6 @@ const APPEND_SITES: readonly {
         why: 'a Headers of a stored response',
     },
     {
-        file: 'api/authentication.ts',
-        receiver: 'headers',
-        why: 'a Headers gaining a Set-Cookie',
-    },
-    {
         file: 'api/served-response.ts',
         receiver: 'headers',
         why: 'a Headers of a served response',
