@@ -74,8 +74,7 @@ export async function getMembers(
     );
     const ais = buildAIAgentMap(agents, memberships);
     const serviceMembers = buildServiceMembers(
-        services,
-        memberships.filter((seat) => !isHumanSeat(seat)),
+        services, memberships,
     );
     return fillHumanMemberPii(ctx, [
         ...humans.values(),

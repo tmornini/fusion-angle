@@ -3585,10 +3585,6 @@ Off the critical path; each with its oracle.
   `members.ts:66`, `members-union.ts:57`). Export one
   builder from `client/members.ts`. Oracle: `grep -rn
   "state=accepted" client/` finds one line.
-- Unreachable `isHumanSeat` checks:
-  `client/service-members.ts:78` and the no-op filter at
-  `client/members-union.ts:78`. Oracle: both removed,
-  `./test validate` green.
 - `required` sits on the service fields only
   (`web-app/members/index.html:318,331`); the dialog
   has no form submit, and the siblings carry none.
