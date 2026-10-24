@@ -38,6 +38,11 @@ import {
     secretsHashHex,
     stampOfMicros,
 } from '../shared/pair-root.ts';
+import {
+    quoteIdent,
+    schemaName,
+    urlWithSearchPath as withSearchPath,
+} from './pg-schema.ts';
 
 // Live pins for the ledger functions and the table.
 // Skip when POSTGRES_URL is unset so ./test validate
@@ -47,7 +52,6 @@ import {
 // cannot match.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const NIL_UUID =
     '00000000-0000-0000-0000-000000000000';
 const PAIR_ID =
@@ -83,31 +87,11 @@ const NO_SEPARATOR =
     'HTTP/1.1 201 \r\n'
     + 'content-length: 5';
 
-function schemaName(): string {
-    const base = Deno.env.get('SCHEMA_NAME')
-        ?? (
-            'fusion_test_'
-            + String(Date.now())
-            + '_'
-            + String(Deno.pid)
-        );
-    const name = base + '_ledger_store';
-    if (!IDENT.test(name)) {
-        throw new Error('invalid SCHEMA_NAME');
-    }
-    return name;
-}
-
-function quoteIdent(name: string): string {
-    return '"' + name + '"';
-}
-
 function urlWithSearchPath(
     url: string,
     schema: string,
 ): string {
-    const parsed = new URL(url);
-    parsed.searchParams.set('search_path', schema);
+    const parsed = new URL(withSearchPath(url, schema));
     parsed.searchParams.set(
         'TimeZone', 'Pacific/Honolulu',
     );
@@ -335,7 +319,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 } else {
-    const schema = schemaName();
+    const schema = schemaName('_ledger_store');
     const sql = connectPostgres(
         urlWithSearchPath(POSTGRES_URL, schema),
     );

@@ -27,13 +27,17 @@ import {
     NIL_IDENTIFIER,
 } from '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';
+import {
+    quoteIdent,
+    schemaName,
+    urlWithSearchPath,
+} from './pg-schema.ts';
 
 // Live EXPLAIN pins for schema indexes. ./validate stays
 // Postgres-free: skip when POSTGRES_URL is unset. Private
 // schema per file; do not share schemas across files.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const IDEA_COLLECTION = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
 const FILLER_COLLECTION = '/filler/';
@@ -58,34 +62,6 @@ const MEMBERSHIP_ORGANIZATIONS = 100;
 const MEMBERSHIP_ID_START = 10000;
 const ORGANIZATION_ID_START = 50000;
 const IDENTITY_ID_START = 80000;
-
-function schemaName(): string {
-    const base = Deno.env.get('SCHEMA_NAME')
-        ?? (
-            'fusion_test_'
-            + String(Date.now())
-            + '_'
-            + String(Deno.pid)
-        );
-    const name = base + '_explain';
-    if (!IDENT.test(name)) {
-        throw new Error('invalid SCHEMA_NAME');
-    }
-    return name;
-}
-
-function quoteIdent(name: string): string {
-    return '"' + name + '"';
-}
-
-function urlWithSearchPath(
-    url: string,
-    schema: string,
-): string {
-    const parsed = new URL(url);
-    parsed.searchParams.set('search_path', schema);
-    return parsed.href;
-}
 
 function id22(n: number): string {
     return n.toString(10).padStart(21, 'a') + 'A';
@@ -367,7 +343,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 } else {
-    const schema = schemaName();
+    const schema = schemaName('_explain');
     const sql = connectPostgres(
         urlWithSearchPath(POSTGRES_URL, schema),
     );

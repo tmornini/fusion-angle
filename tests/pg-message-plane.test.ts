@@ -37,41 +37,17 @@ import { testHashPassword } from './mock-seed.ts';
 import { organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    quoteIdent,
+    schemaName,
+    urlWithSearchPath,
+} from './pg-schema.ts';
 
 // Status overlay pins. Skip when POSTGRES_URL is
 // unset so ./test validate stays Postgres-free.
 // One scratch schema; do not share it.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-function schemaName(): string {
-    const base = Deno.env.get('SCHEMA_NAME')
-        ?? (
-            'fusion_test_'
-            + String(Date.now())
-            + '_'
-            + String(Deno.pid)
-        );
-    const name = base + '_message_plane';
-    if (!IDENT.test(name)) {
-        throw new Error('invalid SCHEMA_NAME');
-    }
-    return name;
-}
-
-function quoteIdent(name: string): string {
-    return '"' + name + '"';
-}
-
-function urlWithSearchPath(
-    url: string,
-    schema: string,
-): string {
-    const parsed = new URL(url);
-    parsed.searchParams.set('search_path', schema);
-    return parsed.href;
-}
 
 function bytesFromHex(hex: string): Uint8Array {
     const out = new Uint8Array(hex.length / 2);
@@ -160,7 +136,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 } else {
-    const schema = schemaName();
+    const schema = schemaName('_message_plane');
     const sql = connectPostgres(
         urlWithSearchPath(POSTGRES_URL, schema),
     );

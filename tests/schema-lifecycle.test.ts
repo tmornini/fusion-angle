@@ -9,6 +9,11 @@ import { connectPostgres } from
     '../api/postgres-client.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
+import {
+    quoteIdent,
+    schemaName,
+    urlWithSearchPath,
+} from './pg-schema.ts';
 
 Deno.test(
     'postSchemaCreation/hasSchema/deleteSchema'
@@ -81,35 +86,6 @@ Deno.test('DbAdapter has no snapshot dump or restore',
 });
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-function schemaName(): string {
-    const base = Deno.env.get('SCHEMA_NAME')
-        ?? (
-            'fusion_test_'
-            + String(Date.now())
-            + '_'
-            + String(Deno.pid)
-        );
-    const name = base + '_lifecycle';
-    if (!IDENT.test(name)) {
-        throw new Error('invalid SCHEMA_NAME');
-    }
-    return name;
-}
-
-function quoteIdent(name: string): string {
-    return '"' + name + '"';
-}
-
-function urlWithSearchPath(
-    url: string,
-    schema: string,
-): string {
-    const parsed = new URL(url);
-    parsed.searchParams.set('search_path', schema);
-    return parsed.href;
-}
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     Deno.test(
@@ -119,7 +95,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 } else {
-    const schema = schemaName();
+    const schema = schemaName('_lifecycle');
     const sql = connectPostgres(
         urlWithSearchPath(POSTGRES_URL, schema),
     );

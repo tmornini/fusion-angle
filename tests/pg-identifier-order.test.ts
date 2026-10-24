@@ -17,41 +17,17 @@ import {
     encodeIdentifier,
 } from '../shared/identifier.ts';
 import { ledgerFields } from './ledger-row.ts';
+import {
+    quoteIdent,
+    schemaName,
+    urlWithSearchPath,
+} from './pg-schema.ts';
 
 // Live pin: uuid ORDER BY matches compareIdentifiers,
 // not ASCII. Skip when POSTGRES_URL is unset so
 // ./validate stays Postgres-free.
 
 const POSTGRES_URL = Deno.env.get('POSTGRES_URL');
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-function schemaName(): string {
-    const base = Deno.env.get('SCHEMA_NAME')
-        ?? (
-            'fusion_test_'
-            + String(Date.now())
-            + '_'
-            + String(Deno.pid)
-        );
-    const name = base + '_id_order';
-    if (!IDENT.test(name)) {
-        throw new Error('invalid SCHEMA_NAME');
-    }
-    return name;
-}
-
-function quoteIdent(name: string): string {
-    return '"' + name + '"';
-}
-
-function urlWithSearchPath(
-    url: string,
-    schema: string,
-): string {
-    const parsed = new URL(url);
-    parsed.searchParams.set('search_path', schema);
-    return parsed.href;
-}
 
 function identifierForPrefix(ch: string): string {
     const bytes = new Uint8Array(16);
@@ -107,7 +83,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         () => {},
     );
 } else {
-    const schema = schemaName();
+    const schema = schemaName('_id_order');
     const sql = connectPostgres(
         urlWithSearchPath(POSTGRES_URL, schema),
     );
