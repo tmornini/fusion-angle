@@ -8,7 +8,10 @@ import { AIMember, nowUtc } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import { requireOrganization } from './members.ts';
+import {
+    acceptedMemberships,
+    requireOrganization,
+} from './members.ts';
 import {
     notifyAIMemberChanges,
     notifyMembershipChanges,
@@ -33,13 +36,6 @@ function agentParent(id: MemberId): MemberEntity {
 function aiAgentsPath(ctx: RequestContext): string {
     return 'organizations/' + requireOrganization(ctx)
         + '/ai-agents/';
-}
-
-function acceptedMembershipsPath(
-    ctx: RequestContext,
-): string {
-    return 'organizations/' + requireOrganization(ctx)
-        + '/memberships/?state=accepted';
 }
 
 function membershipItemPath(
@@ -96,7 +92,7 @@ export async function getAIMemberMap(
 ): Promise<Map<MemberId, AIMember>> {
     const [memberships, agents] = await Promise.all([
         ctx.GETCollection<MembershipEntity>(
-            acceptedMembershipsPath(ctx),
+            acceptedMemberships(ctx),
         ),
         ctx.GETCollection<AIAgentEntity>(
             aiAgentsPath(ctx),
