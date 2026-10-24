@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How the pattern works — Fusion Angle explained</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><span class="brand">Fusion Angle · HTTP pairs as data</span><a href="index.html">Why</a><a href="pattern.html" aria-current="page">How the pattern works</a><a href="client.html">Client reference</a><a href="backend.html">Backend reference</a></nav><main>
+<h1>How the pattern works</h1>
+<p>This page describes the mechanics of fusion-angle's storage and HTTP design and the tradeoffs the repo records. Excerpts are short quotations used to explain the design.</p>
+<h2>1. One append-only table of HTTP pairs</h2>
+<p>The table (<code>api/schema-postgres.ts</code>, abridged) has an envelope, the raw message bytes, and the hashes.</p>
+<pre><code>id uuid PRIMARY KEY,               -- also the ETag
+operation_id uuid NOT NULL,        -- groups one client operation
+path text COLLATE "C" NOT NULL     -- CHECK slash-bounded
+name text COLLATE "C" NOT NULL,    -- '' for an operation
+supersedes uuid NOT NULL,          -- the head this write follows
+requester_identity_id text ...,
+method text ...  CHECK (method ~ '^[A-Z]+$'),
+response_at timestamptz NOT NULL,  -- the one stamp
+request bytea, request_salt, request_hash,
+request_secrets, request_secrets_hash,
+response bytea, response_salt, response_hash,
+response_secrets, response_secrets_hash,
+pair_hash bytea</code></pre>
+<p>Indexes: <code>(path, name, response_at, id)</code> gives "head and history for free". <code>(path, response_at, id)</code> serves collections. The unique <code>(path, name, supersedes)</code> on PUT/DELETE rows enforces succession. <code>path</code> and <code>name</code> are separate columns, and the table holds writes only.</p>
+<h2>2. The write path: If-Match → insert with supersedes → 412</h2>
+<ol>
+<li>The client sends <code>If-Match: "&lt;etag&gt;"</code> naming the head it read, or <code>If-None-Match: *</code> to declare a genesis (API.md § Conditional classes).</li>
+<li>"The gate checks presence and form, never value." A missing conditional on a <code>required</code> route is 428, and a malformed tag is 400.</li>
+<li>"The statement judges the value." An If-Match tag "is an in-order latch, stale unless it names the current head". The row is inserted with <code>supersedes</code> set to that head. A genesis supersedes the nil root.</li>
+<li>Two writers racing on the same head produce two rows with the same <code>(path, name, supersedes)</code>, so the unique index admits only one. "A stale in-order latch is 412." "A stale latch answers 412, even for a byte-identical resend."</li>
+<li>Idempotent resends: "A resent document write whose body equals the head matches, stores nothing, and answers 200."</li>
+</ol>
+<p>In the repo, all rows of one write land together in one SQL statement (<code>api/ledger-statement-sql.ts</code>): "Any stale row refuses the statement. Nothing is stored."</p>
+<h2>3. The read path: serve the stored response</h2>
+<ul>
+<li>Select the head with an index walk. The repo's document head is <code>… WHERE path = $1 AND name = $2 AND method IN ('PUT','DELETE') ORDER BY response_at DESC, id DESC LIMIT 1</code>.</li>
+<li>Serve the stored bytes. Swap only the status line, <code>date</code>, and <code>request-id</code>. Add <code>last-modified</code> and <code>response-at</code> from <code>response_at</code>, and <code>requester-identity-id</code>. "The body bytes are never touched", except for read-role field projection, which happens in one function (<code>servedResponse</code>).</li>
+<li>A collection is "<code>multipart/mixed</code> of <code>application/http; msgtype=response</code> parts, each the unit a document GET serves".</li>
+<li>Store canonical bodies: the repo sorts JSON keys on write (<code>sortJsonKeys</code>), so byte equality means sameness.</li>
+</ul>
+<h2>4. History and tombstones</h2>
+<p>A version is a stored PUT pair, served at <code>versions/:etag</code>. Deletion appends a DELETE head, and the document then answers 410. "Document DELETE is a marked tombstone pair. No physical delete exists." Even PII erasure "appends a bodyless DELETE head; superseded PUT pairs remain in the ledger". Earlier PII versions therefore remain stored.</p>
+<h2>5. Hashing and secrets</h2>
+<ul>
+<li>Message hashes are salted SHA-256: <code>leafHashHex(salt, bytes)</code> (<code>shared/pair-root.ts</code>) hashes salt ‖ bytes, and the CHECKs require 16-byte salts and 32-byte hashes.</li>
+<li>Credential header lines (<code>authorization</code>, <code>cookie</code>, <code>set-cookie</code>, …) are split into <code>request_secrets</code> and <code>response_secrets</code>, which are plaintext, and hashed without salt. <code>pair_hash</code> covers both.</li>
+<li>Row integrity is "the hash tree": <code>fa_pair_root</code> in SQL and <code>pairRootHex</code> in TS. Lineage is <code>supersedes</code>. "No chain."</li>
+</ul>
+<h2>6. Tenancy in the path</h2>
+<p>"Tenancy rides <code>path</code>, and a membership's name. The store is global. The fence enforces organization." The organization comes from the verified token claim, and a path naming another org is 403 at the fence. "Foreign ids 404; foreign paths 403" (AGENTS.md).</p>
+<h2>Tradeoffs recorded in the repo</h2>
+<table><tr><th>Caveat</th><th>Source</th></tr>
+<tr><td>No migrations. The DDL is <code>CREATE TABLE IF NOT EXISTS</code> and "never alters a column". A schema change means wipe (<code>DROP SCHEMA public CASCADE</code>) and reseed, and "Seed refuses a database whose <code>fa_message_pairs</code> exists".</td><td>SCHEMA.md, ARCHITECTURE.md</td></tr>
+<tr><td>GETs are not stored, so the ledger is no read audit log.</td><td>SCHEMA.md</td></tr>
+<tr><td>The bell has no listener. <code>pg_notify('fusion_events', …)</code> fires for inserted rows, but "There is no LISTEN and no SSE client". Other browsers stay stale until navigation.</td><td>SCHEMA.md, AGENTS.md</td></tr>
+<tr><td>Plaintext credential lines are stored in <code>*_secrets</code> columns, and README calls the deployment "Demo-grade security".</td><td>SCHEMA.md, README.md</td></tr>
+<tr><td>One writer process: "One mint process — do not run two replicas."</td><td>ARCHITECTURE.md</td></tr>
+<tr><td>Rows are kept forever and deletion is logical, so storage only grows, short of an operator wipe (<code>./bin/postgres-wipe</code> drops the whole schema).</td><td>SCHEMA.md (tombstones); no <code>DELETE FROM</code>, <code>TRUNCATE</code>, or pruning in <code>api/</code> or <code>server/</code></td></tr>
+<tr><td>Concurrency rests on the succession index plus organization row locks (<code>FOR SHARE</code> / <code>FOR UPDATE</code>), not advisory locks. A blind write "that loses three succession races answers 409".</td><td>API.md, api/backend-postgres.ts</td></tr>
+<tr><td>Some indexes are not yet read: <code>fa_message_pairs_request_id</code> ("Nothing in the product reads the index yet"), and the body GIN index covers only <code>/invitations/</code>.</td><td>SCHEMA.md</td></tr>
+</table>
+<p>Further detail: <a href="backend.html">backend reference</a> (DDL, indexes, layers) and <a href="client.html">client reference</a> (how the browser client keeps responses whole).</p>
+<p class="src">License: <code>tmornini/fusion-angle</code> is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 Universal</a>.</p></main><footer>Every claim is drawn from <code>tmornini/fusion-angle</code> (README.md, ARCHITECTURE.md, SCHEMA.md, API.md, DESIGN-SYSTEM.md, AGENTS.md, and the cited source files).</footer></body></html>

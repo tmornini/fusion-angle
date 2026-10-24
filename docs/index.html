@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Overview — Fusion Angle explained</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><span class="brand">Fusion Angle · HTTP pairs as data</span><a href="index.html" aria-current="page">Why</a><a href="pattern.html">How the pattern works</a><a href="client.html">Client reference</a><a href="backend.html">Backend reference</a></nav><main>
+<h1>HTTP request/response pairs as the stored data</h1>
+<p class="note">A technical walkthrough of <code>tmornini/fusion-angle</code> for developers who build HTTP APIs: how it stores and serves data, and the tradeoffs involved.</p>
+<h2>Context</h2>
+<p>Many HTTP APIs map a request onto domain tables and build each response from those tables on every read, with ETags, version history, and lost-update protection implemented separately. Fusion Angle stores the exchange itself: "The API, the client, and the application treat a response — status line, headers, and body — as one unit" (ARCHITECTURE.md). The stored data is that unit.</p>
+<h2>Properties of the design</h2>
+<div class="grid">
+<div class="card"><h3>Pairs are the data</h3><p>One table, <code>fa_message_pairs</code>. "A pair is the request as received, or nothing, plus the response wire bytes" (SCHEMA.md). A read "serves those stored bytes with exactly three substitutions — the status line, <code>date</code>, and <code>request-id</code>".</p></div>
+<div class="card"><h3>ETags are row ids</h3><p>"The pair <code>id</code> is the ETag — If-Match names that identifier." No separate version column is used.</p></div>
+<div class="card"><h3>History by succession</h3><p>Each write names its predecessor in <code>supersedes</code>. <code>versions/</code> "joins every PUT as <code>multipart/mixed</code>, oldest first". A DELETE is a tombstone: "No physical delete exists."</p></div>
+<div class="card"><h3>Conflicts via a unique index</h3><p><code>CREATE UNIQUE INDEX … fa_message_pairs_succession ON fa_message_pairs (path, name, supersedes) WHERE method IN ('PUT', 'DELETE')</code> is "the only write enforcement". A stale If-Match "is 412".</p></div>
+</div>
+<p><a href="pattern.html">How the pattern works</a> covers the mechanics and tradeoffs in detail.</p>
+<h2>Summary of the mechanics</h2>
+<ul>
+<li>A document's address is <code>path</code> + <code>name</code> ("<code>pathname = path + name</code>, the URL API's word").</li>
+<li>Its head is "its latest PUT or DELETE pair, and a head is its document's whole state".</li>
+<li>Writes append. Reads select heads by index and serve the stored response. "The ledger stores writes only — no GET rows."</li>
+<li>The application built on this storage is an innovation-management app with Ideas, Flow, Projects, Records, Workbox, Identities, and Account (README.md).</li>
+</ul>
+<h2>The five layers</h2>
+<table><tr><th>Dir</th><th>Role (ARCHITECTURE.md § Layers)</th></tr>
+<tr><td><code>api/</code></td><td>Server REST and schema handlers. Postgres on the product path, memory in <code>./test</code>.</td></tr>
+<tr><td><code>shared/</code></td><td>"The one-way chasm": the wire contract and the HTTP message schema. It never imports <code>api/</code>.</td></tr>
+<tr><td><code>client/</code></td><td>The API client. It "imports only itself and <code>shared/</code>", and <code>tests/client-import-graph.test.ts</code> proves it.</td></tr>
+<tr><td><code>web-app/</code></td><td>Pages, presenters, browser adapters, app logic, and CSS.</td></tr>
+<tr><td><code>server/</code></td><td>Boot, HTTP, seed, wipe, and throttle.</td></tr></table>
+<h2>The request path</h2>
+<figure>
+<svg viewBox="0 0 960 300" role="img" aria-labelledby="rp-t" xmlns="http://www.w3.org/2000/svg">
+<title id="rp-t">Request path from browser to the single table</title>
+<defs><marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="hsl(217 45% 60%)"/></marker></defs>
+<g font-family="IBM Plex Sans,system-ui,sans-serif" font-size="13" fill="hsl(220 18% 96%)">
+<g stroke="hsl(217 14% 30%)" fill="hsl(217 16% 22%)">
+<rect x="10" y="40" width="170" height="110" rx="10"/><rect x="205" y="40" width="170" height="110" rx="10"/><rect x="400" y="40" width="170" height="110" rx="10"/><rect x="595" y="40" width="170" height="110" rx="10"/><rect x="790" y="40" width="160" height="110" rx="10" stroke="hsl(48 80% 65%)"/></g>
+<text x="95" y="65" text-anchor="middle" font-weight="700">Browser page</text><text x="95" y="88" text-anchor="middle" font-size="11">web-app/ideas/index.ts</text><text x="95" y="106" text-anchor="middle" font-size="11">init() → presenter</text><text x="95" y="124" text-anchor="middle" font-size="11">SafeHtml</text>
+<text x="290" y="65" text-anchor="middle" font-weight="700">client/ module</text><text x="290" y="88" text-anchor="middle" font-size="11">client/ideas.ts getIdeas()</text><text x="290" y="106" text-anchor="middle" font-size="11">request-context: Operation-ID,</text><text x="290" y="124" text-anchor="middle" font-size="11">Bearer, 401 → refresh</text>
+<text x="485" y="65" text-anchor="middle" font-weight="700">http-facade</text><text x="485" y="88" text-anchor="middle" font-size="11">fetch(origin + '/api/' +</text><text x="485" y="106" text-anchor="middle" font-size="11">resource)</text><text x="485" y="124" text-anchor="middle" font-size="11">same-origin credentials</text>
+<text x="680" y="65" text-anchor="middle" font-weight="700">API dispatch</text><text x="680" y="88" text-anchor="middle" font-size="11">api/api.ts handleRequest</text><text x="680" y="106" text-anchor="middle" font-size="11">framing · ids · auth · fence</text><text x="680" y="124" text-anchor="middle" font-size="11">routes[] → handler</text>
+<text x="870" y="65" text-anchor="middle" font-weight="700" fill="hsl(48 80% 65%)">fa_message_pairs</text><text x="870" y="88" text-anchor="middle" font-size="11">one row per write</text><text x="870" y="106" text-anchor="middle" font-size="11">(path, name, response_at, id)</text><text x="870" y="124" text-anchor="middle" font-size="11">head = latest PUT/DELETE</text>
+<g stroke="hsl(217 45% 60%)" stroke-width="2" marker-end="url(#ar)"><line x1="180" y1="95" x2="203" y2="95"/><line x1="375" y1="95" x2="398" y2="95"/><line x1="570" y1="95" x2="593" y2="95"/><line x1="765" y1="95" x2="788" y2="95"/></g>
+<path d="M870 150 V220 H95 V152" fill="none" stroke="hsl(152 55% 50%)" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ar)"/>
+<text x="480" y="212" text-anchor="middle" font-size="12" fill="hsl(152 55% 50%)">Read: head-reads.ts select → servedResponse → whole response (lists as multipart/mixed) → splitParts in the client</text>
+<text x="480" y="250" text-anchor="middle" font-size="12" fill="hsl(217 12% 65%)">Write: formWriteMessagePair → one ledger statement (INSERT … ON CONFLICT) → pg_notify('fusion_events') → BroadcastChannel 'fusion-angle:data' tells the other tabs</text>
+</g></svg>
+<figcaption class="src">Hand-built diagram. Each label names a file or symbol cited on the other pages.</figcaption></figure>
+<h2>The steps</h2>
+<ol>
+<li><b>Boot.</b> <code>web-app/app/server-core.ts</code> builds the tab's one client: <code>createAppClient(createHttpFacade(serverOrigin(), fetch))</code>, then <code>client.setCookieSession(true)</code>. Its own comment says: "Cookie-session: access token is memory only; refresh lives in the HttpOnly cookie."</li>
+<li><b>Page → client.</b> "Page modules never call transport verbs from <code>api/api.ts</code> — data access goes through <code>client/</code>" (ARCHITECTURE.md § Conventions).</li>
+<li><b>Client → wire.</b> <code>client/request-context.ts</code> adds <code>OPERATION_ID_HEADER</code>. "The client mints operation-id once per operation, on every request, and the server never mints one" (API.md).</li>
+<li><b>Dispatch.</b> <code>handleRequest</code> mints request-id, then runs these steps in order: framing, carried Request-ID refusal, Operation-ID check, <code>matchRoute</code> plus <code>authenticateRequest</code>, the identity fence, body parse plus <code>preconditionRefusal</code>, Region B, the pair plane, and the handler (API.md § Dispatch order).</li>
+<li><b>Storage.</b> A write appends pairs through one statement. A read selects heads and serves the stored bytes, with exactly three substitutions and three additions (ARCHITECTURE.md § A response is one unit).</li>
+<li><b>Fan-out.</b> "A successful write notifies this tab via pub-sub and posts <code>fusion-angle:data</code> so other same-origin windows refresh. There is no LISTEN and no SSE client" (AGENTS.md).</li>
+</ol>
+<p class="src">License: <code>tmornini/fusion-angle</code> is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 Universal</a>.</p></main><footer>Every claim is drawn from <code>tmornini/fusion-angle</code> (README.md, ARCHITECTURE.md, SCHEMA.md, API.md, DESIGN-SYSTEM.md, AGENTS.md, and the cited source files).</footer></body></html>
