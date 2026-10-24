@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One-table backend — Fusion Angle explained</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><span class="brand">Fusion Angle · HTTP pairs as data</span><a href="index.html">Why</a><a href="pattern.html">How the pattern works</a><a href="client.html">Client reference</a><a href="backend.html" aria-current="page">Backend reference</a></nav><main>
+<h1>The single-table Postgres backend</h1>
+<p>"The table is named once, here, and anchored to <code>TABLE_NAMES</code> in <code>api/db.ts</code> (length 1). The name is <code>fa_message_pairs</code>." The only other table is <code>schema_marker</code> (SCHEMA.md).</p>
+<blockquote>A pair is the request as received, or nothing, plus the response wire bytes… A document is <code>path</code> plus <code>name</code>: <code>pathname = path + name</code>… The ledger stores writes only — no GET rows.</blockquote>
+<figure><img src="SCHEMA.svg" alt="SCHEMA.svg from the repo: columns, keys and indexes of fa_message_pairs"><figcaption class="src">SCHEMA.svg, copied verbatim from the repo. It is generated from <code>api/db.ts</code>, <code>api/types.ts</code>, and <code>api/schema-postgres.ts</code>, and <code>./test validate</code> fails on drift.</figcaption></figure>
+<h2>The DDL: <code>api/schema-postgres.ts</code></h2>
+<pre><code>CREATE TABLE IF NOT EXISTS fa_message_pairs (
+    id uuid PRIMARY KEY,
+    operation_id uuid NOT NULL,
+    path text COLLATE "C" NOT NULL
+        CONSTRAINT fa_message_pairs_path_chk
+        CHECK (left(path, 1) = '/'
+           AND right(path, 1) = '/'),
+    name text COLLATE "C" NOT NULL,
+    supersedes uuid NOT NULL,
+    requester_identity_id text COLLATE "C" NOT NULL,
+    method text COLLATE "C" NOT NULL ... CHECK (method ~ '^[A-Z]+$'),
+    response_at timestamptz NOT NULL,
+    request bytea NOT NULL,
+    request_salt bytea NOT NULL ... (octet_length(request_salt) = 16),
+    request_hash bytea NOT NULL ... = 32,
+    request_secrets bytea NOT NULL,
+    request_secrets_hash bytea NOT NULL,
+    response bytea NOT NULL,
+    response_salt / response_hash / response_secrets / response_secrets_hash,
+    pair_hash bytea NOT NULL ... = 32
+);</code></pre>
+<p class="src">Abridged. The source spells out every CHECK constraint.</p>
+<h3>Indexes</h3>
+<pre><code>CREATE INDEX IF NOT EXISTS fa_message_pairs_document
+    ON fa_message_pairs (path, name, response_at, id);
+CREATE INDEX IF NOT EXISTS fa_message_pairs_collection
+    ON fa_message_pairs (path, response_at, id);
+CREATE UNIQUE INDEX IF NOT EXISTS fa_message_pairs_succession
+    ON fa_message_pairs (path, name, supersedes)
+    WHERE method IN ('PUT', 'DELETE');
+CREATE INDEX IF NOT EXISTS fa_message_pairs_request_id
+    ON fa_message_pairs (fa_request_id_of(response));
+CREATE INDEX IF NOT EXISTS fa_message_pairs_body ...  -- partial GIN, jsonb_path_ops, WHERE path = '/invitations/'</code></pre>
+<h3>SQL functions</h3>
+<ul>
+<li><code>fa_pair_root(...)</code>: a SHA-256 over length-prefixed text forms of the envelope and the four hashes. "Integrity is the hash tree… Lineage is <code>supersedes</code>. The nil root is the predecessor of a genesis. No chain."</li>
+<li><code>fa_message_body_bytes</code>: the body after <code>E'\r\n\r\n'</code>. The statement's sameness test reads it.</li>
+<li><code>fa_message_body_json</code>: the body as <code>jsonb</code> when the header block says <code>content-type: application/json</code>, NULL otherwise. "It runs inside an index expression, so it must never raise."</li>
+<li><code>fa_request_id_of</code>: finds the pairs one request wrote. "Nothing in the product reads the index yet."</li>
+<li><code>fa_imf_fixdate</code>: formats <code>last-modified</code>, with English weekday and month names fixed as array lookups.</li>
+</ul>
+<h2>Identity, heads, and conditionals</h2>
+<ul>
+<li>"The pair <code>id</code> is the ETag — If-Match names that identifier."</li>
+<li>"<code>fa_message_pairs_succession</code> is the only write enforcement." A stale latch answers 412 (API.md § Dispatch order, step 8).</li>
+<li>"A document's head is its latest PUT or DELETE pair, and a head is its document's whole state" (ARCHITECTURE.md § Derivation).</li>
+<li>A DELETE is a tombstone. "A deleted document… is 410 on its GET and on both version routes."</li>
+<li>Secrets: <code>request_secrets</code> and <code>response_secrets</code> are "the plaintext credential lines, not digests". Six header names count as credential lines (<code>shared/http-message/credentials.ts</code>).</li>
+<li>Tenancy "rides <code>path</code>, and a membership's name" (<code>&lt;organization-id&gt;:&lt;identity-id&gt;</code>). "The store is global. The fence enforces organization."</li>
+</ul>
+<h2>Head reads in SQL: <code>api/backend-postgres.ts</code></h2>
+<pre><code>SELECT id, method
+FROM fa_message_pairs
+WHERE path = ${path}
+  AND name = ${name}
+  AND method IN ('PUT', 'DELETE')
+ORDER BY response_at DESC, id DESC
+LIMIT 1</code></pre>
+<p>That is <code>selectHead</code>. <code>selectHeadPair</code> is "One backward walk of the document index under a Limit". Collection heads come from <code>COLLECTION_HEAD_PAIRS_SQL</code>, a skip walk that does a <code>CROSS JOIN LATERAL (… ORDER BY head.response_at DESC, head.id DESC LIMIT 1)</code> per name and keeps <code>heads.method = 'PUT'</code>. Every read formats the stamp with <code>to_char(response_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')</code>, so the native and lexical orders agree.</p>
+<h2>The layers above the table</h2>
+<table><tr><th>File</th><th>Role</th></tr>
+<tr><td><code>api/db-postgres.ts</code></td><td><code>postgresDbAdapter(url)</code>: "Construction preset over BackedDbAdapter" wrapping <code>new PostgresBackend(connectPostgres(url))</code>.</td></tr>
+<tr><td><code>api/postgres-client.ts</code></td><td>"Thin postgres.js wrapper. Application code never imports postgres." postgres.js 3.4.9 is the named exception.</td></tr>
+<tr><td><code>api/backend-postgres.ts</code></td><td><code>PostgresBackend implements StorageBackend</code>: the head and collection SQL, <code>schema_marker</code>, and <code>POSTGRES_DROP_SCHEMA</code>. The memory twin is <code>api/backend-memory.ts</code> over <code>api/backend-buffer-tx.ts</code>.</td></tr>
+<tr><td><code>api/ledger-statement-sql.ts</code></td><td>"The one ledger INSERT. Fifteen binds per row follow the attempt class in $1." A CTE ends with <code>SELECT pg_notify('fusion_events', src.notify) … FROM inserted ins</code>, so only rows that actually inserted ring the bell.</td></tr>
+<tr><td><code>api/ledger-statement.ts</code></td><td>Runs that statement. It maps <code>SUCCESSION_CONSTRAINT = 'fa_message_pairs_succession'</code> to <code>SuccessionConflict</code>.</td></tr>
+<tr><td><code>api/ledger-root.ts</code></td><td>"The nil root, one genesis statement at ensureTable."</td></tr>
+<tr><td><code>api/ledger-seed.ts</code></td><td>"Rehearse the live ops on scratch memory, plan the recorded rows by depth, and land them in one transaction." <code>schema_marker</code> is written last, "so a failed seed leaves no table".</td></tr>
+<tr><td><code>api/message-store.ts</code></td><td>"Three reads over the ledger": <code>getDocumentHead</code>, <code>getDocumentHistory</code>, and <code>getCollection</code>. A DELETE head is no document.</td></tr>
+<tr><td><code>api/message-pair.ts</code></td><td>The gate: <code>formWriteMessagePair</code>, <code>parseIfMatch</code>, <code>latchesOf</code>, <code>runStatement</code>, <code>formStateWrite</code>, and <code>landStateWrite</code>.</td></tr>
+<tr><td><code>api/head-reads.ts</code></td><td><code>HeadSelection</code> (<code>'document' | 'collection' | 'version'</code>), plus <code>selectVersionAt</code> and <code>selectVersionsAt</code>.</td></tr>
+<tr><td><code>api/served-response.ts</code></td><td><code>servedResponse</code>, "the only body transform" (read-role projection).</td></tr>
+<tr><td><code>api/derive-*.ts</code></td><td>Each family derives from stored responses "through one parser, <code>bodyOf</code> (<code>api/derive-documents.ts</code>)". There are 19 files, among them <code>derive-ideas.ts</code>, <code>derive-flows.ts</code>, <code>derive-members.ts</code>, and <code>derive-flow-work-orders.ts</code>. "Nothing derives from the <code>request</code> column."</td></tr>
+</table>
+<h2>Advisory locks and row locks</h2>
+<p><code>api/advisory-lock.ts</code> defines "52-bit pg_advisory_xact_lock keys from SHA-256 of lock-name labels" (<code>ADVISORY_KEY_HEX_DIGITS = 13</code>). It also defines <code>FUSION_EVENTS_CHANNEL = 'fusion_events'</code>, <code>PG_NOTIFY_PAYLOAD_MAX_BYTES = 8000</code> (an oversize payload collapses to <code>{"kind":"full"}</code>), and <code>POOL_MAX = 10</code>.</p>
+<p>On the current master, <code>advisoryKey</code> is called only from tests (<code>tests/advisory-lock.test.ts</code> and <code>tests/pg-races.test.ts</code>). The product serializes writes with row locks instead. <code>ORGANIZATION_ROW_FOR_SHARE_SQL</code> and <code>ORGANIZATION_ROW_FOR_UPDATE_SQL</code> (<code>api/backend-postgres.ts</code>) lock an organization's genesis row, "FOR SHARE in a flow write and FOR UPDATE in a roster write" (AGENTS.md):</p>
+<pre><code>// FOR UPDATE on each organization's genesis row, in the
+// order given, before the roster statement: two roster
+// writers queue, and a flow write's share waits or is
+// waited on.</code></pre>
+<p class="src">Footnote: the header comment at <code>api/postgres-client.ts:3</code> ("advisory locks are pg_advisory_xact_lock inside it") looks stale, since no product code takes an advisory lock.</p>
+<h2>"The one table, examined" (plan 2026-09-04)</h2>
+<p><code>docs/superpowers/plans/2026-09-04-one-table-examined.md</code> sets the goal: "Every statement the backend issues has a plan pin; the two heads live in SQL; thirteen single-document reads read one document; the write appends once at the storage edge; the two stamps are <code>timestamptz</code>…". It describes the stack as "One table behind five layers": the DDL, the two backends behind <code>Tx</code>, the seam (<code>EntityStore&lt;MessagePairEntity&gt;</code>, <code>api/store-history-entity.ts</code>), the store, and the gate. The phases are A (pins), B (heads in SQL), C (document reads per derive family), D (append-only write, <code>upsertRow</code> renamed to <code>insertPair</code>), E (<code>timestamptz</code>), and F (the report). Plan pins land in <code>tests/pg-explain.test.ts</code>.</p>
+<p>"Two ways to read, one way to write": a collection read is exact on <code>path</code>, a document read is exact on <code>path</code> and <code>name</code>, and the write appends one pair.</p>
+<blockquote>Tables came and went; the ledger was always there; now it is the schema. <span class="src">— SCHEMA.md § How we got here</span></blockquote>
+<p class="src">License: <code>tmornini/fusion-angle</code> is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 Universal</a>.</p></main><footer>Every claim is drawn from <code>tmornini/fusion-angle</code> (README.md, ARCHITECTURE.md, SCHEMA.md, API.md, DESIGN-SYSTEM.md, AGENTS.md, and the cited source files).</footer></body></html>
