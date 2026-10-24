@@ -7,7 +7,6 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
-    IdentityDefaultOrganizationEntity,
     IdentityTokenEntity,
     ClientRegistrationEntity,
     IdentityProviderEntity,
@@ -631,29 +630,6 @@ validateIdentityTokenRevocationEntity(
     );
     return {
         identity_id: pickIdentifier(body, 'identity_id'),
-        at,
-    };
-}
-
-const IDENTITY_DEFAULT_ORGANIZATION_BODY_KEYS:
-    readonly string[] = [
-    'identity_id', 'organization_id', 'at',
-];
-
-export function validateIdentityDefaultOrganizationEntity(
-    body: Record<string, unknown>,
-): Omit<IdentityDefaultOrganizationEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        IDENTITY_DEFAULT_ORGANIZATION_BODY_KEYS,
-        'IdentityDefaultOrganizationEntity',
-    );
-    const at = validateTimestampField(
-        body, 'at', 'IdentityDefaultOrganizationEntity',
-    );
-    return {
-        identity_id: pickIdentifier(body, 'identity_id'),
-        organization_id: pickIdentifier(body, 'organization_id'),
         at,
     };
 }

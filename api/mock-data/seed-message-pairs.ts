@@ -1013,13 +1013,6 @@ export function membershipSeedBody(
     };
 }
 
-export function seatSeedBody(
-    type: 'admin' | 'member',
-    at: string = MOCK_SEED_TIMESTAMP,
-): Record<string, unknown> {
-    return { type, at };
-}
-
 export function identityPersonSeedBody(
     member: SeedHumanMember,
 ): Record<string, unknown> {

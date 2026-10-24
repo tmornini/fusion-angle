@@ -352,18 +352,6 @@ function tokenAnswerFields(
     return fields;
 }
 
-export function attachSetCookie(
-    response: Response,
-    cookie: string,
-): Response {
-    const headers = new Headers(response.headers);
-    headers.append('Set-Cookie', cookie);
-    return new Response(response.body, {
-        status: response.status,
-        headers,
-    });
-}
-
 // A token's display name = the identity's PII name when present,
 // else the id (a presentation transform at the call site — a
 // service identity has no PII). Never a stored default.
@@ -419,16 +407,6 @@ export async function subjectClaims(
             ),
         ),
     };
-}
-
-// Thin wrapper over subjectClaims for callers that need
-// only the reachable organization ids.
-export async function subjectOrganizations(
-    adapter: DbAdapter,
-    identityId: Id,
-): Promise<Id[]> {
-    return (await subjectClaims(adapter, identityId))
-        .organizations;
 }
 
 // The org a flat (un-exchanged) token resolves to, server-side:

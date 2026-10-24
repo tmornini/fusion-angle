@@ -28,9 +28,6 @@ import {
     runWrite,
     attemptFor,
 } from '../api/message-pair.ts';
-import {
-    postMemberDocumentOp,
-} from '../api/routes.ts';
 import { deriveMembers } from '../api/derive-members.ts';
 import {
     seedPersonIdentity,
@@ -149,8 +146,8 @@ async function leftoverMemberParent(
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
     });
-    await postMemberDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, messagePair,
+    await runWrite(
+        db, attemptFor([messagePair]), [messagePair],
     );
 }
 

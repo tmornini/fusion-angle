@@ -16,13 +16,11 @@ import type {
 } from './validators.ts';
 import type {
     Id,
-    AIMemberEntity,
     AIAgentEntity,
     ServiceEntity,
     FlowEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
-    HumanMemberEntity,
     IdentityEntityFields,
     IdentityKind,
     IdentityPiiEntity,
@@ -39,7 +37,6 @@ import type {
     IdentityProviderEntity,
     MessagePairEntity,
     TransitionFieldValueEntity,
-    MemberEntity,
     AttributeType,
     Constraint,
     StoredGraph,
@@ -2519,84 +2516,6 @@ export async function postActualScoreDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return entity;
-}
-
-// Member document write — Phase Final Task 2: the members
-// ROW half is stripped — pure message-plane write. No states
-// interaction (genesis/archive ride the membership SEAT via
-// PUT/DELETE organizations/:id/members/:id,
-// postMembershipDocumentOp). `messagePair` is optional so a
-// below-facade caller keeps compiling; the live route always
-// supplies one.
-export async function postMemberDocumentOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<MemberEntity, 'id'>> {
-    const entity = withoutId(body) as unknown as
-        Omit<MemberEntity, 'id'>;
-    // Phase Final Task 2: members ROW half stripped.
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return entity;
-}
-
-// AI-member document write — Phase Final Task 2: the
-// ai_members ROW half is stripped — pure message-plane write.
-// No states interaction. The composed POST edit arm at this
-// route sits beside this PUT; verbs stay independent. `messagePair`
-// is optional so a below-facade caller keeps compiling.
-export async function postAiMemberDocumentOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<AIMemberEntity, 'id'>> {
-    const entity = withoutId(body) as unknown as
-        Omit<AIMemberEntity, 'id'>;
-    // Phase Final Task 2: ai_members ROW half stripped.
-    if (messagePair !== undefined) {
-        await runWrite(
-            db,
-            attemptFor([messagePair]),
-            [messagePair],
-        );
-    }
-    return entity;
-}
-
-// Human-member document write — Phase Final Task 2: the
-// human_members ROW half is stripped — pure message-plane
-// write. NO live PUT exists on human-members/:id (get/post
-// only); this op serves synthesis/seed callers. No states
-// interaction. `messagePair` is optional so a below-facade caller
-// keeps compiling.
-export async function postHumanMemberDocumentOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    messagePair?: MessagePair,
-): Promise<Omit<HumanMemberEntity, 'id'>> {
-    const entity = withoutId(body) as unknown as
-        Omit<HumanMemberEntity, 'id'>;
-    // Phase Final Task 2: human_members ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,

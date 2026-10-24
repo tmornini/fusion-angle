@@ -23,14 +23,6 @@ import {
     validateHumanMemberEntity,
 } from '../api/validators.ts';
 import {
-    postMemberDocumentOp,
-    postAiMemberDocumentOp,
-    postHumanMemberDocumentOp,
-} from '../api/routes.ts';
-import {
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
-import {
     documentFamilyWiring,
 } from '../api/document-family.ts';
 import {
@@ -50,8 +42,8 @@ import { operationIdHeader } from
 // dedup by state_event_id is what keeps a re-put from minting
 // a phantom transition.
 // human-members/:id has NO live PUT route (the first registered
-// family without one), so its op/validator/wiring are exercised
-// below-gate only, never through PUT().
+// family without one). Its validator is exercised below-gate;
+// its wiring is absent.
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -304,103 +296,7 @@ Deno.test('validateHumanMemberDocumentBody rejects each missing'
     }
 });
 
-// -- 2. the ops (below-gate, MemoryDbAdapter) ------------------
-
-Deno.test('postMemberDocumentOp writes exactly the pair and'
-+ ' reconstructs the entity return (row half stripped)',
-async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const body = memberFields();
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/members/nVpWUxfKrqvVXWgWENWhbA',
-        routePattern: 'members/:id',
-        routeSegments: ['members', ':id'],
-        pathSegments: ['members', 'nVpWUxfKrqvVXWgWENWhbA'],
-        headerFields: [], body,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: '2026-01-01T00:00:00.000000Z',
-        organization: undefined,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    // Phase Final Task 2: members ROW half stripped —
-    // op returns the reconstructed entity; only pairs land.
-    // Mid-stage: body still includes the trio (Task 6 may
-    // thin the op return to entity fields alone).
-    const written = await postMemberDocumentOp(
-        db, 'nVpWUxfKrqvVXWgWENWhbA', body,
-        'XXZruirZyAOoRpNxaDnpSA', messagePair,
-    );
-    assertEquals(written, body);
-    // Phase Final Stage B: roster tables retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-});
-
-Deno.test('postAiMemberDocumentOp writes exactly the pair and'
-+ ' reconstructs the entity return (row half stripped)',
-async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const body = aiMemberFields();
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/ai-members/VLoTvOKjXoNVDjLLBotQXA',
-        routePattern: 'ai-members/:id',
-        routeSegments: ['ai-members', ':id'],
-        pathSegments: ['ai-members', 'VLoTvOKjXoNVDjLLBotQXA'],
-        headerFields: [], body,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: '2026-01-01T00:00:00.000000Z',
-        organization: undefined,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    const written = await postAiMemberDocumentOp(
-        db, 'VLoTvOKjXoNVDjLLBotQXA', body,
-        'XXZruirZyAOoRpNxaDnpSA', messagePair,
-    );
-    assertEquals(written, body);
-    // Phase Final Stage B: roster tables retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-});
-
-Deno.test('postHumanMemberDocumentOp writes exactly the pair and'
-+ ' reconstructs the entity return (row half stripped;'
-+ ' below-gate only — no live PUT route)', async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const body = humanMemberFields();
-    const messagePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/human-members/fVrMeaOxbnDcSKMPwtIEZg',
-        routePattern: 'human-members/:id',
-        routeSegments: ['human-members', ':id'],
-        pathSegments: ['human-members', 'fVrMeaOxbnDcSKMPwtIEZg'],
-        headerFields: [], body,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: '2026-01-01T00:00:00.000000Z',
-        organization: undefined,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    const written = await postHumanMemberDocumentOp(
-        db, 'fVrMeaOxbnDcSKMPwtIEZg', body,
-        'XXZruirZyAOoRpNxaDnpSA', messagePair,
-    );
-    assertEquals(written, body);
-    // Phase Final Stage B: roster tables retired.
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-    assertStrictEquals((await db.messagePairs.getAll()).length, 2);
-});
-
-// -- 3. byte-identical resend (the E6 fast-path sibling pin) —
+// -- 2. byte-identical resend (the E6 fast-path sibling pin) —
 // LIVE routes only: members/:id and ai-members/:id. No
 // equivalent exists for human-members/:id — it has no live PUT
 // to resend against. ----------------------------------------
