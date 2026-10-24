@@ -8,7 +8,7 @@ import { ServiceMember, nowUtc } from '../shared/types.ts';
 import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
-import { requireOrganization, isHumanSeat } from './members.ts';
+import { requireOrganization } from './members.ts';
 import {
     notifyMembershipChanges,
     notifyServiceMemberChanges,
@@ -62,8 +62,8 @@ export function buildServiceMembers(
     });
 }
 
-// A membership that is not accepted, or that seats a
-// person, is absence, as a missing document is.
+// A membership that is not accepted is absence, as a
+// missing document is.
 export async function getServiceMember(
     ctx: RequestContext,
     id: MemberId,
@@ -74,8 +74,7 @@ export async function getServiceMember(
             membershipItemPath(ctx, id),
         ),
     ]);
-    if (membership.body().toValue().state !== 'accepted'
-        || isHumanSeat(membership)) {
+    if (membership.body().toValue().state !== 'accepted') {
         throw new RequestError(
             'no live service member ' + id,
             HTTP_NOT_FOUND,
