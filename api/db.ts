@@ -79,24 +79,6 @@ export class MissingTableError extends Error {
     }
 }
 
-// A unique-column collision on a declared unique column;
-// the memory backend scans the declared unique columns
-// before buffering. No table declares one today.
-// handleRequest maps it to 412.
-export class UniqueConstraintError extends Error {
-    readonly table: string;
-    readonly column: string;
-    constructor(table: string, column: string) {
-        super(
-            `Unique column ${table}.${column}`
-            + ' already holds this value',
-        );
-        this.table = table;
-        this.column = column;
-        this.name = 'UniqueConstraintError';
-    }
-}
-
 // One entry of a head batch: a collection's live PUT heads,
 // or, with contains, those of its documents with a matching
 // version. Each entry keeps its single read's contract.
@@ -345,23 +327,6 @@ export const TABLE_NAMES = [
 export type TableIndexSpec =
     | string
     | { readonly column: string; readonly unique: true };
-
-export function indexColumn(
-    spec: TableIndexSpec,
-): string {
-    return typeof spec === 'string' ? spec : spec.column;
-}
-
-// The columns a table declares unique, in TABLE_INDEXES
-// order — consumed by the memory backend's pre-buffer
-// scan.
-export function uniqueColumns(
-    table: string,
-): readonly string[] {
-    return (TABLE_INDEXES[table] ?? [])
-        .filter((spec) => typeof spec !== 'string')
-        .map((spec) => indexColumn(spec));
-}
 
 // Secondary indexes per table. Postgres indexes are
 // declared in `schema-postgres.ts`.

@@ -2,8 +2,6 @@ import {
     serializeRecord,
 } from './storage-serialize.ts';
 import {
-    UniqueConstraintError,
-    uniqueColumns,
     type CollectionHeadRead,
     type Tx,
     type TxMode,
@@ -321,33 +319,6 @@ export function bufferTx(
             assertWritable();
             if (buffer.some((existing) => existing.id === row.id)) {
                 return false;
-            }
-            // Scan BEFORE serializeRecord/splice: absence
-            // is unindexed, so a row lacking the column
-            // never collides (genesis rows coexist).
-            for (
-                const column of uniqueColumns(
-                    'fa_message_pairs',
-                )
-            ) {
-                const value = (
-                    row as Record<string, unknown>
-                )[column];
-                if (value === undefined) continue;
-                const collision = buffer.find(
-                    (existing) =>
-                        existing.id !== row.id
-                        && (
-                            existing as Record<
-                                string, unknown
-                            >
-                        )[column] === value,
-                );
-                if (collision !== undefined) {
-                    throw new UniqueConstraintError(
-                        'fa_message_pairs', column,
-                    );
-                }
             }
             const written = {
                 ...serializeRecord(

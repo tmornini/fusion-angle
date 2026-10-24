@@ -8,7 +8,6 @@ import {
     foreignOrganizationMessage,
     MissingTableError,
     RetiredEntityError,
-    UniqueConstraintError,
 } from './db.ts';
 import type { LatencySimulation } from './latency.ts';
 import {
@@ -1404,14 +1403,6 @@ async function dispatched(
             return Response.json(
                 { error: error.message },
                 { status: HTTP_FORBIDDEN },
-            );
-        }
-        if (
-            error instanceof UniqueConstraintError
-        ) {
-            return Response.json(
-                { error: error.message },
-                { status: HTTP_PRECONDITION_FAILED },
             );
         }
         if (
