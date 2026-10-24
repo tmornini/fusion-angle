@@ -8,7 +8,6 @@
     /* Semantic: Surfaces */
     --card: var(--gray-800);
     --color-card-bg: hsl(var(--card));
-    --color-surface: hsl(var(--background));
     --color-foreground: hsl(var(--foreground));
     --color-muted-foreground:
         hsl(var(--muted-foreground));
@@ -59,7 +58,6 @@
 
     /* Status: Warning */
     --warning: 38 85% 55%;
-    --warning-foreground: 38 90% 10%;
     --warning-soft: 38 40% 15%;
     --warning-border: 38 40% 30%;
     --warning-text: 38 80% 65%;
@@ -69,21 +67,18 @@
 
     /* Status: Error */
     --error: 0 65% 58%;
-    --error-foreground: 0 0% 100%;
     --error-soft: 0 40% 15%;
     --error-border: 0 40% 30%;
     --error-text: 0 65% 70%;
 
     /* Status: Info */
     --info: 217 45% 60%;
-    --info-foreground: 0 0% 100%;
     --info-soft: 217 40% 15%;
     --info-border: 217 40% 30%;
     --info-text: 217 45% 70%;
 
-    /* Soft variants for primary and muted */
+    /* Soft variant for primary */
     --primary-soft: 217 40% 15%;
-    --muted-soft: var(--gray-800);
 
     /* Card shadows */
     --shadow-card:
@@ -98,10 +93,6 @@
         linear-gradient(180deg,
         hsl(var(--gray-900)) 0%,
         hsl(var(--gray-800)) 100%);
-
-    /* Chart Colors (extended palette) */
-    --chart-5: 217 71% 63%;
-    --chart-6: 280 65% 70%;
 
     /* Heat-map ramp (flow-stats page) -- four fixed stops, non-uniform */
     /* positions: blue @0% -> green @50% -> yellow @75% -> red @100%.   */
