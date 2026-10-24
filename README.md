@@ -100,3 +100,8 @@ Medium scroll (`Go to Medium Church!`) — see AGENTS.md
 
 This file used to narrate how the product grew. It is now
 the front door: product, modules, clone path, and pointers.
+
+## License
+
+This project is dedicated to the public domain under
+[CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).
