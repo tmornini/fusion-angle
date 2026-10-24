@@ -335,22 +335,24 @@ grep -rnE "['\"]node:|\bprocess\b" web-app/app/*.ts \
     server/ api/ shared/
 ```
 
-Twelve lines. One is the `node:crypto` import above. Two are
+Eleven lines. One is the `node:crypto` import above. Two are
 `api/access-token.ts:31` and `:35`, where the Node-compat
 `process` global is typed and then read through optional
 chaining (`runtime.process?.env?.[…]`) — a real reader that
 the narrower `process\.` pattern silently clears, leaving a
-one-line false all-clear. The remaining nine are the English
-word: eight in comments, one in the page keyword string
+one-line false all-clear. The remaining eight are the English
+word: seven in comments, one in the page keyword string
 `'flow, process,'` at `web-app/app/page-registry.ts:177`.
 
-Dropping the quote anchor adds nine more non-specifier hits:
-`node: GraphNode`, a domain property name, in `flow-graph.ts`
-(×3), `flow-operations.ts` (×3), `mermaid-generate.ts`, and
-`api/types.ts`, plus the comment naming `node:crypto` at
-`server/scrypt-hash.ts:2`. The identifier is right and the
-pattern is wrong. `tests/` is outside the sweep on purpose:
-its files still import `node:test`.
+Dropping the quote anchor adds eleven more non-specifier
+hits: `node: GraphNode`, a domain property name, in
+`flow-graph.ts` (×3), `flow-operations.ts` (×2),
+`flow-export.ts`, `mermaid-generate.ts`, and
+`shared/types.ts`; a `node:` string in `flow-export.ts`
+and a `node:` property in `flow-operations.ts`; plus the
+comment naming `node:crypto` at `server/scrypt-hash.ts:2`.
+The identifier is right and the pattern is wrong. `tests/`
+is outside the sweep on purpose.
 
 ### Operator seed and wipe
 

@@ -6080,7 +6080,7 @@ FSM, unlike `flows/detail`).
   that is not a 22-character identifier) 400s at the
   route gate; an absent one bounces to `identities/`.
   Source: `GET identities/:id/tokens` via
-  `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`),
+  `client/identity-tokens.ts` (`TokenEvent`),
   `web-app/app/presenters/identity-tokens.ts`.
   Pin: tests/presenter-identity-tokens.test.ts 'renders a
        card per chain with each jti event' (decides the
@@ -6115,7 +6115,7 @@ FSM, unlike `flows/detail`).
   adapter's camelCase `ProviderEvent` shape (`provider`,
   `providerSubject`, `action`, `at`). Source: `GET
   identities/:id/providers` via
-  `web-app/app/adapters/identity-providers.ts`
+  `client/identity-providers.ts`
   (`ProviderEvent`),
   `web-app/app/presenters/identity-providers.ts`.
   Pin: tests/presenter-identity-providers.test.ts 'renders
@@ -6175,7 +6175,7 @@ FSM, unlike `flows/detail`).
   `web-app/app/organization-switcher.ts`,
   `web-app/app/sidebar-member.ts`,
   `web-app/app/header-info.ts`,
-  `web-app/app/adapters/organization-session.ts`,
+  `client/organization-session.ts`,
   `web-app/app/app-boot.ts::scopeBootToActiveOrganization`.
   Pin: tests/adapters-organization-session-exchange.test.ts
        'shouldShowOrganizationSwitcher only at two or

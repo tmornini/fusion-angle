@@ -24,7 +24,7 @@ canvas with pan, marquee, drag, and edge connection.
   canvas Space binding.
 - `mermaid-{generate,parse}.ts` — round-trip text format
 - `zip.ts` — in-browser ZIP
-- `adapters/flow-export.ts` — integration point
+- `web-app/app/flow-export.ts` — integration point
 
 The canvas operates on the domain `GraphNode` /
 `GraphEdge` (`memberIds`, `agentIds`, `attributes`). The
@@ -204,7 +204,7 @@ slot.
 
 Three call sites of the same predicate: `flow-graph.ts`,
 `flow-stats-aggregate.ts`, and
-`adapters/flow-publish.ts`. The aggregate model emitted
+`web-app/app/flow-publish.ts`. The aggregate model emitted
 by `flow-stats-aggregate.ts` carries the resolved level
 on each node as
 `memberHazard: 'warning' | 'danger' | null`; the stats
@@ -214,7 +214,7 @@ renderer reads it directly.
 
 The flow-publish gate is the third call site.
 `validateFlowForCreation(flow)` in
-`web-app/app/adapters/flow-publish.ts` returns
+`web-app/app/flow-publish.ts` returns
 `{ ready: boolean, problems: FlowProblem[] }` —
 `zero_members(nodeId)` and `dead_end(nodeId)` variants —
 and `getFlowsForCreation(ctx)` partitions the unlocked
@@ -224,10 +224,7 @@ dropdown. The picker renders two sections: READY
 (clickable, carries `data-flow-id`) and NOT READY
 (disabled, no-entry icon, "N nodes need attention"
 subtitle, no `data-flow-id` so the click handler ignores
-it). The client adapter `postWorkOrderCreation` re-runs
-`validateFlowForCreation` and throws before POST if the
-picker was somehow bypassed — defense in depth at the
-client boundary.
+it).
 
 ## Stats variant
 
@@ -244,17 +241,18 @@ the pure `flow-cycle-edges.ts` (the designer's back-edge
 DFS, extracted so both renderers mark loop-backs
 identically), `iconAlertTriangle` and `iconNoEntry` (the
 two hazard icons). Node positions, though, do not come
-from the renderer: `getFlowGraph` runs
-`flow-graph-layout.ts`'s `withRenderableLayout`, which
-lays a flow out (`computeLayout`) whenever domain
-`isAutoLayout` is set (wire `is_auto_layout` on
-FlowWithGraph) or its stored positions are degenerate —
-so the stats renderer and the designer both start from
-real coordinates, not the persisted (0,0) placeholders.
-`runFlowLayout` / `runLayoutFromInputs` is the one
-`computeLayout` wrapper, shared by `getFlowGraph`, the
-designer's `applyAutoLayout`, and `flow-export`'s
-mermaid-import path.
+from the renderer: `getRenderableFlowGraph` in
+`web-app/app/flow-graph-layout.ts` runs
+`withRenderableLayout`, which lays a flow out
+(`computeLayout`) whenever domain `isAutoLayout` is set
+(wire `is_auto_layout` on FlowWithGraph) or its stored
+positions are degenerate — so the stats renderer and the
+designer both start from real coordinates, not the
+persisted (0,0) placeholders. `runFlowLayout` /
+`runLayoutFromInputs` is the one `computeLayout` wrapper,
+shared by `getRenderableFlowGraph`, the designer's
+`applyAutoLayout`, and `flow-export`'s mermaid-import
+path.
 
 Its emitted SVG carries none of the editor's
 interactivity tells (no `<animate>`, `role="button"`,

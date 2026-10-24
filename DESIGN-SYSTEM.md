@@ -167,7 +167,7 @@ strings except dynamic per-element values via CSS
 custom properties. Colors stay in tokens. Page widths:
 `.entity`, `.overview`, `.workspace`.
 
-Cascade (`./build`; alpha within globs):
+Cascade (`./bin/build`; alpha within globs):
 
 1. `tokens.css`
 2. `fonts.css`
