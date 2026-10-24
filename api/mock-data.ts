@@ -571,10 +571,7 @@ async function postMockDataLoadIn(
     const unaffiliated = buildUnaffiliatedIdentity();
 
     // The organizations first: a seat's write refuses an
-    // organization with no document. Phase Final Task 2:
-    // organizations ROW half stripped — message-plane only
-    // (seededOrganizationBody still shapes the pair body in
-    // seed-message-pairs.ts).
+    // organization with no document.
     await Promise.all(
         [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
             (organization) => postOrganizationDocumentOp(
@@ -877,13 +874,9 @@ async function postMockDataLoadIn(
 
     // One genesis row per seeded Record: its initial
     // state and the member credited with creating it.
-    // Phase Final Task 2: records + record_attributes +
-    // flow_records ROW halves stripped — seed drives
-    // through postRecordWriteOp / postFlowRecordDocumentOp
-    // (pairs + states.postEvent only). recordGenesis
-    // is imported from seed-message-pairs.ts — pass 1
-    // there needs the SAME array to form each record's
-    // pair before the rehearsal's writes.
+    // recordGenesis is imported from seed-message-pairs.ts
+    // — pass 1 there needs the SAME array to form each
+    // record's pair before the rehearsal's writes.
     const recordGenesisById = new Map(
         recordGenesis.map(g => [g.entityId, g]),
     );
@@ -1118,9 +1111,6 @@ async function postMockDataLoadIn(
     // pool now too — the former memberFor DB-read done in the
     // rehearsal retired once its pick moved onto
     // pickHumanMember (Phase 7 Task 5).
-    // Phase Final Task 2: objectives + objective_revisions
-    // ROW halves stripped — seed drives through
-    // postObjectiveCreationOp (pairs only).
     const objectiveMemberPools =
         humanMemberPoolsByOrganization(members);
     for (const seed of OBJECTIVE_SEEDS) {

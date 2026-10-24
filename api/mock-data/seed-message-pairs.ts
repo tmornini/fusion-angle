@@ -1490,9 +1490,6 @@ export function buildMockDataInvocations():
             operation: key,
         });
     });
-    // Phase 12 Task 3 / Phase Final Task 2: the two seeded
-    // organizations form their OWN organizations/:id document
-    // message pairs (ROW half stripped — message-plane only).
     const starkOrganizationKey = seedMessagePairKey(
         'organizations/:id', STARK_ORGANIZATION,
     );

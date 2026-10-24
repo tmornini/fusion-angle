@@ -466,11 +466,6 @@ export async function missedReadError(
     return new EntityNotFoundError(table, id);
 }
 
-// fenceStatesByOwner RETIRED with the bulk lifecycle
-// collection (states-URI elimination C3). Per-entity and
-// collection history routes fence via
-// resolveOwningOrganization / missedReadError directly.
-
 // ---- the work-order head (§5) -------------------------------------
 
 // The work order's head version, from its stored response
@@ -505,13 +500,6 @@ function versionOf(pair: MessagePairEntity): WorkOrderVersion {
 
 // deriveMemberStates / MEMBERS_DOCUMENT_PREFIX RETIRED
 // (C4) — leftover /members/ document-trio history.
-
-// deriveFlowGraphStates RETIRED with the bulk lifecycle
-// collection (states-URI elimination C3). Graph node/edge
-// deleted/restored sidecars still live on the flow
-// document-pair body (graphDelta.deletions / revivals —
-// SIDECAR-KEEP); resolveFlowGraphOwner above still resolves
-// their owners for fences.
 
 // The invitation lifecycle, from the invitation document's
 // own history (api/derive-invitations.ts owns the head

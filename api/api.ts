@@ -201,19 +201,6 @@ function postWriteNotification(
     });
 }
 
-// Resolve a route pattern's WRITE_RESPONSE_SPECS entry for the
-// verb actually in flight. Every entry but two is a plain
-// WriteResponseSpec, applying regardless of which non-DELETE
-// verb hit it (no prior pattern wired both a PUT and a POST at
-// once). A PerVerbWriteResponseSpec — recognized by the absence
-// of `conditional` at its top level — supplies one spec per verb
-// instead; 'ai-members/:id' needs this because it wires a real
-// PUT alongside its composed-edit POST, and 'human-members/:id'
-// joins it (Phase 8 Task 4) for a DIFFERENT reason — its `put`
-// slot serves no live route at all, only the synthesized
-// detail-document bundle and the seed (see routes.ts). Task 10:
-// resolve put / patch / else post EXPLICITLY — never let PATCH
-// silently fall into the post branch.
 function writeResponseSpecFor(
     routePattern: string,
     method: string,

@@ -366,11 +366,9 @@ export { param, requireOrganization, withoutId };
 // Decision 7 state-in-entity (Phase 2/3): the PUT body is the
 // FULL document — the entity's own fields plus state —
 // validated once at the gate (documentWriteResponseSpec, via
-// validateDocument). Phase Final Task 2: the ideas ROW half is
-// stripped; the pair + states.postEvent land in ONE transaction
-// (states ROW half stripped (message plane only)). Genesis
-// is head-presence-defined — a fresh id's PUT simply finds no
-// head, so it authors like any other transition.
+// validateDocument). Genesis is head-presence-defined — a
+// fresh id's PUT simply finds no head, so it authors like
+// any other transition.
 const IDEAS_WIRING: DocumentFamilyWiring = {
     family: 'ideas',
     httpNest: 'organization',
@@ -1084,10 +1082,7 @@ function documentOperationOrganization(
 // Idea document write (Decision 7): ONE shape serves create,
 // edit, and transition — genesis is head-presence-defined (a
 // fresh id's PUT simply finds no head, authoring the birth
-// like any other transition). Phase Final Task 2: the ideas
-// ROW half is stripped — the pair + states.postEvent commit as
-// ONE transaction (states ROW half stripped — message plane
-// only).
+// like any other transition).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
 // and type parity. `messagePair` is optional so the seed's
@@ -1119,10 +1114,7 @@ export async function postIdeaDocumentOp(
 // Project document write (Decision 7): ONE shape serves
 // create, edit, and transition — genesis is head-presence-
 // defined (a fresh id's PUT simply finds no head, authoring
-// the birth like any other transition). Phase Final Task 2:
-// the projects ROW half is stripped — the pair +
-// states.postEvent commit as ONE transaction (states ROW half
-// stripped — message plane only).
+// the birth like any other transition).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
 // and type parity. `messagePair` is optional so the seed's
@@ -1141,8 +1133,6 @@ export async function postProjectDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<ProjectEntity, 'id'>;
-    // Phase Final Task 2: projects ROW half stripped;
-    // states ROW half stripped (message plane only).
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -1161,9 +1151,6 @@ export async function postProjectDocumentOp(
 // (postRecordWriteOp, POST .../record-types) rather than
 // this PUT —
 // this op's genesis arm exists for a live PUT-first flow.
-// Phase Final Task 2: the records ROW half is stripped — the
-// pair + states.postEvent commit as ONE transaction (states
-// row half strips with the states-trace group).
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
 // parity. `messagePair` is optional so the seed's below-facade call
@@ -1180,8 +1167,6 @@ export async function postRecordDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<RecordEntity, 'id'>;
-    // Phase Final Task 2: records ROW half stripped;
-    // states ROW half stripped (message plane only).
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -1193,9 +1178,7 @@ export async function postRecordDocumentOp(
 }
 
 // Record attribute document write — the sixth family, and the
-// SECOND 'stateless' one (vacuous BY CONSTRUCTION). Phase Final
-// Task 2: the record_attributes ROW half is stripped — pure
-// message-plane write (postWorkOrderDocumentOp shape).
+// SECOND 'stateless' one (vacuous BY CONSTRUCTION).
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
 // parity. validateRecordAttributeDocumentBody rejects a body
@@ -1215,8 +1198,6 @@ export async function postRecordAttributeDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<RecordAttributeEntity, 'id'>;
-    // Phase Final Task 2: record_attributes ROW half
-    // stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -1229,10 +1210,8 @@ export async function postRecordAttributeDocumentOp(
 
 // Idea submission write: a genesis-only document (an
 // idea is submitted once per sid; no edit/transition case
-// exists for this family). Phase Final Task 2: the
-// idea_submissions ROW half is stripped — pure message-plane
-// write (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
-// successBody forms the wire bytes via ideaSubmissionEntityOf
+// exists for this family). WRITE_RESPONSE_SPECS successBody
+// forms the wire bytes via ideaSubmissionEntityOf
 // (GET derive). Exported so the seed can
 // drive submission creation through the same op the route
 // uses (Decision 6's below-facade carve-out). `messagePair` is
@@ -1371,9 +1350,8 @@ function flowGraphOf(graph: unknown): StoredGraph {
     return asStoredGraph(graph, 'FlowDocumentBody.graph');
 }
 
-// Flow document write (Decision 7, class B). Phase
-// Final Task 2: flows + graph relation ROW halves stripped —
-// the graph law's reads and the pair commit as ONE
+// Flow document write (Decision 7, class B). The graph
+// law's reads and the pair commit as ONE
 // transaction. graphDelta/revivals stay in the
 // document-pair body (SIDECAR-KEEP → deriveFlowGraphStates);
 // graph is the client-authored snapshot carried on the pair
@@ -1401,8 +1379,6 @@ export async function postFlowDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<FlowEntity, 'id'>;
-    // Phase Final Task 2: flows + graph ROW halves
-    // stripped; states ROW half stripped (message plane only).
     // Revival states events dual-write until the
     // states-trace strip; pair body also carries
     // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
@@ -1616,9 +1592,7 @@ export async function postObjectiveCreationOp(
 }
 
 // Objective document write — the fifth lifecycle-state family
-// (states-document retirement). Phase Final Task 2: the
-// objectives ROW half is stripped — pure message-plane write
-// (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
+// (states-document retirement). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity.
 // validateObjectiveDocumentBody admits entity field plus
@@ -1640,7 +1614,6 @@ export async function postObjectiveDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<ObjectiveEntity, 'id'>;
-    // Phase Final Task 2: objectives ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2361,10 +2334,9 @@ export async function postWorkOrderDocumentOp(
     });
 }
 
-// Flow work-order join document write. Phase Final Task 2:
-// the flow_work_orders ROW half is stripped — pure message-plane
-// write. WRITE_RESPONSE_SPECS successBody forms the wire
-// bytes; the reconstructed return is for below-facade
+// Flow work-order join document write. WRITE_RESPONSE_SPECS
+// successBody forms the wire bytes; the reconstructed
+// return is for below-facade
 // callers and type parity. `messagePair` is optional. The actor
 // parameter is spelled `_actor`: no state event here to author.
 async function postFlowWorkOrderDocumentOp(
@@ -2380,7 +2352,6 @@ async function postFlowWorkOrderDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    // Phase Final Task 2: flow_work_orders ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2391,9 +2362,7 @@ async function postFlowWorkOrderDocumentOp(
     return entity;
 }
 
-// Flow record join document write. Phase Final Task 2: the
-// flow_records ROW half is stripped — pure message-plane write
-// (postFlowWorkOrderDocumentOp shape). WRITE_RESPONSE_SPECS
+// Flow record join document write. WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity. `messagePair` is
 // optional. The actor parameter is spelled `_actor`: no state
@@ -2414,7 +2383,6 @@ export async function postFlowRecordDocumentOp(
         body: withoutId(body),
     });
     const recordsPrefix = recordTypesUriPrefix(organization);
-    // Phase Final Task 2: flow_records ROW half stripped.
     // Record miss is EntityNotFoundError (404) —
     // never missedReadError (would 403 foreign and
     // create an existence oracle; W1 / W7), the
@@ -2467,9 +2435,7 @@ export async function postFlowTagDocumentOp(
     return;
 }
 
-// Objective baseline-score document write. Phase Final Task 2:
-// the project_objective_baseline_scores ROW half is stripped —
-// pure message-plane write (postIdeaSubmissionOp shape).
+// Objective baseline-score document write.
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes.
 // Exported so the seed can drive the same write path (Decision
 // 6's below-facade carve-out). `messagePair` is optional so a
@@ -2501,9 +2467,7 @@ export async function postBaselineScoreDocumentOp(
     return entity;
 }
 
-// Objective actual-score document write. Phase Final Task 2:
-// the project_objective_actual_scores ROW half is stripped —
-// pure message-plane write, byte-twin of
+// Objective actual-score document write, byte-twin of
 // postBaselineScoreDocumentOp. WRITE_RESPONSE_SPECS forms the
 // wire bytes. `_actor` is unused: no state event to author.
 export async function postActualScoreDocumentOp(
@@ -2529,13 +2493,11 @@ export async function postActualScoreDocumentOp(
     return entity;
 }
 
-// Member document write — Phase Final Task 2: the members
-// ROW half is stripped — pure message-plane write. No states
-// interaction (genesis/archive ride the membership SEAT via
-// PUT/DELETE organizations/:id/members/:id,
-// postMembershipDocumentOp). `messagePair` is optional so a
-// below-facade caller keeps compiling; the live route always
-// supplies one.
+// Member document write. No states interaction
+// (genesis/archive ride the membership SEAT via PUT/DELETE
+// organizations/:id/members/:id, postMembershipDocumentOp).
+// `messagePair` is optional so a below-facade caller keeps
+// compiling; the live route always supplies one.
 export async function postMemberDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -2545,7 +2507,6 @@ export async function postMemberDocumentOp(
 ): Promise<Omit<MemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<MemberEntity, 'id'>;
-    // Phase Final Task 2: members ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2556,11 +2517,10 @@ export async function postMemberDocumentOp(
     return entity;
 }
 
-// AI-member document write — Phase Final Task 2: the
-// ai_members ROW half is stripped — pure message-plane write.
-// No states interaction. The composed POST edit arm at this
-// route sits beside this PUT; verbs stay independent. `messagePair`
-// is optional so a below-facade caller keeps compiling.
+// AI-member document write. No states interaction. The
+// composed POST edit arm at this route sits beside this
+// PUT; verbs stay independent. `messagePair` is optional so
+// a below-facade caller keeps compiling.
 export async function postAiMemberDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -2570,7 +2530,6 @@ export async function postAiMemberDocumentOp(
 ): Promise<Omit<AIMemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<AIMemberEntity, 'id'>;
-    // Phase Final Task 2: ai_members ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2581,12 +2540,11 @@ export async function postAiMemberDocumentOp(
     return entity;
 }
 
-// Human-member document write — Phase Final Task 2: the
-// human_members ROW half is stripped — pure message-plane
-// write. NO live PUT exists on human-members/:id (get/post
-// only); this op serves synthesis/seed callers. No states
-// interaction. `messagePair` is optional so a below-facade caller
-// keeps compiling.
+// Human-member document write. NO live PUT exists on
+// human-members/:id (get/post only); this op serves
+// synthesis/seed callers. No states interaction.
+// `messagePair` is optional so a below-facade caller keeps
+// compiling.
 export async function postHumanMemberDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -2596,7 +2554,6 @@ export async function postHumanMemberDocumentOp(
 ): Promise<Omit<HumanMemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<HumanMemberEntity, 'id'>;
-    // Phase Final Task 2: human_members ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2607,11 +2564,9 @@ export async function postHumanMemberDocumentOp(
     return entity;
 }
 
-// Identity PII document write — Phase Final Task 2: the
-// identity_pii ROW half is stripped — pure message-plane write.
-// No states interaction. `messagePair` is optional so a below-
-// facade caller keeps compiling; the live route always
-// supplies one.
+// Identity PII document write. No states interaction.
+// `messagePair` is optional so a below-facade caller keeps
+// compiling; the live route always supplies one.
 export async function postIdentityPiiDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -2625,7 +2580,6 @@ export async function postIdentityPiiDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    // Phase Final Task 2: identity_pii ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2636,11 +2590,9 @@ export async function postIdentityPiiDocumentOp(
     return entity;
 }
 
-// Identity document write — Phase Final Task 2: the
-// identities ROW half is stripped — pure message-plane write.
-// No states interaction. `messagePair` is optional so a below-
-// facade caller keeps compiling; the live route always
-// supplies one.
+// Identity document write. No states interaction.
+// `messagePair` is optional so a below-facade caller keeps
+// compiling; the live route always supplies one.
 export async function postIdentityDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -2650,7 +2602,6 @@ export async function postIdentityDocumentOp(
 ): Promise<IdentityEntityFields> {
     const entity = withoutId(body) as unknown as
         IdentityEntityFields;
-    // Phase Final Task 2: identities ROW half stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2707,10 +2658,9 @@ export async function postServiceDocumentOp(
     return entity;
 }
 
-// Identity credential document write — Phase Final Task 2:
-// the identity_credentials ROW half is stripped — pure
-// message-plane write. No states interaction. A below-facade
-// caller passes no `messagePair` and stores nothing.
+// Identity credential document write. No states interaction.
+// A below-facade caller passes no `messagePair` and stores
+// nothing.
 export async function postIdentityCredentialDocumentOp(
     db: DbAdapter,
     _id: Id,
@@ -2721,8 +2671,6 @@ export async function postIdentityCredentialDocumentOp(
 ): Promise<Omit<IdentityCredentialEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<IdentityCredentialEntity, 'id'>;
-    // Phase Final Task 2: identity_credentials ROW half
-    // stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -2790,9 +2738,7 @@ async function requireServiceIdentity(
 }
 
 
-// Identity provider document write — Phase Final Task 2: the
-// identity_providers ROW half is stripped (gate 1 DEFAULT:
-// DELETE at Stage B) — pure message-plane write. Extracted so
+// Identity provider document write. Extracted so
 // below-facade fixtures form pairs derivation can see.
 export async function postIdentityProviderDocumentOp(
     db: DbAdapter,
@@ -2861,15 +2807,6 @@ export interface WriteResponseSpec {
     ) => unknown;
 }
 
-// Almost every wired pattern exposes exactly one non-DELETE
-// verb, so a single WriteResponseSpec fully describes its
-// success shape. 'ai-members/:id' is the first pattern to wire
-// BOTH a PUT (the bare ai_members facet put, 200 + written row)
-// and a POST (the composed members + ai_members edit, 204, no
-// body) — their response shapes genuinely diverge, so that one
-// entry supplies a spec per verb instead. Distinguished from a
-// plain WriteResponseSpec by the absence of `conditional` at
-// the top level (see writeResponseSpecFor in api.ts).
 export interface PerVerbWriteResponseSpec {
     readonly put?: WriteResponseSpec;
     readonly patch?: WriteResponseSpec;
@@ -3613,8 +3550,6 @@ export async function postOrganizationDocumentOp(
         method: 'PUT',
         body: withoutId(body),
     });
-    // Phase Final Task 2: organizations ROW half
-    // stripped.
     if (messagePair !== undefined) {
         await runWrite(
             db,
@@ -4400,8 +4335,6 @@ export const routes: Route[] = [
             ),
     }),
     route('organizations/:id/projects/:id/flows/:pfid', {
-        // Phase Final Task 2: project_flows ROW half stripped —
-        // pure message-plane write (join derives from the ledger).
         // G6: reconstructed return is projectFlowEntityOf.
         put: async (db, p, body, _actor, messagePair) => {
             const pfid = param(p, 2);
@@ -5075,8 +5008,6 @@ export const routes: Route[] = [
                 db, param(p, 2), body, actor,
                 requireOrganization(organization), messagePair,
             ),
-        // Phase Final Task 2: flow_records ROW half stripped —
-        // DELETE is a pure message-plane tombstone append.
         delete: async (db, _p, _actor, messagePair) => {
             if (messagePair !== undefined) {
                 await runWrite(
@@ -5155,10 +5086,8 @@ export const routes: Route[] = [
     // row's documentOp, and organizations has none. The gate's
     // membership fence answers a foreign organization 403
     // before this selector runs, so a miss here is genuine
-    // absence. Phase Final Task 2: the organizations ROW half
-    // is stripped — pure message-plane write
-    // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
-    // successBody forms the stored bytes via
+    // absence. WRITE_RESPONSE_SPECS successBody forms the
+    // stored bytes via
     // organizationEntityOf; GET serves them as stored.
     route('organizations/:id', {
         select: (db, p) => selectHeadAtPath(
@@ -5364,11 +5293,10 @@ export const routes: Route[] = [
             ),
     }),
     // Hand-written so PUT can append its message pair in the
-    // same transaction (see message-pair.ts). Phase Final
-    // Task 2: objective_revisions ROW half stripped — pure
-    // message-plane write. WRITE_RESPONSE_SPECS successBody forms
-    // the wire bytes; the reconstructed return is for type
-    // parity with the former store put.
+    // same transaction (see message-pair.ts).
+    // WRITE_RESPONSE_SPECS successBody forms the wire bytes;
+    // the reconstructed return is for type parity with the
+    // former store put.
     route('organizations/:id/objectives/:id/revisions/:rid', {
         put: async (db, p, body, _actor, messagePair) => {
             const id = param(p, 2);
@@ -5378,8 +5306,6 @@ export const routes: Route[] = [
                 method: 'PUT',
                 body: withoutId(body),
             });
-            // Phase Final Task 2: objective_revisions ROW
-            // half stripped.
             if (messagePair !== undefined) {
                 await runWrite(
                     db,

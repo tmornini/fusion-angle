@@ -101,9 +101,7 @@ type FenceResult =
 // or access-token expiry — ≤ ACCESS_TTL_SECONDS (15 min) —
 // not on the very next request. Ownership probes
 // (resolveGlobalOwner) remain
-// message-plane reads. Phase Final Task 5 retired the
-// store decorator: handlers receive ctx.base;
-// message-plane tenancy rides path.
+// message-plane reads.
 export async function fenceRequest(
     ctx: AuthenticatedContext,
 ): Promise<FenceResult> {

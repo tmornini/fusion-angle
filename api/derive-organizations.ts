@@ -12,12 +12,7 @@ import {
     type DerivedDocument,
 } from './derive-documents.ts';
 
-// The tenant root's own reduction over the message ledger —
-// Phase 12 Task 2: the derive module lands ahead of both the
-// family's registration (this commit's sibling) and its seed
-// pairs (Task 3). organizations is the THIRTEENTH family and
-// the last unflipped in-scope one — the reads flip at Task 5;
-// nothing reads this module in production yet.
+// The tenant root's own reduction over the message ledger.
 //
 // GLOBAL plane, like members/ai-members/human-members/
 // identities: organizations IS the tenant root, so it is never
@@ -33,9 +28,9 @@ import {
 // stored response (the wire) through
 // validateOrganizationEntity — the SAME
 // validator WRITE_RESPONSE_SPECS['organizations/:id']
-// .successBody already runs (api/routes.ts; message-plane only
-// since Phase Final Task 2 retired the organizations ROW) —
-// so the derived shape is byte-identical to the STORED wire
+// .successBody already runs (api/routes.ts; message-plane
+// only) — so the derived shape is byte-identical to the
+// STORED wire
 // body, id-first. Stored PUT = GET: the writer emits this
 // mapper. Reusing the validator rather than re-listing its six
 // field names here is the DRY choice: ORGANIZATION_BODY_KEYS
@@ -58,8 +53,7 @@ import {
 //
 // Reads db.messagePairs ONLY;
 // tests/derive-organizations.test.ts is the proof of parity
-// against the live PUT's own wire body (Phase Final Task 2:
-// organizations ROW half stripped — message plane is truth).
+// against the live PUT's own wire body.
 
 const ORGANIZATIONS_TABLE = 'organizations';
 

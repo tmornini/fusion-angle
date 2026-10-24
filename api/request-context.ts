@@ -34,10 +34,7 @@ export interface IncomingContext {
     // The raw query, including the leading '?'. Empty when
     // the request names none. A route's query slot reads it.
     readonly search: string;
-    // The unfenced tier. Phase Final Task 5 retired the
-    // org-scoped decorator shell; handlers receive this base
-    // adapter. Pair-plane tenancy rides path, not a
-    // store fence.
+    // The unfenced tier.
     readonly base: GuardedDbAdapter;
     // The ARRIVAL stamp: minted here, gate entry, as early as
     // the request is observable — the message plane's requests

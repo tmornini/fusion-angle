@@ -23,7 +23,7 @@ import { byIdAscending } from './derive-documents.ts';
 
 // On an equal-`at` tie a 'removed' outranks an 'added'
 // regardless of row order — the union's dissolution wins on
-// every backend, mirroring role_grants' revoke-beats-grant.
+// every backend.
 // Equal actions fall to the id tail for determinism.
 const RELATION_ACTION_RANK:
     Record<FlowNodeRelationAction, number> = {

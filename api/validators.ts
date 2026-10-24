@@ -2626,10 +2626,10 @@ export interface RecordDocumentBody {
 // but-ignored, not rejected. State holds to the SAME rules
 // the bare states/:id route applies to an event
 // (assertRecordState, an RFC-3339 `at`, a non-empty event
-// id). Phase Final Task 2: records ROW half stripped — this
-// gate is the sole entity-shape check for the document PUT
-// (validateRecordEntity REQUIRES organization_id, which this
-// body never carries pre-stamp). Name non-empty re-homes here.
+// id). This gate is the sole entity-shape check for the
+// document PUT (validateRecordEntity REQUIRES
+// organization_id, which this body never carries
+// pre-stamp). Name non-empty re-homes here.
 // Instance PATCH create body (Task 20). Wire carries
 // exactly {set}; [] legal. clear is update-only — on
 // create it is an unexpected key. Empty string values
@@ -2964,8 +2964,7 @@ export interface RecordAttributeDocumentBody {
 // tolerated-but-ignored, not rejected. Task 8: flat wire keeps
 // record_id for the alias window; ACL defaults stamp on both
 // create and replace so nothing drifts from nested storage.
-// Phase Final Task 2: record_attributes ROW half stripped —
-// this gate is the sole entity-shape check for the document
+// This gate is the sole entity-shape check for the document
 // PUT.
 export function validateRecordAttributeDocumentBody(
     body: Record<string, unknown>,
@@ -4014,8 +4013,8 @@ function validateWorkOrderLegacyTransitionBody(
                 + ' transitionEventId',
             );
         }
-        // Phase Final Task 2: re-home store put validation —
-        // field values ride the operation message pair body only.
+        // Field values ride the operation message pair body
+        // only.
         validateStateFieldValueEntity(fields);
         return { id, fields };
     });

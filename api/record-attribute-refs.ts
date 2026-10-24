@@ -164,12 +164,9 @@ export async function collectAttributeReferrers(
 
 // RESTRICT-guard one record attribute on an ALREADY-OPEN
 // view: a referenced attribute 409s (naming its referrers)
-// and nothing is written. Phase Final Task 2: the
-// record_attributes ROW splice is stripped — DELETE is a
-// message-plane tombstone only (the route appends the pair
-// after this check). The standalone DELETE route wraps this
-// in its own transaction; a composing POST runs the same
-// RESTRICT scan on the view it already holds.
+// and nothing is written. The standalone DELETE route wraps
+// this in its own transaction; a composing POST runs the
+// same RESTRICT scan on the view it already holds.
 // `boundOrganization` is the verified token claim (or the
 // message-plane organization resolve on the DELETE route).
 // `recordTypeId` scopes the fourth-leg instance scan.

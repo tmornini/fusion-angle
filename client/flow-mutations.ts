@@ -396,12 +396,7 @@ export function buildSaveEvents(
 // Exported: buildFlowPutBody (below) is the ONLY caller,
 // recomputing this fresh against EACH retry attempt's own
 // baseline — the one caller performRedo's revivalTarget flows
-// through. Undo-as-replay (Phase 14 Task 8) computes ITS OWN
-// revivals server-side (api/flow-graph-diff.ts's
-// buildFlowGraphRevivals, the same diff semantics ported to
-// api/routes.ts's undo route) — performUndo/postFlowUndo
-// (flow-operations.ts) never call this function at all; the
-// client no longer knows the restore target well enough to.
+// through.
 export function buildRevivals(
     current: StoredGraph,
     target: StoredGraph,
@@ -503,7 +498,7 @@ async function buildFlowPutBody(
 // transient, capped).
 const MAX_PUT_ATTEMPTS = 3;
 
-// Per-flowId save serialization (Phase 14 Task 8 fast-follow).
+// Per-flowId save serialization.
 // Presenter gestures and flow-operations commitFlowMutation
 // both enqueue here so concurrent puts targeting the same
 // baseline cannot race. Keyed by flowId so DIFFERENT flows
@@ -555,9 +550,8 @@ export function awaitFlowSave(
 // re-fetches the baseline and re-diffs, so the rebuild IS the
 // re-apply — then resubmits with the FRESH echo. E6 split: each
 // 412 attempt is a NEW write (fresh baseline, fresh delta, fresh
-// trio, fresh revivals) — a network-level resend of ONE attempt
-// is still byte-identical and replays via the gate's own fast
-// path. Any other error, or the third 412, propagates — the
+// trio, fresh revivals). Any other error, or the third 412,
+// propagates — the
 // caller (the designer's #persistFlow, routed through
 // reportFault, or performRedo's own catch) is the only place a
 // save failure surfaces. The saved head goes out on the saves

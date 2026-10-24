@@ -326,11 +326,9 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     ): Promise<R>;
 }
 
-// The unfenced tier: same stores as DbAdapter. Phase Final
-// Task 5 retired the guarded write capability (putGuarded
-// family) with the store decorator shell — surviving tables
-// never soft-delete. clients-table elimination retired the
-// rawReadRow primary-key probe with the clients store.
+// The unfenced tier: same stores as DbAdapter.
+// clients-table elimination retired the rawReadRow
+// primary-key probe with the clients store.
 export interface GuardedDbAdapter extends DbAdapter {}
 
 // The tables of the message plane — one,
