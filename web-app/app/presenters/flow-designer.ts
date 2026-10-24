@@ -865,15 +865,6 @@ Auto Fit</label>
         return next;
     }
 
-    selectedNodeName(): string {
-        const nodeId = this
-            .#singleSelectedNodeId();
-        if (!nodeId) return '';
-        return this.#snapshot.nodes.find(
-            n => n.id === nodeId,
-        )!.name;
-    }
-
     withZoomedIn(): FlowSnapshot {
         if (this.#guardAutoFit()) {
             return this.#snapshot;

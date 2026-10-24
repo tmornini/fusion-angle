@@ -208,17 +208,6 @@ ${this.buildLegend()}${footnote}</div>`;
 
     renderShell(container: HTMLElement): void {
         setHtml(container, this.buildShell());
-        // The aggregate is deliberately
-        // flow-name-agnostic; the page module
-        // sets it from the FlowGraph it
-        // already holds (Task 18).
-        const nameEl = $(
-            '.flow-stats-flow-name', container,
-        );
-        if (nameEl) {
-            nameEl.textContent =
-                this.#flowName();
-        }
     }
 
     renderUpdate(
@@ -401,8 +390,4 @@ ${this.buildLegend()}${footnote}</div>`;
         }
         return null;
     }
-
-    // Stub — the page module fills the name from
-    // the FlowGraph it already holds (Task 18).
-    #flowName(): string { return ''; }
 }
