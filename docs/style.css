@@ -7,10 +7,11 @@
 body{margin:0;background:hsl(var(--background));color:hsl(var(--foreground));font:16px/1.6 var(--font-sans)}
 nav{position:sticky;top:0;display:flex;gap:1.5rem;align-items:center;padding:.8rem 2rem;background:hsl(var(--card));border-bottom:1px solid hsl(var(--border));z-index:2}
 nav .brand{font-family:var(--font-display);font-weight:700;color:hsl(var(--accent-text))}
-nav a{color:hsl(var(--gray-200));text-decoration:none}nav a[aria-current]{color:hsl(var(--primary));font-weight:600}
+nav a{color:hsl(var(--gray-200));text-decoration:none}nav a[aria-current]{font-weight:600}
 main{max-width:980px;margin:0 auto;padding:2rem}
 h1,h2,h3{font-family:var(--font-display);line-height:1.25}h1{font-size:2.2rem}h2{margin-top:2.5rem;border-bottom:1px solid hsl(var(--border));padding-bottom:.3rem}
 a{color:hsl(var(--primary))}
+.card a,.cols a,.ahead a,pre a,th a,nav a[aria-current]{color:hsl(217 45% 72%)}
 code,pre{font-family:var(--font-mono);font-size:.88em}code{background:hsl(var(--card));padding:.1em .35em;border-radius:4px}
 pre{background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:var(--radius);padding:1rem;overflow-x:auto}pre code{background:none;padding:0}
 .card{background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:var(--radius-lg);padding:1rem 1.25rem;margin:1rem 0}
