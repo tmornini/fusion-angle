@@ -3053,6 +3053,122 @@ Off the critical path; each with its oracle.
   that earned it; an API `HEAD` answers its GET's
   status and headers with no body, and a 405 carries
   `Allow`.
+- A 401 omits `WWW-Authenticate`. RFC 9110 §15.5.2
+  requires the header (MUST), and RFC 6750 §3
+  requires the Bearer challenge on a resource
+  server. The bearer refusal
+  (`unauthorizedBearerResponse`,
+  `api/request-auth.ts:76-83`, sent at
+  `api/api.ts:540`) and the grant refusal
+  (`api/api.ts:1242-1252`) both return JSON and a
+  status and no challenge. Oracle: every 401
+  carries `WWW-Authenticate`, Bearer on the
+  resource door.
+- Conditional GET — a read never honors
+  `If-None-Match` or `If-Modified-Since` and never
+  answers 304, so a cache cannot revalidate
+  (RFC 9110 §13.1.2, §13.1.3, §15.4.5). The GET
+  arm serves the selection and does not read
+  either header (`api/api.ts:987-1009`);
+  precondition checks run only for a write that
+  has a handler (`:816-825`). The stored response
+  already carries a strong `etag`
+  (`strongEtagOf`, `api/message-pair.ts:608-609`,
+  written at `:322-323`) and `servedResponse`
+  already sends `last-modified`
+  (`api/served-response.ts:111-113`). No 304
+  constant exists (`shared/http-errors.ts:54-72`).
+  Cachability, above, plans
+  `HEAD` and `Allow` on a 405 and leaves this
+  open in a sentence. Oracle: a GET whose
+  `If-None-Match` names the current strong etag
+  answers 304 with no body, and
+  `If-Modified-Since` at or after `last-modified`
+  does the same; a miss answers 200.
+- One strong `etag` serves projections that
+  differ by reader, and nothing sends `Vary`.
+  The stored line quotes the pair id
+  (`api/message-pair.ts:322-323`) and
+  `servedResponse` keeps it while
+  `projectedBody` drops keys or values, or joins
+  keys (`api/served-response.ts:186-222`;
+  readers at `api/routes.ts:3425-3457` and
+  `api/invitations-domain.ts:486-491`). No file
+  under `api/` or `server/` writes `Vary`. The
+  edge sets `Cache-Control: no-store` when the
+  handler set none
+  (`server/http-server.ts:607-610`), so a shared
+  cache does not store the response today. A
+  conditional GET, the bullet above, would 304
+  one reader's bytes for another. Oracle: a
+  projected representation's strong etag changes
+  with the bytes, or the response sends `Vary`
+  naming what selected them.
+- A write carrying both `If-Match` and
+  `If-None-Match` is refused 412
+  (`preconditionRefusal`, `api/api.ts:254-259`).
+  RFC 9110 §13.2.2 evaluates the two in order,
+  `If-Match` first on an unsafe method, then
+  `If-None-Match`, so the pair is a request the
+  server can honor. No test sends both. Oracle:
+  a request carrying both is evaluated in that
+  order, and a test pins the outcome.
+- An origin timeout is answered 504. `statusOf`
+  (`api/errors-postgres.ts:90-94`) maps every
+  code in `TIMEOUT_CODES` (`:15-34`), `57014`
+  included, to `HTTP_GATEWAY_TIMEOUT`. RFC 9110
+  §15.6.5 defines 504 as a gateway or proxy that
+  waited out an upstream; the server's own
+  statement timeout fits 503 (§15.6.4). Item 0f
+  already records that lock starvation ends as
+  this 504. The pin 'timeout and connection loss
+  are 504' (`tests/errors-postgres.test.ts:94`)
+  ties connection loss to the same status.
+  Oracle: a statement timeout answers 503, and
+  the pin says which connection codes stay 504.
+- A unique violation other than succession is a
+  500, and the buffer's 412 for one never fires.
+  `mapStatementError`
+  (`api/ledger-statement.ts:38-45`) returns
+  `SuccessionConflict` only for
+  `fa_message_pairs_succession`; any other
+  `23505` is the error unchanged.
+  `mapPostgresError` then answers it 500
+  (`statusOf`, `api/errors-postgres.ts:90-94`),
+  which `transaction` applies
+  (`api/backend-postgres.ts:113-114`). A bare
+  `executeLedger` throws that raw error
+  (`:196-197`) and `handleRequest`'s last catch
+  answers 500 `internal error`
+  (`api/api.ts:1425-1438`). The pins call the
+  mapping loud ('duplicate PK is loud 500',
+  'other unique is loud 500',
+  `tests/errors-postgres.test.ts:27`, `:57`).
+  The table's unique constraints are the primary
+  key (`api/schema-postgres.ts:6`) and the
+  succession index (`:266-268`), so the leftover
+  case is a duplicate id, a fault 500 already
+  names. The buffer's other answer cannot fire:
+  `handleRequest` answers
+  `UniqueConstraintError` 412
+  (`api/api.ts:1409-1415`), the throw is only
+  the buffer scan
+  (`api/backend-buffer-tx.ts:347`), and no table
+  declares a unique column (`api/db.ts:82-85`,
+  `:343-344`, `:370-375`). Oracle: the dead 412
+  catch and its throw are gone, or a declared
+  unique column reaches one status on both
+  backends and a test pins it.
+- 422 is declared and never sent.
+  `HTTP_UNPROCESSABLE_ENTITY`
+  (`shared/http-errors.ts:69`) is re-exported
+  (`api/api.ts:128`) and documented
+  (`api/http-status-documents.ts:53-56`).
+  Nothing builds a response at that status, and
+  no test asserts it. Oracle: the constant and
+  the status document are gone, or a refusal
+  that means 422 emits it and a test asserts
+  the status.
 - ACL-editing UI for record attributes (`read_roles` /
   `write_roles`) — R21's restricted branches are
   seed-produced today; setting an ACL is
@@ -3126,6 +3242,31 @@ Off the critical path; each with its oracle.
   breaks, names code that runs, as
   `tests/backend-postgres.test.ts:12-13`'s driver
   Buffer path does
+- The 2026-09-15 examination report still describes
+  a tree this one replaced. It names `message_pairs`
+  and `message_pairs_*`
+  (`docs/superpowers/specs/`
+  `2026-09-15-one-table-examined-report.md:10`,
+  `:33`, `:154`) and treats advisory locks as
+  present (`:21-22`, `:643-650`: `lockRequest`,
+  `lockDocument`, `lockHead`). The table is
+  `fa_message_pairs` (`api/schema-postgres.ts:4`)
+  and its indexes are `fa_message_pairs_*`
+  (`:262-275`). `advisoryKey` runs only in tests
+  (`tests/advisory-lock.test.ts:42`,
+  `tests/pg-races.test.ts:629`); `begin` takes no
+  lock (`api/postgres-client.ts:66-79`). The
+  comment that says it does is the absent-code
+  bullet's. `## Sequencing` still hands this
+  report's findings to 0f, 6, 9, 11, and 13. Mark
+  the report historical, or revise the names and
+  drop the locks that left; a finding the code
+  still matches, the head read's method filter
+  (`:195-198`), stays. Oracle: the report's table
+  names are `fa_message_pairs` or the report says
+  it describes a past tree, and it does not
+  prescribe an advisory lock the code no longer
+  takes.
 - Stale-history comment cleanup as one pass — comments
   still describe a past state as present. Sampled:
   `web-app/app/measure-cli.ts` names a Node harness;
@@ -3369,6 +3510,50 @@ Off the critical path; each with its oracle.
   Oracle: `./test` measured before and after a copy
   only a failing statement pays, and the change lands
   only if that number earns it
+- `selectHead` filters on method after the index.
+  The document index is `(path, name, response_at,
+  id)` (`api/schema-postgres.ts:262-263`) and the
+  head read adds `method IN ('PUT', 'DELETE')`
+  (`api/backend-postgres.ts:606-619`). The
+  succession index (`:266-268`) carries method and
+  does not order by `response_at`, so a document
+  whose newest rows are POSTs is walked until a
+  head. `selectHeadPair` (`:623-646`) has the same
+  predicate. The examination report's plan still
+  shows that filter
+  (`docs/superpowers/specs/`
+  `2026-09-15-one-table-examined-report.md:195-198`)
+  and the SQL still matches it. Oracle: the method
+  predicate is an index condition, or a measurement
+  says a long POST tail costs nothing a person sees.
+- `selectAll`, behind `getAll()`, is a test oracle
+  the product backend still carries. The postgres
+  read selects every column of every row
+  (`selectAll`, `api/backend-postgres.ts:543-560`,
+  called at `:271-273`); the buffer copies its
+  whole table (`api/backend-buffer-tx.ts:243-246`);
+  the store exposes it
+  (`api/store-history-entity.ts:32-36`). The
+  adapter keeps the method for a test that holds
+  the concrete store and keeps it off every view
+  (`api/db-backed.ts:47-51`, `:155-157`). No
+  product caller under `api/` uses it. Oracle:
+  `getAll` and `selectAll` are gone from the
+  product backend, and a test that needs the whole
+  plane reads through a test seam.
+- Contention and a table-per-entity baseline are
+  unmeasured. The probes that exist are
+  single-writer `EXPLAIN ANALYZE` medians on local
+  tmpfs (`measurements/probes/README.md:95-99`,
+  the store probe; `:156-179`, the invitations
+  GIN). Nothing times overlapping writers, and
+  nothing builds the same workload as one table
+  per entity on that machine. The ledger sweep,
+  below, plans tmpfs timings and two hundred
+  writes and does not name that baseline. Oracle:
+  one machine reports this table and a
+  table-per-entity schema under the same writers,
+  and the sweep's JSON keeps the comparison.
 - Growth: bytes per pair with two wire messages stored, heap
   against index bytes, `pg_dump` size at 1M, and autovacuum's
   insert-threshold behavior on the insert-only table. Oracle:
