@@ -33,7 +33,18 @@ table.cmp td{font-size:.92em}
 .b-plan{background:hsl(217 30% 25%);color:hsl(var(--primary))}
 .b-unres{background:hsl(var(--accent-soft));color:hsl(var(--accent-text))}
 .b-none{background:hsl(var(--gray-700));color:hsl(var(--gray-200))}
+.b-dev{background:hsl(38 40% 15%);color:hsl(38 80% 65%)}
 .ahead{margin:.4rem 0 1.5rem;padding:.5rem .8rem;border-left:3px solid hsl(var(--accent-text));background:hsl(var(--card))}
+tr.row-st td{background:color-mix(in srgb, hsl(152 55% 50%) 16%, hsl(var(--background)))}
+tr.row-pe td{background:color-mix(in srgb, hsl(0 65% 55%) 16%, hsl(var(--background)))}
+tr.row-st a,tr.row-pe a{color:hsl(217 45% 72%)}
+p.ahead.row-st{background:color-mix(in srgb, hsl(152 55% 50%) 16%, hsl(var(--card)))}
+p.ahead.row-pe{background:color-mix(in srgb, hsl(0 65% 55%) 16%, hsl(var(--card)))}
+.row-legend{display:flex;flex-wrap:wrap;gap:.4rem .7rem;align-items:center;margin:0 0 .6rem;font-size:.85em}
+.swatch{display:inline-block;padding:.05rem .45rem;border-radius:4px}
+.swatch.row-st{background:color-mix(in srgb, hsl(152 55% 50%) 16%, hsl(var(--background)))}
+.swatch.row-pe{background:color-mix(in srgb, hsl(0 65% 55%) 16%, hsl(var(--background)))}
+.swatch.row-even{background:hsl(var(--card));border:1px solid hsl(var(--border))}
 .skeptic{border:1px solid hsl(var(--accent-text) / .5);border-radius:var(--radius-lg);padding:.5rem 1.1rem;margin:1.25rem 0}
 .skeptic h3{color:hsl(var(--accent-text))}
 .lede{font-size:1.1em}
