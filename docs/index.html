@@ -1,35 +1,17 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Overview — Fusion Angle explained</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><span class="brand">Fusion Angle · HTTP pairs as data</span><a href="index.html" aria-current="page">Why</a><a href="pattern.html">How the pattern works</a><a href="client.html">Client reference</a><a href="backend.html">Backend reference</a></nav><main>
-<h1>HTTP request/response pairs as the stored data</h1>
-<p class="note">A technical walkthrough of <code>tmornini/fusion-angle</code> for developers who build HTTP APIs: how it stores and serves data, and the tradeoffs involved.</p>
-<h2>Context</h2>
-<p>Many HTTP APIs map a request onto domain tables and build each response from those tables on every read, with ETags, version history, and lost-update protection implemented separately. Fusion Angle stores the exchange itself: "The API, the client, and the application treat a response — status line, headers, and body — as one unit" (ARCHITECTURE.md). The stored data is that unit.</p>
-<h2>Properties of the design</h2>
-<div class="grid">
-<div class="card"><h3>Pairs are the data</h3><p>One table, <code>fa_message_pairs</code>. "A pair is the request as received, or nothing, plus the response wire bytes" (SCHEMA.md). A read "serves those stored bytes with exactly three substitutions — the status line, <code>date</code>, and <code>request-id</code>".</p></div>
-<div class="card"><h3>ETags are row ids</h3><p>"The pair <code>id</code> is the ETag — If-Match names that identifier." No separate version column is used.</p></div>
-<div class="card"><h3>History by succession</h3><p>Each write names its predecessor in <code>supersedes</code>. <code>versions/</code> "joins every PUT as <code>multipart/mixed</code>, oldest first". A DELETE is a tombstone: "No physical delete exists."</p></div>
-<div class="card"><h3>Conflicts via a unique index</h3><p><code>CREATE UNIQUE INDEX … fa_message_pairs_succession ON fa_message_pairs (path, name, supersedes) WHERE method IN ('PUT', 'DELETE')</code> is "the only write enforcement". A stale If-Match "is 412".</p></div>
-</div>
-<p><a href="pattern.html">How the pattern works</a> covers the mechanics and tradeoffs in detail.</p>
-<h2>Summary of the mechanics</h2>
-<ul>
-<li>A document's address is <code>path</code> + <code>name</code> ("<code>pathname = path + name</code>, the URL API's word").</li>
-<li>Its head is "its latest PUT or DELETE pair, and a head is its document's whole state".</li>
-<li>Writes append. Reads select heads by index and serve the stored response. "The ledger stores writes only — no GET rows."</li>
-<li>The application built on this storage is an innovation-management app with Ideas, Flow, Projects, Records, Workbox, Identities, and Account (README.md).</li>
-</ul>
-<h2>The five layers</h2>
-<table><tr><th>Dir</th><th>Role (ARCHITECTURE.md § Layers)</th></tr>
-<tr><td><code>api/</code></td><td>Server REST and schema handlers. Postgres on the product path, memory in <code>./test</code>.</td></tr>
-<tr><td><code>shared/</code></td><td>"The one-way chasm": the wire contract and the HTTP message schema. It never imports <code>api/</code>.</td></tr>
-<tr><td><code>client/</code></td><td>The API client. It "imports only itself and <code>shared/</code>", and <code>tests/client-import-graph.test.ts</code> proves it.</td></tr>
-<tr><td><code>web-app/</code></td><td>Pages, presenters, browser adapters, app logic, and CSS.</td></tr>
-<tr><td><code>server/</code></td><td>Boot, HTTP, seed, wipe, and throttle.</td></tr></table>
-<h2>The request path</h2>
-<figure>
-<svg viewBox="0 0 960 300" role="img" aria-labelledby="rp-t" xmlns="http://www.w3.org/2000/svg">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Overview — Fusion Angle: single table vs per-entity</title><link rel="stylesheet" href="style.css"></head>
+<body><nav><span class="brand">Fusion Angle · single table vs per-entity</span><a href="index.html" aria-current="page">Overview</a><a href="http.html">HTTP compliance</a><a href="features.html">Features</a><a href="performance.html">Performance</a><a href="lifecycle.html">Lifecycle</a><a href="client.html">Client reference</a><a href="backend.html">Backend reference</a></nav><main>
+<h1>One table of HTTP pairs vs a table per entity</h1>
+<p class="lede">This is a neutral technical comparison of <code>tmornini/fusion-angle</code>'s storage design against a conventional relational schema with one table per entity. fusion-angle stores every write as one row in <code>fa_message_pairs</code>: "A pair is the request as received, or nothing, plus the response wire bytes" (<code>SCHEMA.md</code>). The conventional side is described generically and labelled as such.</p>
+<p class="note"><b>Takeaway.</b> The single-table design gives up SQL-level querying, per-field indexes, in-place migrations, storage compactness, and real deletion. In return it gets built-in optimistic concurrency with no extra column, wire-level history with stored hashes, and one uniform read and write path. A version column, history tables, or CDC can give a conventional schema the first two properties as well. What is specific to fusion-angle is that it keeps the exact request and response bytes.</p>
+<h2>Summary</h2>
+<table><tr><th>Topic</th><th>Ahead (shipped behavior)</th><th>Why</th></tr><tr><td><a href="http.html">HTTP compliance</a></td><td>Depends</td><td>412, 428, and 410 are structural. The other codes are equal work in either design. Gaps: no 304, no <code>Allow</code> on API 405s, no <code>WWW-Authenticate</code>.</td></tr><tr><td><a href="features.html#concurrency">Concurrency &amp; ETags</a></td><td>Single-table</td><td>document-level If-Match → 412 from a unique index, with no extra column. A version column does the same.</td></tr><tr><td><a href="features.html#history">History &amp; audit</a></td><td>Single-table</td><td>the exact wire bytes are kept and hashed (hashes stored, verified only in tests). History tables and CDC are standard alternatives.</td></tr><tr><td><a href="features.html#querying">Querying, joins &amp; reporting</a></td><td>Per-entity</td><td>fields live inside bytea bodies, so joins and aggregates happen in TypeScript</td></tr><tr><td><a href="performance.html#timings">Read/write timings</a></td><td>Depends</td><td>single-table measured fast locally (tmpfs). Per-entity not benchmarked.</td></tr><tr><td><a href="performance.html#indexing">Indexing</a></td><td>Per-entity</td><td>no per-field indexes; single-table wins only on uniformity and tenant locality</td></tr><tr><td><a href="performance.html#storage">Storage growth</a></td><td>Per-entity</td><td>every version is stored whole, as full wire messages. Size is unmeasured.</td></tr><tr><td><a href="performance.html#contention">Contention</a></td><td>Not covered</td><td>only correctness pins exist (<code>tests/pg-races.test.ts</code>)</td></tr><tr><td><a href="lifecycle.html#migrations">Schema evolution</a></td><td>Per-entity (live systems)</td><td>DDL change means wipe and reseed today. "No migrations" moves the schema into the application code.</td></tr><tr><td><a href="lifecycle.html#privacy">Retention, deletion &amp; privacy</a></td><td>Per-entity</td><td>tombstones only; PII and credential lines stay stored</td></tr><tr><td><a href="lifecycle.html#ops">Backup &amp; operations</a></td><td>Per-entity</td><td>one mint process; the backup plan is item 6 (planned)</td></tr></table>
+<p class="src">Verdicts reflect shipped behavior only. Planned work from <code>TODO.md</code> is badged in each topic table and does not change a verdict. Badges: <span class="badge b-ship">Shipped</span><span class="badge b-plan">Planned (TODO.md item N)</span><span class="badge b-unres">Planned, tradeoff unresolved (TODO.md item N)</span><span class="badge b-none">Not covered by the repo</span></p>
+<h2>The one table and its indexes</h2>
+<figure class="hero"><img src="SCHEMA.svg" alt="SCHEMA.svg: the fa_message_pairs columns, keys and indexes, from the repo"></figure>
+<p class="src"><code>SCHEMA.svg</code> is copied from the repo. It is generated from <code>api/db.ts</code>, <code>api/types.ts</code>, and <code>api/schema-postgres.ts</code>, and <code>./test validate</code> fails on drift. The indexes it shows are <code>fa_message_pairs_document (path, name, response_at, id)</code>, <code>fa_message_pairs_collection (path, response_at, id)</code>, the unique <code>fa_message_pairs_succession (path, name, supersedes) WHERE method IN ('PUT','DELETE')</code>, <code>fa_message_pairs_request_id</code>, and the partial GIN <code>fa_message_pairs_body</code> (<code>WHERE path = '/invitations/'</code>).</p>
+<h2>A typical request</h2>
+<figure><svg viewBox="0 0 960 300" role="img" aria-labelledby="rp-t" xmlns="http://www.w3.org/2000/svg">
 <title id="rp-t">Request path from browser to the single table</title>
 <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="hsl(217 45% 60%)"/></marker></defs>
 <g font-family="IBM Plex Sans,system-ui,sans-serif" font-size="13" fill="hsl(220 18% 96%)">
@@ -44,15 +26,6 @@
 <path d="M870 150 V220 H95 V152" fill="none" stroke="hsl(152 55% 50%)" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ar)"/>
 <text x="480" y="212" text-anchor="middle" font-size="12" fill="hsl(152 55% 50%)">Read: head-reads.ts select → servedResponse → whole response (lists as multipart/mixed) → splitParts in the client</text>
 <text x="480" y="250" text-anchor="middle" font-size="12" fill="hsl(217 12% 65%)">Write: formWriteMessagePair → one ledger statement (INSERT … ON CONFLICT) → pg_notify('fusion_events') → BroadcastChannel 'fusion-angle:data' tells the other tabs</text>
-</g></svg>
-<figcaption class="src">Hand-built diagram. Each label names a file or symbol cited on the other pages.</figcaption></figure>
-<h2>The steps</h2>
-<ol>
-<li><b>Boot.</b> <code>web-app/app/server-core.ts</code> builds the tab's one client: <code>createAppClient(createHttpFacade(serverOrigin(), fetch))</code>, then <code>client.setCookieSession(true)</code>. Its own comment says: "Cookie-session: access token is memory only; refresh lives in the HttpOnly cookie."</li>
-<li><b>Page → client.</b> "Page modules never call transport verbs from <code>api/api.ts</code> — data access goes through <code>client/</code>" (ARCHITECTURE.md § Conventions).</li>
-<li><b>Client → wire.</b> <code>client/request-context.ts</code> adds <code>OPERATION_ID_HEADER</code>. "The client mints operation-id once per operation, on every request, and the server never mints one" (API.md).</li>
-<li><b>Dispatch.</b> <code>handleRequest</code> mints request-id, then runs these steps in order: framing, carried Request-ID refusal, Operation-ID check, <code>matchRoute</code> plus <code>authenticateRequest</code>, the identity fence, body parse plus <code>preconditionRefusal</code>, Region B, the pair plane, and the handler (API.md § Dispatch order).</li>
-<li><b>Storage.</b> A write appends pairs through one statement. A read selects heads and serves the stored bytes, with exactly three substitutions and three additions (ARCHITECTURE.md § A response is one unit).</li>
-<li><b>Fan-out.</b> "A successful write notifies this tab via pub-sub and posts <code>fusion-angle:data</code> so other same-origin windows refresh. There is no LISTEN and no SSE client" (AGENTS.md).</li>
-</ol>
-<p class="src">License: <code>tmornini/fusion-angle</code> is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 Universal</a>.</p></main><footer>Every claim is drawn from <code>tmornini/fusion-angle</code> (README.md, ARCHITECTURE.md, SCHEMA.md, API.md, DESIGN-SYSTEM.md, AGENTS.md, and the cited source files).</footer></body></html>
+</g></svg><figcaption class="src">Hand-built diagram of a browser page → <code>client/</code> → <code>api/api.ts</code> dispatch → <code>fa_message_pairs</code>.</figcaption></figure>
+<p>Pages call <code>client/</code> verbs, and <code>client/http-facade.ts</code> sends <code>fetch(origin + '/api/' + resource)</code>. <code>handleRequest</code> runs framing, the id checks, auth, the fence, the conditional check, and then the pair plane (<code>API.md</code> § Dispatch order). A write appends rows in one statement (<code>api/ledger-statement-sql.ts</code>). A read selects heads (<code>api/head-reads.ts</code>) and serves the stored bytes through <code>servedResponse</code>, swapping the status line, <code>date</code>, and <code>request-id</code>.</p>
+<p class="src">License: <code>tmornini/fusion-angle</code> is dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0 Universal</a>.</p></main><footer>Single-table claims are drawn from <code>tmornini/fusion-angle</code> and cite their files. Cells labelled "Conventional" describe a generic table-per-entity Postgres design, not a measured system. Nothing on these pages benchmarks the conventional design.</footer></body></html>

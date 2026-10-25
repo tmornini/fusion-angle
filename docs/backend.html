@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One-table backend — Fusion Angle explained</title><link rel="stylesheet" href="style.css"></head>
-<body><nav><span class="brand">Fusion Angle · HTTP pairs as data</span><a href="index.html">Why</a><a href="pattern.html">How the pattern works</a><a href="client.html">Client reference</a><a href="backend.html" aria-current="page">Backend reference</a></nav><main>
+<body><nav><span class="brand">Fusion Angle · single table vs per-entity</span><a href="index.html">Overview</a><a href="http.html">HTTP compliance</a><a href="features.html">Features</a><a href="performance.html">Performance</a><a href="lifecycle.html">Lifecycle</a><a href="client.html">Client reference</a><a href="backend.html" aria-current="page">Backend reference</a></nav><main>
 <h1>The single-table Postgres backend</h1>
 <p>"The table is named once, here, and anchored to <code>TABLE_NAMES</code> in <code>api/db.ts</code> (length 1). The name is <code>fa_message_pairs</code>." The only other table is <code>schema_marker</code> (SCHEMA.md).</p>
 <blockquote>A pair is the request as received, or nothing, plus the response wire bytes… A document is <code>path</code> plus <code>name</code>: <code>pathname = path + name</code>… The ledger stores writes only — no GET rows.</blockquote>
@@ -87,7 +87,7 @@ LIMIT 1</code></pre>
 // order given, before the roster statement: two roster
 // writers queue, and a flow write's share waits or is
 // waited on.</code></pre>
-<p class="src">Footnote: the header comment at <code>api/postgres-client.ts:3</code> ("advisory locks are pg_advisory_xact_lock inside it") looks stale, since no product code takes an advisory lock.</p>
+<p class="src"><span class="badge b-plan">Planned (pending TODO.md PR)</span> Footnote: the header comment at <code>api/postgres-client.ts:3</code> ("advisory locks are pg_advisory_xact_lock inside it") looks stale, since no product code takes an advisory lock.</p>
 <h2>"The one table, examined" (plan 2026-09-04)</h2>
 <p><code>docs/superpowers/plans/2026-09-04-one-table-examined.md</code> sets the goal: "Every statement the backend issues has a plan pin; the two heads live in SQL; thirteen single-document reads read one document; the write appends once at the storage edge; the two stamps are <code>timestamptz</code>…". It describes the stack as "One table behind five layers": the DDL, the two backends behind <code>Tx</code>, the seam (<code>EntityStore&lt;MessagePairEntity&gt;</code>, <code>api/store-history-entity.ts</code>), the store, and the gate. The phases are A (pins), B (heads in SQL), C (document reads per derive family), D (append-only write, <code>upsertRow</code> renamed to <code>insertPair</code>), E (<code>timestamptz</code>), and F (the report). Plan pins land in <code>tests/pg-explain.test.ts</code>.</p>
 <p>"Two ways to read, one way to write": a collection read is exact on <code>path</code>, a document read is exact on <code>path</code> and <code>name</code>, and the write appends one pair.</p>
