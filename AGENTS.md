@@ -149,7 +149,9 @@ doctrine):
 - Subject: a single line ≈50 chars, present-tense imperative,
   no prose body beyond the mandated `Co-Authored-By` trailer.
 - Never move/rename and change content in the same commit.
-- Linear history — rebase and fast-forward, never merge.
+- Land each unit of work on master as one merge commit
+  (`--no-ff`) whose message describes the whole unit; the
+  branch's own commits stay linear on top of master.
 
 ## Worktrees
 
@@ -164,13 +166,15 @@ cd .worktrees/<slug>
 git rebase master     # amend until every commit is green
 ./test validate        # ./test validate browser before a build or walk
 cd -                  # the main checkout
-git merge --ff-only <slug>
+git merge --no-ff <slug>  # write the merge message
 git worktree remove .worktrees/<slug> && git branch -d <slug>
 ```
 
 `.worktrees/` is gitignored. Red on the branch is fine;
-red on landing is not. `--ff-only` fails if master moved
-— rebase again; `-d` refuses stranded work. Never `-D`,
+red on landing is not. If master moved, rebase again so
+the merge is conflict-free. The merge message's subject
+names the unit in the imperative; its body says why and
+what changed. `-d` refuses stranded work. Never `-D`,
 never force-push: rebase rewrites hashes, so branches
 stay local. One worker per worktree; master owns 8080.
 
