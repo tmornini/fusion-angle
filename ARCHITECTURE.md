@@ -47,8 +47,9 @@ mint process — do not run two replicas.
 fourth verb. It `deno run`s the same
 `dispatch` against a directory
 `bundle_client` writes, and reads that
-directory on each request. Exit takes its
-compose project down.
+directory on each request. Return
+recomposes it. Exit takes its compose
+project down.
 
 `./deploy` is the operator path. Compose
 keeps `:?required`; `./deploy` mints before

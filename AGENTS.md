@@ -64,9 +64,9 @@ own, so neither touches an operator's stack. Each needs
 
 `./bin/develop PORT --postgres mock-data|bootstrap`
 is the edit session. It `deno run`s the server
-against a `bundle_client` directory. A change
-under `web-app/`, `client/`, or `shared/`
-recomposes that directory; reload the browser.
+against a `bundle_client` directory. Press
+Return to rebundle the site, then reload
+the browser.
 It always creates a fresh Postgres
 (`fusion-develop`), seeds it, and prints the
 seeded sign-ins once the site is up. On exit —

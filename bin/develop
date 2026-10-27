@@ -1,6 +1,6 @@
 #!/bin/bash
 # Edit session. Creates a fresh Postgres, seeds it,
-# and serves. Source changes recompose the site.
+# and serves. Return recomposes the site.
 # Exit, including Ctrl-C, takes the stack down.
 set -euo pipefail
 
@@ -14,9 +14,9 @@ Usage: ./bin/develop PORT --postgres mock-data|bootstrap
 
 Creates a fresh Postgres, seeds it, and
 serves. The seeded sign-ins print once the
-site is up. A change under web-app/, client/,
-or shared/ recomposes the site; reload the
-browser. Ctrl-C stops the server and runs:
+site is up. Press Return to rebundle the
+site, then reload the browser. Ctrl-C stops
+the server and runs:
   docker compose -p fusion-develop down
 
 The site directory is $TMPDIR/fusion-develop
@@ -56,7 +56,6 @@ ALLOW_ENV="$ALLOW_ENV,JWT_HMAC_SIGNING_KEY,PORT"
 ALLOW_ENV="$ALLOW_ENV,TRUSTED_PROXY_HOPS"
 
 CLEANED=''
-WATCH_PID=''
 LOOP_PID=''
 SERVER_PID=''
 
@@ -75,10 +74,6 @@ cleanup() {
         return
     fi
     CLEANED=1
-    if [ -n "$WATCH_PID" ]; then
-        kill "$WATCH_PID" 2>/dev/null || true
-        wait "$WATCH_PID" 2>/dev/null || true
-    fi
     if [ -n "$LOOP_PID" ]; then
         kill "$LOOP_PID" 2>/dev/null || true
         wait "$LOOP_PID" 2>/dev/null || true
@@ -93,24 +88,14 @@ cleanup() {
     fi
 }
 
-start_watcher() {
-    local fifo="$SESSION_ROOT/watch.fifo"
-    mkfifo "$fifo"
+read_return() {
+    # An explicit redirect keeps the terminal.
+    # A bare background read would see /dev/null.
     while IFS= read -r _; do
         echo "Rebundling. Reload the browser." >&2
-        bundle_client "$SITE" || true
-    done < "$fifo" &
+        bundle_client "$SITE" </dev/null || true
+    done <&0 &
     LOOP_PID=$!
-    deno run --frozen \
-        --allow-read="$ROOT/web-app" \
-        --allow-read="$ROOT/client" \
-        --allow-read="$ROOT/shared" \
-        server/develop-watch.ts \
-        "$ROOT/web-app" \
-        "$ROOT/client" \
-        "$ROOT/shared" \
-        > "$fifo" &
-    WATCH_PID=$!
 }
 
 run_server() {
@@ -210,11 +195,12 @@ then
     exit 1
 fi
 bundle_client "$SITE"
-start_watcher
+read_return
 echo
 echo "Serving on http://localhost:$PORT/"
 if [ -n "$SEED_TEXT" ]; then
     echo
     printf '%s\n' "$SEED_TEXT"
 fi
+echo "Press Return to rebundle the site."
 run_server

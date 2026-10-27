@@ -43,6 +43,7 @@ async function runDevelop(
         readonly failOn?: string;
         readonly holdMain?: boolean;
         readonly signal?: Deno.Signal;
+        readonly pressReturn?: boolean;
     } = {},
 ): Promise<DevelopRun> {
     const dir = Deno.makeTempDirSync({
@@ -130,12 +131,16 @@ async function runDevelop(
         let signal: Deno.Signal | null = null;
         let stdoutBytes = new Uint8Array();
         let stderrBytes = new Uint8Array();
-        if (options.signal !== undefined) {
+        if (options.signal !== undefined
+            || options.pressReturn === true) {
             const child = new Deno.Command('./bin/develop', {
                 args: [...args],
                 env,
                 stdout: 'piped',
                 stderr: 'piped',
+                stdin: options.pressReturn === true
+                    ? 'piped'
+                    : 'null',
             }).spawn();
             const deadline = Date.now() + 8_000;
             let seen = false;
@@ -160,8 +165,43 @@ async function runDevelop(
                 await child.status;
                 throw new Error('server did not start');
             }
+            if (options.pressReturn === true) {
+                const stdin = child.stdin;
+                if (stdin === null) {
+                    child.kill('SIGTERM');
+                    await child.status;
+                    throw new Error('develop has no stdin');
+                }
+                const before = outdirCount(
+                    Deno.readTextFileSync(log),
+                );
+                const writer = stdin.getWriter();
+                await writer.write(
+                    new TextEncoder().encode('\n'),
+                );
+                await writer.close();
+                const limit = Date.now() + 8_000;
+                let grew = false;
+                while (Date.now() < limit) {
+                    const text = Deno.readTextFileSync(log);
+                    if (outdirCount(text) > before) {
+                        grew = true;
+                        break;
+                    }
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, 20);
+                    });
+                }
+                if (!grew) {
+                    child.kill('SIGTERM');
+                    await child.status;
+                    throw new Error(
+                        'return did not rebundle',
+                    );
+                }
+            }
             try {
-                child.kill(options.signal);
+                child.kill(options.signal ?? 'SIGINT');
             } catch (error) {
                 if (!(error instanceof Deno.errors.NotFound)) {
                     throw error;
@@ -247,6 +287,11 @@ function denoArgs(run: DevelopRun): readonly string[] {
         .map((call) => call[5] ?? '');
 }
 
+function outdirCount(text: string): number {
+    return text.split('\n').filter((line) =>
+        line.includes('--outdir')).length;
+}
+
 Deno.test('develop with no args exits 1 with usage',
 async () => {
     const run = await runDevelop([]);
@@ -260,6 +305,7 @@ async () => {
     const run = await runDevelop(['--help']);
     assertStrictEquals(run.code, 0);
     assertMatch(run.stdout, /Usage: \.\/bin\/develop/);
+    assertMatch(run.stdout, /Press Return/);
     assertMatch(run.stdout, /fusion-develop down/);
     assertEquals(run.calls, []);
 });
@@ -319,8 +365,8 @@ Deno.test(
         assertMatch(seed[3] ?? '', /^[0-9a-f]{64}$/);
         assertStrictEquals(seed[4], '8080');
         const args = denoArgs(run);
-        assert(args.some((line) =>
-            line.includes('server/develop-watch.ts')));
+        assert(args.every((line) =>
+            !line.includes('server/develop-watch.ts')));
         assert(args.some((line) =>
             line.includes('server/develop-main.ts')));
         assertStrictEquals(run.sessionEnv, undefined);
@@ -409,7 +455,8 @@ Deno.test('develop does not compile or build an image',
     assertNotMatch(src, /compose build/);
     assertMatch(src, /bundle_client/);
     assertMatch(src, /server\/develop-main\.ts/);
-    assertMatch(src, /server\/develop-watch\.ts/);
+    assertNotMatch(src, /server\/develop-watch\.ts/);
+    assertMatch(src, /Press Return/);
     assertMatch(src, /server\/postgres-seed\.ts/);
     assertMatch(src, /trap cleanup EXIT/);
     assertNotMatch(src, /exec deno/);
@@ -455,84 +502,30 @@ async () => {
     assertMatch(run.stderr, /Usage: develop-main\.ts dir\//);
 });
 
-Deno.test('develop-watch with no args exits 1',
-async () => {
-    const output = await new Deno.Command('deno', {
-        args: [
-            'run', '--frozen', '--no-check',
-            'server/develop-watch.ts',
-        ],
-        signal: AbortSignal.timeout(30_000),
-    }).output();
-    assertStrictEquals(output.code, 1);
-    assertMatch(
-        new TextDecoder().decode(output.stderr),
-        /Usage: develop-watch\.ts dir\//,
+Deno.test('return recomposes the site', async () => {
+    const run = await runDevelop(
+        ['8080', '--postgres', 'mock-data'],
+        { holdMain: true, pressReturn: true },
     );
-});
-
-Deno.test('develop-watch prints rebuild after a change',
-async () => {
-    const dir = Deno.makeTempDirSync({
-        prefix: 'fusion-watch-',
-    });
-    const file = join(dir, 'leaf.ts');
-    Deno.writeTextFileSync(file, 'a');
-    const child = new Deno.Command('deno', {
-        args: [
-            'run', '--frozen', '--no-check',
-            '--allow-read',
-            'server/develop-watch.ts',
-            dir,
+    assert(
+        run.code === 130 || run.signal === 'SIGINT',
+    );
+    assertEquals(
+        denoArgs(run).filter((line) =>
+            line.includes('--outdir')).length,
+        2,
+    );
+    assertMatch(run.stderr, /Rebundling/);
+    assert(denoArgs(run).every((line) =>
+        !line.includes('server/develop-watch.ts')));
+    assertEquals(
+        dockerCalls(run).map((call) => call[2]),
+        [
+            'compose down --remove-orphans',
+            'compose up -d --wait postgres',
+            'compose down --remove-orphans',
         ],
-        stdout: 'piped',
-        stderr: 'null',
-    }).spawn();
-    const reader = child.stdout?.getReader();
-    if (reader === undefined) {
-        child.kill('SIGTERM');
-        await child.status;
-        throw new Error('watcher has no stdout');
-    }
-    const pending = reader.read();
-    try {
-        // The gap must exceed the watcher's debounce,
-        // or a rewrite resets the timer forever.
-        const deadline = Date.now() + 5_000;
-        let text = '';
-        while (Date.now() < deadline && text === '') {
-            Deno.writeTextFileSync(file, String(Date.now()));
-            let timer: ReturnType<
-                typeof setTimeout
-            > | undefined;
-            const winner = await Promise.race([
-                pending.then((value) => ({
-                    kind: 'read' as const,
-                    value,
-                })),
-                new Promise<{ kind: 'wait' }>((resolve) => {
-                    timer = setTimeout(
-                        () => resolve({ kind: 'wait' }),
-                        500,
-                    );
-                }),
-            ]);
-            if (timer !== undefined) clearTimeout(timer);
-            if (winner.kind === 'read') {
-                const bytes = winner.value.value;
-                if (bytes !== undefined) {
-                    text = new TextDecoder().decode(bytes);
-                }
-                break;
-            }
-        }
-        assertMatch(text, /rebuild/);
-    } finally {
-        child.kill('SIGTERM');
-        await reader.cancel();
-        await child.status;
-        Deno.removeSync(dir, { recursive: true });
-    }
+    );
 });
 
 Deno.test(
