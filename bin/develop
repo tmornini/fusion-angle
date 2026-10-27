@@ -1,26 +1,21 @@
 #!/bin/bash
-# Edit session. Postgres for this compose project is
-# created and seeded when it is not already running,
-# and left in place when it is. Exit does not take
-# the stack down. ./bin/develop bundle only recomposes
-# the site directory the server stats on each request.
+# Edit session. Creates a fresh Postgres, seeds it,
+# and serves. Source changes recompose the site.
+# Exit, including Ctrl-C, takes the stack down.
 set -euo pipefail
 
 usage() {
     cat <<'USAGE'
-Usage: ./bin/develop PORT [--postgres mock-data|bootstrap]
-       ./bin/develop bundle
+Usage: ./bin/develop PORT --postgres mock-data|bootstrap
 
   PORT        Listen port. Required. No default.
-  --postgres  How to seed a new database:
-              mock-data or bootstrap. Required
-              when Postgres is not running.
-  bundle      Recompose the site and exit.
+  --postgres  How to seed the fresh database:
+              mock-data or bootstrap. Required.
 
-The first run creates a fresh Postgres, seeds
-it, and serves. A later run while that Postgres
-is up reuses it and does not reseed. Exit
-leaves Postgres up. Drop it with:
+Creates a fresh Postgres, seeds it, and
+serves. A change under web-app/, client/,
+or shared/ recomposes the site; reload the
+browser. Ctrl-C stops the server and runs:
   docker compose -p fusion-develop down
 
 The site directory is $TMPDIR/fusion-develop
@@ -59,6 +54,11 @@ ALLOW_ENV="$ALLOW_ENV,PGTARGETSESSIONATTRS"
 ALLOW_ENV="$ALLOW_ENV,JWT_HMAC_SIGNING_KEY,PORT"
 ALLOW_ENV="$ALLOW_ENV,TRUSTED_PROXY_HOPS"
 
+CLEANED=''
+WATCH_PID=''
+LOOP_PID=''
+SERVER_PID=''
+
 session_paths() {
     SESSION_ROOT="${FUSION_DEVELOP_DIR:-}"
     if [ -z "$SESSION_ROOT" ]; then
@@ -66,83 +66,64 @@ session_paths() {
     fi
     mkdir -p "$SESSION_ROOT"
     SESSION_ROOT="$(cd "$SESSION_ROOT" && pwd)"
-    SESSION_ENV="$SESSION_ROOT/session.env"
     SITE="$SESSION_ROOT/site"
 }
 
-write_session() {
-    cat > "$SESSION_ENV" <<EOF
-POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-JWT_HMAC_SIGNING_KEY=$JWT_HMAC_SIGNING_KEY
-POSTGRES_URL=$POSTGRES_URL
-EOF
-    chmod 600 "$SESSION_ENV"
-}
-
-postgres_running() {
-    local id
-    id="$(docker compose ps --status running \
-        --quiet postgres)"
-    [ -n "$id" ]
-}
-
-serve_site() {
-    bundle_client "$SITE"
-    echo
-    echo "Serving on http://localhost:$PORT/"
-    exec deno run --frozen --allow-net \
-        --allow-read="$SITE" \
-        --allow-env="$ALLOW_ENV" \
-        server/develop-main.ts "${SITE}/"
-}
-
-prepare_database() {
-    export COMPOSE_PROJECT_NAME=fusion-develop
-    export PORT="$PORT_ARG"
-    local have_session=0
-    if [ -f "$SESSION_ENV" ]; then
-        set -a
-        # shellcheck disable=SC1090
-        . "$SESSION_ENV"
-        set +a
-        export PORT="$PORT_ARG"
-        have_session=1
-    else
-        mint_compose_env "$PORT_ARG"
-    fi
-    if postgres_running; then
-        if [ "$have_session" -eq 0 ]; then
-            echo "Error: Postgres is up but the" \
-                "session file is missing." >&2
-            echo "Error: docker compose -p" \
-                "fusion-develop down, then run" \
-                "again." >&2
-            exit 1
-        fi
-        echo "Postgres is up; leaving the" \
-            "database in place." >&2
+cleanup() {
+    if [ -n "$CLEANED" ]; then
         return
     fi
-    if [ -z "$MODE" ]; then
-        echo "Error: --postgres is required when" \
-            "Postgres is not running." >&2
-        usage >&2
-        exit 1
+    CLEANED=1
+    if [ -n "$WATCH_PID" ]; then
+        kill "$WATCH_PID" 2>/dev/null || true
+        wait "$WATCH_PID" 2>/dev/null || true
     fi
-    if [ "$have_session" -eq 1 ]; then
-        mint_compose_env "$PORT_ARG"
+    if [ -n "$LOOP_PID" ]; then
+        kill "$LOOP_PID" 2>/dev/null || true
+        wait "$LOOP_PID" 2>/dev/null || true
     fi
-    write_session
-    docker compose down --remove-orphans
-    docker compose up -d --wait postgres
-    if ! deno run --frozen --allow-net \
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    compose_down_once
+    if [ -n "${SESSION_ROOT:-}" ]; then
+        rm -rf "$SESSION_ROOT"
+    fi
+}
+
+start_watcher() {
+    local fifo="$SESSION_ROOT/watch.fifo"
+    mkfifo "$fifo"
+    while IFS= read -r _; do
+        echo "Rebundling. Reload the browser." >&2
+        bundle_client "$SITE" || true
+    done < "$fifo" &
+    LOOP_PID=$!
+    deno run --frozen \
+        --allow-read="$ROOT/web-app" \
+        --allow-read="$ROOT/client" \
+        --allow-read="$ROOT/shared" \
+        server/develop-watch.ts \
+        "$ROOT/web-app" \
+        "$ROOT/client" \
+        "$ROOT/shared" \
+        > "$fifo" &
+    WATCH_PID=$!
+}
+
+run_server() {
+    deno run --frozen --allow-net \
+        --allow-read="$SITE" \
         --allow-env="$ALLOW_ENV" \
-        server/postgres-seed.ts "--$MODE"
-    then
-        docker compose down --remove-orphans \
-            || true
-        exit 1
-    fi
+        server/develop-main.ts "${SITE}/" &
+    SERVER_PID=$!
+    while kill -0 "$SERVER_PID" 2>/dev/null; do
+        sleep 0.2
+    done
+    local status=0
+    wait "$SERVER_PID" || status=$?
+    exit "$status"
 }
 
 for arg in "$@"; do
@@ -159,25 +140,10 @@ fi
 
 PORT_ARG=''
 MODE=''
-COMMAND=''
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        bundle)
-            if [ -n "$COMMAND" ] \
-                || [ -n "$PORT_ARG" ] \
-                || [ -n "$MODE" ]; then
-                usage >&2
-                exit 1
-            fi
-            COMMAND=bundle
-            shift
-            ;;
         --postgres)
-            if [ "$COMMAND" = bundle ]; then
-                usage >&2
-                exit 1
-            fi
             if [ $# -lt 2 ]; then
                 echo "Error: --postgres requires" \
                     "a value" >&2
@@ -198,8 +164,7 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         *)
-            if [ -n "$PORT_ARG" ] \
-                || [ "$COMMAND" = bundle ]; then
+            if [ -n "$PORT_ARG" ]; then
                 usage >&2
                 exit 1
             fi
@@ -209,13 +174,6 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-session_paths
-
-if [ "$COMMAND" = bundle ]; then
-    bundle_client "$SITE"
-    exit 0
-fi
-
 if ! valid_port "$PORT_ARG"; then
     echo "Error: PORT must be an integer" \
         "1-65535" >&2
@@ -223,5 +181,29 @@ if ! valid_port "$PORT_ARG"; then
     exit 1
 fi
 
-prepare_database
-serve_site
+if [ -z "$MODE" ]; then
+    echo "Error: --postgres is required." >&2
+    usage >&2
+    exit 1
+fi
+
+export COMPOSE_PROJECT_NAME=fusion-develop
+export PORT="$PORT_ARG"
+mint_compose_env "$PORT_ARG"
+session_paths
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+docker compose down --remove-orphans
+docker compose up -d --wait postgres
+if ! deno run --frozen --allow-net \
+    --allow-env="$ALLOW_ENV" \
+    server/postgres-seed.ts "--$MODE"
+then
+    exit 1
+fi
+bundle_client "$SITE"
+start_watcher
+echo
+echo "Serving on http://localhost:$PORT/"
+run_server

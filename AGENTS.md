@@ -17,8 +17,7 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./bin/build            # executable ZIP to ~/Desktop/
 ./bin/build --no-zip dir/
 ./bin/serve dir/ port  # ZIP hatch; PORT from argv
-./bin/develop PORT [--postgres mock-data|bootstrap]
-./bin/develop bundle   # recompose the site; server stays up
+./bin/develop PORT --postgres mock-data|bootstrap
 ./bin/postgres-seed --postgres local --mock-data|--bootstrap
 ./bin/postgres-wipe --postgres local
 ./bin/measure
@@ -63,19 +62,16 @@ and `./test postgres` name a compose project of their
 own, so neither touches an operator's stack. Each needs
 127.0.0.1:5432 free.
 
-`./bin/develop PORT` is the edit session. It
-`deno run`s the server against a `bundle_client`
-directory, so a rebundle shows up on reload.
-When its Postgres (`fusion-develop`) is down it
-drops any stopped container, starts a fresh
-database, and seeds it (`--postgres
-mock-data|bootstrap`). When that Postgres is
-already up it leaves the database in place.
-Exit does not take the stack down. Drop it
-with `docker compose -p fusion-develop down`.
-Creating the database needs 127.0.0.1:5432 free.
-`./bin/develop bundle` recomposes the site
-and exits.
+`./bin/develop PORT --postgres mock-data|bootstrap`
+is the edit session. It `deno run`s the server
+against a `bundle_client` directory. A change
+under `web-app/`, `client/`, or `shared/`
+recomposes that directory; reload the browser.
+It always creates a fresh Postgres
+(`fusion-develop`), seeds it, and on exit —
+including Ctrl-C — runs `docker compose -p
+fusion-develop down`. Creating the database
+needs 127.0.0.1:5432 free.
 
 When running under the Claude Code sandbox:
 

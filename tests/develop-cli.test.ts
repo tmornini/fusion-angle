@@ -17,6 +17,7 @@ const AMBIENT = 'ambient';
 
 type DevelopRun = {
     readonly code: number;
+    readonly signal: Deno.Signal | null;
     readonly stdout: string;
     readonly stderr: string;
     readonly calls: readonly (readonly string[])[];
@@ -40,6 +41,8 @@ async function runDevelop(
         readonly ps?: string;
         readonly session?: string;
         readonly failOn?: string;
+        readonly holdMain?: boolean;
+        readonly signal?: Deno.Signal;
     } = {},
 ): Promise<DevelopRun> {
     const dir = Deno.makeTempDirSync({
@@ -98,25 +101,95 @@ async function runDevelop(
                     : `case "$*" in\n`
                         + `    *${failOn}*) exit 1 ;;\n`
                         + 'esac\n')
+                + (options.holdMain === true
+                    ? 'if [[ "$*" == *develop-main.ts* ]];'
+                        + ' then\n'
+                        + '    trap "exit 0" INT TERM\n'
+                        + '    while true; do sleep 0.2; done\n'
+                        + 'fi\n'
+                    : '')
                 + 'exit 0\n',
         );
-        const output = await new Deno.Command(
-            './bin/develop',
-            {
+        const env = {
+            PATH: `${dir}:${Deno.env.get('PATH') ?? ''}`,
+            POSTGRES_URL: AMBIENT,
+            POSTGRES_PASSWORD: AMBIENT,
+            JWT_HMAC_SIGNING_KEY: AMBIENT,
+            PORT: AMBIENT,
+            COMPOSE_PROJECT_NAME: AMBIENT,
+            FUSION_DEVELOP_DIR: sessionDir,
+            TMPDIR: dir,
+        };
+        let code = 0;
+        let signal: Deno.Signal | null = null;
+        let stdoutBytes = new Uint8Array();
+        let stderrBytes = new Uint8Array();
+        if (options.signal !== undefined) {
+            const child = new Deno.Command('./bin/develop', {
                 args: [...args],
-                signal: AbortSignal.timeout(15_000),
-                env: {
-                    PATH: `${dir}:${Deno.env.get('PATH') ?? ''}`,
-                    POSTGRES_URL: AMBIENT,
-                    POSTGRES_PASSWORD: AMBIENT,
-                    JWT_HMAC_SIGNING_KEY: AMBIENT,
-                    PORT: AMBIENT,
-                    COMPOSE_PROJECT_NAME: AMBIENT,
-                    FUSION_DEVELOP_DIR: sessionDir,
-                    TMPDIR: dir,
+                env,
+                stdout: 'piped',
+                stderr: 'piped',
+            }).spawn();
+            const deadline = Date.now() + 8_000;
+            let seen = false;
+            while (Date.now() < deadline) {
+                try {
+                    const text = Deno.readTextFileSync(log);
+                    if (text.includes('develop-main.ts')) {
+                        seen = true;
+                        break;
+                    }
+                } catch (error) {
+                    if (!(error instanceof Deno.errors.NotFound)) {
+                        throw error;
+                    }
+                }
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 20);
+                });
+            }
+            if (!seen) {
+                child.kill('SIGTERM');
+                await child.status;
+                throw new Error('server did not start');
+            }
+            try {
+                child.kill(options.signal);
+            } catch (error) {
+                if (!(error instanceof Deno.errors.NotFound)) {
+                    throw error;
+                }
+            }
+            const status = await child.status;
+            code = status.code;
+            signal = status.signal;
+            if (child.stdout !== null) {
+                stdoutBytes = new Uint8Array(
+                    await new Response(child.stdout)
+                        .arrayBuffer(),
+                );
+            }
+            if (child.stderr !== null) {
+                stderrBytes = new Uint8Array(
+                    await new Response(child.stderr)
+                        .arrayBuffer(),
+                );
+            }
+        } else {
+            const output = await new Deno.Command(
+                './bin/develop',
+                {
+                    args: [...args],
+                    signal: AbortSignal.timeout(15_000),
+                    env,
                 },
-            },
-        ).output();
+            ).output();
+            code = output.code;
+            signal = output.signal;
+            stdoutBytes = output.stdout;
+            stderrBytes = output.stderr;
+        }
         const decoder = new TextDecoder();
         let calls: (readonly string[])[] = [];
         try {
@@ -143,9 +216,10 @@ async function runDevelop(
             }
         }
         return {
-            code: output.code,
-            stdout: decoder.decode(output.stdout),
-            stderr: decoder.decode(output.stderr),
+            code,
+            signal,
+            stdout: decoder.decode(stdoutBytes),
+            stderr: decoder.decode(stderrBytes),
             calls,
             sessionEnv,
             sessionMode,
@@ -167,15 +241,6 @@ function denoArgs(run: DevelopRun): readonly string[] {
         .map((call) => call[5] ?? '');
 }
 
-const SESSION = [
-    'POSTGRES_PASSWORD=' + 'ab'.repeat(16),
-    'JWT_HMAC_SIGNING_KEY=' + 'cd'.repeat(32),
-    'POSTGRES_URL=postgres://fusion:'
-        + 'ab'.repeat(16)
-        + '@127.0.0.1:5432/fusion',
-    '',
-].join('\n');
-
 Deno.test('develop with no args exits 1 with usage',
 async () => {
     const run = await runDevelop([]);
@@ -189,7 +254,7 @@ async () => {
     const run = await runDevelop(['--help']);
     assertStrictEquals(run.code, 0);
     assertMatch(run.stdout, /Usage: \.\/bin\/develop/);
-    assertMatch(run.stdout, /fusion-develop/);
+    assertMatch(run.stdout, /fusion-develop down/);
     assertEquals(run.calls, []);
 });
 
@@ -217,26 +282,6 @@ async () => {
     assertEquals(run.calls, []);
 });
 
-Deno.test('develop bundle takes no other arguments',
-async () => {
-    const run = await runDevelop(['bundle', '--postgres',
-        'mock-data']);
-    assertStrictEquals(run.code, 1);
-    assertEquals(run.calls, []);
-});
-
-Deno.test('develop bundle recomposes and does not seed',
-async () => {
-    const run = await runDevelop(['bundle']);
-    assertStrictEquals(run.code, 0);
-    assertEquals(dockerCalls(run), []);
-    const args = denoArgs(run);
-    assert(args.some((line) => line.includes('bundle')));
-    assert(args.every((line) =>
-        !line.includes('postgres-seed.ts')
-        && !line.includes('develop-main.ts')));
-});
-
 Deno.test(
     'a down database is created, seeded, and served',
     async () => {
@@ -247,9 +292,9 @@ Deno.test(
         assertEquals(
             dockerCalls(run).map((call) => call[2]),
             [
-                'compose ps --status running --quiet postgres',
                 'compose down --remove-orphans',
                 'compose up -d --wait postgres',
+                'compose down --remove-orphans',
             ],
         );
         for (const call of dockerCalls(run)) {
@@ -267,15 +312,12 @@ Deno.test(
         assertNotStrictEquals(seed[2], AMBIENT);
         assertMatch(seed[3] ?? '', /^[0-9a-f]{64}$/);
         assertStrictEquals(seed[4], '8080');
-        const served = denoArgs(run).some((line) =>
-            line.includes('server/develop-main.ts'));
-        assert(served);
-        assert(
-            run.sessionEnv?.includes(
-                `POSTGRES_PASSWORD=${seed[2]}`,
-            ),
-        );
-        assertStrictEquals(run.sessionMode, 0o600);
+        const args = denoArgs(run);
+        assert(args.some((line) =>
+            line.includes('server/develop-watch.ts')));
+        assert(args.some((line) =>
+            line.includes('server/develop-main.ts')));
+        assertStrictEquals(run.sessionEnv, undefined);
         assert(!run.stdout.includes(seed[2] ?? ''));
         assert(!run.stderr.includes(seed[2] ?? ''));
         assertMatch(run.stdout, /http:\/\/localhost:8080\//);
@@ -300,10 +342,7 @@ Deno.test(
         const run = await runDevelop(['8080']);
         assertStrictEquals(run.code, 1);
         assertMatch(run.stderr, /--postgres/);
-        const ops = dockerCalls(run).map((call) => call[2]);
-        assertEquals(ops, [
-            'compose ps --status running --quiet postgres',
-        ]);
+        assertEquals(dockerCalls(run), []);
         assert(denoArgs(run).every((line) =>
             !line.includes('postgres-seed.ts')));
     },
@@ -319,7 +358,6 @@ async () => {
     assertEquals(
         dockerCalls(run).map((call) => call[2]),
         [
-            'compose ps --status running --quiet postgres',
             'compose down --remove-orphans',
             'compose up -d --wait postgres',
             'compose down --remove-orphans',
@@ -330,65 +368,25 @@ async () => {
     assertNotMatch(run.stdout, /localhost/);
 });
 
-Deno.test('a running database is served and not reseeded',
+Deno.test('ctrl-c takes the develop stack down',
 async () => {
-    const run = await runDevelop(['9090'], { ps: 'cid',
-        session: SESSION });
-    assertStrictEquals(run.code, 0);
+    const run = await runDevelop(
+        ['8080', '--postgres', 'mock-data'],
+        { holdMain: true, signal: 'SIGINT' },
+    );
+    assert(
+        run.code === 130 || run.signal === 'SIGINT',
+    );
     assertEquals(
         dockerCalls(run).map((call) => call[2]),
-        ['compose ps --status running --quiet postgres'],
+        [
+            'compose down --remove-orphans',
+            'compose up -d --wait postgres',
+            'compose down --remove-orphans',
+        ],
     );
-    const args = denoArgs(run);
-    assert(args.every((line) =>
-        !line.includes('postgres-seed.ts')));
-    assert(args.some((line) =>
-        line.includes('server/develop-main.ts')));
-    const served = run.calls.find((call) =>
-        (call[5] ?? '').includes('develop-main.ts'));
-    assertStrictEquals(served?.[1],
-        'postgres://fusion:' + 'ab'.repeat(16)
-            + '@127.0.0.1:5432/fusion');
-    assertStrictEquals(served?.[4], '9090');
-    assertMatch(run.stderr, /leaving the database/);
-    assertStrictEquals(run.sessionEnv, SESSION);
+    assertStrictEquals(run.sessionEnv, undefined);
 });
-
-Deno.test(
-    '--postgres does not reseed a running database',
-    async () => {
-        const run = await runDevelop(
-            ['9090', '--postgres', 'mock-data'],
-            { ps: 'cid', session: SESSION },
-        );
-        assertStrictEquals(run.code, 0);
-        assert(denoArgs(run).every((line) =>
-            !line.includes('postgres-seed.ts')));
-        assertEquals(
-            dockerCalls(run).map((call) => call[2]),
-            ['compose ps --status running'
-                + ' --quiet postgres'],
-        );
-    },
-);
-
-Deno.test(
-    'a running database with no session file exits 1',
-    async () => {
-        const run = await runDevelop(['8080'], {
-            ps: 'cid',
-        });
-        assertStrictEquals(run.code, 1);
-        assertMatch(run.stderr, /session file is missing/);
-        const ops = dockerCalls(run).map((call) => call[2]);
-        assertEquals(ops, [
-            'compose ps --status running --quiet postgres',
-        ]);
-        assert(denoArgs(run).every((line) =>
-            !line.includes('postgres-seed.ts')));
-        assertStrictEquals(run.sessionEnv, undefined);
-    },
-);
 
 Deno.test('develop does not compile or build an image',
 () => {
@@ -398,7 +396,10 @@ Deno.test('develop does not compile or build an image',
     assertNotMatch(src, /compose build/);
     assertMatch(src, /bundle_client/);
     assertMatch(src, /server\/develop-main\.ts/);
+    assertMatch(src, /server\/develop-watch\.ts/);
     assertMatch(src, /server\/postgres-seed\.ts/);
+    assertMatch(src, /trap cleanup EXIT/);
+    assertNotMatch(src, /exec deno/);
     assertMatch(src, /fusion-develop/);
 });
 
@@ -439,6 +440,86 @@ async () => {
     const run = await runMain(['site/']);
     assertStrictEquals(run.code, 1);
     assertMatch(run.stderr, /Usage: develop-main\.ts dir\//);
+});
+
+Deno.test('develop-watch with no args exits 1',
+async () => {
+    const output = await new Deno.Command('deno', {
+        args: [
+            'run', '--frozen', '--no-check',
+            'server/develop-watch.ts',
+        ],
+        signal: AbortSignal.timeout(30_000),
+    }).output();
+    assertStrictEquals(output.code, 1);
+    assertMatch(
+        new TextDecoder().decode(output.stderr),
+        /Usage: develop-watch\.ts dir\//,
+    );
+});
+
+Deno.test('develop-watch prints rebuild after a change',
+async () => {
+    const dir = Deno.makeTempDirSync({
+        prefix: 'fusion-watch-',
+    });
+    const file = join(dir, 'leaf.ts');
+    Deno.writeTextFileSync(file, 'a');
+    const child = new Deno.Command('deno', {
+        args: [
+            'run', '--frozen', '--no-check',
+            '--allow-read',
+            'server/develop-watch.ts',
+            dir,
+        ],
+        stdout: 'piped',
+        stderr: 'null',
+    }).spawn();
+    const reader = child.stdout?.getReader();
+    if (reader === undefined) {
+        child.kill('SIGTERM');
+        await child.status;
+        throw new Error('watcher has no stdout');
+    }
+    const pending = reader.read();
+    try {
+        // The gap must exceed the watcher's debounce,
+        // or a rewrite resets the timer forever.
+        const deadline = Date.now() + 5_000;
+        let text = '';
+        while (Date.now() < deadline && text === '') {
+            Deno.writeTextFileSync(file, String(Date.now()));
+            let timer: ReturnType<
+                typeof setTimeout
+            > | undefined;
+            const winner = await Promise.race([
+                pending.then((value) => ({
+                    kind: 'read' as const,
+                    value,
+                })),
+                new Promise<{ kind: 'wait' }>((resolve) => {
+                    timer = setTimeout(
+                        () => resolve({ kind: 'wait' }),
+                        500,
+                    );
+                }),
+            ]);
+            if (timer !== undefined) clearTimeout(timer);
+            if (winner.kind === 'read') {
+                const bytes = winner.value.value;
+                if (bytes !== undefined) {
+                    text = new TextDecoder().decode(bytes);
+                }
+                break;
+            }
+        }
+        assertMatch(text, /rebuild/);
+    } finally {
+        child.kill('SIGTERM');
+        await reader.cancel();
+        await child.status;
+        Deno.removeSync(dir, { recursive: true });
+    }
 });
 
 Deno.test(
