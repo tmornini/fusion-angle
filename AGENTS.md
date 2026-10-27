@@ -66,7 +66,8 @@ own, so neither touches an operator's stack. Each needs
 is the edit session. It `deno run`s the server
 against a `bundle_client` directory. Press
 Return to rebundle the site, then reload
-the browser.
+the browser. The request log is a file
+beside the site; its path prints at startup.
 It always creates a fresh Postgres
 (`fusion-develop`), seeds it, and prints the
 seeded sign-ins once the site is up. On exit —

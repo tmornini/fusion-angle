@@ -108,6 +108,10 @@ async function runDevelop(
                 + ' \'demo@example.com\\tsecret\\n\'\n'
                 + '        ;;\n'
                 + 'esac\n'
+                + 'if [[ "$*" == *develop-main.ts* ]];'
+                + ' then\n'
+                + '    printf \'request-log-line\\n\'\n'
+                + 'fi\n'
                 + (options.holdMain === true
                     ? 'if [[ "$*" == *develop-main.ts* ]];'
                         + ' then\n'
@@ -306,6 +310,7 @@ async () => {
     assertStrictEquals(run.code, 0);
     assertMatch(run.stdout, /Usage: \.\/bin\/develop/);
     assertMatch(run.stdout, /Press Return/);
+    assertMatch(run.stdout, /Request log/);
     assertMatch(run.stdout, /fusion-develop down/);
     assertEquals(run.calls, []);
 });
@@ -380,6 +385,11 @@ Deno.test(
         );
         assert(urlAt !== -1);
         assert(signInAt > urlAt);
+        assertMatch(
+            run.stdout,
+            /Request log: \/\S+\/requests\.log/,
+        );
+        assertNotMatch(run.stdout, /request-log-line/);
     },
 );
 

@@ -19,7 +19,9 @@ site, then reload the browser. Ctrl-C stops
 the server and runs:
   docker compose -p fusion-develop down
 
-The site directory is $TMPDIR/fusion-develop
+Request log: a file beside the site. Its
+path prints at startup. The site directory
+is $TMPDIR/fusion-develop
 (FUSION_DEVELOP_DIR overrides it).
 USAGE
 }
@@ -102,7 +104,8 @@ run_server() {
     deno run --frozen --allow-net \
         --allow-read="$SITE" \
         --allow-env="$ALLOW_ENV" \
-        server/develop-main.ts "${SITE}/" &
+        server/develop-main.ts "${SITE}/" \
+        >> "$REQUEST_LOG" &
     SERVER_PID=$!
     while kill -0 "$SERVER_PID" 2>/dev/null; do
         sleep 0.2
@@ -196,6 +199,8 @@ then
 fi
 bundle_client "$SITE"
 read_return
+REQUEST_LOG="$SESSION_ROOT/requests.log"
+: > "$REQUEST_LOG"
 echo
 echo "Serving on http://localhost:$PORT/"
 if [ -n "$SEED_TEXT" ]; then
@@ -203,4 +208,5 @@ if [ -n "$SEED_TEXT" ]; then
     printf '%s\n' "$SEED_TEXT"
 fi
 echo "Press Return to rebundle the site."
+echo "Request log: $REQUEST_LOG"
 run_server
