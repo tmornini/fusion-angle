@@ -17,6 +17,8 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 ./bin/build            # executable ZIP to ~/Desktop/
 ./bin/build --no-zip dir/
 ./bin/serve dir/ port  # ZIP hatch; PORT from argv
+./bin/develop PORT [--postgres mock-data|bootstrap]
+./bin/develop bundle   # recompose the site; server stays up
 ./bin/postgres-seed --postgres local --mock-data|--bootstrap
 ./bin/postgres-wipe --postgres local
 ./bin/measure
@@ -24,9 +26,10 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 
 Deno 2.9.8 runs `./test`, `./test validate`,
 `./bin/build`, `./test browser`, `./bin/measure`,
-and both generators, each invoking the `deno` CLI
-directly. `postgres-lib`'s eight inline programs
-pipe into `deno run --frozen` on stdin. `./deploy`
+`./bin/develop`, and both generators, each
+invoking the `deno` CLI directly.
+`postgres-lib`'s eight inline programs pipe
+into `deno run --frozen` on stdin. `./deploy`
 composes the walk origin, and `./bin/serve` execs
 the `deno compile` binary, which embeds the
 runtime — neither calls `deno` itself.
@@ -59,6 +62,20 @@ and take their compose stack down on exit; the measure
 and `./test postgres` name a compose project of their
 own, so neither touches an operator's stack. Each needs
 127.0.0.1:5432 free.
+
+`./bin/develop PORT` is the edit session. It
+`deno run`s the server against a `bundle_client`
+directory, so a rebundle shows up on reload.
+When its Postgres (`fusion-develop`) is down it
+drops any stopped container, starts a fresh
+database, and seeds it (`--postgres
+mock-data|bootstrap`). When that Postgres is
+already up it leaves the database in place.
+Exit does not take the stack down. Drop it
+with `docker compose -p fusion-develop down`.
+Creating the database needs 127.0.0.1:5432 free.
+`./bin/develop bundle` recomposes the site
+and exits.
 
 When running under the Claude Code sandbox:
 

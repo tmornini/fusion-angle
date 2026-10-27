@@ -1,0 +1,461 @@
+import {
+    assert,
+    assertEquals,
+    assertMatch,
+    assertNotMatch,
+    assertNotStrictEquals,
+    assertStrictEquals,
+} from '@std/assert';
+import { join } from '@std/path';
+
+// bin/develop runs with deno and docker stubbed on PATH.
+// Each stub appends one tab-separated line: docker the
+// compose project and arguments, deno the environment
+// the wrapper handed it and its arguments. Ambient
+// values are decoys the fresh path must mint over.
+const AMBIENT = 'ambient';
+
+type DevelopRun = {
+    readonly code: number;
+    readonly stdout: string;
+    readonly stderr: string;
+    readonly calls: readonly (readonly string[])[];
+    readonly sessionEnv: string | undefined;
+    readonly sessionMode: number | undefined;
+};
+
+function writeStub(
+    dir: string,
+    name: string,
+    body: string,
+): void {
+    Deno.writeTextFileSync(join(dir, name), body, {
+        mode: 0o755,
+    });
+}
+
+async function runDevelop(
+    args: readonly string[],
+    options: {
+        readonly ps?: string;
+        readonly session?: string;
+        readonly failOn?: string;
+    } = {},
+): Promise<DevelopRun> {
+    const dir = Deno.makeTempDirSync({
+        prefix: 'fusion-develop-',
+    });
+    const log = join(dir, 'calls.log');
+    const sessionDir = join(dir, 'session');
+    Deno.mkdirSync(sessionDir);
+    if (options.session !== undefined) {
+        Deno.writeTextFileSync(
+            join(sessionDir, 'session.env'),
+            options.session,
+            { mode: 0o600 },
+        );
+    }
+    const failOn = options.failOn ?? '';
+    const ps = options.ps ?? '';
+    try {
+        writeStub(
+            dir,
+            'docker',
+            '#!/bin/bash\n'
+                + 'printf \'docker\\t%s\\t%s\\n\' \\\n'
+                + '    "${COMPOSE_PROJECT_NAME-}" "$*" \\\n'
+                + `    >> "${log}"\n`
+                + 'case "$*" in\n'
+                + '    *compose\\ ps\\ *)\n'
+                + `        printf '%s' '${ps}'\n`
+                + '        ;;\n'
+                + 'esac\n'
+                + 'exit 0\n',
+        );
+        writeStub(
+            dir,
+            'deno',
+            '#!/bin/bash\n'
+                + 'printf \'deno\\t%s\\t%s\\t%s\\t%s\\t%s\\n\' \\\n'
+                + '    "${POSTGRES_URL-}" \\\n'
+                + '    "${POSTGRES_PASSWORD-}" \\\n'
+                + '    "${JWT_HMAC_SIGNING_KEY-}" \\\n'
+                + '    "${PORT-}" "$*" \\\n'
+                + `    >> "${log}"\n`
+                + 'prev=""\n'
+                + 'for arg in "$@"; do\n'
+                + '    if [ "$prev" = "--outdir" ]; then\n'
+                + '        mkdir -p "$arg"\n'
+                + '        printf x > "$arg/server-core.js"\n'
+                + '    elif [ "$prev" = "-o" ]; then\n'
+                + '        mkdir -p "$(dirname "$arg")"\n'
+                + '        printf x > "$arg"\n'
+                + '    fi\n'
+                + '    prev="$arg"\n'
+                + 'done\n'
+                + (failOn === ''
+                    ? ''
+                    : `case "$*" in\n`
+                        + `    *${failOn}*) exit 1 ;;\n`
+                        + 'esac\n')
+                + 'exit 0\n',
+        );
+        const output = await new Deno.Command(
+            './bin/develop',
+            {
+                args: [...args],
+                signal: AbortSignal.timeout(15_000),
+                env: {
+                    PATH: `${dir}:${Deno.env.get('PATH') ?? ''}`,
+                    POSTGRES_URL: AMBIENT,
+                    POSTGRES_PASSWORD: AMBIENT,
+                    JWT_HMAC_SIGNING_KEY: AMBIENT,
+                    PORT: AMBIENT,
+                    COMPOSE_PROJECT_NAME: AMBIENT,
+                    FUSION_DEVELOP_DIR: sessionDir,
+                    TMPDIR: dir,
+                },
+            },
+        ).output();
+        const decoder = new TextDecoder();
+        let calls: (readonly string[])[] = [];
+        try {
+            calls = Deno.readTextFileSync(log)
+                .trimEnd()
+                .split('\n')
+                .filter((line) => line !== '')
+                .map((line) => line.split('\t'));
+        } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) {
+                throw error;
+            }
+        }
+        let sessionEnv: string | undefined;
+        let sessionMode: number | undefined;
+        const sessionPath = join(sessionDir, 'session.env');
+        try {
+            sessionEnv = Deno.readTextFileSync(sessionPath);
+            sessionMode = (Deno.statSync(sessionPath).mode
+                ?? 0) & 0o777;
+        } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) {
+                throw error;
+            }
+        }
+        return {
+            code: output.code,
+            stdout: decoder.decode(output.stdout),
+            stderr: decoder.decode(output.stderr),
+            calls,
+            sessionEnv,
+            sessionMode,
+        };
+    } finally {
+        Deno.removeSync(dir, { recursive: true });
+    }
+}
+
+function dockerCalls(
+    run: DevelopRun,
+): readonly (readonly string[])[] {
+    return run.calls.filter((call) => call[0] === 'docker');
+}
+
+function denoArgs(run: DevelopRun): readonly string[] {
+    return run.calls
+        .filter((call) => call[0] === 'deno')
+        .map((call) => call[5] ?? '');
+}
+
+const SESSION = [
+    'POSTGRES_PASSWORD=' + 'ab'.repeat(16),
+    'JWT_HMAC_SIGNING_KEY=' + 'cd'.repeat(32),
+    'POSTGRES_URL=postgres://fusion:'
+        + 'ab'.repeat(16)
+        + '@127.0.0.1:5432/fusion',
+    '',
+].join('\n');
+
+Deno.test('develop with no args exits 1 with usage',
+async () => {
+    const run = await runDevelop([]);
+    assertStrictEquals(run.code, 1);
+    assertMatch(run.stderr, /Usage: \.\/bin\/develop/);
+    assertEquals(run.calls, []);
+});
+
+Deno.test('develop --help exits 0 with usage',
+async () => {
+    const run = await runDevelop(['--help']);
+    assertStrictEquals(run.code, 0);
+    assertMatch(run.stdout, /Usage: \.\/bin\/develop/);
+    assertMatch(run.stdout, /fusion-develop/);
+    assertEquals(run.calls, []);
+});
+
+Deno.test('develop rejects a port of 0', async () => {
+    const run = await runDevelop(['0', '--postgres',
+        'mock-data']);
+    assertStrictEquals(run.code, 1);
+    assertMatch(run.stderr, /Usage: \.\/bin\/develop/);
+    assertEquals(run.calls, []);
+});
+
+Deno.test('develop rejects a port above 65535',
+async () => {
+    const run = await runDevelop(['65536']);
+    assertStrictEquals(run.code, 1);
+    assertEquals(run.calls, []);
+});
+
+Deno.test('develop rejects an unknown seed mode',
+async () => {
+    const run = await runDevelop(['8080', '--postgres',
+        'nope']);
+    assertStrictEquals(run.code, 1);
+    assertMatch(run.stderr, /mock-data or bootstrap/);
+    assertEquals(run.calls, []);
+});
+
+Deno.test('develop bundle takes no other arguments',
+async () => {
+    const run = await runDevelop(['bundle', '--postgres',
+        'mock-data']);
+    assertStrictEquals(run.code, 1);
+    assertEquals(run.calls, []);
+});
+
+Deno.test('develop bundle recomposes and does not seed',
+async () => {
+    const run = await runDevelop(['bundle']);
+    assertStrictEquals(run.code, 0);
+    assertEquals(dockerCalls(run), []);
+    const args = denoArgs(run);
+    assert(args.some((line) => line.includes('bundle')));
+    assert(args.every((line) =>
+        !line.includes('postgres-seed.ts')
+        && !line.includes('develop-main.ts')));
+});
+
+Deno.test(
+    'a down database is created, seeded, and served',
+    async () => {
+        const run = await runDevelop(
+            ['8080', '--postgres', 'mock-data'],
+        );
+        assertStrictEquals(run.code, 0);
+        assertEquals(
+            dockerCalls(run).map((call) => call[2]),
+            [
+                'compose ps --status running --quiet postgres',
+                'compose down --remove-orphans',
+                'compose up -d --wait postgres',
+            ],
+        );
+        for (const call of dockerCalls(run)) {
+            assertStrictEquals(call[1], 'fusion-develop');
+        }
+        const seed = run.calls.find((call) =>
+            (call[5] ?? '').includes('postgres-seed.ts'));
+        assert(seed !== undefined);
+        assertMatch(seed[5] ?? '', /--mock-data/);
+        assertMatch(seed[2] ?? '', /^[0-9a-f]{32}$/);
+        assertStrictEquals(
+            seed[1],
+            `postgres://fusion:${seed[2]}@127.0.0.1:5432/fusion`,
+        );
+        assertNotStrictEquals(seed[2], AMBIENT);
+        assertMatch(seed[3] ?? '', /^[0-9a-f]{64}$/);
+        assertStrictEquals(seed[4], '8080');
+        const served = denoArgs(run).some((line) =>
+            line.includes('server/develop-main.ts'));
+        assert(served);
+        assert(
+            run.sessionEnv?.includes(
+                `POSTGRES_PASSWORD=${seed[2]}`,
+            ),
+        );
+        assertStrictEquals(run.sessionMode, 0o600);
+        assert(!run.stdout.includes(seed[2] ?? ''));
+        assert(!run.stderr.includes(seed[2] ?? ''));
+        assertMatch(run.stdout, /http:\/\/localhost:8080\//);
+    },
+);
+
+Deno.test('a down database can be bootstrapped',
+async () => {
+    const run = await runDevelop(
+        ['8080', '--postgres', 'bootstrap'],
+    );
+    assertStrictEquals(run.code, 0);
+    const args = denoArgs(run);
+    assert(args.some((line) =>
+        line.includes('postgres-seed.ts')
+        && line.includes('--bootstrap')));
+});
+
+Deno.test(
+    'a down database without --postgres does not start',
+    async () => {
+        const run = await runDevelop(['8080']);
+        assertStrictEquals(run.code, 1);
+        assertMatch(run.stderr, /--postgres/);
+        const ops = dockerCalls(run).map((call) => call[2]);
+        assertEquals(ops, [
+            'compose ps --status running --quiet postgres',
+        ]);
+        assert(denoArgs(run).every((line) =>
+            !line.includes('postgres-seed.ts')));
+    },
+);
+
+Deno.test('a failed seed takes the new database down',
+async () => {
+    const run = await runDevelop(
+        ['8080', '--postgres', 'mock-data'],
+        { failOn: 'postgres-seed.ts' },
+    );
+    assertStrictEquals(run.code, 1);
+    assertEquals(
+        dockerCalls(run).map((call) => call[2]),
+        [
+            'compose ps --status running --quiet postgres',
+            'compose down --remove-orphans',
+            'compose up -d --wait postgres',
+            'compose down --remove-orphans',
+        ],
+    );
+    assert(denoArgs(run).every((line) =>
+        !line.includes('develop-main.ts')));
+    assertNotMatch(run.stdout, /localhost/);
+});
+
+Deno.test('a running database is served and not reseeded',
+async () => {
+    const run = await runDevelop(['9090'], { ps: 'cid',
+        session: SESSION });
+    assertStrictEquals(run.code, 0);
+    assertEquals(
+        dockerCalls(run).map((call) => call[2]),
+        ['compose ps --status running --quiet postgres'],
+    );
+    const args = denoArgs(run);
+    assert(args.every((line) =>
+        !line.includes('postgres-seed.ts')));
+    assert(args.some((line) =>
+        line.includes('server/develop-main.ts')));
+    const served = run.calls.find((call) =>
+        (call[5] ?? '').includes('develop-main.ts'));
+    assertStrictEquals(served?.[1],
+        'postgres://fusion:' + 'ab'.repeat(16)
+            + '@127.0.0.1:5432/fusion');
+    assertStrictEquals(served?.[4], '9090');
+    assertMatch(run.stderr, /leaving the database/);
+    assertStrictEquals(run.sessionEnv, SESSION);
+});
+
+Deno.test(
+    '--postgres does not reseed a running database',
+    async () => {
+        const run = await runDevelop(
+            ['9090', '--postgres', 'mock-data'],
+            { ps: 'cid', session: SESSION },
+        );
+        assertStrictEquals(run.code, 0);
+        assert(denoArgs(run).every((line) =>
+            !line.includes('postgres-seed.ts')));
+        assertEquals(
+            dockerCalls(run).map((call) => call[2]),
+            ['compose ps --status running'
+                + ' --quiet postgres'],
+        );
+    },
+);
+
+Deno.test(
+    'a running database with no session file exits 1',
+    async () => {
+        const run = await runDevelop(['8080'], {
+            ps: 'cid',
+        });
+        assertStrictEquals(run.code, 1);
+        assertMatch(run.stderr, /session file is missing/);
+        const ops = dockerCalls(run).map((call) => call[2]);
+        assertEquals(ops, [
+            'compose ps --status running --quiet postgres',
+        ]);
+        assert(denoArgs(run).every((line) =>
+            !line.includes('postgres-seed.ts')));
+        assertStrictEquals(run.sessionEnv, undefined);
+    },
+);
+
+Deno.test('develop does not compile or build an image',
+() => {
+    const src = Deno.readTextFileSync('bin/develop');
+    assertNotMatch(src, /deno compile/);
+    assertNotMatch(src, /\.\/bin\/build/);
+    assertNotMatch(src, /compose build/);
+    assertMatch(src, /bundle_client/);
+    assertMatch(src, /server\/develop-main\.ts/);
+    assertMatch(src, /server\/postgres-seed\.ts/);
+    assertMatch(src, /fusion-develop/);
+});
+
+async function runMain(
+    args: readonly string[],
+    env: Record<string, string> = {},
+): Promise<{ code: number; stderr: string }> {
+    const output = await new Deno.Command('deno', {
+        args: [
+            'run', '--frozen', '--no-check',
+            '--allow-net', '--allow-env',
+            'server/develop-main.ts',
+            ...args,
+        ],
+        signal: AbortSignal.timeout(30_000),
+        env: {
+            POSTGRES_URL: '',
+            JWT_HMAC_SIGNING_KEY: '',
+            PORT: '',
+            ...env,
+        },
+    }).output();
+    return {
+        code: output.code,
+        stderr: new TextDecoder().decode(output.stderr),
+    };
+}
+
+Deno.test('develop-main with no args exits 1',
+async () => {
+    const run = await runMain([]);
+    assertStrictEquals(run.code, 1);
+    assertMatch(run.stderr, /Usage: develop-main\.ts dir\//);
+});
+
+Deno.test('develop-main rejects a relative directory',
+async () => {
+    const run = await runMain(['site/']);
+    assertStrictEquals(run.code, 1);
+    assertMatch(run.stderr, /Usage: develop-main\.ts dir\//);
+});
+
+Deno.test(
+    'develop-main reports a missing POSTGRES_URL',
+    async () => {
+        const dir = Deno.makeTempDirSync({
+            prefix: 'fusion-develop-site-',
+        });
+        try {
+            const run = await runMain([`${dir}/`]);
+            assertStrictEquals(run.code, 1);
+            assertMatch(
+                run.stderr,
+                /missing required env POSTGRES_URL/,
+            );
+        } finally {
+            Deno.removeSync(dir, { recursive: true });
+        }
+    },
+);
