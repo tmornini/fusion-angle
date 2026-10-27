@@ -101,6 +101,12 @@ async function runDevelop(
                     : `case "$*" in\n`
                         + `    *${failOn}*) exit 1 ;;\n`
                         + 'esac\n')
+                + 'case "$*" in\n'
+                + '    *postgres-seed.ts*)\n'
+                + '        printf'
+                + ' \'demo@example.com\\tsecret\\n\'\n'
+                + '        ;;\n'
+                + 'esac\n'
                 + (options.holdMain === true
                     ? 'if [[ "$*" == *develop-main.ts* ]];'
                         + ' then\n'
@@ -320,7 +326,14 @@ Deno.test(
         assertStrictEquals(run.sessionEnv, undefined);
         assert(!run.stdout.includes(seed[2] ?? ''));
         assert(!run.stderr.includes(seed[2] ?? ''));
-        assertMatch(run.stdout, /http:\/\/localhost:8080\//);
+        const urlAt = run.stdout.indexOf(
+            'http://localhost:8080/',
+        );
+        const signInAt = run.stdout.indexOf(
+            'demo@example.com\tsecret',
+        );
+        assert(urlAt !== -1);
+        assert(signInAt > urlAt);
     },
 );
 

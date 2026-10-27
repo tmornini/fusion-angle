@@ -68,8 +68,9 @@ against a `bundle_client` directory. A change
 under `web-app/`, `client/`, or `shared/`
 recomposes that directory; reload the browser.
 It always creates a fresh Postgres
-(`fusion-develop`), seeds it, and on exit —
-including Ctrl-C — runs `docker compose -p
+(`fusion-develop`), seeds it, and prints the
+seeded sign-ins once the site is up. On exit —
+including Ctrl-C — it runs `docker compose -p
 fusion-develop down`. Creating the database
 needs 127.0.0.1:5432 free.
 

@@ -13,7 +13,8 @@ Usage: ./bin/develop PORT --postgres mock-data|bootstrap
               mock-data or bootstrap. Required.
 
 Creates a fresh Postgres, seeds it, and
-serves. A change under web-app/, client/,
+serves. The seeded sign-ins print once the
+site is up. A change under web-app/, client/,
 or shared/ recomposes the site; reload the
 browser. Ctrl-C stops the server and runs:
   docker compose -p fusion-develop down
@@ -196,14 +197,24 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 docker compose down --remove-orphans
 docker compose up -d --wait postgres
-if ! deno run --frozen --allow-net \
-    --allow-env="$ALLOW_ENV" \
-    server/postgres-seed.ts "--$MODE"
+SEED_TEXT=''
+if ! SEED_TEXT="$(
+    deno run --frozen --allow-net \
+        --allow-env="$ALLOW_ENV" \
+        server/postgres-seed.ts "--$MODE"
+)"
 then
+    if [ -n "$SEED_TEXT" ]; then
+        printf '%s\n' "$SEED_TEXT"
+    fi
     exit 1
 fi
 bundle_client "$SITE"
 start_watcher
 echo
 echo "Serving on http://localhost:$PORT/"
+if [ -n "$SEED_TEXT" ]; then
+    echo
+    printf '%s\n' "$SEED_TEXT"
+fi
 run_server
