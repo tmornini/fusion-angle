@@ -62,6 +62,36 @@ Deno.test('landing has no how-it-works jump', () => {
     );
 });
 
+Deno.test('landing has no ai or pilot section', () => {
+    assertStrictEquals(
+        src.includes('href="#ai"'), false,
+    );
+    assertStrictEquals(
+        src.includes('href="#pilot"'), false,
+    );
+    assertStrictEquals(
+        src.includes('id="ai"'), false,
+    );
+    assertStrictEquals(
+        src.includes('id="pilot"'), false,
+    );
+    assertStrictEquals(
+        src.includes('buildAiSeat'), false,
+    );
+    assertStrictEquals(
+        src.includes('buildPilot'), false,
+    );
+    const landingCss = readRel(
+        '../web-app/app/styles/pages-landing.css',
+    );
+    assertStrictEquals(
+        landingCss.includes('navbar-link'), false,
+    );
+    assertStrictEquals(
+        landingCss.includes('cta-section'), false,
+    );
+});
+
 Deno.test('landing has no book-pilot control', () => {
     assertStrictEquals(
         src.includes('Book a pilot call'), false,

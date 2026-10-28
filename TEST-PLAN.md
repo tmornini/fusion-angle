@@ -1510,13 +1510,15 @@ the second organization.
 
 - [ ] **B1** Page renders the hero ("Fusion Angle is
   your Strategy-to-Change Engine."), the stalls
-  paragraph, the roadmap block labelled "Roadmap,
-  shaped with pilots", the three safety cards, and
-  the pilot section, and stays. Wait ~3 seconds.
+  paragraph, and the three safety cards, and stays.
+  The top bar has no AI or Pilot link, and the page
+  has no `#ai` or `#pilot` section. Wait ~3 seconds.
   PASS: still on `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
        shove to dashboard'; tests/browser/landing.test.ts
-       'unsigned landing stays and signs in'
+       'unsigned landing stays and signs in';
+       tests/landing-stay.test.ts 'landing has no ai
+       or pilot section'
 - [ ] **B2** "Book a pilot call" does not appear, and
   the page has no `[data-book-pilot]` anchor. PASS:
   zero matches. Drive by selector, never

@@ -63,16 +63,6 @@ function buildNavbar(): SafeHtml {
                         'navbar-logo-text'
                     }">Fusion Angle</span>
                 </a>
-                <div class="navbar-links">
-                    <a href="#ai"
-                        class="navbar-link">${
-                            'AI'
-                    }</a>
-                    <a href="#pilot"
-                        class="navbar-link">${
-                            'Pilot'
-                    }</a>
-                </div>
                 <div class="navbar-cta">
                     <button class="${
                         'btn btn-ghost'
@@ -95,17 +85,8 @@ function buildNavbar(): SafeHtml {
             <div class="${
                 'navbar-mobile-menu hidden'
             }" id="mobile-menu">
-                <a href="#ai"
-                    class="navbar-link">${
-                        'AI'
-                }</a>
-                <a href="#pilot"
-                    class="navbar-link">${
-                        'Pilot'
-                }</a>
                 <div class="${
-                    'flex flex-col '
-                    + 'gap-2 mt-4'
+                    'flex flex-col gap-2'
                 }">
                     <button class="${
                         'btn btn-ghost'
@@ -168,54 +149,6 @@ function buildStalls(): SafeHtml {
     </section>`;
 }
 
-function buildAiSeat(): SafeHtml {
-    return html`
-    <section id="ai" class="${
-        'features-section bg-background'
-    }">
-        <div class="container">
-            <div class="section-header">
-                <div class="${
-                    'badge badge-outline'
-                }">${
-                    'Roadmap, shaped with pilots'
-                }</div>
-                <h2>${
-                    'People and AI, same process,'
-                    + ' same rules'
-                }</h2>
-                <p>${
-                    'An AI member already holds a'
-                    + ' seat on the roster: a name, a'
-                    + ' skill focus, and the model'
-                    + ' behind it. You can name it on'
-                    + ' a step of a flow.'
-                }</p>
-                <p>${
-                    'Next comes the worker. It will'
-                    + ' claim a work order at its'
-                    + ' step, do the work under the'
-                    + ' same validation a person'
-                    + ' faces, leave its name on every'
-                    + ' change, and hand the order on.'
-                    + ' You will correct it in the'
-                    + ' same conversation you would'
-                    + ' have with a colleague, and'
-                    + ' record content will be data'
-                    + ' to it, never instruction.'
-                }</p>
-                <p>${
-                    'That is how an AI strategy gets'
-                    + ' executed safely: one step at'
-                    + ' a time, on a process you drew,'
-                    + ' with a ledger of what the'
-                    + ' agent did.'
-                }</p>
-            </div>
-        </div>
-    </section>`;
-}
-
 function buildSafety(): SafeHtml {
     return html`
     <section id="safety" class="${
@@ -243,47 +176,6 @@ function buildSafety(): SafeHtml {
                     <p>${card.body}</p>
                 </div>`,
                 )}
-            </div>
-        </div>
-    </section>`;
-}
-
-function buildPilot(): SafeHtml {
-    return html`
-    <section id="pilot" class="cta-section">
-        <div class="cta-bg"></div>
-        <div class="${
-            'cta-blob cta-blob-1'
-        }"></div>
-        <div class="${
-            'cta-blob cta-blob-2'
-        }"></div>
-        <div class="container">
-            <div class="cta-content">
-                <h2>${
-                    'Run a pilot with us'
-                }</h2>
-                <p>${
-                    'We are a small team with a'
-                    + ' working product and no'
-                    + ' customers yet. A pilot is'
-                    + ' one team, one real process,'
-                    + ' and the founders on the'
-                    + ' call. You get the system and'
-                    + ' a direct line to the people'
-                    + ' building it. We get the'
-                    + ' process that proves the next'
-                    + ' step. There is no pricing'
-                    + ' page. We work that out'
-                    + ' together.'
-                }</p>
-                <p>${
-                    'Already a member? '
-                }<a href="${
-                    '../auth/index.html'
-                }" data-goto-auth>${
-                    'Sign in'
-                }</a></p>
             </div>
         </div>
     </section>`;
@@ -334,9 +226,7 @@ export async function init(): Promise<void> {
         <main>
             ${buildHero()}
             ${buildStalls()}
-            ${buildAiSeat()}
             ${buildSafety()}
-            ${buildPilot()}
         </main>
         ${buildFooter()}
     </div>`);
