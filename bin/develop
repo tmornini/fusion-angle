@@ -1,6 +1,6 @@
 #!/bin/bash
 # Edit session. Creates a fresh Postgres, seeds it,
-# and serves. Return recomposes the site.
+# and serves. Return redeploys the server.
 # Exit, including Ctrl-C, takes the stack down.
 set -euo pipefail
 
@@ -14,8 +14,8 @@ Usage: ./bin/develop PORT --postgres mock-data|bootstrap
 
 Creates a fresh Postgres, seeds it, and
 serves. The seeded sign-ins print once the
-site is up. Press Return to rebundle the
-site, then reload the browser. Ctrl-C stops
+site is up. Press Return to redeploy, then
+reload the browser. Ctrl-C stops
 the server and runs:
   docker compose -p fusion-develop down
 
@@ -60,6 +60,7 @@ ALLOW_ENV="$ALLOW_ENV,TRUSTED_PROXY_HOPS"
 CLEANED=''
 LOOP_PID=''
 SERVER_PID=''
+RESTARTING=0
 
 session_paths() {
     SESSION_ROOT="${FUSION_DEVELOP_DIR:-}"
@@ -94,25 +95,49 @@ read_return() {
     # An explicit redirect keeps the terminal.
     # A bare background read would see /dev/null.
     while IFS= read -r _; do
-        echo "Rebundling. Reload the browser." >&2
+        echo "Redeploying. Reload the browser." >&2
         bundle_client "$SITE" </dev/null || true
+        kill -USR1 "$$" 2>/dev/null || true
     done <&0 &
     LOOP_PID=$!
 }
 
-run_server() {
+start_server() {
     deno run --frozen --allow-net \
         --allow-read="$SITE" \
         --allow-env="$ALLOW_ENV" \
         server/develop-main.ts "${SITE}/" \
         >> "$REQUEST_LOG" &
     SERVER_PID=$!
-    while kill -0 "$SERVER_PID" 2>/dev/null; do
-        sleep 0.2
+}
+
+stop_server() {
+    if [ -z "$SERVER_PID" ]; then
+        return
+    fi
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+    SERVER_PID=''
+}
+
+run_server() {
+    start_server
+    while true; do
+        if [ "$RESTARTING" = 1 ]; then
+            RESTARTING=0
+            stop_server
+            start_server
+            continue
+        fi
+        if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            local status=0
+            wait "$SERVER_PID" || status=$?
+            exit "$status"
+        fi
+        # A restart signal interrupts sleep. set -e
+        # must not treat that as a server failure.
+        sleep 0.2 || true
     done
-    local status=0
-    wait "$SERVER_PID" || status=$?
-    exit "$status"
 }
 
 for arg in "$@"; do
@@ -207,6 +232,7 @@ if [ -n "$SEED_TEXT" ]; then
     echo
     printf '%s\n' "$SEED_TEXT"
 fi
-echo "Press Return to rebundle the site."
+echo "Press Return to redeploy."
 echo "Request log: $REQUEST_LOG"
+trap 'RESTARTING=1' USR1
 run_server

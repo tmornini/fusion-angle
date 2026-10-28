@@ -176,9 +176,10 @@ async function runDevelop(
                     await child.status;
                     throw new Error('develop has no stdin');
                 }
-                const before = outdirCount(
-                    Deno.readTextFileSync(log),
-                );
+                const beforeText =
+                    Deno.readTextFileSync(log);
+                const before = outdirCount(beforeText);
+                const beforeMain = mainCount(beforeText);
                 const writer = stdin.getWriter();
                 await writer.write(
                     new TextEncoder().encode('\n'),
@@ -188,7 +189,8 @@ async function runDevelop(
                 let grew = false;
                 while (Date.now() < limit) {
                     const text = Deno.readTextFileSync(log);
-                    if (outdirCount(text) > before) {
+                    if (outdirCount(text) > before
+                        && mainCount(text) > beforeMain) {
                         grew = true;
                         break;
                     }
@@ -200,7 +202,7 @@ async function runDevelop(
                     child.kill('SIGTERM');
                     await child.status;
                     throw new Error(
-                        'return did not rebundle',
+                        'return did not redeploy',
                     );
                 }
             }
@@ -294,6 +296,11 @@ function denoArgs(run: DevelopRun): readonly string[] {
 function outdirCount(text: string): number {
     return text.split('\n').filter((line) =>
         line.includes('--outdir')).length;
+}
+
+function mainCount(text: string): number {
+    return text.split('\n').filter((line) =>
+        line.includes('develop-main.ts')).length;
 }
 
 Deno.test('develop with no args exits 1 with usage',
@@ -512,7 +519,7 @@ async () => {
     assertMatch(run.stderr, /Usage: develop-main\.ts dir\//);
 });
 
-Deno.test('return recomposes the site', async () => {
+Deno.test('return redeploys the server', async () => {
     const run = await runDevelop(
         ['8080', '--postgres', 'mock-data'],
         { holdMain: true, pressReturn: true },
@@ -525,7 +532,14 @@ Deno.test('return recomposes the site', async () => {
             line.includes('--outdir')).length,
         2,
     );
-    assertMatch(run.stderr, /Rebundling/);
+    assertEquals(
+        denoArgs(run).filter((line) =>
+            line.includes('server/develop-main.ts'))
+            .length,
+        2,
+    );
+    assertMatch(run.stderr, /Redeploying/);
+    assertMatch(run.stdout, /Press Return to redeploy/);
     assert(denoArgs(run).every((line) =>
         !line.includes('server/develop-watch.ts')));
     assertEquals(
