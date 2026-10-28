@@ -1508,12 +1508,13 @@ the second organization.
 
 ### Landing Page (`landing/`)
 
-- [ ] **B1** Page renders the hero ("Ideas are easy.
-  Execution is hard."), the stalls paragraph, the
-  five-step pipeline, the roadmap block labelled
-  "Roadmap, shaped with pilots", the three safety
-  cards, and the pilot section, and stays. Wait ~3
-  seconds. PASS: still on `landing/index.html`.
+- [ ] **B1** Page renders the hero ("Fusion Angle is
+  your Strategy-to-Change Engine."), the stalls
+  paragraph, the five-step pipeline, the roadmap
+  block labelled "Roadmap, shaped with pilots", the
+  three safety cards, and the pilot section, and
+  stays. Wait ~3 seconds. PASS: still on
+  `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
        shove to dashboard'; tests/browser/landing.test.ts
        'unsigned landing stays, books, and signs in'

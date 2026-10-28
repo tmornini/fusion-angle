@@ -203,19 +203,18 @@ function buildHero(): SafeHtml {
                 <h1 class="${
                     'animate-fade-in-up'
                 }">${
-                    'Ideas are easy. Execution is hard.'
+                    'Fusion Angle is your '
+                    + 'Strategy-to-Change Engine'
                 }</h1>
                 <p class="${
                     'hero-subtitle '
                     + 'animate-fade-in-up'
                 }">${
-                    'Fusion Angle takes an idea to'
-                    + ' execution in one system: the'
-                    + ' case, the approval, the'
-                    + ' project, and the process that'
-                    + ' moves the work. For teams that'
-                    + ' have an AI strategy and need a'
-                    + ' place to execute it safely.'
+                    'Ideas are easy and execution '
+                    + 'is hard. We make it easy to '
+                    + 'align ideas with strategy '
+                    + 'and get them implemented '
+                    + 'quickly.'
                 }</p>
                 <div class="${
                     'hero-buttons '
