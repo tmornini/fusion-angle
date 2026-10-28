@@ -12,8 +12,6 @@ import {
 } from '../app/icons.ts';
 import { putLocation } from '../app/adapters/index.ts';
 
-export const PILOT_SCHEDULING_URL = '';
-
 const STALLS = [
     'The idea never becomes a case, so nobody can'
         + ' decide.',
@@ -51,14 +49,6 @@ const SAFETY = [
     },
 ] as const;
 
-function bookPilot(className: string): SafeHtml {
-    return html`<a class="${className}"
-        data-book-pilot
-        href="${PILOT_SCHEDULING_URL}">${
-            'Book a pilot call'
-        }</a>`;
-}
-
 function buildNavbar(): SafeHtml {
     return html`
     <nav class="navbar" id="navbar">
@@ -90,7 +80,6 @@ function buildNavbar(): SafeHtml {
                         data-goto-auth>${
                             'Sign In'
                     }</button>
-                    ${bookPilot('btn btn-primary')}
                 </div>
                 <button class="${
                     'navbar-mobile-toggle'
@@ -124,7 +113,6 @@ function buildNavbar(): SafeHtml {
                         data-goto-auth>${
                             'Sign In'
                     }</button>
-                    ${bookPilot('btn btn-primary')}
                 </div>
             </div>
         </div>
@@ -159,14 +147,6 @@ function buildHero(): SafeHtml {
                     + 'and get them implemented '
                     + 'quickly.'
                 }</p>
-                <div class="${
-                    'hero-buttons '
-                    + 'animate-fade-in-up'
-                }">
-                    ${bookPilot(
-                        'btn btn-accent btn-xl',
-                    )}
-                </div>
             </div>
         </div>
     </section>`;
@@ -297,11 +277,6 @@ function buildPilot(): SafeHtml {
                     + ' page. We work that out'
                     + ' together.'
                 }</p>
-                <div class="cta-buttons">
-                    ${bookPilot(
-                        'btn btn-accent btn-xl',
-                    )}
-                </div>
                 <p>${
                     'Already a member? '
                 }<a href="${

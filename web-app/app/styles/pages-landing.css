@@ -176,16 +176,6 @@
 
 @media (min-width: 640px) { .hero-subtitle { font-size: var(--text-xl); } }
 
-.hero-buttons {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-4);
-}
-
-@media (min-width: 640px) { .hero-buttons { flex-direction: row; } }
-
 .features-section {
     padding: 6rem 0;
 }
@@ -299,17 +289,6 @@
     margin-left: auto;
     margin-right: auto;
 }
-
-.cta-buttons {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-4);
-}
-
-@media (min-width: 640px) { .cta-buttons { flex-direction: row; } }
-
 
 .footer {
     padding: var(--space-16) 0;

@@ -1516,21 +1516,13 @@ the second organization.
   PASS: still on `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
        shove to dashboard'; tests/browser/landing.test.ts
-       'unsigned landing stays, books, and signs in'
-- [ ] **B2** "Book a pilot call" appears four times
-  (navbar, mobile menu, hero, pilot section) as
-  anchors carrying `data-book-pilot`. Their `href`
-  attribute is `PILOT_SCHEDULING_URL` from
-  `web-app/landing/index.ts`, the empty string until
-  the operator names a scheduling URL. Read it with
-  `getAttribute('href')`: the `href` property resolves
-  `''` to the page's own URL. PASS: four anchors, each
-  `getAttribute('href')` is `''`. Do not click a
-  `data-book-pilot` anchor in the walk: it leaves the
-  origin. Drive by selector, never `.navbar-logo`
-  (Apple menu).
-  Pin: tests/browser/landing.test.ts 'unsigned landing
-       stays, books, and signs in'
+       'unsigned landing stays and signs in'
+- [ ] **B2** "Book a pilot call" does not appear, and
+  the page has no `[data-book-pilot]` anchor. PASS:
+  zero matches. Drive by selector, never
+  `.navbar-logo` (Apple menu).
+  Pin: tests/landing-stay.test.ts 'landing has no
+       book-pilot control'
 - [ ] **B3** "Sign In" button is present and navigates to `auth/index.html`. PASS: button exists with correct target.
   Drive `[data-goto-auth]`, never `.navbar-logo`
   (Apple menu; same as B2).

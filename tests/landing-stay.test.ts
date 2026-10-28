@@ -61,3 +61,34 @@ Deno.test('landing has no how-it-works jump', () => {
         buttons.includes('btn-outline-hero'), false,
     );
 });
+
+Deno.test('landing has no book-pilot control', () => {
+    assertStrictEquals(
+        src.includes('Book a pilot call'), false,
+    );
+    assertStrictEquals(
+        src.includes('data-book-pilot'), false,
+    );
+    assertStrictEquals(
+        src.includes('PILOT_SCHEDULING_URL'), false,
+    );
+    assertStrictEquals(
+        src.includes('bookPilot'), false,
+    );
+    const landingCss = readRel(
+        '../web-app/app/styles/pages-landing.css',
+    );
+    assertStrictEquals(
+        landingCss.includes('hero-buttons'), false,
+    );
+    assertStrictEquals(
+        landingCss.includes('cta-buttons'), false,
+    );
+    const buttons = readRel(
+        '../web-app/app/styles/'
+            + 'components-buttons.css',
+    );
+    assertStrictEquals(
+        buttons.includes('btn-accent'), false,
+    );
+});
