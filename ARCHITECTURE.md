@@ -43,6 +43,13 @@ recreate `public`, re-grant. Missing
 `schema_marker` refuses with `schema_marker
 absent; seed with ./bin/postgres-seed`. One
 mint process — do not run two replicas.
+`./bin/develop` is the edit session, not a
+fourth verb. It `deno run`s the same
+`dispatch` against a directory
+`bundle_client` writes, and reads that
+directory on each request. Return
+recomposes it. Exit takes its compose
+project down.
 
 `./deploy` is the operator path. Compose
 keeps `:?required`; `./deploy` mints before

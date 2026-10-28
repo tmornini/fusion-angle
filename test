@@ -33,9 +33,9 @@ cd "$ROOT"
 # skips), read (fixtures, scripts, source walkers),
 # write (temp dirs for the HTTP tests), net (127.0.0.1
 # listeners), run (the metafile test now spawns deno;
-# serve, deploy, test, measure, and postgres-gun CLI
-# pins spawn those scripts; test-cli's git SHA skip
-# uses sh).
+# serve, develop, deploy, test, measure, and
+# postgres-gun CLI pins spawn those scripts;
+# test-cli's git SHA skip uses sh).
 run_memory() {
     JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
     export JWT_HMAC_SIGNING_KEY
@@ -43,6 +43,7 @@ run_memory() {
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-wipe"
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-seed"
     ALLOW_RUN="$ALLOW_RUN,./bin/measure"
+    ALLOW_RUN="$ALLOW_RUN,./bin/develop"
     DENO_TEST=(
         deno test --frozen --no-check
         --sanitize-ops --sanitize-resources
@@ -76,6 +77,7 @@ run_lint() {
             -exec awk "$AWK_LINT" {} +
         awk "$AWK_LINT" test deploy \
             bin/build bin/build-lib bin/serve \
+            bin/develop \
             bin/test-postgres bin/test-browser \
             bin/generate-schema-svg \
             bin/generate-api-documentation \

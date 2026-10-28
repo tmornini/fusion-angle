@@ -1,16 +1,14 @@
-import { assert, assertStrictEquals } from '@std/assert';
+import { assert } from '@std/assert';
 import {
     stays,
     startOrigin,
     useBrowser,
 } from './fixtures.ts';
-import { PILOT_SCHEDULING_URL } from
-    '../../web-app/landing/index.ts';
 
 const browser = useBrowser();
 
 Deno.test(
-    'unsigned landing stays, books, and signs in',
+    'unsigned landing stays and signs in',
 async () => {
     const origin = await startOrigin();
     try {
@@ -19,21 +17,10 @@ async () => {
             await page.navigate(
                 origin.baseUrl + '/landing/index.html',
             );
-            await page.waitFor('[data-book-pilot]');
+            await page.waitFor('[data-goto-auth]');
             await stays(
                 page, 'location.pathname', 3_000,
             );
-            const hrefs = await page.evaluate<string[]>(
-                `[...document.querySelectorAll(
-                    '[data-book-pilot]')]
-                    .map(a => a.getAttribute('href'))`,
-            );
-            assertStrictEquals(hrefs.length, 4);
-            for (const href of hrefs) {
-                assertStrictEquals(
-                    href, PILOT_SCHEDULING_URL,
-                );
-            }
             await page.click('[data-goto-auth]');
             const path = await page.until<string>(
                 `location.pathname.includes('/auth/')

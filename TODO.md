@@ -1713,10 +1713,8 @@ Off the critical path; each with its oracle.
   ends with the other. Oracle: a walk scores J1 and
   J2 from the text alone, with no `kill` in the
   master's transcript.
-- Walk wording left over from `walk-b2-j1`. B2 says
-  the "See how it works" scroll twice (`:1498`,
-  `:1500`) and leaves an 18-column line, "origin.
-  Drive by" (`:1503`). Step 2 names the A3 launch
+- Walk wording left over from `walk-b2-j1`. Step 2
+  names the A3 launch
   after "Red anywhere aborts the walk" (`:51`), not
   first, and quotes the deploy command twice (`:49`,
   `:55`; the second makes "and nothing else"

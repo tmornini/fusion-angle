@@ -539,9 +539,12 @@ body. The code grant's 401 wire body is
 `{"error":"invalid_grant"}`. `wireGrantError` maps
 that from `invalid or used authorization code`, maps
 a client_credentials replay of `invalid_grant` to
-the same body, and maps a failure that starts with
-`invalid client_assertion` to `invalid_client`. The
-token door's other 401 strings pass through:
+the same body, maps `missing refresh token` to the
+same body, and maps a failure that starts with
+`invalid client_assertion` to `invalid_client`. An
+absent refresh cookie is that missing-token grant,
+and the token door does not log it. The token
+door's other 401 strings pass through:
 `unknown client`, `client is disabled`,
 `refresh token reuse or unknown`, `token revoked`,
 `token chain revoked`,

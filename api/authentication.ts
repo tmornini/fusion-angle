@@ -161,6 +161,7 @@ export function wireGrantError(error: string): string {
         error === 'invalid credentials'
         || error === 'invalid or used authorization code'
         || error === 'invalid_grant'
+        || error === 'missing refresh token'
     ) {
         return 'invalid_grant';
     }
@@ -1091,6 +1092,13 @@ async function grantRefresh(
     const token = refreshTokenFromCookieHeader(
         request.headers.get('cookie'),
     );
+    // An empty cookie is the anonymous probe. It is not
+    // a malformed credential.
+    if (token === '') {
+        return failure(
+            HTTP_UNAUTHORIZED, 'missing refresh token',
+        );
+    }
     const now = nowEpochSeconds();
     const verified = await verifyAccessToken(token, now);
     if (!verified.valid) {

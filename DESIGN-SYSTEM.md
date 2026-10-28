@@ -36,8 +36,8 @@ truth. Tones: `primary`, `success`, `warning`, `error`,
 ## Components
 
 Buttons: `btn-primary`, `secondary`, `outline`, `ghost`,
-`destructive`, `success`, `accent`, `hero`,
-`outline-hero`, `outline-light`, `outline-error`,
+`destructive`, `success`, `hero`,
+`outline-light`, `outline-error`,
 `.link`. Cards: `.card`, `.card-flat`. Badges:
 `.status-badge-success`, `.status-badge-warning`,
 `.status-badge-error`.
