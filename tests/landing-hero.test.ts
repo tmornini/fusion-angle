@@ -50,7 +50,7 @@ Deno.test('landing hero states the engine', () => {
     assertStrictEquals(
         slot(hero, 'p'),
         'Ideas are easy and execution is hard. '
-            + 'We make it easy to align ideas with '
+            + 'We make it easy to align ideas to '
             + 'strategy and get them implemented '
             + 'quickly.',
     );

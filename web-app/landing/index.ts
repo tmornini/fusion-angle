@@ -143,7 +143,7 @@ function buildHero(): SafeHtml {
                 }">${
                     'Ideas are easy and execution '
                     + 'is hard. We make it easy to '
-                    + 'align ideas with strategy '
+                    + 'align ideas to strategy '
                     + 'and get them implemented '
                     + 'quickly.'
                 }</p>
