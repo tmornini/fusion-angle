@@ -758,10 +758,47 @@ async () => {
 Deno.test('an invalid refresh token is a 401 no-op', async () => {
     const db = await freshDb();
     const before = (await db.messagePairs.getAll()).length;
-    const res = await handleRequest(db, tokenRequest({
-        grant_type: 'refresh', refresh_token: 'not.a.jwt',
-    }));
+    const { result: res, calls } = await captureConsole(
+        'warn',
+        () => handleRequest(db, tokenRequest({
+            grant_type: 'refresh',
+            refresh_token: 'not.a.jwt',
+        })),
+    );
     assertStrictEquals(res.status, 401);
+    assertEquals(
+        await presentedFields(res),
+        { error: 'invalid refresh token: bad signature' },
+    );
+    assert(
+        calls.some(args =>
+            args.includes('authentication failed')),
+        'a presented bad refresh token must warn',
+    );
+    assertStrictEquals(
+        (await db.messagePairs.getAll()).length, before);
+});
+
+Deno.test('an anonymous refresh probe is a quiet 401',
+async () => {
+    const db = await freshDb();
+    const before = (await db.messagePairs.getAll()).length;
+    const { result: res, calls } = await captureConsole(
+        'warn',
+        () => handleRequest(db, tokenRequest({
+            grant_type: 'refresh',
+        })),
+    );
+    assertStrictEquals(res.status, 401);
+    assertEquals(
+        await presentedFields(res),
+        { error: 'invalid_grant' },
+    );
+    assert(
+        !calls.some(args =>
+            args.includes('authentication failed')),
+        'an anonymous refresh probe must stay quiet',
+    );
     assertStrictEquals(
         (await db.messagePairs.getAll()).length, before);
 });

@@ -1230,15 +1230,23 @@ async function dispatched(
                     if (!dispatched.ok) {
                         if (dispatched.status
                             === HTTP_UNAUTHORIZED) {
-                            console.warn(
-                                'authentication failed',
-                                {
-                                    requestId: ctx.requestId,
-                                    operationId:
-                                        ctx.operationId,
-                                    reason: dispatched.error,
-                                },
-                            );
+                            // No cookie is the anonymous
+                            // probe, not a bad credential.
+                            if (dispatched.error
+                                !== 'missing refresh token'
+                            ) {
+                                console.warn(
+                                    'authentication failed',
+                                    {
+                                        requestId:
+                                            ctx.requestId,
+                                        operationId:
+                                            ctx.operationId,
+                                        reason:
+                                            dispatched.error,
+                                    },
+                                );
+                            }
                             return Response.json(
                                 {
                                     error: wireGrantError(
