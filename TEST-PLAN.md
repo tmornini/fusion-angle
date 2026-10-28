@@ -1510,11 +1510,10 @@ the second organization.
 
 - [ ] **B1** Page renders the hero ("Fusion Angle is
   your Strategy-to-Change Engine."), the stalls
-  paragraph, the five-step pipeline, the roadmap
-  block labelled "Roadmap, shaped with pilots", the
-  three safety cards, and the pilot section, and
-  stays. Wait ~3 seconds. PASS: still on
-  `landing/index.html`.
+  paragraph, the roadmap block labelled "Roadmap,
+  shaped with pilots", the three safety cards, and
+  the pilot section, and stays. Wait ~3 seconds.
+  PASS: still on `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
        shove to dashboard'; tests/browser/landing.test.ts
        'unsigned landing stays, books, and signs in'
@@ -1525,13 +1524,11 @@ the second organization.
   `web-app/landing/index.ts`, the empty string until
   the operator names a scheduling URL. Read it with
   `getAttribute('href')`: the `href` property resolves
-  `''` to the page's own URL. "See how it works"
-  scrolls to `#how-it-works`. PASS: four anchors, each
-  `getAttribute('href')` is `''`, and "See how it
-  works" scrolls to `#how-it-works`. Do not click a
+  `''` to the page's own URL. PASS: four anchors, each
+  `getAttribute('href')` is `''`. Do not click a
   `data-book-pilot` anchor in the walk: it leaves the
-  origin. Drive by
-  selector, never `.navbar-logo` (Apple menu).
+  origin. Drive by selector, never `.navbar-logo`
+  (Apple menu).
   Pin: tests/browser/landing.test.ts 'unsigned landing
        stays, books, and signs in'
 - [ ] **B3** "Sign In" button is present and navigates to `auth/index.html`. PASS: button exists with correct target.

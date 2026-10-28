@@ -17,15 +17,6 @@
 }
 .btn-accent:hover { filter: brightness(0.95); }
 
-.btn-outline-hero {
-    border: 1px solid hsl(var(--border));
-    background-color: transparent;
-    color: hsl(var(--foreground));
-}
-.btn-outline-hero:hover {
-    background-color: hsl(var(--secondary));
-}
-
 .btn-outline-light {
     border: 1px solid hsl(var(--primary-foreground) / 0.3);
     background-color: hsl(var(--primary-foreground) / 0.1);

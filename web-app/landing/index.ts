@@ -23,55 +23,6 @@ const STALLS = [
         + ' see where it piles up.',
 ] as const;
 
-const PIPELINE = [
-    {
-        number: '01',
-        title: 'Ideas',
-        description:
-            'An idea is captured as a case: the'
-            + ' problem, the target users, the'
-            + ' proposed solution, the expected'
-            + ' outcome, and the metrics that'
-            + ' would prove it.',
-    },
-    {
-        number: '02',
-        title: 'Objectives and approval',
-        description:
-            'Converting an idea scores it against'
-            + " your organization's objectives,"
-            + ' sets a budget and a duration, and'
-            + ' makes it a project. The score stays'
-            + ' on the record.',
-    },
-    {
-        number: '03',
-        title: 'Projects',
-        description:
-            'A project tracks progress, dates, and'
-            + ' cost against plan. Actuals roll up'
-            + ' to the objectives it was approved'
-            + ' against.',
-    },
-    {
-        number: '04',
-        title: 'Flows',
-        description:
-            'Draw the process on a canvas, bind it'
-            + ' to a typed Record, publish it, and'
-            + ' it runs.',
-    },
-    {
-        number: '05',
-        title: 'Workbox',
-        description:
-            'A member claims a work order, satisfies'
-            + ' the fields its step requires, and'
-            + ' transitions it. A heat map shows'
-            + ' where work piles up.',
-    },
-] as const;
-
 const SAFETY = [
     {
         title: 'Nothing is overwritten.',
@@ -123,10 +74,6 @@ function buildNavbar(): SafeHtml {
                     }">Fusion Angle</span>
                 </a>
                 <div class="navbar-links">
-                    <a href="#how-it-works"
-                        class="navbar-link">${
-                            'How it works'
-                    }</a>
                     <a href="#ai"
                         class="navbar-link">${
                             'AI'
@@ -159,10 +106,6 @@ function buildNavbar(): SafeHtml {
             <div class="${
                 'navbar-mobile-menu hidden'
             }" id="mobile-menu">
-                <a href="#how-it-works"
-                    class="navbar-link">${
-                        'How it works'
-                }</a>
                 <a href="#ai"
                     class="navbar-link">${
                         'AI'
@@ -223,14 +166,6 @@ function buildHero(): SafeHtml {
                     ${bookPilot(
                         'btn btn-accent btn-xl',
                     )}
-                    <a class="${
-                        'btn btn-outline-hero'
-                        + ' btn-xl'
-                    }" href="${
-                        '#how-it-works'
-                    }">${
-                        'See how it works'
-                    }</a>
                 </div>
             </div>
         </div>
@@ -248,52 +183,6 @@ function buildStalls(): SafeHtml {
                     'Most ideas do not fail. They stall.'
                 }</h2>
                 <p>${STALLS.join(' ')}</p>
-            </div>
-        </div>
-    </section>`;
-}
-
-function buildPipeline(): SafeHtml {
-    return html`
-    <section id="how-it-works"
-        class="${
-            'how-it-works-section'
-        }">
-        <div class="container">
-            <div class="section-header">
-                <h2>${
-                    'Idea to execution, one system'
-                }</h2>
-                <p>${
-                    'Every step ships today, under'
-                    + ' the names you will see in'
-                    + ' the product.'
-                }</p>
-            </div>
-            <div class="steps-list">
-                ${PIPELINE.map(
-                    stepData => html`
-                <div class="step">
-                    <div class="${
-                        'step-number'
-                    }">
-                        <span>${
-                            stepData.number
-                        }</span>
-                    </div>
-                    <div class="${
-                        'card card-flat '
-                        + 'step-content p-6'
-                    }">
-                        <h3>${
-                            stepData.title
-                        }</h3>
-                        <p>${
-                            stepData.description
-                        }</p>
-                    </div>
-                </div>`,
-                )}
             </div>
         </div>
     </section>`;
@@ -470,7 +359,6 @@ export async function init(): Promise<void> {
         <main>
             ${buildHero()}
             ${buildStalls()}
-            ${buildPipeline()}
             ${buildAiSeat()}
             ${buildSafety()}
             ${buildPilot()}
