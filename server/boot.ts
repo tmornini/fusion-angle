@@ -108,7 +108,6 @@ export async function boot(
     const adapter = new BackedDbAdapter(
         new PostgresBackend(sql),
         async () => {},
-        async () => {},
         () => {},
     );
     const listener = await listenHttp({

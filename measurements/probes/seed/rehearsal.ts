@@ -94,7 +94,6 @@ if (url !== undefined) {
     const adapter = new BackedDbAdapter(
         new PostgresBackend(sql),
         async () => {},
-        async () => {},
         () => {},
     );
     try {

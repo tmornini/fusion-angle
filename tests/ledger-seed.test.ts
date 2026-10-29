@@ -572,7 +572,7 @@ function adapterOver(
     backend: MemoryStorageBackend,
 ): BackedDbAdapter {
     return new BackedDbAdapter(
-        backend, async () => {}, async () => {}, () => {},
+        backend, async () => {}, () => {},
     );
 }
 

@@ -502,7 +502,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const db = new BackedDbAdapter(
         backend,
         async () => {},
-        async () => {},
         () => {},
     );
 
@@ -532,7 +531,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         const paused = new BackedDbAdapter(
             seam.backend,
-            async () => {},
             async () => {},
             () => {},
         );
@@ -886,7 +884,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const rosterDb = new BackedDbAdapter(
             new PostgresBackend(rosterSeam.client),
             async () => {},
-            async () => {},
             () => {},
         );
         const flowSql = clientNamed(PAUSED_FLOW);
@@ -895,7 +892,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         const flowDb = new BackedDbAdapter(
             flowSeam.backend,
-            async () => {},
             async () => {},
             () => {},
         );

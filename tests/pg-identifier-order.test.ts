@@ -159,7 +159,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             const postgres = new BackedDbAdapter(
                 backend,
                 async () => {},
-                async () => {},
                 () => {},
             );
             const memory = memoryDbAdapter();
