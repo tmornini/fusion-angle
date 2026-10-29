@@ -17,13 +17,8 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { latestActionForJti } from '../shared/identity-tokens.ts';
 import {
-    runWrite,
-    attemptFor,
-    formAuthMessagePair,
-    formWriteMessagePair,
     responseFromLatin1,
 } from '../api/message-pair.ts';
-import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import {
     exchangeBearerForOrganization,
     rotateRefreshJti,
@@ -40,9 +35,10 @@ import {
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
+import type { IdentityTokenEntity } from '../shared/types.ts';
 import {
-    nowUtc, type IdentityTokenEntity,
-} from '../shared/types.ts';
+    seedAuthorizationCodeMessagePair,
+} from './authorization-code-fixtures.ts';
 import {
     deriveIdentityToken,
     deriveIdentityTokensFor,
@@ -501,87 +497,6 @@ async function assertRootEventMessagePair(
     const eventBody =
         await responseFromLatin1(eventResponse.response).json();
     assertEquals(eventBody, root satisfies IdentityTokenEntity);
-}
-
-// Below-facade pair formation, mirroring authorizePassword's OWN
-// storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
-// 's pre-tx lookup reads by body containment the
-// '/authentication/authorize/' response
-// family for a stored pair whose `code` field equals the
-// presented code, so a bare pair — the SAME
-// shape a real login forms (Phase 13 Task 9: the authorization_
-// codes row half retired) — is all a seed needs.
-async function seedAuthorizationCodeMessagePair(
-    db: MemoryDbAdapter,
-    code: string,
-    identityId: string,
-    clientId: string,
-): Promise<void> {
-    // Fresh `at` (nowUtc): authorization_code TTL is 10 min;
-    // a fixed historical AT would expire before the grant.
-    const seed: AuthMessagePairSeed = {
-        requestAt: nowUtc(),
-        headerFields: [],
-        method: 'POST',
-        pathname: '/authentication/authorize',
-        routePattern: 'authentication/authorize',
-        routeSegments: ['authentication', 'authorize'],
-        pathSegments: ['authentication', 'authorize'],
-        bodyBytes: new Uint8Array(),
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    };
-    const requestBody = {
-        method: 'password', username: 'seed@example.com',
-        password: 'seed-password', client_id: clientId,
-    };
-    const messagePair = await formAuthMessagePair(
-        {
-            ...seed,
-            bodyBytes: new TextEncoder().encode(
-                JSON.stringify(requestBody),
-            ),
-        },
-        requestBody, identityId, undefined,
-        seed.operationId, seed.requestId,
-        [{
-            name: 'authentication-info',
-            value: 'code="' + code + '"',
-        }],
-    );
-    const codeName = await sha256Hex(code);
-    const codePair = await formWriteMessagePair({
-        method: 'PUT',
-        pathname: '/authentication/authorization-codes/'
-            + codeName,
-        routePattern:
-            'authentication/authorization-codes/:hash',
-        routeSegments: [
-            'authentication',
-            'authorization-codes',
-            ':hash',
-        ],
-        pathSegments: [
-            'authentication',
-            'authorization-codes',
-            codeName,
-        ],
-        headerFields: [],
-        body: undefined,
-        requesterIdentityId: identityId,
-        requestAt: seed.requestAt,
-        organization: undefined,
-        responseBody: { client_id: clientId },
-        operationId: seed.operationId,
-        requestId: seed.requestId,
-        genesis: 'handler',
-        emptyRequest: true,
-    });
-    await runWrite(
-        db,
-        attemptFor([codePair, messagePair]),
-        [codePair, messagePair],
-    );
 }
 
 Deno.test('an authorization_code grant appends its root\'s own'
