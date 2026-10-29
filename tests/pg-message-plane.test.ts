@@ -8,15 +8,8 @@ import { handleRequest } from '../api/api.ts';
 import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
-import type { DbAdapter } from '../api/db.ts';
-import {
-    attemptFor,
-    formWriteMessagePair,
-    runWrite,
-} from '../api/message-pair.ts';
 import { connectPostgres } from
     '../api/postgres-client.ts';
-import { nowUtc } from '../shared/types.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
 import { generateIdentifier } from
@@ -37,6 +30,7 @@ import { testHashPassword } from './mock-seed.ts';
 import { organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { plantDelete } from './plant-delete-fixture.ts';
 
 // Status overlay pins. Skip when POSTGRES_URL is
 // unset so ./test validate stays Postgres-free.
@@ -110,46 +104,6 @@ function req(
     body: unknown,
 ): Request {
     return apiRequest({ method, path, token, body });
-}
-
-// ideas/:id has no DELETE route. The head is planted
-// as a successor of the live PUT, not a second genesis.
-async function plantDelete(
-    db: DbAdapter,
-    pathname: string,
-): Promise<void> {
-    const pathSegments = pathname
-        .replace(/^\/+/, '')
-        .split('/');
-    const organization = pathSegments[1];
-    if (
-        pathSegments.length !== 4
-        || organization === undefined
-    ) {
-        throw new Error('not an idea document path');
-    }
-    const messagePair = await formWriteMessagePair({
-        method: 'DELETE',
-        pathname,
-        routePattern: 'organizations/:id/ideas/:id',
-        routeSegments: [
-            'organizations', ':id', 'ideas', ':id',
-        ],
-        pathSegments,
-        headerFields: [],
-        body: undefined,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: nowUtc(),
-        organization,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await runWrite(
-        db,
-        attemptFor([messagePair]),
-        [messagePair],
-    );
 }
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {

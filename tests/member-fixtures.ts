@@ -33,6 +33,9 @@ import { membershipNameOf } from
 import { responseMessage } from './fixtures/response-message.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
+import {
+    identityPiiDocumentMessagePair,
+} from './identity-fixtures.ts';
 
 // The catalog's first model — the fixture default.
 export function firstProviderModel() {
@@ -157,37 +160,6 @@ async function identityDocumentMessagePair(
         organization: undefined,
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
-        ),
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-}
-
-async function identityPiiDocumentMessagePair(
-    id: Id,
-    pii: Record<string, unknown>,
-    requestAt: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['identities/:id/pii'];
-    if (spec === undefined || !('conditional' in spec)) {
-        throw new Error(
-            'no per-write response spec for'
-            + ' identities/:id/pii',
-        );
-    }
-    return formWriteMessagePair({
-        method: 'PUT',
-        pathname: `/identities/${id}/pii`,
-        routePattern: 'identities/:id/pii',
-        routeSegments: ['identities', ':id', 'pii'],
-        pathSegments: ['identities', id, 'pii'],
-        headerFields: [],
-        body: pii,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt,
-        organization: undefined,
-        responseBody: spec.successBody?.(
-            [id], pii, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: generateIdentifier(),
         requestId: generateIdentifier(),
