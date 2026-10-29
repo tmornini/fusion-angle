@@ -293,10 +293,9 @@ export interface DbStores {
     messagePairs: EntityStore<MessagePairEntity>;
 }
 
-// Schema/connection lifecycle — the non-row surface every
-// adapter face serves identically.
+// Schema lifecycle — the non-row surface every adapter
+// face serves identically.
 export interface DbLifecycle {
-    initialize(): Promise<void>;
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
@@ -309,11 +308,9 @@ export interface DbLifecycle {
         rows: readonly StatementBind[],
         now?: string,
     ): Promise<StatementAnswer[]>;
-    // The Decision 5 post hook: fired AFTER a write commits,
-    // so cross-tab (and future cross-process) subscribers are
-    // informed of state changes — never polled. Carried on the
-    // COMMON ancestor of DbAdapter and GuardedDbAdapter so
-    // both the open-client view and plain adapters type-check.
+    // Fired AFTER a write commits, so cross-tab (and future
+    // cross-process) subscribers are informed of state
+    // changes — never polled.
     postNotification: NotificationPost;
 }
 
@@ -325,13 +322,6 @@ export interface DbAdapter extends DbLifecycle, DbStores {
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
 }
-
-// The unfenced tier: same stores as DbAdapter. Phase Final
-// Task 5 retired the guarded write capability (putGuarded
-// family) with the store decorator shell — surviving tables
-// never soft-delete. clients-table elimination retired the
-// rawReadRow primary-key probe with the clients store.
-export interface GuardedDbAdapter extends DbAdapter {}
 
 // The tables of the message plane — one,
 // `fa_message_pairs`.

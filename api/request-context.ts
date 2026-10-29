@@ -1,4 +1,4 @@
-import type { GuardedDbAdapter } from './db.ts';
+import type { DbAdapter } from './db.ts';
 import { nowUtc, type Id } from '../shared/types.ts';
 import type { Principal } from './access-token.ts';
 import { generateIdentifier } from
@@ -38,7 +38,7 @@ export interface IncomingContext {
     // org-scoped decorator shell; handlers receive this base
     // adapter. Pair-plane tenancy rides path, not a
     // store fence.
-    readonly base: GuardedDbAdapter;
+    readonly base: DbAdapter;
     // The ARRIVAL stamp: minted here, gate entry, as early as
     // the request is observable — the message plane's requests
     // row keeps it verbatim (api/message-pair.ts). nowUtc() is
@@ -79,7 +79,7 @@ export interface RequestContext extends AuthenticatedContext {
 }
 
 export async function incomingContext(
-    base: GuardedDbAdapter,
+    base: DbAdapter,
     request: Request,
 ): Promise<IncomingContext> {
     const bodyBytes = new Uint8Array(

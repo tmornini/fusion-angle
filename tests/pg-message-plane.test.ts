@@ -168,7 +168,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const db = new BackedDbAdapter(
         backend,
         async () => {},
-        async () => {},
         () => {},
     );
 

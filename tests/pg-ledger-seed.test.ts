@@ -182,7 +182,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     );
 
     const adapter = new BackedDbAdapter(
-        backend, async () => {}, async () => {}, () => {},
+        backend, async () => {}, () => {},
     );
     const quiet = {
         hashPassword: testHashPassword,

@@ -114,7 +114,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         async () => {
             queries.length = 0;
             const adapter = new BackedDbAdapter(
-                backend, async () => {}, async () => {},
+                backend, async () => {},
                 () => {},
             );
             await adapter.messagePairs.getCollectionPairs(

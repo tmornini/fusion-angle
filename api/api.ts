@@ -1,7 +1,4 @@
-import type {
-    DbAdapter,
-    GuardedDbAdapter,
-} from './db.ts';
+import type { DbAdapter } from './db.ts';
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
@@ -179,7 +176,7 @@ function requireWrite(
 }
 
 function postWriteNotification(
-    adapter: GuardedDbAdapter,
+    adapter: DbAdapter,
     routePattern: string,
     params: readonly string[],
     body: Record<string, unknown> | undefined,
@@ -444,7 +441,7 @@ function finish(
 }
 
 export async function handleRequest(
-    adapter: GuardedDbAdapter,
+    adapter: DbAdapter,
     request: Request,
 ): Promise<Response> {
     const ctx = await incomingContext(adapter, request);
@@ -1453,7 +1450,7 @@ async function dispatched(
 // it per request) plus the latency shim — both presets pass
 // a no-op today.
 export type ClientFacadeAdapter =
-    GuardedDbAdapter & LatencySimulation;
+    DbAdapter & LatencySimulation;
 
 function wiringForSegments(
     segments: readonly string[],

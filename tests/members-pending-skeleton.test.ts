@@ -90,7 +90,6 @@ Deno.test(
             const db = new BackedDbAdapter(
                 new MemoryStorageBackend(),
                 () => gate.held,
-                async () => {},
                 () => {},
             );
             await seedAdminSchema(db);

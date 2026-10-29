@@ -248,7 +248,7 @@ Deno.test('a failed landing prints no credential',
 async () => {
     const backend = new MemoryStorageBackend();
     const db = new BackedDbAdapter(
-        backend, async () => {}, async () => {}, () => {},
+        backend, async () => {}, () => {},
     );
     const empty = fakeClient([{ message_pairs: false }]);
     backend.refuseNextSuccessions(1);
@@ -349,7 +349,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const backend = new PostgresBackend(sql);
     const adapter = new BackedDbAdapter(
         backend,
-        async () => {},
         async () => {},
         () => {},
     );
