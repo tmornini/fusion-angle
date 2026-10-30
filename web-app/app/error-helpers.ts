@@ -27,12 +27,31 @@ export function isAbortFault(err: unknown): boolean {
         && err.name === 'AbortError';
 }
 
+const SKIPPED_TRANSITION =
+    'Transition was aborted because of invalid state';
+
+export function isSkippedViewTransition(
+    err: unknown,
+): boolean {
+    if (typeof err === 'string') {
+        return err.startsWith(SKIPPED_TRANSITION);
+    }
+    return typeof err === 'object'
+        && err !== null
+        && 'name' in err
+        && err.name === 'InvalidStateError'
+        && 'message' in err
+        && typeof err.message === 'string'
+        && err.message.startsWith(SKIPPED_TRANSITION);
+}
+
 export function shouldSurfaceFault(
     err: unknown,
     pageUnloading: boolean,
 ): boolean {
     if (pageUnloading) return false;
-    return !isAbortFault(err);
+    if (isAbortFault(err)) return false;
+    return !isSkippedViewTransition(err);
 }
 
 // One latch for the floor and for caught reportFault.
@@ -63,7 +82,8 @@ export function reportFault(
 // uncaught errors and unhandled rejections log AND toast, so a
 // failed fire-and-forget handler degrades visibly instead of
 // vanishing to the console while the UI proceeds. Aborted
-// fetches and pagehide teardown do not toast.
+// fetches, a skipped view transition, and pagehide
+// teardown do not toast.
 export function initErrorSurfacing(): void {
     window.addEventListener('pagehide', () => {
         pageUnloading = true;

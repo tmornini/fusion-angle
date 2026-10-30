@@ -14,6 +14,10 @@ html {
     font-size: 16px;
     tab-size: 4;
     color-scheme: dark;
+    /* A scrolling page and a page that fits differ
+        by a classic scrollbar. That viewport change
+        aborts the cross-document view transition. */
+    scrollbar-gutter: stable;
 }
 
 body {

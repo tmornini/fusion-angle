@@ -209,7 +209,10 @@ function rewriteCssUrls(
     const names = Object.keys(manifest)
         .sort((a, b) => b.length - a.length);
     for (const logical of names) {
-        if (!logical.endsWith('.woff2')) continue;
+        if (!logical.endsWith('.woff2')
+            && !logical.endsWith('.png')) {
+            continue;
+        }
         const hashed = manifest[logical];
         if (hashed === undefined) continue;
         out = out.replaceAll(
@@ -331,9 +334,10 @@ type OpaqueAsset = {
 async function hashAssets(dest: string): Promise<void> {
     const assetsDir = join(dest, 'assets');
     const manifest = readManifest(dest);
-    const files = await walkFiles(assetsDir);
+    const files = (await walkFiles(assetsDir)).sort();
     const jsPending: TextAsset[] = [];
     const svgPending: TextAsset[] = [];
+    const cssPending: OpaqueAsset[] = [];
     const opaque: OpaqueAsset[] = [];
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
@@ -343,7 +347,14 @@ async function hashAssets(dest: string): Promise<void> {
         if (path.toLowerCase().endsWith('.gz')) continue;
         const name = basename(path);
         if (isHashedAssetName(name)) {
-            manifest[logicalAssetName(name)] = name;
+            // A redeploy leaves every prior hashed
+            // name on disk. Keep the manifest's
+            // published name; the last directory
+            // entry must not replace it.
+            const logical = logicalAssetName(name);
+            if (manifest[logical] === undefined) {
+                manifest[logical] = name;
+            }
             continue;
         }
         const bytes = await Deno.readFile(path);
@@ -363,6 +374,12 @@ async function hashAssets(dest: string): Promise<void> {
             });
             continue;
         }
+        if (name.endsWith('.css')) {
+            cssPending.push({
+                logical: name, path, bytes,
+            });
+            continue;
+        }
         opaque.push({ logical: name, path, bytes });
     }
 
@@ -379,6 +396,32 @@ async function hashAssets(dest: string): Promise<void> {
             dirname(asset.path), hashed,
         );
         await Deno.writeFile(hashedPath, asset.bytes);
+        if (hashedPath !== asset.path) {
+            await Deno.remove(asset.path);
+        }
+    }
+
+    for (const asset of cssPending) {
+        const text = decoder.decode(asset.bytes);
+        const rewritten = rewriteCssUrls(
+            rewriteAssetPaths(text, manifest),
+            manifest,
+        );
+        const bytes = rewritten === text
+            ? asset.bytes
+            : encoder.encode(rewritten);
+        const hashed = await hashedFileName(
+            asset.logical, bytes,
+        );
+        h0.set(
+            asset.logical,
+            await sha256HexOfBytes(bytes),
+        );
+        manifest[asset.logical] = hashed;
+        const hashedPath = join(
+            dirname(asset.path), hashed,
+        );
+        await Deno.writeFile(hashedPath, bytes);
         if (hashedPath !== asset.path) {
             await Deno.remove(asset.path);
         }

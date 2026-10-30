@@ -1,80 +1,4 @@
-/* Landing: navbar, hero, features, footer. */
-
-.navbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: var(--z-fixed);
-    height: 4rem;
-    background-color: hsl(var(--background) / 0.8);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid hsl(var(--border) / 0.5);
-    display: flex;
-    align-items: center;
-}
-
-@media (min-width: 1024px) {
-    .navbar { height: 5rem; }
-}
-
-.navbar-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.navbar-logo {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    text-decoration: none;
-}
-
-.navbar-logo-icon {
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.navbar-logo-text {
-    font-family: var(--font-display);
-    font-weight: var(--font-weight-bold);
-    font-size: var(--text-xl);
-    color: hsl(var(--foreground));
-}
-
-.navbar-cta {
-    display: none;
-    align-items: center;
-    gap: var(--space-3);
-}
-
-@media (min-width: 768px) {
-    .navbar-cta { display: flex; }
-}
-
-.navbar-mobile-toggle {
-    display: flex;
-    padding: var(--space-2);
-    color: hsl(var(--foreground));
-    background: none;
-    border: none;
-    cursor: pointer;
-}
-
-@media (min-width: 768px) {
-    .navbar-mobile-toggle { display: none; }
-}
-
-.navbar-mobile-menu {
-    padding: var(--space-4) 0;
-    border-top: 1px solid hsl(var(--border) / 0.5);
-    animation: fade-in var(--duration-normal) var(--ease-out);
-}
+/* Landing: the hero fills the page. */
 
 .hero {
     position: relative;
@@ -82,7 +6,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-top: 5rem;
     overflow: hidden;
 }
 
@@ -121,125 +44,81 @@
     max-width: 56rem;
     margin: 0 auto;
     text-align: center;
+    font-size: var(--text-4xl);
+    line-height: var(--leading-tight);
+    transform: translateY(-1.5rem);
+}
+
+.hero-mark {
+    display: flex;
+    justify-content: center;
+    /* Quarter of the visible gap. The
+       padding keeps the headline put. */
+    padding-top: calc(5em / 18);
+    margin-bottom: calc(0.65em - 5em / 18);
+}
+
+.hero-mark .brand-mark {
+    width: 2.25em;
+    height: 2.25em;
+    background-color: hsl(var(--accent));
+    -webkit-mask-image: url(
+        "../../assets/mark.png"
+    );
+    mask-image: url("../../assets/mark.png");
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    /* The file paints white. Shift it
+       out so the masked accent remains. */
+    object-fit: none;
+    object-position: -10000px -10000px;
+}
+
+@media (min-width: 640px) {
+    .hero-content { font-size: 3rem; }
+}
+@media (min-width: 1024px) {
+    .hero-content { font-size: 3.75rem; }
+}
+@media (min-width: 1280px) {
+    .hero-content { font-size: 4.5rem; }
 }
 
 .hero h1 {
     font-family: var(--font-display);
     font-weight: var(--font-weight-bold);
-    font-size: var(--text-4xl);
+    font-size: inherit;
     color: hsl(var(--foreground));
     margin-bottom: var(--space-6);
-    line-height: var(--leading-tight);
+    line-height: inherit;
 }
 
-@media (min-width: 640px) { .hero h1 { font-size: 3rem; } }
-@media (min-width: 1024px) { .hero h1 { font-size: 3.75rem; } }
-@media (min-width: 1280px) { .hero h1 { font-size: 4.5rem; } }
+.hero-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+}
+
+.btn-ink {
+    background-color: hsl(0 0% 0%);
+    color: hsl(var(--foreground));
+    border-color: hsl(0 0% 0%);
+}
+.btn-ink:hover {
+    background-color: hsl(var(--gray-800));
+    border-color: hsl(var(--gray-800));
+}
 
 .hero-subtitle {
     font-size: var(--text-lg);
     color: hsl(var(--muted-foreground));
-    max-width: 42rem;
     margin: 0 auto 2.5rem;
     line-height: var(--leading-relaxed);
+    white-space: nowrap;
 }
 
 @media (min-width: 640px) { .hero-subtitle { font-size: var(--text-xl); } }
-
-.features-section {
-    padding: 6rem 0;
-}
-
-@media (min-width: 1024px) { .features-section { padding: 8rem 0; } }
-
-.section-header {
-    max-width: 48rem;
-    margin: 0 auto var(--space-16);
-    text-align: center;
-}
-
-.section-header h2 {
-    font-family: var(--font-display);
-    font-weight: var(--font-weight-bold);
-    font-size: var(--text-3xl);
-    color: hsl(var(--foreground));
-    margin-bottom: var(--space-4);
-}
-
-@media (min-width: 640px) {
-    .section-header h2 {
-        font-size: var(--text-4xl);
-    }
-}
-
-.section-header p {
-    font-size: var(--text-lg);
-    color: hsl(var(--muted-foreground));
-}
-
-.feature-card {
-    padding: var(--space-6);
-}
-
-@media (min-width: 1024px) { .feature-card { padding: var(--space-8); } }
-
-.feature-card h3 {
-    font-family: var(--font-display);
-    font-weight: var(--font-weight-semibold);
-    font-size: var(--text-xl);
-    color: hsl(var(--foreground));
-    margin-bottom: var(--space-3);
-}
-
-.feature-card p {
-    color: hsl(var(--muted-foreground));
-    line-height: var(--leading-relaxed);
-}
-
-.footer {
-    padding: var(--space-16) 0;
-    background-color: hsl(var(--background));
-    border-top: 1px solid hsl(var(--border) / 0.5);
-}
-
-.footer-grid {
-    display: grid;
-    gap: 2.5rem;
-    margin-bottom: var(--space-12);
-}
-
-@media (min-width: 768px) {
-    .footer-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-@media (min-width: 1024px) {
-    .footer-grid {
-        grid-template-columns: 1fr 1fr 1fr 1fr;
-        gap: var(--space-8);
-    }
-}
-
-.footer-brand p {
-    font-size: var(--text-sm);
-    color: hsl(var(--muted-foreground));
-    line-height: var(--leading-relaxed);
-    margin-top: var(--space-4);
-}
-
-.footer-bottom {
-    padding-top: var(--space-8);
-    border-top: 1px solid hsl(var(--border) / 0.5);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-}
-
-@media (min-width: 640px) { .footer-bottom { flex-direction: row; } }
-
-.footer-bottom p {
-    font-size: var(--text-sm);
-    color: hsl(var(--muted-foreground));
-}

@@ -539,6 +539,7 @@ Deno.test('return redeploys the server', async () => {
         2,
     );
     assertMatch(run.stderr, /Redeploying/);
+    assertNotMatch(run.stderr, /\u0007/);
     assertMatch(run.stdout, /Press Return to redeploy/);
     assert(denoArgs(run).every((line) =>
         !line.includes('server/develop-watch.ts')));

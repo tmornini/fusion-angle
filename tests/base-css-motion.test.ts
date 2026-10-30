@@ -28,3 +28,15 @@ Deno.test(
         assert(block.includes('animation: none;'));
     },
 );
+
+Deno.test(
+    'the root reserves a scrollbar gutter',
+    () => {
+        const open = src.indexOf('html {');
+        assert(open >= 0);
+        const close = src.indexOf('\n}', open);
+        assert(close > open);
+        const block = src.slice(open, close);
+        assert(block.includes('scrollbar-gutter: stable;'));
+    },
+);
