@@ -131,3 +131,42 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'drilled columns are desktop-only',
+    () => {
+        const metrics = Deno.readTextFileSync(
+            'web-app/app/styles/components-metrics.css',
+        );
+        const aggregate = metrics.indexOf(
+            '.objective-aggregates-card .score-row {\n'
+            + '    grid-template-columns:'
+            + ' 140px 110px 1fr;\n'
+            + '}',
+        );
+        assert(aggregate >= 0);
+        const media = metrics.indexOf(
+            '@media (min-width: 768px) {',
+        );
+        const drilled = metrics.indexOf(
+            '.objective-aggregates-card'
+            + '.objective-drill .score-row',
+        );
+        const columns = metrics.indexOf(
+            'grid-template-columns:'
+            + ' 220px 110px 1fr;',
+        );
+        assert(media > aggregate);
+        assert(drilled > media);
+        assert(columns > drilled);
+        const responsive = Deno.readTextFileSync(
+            'web-app/app/styles/responsive.css',
+        );
+        assert(responsive.includes(
+            '.objective-aggregates-card .score-row {\n'
+            + '        grid-template-columns:'
+            + ' minmax(0, 1fr) 110px;\n'
+            + '    }',
+        ));
+    },
+);

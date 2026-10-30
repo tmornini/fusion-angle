@@ -81,6 +81,14 @@
     grid-template-columns: 140px 110px 1fr;
 }
 
+/* Desktop only. A bare rule outranks the
+    max-width 767px stack in responsive.css. */
+@media (min-width: 768px) {
+    .objective-aggregates-card.objective-drill .score-row {
+        grid-template-columns: 220px 110px 1fr;
+    }
+}
+
 /* Width of two top-row gauge columns and the gap
     between them, so the right edge sits under Cost's:
     the grid is repeat(3, 1fr) with a --space-6 gap.
