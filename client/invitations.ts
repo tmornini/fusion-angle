@@ -46,12 +46,29 @@ export interface InvitationView {
     readonly message: HttpMessage<MembershipEntity>;
 }
 
-export function invitationIsExpired(
-    view: InvitationView,
+export function invitationIsExpired<
+    T extends { readonly expiresAt?: string },
+>(
+    view: T,
     now: string,
-): view is InvitationView & { readonly expiresAt: string } {
+): view is T & { readonly expiresAt: string } {
     return view.expiresAt !== undefined
         && view.expiresAt <= now;
+}
+
+export function omitExpiredPending<
+    T extends {
+        readonly state: InvitationState;
+        readonly expiresAt?: string;
+    },
+>(
+    rows: readonly T[],
+    now: string,
+): T[] {
+    return rows.filter((row) =>
+        row.state !== 'pending'
+        || !invitationIsExpired(row, now),
+    );
 }
 
 // One outstanding membership as the inviting admin sees
@@ -62,6 +79,7 @@ export interface SentInvitation {
     readonly organizationId: Id;
     readonly identityId: Id;
     readonly invitedAt: string;
+    readonly expiresAt?: string;
     readonly state: InvitationState;
     readonly inviteeName?: string;
     readonly inviteeEmail?: string;
@@ -87,7 +105,7 @@ function sentViewOf(
     message: HttpMessage<MembershipReadEntity>,
 ): SentInvitation {
     const row = message.body().toValue();
-    const view: SentInvitation = {
+    let view: SentInvitation = {
         id: row.id,
         organizationId: row.organization_id,
         identityId: row.identity_id,
@@ -96,19 +114,13 @@ function sentViewOf(
         message: message as HttpMessage<MembershipEntity>,
     };
     if (row.invitee_name !== undefined) {
-        if (row.invitee_email !== undefined) {
-            return {
-                ...view,
-                inviteeName: row.invitee_name,
-                inviteeEmail: row.invitee_email,
-            };
-        }
-        return { ...view, inviteeName: row.invitee_name };
+        view = { ...view, inviteeName: row.invitee_name };
     }
     if (row.invitee_email !== undefined) {
-        return { ...view, inviteeEmail: row.invitee_email };
+        view = { ...view, inviteeEmail: row.invitee_email };
     }
-    return view;
+    if (row.state !== 'pending') return view;
+    return { ...view, expiresAt: row.expires_at };
 }
 
 // The caller's own memberships. The server fences by
@@ -125,7 +137,9 @@ export async function getInvitations(
         'identities/' + ctx.identity.id
             + '/invitations/' + query,
     );
-    return parts.map(inviteeViewOf);
+    return omitExpiredPending(
+        parts.map(inviteeViewOf), nowUtc(),
+    );
 }
 
 function invitationPath(ctx: RequestContext, id: Id): string {
@@ -154,7 +168,9 @@ export async function getSentInvitations(
             + activeOrganization(ctx)
             + '/invitations/?state=' + state,
     );
-    return parts.map(sentViewOf);
+    return omitExpiredPending(
+        parts.map(sentViewOf), nowUtc(),
+    );
 }
 
 // Invite an EXISTING identity, by email, to the admin's

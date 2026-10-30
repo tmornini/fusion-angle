@@ -1703,7 +1703,7 @@ the second organization.
        bounce-to-invitations branch); exploratory —
        the live reload and the absence of an error
        card or retry loop
-- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — the absence marker (`—`) where an organization name and an inviter name are not on the read, a date sub-line, a Pending state badge, and Accept / Decline buttons. No "Invited by" line. Click neither — B29 still needs the zero-membership state. The seeded pending invitation expires one year after `MOCK_SEED_TIMESTAMP`, at `2027-01-01T00:00:00.000000Z`. The case stays walkable through 2026, so Accept and Decline are still on the card during the walk.
+- [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows the seeded pending invitation card — the absence marker (`—`) where an organization name and an inviter name are not on the read, a date sub-line with the invited date and expires in N days, a Pending state badge, and Accept / Decline buttons. No "Invited by" line. Click neither — B29 still needs the zero-membership state. The seeded pending invitation expires one year after `MOCK_SEED_TIMESTAMP`, at `2027-01-01T00:00:00.000000Z`. The case stays walkable through 2026, so Accept and Decline are still on the card during the walk. An expired pending invitation does not show and cannot be accepted (409).
   Pin: tests/boot-organization-gate.test.ts
        'invitations page keeps an empty organization
        list' (its `resolveOrganizationGate([],
@@ -1716,7 +1716,15 @@ the second organization.
        tests/presenter-invitation-list.test.ts 'a
        pending invitation shows the absence marker
        and Accept / Decline' (decides the card's
-       shape);
+       shape, including expires in N days);
+       tests/presenter-invitation-list.test.ts 'an
+       expired pending invitation does not show';
+       tests/adapters-invitations.test.ts
+       'getInvitations omits an expired pending
+       invitation';
+       tests/api-invitation-expiry.test.ts 'accept
+       after expires_at is 409 and the head stays
+       pending';
        exploratory — the live stay and the rendered
        seeded card
 - [ ] **B28** As the demo admin, open a seeded member's detail page (one accepted membership, one no later case names), click Remove, confirm in the alertdialog (its copy says access ends at the next token refresh). PASS: a "Member removed" toast, the roster no longer lists them. The write is `postMembershipRemoval`: the held membership, `accepted` → `removed`. Sign in as that member. PASS: lands on `invitations/index.html` — the gate fires for a made orphan exactly as for the seeded one. Then sign in as an untouched seeded member (e.g. the demo admin) and load a gated page. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected). Also confirm the demo admin's own detail page shows no Remove — it is Stark's only accepted admin. After PASS, sign back in as Riley for B29.
@@ -5630,8 +5638,10 @@ FSM, unlike `flows/detail`).
   invitations-list`) shows one row per invitation in
   that state — invitee name and email when PII is
   live, the absence marker (`—`) when it is erased,
-  an "Invited {calendar date}" sub-line, a state
-  badge, and, on a pending row, a Revoke button.
+  an "Invited {calendar date} · expires in N days"
+  sub-line on a pending row, a state badge,
+  and, on a pending row, a Revoke button. Expired
+  pending invitations do not show.
   TWO rows are pending here: invitation C and the SEEDED
   pending invitation to `riley.okafor@example.net`
   (present from boot — B25–B29's fixture; do NOT revoke
@@ -5664,14 +5674,22 @@ FSM, unlike `flows/detail`).
        tests/presenter-invitation-list.test.ts 'a
        sent invitation shows the absence marker and
        Revoke';
+       tests/presenter-invitation-list.test.ts 'a
+       sent invitation shows the invitee name and
+       email' (decides Invited and expires in N days);
+       tests/presenter-invitation-list.test.ts 'an
+       expired sent pending invitation does not
+       show';
+       tests/adapters-invitations.test.ts
+       'getSentInvitations omits an expired pending
+       invitation';
        tests/presenter-invitation-list.test.ts 'an empty
        sent list shows the empty state' (decides the "No
        outstanding invitations." copy); exploratory — the
        live "Invitation sent"/"Invitation revoked" toasts,
        the section's hidden-until-success reveal, and the
-       "Invited {date}" sub-line and state badge on a sent
-       row (claimed by nothing today; see Unpinned but
-       pinnable)
+       state badge on a sent row (claimed by nothing
+       today; see Unpinned but pinnable)
 - [ ] **V7 — Authz: non-admin grant/revoke rejected;
   invitee may still read & accept** Sign in as a
   non-admin Stark member (e.g. Sarah Chen,

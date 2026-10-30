@@ -88,6 +88,7 @@ import { generateIdentifier } from
 import { framedRequest } from './http-fixtures.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
+const PAST_EXPIRES = '2026-01-02T00:00:00.000000Z';
 const WAYNE = 'BBjWJsjYIDkTRKIIPrzWRw';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 
@@ -912,6 +913,7 @@ Deno.test('sent invitations list the active org pending only',
     );
     assertStrictEquals(sent[0]!.inviteeName, 'Sarah');
     assertStrictEquals(sent[0]!.inviteeEmail, 'sarah@x.com');
+    assert(sent[0]!.expiresAt !== undefined);
     // Switched to Stark, the Wayne invitation is out of scope.
     const tonyStark = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');
@@ -920,6 +922,59 @@ Deno.test('sent invitations list the active org pending only',
             .length,
         0,
     );
+}));
+
+Deno.test('getInvitations omits an expired pending invitation',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    await tony.POST(
+        'organizations/' + WAYNE + '/invitations/',
+        {
+            email: 'sarah@x.com',
+            at: AT,
+            expiresAt: PAST_EXPIRES,
+        },
+    );
+    const sarah = await ctxOn(db, 'toccYYkLEABmlbpHJalgtQ'
+        , 'AjdvjuECVZEgZoFajaIEkg');
+    const mine = await getInvitations(sarah, 'pending');
+    assertStrictEquals(
+        mine.find((row) => row.organizationId === WAYNE),
+        undefined,
+    );
+    const parts = await sarah.GETCollection<MembershipEntity>(
+        'identities/' + sarah.identity.id
+            + '/invitations/?state=pending',
+    );
+    assert(parts.some((message) =>
+        message.body().toValue().organization_id === WAYNE));
+}));
+
+Deno.test(
+    'getSentInvitations omits an expired pending invitation',
+() => withLocalStorageAsync(freshStorage(), async () => {
+    const { db } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    const tony = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
+        , 'BBjWJsjYIDkTRKIIPrzWRw');
+    await tony.POST(
+        'organizations/' + WAYNE + '/invitations/',
+        {
+            email: 'sarah@x.com',
+            at: AT,
+            expiresAt: PAST_EXPIRES,
+        },
+    );
+    const sent = await getSentInvitations(tony, 'pending');
+    assertStrictEquals(sent.length, 0);
+    const parts = await tony.GETCollection<MembershipEntity>(
+        'organizations/' + WAYNE
+            + '/invitations/?state=pending',
+    );
+    assertStrictEquals(parts.length, 1);
 }));
 
 Deno.test('the sent view omits the email when PII is erased',

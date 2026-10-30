@@ -3,12 +3,14 @@ import {
 } from '../safe-html.ts';
 import {
     DISPLAY_ABSENT, formatDate, formatCalendarDate,
+    formatExpiresInDays,
 } from '../format.ts';
 import {
     INVITATION_STATE_CONFIG,
 } from './state-display.ts';
 import {
     invitationIsExpired,
+    omitExpiredPending,
     type InvitationView,
     type SentInvitation,
 } from '../../../client/index.ts';
@@ -47,6 +49,13 @@ function inviteeActions(inv: InvitationView): SafeHtml {
         </div>`;
 }
 
+function inviteeDateLine(inv: InvitationView): string {
+    const invited = formatDate(inv.invitedAt);
+    if (inv.expiresAt === undefined) return invited;
+    return invited + ' · '
+        + formatExpiresInDays(inv.expiresAt, nowUtc());
+}
+
 function buildInviteeRow(inv: InvitationView): SafeHtml {
     return html`
         <div class="${
@@ -58,7 +67,7 @@ function buildInviteeRow(inv: InvitationView): SafeHtml {
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
-                }">${formatDate(inv.invitedAt)}</p>
+                }">${inviteeDateLine(inv)}</p>
             </div>
             ${stateBadge(inv.state)}
             ${
@@ -86,13 +95,17 @@ function sentInviteeTitle(inv: SentInvitation): string {
 function sentInviteeSub(inv: SentInvitation): string {
     const invited = 'Invited '
         + formatCalendarDate(inv.invitedAt);
+    const dated = inv.expiresAt === undefined
+        ? invited
+        : invited + ' · '
+            + formatExpiresInDays(inv.expiresAt, nowUtc());
     if (
         inv.inviteeName !== undefined
         && inv.inviteeEmail !== undefined
     ) {
-        return inv.inviteeEmail + ' · ' + invited;
+        return inv.inviteeEmail + ' · ' + dated;
     }
-    return invited;
+    return dated;
 }
 
 function buildSentRow(inv: SentInvitation): SafeHtml {
@@ -192,10 +205,13 @@ export class InvitationListPresenter {
     }
 
     render(container: HTMLElement): void {
+        const rows = omitExpiredPending(
+            this.#rows, nowUtc(),
+        );
         setHtml(container, html`${
-            this.#rows.length === 0
+            rows.length === 0
                 ? emptyState('No invitations.')
-                : html`${this.#rows.map(buildInviteeRow)}`
+                : html`${rows.map(buildInviteeRow)}`
         }`);
     }
 }
@@ -216,9 +232,12 @@ export class SentInvitationsPresenter {
     }
 
     buildBox(): SafeHtml {
-        const list = this.#rows.length === 0
+        const rows = omitExpiredPending(
+            this.#rows, nowUtc(),
+        );
+        const list = rows.length === 0
             ? emptyState(emptySentMessage(this.#state))
-            : html`${this.#rows.map(buildSentRow)}`;
+            : html`${rows.map(buildSentRow)}`;
         return html`
             <div class="card card-hover p-6 mt-6">
                 <div class="${
