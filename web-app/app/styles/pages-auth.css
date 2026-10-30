@@ -2,7 +2,7 @@
 
 .auth-branding {
     width: 50%;
-    background: var(--gradient-hero);
+    background-color: hsl(var(--background));
     position: relative;
     overflow: hidden;
 }
@@ -20,7 +20,26 @@
 }
 
 @media (min-width: 1024px) {
-    .auth-form-wrapper { width: 50%; }
+    .auth-form-wrapper {
+        width: 50%;
+        /* The card's natural right gutter is
+           (half - card) / 2. The extra 4rem
+           draws that edge inward. */
+        justify-content: flex-end;
+        padding-right: calc((50vw - 28rem) / 2 + 4rem);
+    }
+    .auth-branding .auth-branding-content {
+        padding-left: calc((50vw - 28rem) / 2 + 4rem);
+        padding-right: var(--space-12);
+        /* Legal lines hang below the card,
+           so its middle sits above the
+           column middle. The extra bottom
+           padding lifts the left block
+           onto the card. */
+        padding-bottom: calc(
+            var(--space-12) + var(--space-6) + 2.5rem
+        );
+    }
 }
 
 .auth-branding-content {
@@ -33,40 +52,57 @@
     height: 100%;
 }
 
+.auth-lockup {
+    width: fit-content;
+    max-width: 100%;
+}
+
+.auth-mark {
+    display: flex;
+    justify-content: center;
+    font-size: var(--text-4xl);
+    margin-bottom: 0.2em;
+}
+
+.auth-stats {
+    margin-top: 0.45em;
+    font-size: var(--text-4xl);
+}
+
+@media (min-width: 640px) {
+    .auth-mark,
+    .auth-stats { font-size: 3rem; }
+}
+@media (min-width: 1024px) {
+    .auth-mark,
+    .auth-stats { font-size: 3.75rem; }
+}
+@media (min-width: 1280px) {
+    .auth-mark,
+    .auth-stats { font-size: 4.5rem; }
+}
+
+.auth-mark .brand-mark {
+    width: 2.25em;
+    height: 2.25em;
+    transform: translateX(-16%);
+}
+
 .auth-form-card {
     width: 100%;
     max-width: 28rem;
 }
 
-.auth-mobile-logo {
-    width: 2.5rem;
-    height: 2.5rem;
-}
-
-.auth-brand-icon {
-    width: 3rem;
-    height: 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.auth-brand-name {
-    color: hsl(var(--primary-foreground));
-}
-
 .auth-headline {
     font-size: 2.5rem;
-    color: hsl(var(--primary-foreground));
+    color: hsl(var(--foreground));
     line-height: 1.2;
     margin-bottom: var(--space-6);
 }
 
 .auth-subhead {
     font-size: var(--text-lg);
-    color: hsl(
-        var(--primary-foreground) / 0.8
-        );
+    color: hsl(var(--muted-foreground));
     max-width: 28rem;
 }
 
@@ -75,9 +111,7 @@
 }
 
 .auth-stat-label {
-    color: hsl(
-        var(--primary-foreground) / 0.7
-        );
+    color: hsl(var(--muted-foreground));
 }
 
 .auth-submit-btn {
