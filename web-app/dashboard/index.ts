@@ -2,6 +2,7 @@ import { $, $required } from '../app/dom.ts';
 import {
     html,
     setHtml,
+    type SafeHtml,
 } from '../app/safe-html.ts';
 import {
     buildSkeleton,
@@ -22,10 +23,12 @@ import { sessionContext } from '../app/client.ts';
 import {
     buildObjectiveAggregates,
     buildObjectiveTrendlines,
+    buildProjectObjectiveRows,
 } from '../app/scoring-aggregate.ts';
 import {
     GaugePresenter,
     DashboardObjectiveAggregatesPresenter,
+    DashboardObjectiveProjectsPresenter,
 } from '../app/presenters/index.ts';
 import {
     fetchMeasureName,
@@ -33,10 +36,15 @@ import {
     markStart,
     renderMeasureName,
 } from '../app/page-performance.ts';
+import { objectiveCardHit } from
+    './objective-card-hit.ts';
 
 type ObjectiveDefs = Awaited<
     ReturnType<typeof getCurrentObjectiveDefinitions>
 >;
+
+let openObjectiveId: string | null = null;
+let objectiveCardBound = false;
 
 function definitionsFrom(
     ctx: ReturnType<typeof sessionContext>,
@@ -53,6 +61,59 @@ function definitionsFrom(
     );
 }
 
+function objectiveCardTarget(
+    event: Event,
+): Element | null {
+    const target = event.target;
+    if (
+        target === null
+        || typeof (target as Element).closest
+            !== 'function'
+    ) {
+        return null;
+    }
+    return target as Element;
+}
+
+function activateObjectiveCard(event: Event): void {
+    const target = objectiveCardTarget(event);
+    if (target === null) return;
+    const hit = objectiveCardHit(target);
+    if (hit.kind === 'none') return;
+    if (hit.kind === 'open') {
+        event.preventDefault();
+        openObjectiveId = hit.objectiveId;
+    } else {
+        openObjectiveId = null;
+    }
+    void renderObjectiveAggregates();
+}
+
+function onObjectiveCardClick(event: Event): void {
+    activateObjectiveCard(event);
+}
+
+function onObjectiveCardKeydown(event: Event): void {
+    const key = (event as KeyboardEvent).key;
+    if (key !== 'Enter' && key !== ' ') return;
+    activateObjectiveCard(event);
+}
+
+function bindObjectiveCard(): void {
+    if (objectiveCardBound) return;
+    const card = $required(
+        '#objective-aggregates-card',
+        document,
+    );
+    card.addEventListener(
+        'click', onObjectiveCardClick,
+    );
+    card.addEventListener(
+        'keydown', onObjectiveCardKeydown,
+    );
+    objectiveCardBound = true;
+}
+
 async function fillObjectiveAggregatesCard(
     bundleP: Promise<DashboardScoringBundle>,
     defsP: Promise<ObjectiveDefs>,
@@ -67,20 +128,60 @@ async function fillObjectiveAggregatesCard(
     ]);
     const inputs = getObjectiveScoringInputs(bundle);
     const active = inputs.activeObjectives;
-    const aggregates =
-        buildObjectiveAggregates(inputs);
-    const trendlines =
-        buildObjectiveTrendlines(inputs);
+    const activeIds = active.map(
+        message => message.body().toValue().id,
+    );
+    if (
+        openObjectiveId !== null
+        && !activeIds.includes(openObjectiveId)
+    ) {
+        openObjectiveId = null;
+    }
+    const aggregates = buildObjectiveAggregates(
+        inputs,
+    );
+    const trendlines = buildObjectiveTrendlines(
+        inputs,
+    );
     markEnd(fetchName);
     const renderName = renderMeasureName(
         'objective-aggregates-card',
     );
     markStart(renderName);
+    const openId = openObjectiveId;
+    let card: SafeHtml;
+    if (openId === null) {
+        card = new DashboardObjectiveAggregatesPresenter(
+            active, defs, aggregates, trendlines,
+        ).buildCard();
+    } else {
+        const def = defs.get(openId);
+        if (!def) {
+            throw new Error(
+                'objective definition missing for '
+                + openId,
+            );
+        }
+        const projects = bundle.projects.map(
+            message => {
+                const project = message.body()
+                    .toValue();
+                return {
+                    id: project.id,
+                    title: project.title,
+                };
+            },
+        );
+        card = new DashboardObjectiveProjectsPresenter(
+            def.name,
+            buildProjectObjectiveRows(
+                inputs, projects, openId,
+            ),
+        ).buildCard();
+    }
     setHtml(
         $('#objective-aggregates-card', document)!,
-        new DashboardObjectiveAggregatesPresenter(
-            active, defs, aggregates, trendlines,
-        ).buildCard(),
+        card,
     );
     markEnd(renderName);
 }
@@ -98,6 +199,7 @@ async function renderObjectiveAggregates(
 
 export async function init(
 ): Promise<void> {
+    bindObjectiveCard();
     const container = $required(
         '#gauge-container', document,
     );

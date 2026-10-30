@@ -106,7 +106,8 @@ export class DashboardObjectiveAggregatesPresenter {
         return html`
             <li class="score-row"
                 data-objective-id="${o.id}"
-                data-empty="${empty}">
+                data-empty="${empty}"
+                tabindex="0">
                 <span class="score-row-label">
                     ${def.name}
                 </span>
