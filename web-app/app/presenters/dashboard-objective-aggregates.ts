@@ -27,10 +27,12 @@ interface Aggregate {
     projectsActualScored: number;
 }
 
-// Sparkline geometry, in viewBox units. SPARK_PAD keeps
-// the highest and lowest points off the top and bottom
-// edges so their dots are not clipped.
-const SPARK_HEIGHT = 30;
+// Sparkline geometry, in viewBox units. The plot maps
+// each series' own min..max onto SPARK_HEIGHT, so a
+// taller box is a larger y scale: the same score gap
+// draws farther apart. SPARK_PAD keeps the extreme
+// dots off the edges.
+const SPARK_HEIGHT = 96;
 const SPARK_MID = SPARK_HEIGHT / 2;
 const SPARK_PAD = 4;
 
@@ -220,7 +222,7 @@ export class DashboardObjectiveAggregatesPresenter {
             : this.#changeTip(date, p, points[i - 1]!);
         const label = i === 0
             ? `Baseline ${date}, value ${p.value}`
-            : `${date}, change `
+            : `${date}, ${p.value} / `
                 + formatSigned(
                     p.value - points[i - 1]!.value,
                 );
@@ -260,6 +262,9 @@ export class DashboardObjectiveAggregatesPresenter {
         prev: TrendPoint,
     ): SafeHtml {
         const change = p.value - prev.value;
+        const readout = `${p.value} / ${
+            formatSigned(change)
+        }`;
         return html`
             <span class="spark-tip" aria-hidden="true">
                 <span class="spark-tip-date">${
@@ -267,7 +272,7 @@ export class DashboardObjectiveAggregatesPresenter {
                 }</span>
                 <span class="spark-tip-change"
                     data-tone="${toneForScore(change)}">${
-                    formatSigned(change)
+                    readout
                 }</span>
             </span>`;
     }

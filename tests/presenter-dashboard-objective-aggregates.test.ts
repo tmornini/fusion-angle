@@ -220,13 +220,25 @@ Deno.test('points carry dated, signed-change tooltips', () => {
     );
     assertMatch(
         o1Row,
-        /data-tone="success"[^>]*>\s*\+20/,
-        'rise tooltip is green and signed +20',
+        /data-tone="success"[^>]*>\s*40 \/ \+20/,
+        'rise tooltip is the value over its change',
     );
     assertMatch(
         o1Row,
-        /data-tone="error"[^>]*>\s*−15/,
-        'drop tooltip is red and signed −15',
+        /data-tone="error"[^>]*>\s*25 \/ −15/,
+        'drop tooltip is the value over its change',
+    );
+    assert(
+        o1Row.includes(
+            'aria-label="May 10, 2026, 40 / +20"',
+        ),
+        'rise dot names the value over its change',
+    );
+    assert(
+        o1Row.includes(
+            'aria-label="May 20, 2026, 25 / −15"',
+        ),
+        'drop dot names the value over its change',
     );
 });
 
@@ -268,13 +280,43 @@ Deno.test('origin line sits at the baseline value', () => {
     const o1Row = o1Slice.slice(
         0, o1Slice.indexOf('</li>'),
     );
-    // ohqxgUBEaFQwYbXsonRPmg trend [20, 40, 25]: min 20 == baseline, so the
-    // axis sits at the bottom edge (SPARK_HEIGHT -
-    // SPARK_PAD = 26), not the geometric mid (15).
+    // Trend [20, 40, 25]: min 20 is the baseline, so
+    // the axis sits on the bottom pad of the tall
+    // plot (96 - 4), not the geometric mid (48).
     assertMatch(
         o1Row,
-        /class="sparkline-axis"[^>]*y1="26"/,
+        /class="sparkline-axis"[^>]*y1="92"/,
         'grey axis tracks the baseline, not the mid',
+    );
+    assert(
+        o1Row.includes('viewBox="0 0 100 96"'),
+        'the plot is the tall y scale',
+    );
+    // 40 is the max (pad 4); 20 is the min (92).
+    // 4/96 and 92/96, as the dot's --y percent.
+    assert(
+        o1Row.includes('--y:4.17%'),
+        'the high point sits on the top pad',
+    );
+    assert(
+        o1Row.includes('--y:95.83%'),
+        'the low point sits on the bottom pad',
+    );
+});
+
+Deno.test('sparkline track matches the tall plot', () => {
+    const src = Deno.readTextFileSync(
+        'web-app/app/styles/components-metrics.css',
+    );
+    assert(
+        src.includes(
+            '.sparkline-wrap {\n'
+            + '    position: relative;\n'
+            + '    width: 100%;\n'
+            + '    height: 96px;\n'
+            + '}',
+        ),
+        'the track height is the plot height',
     );
 });
 

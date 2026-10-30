@@ -107,10 +107,13 @@
     align-items: center;
 }
 
+/* The series min..max fills this height, so a score
+    gap draws about four times farther apart than
+    the old 30px track. */
 .sparkline-wrap {
     position: relative;
     width: 100%;
-    height: 30px;
+    height: 96px;
 }
 
 .sparkline-wrap .sparkline-svg {
