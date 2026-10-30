@@ -416,13 +416,12 @@ export async function init(): Promise<void> {
         );
     }
     markEnd(renderName);
-    $('#sent-invitations-list', document)
+    $('#sent-invitations-box', document)
         ?.addEventListener(
             'click',
-            e => void onSentInvitationClick(e),
+            e => void onSentBoxClick(e),
             { signal },
         );
-    bindSentInvitationState();
 
     // Add-Objective dialog wiring
     $(
@@ -498,18 +497,15 @@ async function fetchSentInvitations(
 }
 
 function paintSentInvitations(
-    sent: Awaited<
-        ReturnType<typeof getSentInvitations>
-    >,
+    sent: readonly SentInvitation[],
     selected: SentInvitationState,
 ): void {
     const box = $('#sent-invitations-box', document);
-    const list = $('#sent-invitations-list', document);
     sentInvitations = sent;
-    if (!box || !list) return;
+    if (!box) return;
     new SentInvitationsPresenter(
         sent, selected,
-    ).render(list);
+    ).render(box);
     box.classList.remove('hidden');
     paintedSentInvitationState = selected;
 }
@@ -523,11 +519,18 @@ async function renderSentInvitations(): Promise<void> {
     paintSentInvitations(sent, selected);
 }
 
-async function onSentInvitationClick(
+async function onSentBoxClick(
     e: MouseEvent,
 ): Promise<void> {
     const target = e.target;
     if (!(target instanceof Element)) return;
+    const stateBtn = target.closest(
+        '[data-invitation-state]',
+    );
+    if (stateBtn instanceof HTMLElement) {
+        await onSentInvitationStateClick(stateBtn);
+        return;
+    }
     const btn = target.closest(
         '[data-invitation-action="revoke"]');
     if (!btn) return;
@@ -556,45 +559,9 @@ async function onSentInvitationClick(
     }
 }
 
-const SENT_INVITATION_STATES: readonly SentInvitationState[] = [
-    'pending', 'declined', 'revoked',
-];
-
-function sentStateButton(
-    selected: SentInvitationState,
-): HTMLElement | null {
-    return $(
-        '[data-invitation-state="' + selected + '"]',
-        document,
-    );
-}
-
-function bindSentInvitationState(): void {
-    for (const selected of SENT_INVITATION_STATES) {
-        sentStateButton(selected)?.addEventListener(
-            'click',
-            e => void onSentInvitationStateClick(e),
-            { signal },
-        );
-    }
-}
-
-function pressSentInvitationState(
-    selected: SentInvitationState,
-): void {
-    for (const candidate of SENT_INVITATION_STATES) {
-        sentStateButton(candidate)?.setAttribute(
-            'aria-pressed',
-            candidate === selected ? 'true' : 'false',
-        );
-    }
-}
-
 async function onSentInvitationStateClick(
-    e: Event,
+    target: HTMLElement,
 ): Promise<void> {
-    const target = e.currentTarget;
-    if (!(target instanceof HTMLElement)) return;
     const selected = target.getAttribute(
         'data-invitation-state',
     );
@@ -603,8 +570,9 @@ async function onSentInvitationStateClick(
         && selected !== 'declined'
         && selected !== 'revoked'
     ) return;
+    const previous = paintedSentInvitationState;
     sentInvitationState = selected;
-    pressSentInvitationState(selected);
+    paintSentInvitations(sentInvitations, selected);
     try {
         await renderSentInvitations();
     } catch (err) {
@@ -613,10 +581,8 @@ async function onSentInvitationStateClick(
             'organization', err,
         );
         if (sentInvitationState !== selected) return;
-        sentInvitationState = paintedSentInvitationState;
-        pressSentInvitationState(
-            paintedSentInvitationState,
-        );
+        sentInvitationState = previous;
+        paintSentInvitations(sentInvitations, previous);
         showToast(
             'Failed to load invitations: '
             + extractErrorMessage(err), 'error',

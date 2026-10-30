@@ -5621,16 +5621,17 @@ FSM, unlike `flows/detail`).
   `mike.thompson@company.com` (Wayne-only). PASS:
   "Invitation sent" toast. Then on
   `organization/index.html` confirm a "Sent
-  invitations" section (`#sent-invitations-box`, h2
-  "Sent invitations") appears below the cards. A
-  segmented control (`data-invitation-state`) offers
+  invitations" section (`#sent-invitations-box`, h3
+  "Sent invitations" in a `.card.card-hover.p-6`)
+  appears below the cards. State-badge chips
+  (`data-invitation-state`, `data-dimmed`) offer
   Pending, Declined, and Revoked, one `aria-pressed`.
   Pending is pressed on load. The list (`#sent-
   invitations-list`) shows one row per invitation in
-  that state — the absence marker (`—`) where the
-  invitee email is not on the read, an "Invited
-  {date}" sub-line, a state badge, and, on a pending
-  row, a Revoke button.
+  that state — invitee name and email when PII is
+  live, the absence marker (`—`) when it is erased,
+  an "Invited {calendar date}" sub-line, a state
+  badge, and, on a pending row, a Revoke button.
   TWO rows are pending here: invitation C and the SEEDED
   pending invitation to `riley.okafor@example.net`
   (present from boot — B25–B29's fixture; do NOT revoke
