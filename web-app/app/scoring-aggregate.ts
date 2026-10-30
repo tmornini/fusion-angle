@@ -11,6 +11,7 @@ import {
     getAllActualScores,
     getAllBaselineScores,
     type DashboardScoringBundle,
+    type ObjectiveScore,
     type ObjectiveScoringInputs,
 } from '../../client/project-scoring.ts';
 import {
@@ -320,4 +321,107 @@ export async function getProjectsScoreColumn(
         });
     }
     return out;
+}
+
+export interface ProjectObjectiveRow {
+    projectId: Id;
+    title: string;
+    baseline: number | undefined;
+    latestActual: number | undefined;
+    points: TrendPoint[];
+}
+
+function scoresForPair(
+    rows: readonly ObjectiveScore[],
+    projectId: string,
+    objectiveId: ObjectiveId,
+): ObjectiveScore[] {
+    return rows.filter(row =>
+        row.projectId === projectId
+        && row.objectiveId === objectiveId,
+    );
+}
+
+function seriesPoints(
+    baseline: ObjectiveScore | undefined,
+    actuals: readonly ObjectiveScore[],
+): TrendPoint[] {
+    if (baseline === undefined) return [];
+    // Equal `at` keeps input order, so the last row
+    // of a shared `at` is the later input. The gauge
+    // value is latestPerPair, which breaks a tie by id.
+    const indexed = actuals.map((row, index) => ({
+        row,
+        index,
+    }));
+    indexed.sort((a, b) =>
+        a.row.at < b.row.at ? -1
+            : a.row.at > b.row.at ? 1
+                : a.index - b.index,
+    );
+    const points: TrendPoint[] = [{
+        at: baseline.at,
+        value: baseline.score,
+    }];
+    let index = 0;
+    while (index < indexed.length) {
+        let next = index + 1;
+        while (
+            next < indexed.length
+            && indexed[next]!.row.at
+                === indexed[index]!.row.at
+        ) {
+            next += 1;
+        }
+        const last = indexed[next - 1]!.row;
+        points.push({
+            at: last.at,
+            value: last.score,
+        });
+        index = next;
+    }
+    return points;
+}
+
+export function buildProjectObjectiveRows(
+    inputs: ObjectiveScoringInputs,
+    projects: ReadonlyArray<{
+        id: Id;
+        title: string;
+    }>,
+    objectiveId: ObjectiveId,
+): ProjectObjectiveRow[] {
+    const rows: ProjectObjectiveRow[] = [];
+    for (const project of projects) {
+        if (!inputs.approvedProjectIds.has(
+            project.id,
+        )) {
+            continue;
+        }
+        const baselines = latestPerPair(
+            scoresForPair(
+                inputs.baselineScores,
+                project.id,
+                objectiveId,
+            ),
+        );
+        const actualRows = scoresForPair(
+            inputs.actualScores,
+            project.id,
+            objectiveId,
+        );
+        const latestActuals = latestPerPair(
+            actualRows,
+        );
+        const baseline = baselines[0];
+        const actual = latestActuals[0];
+        rows.push({
+            projectId: project.id,
+            title: project.title,
+            baseline: baseline?.score,
+            latestActual: actual?.score,
+            points: seriesPoints(baseline, actualRows),
+        });
+    }
+    return rows;
 }
