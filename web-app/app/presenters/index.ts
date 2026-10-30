@@ -148,6 +148,9 @@ export {
     DashboardObjectiveAggregatesPresenter,
 } from './dashboard-objective-aggregates.ts';
 export {
+    DashboardObjectiveProjectsPresenter,
+} from './dashboard-objective-projects.ts';
+export {
     RecordListPresenter,
     RecordPresenter,
     buildInitialRecordListState,
