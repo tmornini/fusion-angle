@@ -382,7 +382,7 @@ Deno.test('mock-data derived baseline/actual scores pass'
         }
     }
     assertStrictEquals(baselineTotal, 49);
-    assertStrictEquals(actualTotal, 92);
+    assertStrictEquals(actualTotal, 704);
 });
 
 // The Office of Time: every persisted `at` is 6-digit

@@ -576,7 +576,7 @@ HTTP nest. Validators, crypto, hash, and
 
 ## Seed pair formation
 
-Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1889`, root
+Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 2501`, root
 included; bootstrap eight, root included. Pinned by
 `tests/mock-data-pairs.test.ts`. A pair's request holds
 what was received, or nothing. A seeded row was never
