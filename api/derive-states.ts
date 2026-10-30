@@ -333,8 +333,8 @@ export async function resolveOwningOrganization(
 // collections is two documents. Miss at THIS document is
 // 404. The probe reads the bound organization's own
 // collection, so a foreign id in an organization-nested
-// family is a miss there: 404. Only the global plane
-// (organizations) can 403.
+// family is a miss there: 404. This probe 403s for
+// organizations. identities is not collected here.
 
 // Organization-nested path prefixes:
 // /organizations/{id}/...
@@ -421,13 +421,22 @@ export async function resolveGlobalOwner(
 // Miss-path 403-vs-404 helper for org-scoped reads. Probe
 // THIS route's collection, not any row with this id.
 // owner-null → EntityNotFoundError (404); foreign →
-// ForeignOrganizationError (403). The probe collection is
-// the bound organization's own (resolveGlobalOwner →
-// ownerProbeCollection), so an organization-nested
-// family's foreign id is owner-null: 404. Only the global
-// plane (organizations) can reach 403. probeId defaults to
-// id; pass a parent id when the miss is on a nested child
-// (e.g. flow records probe the parent flow).
+// ForeignOrganizationError (403). resolveGlobalOwner
+// probes ownerProbeCollection. An organization-nested
+// family (OWNER_PROBE_FAMILY) reads the bound
+// organization's collection, so a foreign id is
+// owner-null: 404. organizations reaches 403: its probe
+// is the global collection, and the document id is the
+// owner. identities is a notFoundTable and is not in
+// OWNER_PROBE_FAMILY, so that call falls through to
+// resolveOwningOrganization. With no membership in the
+// bound organization, a membership elsewhere names that
+// organization, so identities reaches 403. Any other
+// table the probe does not map takes that fallthrough,
+// and a foreign owner there is 403.
+// probeId defaults to id; pass a parent id when the
+// miss is on a nested child (e.g. flow records probe
+// the parent flow).
 export async function missedReadError(
     db: DbAdapter,
     id: Id,
