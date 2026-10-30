@@ -26,8 +26,10 @@ import {
     type Reader,
 } from '../api/served-response.ts';
 import { imfFixdate } from '../shared/pair-root.ts';
-import { deriveIdentityKindsOf } from
-    '../api/derive-identity-spine.ts';
+import {
+    deriveIdentityKindsOf,
+    deriveIdentityPiiOf,
+} from '../api/derive-identity-spine.ts';
 
 const BASE = 'http://localhost';
 
@@ -384,7 +386,8 @@ export async function assertPartIsDocumentGet(
 
 // The reader a membership read on the organization nest
 // serves with: each seat's identity kind from the identity
-// ledger. Every seat's identity has a document; a seat
+// ledger, plus live PII name and email when the slot
+// exists. Every seat's identity has a document; a seat
 // without one is the fixture's bug.
 export async function membershipJoinReader(
     db: DbAdapter,
@@ -393,9 +396,11 @@ export async function membershipJoinReader(
         identity_id: string;
     }>[],
 ): Promise<Reader> {
-    const kinds = await deriveIdentityKindsOf(db, new Set(
+    const ids = new Set(
         parts.map((part) => part.body().toValue().identity_id),
-    ));
+    );
+    const kinds = await deriveIdentityKindsOf(db, ids);
+    const pii = await deriveIdentityPiiOf(db, ids);
     return {
         sees: 'joined',
         joined: new Map(parts.map((part) => {
@@ -406,7 +411,19 @@ export async function membershipJoinReader(
                     'no identity document for ' + identity_id,
                 );
             }
-            return [id, { identity_kind: kind }];
+            const extra: Record<string, unknown> = {
+                identity_kind: kind,
+            };
+            const slot = pii.get(identity_id);
+            if (slot !== undefined) {
+                if (slot.name !== '') {
+                    extra.invitee_name = slot.name;
+                }
+                if (slot.email !== '') {
+                    extra.invitee_email = slot.email;
+                }
+            }
+            return [id, extra];
         })),
     };
 }

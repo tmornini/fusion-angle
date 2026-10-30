@@ -910,7 +910,8 @@ Deno.test('sent invitations list the active org pending only',
     assertStrictEquals(
         sent[0]!.identityId, 'toccYYkLEABmlbpHJalgtQ',
     );
-    assert(!('inviteeEmail' in sent[0]!));
+    assertStrictEquals(sent[0]!.inviteeName, 'Sarah');
+    assertStrictEquals(sent[0]!.inviteeEmail, 'sarah@x.com');
     // Switched to Stark, the Wayne invitation is out of scope.
     const tonyStark = await ctxOn(db, 'XXZruirZyAOoRpNxaDnpSA'
         , 'AjdvjuECVZEgZoFajaIEkg');

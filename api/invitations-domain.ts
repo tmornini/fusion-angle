@@ -12,6 +12,7 @@ import {
     nowUtc,
     type Id,
     type IdentityKind,
+    type IdentityPiiEntity,
     type InvitationState,
     type MembershipEntity,
     type MessagePairEntity,
@@ -49,6 +50,7 @@ import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityKind,
     deriveIdentityKindsOf,
+    deriveIdentityPiiOf,
     deriveIdentityPiiRows,
     identityPrefixFor,
 } from './derive-identity-spine.ts';
@@ -480,12 +482,14 @@ export async function getInvitationOnIdentityNest(
 
 // A membership read on the organization nest joins each
 // seat's identity kind, the one rule every roster reader
-// sorts members by. Every seat's identity has a document
+// sorts members by, and the live PII name and email when
+// the slot exists. Every seat's identity has a document
 // (memberGeneses and postBootstrapIn write both), so a
 // seat without one is the store's bug, never served bare.
 function identityKindJoin(
     heads: readonly MessagePairEntity[],
     kinds: ReadonlyMap<Id, IdentityKind>,
+    pii: ReadonlyMap<Id, IdentityPiiEntity>,
 ): Reader {
     return {
         sees: 'joined',
@@ -498,7 +502,19 @@ function identityKindJoin(
                         + membership.identity_id,
                 );
             }
-            return [membership.id, { identity_kind: kind }];
+            const extra: Record<string, unknown> = {
+                identity_kind: kind,
+            };
+            const slot = pii.get(membership.identity_id);
+            if (slot !== undefined) {
+                if (slot.name !== '') {
+                    extra.invitee_name = slot.name;
+                }
+                if (slot.email !== '') {
+                    extra.invitee_email = slot.email;
+                }
+            }
+            return [membership.id, extra];
         })),
     };
 }
@@ -518,6 +534,15 @@ function seatedIdentityKinds(
     ));
 }
 
+function seatedIdentityPii(
+    view: DbAdapter,
+    heads: readonly MessagePairEntity[],
+): Promise<ReadonlyMap<Id, IdentityPiiEntity>> {
+    return deriveIdentityPiiOf(view, new Set(
+        heads.map((head) => membershipOfHead(head).identity_id),
+    ));
+}
+
 // GET /organizations/:id/invitations/
 export async function getOrganizationInvitations(
     db: DbAdapter,
@@ -527,7 +552,7 @@ export async function getOrganizationInvitations(
     _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
-    const { heads, kinds } = await db.readTransaction(
+    const { heads, kinds, pii } = await db.readTransaction(
         async (view) => {
             const heads = await organizationMembershipHeads(
                 view, param(params, 0), askedQuery(query),
@@ -535,12 +560,13 @@ export async function getOrganizationInvitations(
             return {
                 heads,
                 kinds: await seatedIdentityKinds(view, heads),
+                pii: await seatedIdentityPii(view, heads),
             };
         },
     );
     return {
         ...wholeCollectionSelection(heads, 'stateless'),
-        reader: identityKindJoin(heads, kinds),
+        reader: identityKindJoin(heads, kinds, pii),
     };
 }
 
@@ -553,7 +579,7 @@ export async function getInvitationOnOrganizationNest(
     roles: readonly string[],
 ): Promise<HeadSelection> {
     const name = membershipName(params);
-    const { head, kinds } = await db.readTransaction(
+    const { head, kinds, pii } = await db.readTransaction(
         async (view) => {
             const head = await visibleHead(
                 view, name, roles, 'organization',
@@ -561,6 +587,7 @@ export async function getInvitationOnOrganizationNest(
             return {
                 head,
                 kinds: await seatedIdentityKinds(view, [head]),
+                pii: await seatedIdentityPii(view, [head]),
             };
         },
     );
@@ -568,7 +595,7 @@ export async function getInvitationOnOrganizationNest(
         ...wholeHeadSelection(
             head, 'stateless', 'invitations', name,
         ),
-        reader: identityKindJoin([head], kinds),
+        reader: identityKindJoin([head], kinds, pii),
     };
 }
 

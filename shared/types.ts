@@ -1482,9 +1482,12 @@ export type MembershipEntity =
 // A membership as the organization nest serves it: the
 // stored body and its identity's kind, derived when served
 // and never stored. A member is human if and only if that
-// kind is 'person'.
+// kind is 'person'. Invitee name and email join from live
+// PII when the slot exists; erasure omits them.
 export type MembershipReadEntity = MembershipEntity & {
     identity_kind: IdentityKind;
+    invitee_name?: string;
+    invitee_email?: string;
 };
 
 // An invitation binding an identity to an organization, awaiting the holder's

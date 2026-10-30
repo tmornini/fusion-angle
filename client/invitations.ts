@@ -2,6 +2,7 @@ import type {
     Id,
     InvitationState,
     MembershipEntity,
+    MembershipReadEntity,
 } from '../shared/types.ts';
 import {
     nowUtc,
@@ -54,13 +55,16 @@ export function invitationIsExpired(
 }
 
 // One outstanding membership as the inviting admin sees
-// it. The invitee's email is not on this wire.
+// it. Invitee name and email are joined from live PII
+// when the slot exists; erasure omits them.
 export interface SentInvitation {
     readonly id: Id;
     readonly organizationId: Id;
     readonly identityId: Id;
     readonly invitedAt: string;
     readonly state: InvitationState;
+    readonly inviteeName?: string;
+    readonly inviteeEmail?: string;
     readonly message: HttpMessage<MembershipEntity>;
 }
 
@@ -80,17 +84,31 @@ function inviteeViewOf(
 }
 
 function sentViewOf(
-    message: HttpMessage<MembershipEntity>,
+    message: HttpMessage<MembershipReadEntity>,
 ): SentInvitation {
     const row = message.body().toValue();
-    return {
+    const view: SentInvitation = {
         id: row.id,
         organizationId: row.organization_id,
         identityId: row.identity_id,
         invitedAt: row.at,
         state: row.state,
-        message,
+        message: message as HttpMessage<MembershipEntity>,
     };
+    if (row.invitee_name !== undefined) {
+        if (row.invitee_email !== undefined) {
+            return {
+                ...view,
+                inviteeName: row.invitee_name,
+                inviteeEmail: row.invitee_email,
+            };
+        }
+        return { ...view, inviteeName: row.invitee_name };
+    }
+    if (row.invitee_email !== undefined) {
+        return { ...view, inviteeEmail: row.invitee_email };
+    }
+    return view;
 }
 
 // The caller's own memberships. The server fences by
@@ -131,7 +149,7 @@ export async function getSentInvitations(
     ctx: RequestContext,
     state: InvitationState,
 ): Promise<SentInvitation[]> {
-    const parts = await ctx.GETCollection<MembershipEntity>(
+    const parts = await ctx.GETCollection<MembershipReadEntity>(
         'organizations/'
             + activeOrganization(ctx)
             + '/invitations/?state=' + state,

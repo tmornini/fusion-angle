@@ -213,7 +213,9 @@ grants the role. The members roster is accepted
 memberships (not a members collection, not identities).
 A membership read serves the stored body plus a derived
 `identity_kind`, `person` or `service`, and a member is
-human if and only if it is `person`. A service identity
+human if and only if it is `person`. Live PII joins
+`invitee_name` and `invitee_email` when the slot exists;
+erasure omits them. A service identity
 is an AI member when it names a document in the
 organization's `ai-agents/`, and a service member when it
 names one in `services/`. An AI or a service is live

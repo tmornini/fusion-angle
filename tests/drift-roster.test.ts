@@ -19,8 +19,10 @@ import {
     organizationMembershipHeads,
 } from '../api/memberships.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
-import { deriveIdentityKindsOf } from
-    '../api/derive-identity-spine.ts';
+import {
+    deriveIdentityKindsOf,
+    deriveIdentityPiiOf,
+} from '../api/derive-identity-spine.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -121,13 +123,22 @@ async function withIdentityKind(
     db: DbAdapter,
     rows: readonly MembershipEntity[],
 ) {
-    const kinds = await deriveIdentityKindsOf(db, new Set(
-        rows.map((row) => row.identity_id),
-    ));
-    return rows.map((row) => ({
-        ...row,
-        identity_kind: kinds.get(row.identity_id),
-    }));
+    const ids = new Set(rows.map((row) => row.identity_id));
+    const kinds = await deriveIdentityKindsOf(db, ids);
+    const pii = await deriveIdentityPiiOf(db, ids);
+    return rows.map((row) => {
+        const slot = pii.get(row.identity_id);
+        return {
+            ...row,
+            identity_kind: kinds.get(row.identity_id),
+            ...(slot !== undefined && slot.name !== ''
+                ? { invitee_name: slot.name }
+                : {}),
+            ...(slot !== undefined && slot.email !== ''
+                ? { invitee_email: slot.email }
+                : {}),
+        };
+    });
 }
 
 // -- shared live-write body builders -----------------------------
