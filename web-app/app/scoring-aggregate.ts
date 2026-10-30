@@ -383,6 +383,43 @@ function seriesPoints(
     return points;
 }
 
+function numericChange(
+    row: ProjectObjectiveRow,
+): number | undefined {
+    if (
+        row.baseline === undefined
+        || row.latestActual === undefined
+    ) {
+        return undefined;
+    }
+    return row.latestActual - row.baseline;
+}
+
+function compareProjectObjectiveRows(
+    a: ProjectObjectiveRow,
+    b: ProjectObjectiveRow,
+): number {
+    const aChange = numericChange(a);
+    const bChange = numericChange(b);
+    if (
+        aChange !== undefined
+        && bChange !== undefined
+        && aChange !== bChange
+    ) {
+        return aChange - bChange;
+    }
+    const aNumeric = aChange !== undefined;
+    const bNumeric = bChange !== undefined;
+    if (aNumeric !== bNumeric) {
+        return aNumeric ? -1 : 1;
+    }
+    if (a.title < b.title) return -1;
+    if (b.title < a.title) return 1;
+    if (a.projectId < b.projectId) return -1;
+    if (b.projectId < a.projectId) return 1;
+    return 0;
+}
+
 export function buildProjectObjectiveRows(
     inputs: ObjectiveScoringInputs,
     projects: ReadonlyArray<{
@@ -423,5 +460,5 @@ export function buildProjectObjectiveRows(
             points: seriesPoints(baseline, actualRows),
         });
     }
-    return rows;
+    return rows.sort(compareProjectObjectiveRows);
 }

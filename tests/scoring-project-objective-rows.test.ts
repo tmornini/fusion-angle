@@ -215,3 +215,60 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'project rows sort by change, then title, then id',
+    () => {
+        const at = '2026-05-14T00:00:00.000000Z';
+        const later = '2026-05-15T00:00:00.000000Z';
+        const projects = [
+            { id: 'p-pos', title: 'Pos' },
+            { id: 'p-missb', title: 'MissB' },
+            { id: 'p-b', title: 'Tie' },
+            { id: 'p-zero', title: 'Zero' },
+            { id: 'p-out', title: 'Aaa' },
+            { id: 'p-neg', title: 'Neg' },
+            { id: 'p-missa', title: 'MissA' },
+            { id: 'p-a', title: 'Tie' },
+            { id: 'p-none', title: 'Empty' },
+        ];
+        const approved = projects
+            .map(project => project.id)
+            .filter(id => id !== 'p-out');
+        const rows = rowsFor(
+            projects,
+            approved,
+            [
+                score('bn', 'p-neg', OBJ, 10, at),
+                score('ba', 'p-a', OBJ, 10, at),
+                score('bb', 'p-b', OBJ, 0, at),
+                score('bz', 'p-zero', OBJ, 5, at),
+                score('bp', 'p-pos', OBJ, 1, at),
+                score('bma', 'p-missa', OBJ, 9, at),
+                score('bo', 'p-out', OBJ, 0, at),
+            ],
+            [
+                score('an', 'p-neg', OBJ, 4, later),
+                score('aa', 'p-a', OBJ, 7, later),
+                score('ab', 'p-b', OBJ, -3, later),
+                score('az', 'p-zero', OBJ, 5, later),
+                score('ap', 'p-pos', OBJ, 4, later),
+                score('amb', 'p-missb', OBJ, 8, later),
+                score('ao', 'p-out', OBJ, -100, later),
+            ],
+        );
+        assertEquals(
+            rows.map(row => row.projectId),
+            [
+                'p-neg',
+                'p-a',
+                'p-b',
+                'p-zero',
+                'p-pos',
+                'p-none',
+                'p-missa',
+                'p-missb',
+            ],
+        );
+    },
+);
