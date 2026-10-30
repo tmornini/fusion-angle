@@ -2,6 +2,9 @@
 # Edit session. Creates a fresh Postgres, seeds it,
 # and serves. Return redeploys the server.
 # Exit, including Ctrl-C, takes the stack down.
+# An agent that starts this server reloads each
+# changed page in browser-use after a commit.
+# The contract is in AGENTS.md.
 set -euo pipefail
 
 usage() {
@@ -18,6 +21,12 @@ site is up. Press Return to redeploy, then
 reload the browser. Ctrl-C stops
 the server and runs:
   docker compose -p fusion-develop down
+
+An agent that starts this server owns that
+reload. After each commit, send Return, then
+reload the changed page in browser-use.
+Seed data needs a new process, not Return.
+The contract is in AGENTS.md.
 
 Request log: a file beside the site. Its
 path prints at startup. The site directory

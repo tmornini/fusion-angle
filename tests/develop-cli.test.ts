@@ -319,6 +319,11 @@ async () => {
     assertMatch(run.stdout, /Press Return/);
     assertMatch(run.stdout, /Request log/);
     assertMatch(run.stdout, /fusion-develop down/);
+    assertMatch(run.stdout, /browser-use/);
+    assertMatch(
+        run.stdout,
+        /After each commit/,
+    );
     assertEquals(run.calls, []);
 });
 
