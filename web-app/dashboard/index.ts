@@ -99,6 +99,16 @@ function onObjectiveCardKeydown(event: Event): void {
     activateObjectiveCard(event);
 }
 
+function onObjectiveCardEscape(event: Event): void {
+    if ((event as KeyboardEvent).key !== 'Escape') {
+        return;
+    }
+    if (openObjectiveId === null) return;
+    event.preventDefault();
+    openObjectiveId = null;
+    void renderObjectiveAggregates();
+}
+
 function bindObjectiveCard(): void {
     if (objectiveCardBound) return;
     const card = $required(
@@ -110,6 +120,9 @@ function bindObjectiveCard(): void {
     );
     card.addEventListener(
         'keydown', onObjectiveCardKeydown,
+    );
+    document.addEventListener(
+        'keydown', onObjectiveCardEscape,
     );
     objectiveCardBound = true;
 }

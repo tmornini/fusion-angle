@@ -106,6 +106,18 @@
     padding-right: calc(var(--space-6) * 1.5);
 }
 
+/* Same inset from the top and right edges,
+    matching the gauge-card's top padding. */
+.objective-aggregates-card.objective-drill {
+    position: relative;
+}
+
+.objective-aggregates-card.objective-drill [data-drill-back] {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+}
+
 .objective-aggregates-card .icon-box {
     background: linear-gradient(135deg,
         hsl(var(--blue-400) / 0.2),

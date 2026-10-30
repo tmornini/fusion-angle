@@ -61,7 +61,15 @@ Deno.test(
         assert(html.includes('objective-drill'));
         assert(html.includes('type="button"'));
         assert(html.includes('data-drill-back'));
-        assert(html.includes('← Objectives'));
+        assert(html.includes('⊗'));
+        assert(html.includes(
+            'aria-label="Back to objectives"',
+        ));
+        assert(html.includes('justify-between'));
+        assertStrictEquals(
+            html.includes('← Objectives'),
+            false,
+        );
         assertMatch(
             html,
             /<h3[^>]*>\s*Raise income\s*<\/h3>/,
@@ -199,6 +207,29 @@ Deno.test(
         );
         assert(metrics.includes(
             'padding-right: calc(var(--space-6) * 1.5);',
+        ));
+    },
+);
+
+Deno.test(
+    'the drill close sits equally from the corner',
+    () => {
+        const metrics = Deno.readTextFileSync(
+            'web-app/app/styles/components-metrics.css',
+        );
+        assert(metrics.includes(
+            '.objective-aggregates-card'
+            + '.objective-drill {\n'
+            + '    position: relative;\n'
+            + '}',
+        ));
+        assert(metrics.includes(
+            '.objective-aggregates-card'
+            + '.objective-drill [data-drill-back] {\n'
+            + '    position: absolute;\n'
+            + '    top: var(--space-4);\n'
+            + '    right: var(--space-4);\n'
+            + '}',
         ));
     },
 );

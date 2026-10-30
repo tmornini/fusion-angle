@@ -25,15 +25,18 @@ export class DashboardObjectiveProjectsPresenter {
                 + ' objective-drill'
             }">
                 <div class="${
-                    'flex items-center gap-3 mb-5'
+                    'flex items-center'
+                    + ' justify-between mb-5'
                 }">
-                    <button type="button"
-                        data-drill-back>${
-                        '← Objectives'
-                    }</button>
                     <h3 class="${
                         'text-sm font-semibold'
                     }">${this.#name}</h3>
+                    <button type="button"
+                        class="link"
+                        data-drill-back
+                        aria-label="${
+                            'Back to objectives'
+                        }">⊗</button>
                 </div>
                 <ul class="${
                     'objective-aggregates-rows'

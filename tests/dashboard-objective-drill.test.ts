@@ -73,6 +73,10 @@ Deno.test(
                 querySelector: () => null,
                 querySelectorAll: () => [],
             };
+            const documentListeners: Array<{
+                type: string;
+                fn: EventListener;
+            }> = [];
             g['window'] = {
                 addEventListener: () => {},
             };
@@ -80,7 +84,14 @@ Deno.test(
                 observe(): void {}
             };
             g['document'] = {
-                addEventListener: () => {},
+                addEventListener(
+                    type: string,
+                    fn: EventListener,
+                ): void {
+                    documentListeners.push({
+                        type, fn,
+                    });
+                },
                 createElement: () => ({
                     className: '',
                     setAttribute: () => {},
@@ -177,6 +188,12 @@ Deno.test(
                     ).length,
                     1,
                 );
+                assertStrictEquals(
+                    documentListeners.filter(
+                        item => item.type === 'keydown',
+                    ).length,
+                    1,
+                );
 
                 function listeners(
                     type: string,
@@ -191,6 +208,18 @@ Deno.test(
                 ): void {
                     const fn = listeners(type)[0];
                     assert(fn, type);
+                    fn(event);
+                }
+                function fireDocument(
+                    type: string,
+                    event: Event,
+                ): void {
+                    const fn = documentListeners
+                        .filter(item =>
+                            item.type === type,
+                        )
+                        .map(item => item.fn)[0];
+                    assert(fn, 'document ' + type);
                     fn(event);
                 }
                 function pointer(
@@ -294,6 +323,19 @@ Deno.test(
                     });
                 }
 
+                const idleEscape = pointer(
+                    { closest: () => null },
+                    'Escape',
+                );
+                fireDocument('keydown', idleEscape);
+                assertStrictEquals(
+                    idleEscape.defaultPrevented, false,
+                );
+                assertStrictEquals(
+                    cardHtml.includes('data-drill-back'),
+                    false,
+                );
+
                 const ignored = pointer(rowTarget(), 'x');
                 fire('keydown', ignored);
                 assertStrictEquals(
@@ -325,7 +367,11 @@ Deno.test(
                 );
                 const drilled = await opened;
                 assert(drilled.includes('data-drill-back'));
-                assert(drilled.includes('← Objectives'));
+                assert(drilled.includes('⊗'));
+                assertStrictEquals(
+                    drilled.includes('← Objectives'),
+                    false,
+                );
                 assert(drilled.includes('Raise income'));
                 assert(drilled.includes('North'));
                 assert(drilled.includes(
@@ -345,11 +391,14 @@ Deno.test(
                     false,
                 );
 
-                const close = pointer(backTarget());
+                const escapeClose = pointer(
+                    { closest: () => null },
+                    'Escape',
+                );
                 const closed = nextCardHtml();
-                fire('click', close);
+                fireDocument('keydown', escapeClose);
                 assertStrictEquals(
-                    close.defaultPrevented, false,
+                    escapeClose.defaultPrevented, true,
                 );
                 const listed = await closed;
                 assert(listed.includes('icon-box'));
@@ -478,6 +527,12 @@ Deno.test(
                 );
                 assertStrictEquals(
                     cardListeners.filter(
+                        item => item.type === 'keydown',
+                    ).length,
+                    1,
+                );
+                assertStrictEquals(
+                    documentListeners.filter(
                         item => item.type === 'keydown',
                     ).length,
                     1,
