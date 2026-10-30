@@ -1,6 +1,8 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { DashboardObjectiveAggregatesPresenter } from
     '../web-app/app/presenters/dashboard-objective-aggregates.ts';
+import { buildSparkline } from
+    '../web-app/app/presenters/sparkline.ts';
 import type { TrendPoint } from '../web-app/app/scoring-aggregate.ts';
 import type { ObjectiveEntity } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
@@ -349,3 +351,64 @@ Deno.test('baseline dot is grey; dots match their segment',
         '40 -> 25 dot matches the down segment',
     );
 });
+
+Deno.test(
+    'buildSparkline paints the aggregate series',
+    () => {
+        const empty = buildSparkline([]).toString();
+        assert(
+            empty.includes('class="sparkline-axis"'),
+        );
+        assertStrictEquals(
+            empty.includes('class="sparkline-seg"'),
+            false,
+        );
+        assertStrictEquals(
+            empty.includes('class="spark-dot"'),
+            false,
+        );
+        const html = buildSparkline([
+            {
+                at: '2026-05-01T00:00:00.000000Z',
+                value: 20,
+            },
+            {
+                at: '2026-05-10T00:00:00.000000Z',
+                value: 40,
+            },
+            {
+                at: '2026-05-20T00:00:00.000000Z',
+                value: 25,
+            },
+        ]).toString();
+        assert(html.includes('viewBox="0 0 100 96"'));
+        assert(html.includes('data-direction="up"'));
+        assert(html.includes('data-direction="down"'));
+        assert(html.includes('class="sparkline-seg"'));
+        assert(html.includes('class="spark-dot"'));
+        assert(
+            html.includes('Baseline · 20'),
+        );
+    },
+);
+
+Deno.test(
+    'the aggregate card uses the shared painter',
+    () => {
+        const src = Deno.readTextFileSync(
+            'web-app/app/presenters/'
+            + 'dashboard-objective-aggregates.ts',
+        );
+        assert(src.includes(
+            "from './sparkline.ts'",
+        ));
+        assertStrictEquals(
+            src.includes('function directionForDelta'),
+            false,
+        );
+        assertStrictEquals(
+            src.includes('#sparkline'),
+            false,
+        );
+    },
+);
