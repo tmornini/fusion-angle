@@ -21,6 +21,7 @@ export const SEED_HASH_PREIMAGE: Readonly<
     'OvJSmafViYCdfyAIdgzJTQ': 'P13W0rk4rcF0r3castsXY1',
     'OXxlaOFaAWfVofOqOHeTrQ': 'P06SmInvOptZyXY010203A',
     'PGtnaoTOuWCcbADPrancjA': 'P14SmartD0cumtR0utngX1',
+    'PIfhHMLQQxTxKFDdabXbOw': 'P16MktSent1mentXY01020',
     'PIImLccwpnfvbBBMsIKoMA': 'P15Inv3st0rRep0rtP1Y00',
     'QVZjTYvKwffyfGpYILwkOA': 'RgT2mNvKpQ8xLsYwBzHcUe',
     'VhxqyRIQytSnUArslwxyog': 'bDf6uStZlA9eGmYjIoNcWq',
