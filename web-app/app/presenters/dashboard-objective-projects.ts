@@ -68,12 +68,13 @@ export class DashboardObjectiveProjectsPresenter {
                     item.points.length === 0
                 }">
                 <span class="score-row-label">
-                    <a href="${buildPageUrl(
-                        'project-detail',
-                        {
-                            projectId: item.projectId,
-                        },
-                    )}">${item.title}</a>
+                    <a class="score-row-link" href="${
+                        buildPageUrl(
+                            'project-detail',
+                            {
+                                projectId: item.projectId,
+                            },
+                        )}">${item.title}</a>
                 </span>
                 <span class="score-row-gauge">
                     ${gauge}

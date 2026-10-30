@@ -109,7 +109,9 @@ export class DashboardObjectiveAggregatesPresenter {
                 data-empty="${empty}"
                 tabindex="0">
                 <span class="score-row-label">
-                    ${def.name}
+                    <span class="score-row-link">${
+                        def.name
+                    }</span>
                 </span>
                 <span class="score-row-gauge">
                     ${gauge}

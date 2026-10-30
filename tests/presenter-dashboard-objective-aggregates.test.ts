@@ -49,6 +49,32 @@ Deno.test('renders one row per active objective', () => {
     assert(html.includes('Lower expenses'));
 });
 
+Deno.test(
+    'an aggregate name uses the shared row link',
+    () => {
+        const p =
+            new DashboardObjectiveAggregatesPresenter(
+                activeObjs, defs, aggregates, trendlines,
+            );
+        const html = p.buildCard().toString();
+        const start = html.indexOf(
+            'data-objective-id="ohqxgUBEaFQwYbXsonRPmg"',
+        );
+        const row = html.slice(start).slice(
+            0, html.slice(start).indexOf('</li>'),
+        );
+        assertMatch(
+            row,
+            /class="score-row-link"[^>]*>\s*Increase incomes/,
+        );
+        assertStrictEquals(
+            /<a\b/.test(row),
+            false,
+            'the drill name is not a navigation anchor',
+        );
+    },
+);
+
 Deno.test('card chassis matches Time/Cost/Impact pattern', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
         activeObjs, defs, aggregates, trendlines,

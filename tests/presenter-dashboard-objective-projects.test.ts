@@ -104,6 +104,10 @@ Deno.test(
             projectId: 'p-b',
         });
         assert(beta.includes('href="' + href + '"'));
+        assertMatch(
+            beta,
+            /<a class="score-row-link" href="/,
+        );
         assert(beta.includes('data-size="small"'));
         assert(beta.includes(
             'id="outer-left-drill-p-b"',
@@ -133,7 +137,7 @@ Deno.test(
 );
 
 Deno.test(
-    'drilled columns are desktop-only',
+    'score-row names size the first column',
     () => {
         const metrics = Deno.readTextFileSync(
             'web-app/app/styles/components-metrics.css',
@@ -141,7 +145,7 @@ Deno.test(
         const aggregate = metrics.indexOf(
             '.objective-aggregates-card .score-row {\n'
             + '    grid-template-columns:'
-            + ' 140px 110px 1fr;\n'
+            + ' 12rem 110px 1fr;\n'
             + '}',
         );
         assert(aggregate >= 0);
@@ -154,7 +158,7 @@ Deno.test(
         );
         const columns = metrics.indexOf(
             'grid-template-columns:'
-            + ' 220px 110px 1fr;',
+            + ' 16.5rem 110px 1fr;',
         );
         assert(media > aggregate);
         assert(drilled > media);
@@ -167,6 +171,34 @@ Deno.test(
             + '        grid-template-columns:'
             + ' minmax(0, 1fr) 110px;\n'
             + '    }',
+        ));
+    },
+);
+
+Deno.test(
+    'score-row names share the link affordance',
+    () => {
+        const metrics = Deno.readTextFileSync(
+            'web-app/app/styles/components-metrics.css',
+        );
+        assert(metrics.includes(
+            '.score-row-link {\n'
+            + '    cursor: pointer;\n'
+            + '    text-decoration: underline;\n'
+            + '    text-underline-offset: 0.12em;\n'
+            + '}',
+        ));
+    },
+);
+
+Deno.test(
+    'the card keeps extra space after the graphs',
+    () => {
+        const metrics = Deno.readTextFileSync(
+            'web-app/app/styles/components-metrics.css',
+        );
+        assert(metrics.includes(
+            'padding-right: calc(var(--space-6) * 1.5);',
         ));
     },
 );
