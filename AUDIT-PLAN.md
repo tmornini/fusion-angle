@@ -362,6 +362,33 @@ safest-first; `./validate` green before each commit.
 The Office of the Commit and AGENTS.md govern the
 rest.
 
+### Bookmark tags
+
+Two annotated git tags bookmark the last closed
+cycles. Read them with `git rev-parse --verify NAME`.
+
+`last-audit-remediation` names the commit that closed
+the last doctrine-audit remediation cycle —
+remediations landed, report retired.
+`last-successful-test-plan` names the commit of the
+last Layer 3 walk cycle that closed with zero FAIL;
+see [TEST-PLAN.md](TEST-PLAN.md).
+
+Move `last-audit-remediation` only when remediations
+have landed and the report is retired. Tag the closing
+commit. When that close is a merge, tag the merge.
+Recreate the annotated tag:
+
+```
+git tag -d last-audit-remediation
+git tag -a last-audit-remediation SHA \
+    -m "Close the audit remediation"
+```
+
+The tags are local bookmarks. A published tag moves
+only with the operator's announced rewrite of that
+name.
+
 ## How we got here
 
 The first runbooks hunted the whole repository per
