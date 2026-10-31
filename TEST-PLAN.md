@@ -286,28 +286,29 @@ not repeat the note in every case.
   `performance.getEntriesByType('resource')` into
   `sessionStorage`, read back on the inbox. Arming
   (a) records only requests issued after it is
-  enabled, so enable it before bind to see the
-  binding PUT. Arming (b) holds the whole document
-  buffer, PUT included, so it may be installed after
-  fill; it witnesses URL and status only, and the
-  Layer 1 pins decide the body and `If-Match`. A
+  enabled. Arming (b) holds the whole document
+  buffer, so it may be installed after fill; it
+  witnesses URL and status only, and the Layer 1
+  pins decide the body and `If-Match`. A
   `getEntries()` call made on the inbox document is
   not the read, and `js()` fetch of the API is not a
   read: the bearer is memory-only. A successor who
   finds the inbox already loaded does not call
   `getEntries()` there. They witness the pair once,
-  in this order: one fresh unbound Data Capture work
-  order, bind, fill, arm the read, click `submit`,
-  and snapshot before the inbox document commits
-  (with arming (a), enabled before bind). One
-  attempt. Append WB16's line after WB15's, out of
-  document order, holding the witnessed read until
-  then; a resume at the first ID after the last
-  scored line must not skip WB12 through WB15. A
-  transition POST missing because navigation dropped
-  an unarmed buffer is BLOCKED, not FAIL. The Layer 1
-  pins decide the instance-shape body and If-Match.
-  The live network-log read is the exploratory half.
+  in this order: a claimed-by-me action screen
+  (create still birth-claims, or drag onto
+  claimed-by-me first), fill, arm the read, click
+  `submit`, and snapshot before the inbox document
+  commits (with arming (a), enabled before
+  `submit`). One attempt. Append WB16's line after
+  WB15's, out of document order, holding the
+  witnessed read until then; a resume at the first
+  ID after the last scored line must not skip WB12
+  through WB15. A transition POST missing because
+  navigation dropped an unarmed buffer is BLOCKED,
+  not FAIL. The Layer 1 pins decide the
+  instance-shape body and If-Match. The live
+  network-log read is the exploratory half.
 - Canvas `viewBox`: read `svg.getAttribute('viewBox')`,
   never `clientWidth` / `clientHeight`. 1102×549 is the
   wrap's pixel size, not a camera value.
@@ -350,11 +351,12 @@ not repeat the note in every case.
   element was hit twice.
 - F70: if the Industry row is not in the open
   panel, DEFERRED on F69.
-- R14: bind `#gate0001` to any existing Customer
-  Profile instance in the picker (never mint). The
-  label may read `Walk Co B` after WB19a. R13's
-  open claimed the WO; bind while claimed by the
-  current member is expected.
+- R14: `#gate0001` is unbound; bind-at-creation is
+  later. There is no action-screen picker. Drive a
+  seeded bound WO after a claim drag (or a
+  birth-claimed create if that WO is already bound).
+  A value-bearing transition while unbound is 400,
+  not 409. Opening does not claim.
 - R16: PASS if the Instances section lists at least
   one instance with id + readable values. `Acme Corp`
   and `Walk Co B` are both this walk's instance.
@@ -366,13 +368,14 @@ not repeat the note in every case.
   'chip toggles persist on save and reload (AA9)'
   decides the save. If the chips do not toggle,
   record BLOCKED naming that. Do not FAIL.
-- WB11: create or open an unbound Data Capture WO,
-  bind, fill, submit. Layer 2 pin
+- WB11: from a claimed-by-me action screen (create
+  still birth-claims, or drag onto claimed-by-me
+  first), fill, submit. Opening inspects; bind is
+  gone. Layer 2 pin
   tests/browser/workbox-transition.test.ts
-  'bind, fill, and submit navigates to the inbox
-  (WB11)' decides the inbox navigation. If bind
-  cannot be driven, record BLOCKED. Do not FAIL.
-  WB16's read is armed before this `submit`, in the
+  'fill and submit navigates to the inbox
+  (WB11)' decides the inbox navigation. WB16's
+  read is armed before this `submit`, in the
   same turn (Driving notes, WB11/WB16).
 - WB19a/WB19b: drive while the bound WO is still
   Active, before WB14. If WB14 already archived it,
@@ -4439,39 +4442,31 @@ gesture pans instead of dragging, marquee-ing, or connecting.
 ### Workbox Inbox (`workbox/`)
 
 - [ ] **WB1** Navigate to `workbox/`. PASS: page shows
-  "Workbox" title, subtitle "Your work order inbox",
-  Active/Archive tabs, and a "Create Work Order" button
-  (plus icon + label; mobile short label "Create").
-  Pin: exploratory — the live page chrome; the shell text
-       carries no CLI or browser test
-- [ ] **WB2** With no work orders, the Active tab shows
-  an empty state with mail icon and "No Active Work
-  Orders Yet" message. The mock seed has active work
-  orders, so verify against an org with none, or by
-  component source.
-  Pin: tests/workbox-inbox.test.ts 'buildInboxItems
-       returns an empty array in active mode with no work
-       orders' (decides the data is empty; the rendered
-       empty-state copy itself, `emptyStateFor` in
-       web-app/workbox/index.ts, carries no test);
-       exploratory — the live empty-state render
-- [ ] **WB3** Click the Archive tab. PASS: tab switches
-  to show the archive list — the mock seed carries
-  ≥ 129 completed work orders (of ≥ 145 seeded total:
-  `buildWorkOrders()` seeds Customer Onboarding and
-  Layout Test work orders, and `buildLeadToCloseWorkload()`
-  — a second, easily-missed source — seeds 100 more for
-  Lead-to-Close; all 145 are stamped into Stark and the
-  inbox is org-scoped, so all land in this one list).
-  Pin: exploratory — the live tab switch and list render;
-       the seeded completed count (129 of 145: Customer
-       Onboarding 33/39, Layout Test 5/6, Lead-to-Close
-       91/100 — computed from `buildWorkOrders()` +
-       `buildLeadToCloseWorkload()` and each work order's
-       own embedded `flow_graph`'s `isArchive` node, the
-       same test `curNode.isArchive` in
-       web-app/app/presenters/workbox-inbox.ts applies
-       live) carries no CLI test pinning these numbers
+  "Workbox" title, no subtitle, two cards "Work Orders
+  available to me" and "Work Orders claimed by me",
+  pills Active | Archived by Me on the right card, and
+  a "Create Work Order" button (plus icon + label;
+  mobile short label "Create"). The user-facing word is
+  the past participle Archived, never Archive.
+  Pin: tests/presenter-workbox-inbox.test.ts 'workbox
+       index.html is two cards, pills on the right, no
+       subtitle'
+- [ ] **WB2** With no work orders available to the
+  current member, the left card shows "No work orders
+  available to me". The right card Active pill shows
+  "No work orders claimed by me".
+  Pin: tests/presenter-workbox-inbox.test.ts 'available
+       empty copy is No work orders available to me';
+       tests/presenter-workbox-inbox.test.ts 'claimed
+       empty copy is No work orders claimed by me'
+- [ ] **WB3** Click Archived by Me. PASS: the right card
+  lists this member's archived-by-me rows, most recently
+  archived first. The left card does not change.
+  Pin: tests/workbox-inbox.test.ts 'this member's
+       archive transition is archived-by-me';
+       tests/presenter-workbox-inbox.test.ts
+       'archived-by-me empty copy is No work orders
+       archived by me'
 
 ### Workbox — Create Work Order
 
@@ -4591,18 +4586,16 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        'buildAttributeInputHtml renders a bare checkbox
        input for the checkbox type'
 - [ ] **WB8** Transition buttons appear below the
-  attributes, one per outgoing edge from the current
-  node, labeled with the edge name.
-  Pin: tests/presenter-workbox-detail.test.ts 'buildPage
-       renders one transition button per outgoing edge
-       and a release button when the work order is not
-       complete'
-- [ ] **WB9** A "Release Work Order" button is visible,
-  separate from transition buttons.
-  Pin: tests/presenter-workbox-detail.test.ts 'buildPage
-       renders one transition button per outgoing edge
-       and a release button when the work order is not
-       complete' (the same test decides both)
+  attributes on claimed-by-me, one per outgoing edge
+  from the current node, labeled with the edge name.
+  Pin: tests/presenter-workbox-detail.test.ts
+       'buildPage claimed-by-me enables transitions'
+- [ ] **WB9** No Release button. Release is an inbox
+  drag onto available-to-me (WB13).
+  Pin: tests/workbox-inbox-drag.test.ts 'transfer
+       release clears this member's live claim';
+       tests/workbox-inbox-drag.test.ts 'claimed-by-me
+       onto available is release'
 - [ ] **WB10** A collapsible History section shows all
   transitions with from/to state names, user name, and
   relative timestamp.
@@ -4614,65 +4607,43 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        attribute values'; exploratory — the collapsible
        interaction and the relative-timestamp formatting
        live
-- [ ] **WB10a — Bind picker on an unbound WO.** Open an
-  unbound work order on a flow that has a record-type
-  join and at least one instance. PASS: header shows an
-  Unbound badge; a "Bind instance" button is visible;
-  clicking it opens the bind-instance dialog listing
-  instances for the flow's record type (rows use
-  `data-instance-pick`, never `data-attribute-id`);
-  picking an instance PUTs `work-orders/:id/binding`
-  (200), the dialog closes, and the screen re-presents
-  with a bound Instance badge and pre-filled values from
-  the instance head.
-  Pin: tests/presenter-workbox-detail.test.ts 'buildPage
-       unbound disables fields, shows bind prompt and
-       picker button';
-       tests/presenter-workbox-detail.test.ts 'buildPage
-       pre-fills inputs from instance values and shows a
-       bound badge'; tests/api-work-order-binding.test.ts
-       'fresh bind → 200; detail + list embed; unbound
-       omits keys'; exploratory — the live dialog
-       open/close and the click-to-pick gesture
-- [ ] **WB10b — Disabled fields + bind prompt.** On an
-  unbound work order with current-node attribute refs.
-  PASS: every attribute input is disabled/readonly with
-  title "Bind an instance before editing values"; the
-  bind button from WB10a is the path to enable editing.
+- [ ] **WB10a — No bind chrome.** Open a work order on a
+  flow that has a record-type join. PASS: there is no
+  "Bind instance" button, no bind-instance dialog, and
+  no bind-prompt title. A bound instance may still show
+  an Instance badge that identifies the record.
   Pin: tests/presenter-workbox-detail.test.ts
-       'buildAttributeInputHtml force-disables with bind
-       prompt title when unbound';
-       tests/presenter-workbox-detail.test.ts 'buildPage
-       unbound disables fields, shows bind prompt and
-       picker button'
+       'buildPage claimed-by-me enables fields and omits
+       bind chrome'
+- [ ] **WB10b — Unclaimed fields disabled with values.**
+  Open an unclaimed (or lapsed) work order that has
+  instance values. PASS: attribute inputs are disabled
+  and still show those values; transition buttons are
+  shown and disabled. To work it, return to Workbox and
+  drag onto claimed-by-me.
+  Pin: tests/presenter-workbox-detail.test.ts
+       'buildPage unclaimed shows disabled fields with
+       values and disabled transitions'
 
 ### Workbox — Transitions
 
-- [ ] **WB11** Bind an instance, fill Company Name and
-  Contact Email, click `submit` → Review. PASS: transition
-  POSTs `work-orders/:id/transition` (200), work order
-  moves to the next state, browser navigates back to the
-  inbox. The work order appears in the Active tab
-  (unclaimed).
-  Pin: tests/api-work-order-transition-instance.test.ts
-       'value-bearing fresh If-Match → 200; head advances'
-       (decides the transition answers 200 and the
-       instance's head advances);
-       tests/browser/workbox-transition.test.ts
-       'bind, fill, and submit navigates to the inbox
-       (WB11)' (decides bind → fill Company Name and
-       Contact Email → submit lands on
-       `/workbox/index.html` with the Transition
-       complete toast);
-       exploratory — the live keystroke fill
-- [ ] **WB16** Read the network log across WB11's bind
-  and transition (never `js()` fetch — the bearer is
+- [ ] **WB11** On a claimed-by-me action screen, fill
+  Company Name and Contact Email, click `submit` →
+  Review. PASS: transition POSTs
+  `work-orders/:id/transition` (200), work order moves
+  to the next state, browser navigates back to the
+  inbox. The work order appears in claimed-by-me
+  Active.
+  Pin: tests/browser/workbox-transition.test.ts
+       'fill and submit navigates to the inbox (WB11)'
+- [ ] **WB16** Read the network log across WB11's
+  transition (never `js()` fetch — the bearer is
   memory-only, per the explorer prompt). Drive WB16
   in WB11's turn, on the action-screen document, with
   the read armed before `submit`: CDP `Network`
-  enabled before bind, or a `pagehide` copy installed
-  after fill, before the `submit` click (Driving
-  notes, WB11/WB16). A
+  enabled before `submit`, or a `pagehide` copy
+  installed after fill, before the `submit` click
+  (Driving notes, WB11/WB16). A
   `getEntries()` on the inbox document
   is not this case; a successor re-witnesses the pair
   once, per that note. If the transition POST is
@@ -4718,44 +4689,32 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        lists its versions oldest first, each part the
        version its tag serves';
        exploratory — the live network-log read itself
-- [ ] **WB12** Click the work order row in the Active
-  tab. PASS: work order PUTs `work-orders/:id/claim`
-  (200) and the browser navigates to the action screen
-  showing the new state's attributes.
-  Pin: tests/api-work-order-claim.test.ts 'a fresh claim
-       appends one claimed event'; exploratory — the live
-       navigation and rendered attributes
-- [ ] **WB13** Click "Release Work Order". PASS: a single
-  click DELETEs `work-orders/:id/claim` (200),
-  soft-releases the active claim, and the browser
-  navigates to the inbox, where the work order reappears
-  in the Active tab.
-  Pin: tests/api-work-order-release.test.ts 'release of a
-       live claim is 200 and the claim history shows
-       claim_released'; exploratory — the live navigation
-       back to the inbox and the reappearance in Active
-- [ ] **WB13a — Claim → unclaim → reclaim.** From the
-  Active tab, click the same work order again (claim).
-  PASS: action screen opens under the caller's claim.
-  Click "Release Work Order" (unclaim via DELETE claim).
-  PASS: back on the Active tab unclaimed. Click the row a
-  third time (reclaim). PASS: claim succeeds again; the
-  message plane carries the sequence
-  `claimed` → `claim_released` → `claimed` in the work
-  order's version chain, oldest first (inspect via
-  `GET work-orders/:id/versions/` or the matching
-  operation message pairs). On a seeded work order, its
-  first claim (the first open of its action screen)
-  records `claim_expired` for its creator's lapsed birth
-  claim, then `claimed`.
-  Pin: tests/api-work-order-claim.test.ts 'a released
-       claim allows a fresh claim' (decides exactly this
-       claim→release→reclaim sequence and its event
-       ordering);
+- [ ] **WB12** Click a work order row. PASS: the browser
+  navigates to the action screen and does not PUT
+  `work-orders/:id/claim`.
+  Pin: tests/presenter-workbox-detail.test.ts
+       'detail.ts does not call putWorkOrderClaim'
+- [ ] **WB13** Drag a claimed-by-me Active row onto
+  available-to-me. PASS: DELETE `work-orders/:id/claim`
+  (200) and the row reappears in available-to-me.
+  Pin: tests/workbox-inbox-drag.test.ts 'transfer
+       release clears this member's live claim';
+       tests/workbox-inbox-drag.test.ts 'claimed-by-me
+       onto available is release'
+- [ ] **WB13a — Claim → release → reclaim.** Drag an
+  available row onto claimed-by-me Active (claim then
+  position). Drag it back onto available (release).
+  Drag it onto claimed-by-me again (reclaim). PASS:
+  the message plane carries `claimed` →
+  `claim_released` → `claimed`. On a seeded work
+  order, its first claim records `claim_expired` for
+  its creator's lapsed birth claim, then `claimed`.
+  Pin: tests/workbox-inbox-drag.test.ts 'transfer claim
+       then positions among claimed rows';
+       tests/api-work-order-claim.test.ts 'a released
+       claim allows a fresh claim';
        tests/mock-data-pairs.test.ts 'claiming a seeded
-       work order expires its birth claim' (decides the
-       first claim's `claim_expired`, then `claimed`);
-       exploratory — the live three-click UI sequence
+       work order expires its birth claim'
 - [ ] **WB19** Subject: the bound WO from WB11–WB13
   (WB14 archives it later; history is still readable
   after archive). After transitioning a work order
@@ -4779,10 +4738,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        ever mutates an existing pair (an architectural
        invariant, not a single assertion)
 - [ ] **WB19a — Two-tab 412 on the action screen.**
-  Subject: the same bound Active WO from WB11–WB13.
-  Drive before WB14. If the WO is already archived,
-  DEFERRED on WB14 — not FAIL. Bind a work order to
-  an instance. Open the action screen in two tabs.
+  Subject: the same bound Active WO from WB11–WB13,
+  claimed by drag (or already claimed-by-me). Drive
+  before WB14. If the WO is already archived,
+  DEFERRED on WB14 — not FAIL. Open the action
+  screen in two tabs.
   In tab 2, open the bound record's detail. The
   Instances section sits below the fold at
   1280×800 — `scrollIntoView` the row's
@@ -4853,14 +4813,13 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   order to the completion
   (Archive) node (its `isArchive` is true) — on Review
   fill Reviewer Notes and click `approve`. PASS: work
-  order moves to the Archive tab. It no longer appears in
-  Active.
-  Pin: tests/workbox-inbox.test.ts 'buildInboxItems shows
-       a finished work order in archived mode and hides
-       it from active'; exploratory — the live transition
-       and tab move
+  order moves to the Archived by Me. It no longer appears
+  in Active.
+  Pin: tests/workbox-inbox.test.ts 'this member's archive
+       transition is archived-by-me'; exploratory — the
+       live transition and tab move
 - [ ] **WB15** Click a completed work order in the
-  Archive tab. PASS: action screen shows read-only view
+  Archived by Me. PASS: action screen shows read-only view
   with history but no attributes or transition buttons.
   Pin: tests/presenter-workbox-detail.test.ts 'buildPage
        on a complete work order hides the attributes
@@ -4881,15 +4840,18 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   two members in two cookie jars: Tony Stark in the
   walk's tab, and Sarah Chen in a second jar minted
   as SV6 does (Driving notes, SV6/SV7/SV10). In
-  Tony's tab, click the row to claim it. In Sarah's,
-  open the same row. PASS: Sarah's claim is rejected
-  — `PUT work-orders/:id/claim` answers 409 `work
-  order is already claimed`, and her action screen
-  shows the error state carrying that message with
-  Try Again — and this work order's version chain
-  carries one live `'claimed'` event, Tony's (a stale
-  prior claim is superseded by a `'claim_expired'`
-  event, never overwritten in place). Inspect via
+  Tony's tab, drag onto claimed-by-me. Opening
+  inspects. In Sarah's, drag onto claimed-by-me.
+  PASS: Sarah's drag is 409 `work order is already
+  claimed` — `PUT work-orders/:id/claim` answers 409
+  `work order is already claimed` — and a toast
+  carries `Someone else holds that work order`. After
+  reload the row is in neither of Sarah's cards. This
+  work order's version chain carries one live `'claimed'`
+  event, Tony's
+  (a stale prior claim is superseded by a
+  `'claim_expired'` event, never overwritten in
+  place). Inspect via
   derived `GET work-orders/:id/versions/` (oldest
   first; claim events carry `field_values: []`). Two
   tabs of one jar are one
@@ -4907,92 +4869,60 @@ gesture pans instead of dragging, marquee-ing, or connecting.
        is superseded atomically' (the general
        never-overwritten-in-place invariant, though this
        specific live drive is unlikely to trigger an
-       actual expiry); exploratory — Sarah's rendered
-       refusal
+       actual expiry); exploratory — Sarah's toast and
+       that the row is in neither of her cards after
+       reload
 
-### Workbox — All-See-All Visibility
+### Workbox — Personal inbox
 
-Every authenticated user sees every active and archived
-work order regardless of node assignment. There is no
-per-user visibility filter.
+The inbox is personal. Available-to-me is the org pool
+(every unclaimed or released active work order, any
+node). Assigned-pool (current node `memberIds`) is
+TODO.md item 11a. Item 11's processes rewrite keeps
+all-see-all as the default.
 
 - [ ] **WB20** As the demo user, navigate to `workbox/`.
-  Active tab. PASS: every active (non-completed) work
-  order is listed, claimed or not — a claim does not hide
-  the row; the row names its claimant (`claimedByName`
-  badge). Listed regardless of the current node's
-  `memberIds` — including nodes assigned only to AI
-  members and nodes with zero members (which carry the
-  danger badge in the designer but are still visible in
-  the inbox).
-  Pin: tests/workbox-inbox.test.ts 'buildInboxItems
-       surfaces a claimed, unfinished work order as an
-       active item naming its claimant';
-       tests/workbox-inbox.test.ts 'buildInboxItems
-       surfaces an unclaimed, in-progress work order as an
-       active item'; exploratory — the live rendering for
-       AI-only-member and zero-member nodes specifically
-       (no fixture in tests/workbox-inbox.test.ts uses
-       either)
-- [ ] **WB21** Switch to the Archive tab. PASS: every
-  completed work order is listed regardless of which
-  member(s) the final transition referenced.
-  Pin: tests/workbox-inbox.test.ts 'buildInboxItems shows
-       a finished work order in archived mode and hides
-       it from active'; exploratory — that the member(s)
-       the final transition referenced do not affect
-       Archive-tab visibility (no fixture varies this)
+  PASS: the left card lists available-to-me (unclaimed
+  or released, not `isArchive`, any node). The right
+  card Active lists this member's live claims. Another
+  member's live claim is omitted. Rows do not name a
+  claimant.
+  Pin: tests/workbox-inbox.test.ts 'an unclaimed active
+       work order is available';
+       tests/workbox-inbox.test.ts 'this member's live
+       claim is claimed';
+       tests/workbox-inbox.test.ts 'another member's
+       live claim is omitted'
+- [ ] **WB21** Click Archived by Me. PASS: only work
+  this member last transitioned onto an `isArchive`
+  node is listed. Another member's archive is omitted.
+  Pin: tests/workbox-inbox.test.ts 'this member's
+       archive transition is archived-by-me';
+       tests/workbox-inbox.test.ts 'another member's
+       archive is omitted'
 - [ ] **WB22** Inspect
   `web-app/app/presenters/workbox-inbox.ts`. PASS:
-  `buildInboxItems` takes four parameters —
-  `(workOrders, activeClaimsByWo, memberMap, mode)` —
-  and no scope parameter. Its exports are
-  `InboxItem`, `InboxMode`, `ActiveClaim`,
-  `WorkboxInboxPresenter`, and `buildInboxItems`;
-  none filters by user — the workbox shows all work
-  orders to all users by construction.
+  `buildInboxItems` takes three parameters —
+  `(workOrders, activeClaimsByWo, currentMemberId)` —
+  and returns `{ available, claimed, archivedByMe }`.
+  Its exports include `InboxItem`, `InboxListKind`,
+  `InboxLists`, `ActiveClaim`,
+  `WorkboxInboxPresenter`, and `buildInboxItems`. There
+  is no `InboxMode`.
   Pin: tests/workbox-inbox.test.ts calls
-       `buildInboxItems` with exactly these four
+       `buildInboxItems` with exactly these three
        arguments, so AT1's `deno check` rejects any
-       further required parameter; exploratory — the
-       absence of a scope parameter is read from the
-       source, since no `Deno.test` assertion inspects
-       a signature
-- [ ] **WB23** Claim, release, and transition a work
-  order in two tabs of one cookie jar: act in the
-  first tab, then act on the same work order in the
-  second without reloading it. PASS: the second tab's
-  action is judged against the first tab's result
-  rather than refused. Claim: the second tab, opened
-  on the holder's live claim, shows the holder's
-  editable screen and appends no second claim (the
-  action screen claims on open only when the caller
-  holds no live claim). Release: after the first tab
-  releases, the second tab has repainted (a write
-  rings the same-origin bus); its Release reads the
-  work order's head at the click and DELETEs
-  `work-orders/:id/claim` latched on it — a 200 no-op
-  that stores nothing — then toasts "Work order
-  released" and lands on the inbox. Transition: after
-  the first tab transitions, the second tab has
-  repainted at the new state, and its transition
-  latches that head and lands. A value-bearing
-  transition sent over a changed instance shows the
-  412 refusal (WB19a's recovery). A reload shows the
-  result.
-  Pin: tests/browser/workbox-transition.test.ts 'a
-       second tab releases after the first released
-       (WB23)' (decides the second tab's Release sends
-       the DELETE, toasts, and lands on the inbox);
+       further required parameter
+- [ ] **WB23** Open the holder's action screen in two
+  tabs of one cookie jar. PASS: the second tab shows
+  the holder's editable screen and appends no claim.
+  Release is an inbox drag, not `#unclaim-btn`.
+  Pin: tests/presenter-workbox-detail.test.ts
+       'detail.ts does not call putWorkOrderClaim';
+       tests/workbox-inbox-drag.test.ts 'transfer
+       release clears this member's live claim';
        tests/api-work-order-release.test.ts 'a release
-       with no live claim answers the head' (decides
-       the 200 no-op stores nothing);
-       tests/api-work-order-transition-instance.test.ts
-       'racing value-bearing transitions land once'
-       (decides that of two transitions latched on one
-       head, one lands and the other answers 412 with
-       nothing stored); exploratory — the claim and
-       transition halves, and the reload
+       with no live claim answers the head'
 
 ---
 
@@ -7305,16 +7235,18 @@ K30 only describes.
        exploratory — the live node-panel paint
 - [ ] **R13** From workbox, open the gate-violation work
   order (`#gate0001`, `eOlNZpGQfmCdpSFWXGkzFQ`) at Data
-  Capture, unbound. PASS: current node is Data Capture;
-  every attribute input is disabled/readonly behind the
-  bind prompt (WB10b) — there is no fillable-while-unbound
-  path. The typed gate (`validateRecordTransition` on
-  CURRENT-node refs) is the durable covenant; CLI pins
-  it; constraint failures still surface via
+  Capture, unbound. Opening inspects; it does not claim.
+  PASS: current node is Data Capture; attribute inputs
+  are disabled and still show their values; transition
+  buttons are shown and disabled; there is no bind
+  prompt (WB10b). The typed gate
+  (`validateRecordTransition` on CURRENT-node refs) is
+  the durable covenant; CLI pins it; constraint
+  failures still surface via
   `WorkboxDetailPresenter.buildViolations` banner. Only
-  WO01 (`a7c3e1f9`) is instance-bound — do not bind
-  `#gate0001` here (the seeded Customer Profile instance,
-  Acme, already has values set).
+  WO01 (`a7c3e1f9`) is instance-bound — `#gate0001`
+  stays unbound here (the seeded Customer Profile
+  instance, Acme, already has values set).
   Pin: tests/adapters-record-transitions.test.ts
        'validateRecordTransition returns a required
        violation when the CURRENT node has a required
@@ -7326,24 +7258,26 @@ K30 only describes.
        gate-violation work order has a current node
        with at least one required attribute with a
        null stored value'; exploratory — the action
-       screen's disabled inputs and the bind prompt
-- [ ] **R14** Bind `#gate0001` to an existing Customer
-  Profile instance in the picker (label may be Acme Corp
-  or Walk Co B after WB19a) — never mint a new one —
-  then fill Company Name + Contact Email and
-  click submit. PASS: transition succeeds; work order
-  advances to Review (does NOT demand Reviewer Notes —
-  that is current-node only when leaving Review). A
-  value-bearing transition while still unbound is
-  refused with 400 (`ValidationError` →
-  `HTTP_BAD_REQUEST`), not 409; 409 is rebind. R13's
-  open claimed the WO; bind while claimed by the
-  current member is expected.
+       screen's disabled inputs; no bind prompt
+- [ ] **R14** `#gate0001` is unbound; bind-at-creation
+  is later. There is no action-screen picker; do not
+  invent one. Opening inspects. Drive a seeded bound
+  WO after a claim drag (or a birth-claimed create if
+  that WO is already bound). Fill Company Name +
+  Contact Email and click submit. PASS: transition
+  succeeds; work order advances to Review (does NOT
+  demand Reviewer Notes — that is current-node only
+  when leaving Review). A value-bearing transition
+  while still unbound is refused with 400
+  (`ValidationError` → `HTTP_BAD_REQUEST`), not 409;
+  409 is rebind. Create still birth-claims; it does
+  not bind.
   Pin: tests/adapters-record-transitions.test.ts
        'validateRecordTransition does not require
        TARGET-node attributes when the current node is
-       clean'; exploratory — the live fill, submit, and
-       bind-picker interactions
+       clean'; exploratory — the live fill and submit
+       on a bound claimed-by-me screen, and the 400
+       on an unbound value-bearing transition
 - [ ] **R14a** When a node references a `radio`-typed
   Record attribute, the workbox work-order detail renders
   it as a radio group — one `<input type="radio">` per
