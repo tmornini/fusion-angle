@@ -408,9 +408,16 @@ not repeat the note in every case.
   gone. Layer 2 pin
   tests/browser/workbox-transition.test.ts
   'fill and submit navigates to the inbox
-  (WB11)' decides the inbox navigation. WB16's
-  read is armed before this `submit`, in the
-  same turn (Driving notes, WB11/WB16).
+  (WB11)' binds a genesis instance via API first,
+  then fills; it decides the inbox navigation.
+  Drive a bound claimed-by-me Data Capture screen
+  when one exists (seeded bound WO, or create after
+  bind-at-creation). A live unbound create + fill +
+  submit that 400s `work order has no instance
+  binding` is BLOCKED, naming unbound create and no
+  bind chrome. One attempt. WB16's read is armed
+  before this `submit`, in the same turn (Driving
+  notes, WB11/WB16).
 - WB19a/WB19b: drive while the bound WO is still
   Active, before WB14. If WB14 already archived it,
   DEFERRED on WB14, not FAIL. Layer 1 pins decide
@@ -494,6 +501,11 @@ exploratory half (no Layer 1 pin renders the live
 Customer Profile list).
 WB19a/WB19b when the bound WO is already archived:
 DEFERRED on WB14. Layer 1 pins decide the 412.
+A live WB11 or WB16 400 for no instance binding
+is BLOCKED, not FAIL, while those pins are green.
+WB19, WB19a, WB19b, WB14, and WB15 stay DEFERRED
+on WB11 until a bound Active WO exists from
+WB11–WB13.
 I21 skeleton miss without the Fetch pause:
 BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
@@ -4683,10 +4695,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   once, per that note. If the transition POST is
   missing because navigation dropped an unarmed
   buffer, record BLOCKED naming that — an honest
-  BLOCKED costs nothing. PASS: the
-  binding PUT lands at `work-orders/:id/binding` with
-  `{instance_id, record_type_id}` (200); the transition
-  POST is `work-orders/:id/transition` (200) whose body
+  BLOCKED costs nothing. A missing 200 because the
+  work order is unbound is BLOCKED, same reason as
+  WB11. There is no submit-time binding PUT. PASS:
+  the transition POST is `work-orders/:id/transition`
+  (200) whose body
   is the **instance shape** (`targetState`, `instance_id`,
   `record_type_id`, `set`/`clear` delta, `release`,
   `transitionAt` — no `fieldValues` bag) and carries a
