@@ -17,9 +17,16 @@ import { verifyPassword } from '../shared/password-hash.ts';
 import { deriveCredentialsFor } from
     '../api/derive-identity-spine.ts';
 
+const SEED_PASSWORD_ALPHABET = /^[A-Za-z0-9_-]{22}$/;
+
 function currentReveal(creds: SeededCredentials) {
     return creds.identities.find(
         c => c.identityId === 'XXZruirZyAOoRpNxaDnpSA');
+}
+
+function assertSeedPassword(password: string): void {
+    assertStrictEquals(password.length, 22);
+    assertMatch(password, SEED_PASSWORD_ALPHABET);
 }
 
 // Phase Final Task 2: identity_credentials ROW half stripped —
@@ -36,7 +43,7 @@ async () => {
         await postBootstrap(db));
     assert(reveal, 'current credential surfaced');
     assertStrictEquals(reveal.username, 'demo@example.com');
-    assert(reveal.password.length >= 16);
+    assertSeedPassword(reveal.password);
     const cred = await adminCredential(db);
     assert(cred, 'admin password credential seeded');
     // the column holds a hash, never the surfaced plaintext
@@ -71,9 +78,9 @@ async () => {
     const db = memoryDbAdapter();
     const creds = await postMockDataLoad(db);
     assertStrictEquals(creds.identities.length, 12);
-    assert(
-        creds.identities.every((c) => c.password.length >= 16),
-    );
+    for (const cred of creds.identities) {
+        assertSeedPassword(cred.password);
+    }
 });
 
 Deno.test('bootstrap surfaces exactly one human credential',
@@ -85,6 +92,7 @@ async () => {
         creds.identities[0]!.identityId,
         'XXZruirZyAOoRpNxaDnpSA',
     );
+    assertSeedPassword(creds.identities[0]!.password);
 });
 
 Deno.test('each seed run yields a distinct admin password',
