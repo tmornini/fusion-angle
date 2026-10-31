@@ -3625,14 +3625,6 @@ Off the critical path; each with its oracle.
   dead `cursor` declaration is gone, or
   `pointer-events: none` is, with the hover glow
   guarded by `:not(:disabled)`.
-- `.tooltip` (`web-app/app/styles/components-menus.css:51`)
-  styles nothing: no page renders the class, and the
-  dark-only parity check injected one by hand. The
-  app's tooltips are `title` attributes
-  (`web-app/app/presenters/project-action-bar.ts:92`).
-  Oracle: a page renders `.tooltip`, or the rule and
-  `--z-tooltip` (`web-app/app/styles/tokens.css:177`)
-  are gone.
 - DESIGN-SYSTEM.md:170 names the cascade's builder
   `./build`; the script is `./bin/build`. Oracle:
   `grep -n '\./build' DESIGN-SYSTEM.md` is empty.
