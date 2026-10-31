@@ -163,3 +163,28 @@
     padding: 0;
     margin: 0;
 }
+
+.inbox-drop-indicator {
+    height: 3px;
+    margin: 2px 0;
+    pointer-events: none;
+    border-radius: 2px;
+    background: hsl(var(--primary));
+}
+
+.inbox-dragging {
+    opacity: 0.4;
+    position: relative;
+    z-index: 1;
+}
+
+.inbox-drop-target {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+}
+
+/* Native link drag over other rows looks like
+    reorder. Available is never Custom-order. */
+#workbox-inbox a {
+    -webkit-user-drag: none;
+}

@@ -75,3 +75,16 @@ export function followTranslateY(
         + (clientY - startClientY)
         + 'px)';
 }
+
+export function followTranslate(
+    startClientX: number,
+    startClientY: number,
+    clientX: number,
+    clientY: number,
+): string {
+    return 'translate('
+        + (clientX - startClientX)
+        + 'px, '
+        + (clientY - startClientY)
+        + 'px)';
+}

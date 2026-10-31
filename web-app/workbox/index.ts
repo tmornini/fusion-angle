@@ -25,8 +25,10 @@ import {
 } from '../app/flow-publish.ts';
 import {
     getCurrentHumanMember,
+    isClaimedAndUnlapsed,
     subscribeWorkOrderChanges,
     type RequestContext,
+    type WorkOrder,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
 import { generateIdentifier } from
@@ -45,7 +47,15 @@ import {
 } from '../app/presenters/index.ts';
 import {
     inboxListKindFromHash,
+    initInboxDrag,
+    paintInboxDrop,
+    transferInboxDrop,
+    type InboxTransfer,
 } from '../app/workbox-inbox-drag.ts';
+import {
+    RequestError,
+    HTTP_CONFLICT,
+} from '../../shared/http-errors.ts';
 
 const { signal } = createPageAbort();
 
@@ -53,6 +63,8 @@ let inboxRows: InboxRows | null = null;
 let currentMemberId: string | null = null;
 let rightListKind: 'claimed' | 'archivedByMe' =
     'claimed';
+let dragBound = false;
+let dropInFlight = false;
 
 export async function init(
     _params?: Record<string, string>,
@@ -80,14 +92,29 @@ export async function init(
     ]);
 
     subscribeWorkOrderChanges(() => {
-        const shared = fetchInboxRows(ctx);
-        void renderAvailable(
-            availableEl, ctx, shared,
-        );
-        void renderRightList(
-            claimedEl, ctx, shared,
-        );
+        if (dropInFlight) return;
+        void (async () => {
+            const rows = await fetchInboxRows(ctx);
+            if (dropInFlight) return;
+            paintInboxLists(
+                availableEl, claimedEl, rows,
+            );
+        })();
     });
+
+    const root = $('#workbox-inbox', document);
+    if (root && !dragBound) {
+        dragBound = true;
+        initInboxDrag(root, {
+            cardSelector:
+                '[data-work-order-card]',
+            idAttribute: 'data-work-order-card',
+            rightListKind: () => rightListKind,
+            onDrop: (id, transfer) => {
+                void onInboxDrop(id, transfer, ctx);
+            },
+        });
+    }
 }
 
 function pressInboxPills(): void {
@@ -150,6 +177,55 @@ function listsFrom(
         rows.activeClaimsByWo,
         currentMemberId ?? '',
     );
+}
+
+function paintInboxLists(
+    availableEl: HTMLElement,
+    claimedEl: HTMLElement,
+    rows: InboxRows,
+): void {
+    const lists = listsFrom(rows);
+    new WorkboxInboxPresenter(
+        lists.available, 'available',
+    ).renderList(availableEl);
+    bindRowNavigation(availableEl);
+    const kind: InboxListKind =
+        rightListKind === 'archivedByMe'
+            ? 'archivedByMe'
+            : 'claimed';
+    claimedEl.setAttribute('data-inbox-list', kind);
+    new WorkboxInboxPresenter(
+        kind === 'archivedByMe'
+            ? lists.archivedByMe
+            : lists.claimed,
+        kind,
+    ).renderList(claimedEl);
+    bindRowNavigation(claimedEl);
+}
+
+function latchMovedWorkOrder(
+    rows: InboxRows,
+    moved: WorkOrder,
+): InboxRows {
+    const workOrders = rows.workOrders.map(
+        wo => wo.id === moved.id ? moved : wo,
+    );
+    const activeClaimsByWo = new Map(
+        rows.activeClaimsByWo,
+    );
+    if (isClaimedAndUnlapsed(moved.claim)) {
+        activeClaimsByWo.set(moved.id, {
+            memberId: moved.claim.memberId,
+            at: moved.claim.at,
+        });
+    } else {
+        activeClaimsByWo.delete(moved.id);
+    }
+    return {
+        ...rows,
+        workOrders,
+        activeClaimsByWo,
+    };
 }
 
 async function renderAvailable(
@@ -228,6 +304,79 @@ function onRowClick(e: MouseEvent): void {
         card, 'data-work-order-card',
     );
     navigateTo('workbox-detail', { id });
+}
+
+function cardById(id: string): HTMLElement | null {
+    return document.querySelector<HTMLElement>(
+        '[data-work-order-card="' + id + '"]',
+    );
+}
+
+async function onInboxDrop(
+    id: string,
+    transfer: InboxTransfer,
+    ctx: RequestContext,
+): Promise<void> {
+    if (!inboxRows || transfer.kind === 'none') {
+        return;
+    }
+    const rows = inboxRows;
+    const held = rows.workOrders.find(
+        wo => wo.id === id,
+    );
+    if (!held) return;
+    const card = cardById(id);
+    const availableEl =
+        $('#available-list', document);
+    const claimedEl =
+        $('#claimed-list', document);
+    if (card && availableEl && claimedEl) {
+        paintInboxDrop(card, transfer, {
+            available: availableEl,
+            claimed: claimedEl,
+        });
+    }
+    dropInFlight = true;
+    try {
+        const moved = await transferInboxDrop(
+            ctx, held, transfer,
+        );
+        inboxRows = latchMovedWorkOrder(
+            rows, moved,
+        );
+        if (availableEl && claimedEl) {
+            paintInboxLists(
+                availableEl, claimedEl, inboxRows,
+            );
+        }
+    } catch (err) {
+        log.error(
+            'inbox drop failed', 'workbox', err,
+        );
+        if (
+            err instanceof RequestError
+            && err.status === HTTP_CONFLICT
+        ) {
+            showToast(
+                'Someone else holds that'
+                + ' work order',
+                'error',
+            );
+        } else {
+            showToast(
+                'Failed to save order',
+                'error',
+            );
+        }
+        if (availableEl) {
+            await renderAvailable(availableEl, ctx);
+        }
+        if (claimedEl) {
+            await renderRightList(claimedEl, ctx);
+        }
+    } finally {
+        dropInFlight = false;
+    }
 }
 
 async function createWorkOrderForFlow(
