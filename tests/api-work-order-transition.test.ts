@@ -18,19 +18,15 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
     nowUtc,
-    SYSTEM_MEMBER_ID,
     ValidationError,
 } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
-import {
-    postSeedWorkOrderTransitionOp,
-} from '../api/routes.ts';
-import {
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import {
+    appendLegacyTransition,
+} from './legacy-transition-fixture.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 import { seedCreatedWorkOrder } from
@@ -55,7 +51,6 @@ const TRANSITION_EVENT_ID = generateIdentifier();
 const LOCK_TIMEOUT_SECONDS = 300;
 const FLOW_ID = generateIdentifier();
 const N_CREATE = generateIdentifier();
-const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 
 function graphJson(): Record<string, unknown> {
     return {
@@ -122,38 +117,6 @@ async function eventsFor(
     return all.slice(SEEDED_EVENTS);
 }
 
-// Below-facade legacy append (organization === undefined).
-// Task 8: live gate rejects fieldValues; SFV/legacy fold
-// pins stay on the seed-tier dual-tolerant path.
-async function appendLegacyTransition(
-    db: MemoryDbAdapter,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const pathSegments = [
-        'organizations', STARK_ORGANIZATION,
-        'work-orders', 'yNSSnbrpacodQTzUEcdEVA', 'transition',
-    ];
-    const messagePair = await formWriteMessagePair({
-        method: 'POST',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: TRANSITION_PATTERN,
-        routeSegments: TRANSITION_PATTERN.split('/'),
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: STARK_ORGANIZATION,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await postSeedWorkOrderTransitionOp(
-        db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA', body,
-        SYSTEM_MEMBER_ID, messagePair,
-    );
-}
-
 Deno.test(
     'a transition writes the target state event authored'
     + ' by the actor',
@@ -209,22 +172,26 @@ Deno.test(
             },
             DEV_TOKEN,
             operationIdHeader());
-        await appendLegacyTransition(db, {
-            transitionEventId: TRANSITION_EVENT_ID,
-            targetState: 'n-next',
-            fieldValues: [
-                {
-                    id: FIELD_VALUE_ID,
-                    fields: {
-                        state_event_id: TRANSITION_EVENT_ID,
-                        attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                        value: 'high',
+        await appendLegacyTransition(
+            db, STARK_ORGANIZATION,
+            'yNSSnbrpacodQTzUEcdEVA', {
+                transitionEventId: TRANSITION_EVENT_ID,
+                targetState: 'n-next',
+                fieldValues: [
+                    {
+                        id: FIELD_VALUE_ID,
+                        fields: {
+                            state_event_id: TRANSITION_EVENT_ID,
+                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                            value: 'high',
+                        },
                     },
-                },
-            ],
-            release: null,
-            transitionAt: nowUtc(),
-        });
+                ],
+                release: null,
+                transitionAt: nowUtc(),
+            },
+            { requestAt: nowUtc() },
+        );
         const events = await eventsFor(db);
         assertStrictEquals(events.length, 1);
         assertStrictEquals(events[0]!.state, 'n-next');
@@ -329,29 +296,33 @@ Deno.test(
         // runs in the dual-tolerant validator (no SFV put).
         // A malformed fold 400s pre-tx — zero events.
         await assertRejects(
-            () => appendLegacyTransition(db, {
-                transitionEventId: 'te1',
-                targetState: 'n-next',
-                fieldValues: [
-                    {
-                        id: FIELD_VALUE_ID,
-                        fields: {
-                            state_event_id: 'te1',
-                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                            value: 'high',
+            () => appendLegacyTransition(
+                db, STARK_ORGANIZATION,
+                'yNSSnbrpacodQTzUEcdEVA', {
+                    transitionEventId: 'te1',
+                    targetState: 'n-next',
+                    fieldValues: [
+                        {
+                            id: FIELD_VALUE_ID,
+                            fields: {
+                                state_event_id: 'te1',
+                                attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                                value: 'high',
+                            },
                         },
-                    },
-                    {
-                        id: generateIdentifier(),
-                        fields: {
-                            state_event_id: 'te1',
-                            value: 'low',
+                        {
+                            id: generateIdentifier(),
+                            fields: {
+                                state_event_id: 'te1',
+                                value: 'low',
+                            },
                         },
-                    },
-                ],
-                release: null,
-                transitionAt: nowUtc(),
-            }),
+                    ],
+                    release: null,
+                    transitionAt: nowUtc(),
+                },
+                { requestAt: nowUtc() },
+            ),
             ValidationError,
         );
         const events = await eventsFor(db);
@@ -428,22 +399,26 @@ Deno.test(
             DEV_TOKEN,
             operationIdHeader());
         await assertRejects(
-            () => appendLegacyTransition(db, {
-                transitionEventId: 'te1',
-                targetState: 'n-next',
-                fieldValues: [
-                    {
-                        id: FIELD_VALUE_ID,
-                        fields: {
-                            state_event_id: 'other-event',
-                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                            value: 'high',
+            () => appendLegacyTransition(
+                db, STARK_ORGANIZATION,
+                'yNSSnbrpacodQTzUEcdEVA', {
+                    transitionEventId: 'te1',
+                    targetState: 'n-next',
+                    fieldValues: [
+                        {
+                            id: FIELD_VALUE_ID,
+                            fields: {
+                                state_event_id: 'other-event',
+                                attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                                value: 'high',
+                            },
                         },
-                    },
-                ],
-                release: null,
-                transitionAt: nowUtc(),
-            }),
+                    ],
+                    release: null,
+                    transitionAt: nowUtc(),
+                },
+                { requestAt: nowUtc() },
+            ),
             ValidationError,
             'state_event_id must equal transitionEventId',
         );
@@ -458,21 +433,25 @@ Deno.test(
     async () => {
         const db = await seededDb();
         await assertRejects(
-            () => appendLegacyTransition(db, {
-                transitionEventId: 'te1',
-                targetState: 'n-next',
-                fieldValues: [
-                    {
-                        id: FIELD_VALUE_ID,
-                        fields: {
-                            attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                            value: 'high',
+            () => appendLegacyTransition(
+                db, STARK_ORGANIZATION,
+                'yNSSnbrpacodQTzUEcdEVA', {
+                    transitionEventId: 'te1',
+                    targetState: 'n-next',
+                    fieldValues: [
+                        {
+                            id: FIELD_VALUE_ID,
+                            fields: {
+                                attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                                value: 'high',
+                            },
                         },
-                    },
-                ],
-                release: null,
-                transitionAt: nowUtc(),
-            }),
+                    ],
+                    release: null,
+                    transitionAt: nowUtc(),
+                },
+                { requestAt: nowUtc() },
+            ),
             ValidationError,
             'state_event_id must equal transitionEventId',
         );

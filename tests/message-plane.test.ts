@@ -83,6 +83,7 @@ import {
 } from './http-fixtures.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { plantDelete } from './plant-delete-fixture.ts';
 import { INSTANCE_DETAIL_PATTERN } from
     '../api/family-registry.ts';
 import {
@@ -110,46 +111,6 @@ function req(
     body?: unknown,
 ): Request {
     return apiRequest({ method, path, token, body });
-}
-
-// ideas/:id has no DELETE route. The head is planted
-// as a successor of the live PUT, not a second genesis.
-async function plantDelete(
-    db: DbAdapter,
-    pathname: string,
-): Promise<void> {
-    const pathSegments = pathname
-        .replace(/^\/+/, '')
-        .split('/');
-    const organization = pathSegments[1];
-    if (
-        pathSegments.length !== 4
-        || organization === undefined
-    ) {
-        throw new Error('not an idea document path');
-    }
-    const messagePair = await formWriteMessagePair({
-        method: 'DELETE',
-        pathname,
-        routePattern: 'organizations/:id/ideas/:id',
-        routeSegments: [
-            'organizations', ':id', 'ideas', ':id',
-        ],
-        pathSegments,
-        headerFields: [],
-        body: undefined,
-        requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA',
-        requestAt: nowUtc(),
-        organization,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await runWrite(
-        db,
-        attemptFor([messagePair]),
-        [messagePair],
-    );
 }
 
 function latestPutResponse(
