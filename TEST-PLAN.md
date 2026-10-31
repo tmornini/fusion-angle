@@ -351,6 +351,14 @@ not repeat the note in every case.
   PASSed on the second 09-02 walk — the driver *can*
   drag lists; a miss on D36 or K6 is still BLOCKED
   this walk, not a missing product.
+- D37: drive with two or more compositor
+  `pointermove`s across a neighbour midpoint during a
+  D36-style ideas-list drag. The drop indicator is an
+  unclassed inline `div`; do not grind a class or a
+  tighter step. If the live flip is not witnessed,
+  BLOCKED naming the unclassed indicator. The two
+  `dropIndex` pins decide the 8px band. Workbox
+  `.inbox-drop-indicator` is a different list.
 - F12: after the pan-mode node drag, Space toggles
   pan off (Layer 2 pin). The double-click half
   retargets the same node id; landing on Archive or
