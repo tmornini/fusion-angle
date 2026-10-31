@@ -121,7 +121,6 @@ export {
 export {
     WorkboxInboxPresenter,
     buildInboxItems,
-    type InboxMode,
     type InboxListKind,
     type InboxLists,
     type InboxItem,

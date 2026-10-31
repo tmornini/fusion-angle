@@ -4,9 +4,6 @@
             <h1 class="page-title">
                 Workbox
             </h1>
-            <p class="text-sm text-muted">
-                Your work order inbox
-            </p>
         </div>
         <div
             class="flex flex-wrap
@@ -38,29 +35,64 @@
     </div>
 
     <div
-        id="workbox-tabs"
-        class="flex items-center gap-2 mb-6"
-    ></div>
-
-    <div
-        id="tab-active"
-        class="tab-panel"
+        id="workbox-inbox"
+        class="grid grid-cols-1
+            md:grid-cols-2 gap-6"
     >
-        <div
-            id="active-list"
-            class="flex flex-col gap-3"
-        >
+        <div class="card p-4">
+            <h2
+                class="text-lg font-semibold
+                    mb-4"
+            >
+                Work Orders available to me
+            </h2>
+            <div
+                id="available-list"
+                class="flex flex-col gap-3"
+                data-inbox-list="available"
+            >
+            </div>
         </div>
-    </div>
-
-    <div
-        id="tab-archive"
-        class="tab-panel hidden"
-    >
-        <div
-            id="archive-list"
-            class="flex flex-col gap-3"
-        >
+        <div class="card p-4">
+            <div
+                class="flex items-center
+                    justify-between gap-3
+                    mb-4"
+            >
+                <h2
+                    class="text-lg
+                        font-semibold"
+                >
+                    Work Orders claimed by me
+                </h2>
+                <div
+                    class="flex items-center
+                        gap-2"
+                    role="group"
+                    aria-label="Claimed or archived by me"
+                >
+                    <button
+                        type="button"
+                        class="btn btn-secondary
+                            btn-sm"
+                        data-inbox-pill="claimed"
+                        aria-pressed="true"
+                    >Active</button>
+                    <button
+                        type="button"
+                        class="btn btn-secondary
+                            btn-sm"
+                        data-inbox-pill="archivedByMe"
+                        aria-pressed="false"
+                    >Archived by Me</button>
+                </div>
+            </div>
+            <div
+                id="claimed-list"
+                class="flex flex-col gap-3"
+                data-inbox-list="claimed"
+            >
+            </div>
         </div>
     </div>
 </div>

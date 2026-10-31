@@ -140,3 +140,58 @@ Deno.test(
         );
     },
 );
+
+Deno.test(
+    'workbox index.html is two cards, pills on'
+    + ' the right, no subtitle',
+    async () => {
+        const page = await Deno.readTextFile(
+            new URL(
+                '../web-app/workbox/index.html',
+                import.meta.url,
+            ),
+        );
+        assertStringIncludes(page, 'Workbox');
+        assertStringIncludes(
+            page,
+            'Work Orders available to me',
+        );
+        assertStringIncludes(
+            page,
+            'Work Orders claimed by me',
+        );
+        assertStringIncludes(page, 'Active');
+        assertStringIncludes(
+            page, 'Archived by Me',
+        );
+        assertStringIncludes(
+            page, 'id="available-list"',
+        );
+        assertStringIncludes(
+            page, 'id="claimed-list"',
+        );
+        assertStringIncludes(
+            page, 'data-inbox-pill="claimed"',
+        );
+        assertStringIncludes(
+            page,
+            'data-inbox-pill="archivedByMe"',
+        );
+        assertEquals(
+            page.includes('Your work order inbox'),
+            false,
+        );
+        assertEquals(
+            page.includes('workbox-tabs'), false,
+        );
+        assertEquals(
+            page.includes('tab-archive'), false,
+        );
+        assertEquals(
+            page.includes('Archive</'), false,
+        );
+        assertEquals(
+            page.includes('drag-handle'), false,
+        );
+    },
+);

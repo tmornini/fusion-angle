@@ -57,8 +57,6 @@ interface UnplacedInboxItem {
 
 export type InboxItem = PlacedInboxItem | UnplacedInboxItem;
 
-export type InboxMode = 'active' | 'archived';
-
 export type InboxListKind =
     | 'available'
     | 'claimed'

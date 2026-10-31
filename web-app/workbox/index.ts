@@ -1,11 +1,12 @@
 import {
-    $, populateIcons, getRequiredAttribute,
+    $, $$, populateIcons, getRequiredAttribute,
 } from '../app/dom.ts';
 import {
     html, setHtml,
 } from '../app/safe-html.ts';
 import { log } from '../app/logger.ts';
-import { createPageAbort } from '../app/page-lifecycle.ts';
+import { createPageAbort } from
+    '../app/page-lifecycle.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
@@ -13,11 +14,10 @@ import {
 } from '../app/loading-states.ts';
 import {
     ICON_SIZE,
-    iconMail, iconArchive, iconPlus,
+    iconPlus,
     iconNoEntry,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
-import { initTabs } from '../app/dialog.ts';
 import { initDropdown } from '../app/dropdown.ts';
 import {
     getFlowsForCreation,
@@ -25,13 +25,12 @@ import {
 } from '../app/flow-publish.ts';
 import {
     getCurrentHumanMember,
-    putWorkOrderPosition,
     subscribeWorkOrderChanges,
     type RequestContext,
-    type WorkOrder,
 } from '../../client/index.ts';
 import { sessionContext } from '../app/client.ts';
-import { generateIdentifier } from '../../shared/identifier.ts';
+import { generateIdentifier } from
+    '../../shared/identifier.ts';
 import {
     createWorkOrderFromFlow,
 } from '../app/work-order-creation.ts';
@@ -42,123 +41,98 @@ import {
 import {
     WorkboxInboxPresenter,
     buildInboxItems,
-    type InboxMode,
-    type InboxItem,
+    type InboxListKind,
 } from '../app/presenters/index.ts';
 import {
-    initDragReorder,
-} from '../app/drag-reorder.ts';
+    inboxListKindFromHash,
+} from '../app/workbox-inbox-drag.ts';
 
 const { signal } = createPageAbort();
 
-let activePresenter:
-    WorkboxInboxPresenter | null = null;
-// The rows the page last read, with each reorder's answer
-// in place of the work order it moved, so the next drag of
-// that card latches the head the last save made.
 let inboxRows: InboxRows | null = null;
-
 let currentMemberId: string | null = null;
+let rightListKind: 'claimed' | 'archivedByMe' =
+    'claimed';
 
 export async function init(
     _params?: Record<string, string>,
 ): Promise<void> {
-    renderTabs();
-    initTabs(
-        '[data-tab]', '.tab-panel', 'active',
+    rightListKind = inboxListKindFromHash(
+        location.hash,
     );
+    pressInboxPills();
+    bindInboxPills();
 
-    const activeEl =
-        $('#active-list', document);
-    const archiveEl =
-        $('#archive-list', document);
+    const availableEl =
+        $('#available-list', document);
+    const claimedEl =
+        $('#claimed-list', document);
+    if (!availableEl || !claimedEl) return;
 
     const ctx = sessionContext();
     currentMemberId =
         (await getCurrentHumanMember(ctx)).id;
-    // One shared inbox fetch feeds both lists.
     const rowsPromise = fetchInboxRows(ctx);
-    const listInits: Array<Promise<void>> = [];
-    if (activeEl) {
-        listInits.push(
-            initActiveList(activeEl, ctx, rowsPromise),
-        );
-    }
-    if (archiveEl) {
-        listInits.push(
-            initArchiveList(
-                archiveEl, ctx, rowsPromise,
-            ),
-        );
-    }
     await Promise.all([
-        ...listInits,
+        renderAvailable(availableEl, ctx, rowsPromise),
+        renderRightList(claimedEl, ctx, rowsPromise),
         initCreateDropdown(ctx),
     ]);
 
     subscribeWorkOrderChanges(() => {
-        // One refetch, feed both lists.
         const shared = fetchInboxRows(ctx);
-        if (activeEl) {
-            void rerenderInbox(
-                activeEl, 'active', ctx, shared,
-            );
-        }
-        if (archiveEl) {
-            void rerenderInbox(
-                archiveEl, 'archived', ctx, shared,
-            );
-        }
+        void renderAvailable(
+            availableEl, ctx, shared,
+        );
+        void renderRightList(
+            claimedEl, ctx, shared,
+        );
     });
 }
 
-async function rerenderInbox(
-    listEl: HTMLElement,
-    mode: InboxMode,
-    ctx: RequestContext,
-    rowsPromise?: Promise<InboxRows>,
-): Promise<void> {
-    const rows = rowsPromise ?? fetchInboxRows(ctx);
-    await loadInto({
-        container: listEl,
-        skeleton: buildSkeleton('card-list', 4),
-        fetch: () => rows.then(
-            r => buildItems(r, mode),
-        ),
-        retry: init,
-        onData: items => {
-            const presenter =
-                new WorkboxInboxPresenter(
-                    items, mode === 'archived'
-                        ? 'archivedByMe'
-                        : 'available',
-                );
-            presenter.renderList(listEl);
-            if (mode === 'active') {
-                activePresenter = presenter;
-            }
-        },
-    });
+function pressInboxPills(): void {
+    for (const pill of $$(
+        '[data-inbox-pill]', document,
+    )) {
+        const kind = pill.getAttribute(
+            'data-inbox-pill',
+        );
+        pill.setAttribute(
+            'aria-pressed',
+            kind === rightListKind
+                ? 'true' : 'false',
+        );
+    }
 }
 
-function renderTabs(): void {
-    const tabsEl = $(
-        '#workbox-tabs', document,
-    );
-    if (!tabsEl) return;
-    setHtml(tabsEl, html`
-        <span class="${
-            'badge badge-success'
-            + ' text-xs cursor-pointer active'
-        }" data-tab="active">${
-            iconMail(ICON_SIZE.sm, '')
-        } Active</span>
-        <span class="${
-            'badge badge-default'
-            + ' text-xs cursor-pointer'
-        }" data-tab="archive">${
-            iconArchive(ICON_SIZE.sm, '')
-        } Archive</span>`);
+function bindInboxPills(): void {
+    for (const pill of $$(
+        '[data-inbox-pill]', document,
+    )) {
+        pill.addEventListener('click', () => {
+            const kind = pill.getAttribute(
+                'data-inbox-pill',
+            );
+            if (
+                kind !== 'claimed'
+                && kind !== 'archivedByMe'
+            ) return;
+            rightListKind = kind;
+            history.replaceState(
+                null,
+                '',
+                kind === 'archivedByMe'
+                    ? '#archived'
+                    : '#active',
+            );
+            pressInboxPills();
+            const claimedEl =
+                $('#claimed-list', document);
+            const ctx = sessionContext();
+            if (!claimedEl) return;
+            void renderRightList(claimedEl, ctx);
+        }, { signal });
+    }
 }
 
 async function fetchInboxRows(
@@ -168,112 +142,64 @@ async function fetchInboxRows(
     return inboxRows;
 }
 
-function buildItems(
+function listsFrom(
     rows: InboxRows,
-    mode: InboxMode,
-): InboxItem[] {
-    const lists = buildInboxItems(
+) {
+    return buildInboxItems(
         rows.workOrders,
         rows.activeClaimsByWo,
         currentMemberId ?? '',
     );
-    if (mode === 'archived') {
-        return lists.archivedByMe;
-    }
-    return [...lists.available, ...lists.claimed];
 }
 
-async function initActiveList(
-    activeEl: HTMLElement,
+async function renderAvailable(
+    listEl: HTMLElement,
     ctx: RequestContext,
-    rowsPromise: Promise<InboxRows>,
+    rowsPromise?: Promise<InboxRows>,
 ): Promise<void> {
+    const rows = rowsPromise ?? fetchInboxRows(ctx);
     await loadInto({
-        container: activeEl,
+        container: listEl,
         skeleton: buildSkeleton('card-list', 4),
-        fetch: () => rowsPromise.then(
-            r => buildItems(r, 'active'),
-        ),
-        retry: init,
-        onData: items => onActiveListLoaded(
-            items, activeEl, ctx,
-        ),
-    });
-}
-
-function onActiveListLoaded(
-    items: InboxItem[],
-    activeEl: HTMLElement,
-    ctx: RequestContext,
-): void {
-    activePresenter = new WorkboxInboxPresenter(
-        items, 'available',
-    );
-    activePresenter.renderList(activeEl);
-    bindRowNavigation(activeEl);
-
-    initDragReorder(
-        activeEl,
-        '[data-work-order-card]',
-        'data-work-order-card',
-        async (id, newPosition) => {
-            if (!inboxRows) return;
-            const held = inboxRows.workOrders
-                .find(wo => wo.id === id);
-            if (!held) return;
-            let moved: WorkOrder;
-            try {
-                moved = await putWorkOrderPosition(
-                    ctx, held, newPosition,
-                );
-            } catch (err) {
-                log.error(
-                    'reorder failed',
-                    'workbox', err,
-                );
-                showToast(
-                    'Failed to save order',
-                    'error',
-                );
-                return;
-            }
-            inboxRows = {
-                ...inboxRows,
-                workOrders: inboxRows.workOrders.map(
-                    wo => wo.id === id ? moved : wo,
-                ),
-            };
-            activePresenter =
-                new WorkboxInboxPresenter(
-                    buildItems(inboxRows, 'active'),
-                    'available',
-                );
-            activePresenter.renderList(
-                activeEl,
-            );
-        },
-    );
-}
-
-async function initArchiveList(
-    archiveEl: HTMLElement,
-    _ctx: RequestContext,
-    rowsPromise: Promise<InboxRows>,
-): Promise<void> {
-    await loadInto({
-        container: archiveEl,
-        skeleton: buildSkeleton('card-list', 4),
-        fetch: () => rowsPromise.then(
-            r => buildItems(r, 'archived'),
+        fetch: () => rows.then(
+            r => listsFrom(r).available,
         ),
         retry: init,
         onData: items => {
-            const presenter =
-                new WorkboxInboxPresenter(
-                    items, 'archivedByMe',
-                );
-            presenter.renderList(archiveEl);
-            bindRowNavigation(archiveEl);
+            new WorkboxInboxPresenter(
+                items, 'available',
+            ).renderList(listEl);
+            bindRowNavigation(listEl);
+        },
+    });
+}
+
+async function renderRightList(
+    listEl: HTMLElement,
+    ctx: RequestContext,
+    rowsPromise?: Promise<InboxRows>,
+): Promise<void> {
+    const rows = rowsPromise ?? fetchInboxRows(ctx);
+    const kind: InboxListKind =
+        rightListKind === 'archivedByMe'
+            ? 'archivedByMe'
+            : 'claimed';
+    listEl.setAttribute('data-inbox-list', kind);
+    await loadInto({
+        container: listEl,
+        skeleton: buildSkeleton('card-list', 4),
+        fetch: () => rows.then(r => {
+            const lists = listsFrom(r);
+            return kind === 'archivedByMe'
+                ? lists.archivedByMe
+                : lists.claimed;
+        }),
+        retry: init,
+        onData: items => {
+            new WorkboxInboxPresenter(
+                items, kind,
+            ).renderList(listEl);
+            bindRowNavigation(listEl);
         },
     });
 }
@@ -281,6 +207,10 @@ async function initArchiveList(
 function bindRowNavigation(
     container: HTMLElement,
 ): void {
+    if (container.dataset.navBound === 'true') {
+        return;
+    }
+    container.dataset.navBound = 'true';
     container.addEventListener(
         'click', e => onRowClick(e),
         { signal },
@@ -288,14 +218,8 @@ function bindRowNavigation(
 }
 
 function onRowClick(e: MouseEvent): void {
-    if (
-        !(e.target instanceof Element)
-    ) return;
-    // Real links navigate themselves, and
-    // the reorder handle is not navigation.
-    if (e.target.closest(
-        'a[href], .drag-handle',
-    )) return;
+    if (!(e.target instanceof Element)) return;
+    if (e.target.closest('a[href]')) return;
     const card = e.target.closest<HTMLElement>(
         '[data-work-order-card]',
     );
