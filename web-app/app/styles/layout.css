@@ -286,7 +286,6 @@ html.sidebar-collapsed .main-content {
     .mobile-header { display: none !important; }
     #mobile-sheet { display: none !important; }
     #mobile-sheet-backdrop { display: none !important; }
-    #mobile-search-bar { display: none !important; }
 }
 
 @media (max-width: 1023px) {
@@ -309,26 +308,6 @@ html.sidebar-collapsed .main-content {
 .sidebar-signout {
     justify-content: flex-start;
     color: hsl(var(--muted-foreground));
-}
-
-/* Mobile search bar */
-.mobile-search-bar {
-    position: fixed;
-    top: 3.5rem;
-    left: 0;
-    right: 0;
-    background: hsl(var(--background));
-    border-bottom: 1px solid hsl(var(--border));
-    z-index: 40;
-    padding: var(--space-3);
-}
-
-/* Search close button */
-.search-close-btn {
-    position: absolute;
-    right: var(--space-1);
-    top: 50%;
-    transform: translateY(-50%);
 }
 
 /* -- Named Grid Layouts ---------------------- */
