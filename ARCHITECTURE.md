@@ -453,11 +453,14 @@ whether a prior claim lapsed. The workbox pages read a
 claim's liveness from the head's `claim.expires_at`,
 the page judging the stored claim against the clock.
 
-The workbox shows every active and archived work order
-to every user; there is no per-user visibility filter.
-`buildInboxItems` in `presenters/workbox-inbox.ts` runs
-the active/archive split, the claimed-and-unfinished
-exclusion, and the sort — nothing more.
+The workbox inbox is personal. `buildInboxItems` in
+`presenters/workbox-inbox.ts` takes the current
+member id and splits heads into available-to-me,
+claimed-by-me, and archived-by-me. Another member's
+live claim is omitted. Another member's archive is
+omitted. Item 11's processes rewrite keeps
+all-see-all as the default; item 11a is the
+assigned pool (current node `memberIds`).
 
 ## Conventions
 
