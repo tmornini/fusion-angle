@@ -300,7 +300,6 @@ export async function rehearse(
     const db = new BackedDbAdapter(
         backend,
         async () => {},
-        async () => {},
         () => {},
     );
     await db.ensureTable();

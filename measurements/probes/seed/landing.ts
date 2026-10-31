@@ -53,7 +53,7 @@ backend.executeLedger = async (attempt, rows, now, tx) => {
     return answers;
 };
 const adapter = new BackedDbAdapter(
-    backend, async () => {}, async () => {}, () => {});
+    backend, async () => {}, () => {});
 const rehearsalStarted = performance.now();
 await postMockDataLoad(adapter, { hashPassword: testHashPassword });
 const rehearsalMs = performance.now() - rehearsalStarted;

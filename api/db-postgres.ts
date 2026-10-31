@@ -7,7 +7,7 @@ import { connectPostgres } from './postgres-client.ts';
 // hands a URL to the wrapper.
 //
 // The return type is the class, not
-// `GuardedDbAdapter & LatencySimulation`: the class
+// `DbAdapter & LatencySimulation`: the class
 // declares `messagePairs` concrete, so a test holding one
 // keeps `getAll()` as its whole-plane oracle. Every face
 // the product passes around still hides it.
@@ -16,7 +16,6 @@ export function postgresDbAdapter(
 ): BackedDbAdapter {
     return new BackedDbAdapter(
         new PostgresBackend(connectPostgres(url)),
-        async () => {},
         async () => {},
         () => {},
     );

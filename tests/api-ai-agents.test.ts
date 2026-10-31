@@ -640,7 +640,6 @@ Deno.test('a flow PUT reads its agents in the transaction'
     const db = new BackedDbAdapter(
         hooked.backend,
         async () => {},
-        async () => {},
         () => {},
     );
     await seedAdminSchema(db);
@@ -762,7 +761,6 @@ Deno.test('a flow create reads its programs in the'
     const db = new BackedDbAdapter(
         hooked.backend,
         async () => {},
-        async () => {},
         () => {},
     );
     await seedAdminSchema(db);
@@ -822,7 +820,6 @@ async function flowLawFixture(): Promise<{
     const hooked = lawTransactionWatched(STARK);
     const db = new BackedDbAdapter(
         hooked.backend,
-        async () => {},
         async () => {},
         () => {},
     );

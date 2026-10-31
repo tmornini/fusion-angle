@@ -29,7 +29,6 @@ export async function initAdapter(
     makeAdapter: () => ClientFacadeAdapter,
 ): Promise<boolean> {
     adapter = makeAdapter();
-    await adapter.initialize();
     putClient(createAppClient(wrapInPageAdapter(adapter)));
     await postSessionSeed();
     return adapter.hasSchema();

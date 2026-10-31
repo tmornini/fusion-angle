@@ -82,7 +82,6 @@ export async function seedMain(
             const adapter = new BackedDbAdapter(
                 new PostgresBackend(sql),
                 async () => {},
-                async () => {},
                 () => {},
             );
             await seedPostgres(
