@@ -103,10 +103,20 @@ cleanup() {
 read_return() {
     # An explicit redirect keeps the terminal.
     # A bare background read would see /dev/null.
+    # A function in if or || loses set -e, and a
+    # subshell there inherits that loss. The bundle
+    # runs under its own set -e; only success signals.
     while IFS= read -r _; do
-        echo "Redeploying. Reload the browser." >&2
-        bundle_client "$SITE" </dev/null || true
-        kill -USR1 "$$" 2>/dev/null || true
+        set +e
+        (
+            set -euo pipefail
+            bundle_client "$SITE" </dev/null
+        )
+        status=$?
+        set -e
+        if [ "$status" -eq 0 ]; then
+            kill -USR1 "$$" 2>/dev/null || true
+        fi
     done <&0 &
     LOOP_PID=$!
 }
@@ -129,19 +139,46 @@ stop_server() {
     SERVER_PID=''
 }
 
+listening_count() {
+    local n=0 line
+    if [ ! -f "$REQUEST_LOG" ]; then
+        printf '0'
+        return
+    fi
+    while IFS= read -r line; do
+        case "$line" in
+            *'"message":"listening"'*)
+                n=$((n + 1))
+                ;;
+        esac
+    done < "$REQUEST_LOG"
+    printf '%s' "$n"
+}
+
 run_server() {
+    local restart=0 mark=0 now=0 status=0
+    mark=$(listening_count)
     start_server
     while true; do
         if [ "$RESTARTING" = 1 ]; then
             RESTARTING=0
             stop_server
+            mark=$(listening_count)
             start_server
+            restart=1
             continue
         fi
         if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-            local status=0
             wait "$SERVER_PID" || status=$?
             exit "$status"
+        fi
+        if [ "$restart" = 1 ]; then
+            now=$(listening_count)
+            if [ "$now" -gt "$mark" ]; then
+                echo "Redeploying." \
+                    "Reload the browser." >&2
+                restart=0
+            fi
         fi
         # A restart signal interrupts sleep. set -e
         # must not treat that as a server failure.
@@ -232,6 +269,7 @@ then
     exit 1
 fi
 bundle_client "$SITE"
+trap 'RESTARTING=1' USR1
 read_return
 REQUEST_LOG="$SESSION_ROOT/requests.log"
 : > "$REQUEST_LOG"
@@ -243,5 +281,4 @@ if [ -n "$SEED_TEXT" ]; then
 fi
 echo "Press Return to redeploy."
 echo "Request log: $REQUEST_LOG"
-trap 'RESTARTING=1' USR1
 run_server
