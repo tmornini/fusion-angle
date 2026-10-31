@@ -1,5 +1,12 @@
 import type { InboxListKind } from
     './presenters/workbox-inbox.ts';
+import {
+    deleteWorkOrderClaim,
+    putWorkOrderClaim,
+    putWorkOrderPosition,
+    type RequestContext,
+    type WorkOrder,
+} from '../../client/index.ts';
 
 export type InboxDropDestination =
     | InboxListKind
@@ -53,4 +60,36 @@ export function classifyInboxDrop(
         return 'reorder';
     }
     return 'none';
+}
+
+export type InboxTransfer =
+    | { kind: 'claim'; position: number }
+    | { kind: 'release' }
+    | { kind: 'reorder'; position: number }
+    | { kind: 'none' };
+
+export async function transferInboxDrop(
+    ctx: RequestContext,
+    held: WorkOrder,
+    drop: InboxTransfer,
+): Promise<WorkOrder> {
+    if (drop.kind === 'none') {
+        return held;
+    }
+    if (drop.kind === 'release') {
+        return await deleteWorkOrderClaim(
+            ctx, held,
+        );
+    }
+    if (drop.kind === 'reorder') {
+        return await putWorkOrderPosition(
+            ctx, held, drop.position,
+        );
+    }
+    const claimed = await putWorkOrderClaim(
+        ctx, held,
+    );
+    return await putWorkOrderPosition(
+        ctx, claimed, drop.position,
+    );
 }
