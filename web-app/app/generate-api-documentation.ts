@@ -1019,6 +1019,15 @@ function viewStorageField(
 }
 
 export function svgOf(rows: readonly Route[]): string {
+    // The page CSP drops this <style> block
+    // (style-src 'self'), so each paint is also a
+    // presentation attribute. hsl(var(--token))
+    // resolves on the inline SVG, as on the flow
+    // canvas. The style block keeps a standalone
+    // API.svg on the same tokens.
+    const ink = 'hsl(var(--foreground))';
+    const muted = 'hsl(var(--muted-foreground))';
+    const surface = 'hsl(var(--background))';
     const wings = new Map<string, Route[]>();
     for (const row of rows) {
         offeredVerbs(row);
@@ -1056,14 +1065,16 @@ export function svgOf(rows: readonly Route[]): string {
         'filled circle = offered verb (item or'
         + ' operation)';
     parts.push(
-        '  <text class="legend" x="' + PAD + '" y="'
+        '  <text class="legend" fill="' + muted
+        + '" x="' + PAD + '" y="'
         + y + '">' + escapeXml(legend) + '</text>',
     );
     y += LEGEND_H;
     HTTP_VERBS.forEach((verb, i) => {
         const cx = verbColumnX(i) + VERB_W / 2;
         parts.push(
-            '  <text class="col" x="' + cx + '" y="'
+            '  <text class="col" fill="' + muted
+            + '" x="' + cx + '" y="'
             + y + '">'
             + escapeXml(verb.toUpperCase())
             + '</text>',
@@ -1073,7 +1084,8 @@ export function svgOf(rows: readonly Route[]): string {
     for (const name of wingNames) {
         y += 6;
         parts.push(
-            '  <text class="wing" x="' + PAD + '" y="'
+            '  <text class="wing" fill="' + ink
+            + '" x="' + PAD + '" y="'
             + y + '">' + escapeXml(name) + '</text>',
         );
         y += WING_H - 8;
@@ -1091,6 +1103,7 @@ export function svgOf(rows: readonly Route[]): string {
                         '  <a href="'
                         + escapeXml(href) + '">',
                         '    <circle class="filled"'
+                        + ' fill="' + ink + '"'
                         + ' cx="' + cx + '" cy="'
                         + cy + '" r="' + CIRCLE_R
                         + '"/>',
@@ -1104,12 +1117,14 @@ export function svgOf(rows: readonly Route[]): string {
                         + rx + '" y="' + ry
                         + '" width="' + EMPTY
                         + '" height="' + EMPTY
-                        + '" fill="none"/>',
+                        + '" fill="none"'
+                        + ' stroke="' + muted + '"/>',
                     );
                 }
             });
             parts.push(
-                '  <text class="uri" x="' + uriX()
+                '  <text class="uri" fill="' + ink
+                + '" x="' + uriX()
                 + '" y="' + (cy + 3) + '">'
                 + escapeXml(uri) + '</text>',
             );
@@ -1120,7 +1135,8 @@ export function svgOf(rows: readonly Route[]): string {
     if (backingFamilies.length > 0) {
         y += 6;
         parts.push(
-            '  <text class="wing" x="' + PAD + '" y="'
+            '  <text class="wing" fill="' + ink
+            + '" x="' + PAD + '" y="'
             + y + '">' + escapeXml('backing')
             + '</text>',
         );
@@ -1142,11 +1158,13 @@ export function svgOf(rows: readonly Route[]): string {
                     + rx + '" y="' + ry
                     + '" width="' + EMPTY
                     + '" height="' + EMPTY
-                    + '" fill="none"/>',
+                    + '" fill="none"'
+                    + ' stroke="' + muted + '"/>',
                 );
             }
             parts.push(
-                '  <text class="uri" x="' + uriX()
+                '  <text class="uri" fill="' + ink
+                + '" x="' + uriX()
                 + '" y="' + (cy + 3) + '">'
                 + escapeXml(label) + '</text>',
             );
@@ -1160,20 +1178,20 @@ export function svgOf(rows: readonly Route[]): string {
         '      .legend, .wing, .col { font-family:',
         '        ui-sans-serif, system-ui, sans-serif;',
         '      }',
-        '      .legend { fill: hsl(217 38% 38%);',
+        '      .legend { fill: ' + muted + ';',
         '        font-size: 11px; }',
-        '      .wing { fill: hsl(217 45% 15%);',
+        '      .wing { fill: ' + ink + ';',
         '        font-size: 12px; font-weight: 700; }',
-        '      .col { fill: hsl(217 12% 40%);',
+        '      .col { fill: ' + muted + ';',
         '        font-size: 8px; text-anchor: middle;',
         '      }',
         '      .uri { font-family: ui-monospace,',
         "        SFMono-Regular, Menlo, monospace;",
         '        font-size: ' + URI_SIZE + 'px;',
-        '        fill: hsl(217 45% 15%); }',
-        '      .filled { fill: hsl(217 45% 15%); }',
+        '        fill: ' + ink + '; }',
+        '      .filled { fill: ' + ink + '; }',
         '      .empty { fill: none;',
-        '        stroke: hsl(217 30% 40%);',
+        '        stroke: ' + muted + ';',
         '        stroke-width: 1; }',
         '    </style>',
     ];
@@ -1187,7 +1205,7 @@ export function svgOf(rows: readonly Route[]): string {
         '  </defs>',
         '  <rect x="0" y="0" width="' + width
         + '" height="' + height
-        + '" fill="hsl(217 30% 97%)"/>',
+        + '" fill="' + surface + '"/>',
         ...parts,
         '</svg>',
         '',
