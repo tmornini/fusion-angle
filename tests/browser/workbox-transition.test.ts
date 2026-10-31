@@ -1,6 +1,15 @@
 import { assert, assertStrictEquals } from '@std/assert';
+import { handleRequest } from '../../api/api.ts';
+import { STARK_ORGANIZATION } from
+    '../../api/mock-data/seed-constants.ts';
+import { customerProfileRecordId } from
+    '../../api/mock-data/records.ts';
+import { generateIdentifier } from
+    '../../shared/identifier.ts';
+import { apiRequest } from '../http-fixtures.ts';
 import {
-    useBrowser, withAdminPage, type Page,
+    adminToken, useBrowser, withAdminPage,
+    type Origin, type Page,
 } from './fixtures.ts';
 import { registryUrl } from
     '../../web-app/app/browser-drive.ts';
@@ -15,9 +24,66 @@ const COMPANY_NAME_ID =
 const CONTACT_EMAIL_ID =
     'oeqelDVElwxHYWkWRVTCYw';
 
+// Create still posts an unbound work order (TODO.md
+// bind-at-creation). Submit is value-bearing; an
+// unbound required node 400s. Genesis + bind here
+// until create carries the instance.
+async function bindGenesisInstance(
+    origin: Origin, workOrderId: string,
+): Promise<void> {
+    const token = await adminToken();
+    const instanceId = generateIdentifier();
+    const created = await handleRequest(
+        origin.db, apiRequest({
+            method: 'PATCH',
+            path: '/organizations/'
+                + STARK_ORGANIZATION
+                + '/record-types/'
+                + customerProfileRecordId
+                + '/instances/' + instanceId,
+            token,
+            headers: { 'if-none-match': '*' },
+            body: { set: [] },
+        }),
+    );
+    assertStrictEquals(created.status, 201);
+    await created.body?.cancel();
+    const head = await handleRequest(
+        origin.db, apiRequest({
+            method: 'GET',
+            path: '/organizations/'
+                + STARK_ORGANIZATION
+                + '/work-orders/' + workOrderId,
+            token,
+        }),
+    );
+    assertStrictEquals(head.status, 200);
+    const etag = head.headers.get('ETag');
+    assert(etag !== null);
+    await head.body?.cancel();
+    const bound = await handleRequest(
+        origin.db, apiRequest({
+            method: 'PUT',
+            path: '/organizations/'
+                + STARK_ORGANIZATION
+                + '/work-orders/' + workOrderId
+                + '/binding',
+            token,
+            body: {
+                instance_id: instanceId,
+                record_type_id:
+                    customerProfileRecordId,
+            },
+            headers: { 'If-Match': etag },
+        }),
+    );
+    assertStrictEquals(bound.status, 200);
+    await bound.body?.cancel();
+}
+
 async function createOnboardingWorkOrder(
     page: Page, baseUrl: string,
-): Promise<void> {
+): Promise<string> {
     await page.navigate(
         registryUrl(baseUrl, 'workbox'),
     );
@@ -38,6 +104,12 @@ async function createOnboardingWorkOrder(
         'action screen',
     );
     await page.ready('workbox-detail');
+    const id = await page.evaluate<string>(
+        `new URLSearchParams(location.search)`
+        + `.get('id') ?? ''`,
+    );
+    assert(id !== '');
+    return id;
 }
 
 async function fillRequired(
@@ -126,9 +198,21 @@ Deno.test(
         await withAdminPage(
             browser.get(),
             async (page, origin) => {
-                await createOnboardingWorkOrder(
-                    page, origin.baseUrl,
+                const workOrderId =
+                    await createOnboardingWorkOrder(
+                        page, origin.baseUrl,
+                    );
+                await bindGenesisInstance(
+                    origin, workOrderId,
                 );
+                await page.navigate(
+                    registryUrl(
+                        origin.baseUrl,
+                        'workbox-detail',
+                        'id=' + workOrderId,
+                    ),
+                );
+                await page.ready('workbox-detail');
                 await fillRequired(page);
                 await page.click(
                     `[data-edge-id="${SUBMIT_EDGE_ID}"]`,
