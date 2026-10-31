@@ -866,7 +866,7 @@ Deno.test(
                 captured = value;
             },
         };
-        new WorkboxInboxPresenter(items, true)
+        new WorkboxInboxPresenter(items, 'available')
             .renderList(
                 container as unknown as HTMLElement,
             );
@@ -881,7 +881,7 @@ Deno.test(
             ? secondRow : firstRow;
         for (const present of [
             'data-work-order-card="' + placed.id + '"',
-            'href=', 'drag-handle', 'cursor-pointer',
+            'href=', 'cursor-pointer',
             'Doing work',
         ]) {
             assertStringIncludes(placedRow, present);
@@ -895,7 +895,7 @@ Deno.test(
         }
         for (const absent of [
             'data-work-order-card', 'href=',
-            'drag-handle', 'cursor-pointer',
+            'cursor-pointer',
         ]) {
             assertEquals(
                 unplacedRow.includes(absent),

@@ -2,7 +2,6 @@ import {
     html, setHtml, SafeHtml,
     trusted, escapeForHtml,
 } from '../safe-html.ts';
-import { ICON_SIZE, iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {
@@ -65,6 +64,12 @@ export type InboxListKind =
     | 'claimed'
     | 'archivedByMe';
 
+const EMPTY_COPY: Record<InboxListKind, string> = {
+    available: 'No work orders available to me',
+    claimed: 'No work orders claimed by me',
+    archivedByMe: 'No work orders archived by me',
+};
+
 export interface InboxLists {
     available: InboxItem[];
     claimed: InboxItem[];
@@ -86,8 +91,6 @@ export interface ActiveClaim {
 function buildUnplacedRow(
     item: UnplacedInboxItem,
 ): SafeHtml {
-    const from = item.transitionerName
-        ?? DISPLAY_ABSENT;
     return html`
         <div class="card p-4">
             <div class="flex-fill">
@@ -114,9 +117,6 @@ function buildUnplacedRow(
                     <span
                         class="badge badge-warning"
                         >State unknown</span>
-                    <span>from ${
-                        from
-                    }</span>
                     <span class="ml-auto"
                         >${
                             item.lastTransitionedAt
@@ -132,19 +132,25 @@ function buildUnplacedRow(
 
 export class WorkboxInboxPresenter {
     readonly #items: readonly InboxItem[];
-    readonly #showGrip: boolean;
+    readonly #kind: InboxListKind;
 
     constructor(
         items: readonly InboxItem[],
-        showGrip: boolean,
+        kind: InboxListKind,
     ) {
         this.#items = items;
-        this.#showGrip = showGrip;
+        this.#kind = kind;
     }
 
     renderList(
         container: HTMLElement,
     ): void {
+        if (this.#items.length === 0) {
+            setHtml(container, html`<p
+                class="text-muted"
+            >${EMPTY_COPY[this.#kind]}</p>`);
+            return;
+        }
         setHtml(container, html`${
             this.#items.map(
                 i => this.#buildRow(i),
@@ -172,31 +178,6 @@ export class WorkboxInboxPresenter {
                 class="badge badge-info"${
                 titleAttr}
                 >${item.stateName}</span>`;
-        const claimedBadge =
-            !item.completed && item.claimedByName
-                ? html`<span
-                    class="badge badge-warning"
-                    >In progress — ${
-                        item.claimedByName
-                    }</span>`
-                : html``;
-        const from = item.transitionerName
-            ?? DISPLAY_ABSENT;
-        const grip = this.#showGrip
-            ? html`<button
-                type="button"
-                class="${
-                    'hidden-mobile text-muted'
-                    + ' drag-handle'
-                }"
-                aria-label="${
-                    'Reorder '
-                    + item.flowName
-                    + ' #' + item.displayId
-                }">${
-                iconGripVertical(ICON_SIZE.xl, '')
-            }</button>`
-            : html``;
         return html`
         <div
             class="card p-4 cursor-pointer"
@@ -205,7 +186,6 @@ export class WorkboxInboxPresenter {
             <div class="${
                 'flex items-center gap-4'
             }">
-                ${grip}
                 <div class="flex-fill">
                     <a href="${
                         buildPageUrl(
@@ -233,10 +213,6 @@ export class WorkboxInboxPresenter {
                         + ' text-muted'
                     }">
                         ${badge}
-                        ${claimedBadge}
-                        <span>from ${
-                            from
-                        }</span>
                         <span class="ml-auto"
                             >${
                                 item.lastTransitionedAt

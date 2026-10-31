@@ -10,7 +10,6 @@ import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
     loadInto,
-    type EmptyStateConfig,
 } from '../app/loading-states.ts';
 import {
     ICON_SIZE,
@@ -113,27 +112,6 @@ export async function init(
     });
 }
 
-function emptyStateFor(
-    mode: InboxMode,
-): EmptyStateConfig {
-    if (mode === 'active') {
-        return {
-            icon: iconMail(ICON_SIZE['2xl'], ''),
-            title: 'No Active Work Orders Yet',
-            description:
-                'Create a work order to get'
-                + ' started.',
-        };
-    }
-    return {
-        icon: iconMail(ICON_SIZE['2xl'], ''),
-        title: 'No Archived Work Orders Yet',
-        description:
-            'Completed work orders will'
-            + ' appear here.',
-    };
-}
-
 async function rerenderInbox(
     listEl: HTMLElement,
     mode: InboxMode,
@@ -148,11 +126,12 @@ async function rerenderInbox(
             r => buildItems(r, mode),
         ),
         retry: init,
-        emptyState: emptyStateFor(mode),
         onData: items => {
             const presenter =
                 new WorkboxInboxPresenter(
-                    items, mode === 'active',
+                    items, mode === 'archived'
+                        ? 'archivedByMe'
+                        : 'available',
                 );
             presenter.renderList(listEl);
             if (mode === 'active') {
@@ -216,7 +195,6 @@ async function initActiveList(
             r => buildItems(r, 'active'),
         ),
         retry: init,
-        emptyState: emptyStateFor('active'),
         onData: items => onActiveListLoaded(
             items, activeEl, ctx,
         ),
@@ -229,7 +207,7 @@ function onActiveListLoaded(
     ctx: RequestContext,
 ): void {
     activePresenter = new WorkboxInboxPresenter(
-        items, true,
+        items, 'available',
     );
     activePresenter.renderList(activeEl);
     bindRowNavigation(activeEl);
@@ -267,7 +245,8 @@ function onActiveListLoaded(
             };
             activePresenter =
                 new WorkboxInboxPresenter(
-                    buildItems(inboxRows, 'active'), true,
+                    buildItems(inboxRows, 'active'),
+                    'available',
                 );
             activePresenter.renderList(
                 activeEl,
@@ -288,11 +267,10 @@ async function initArchiveList(
             r => buildItems(r, 'archived'),
         ),
         retry: init,
-        emptyState: emptyStateFor('archived'),
         onData: items => {
             const presenter =
                 new WorkboxInboxPresenter(
-                    items, false,
+                    items, 'archivedByMe',
                 );
             presenter.renderList(archiveEl);
             bindRowNavigation(archiveEl);
