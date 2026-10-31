@@ -42,10 +42,6 @@ const ATTRIBUTE_HTML_TYPE: Record<
     checkbox: { type: 'checkbox' },
 };
 
-// Unbound action-screen prompt on disabled fields.
-const UNBOUND_FIELD_TITLE =
-    'Bind an instance before editing values';
-
 export type WorkOrderBinding = {
     readonly instanceId: string;
     readonly recordTypeId: string;
@@ -78,13 +74,7 @@ export function buildAttributeInputHtml(
     const disabledAttr = isReadonly
         ? trusted('disabled')
         : html``;
-    const titleAttr = forceDisabled
-        ? trusted(
-            ' title="'
-            + escapeForHtml(UNBOUND_FIELD_TITLE)
-            + '"',
-        )
-        : html``;
+    const titleAttr = html``;
     const safeValue = value ?? '';
     if (attribute.attributeType === 'select') {
         const options = attribute.options;
@@ -179,8 +169,6 @@ export class WorkboxDetailPresenter {
         string, string
     > | null;
     readonly #binding: WorkOrderBinding | null;
-    readonly #pickerItems:
-        readonly InstancePickerItem[];
     readonly #conflictNotice: string | null;
 
     constructor(
@@ -202,7 +190,7 @@ export class WorkboxDetailPresenter {
         instanceValues:
             ReadonlyMap<string, string> | null,
         binding: WorkOrderBinding | null,
-        pickerItems:
+        _pickerItems:
             readonly InstancePickerItem[] = [],
         conflictNotice: string | null = null,
     ) {
@@ -211,7 +199,6 @@ export class WorkboxDetailPresenter {
         this.#attributeMap = attributeMap;
         this.#instanceValues = instanceValues;
         this.#binding = binding;
-        this.#pickerItems = pickerItems;
         this.#conflictNotice = conflictNotice;
 
         const head = this.#flowGraph.nodes.find(
@@ -336,14 +323,6 @@ export class WorkboxDetailPresenter {
             : html`<div
                 id="transition-violations"></div>`;
 
-        const unclaimBtn = complete
-            ? html``
-            : html`<button
-                id="unclaim-btn"
-                class="btn btn-outline">
-                Release Work Order
-            </button>`;
-
         const conflict = this.#conflictNotice
             !== null
             ? html`<p class="${
@@ -355,9 +334,7 @@ export class WorkboxDetailPresenter {
                 >${this.#conflictNotice}</p>`
             : html``;
 
-        // Bind rides the header so the compositor
-        // click lands in the 1280×800 viewport
-        // (WB11). Attributes are two columns so
+        // Attributes are two columns so
         // submit stays below them and still in view.
         return html`<div
             class="entity">
@@ -395,18 +372,12 @@ export class WorkboxDetailPresenter {
                         ${this.#bindingBadge()}
                     </div>
                 </div>
-                ${this.#bindButton()}
             </div>
 
             ${conflict}
             ${fields}
             ${violationsSlot}
             ${transitions}
-
-            <div class="flex gap-3 mb-6
-                flex-wrap">
-                ${unclaimBtn}
-            </div>
 
             <details
                 id="work-order-history"
@@ -434,18 +405,18 @@ export class WorkboxDetailPresenter {
                             )}
                 </div>
             </details>
-            ${this.#bindDialog()}
         </div>`;
+    }
+
+    #claimedByMe(): boolean {
+        return this.#claim.state === 'claimed'
+            && this.#claim.byCurrentMember;
     }
 
     #bindingBadge(): SafeHtml {
         const bind = this.#binding;
         if (bind === null) {
-            return html`<span
-                class="badge badge-warning"
-                data-binding="unbound">
-                Unbound
-            </span>`;
+            return html``;
         }
         return html`<span
             class="badge badge-success"
@@ -455,110 +426,6 @@ export class WorkboxDetailPresenter {
             }">
             Instance ${bind.instanceId}
         </span>`;
-    }
-
-    #bindButton(): SafeHtml {
-        if (
-            this.isArchive()
-            || this.#binding !== null
-        ) {
-            return html``;
-        }
-        return html`<button
-            type="button"
-            class="btn btn-primary"
-            data-dialog-open="bind-instance">
-            Bind instance
-        </button>`;
-    }
-
-    #bindDialog(): SafeHtml {
-        if (
-            this.isArchive()
-            || this.#binding !== null
-        ) {
-            return html``;
-        }
-        const rows = this.#pickerItems.length === 0
-            ? html`<p class="text-muted">
-                No instances available.
-            </p>`
-            : html`<ul class="${
-                'bind-instance-list'
-            }">
-                ${this.#pickerItems.map(
-                    item => this.#pickerRow(item),
-                )}
-            </ul>`;
-        return html`<dialog
-            id="bind-instance-dialog"
-            class="dialog dialog-wide"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="${
-                'bind-instance-title'
-            }">
-            <div class="dialog-header">
-                <h3 class="dialog-title"
-                    id="bind-instance-title">
-                    Bind instance
-                </h3>
-                <p class="dialog-description">
-                    Choose an instance of the
-                    flow's record type for this
-                    work order.
-                </p>
-            </div>
-            <div class="py-4">
-                ${rows}
-            </div>
-            <div class="dialog-footer">
-                <button
-                    type="button"
-                    class="btn btn-outline"
-                    data-dialog-cancel="${
-                        'bind-instance'
-                    }">
-                    Cancel
-                </button>
-            </div>
-        </dialog>`;
-    }
-
-    #pickerRow(
-        item: InstancePickerItem,
-    ): SafeHtml {
-        const summary = item.fields.length === 0
-            ? html`<span class="text-muted">
-                (empty)
-            </span>`
-            : item.fields.map(
-                f => html`<span
-                    class="bind-instance-field">
-                    <span class="text-muted"
-                        >${f.name}</span>
-                    <span>${f.value}</span>
-                </span>`,
-            );
-        // data-instance-pick — NEVER data-attribute-id
-        // (collectAttributeValues scrapes the latter).
-        return html`<li>
-            <button
-                type="button"
-                class="${
-                    'btn btn-outline'
-                    + ' bind-instance-pick'
-                }"
-                data-instance-pick="${item.id}">
-                <span class="font-semibold"
-                    >${item.id}</span>
-                <span class="${
-                    'bind-instance-summary'
-                }">
-                    ${summary}
-                </span>
-            </button>
-        </li>`;
     }
 
     #buildAttributesCard(): SafeHtml {
@@ -616,6 +483,9 @@ export class WorkboxDetailPresenter {
     }
 
     #buildTransitionButtons(): SafeHtml {
+        const disabledAttr = this.#claimedByMe()
+            ? html``
+            : trusted('disabled');
         return html`<div
             id="work-order-transitions"
             class="flex gap-3 mb-6
@@ -623,7 +493,8 @@ export class WorkboxDetailPresenter {
             ${this.#outgoingEdges.map(
                 e => html`<button
                     class="btn btn-primary"
-                    data-edge-id="${e.id}">
+                    data-edge-id="${e.id}"
+                    ${disabledAttr}>
                     ${e.name}
                 </button>`,
             )}
@@ -690,7 +561,7 @@ export class WorkboxDetailPresenter {
                 attribute.id,
             ) ?? null;
         const forceDisabled =
-            this.#binding === null;
+            !this.#claimedByMe();
         if (
             attribute.attributeType === 'radio'
         ) {

@@ -9,7 +9,6 @@ import {
     WorkboxDetailPresenter,
 } from '../app/presenters/index.ts';
 import {
-    instanceListItems,
     INSTANCE_CONFLICT_NOTICE,
 } from '../app/presenters/record-detail.ts';
 import { reportFault } from '../app/error-helpers.ts';
@@ -20,10 +19,6 @@ import {
 } from '../app/loading-states.ts';
 import { navigateTo } from '../app/navigation.ts';
 import {
-    handleDialogClick,
-    closeDialog,
-} from '../app/dialog.ts';
-import {
     getWorkOrder,
     getWorkOrderVersions,
     workOrderEventsOf,
@@ -31,14 +26,10 @@ import {
     fieldValuesByEventFromHistory,
     getMemberMap,
     postWorkOrderTransition,
-    putWorkOrderClaim,
-    putWorkOrderBinding,
-    deleteWorkOrderClaim,
     getCurrentHumanMember,
     getRecordForWorkOrder,
     getRecordAttributesByRecord,
     getRecordInstance,
-    getRecordInstances,
     subscribeWorkOrderChanges,
     RecordTransitionViolations,
     isClaimedAndUnlapsed,
@@ -60,9 +51,6 @@ import type { HttpMessage } from
 
 /* ── Module state ────────── */
 
-// Flow's record type for the unbound bind picker
-// (also equals the binding's type when bound).
-let heldRecordTypeId: string | null = null;
 // Instance head from the GET that filled the form. A
 // transition latches this snapshot, never a
 // submit-time GET (WB19a / WB19b).
@@ -253,112 +241,6 @@ async function recoverFrom412(
     }
 }
 
-function initUnclaimButton(
-    container: HTMLElement,
-    detail: WorkboxDetailPresenter,
-): void {
-    const btn = $(
-        '#unclaim-btn', container,
-    );
-    if (!btn) return;
-    btn.addEventListener(
-        'click',
-        async () => {
-            const ctx = sessionContext();
-            try {
-                await deleteWorkOrderClaimAtHead(
-                    ctx, detail.idValue(),
-                );
-            } catch (err) {
-                reportFault(
-                    ctx,
-                    'Failed to release work order',
-                    err,
-                );
-                return;
-            }
-            showToast(
-                'Work order released',
-                'success',
-            );
-            navigateTo('workbox');
-        },
-    );
-}
-
-// A release judges the work order as it stands at the
-// click, not as this tab last painted it: a claim that
-// another tab already released answers 200 and stores
-// nothing.
-async function deleteWorkOrderClaimAtHead(
-    ctx: RequestContext,
-    workOrderId: string,
-): Promise<void> {
-    await deleteWorkOrderClaim(
-        ctx, await getWorkOrder(ctx, workOrderId),
-    );
-}
-
-function initBindPicker(
-    container: HTMLElement,
-    detail: WorkboxDetailPresenter,
-    workOrderId: string,
-    memberId: string,
-    recordTypeId: string | null,
-): void {
-    container.addEventListener('click', e => {
-        const target = e.target;
-        if (!(target instanceof Element)) return;
-        if (handleDialogClick(target, e)) return;
-    });
-
-    if (recordTypeId === null) return;
-    if (detail.isBound()) return;
-
-    const picks = $$(
-        '[data-instance-pick]', container,
-    );
-    for (const pick of picks) {
-        pick.addEventListener(
-            'click',
-            async () => {
-                const instanceId =
-                    getRequiredAttribute(
-                        pick,
-                        'data-instance-pick',
-                    );
-                const ctx = sessionContext();
-                try {
-                    await putWorkOrderBinding(
-                        ctx,
-                        detail.workOrder(),
-                        instanceId,
-                        recordTypeId,
-                    );
-                } catch (err) {
-                    reportFault(
-                        ctx,
-                        'Failed to bind instance',
-                        err,
-                    );
-                    return;
-                }
-                closeDialog('bind-instance');
-                conflictNotice = null;
-                showToast(
-                    'Instance bound',
-                    'success',
-                );
-                await refreshDetail(
-                    container,
-                    workOrderId,
-                    memberId,
-                );
-            },
-        );
-    }
-}
-
 async function loadPresenter(
     workOrderId: string,
     currentMemberIdPromise: Promise<string>,
@@ -403,7 +285,7 @@ async function loadPresenter(
             }
             : null;
 
-    // Wave 2: attributes ∥ instance head (or picker list).
+    // Wave 2: attributes ∥ instance head when bound.
     const attributesPromise: Promise<
         RecordAttribute[]
     > = recordId === null
@@ -414,14 +296,6 @@ async function loadPresenter(
         instanceValues:
             ReadonlyMap<string, string> | null;
         instance: HttpMessage | null;
-        pickerItems: readonly {
-            readonly id: string;
-            readonly fields: readonly {
-                readonly name: string;
-                readonly value: string;
-            }[];
-        }[];
-        heldTypeId: string | null;
     };
 
     const instanceWavePromise: Promise<InstanceWave> =
@@ -437,31 +311,11 @@ async function loadPresenter(
                 return {
                     instanceValues: detail.values,
                     instance: detail.message,
-                    pickerItems: [],
-                    heldTypeId: bound.recordTypeId,
-                };
-            }
-            if (recordId !== null) {
-                const attributes =
-                    await attributesPromise;
-                const instances =
-                    await getRecordInstances(
-                        ctx, recordId,
-                    );
-                return {
-                    instanceValues: null,
-                    instance: null,
-                    pickerItems: instanceListItems(
-                        instances, attributes,
-                    ),
-                    heldTypeId: recordId,
                 };
             }
             return {
                 instanceValues: null,
                 instance: null,
-                pickerItems: [],
-                heldTypeId: recordId,
             };
         })();
 
@@ -475,7 +329,6 @@ async function loadPresenter(
             a => [a.id, a] as const,
         ),
     );
-    heldRecordTypeId = instanceWave.heldTypeId;
     heldInstance = instanceWave.instance;
 
     return new WorkboxDetailPresenter(
@@ -488,7 +341,7 @@ async function loadPresenter(
         attributeMap,
         instanceWave.instanceValues,
         bound,
-        instanceWave.pickerItems,
+        [],
         conflictNotice,
     );
 }
@@ -521,20 +374,12 @@ function renderDetail(
             workOrderId,
             memberId,
         );
-        initUnclaimButton(container, detail);
-        initBindPicker(
-            container,
-            detail,
-            workOrderId,
-            memberId,
-            heldRecordTypeId,
-        );
     }
 }
 
-// Reload the action screen from the message plane —
-// claim is NOT re-attempted (init owns that once).
-// Cross-tab release/transition rings the same bell.
+// Reload the action screen from the message plane.
+// Opening never claims. Cross-tab release/transition
+// rings the same bell.
 async function refreshDetail(
     container: HTMLElement,
     workOrderId: string,
@@ -588,34 +433,11 @@ export async function init(
     await loadInto({
         container,
         skeleton: buildSkeleton('detail', 4),
-        fetch: async () => {
-            let presenter =
-                await loadPresenter(
-                    id,
-                    currentMemberIdPromise,
-                    ctx,
-                );
-            const claim =
-                presenter.claimStatus();
-            if (
-                (claim.state !== 'claimed'
-                    || !claim.byCurrentMember)
-                && !presenter.isArchive()
-            ) {
-                await putWorkOrderClaim(
-                    ctx,
-                    presenter.workOrder(),
-                );
-                // Reuse the settled member-id promise.
-                presenter =
-                    await loadPresenter(
-                        id,
-                        currentMemberIdPromise,
-                        ctx,
-                    );
-            }
-            return presenter;
-        },
+        fetch: async () => loadPresenter(
+            id,
+            currentMemberIdPromise,
+            ctx,
+        ),
         retry: () => init(params),
         onData: async detail => {
             const memberId =
@@ -624,8 +446,6 @@ export async function init(
                 container, detail, id, memberId,
             );
 
-            // Subscribe after the claim-on-load path so
-            // the initial notify does not double-render.
             // Full <a href> navigation tears the page
             // down; the channel entry dies with it.
             subscribeWorkOrderChanges(() => {

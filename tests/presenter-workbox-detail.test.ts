@@ -1,5 +1,6 @@
 import {
     assert,
+    assertEquals,
     assertMatch,
     assertStrictEquals,
     assertThrows,
@@ -325,20 +326,18 @@ Deno.test(
 );
 
 Deno.test(
-    'buildAttributeInputHtml force-disables with'
-    + ' bind prompt title when unbound',
+    'buildAttributeInputHtml force-disables'
+    + ' without bind-prompt copy',
     () => {
         const ref = makeAttributeRef();
         const attribute = makeAttribute();
         const out = buildAttributeInputHtml(
-            ref, attribute, null, true,
+            ref, attribute, 'kept', true,
         ).toString();
         assertMatch(out, /disabled/);
+        assertMatch(out, /value="kept"/);
         assert(
-            out.includes(
-                'title="Bind an instance before'
-                + ' editing values"',
-            ),
+            !out.includes('Bind an instance'),
         );
     },
 );
@@ -375,6 +374,10 @@ Deno.test(
                 instanceId: 'inst-xyz',
                 recordTypeId: 'rt-cust',
             },
+            activeClaim: {
+                memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
+                at: '2026-04-01T12:00:00.000000Z',
+            },
         });
         const out = presenter.buildPage()
             .toString();
@@ -386,8 +389,8 @@ Deno.test(
 );
 
 Deno.test(
-    'buildPage unbound disables fields, shows'
-    + ' bind prompt and picker button',
+    'buildPage claimed-by-me enables fields'
+    + ' and omits bind chrome',
     () => {
         const attr = makeAttribute({
             id: 'UQBiHFcwJeCDSnmkPBoYRA',
@@ -401,7 +404,8 @@ Deno.test(
                     name: 'Triage',
                     attributes: [
                         makeAttributeRef({
-                            attributeId: 'UQBiHFcwJeCDSnmkPBoYRA',
+                            attributeId:
+                                'UQBiHFcwJeCDSnmkPBoYRA',
                         }),
                     ],
                 }),
@@ -410,40 +414,38 @@ Deno.test(
         const presenter = makePresenter({
             graph,
             attributes: [attr],
-            instanceValues: null,
+            instanceValues: new Map([
+                ['UQBiHFcwJeCDSnmkPBoYRA', 'from-head'],
+            ]),
             binding: null,
-            pickerItems: [{
-                id: 'inst-a',
-                fields: [
-                    {
-                        name: 'Notes',
-                        value: 'x',
-                    },
-                ],
-            }],
+            activeClaim: {
+                memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
+                at: '2026-04-01T12:00:00.000000Z',
+            },
+            currentMemberId:
+                'pjQzgITAPDQVyvCVpzpIfQ',
         });
         const out = presenter.buildPage()
             .toString();
-        assertMatch(
-            out, /data-binding="unbound"/,
-        );
-        assertMatch(
-            out, /data-dialog-open="bind-instance"/,
-        );
-        assertMatch(
-            out, /id="bind-instance-dialog"/,
-        );
-        assertMatch(
-            out, /data-instance-pick="inst-a"/,
+        assert(
+            !out.includes('data-dialog-open="bind-instance"'),
         );
         assert(
-            !out.includes('data-attribute-id="inst'),
+            !out.includes('id="bind-instance-dialog"'),
         );
-        // Fields disabled with bind title.
-        assertMatch(out, /disabled/);
-        assertMatch(
-            out,
-            /Bind an instance before editing/,
+        assert(!out.includes('Bind instance'));
+        assert(!out.includes('unclaim-btn'));
+        assert(!out.includes('Release Work Order'));
+        assert(
+            !out.includes('Bind an instance before'),
+        );
+        assertMatch(out, /value="from-head"/);
+        const notes = out.match(
+            /id="wo-attr-UQBiHFcwJeCDSnmkPBoYRA"[\s\S]*?>/,
+        );
+        assert(notes);
+        assertEquals(
+            notes[0]!.includes('disabled'), false,
         );
     },
 );
@@ -663,9 +665,66 @@ Deno.test(
 );
 
 Deno.test(
-    'buildPage renders one transition button per'
-    + ' outgoing edge and a release button when'
-    + ' the work order is not complete',
+    'buildPage unclaimed shows disabled fields'
+    + ' with values and disabled transitions',
+    () => {
+        const attr = makeAttribute({
+            id: 'UQBiHFcwJeCDSnmkPBoYRA',
+            name: 'Notes',
+        });
+        const graph = makeFlowGraph({
+            nodes: [
+                makeNode({
+                    id: 'n-1',
+                    name: 'Triage',
+                    attributes: [
+                        makeAttributeRef({
+                            attributeId:
+                                'UQBiHFcwJeCDSnmkPBoYRA',
+                        }),
+                    ],
+                }),
+                makeNode({
+                    id: 'n-2', name: 'Approved',
+                }),
+            ],
+            edges: [
+                makeEdge({
+                    id: 'e-ok', name: 'Approve',
+                    fromNodeId: 'n-1',
+                    toNodeId: 'n-2',
+                }),
+            ],
+        });
+        const presenter = makePresenter({
+            graph,
+            attributes: [attr],
+            instanceValues: new Map([
+                ['UQBiHFcwJeCDSnmkPBoYRA', 'kept'],
+            ]),
+            binding: {
+                instanceId: 'inst-1',
+                recordTypeId: 'sjWcXwYGlgxxJOHxzMoUow',
+            },
+            activeClaim: null,
+        });
+        const out = presenter.buildPage()
+            .toString();
+        assertMatch(out, /value="kept"/);
+        assertMatch(out, /disabled/);
+        assertMatch(out, /data-edge-id="e-ok"/);
+        assertMatch(
+            out,
+            /data-edge-id="e-ok"[^>]*disabled/,
+        );
+        assert(!out.includes('unclaim-btn'));
+        assert(!out.includes('Bind instance'));
+    },
+);
+
+Deno.test(
+    'buildPage claimed-by-me enables'
+    + ' transitions',
     () => {
         const graph = makeFlowGraph({
             nodes: [
@@ -675,9 +734,6 @@ Deno.test(
                 makeNode({
                     id: 'n-2', name: 'Approved',
                 }),
-                makeNode({
-                    id: 'n-3', name: 'Rejected',
-                }),
             ],
             edges: [
                 makeEdge({
@@ -685,22 +741,25 @@ Deno.test(
                     fromNodeId: 'n-1',
                     toNodeId: 'n-2',
                 }),
-                makeEdge({
-                    id: 'e-no', name: 'Reject',
-                    fromNodeId: 'n-1',
-                    toNodeId: 'n-3',
-                }),
             ],
         });
-        const presenter = makePresenter({ graph });
-        const out = presenter.buildPage().toString();
-        assertMatch(out, /data-edge-id="e-ok"/);
-        assertMatch(out, /data-edge-id="e-no"/);
-        assertMatch(out, /Approve/);
-        assertMatch(out, /Reject/);
-        assertMatch(out, /id="unclaim-btn"/);
-        assertMatch(out, /Release Work Order/);
-        assertMatch(out, /work-order-transitions/);
+        const presenter = makePresenter({
+            graph,
+            activeClaim: {
+                memberId: 'pjQzgITAPDQVyvCVpzpIfQ',
+                at: '2026-04-01T12:00:00.000000Z',
+            },
+        });
+        const out = presenter.buildPage()
+            .toString();
+        const btn = out.match(
+            /data-edge-id="e-ok"[^>]*>/,
+        );
+        assert(btn);
+        assertEquals(
+            btn[0]!.includes('disabled'), false,
+        );
+        assert(!out.includes('unclaim-btn'));
     },
 );
 
@@ -1046,3 +1105,35 @@ Deno.test('the detail reads its node from the head', () => {
     });
     assertStrictEquals(presenter.currentNodeId(), 'n-2');
 });
+
+Deno.test(
+    'detail.ts does not call putWorkOrderClaim',
+    async () => {
+        const src = await Deno.readTextFile(
+            new URL(
+                '../web-app/workbox/detail.ts',
+                import.meta.url,
+            ),
+        );
+        assertEquals(
+            src.includes('putWorkOrderClaim'),
+            false,
+        );
+        assertEquals(
+            src.includes('unclaim-btn'),
+            false,
+        );
+        assertEquals(
+            src.includes('putWorkOrderBinding'),
+            false,
+        );
+        assertEquals(
+            src.includes('initBindPicker'),
+            false,
+        );
+        assertEquals(
+            src.includes('initUnclaimButton'),
+            false,
+        );
+    },
+);
