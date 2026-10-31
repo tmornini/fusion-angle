@@ -3580,15 +3580,6 @@ Off the critical path; each with its oracle.
   `service-member-detail.ts:62`). Share the member
   detail chrome. Oracle: one definition of each
   remains under `web-app/app/presenters/`.
-- The accepted-memberships path is built four times
-  (`client/admin.ts:48`, `ai-members.ts:42`,
-  `members.ts:66`, `members-union.ts:57`). Export one
-  builder from `client/members.ts`. Oracle: `grep -rn
-  "state=accepted" client/` finds one line.
-- Unreachable `isHumanSeat` checks:
-  `client/service-members.ts:78` and the no-op filter at
-  `client/members-union.ts:78`. Oracle: both removed,
-  `./test validate` green.
 - `required` sits on the service fields only
   (`web-app/members/index.html:318,331`); the dialog
   has no form submit, and the siblings carry none.

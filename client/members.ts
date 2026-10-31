@@ -61,7 +61,7 @@ export function requireOrganization(ctx: RequestContext): string {
     return organization;
 }
 
-function acceptedMemberships(ctx: RequestContext): string {
+export function acceptedMemberships(ctx: RequestContext): string {
     return 'organizations/' + requireOrganization(ctx)
         + '/memberships/?state=accepted';
 }
