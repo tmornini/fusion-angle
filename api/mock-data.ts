@@ -53,7 +53,7 @@ import {
     SYSTEM_MEMBER_ID,
     nowUtc,
 } from '../shared/types.ts';
-import { generateSecret } from
+import { generatePassword } from
     '../shared/secret.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import { membershipNameOf } from
@@ -277,7 +277,7 @@ async function hashSeedCredentials(
 ): Promise<SeedCredentialPlan> {
     const humans = await Promise.all(
         recipients.map(async (recipient) => {
-            const password = generateSecret();
+            const password = generatePassword();
             return {
                 id: seedPasswordCredentialId(
                     recipient.identityId),
