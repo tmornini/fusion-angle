@@ -480,7 +480,9 @@ A read of the organization nest (`memberships/`,
 serves the stored body plus `identity_kind`, `'person'`
 or `'service'`, derived from the seat's identity
 document in the transaction that read the seat and
-never stored. A member is human if and only if its
+never stored, plus `invitee_name` and `invitee_email`
+from live PII when that slot exists (erasure omits
+them). A member is human if and only if its
 `identity_kind` is `'person'`. The item PUT genesis
 (`If-None-Match: *`) on
 `organizations/:id/invitations/:membership-id` naming
@@ -576,7 +578,7 @@ HTTP nest. Validators, crypto, hash, and
 
 ## Seed pair formation
 
-Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 1889`, root
+Mock seed `EXPECTED_MESSAGE_PAIR_COUNT = 2501`, root
 included; bootstrap eight, root included. Pinned by
 `tests/mock-data-pairs.test.ts`. A pair's request holds
 what was received, or nothing. A seeded row was never

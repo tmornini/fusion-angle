@@ -14,7 +14,7 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Fourteen items, in this order — each its own brainstorm
+Fifteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
 The 0-items finish the release: the ledger's one
@@ -22,7 +22,8 @@ deploy — `fa_` names (0e), the fence (0f),
 `FA_GIT_SHA` (0g), migrations (0h), and the wipe and
 reseed that ships them (0i). Then what a pilot
 tenant needs (4–7), the process engine and its AI
-worker on that (9–12), and two processes last (13). An
+worker on that (9–12; 11a is the assigned workbox
+pool), and two processes last (13). An
 item's number is its name, which specs, plans, and
 code comments cite; specs and plans written before the
 0-items were named call 0f and 0h items 2 and 3.
@@ -769,6 +770,28 @@ code comments cite; specs and plans written before the
   genericity bullet (two zoom
   implementations, `#noteMutation`, `handleSpace`,
   Delete's `preventDefault`).
+- **11a.** Assigned workbox pool — Available lists only
+  unclaimed or released work whose current node lists
+  this user. Today's workbox ships the org pool: every
+  unclaimed or released active work order, any node,
+  and hides others' live claims. This item replaces
+  that pool and item 11's kept all-see-all on the
+  inbox (`ARCHITECTURE.md` workbox visibility;
+  TEST-PLAN WB20–WB22; `buildInboxItems` in
+  `web-app/app/presenters/workbox-inbox.ts`). My Work
+  in process stays this user's live claims. Consumed
+  by item 12 (an AI seat's workbox is then only the
+  work assigned to that seat).
+  Layer 1 pin: a member not in the current node's
+  `memberIds` cannot claim that work order — PUT
+  `work-orders/:id/claim` is refused, and an inbox
+  drop that would call it does not land a claim.
+  Today's `postWorkOrderClaimOp`
+  (`api/routes.ts:1827`) checks a live hold only
+  (409 `work order is already claimed`); it does
+  not read the node's `memberIds`. Oracle: Tony
+  cannot claim a work order sitting on a node that
+  lists only Sarah; the row stays in available.
 - **12.** Headless AI worker — a process that hears item 9's
   bell for each AI seat's workbox, claims the work
   order as that seat (the `client_credentials` grant
@@ -918,6 +941,19 @@ Off the critical path; each with its oracle.
   defect) —
   `web-app/workbox/detail.ts:598-616`,
   `shared/types.ts:1087`
+- Bind the record instance at work order creation.
+  Create today (`createWorkOrderFromFlow`,
+  `web-app/app/work-order-creation.ts:18-41`) posts an
+  unbound work order; the action screen's Bind instance
+  (`WorkboxDetailPresenter.#bindButton`,
+  `web-app/app/presenters/workbox-detail.ts:460-473`)
+  and `putWorkOrderBinding` attach it later. Bind
+  belongs on create. This workbox pass removes the
+  action-screen bind control; create still posts an
+  unbound work order until this item. Oracle:
+  creating a work order requires the instance when the
+  flow names a record type; the action screen has no
+  bind control.
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
@@ -3625,8 +3661,9 @@ Off the critical path; each with its oracle.
 - 4 → 6 → 13 (the health probe, then per process)
 - 7 → 11, 12 (the designer roster and AI seats read the
   profile)
-- 9 → 10 → 11 → 12 (the bell, then chats, then
-  processes, then the worker)
+- 9 → 10 → 11 → 11a → 12 (the bell, then chats, then
+  processes, then the assigned workbox pool, then
+  the worker)
 - Items 6, 9, and 13, and the later-work XSS and
   physical-erasure bullets, close KNOWN seams (the
   erasure bullet "Erased PII persists as superseded

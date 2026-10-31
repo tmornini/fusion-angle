@@ -56,6 +56,7 @@ const PENDING = {
     id: 'jEoYCFtPjXFEgZqZNtOcEA',
     organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
     invitedAt: '2026-01-01T00:00:00.000000Z',
+    expiresAt: '2099-12-31T00:00:00.000000Z',
     state: 'pending' as const,
     message: heldMessage('jEoYCFtPjXFEgZqZNtOcEA'),
 };
@@ -71,6 +72,21 @@ Deno.test('a pending invitation shows the absence marker'
     assertMatch(out, /data-invitation-action="accept"/);
     assertMatch(out, /data-invitation-action="decline"/);
     assertMatch(out, /Pending/);
+    assertMatch(out, /expires in \d+ days/);
+    assertNotMatch(out, /Expires Dec 31/);
+});
+
+Deno.test('an expired pending invitation does not show',
+() => {
+    const rec = record();
+    new InvitationListPresenter([{
+        ...PENDING,
+        expiresAt: '2020-01-01T00:00:00.000000Z',
+    }]).render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /No invitations/);
+    assertNotMatch(out, /data-invitation-id=/);
+    assertNotMatch(out, /data-invitation-action="accept"/);
 });
 
 Deno.test('a non-pending invitation offers no actions', () => {
@@ -135,6 +151,49 @@ Deno.test('a sent invitation shows the absence marker'
     assertMatch(out, /data-invitation-action="revoke"/);
 });
 
+Deno.test('a sent invitation shows the invitee name and email',
+() => {
+    const rec = record();
+    new SentInvitationsPresenter([{
+        id: 'inv-named',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
+        identityId: 'toccYYkLEABmlbpHJalgtQ',
+        invitedAt: '2026-01-01T00:00:00.000000Z',
+        state: 'pending' as const,
+        inviteeName: 'Riley Okafor',
+        inviteeEmail: 'riley.okafor@example.net',
+        expiresAt: '2099-12-31T00:00:00.000000Z',
+        message: heldMessage('inv-named'),
+    }], 'pending').render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /Riley Okafor/);
+    assertMatch(out, /riley\.okafor@example\.net/);
+    assertMatch(out, /Invited Jan 1, 2026/);
+    assertMatch(out, /expires in \d+ days/);
+    assertNotMatch(out, /Expires Dec 31/);
+    assertNotMatch(out, />—</);
+});
+
+Deno.test('an expired sent pending invitation does not show',
+() => {
+    const rec = record();
+    new SentInvitationsPresenter([{
+        id: 'inv-expired',
+        organizationId: 'BBjWJsjYIDkTRKIIPrzWRw',
+        identityId: 'toccYYkLEABmlbpHJalgtQ',
+        invitedAt: '2026-01-01T00:00:00.000000Z',
+        expiresAt: '2020-01-01T00:00:00.000000Z',
+        state: 'pending' as const,
+        inviteeName: 'Riley Okafor',
+        inviteeEmail: 'riley.okafor@example.net',
+        message: heldMessage('inv-expired'),
+    }], 'pending').render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /No pending invitations\./);
+    assertNotMatch(out, /Riley Okafor/);
+    assertNotMatch(out, /data-invitation-action="revoke"/);
+});
+
 Deno.test('an absent invitee email renders the absence glyph',
 () => {
     const rec = record();
@@ -164,7 +223,8 @@ Deno.test('a declined sent invitation shows its badge'
     assertMatch(out, /data-invitation-id="inv-declined"/);
     assertMatch(out, /—/);
     assertMatch(out, /Declined/);
-    assertNotMatch(out, /<button/);
+    assertNotMatch(out,
+        /data-invitation-action="revoke"/);
 });
 
 Deno.test('a revoked sent invitation shows its badge'
@@ -182,7 +242,8 @@ Deno.test('a revoked sent invitation shows its badge'
     assertMatch(out, /data-invitation-id="inv-revoked"/);
     assertMatch(out, /—/);
     assertMatch(out, /Revoked/);
-    assertNotMatch(out, /<button/);
+    assertNotMatch(out,
+        /data-invitation-action="revoke"/);
 });
 
 Deno.test('an empty sent list shows the empty state', () => {
@@ -190,6 +251,32 @@ Deno.test('an empty sent list shows the empty state', () => {
     new SentInvitationsPresenter([], 'pending')
         .render(rec.container);
     assertMatch(rec.html(), /No pending invitations\./);
+});
+
+Deno.test('sent invitations sit in a card like the others',
+() => {
+    const rec = record();
+    new SentInvitationsPresenter([], 'pending')
+        .render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /card card-hover p-6/);
+    assertMatch(out, /font-display/);
+    assertMatch(out, /<h3[\s\S]*Sent invitations/);
+});
+
+Deno.test('sent invitation filters are state badges', () => {
+    const rec = record();
+    new SentInvitationsPresenter([], 'pending')
+        .render(rec.container);
+    const out = rec.html();
+    assertMatch(out, /data-invitation-state="pending"/);
+    assertMatch(out, /data-invitation-state="declined"/);
+    assertMatch(out, /data-invitation-state="revoked"/);
+    assertMatch(out, /badge-warning/);
+    assertMatch(out, /badge-fixed-w/);
+    assertMatch(out, /data-dimmed="false"/);
+    assertMatch(out, /data-dimmed="true"/);
+    assertNotMatch(out, /btn-secondary/);
 });
 
 Deno.test('an empty declined sent list names declined', () => {

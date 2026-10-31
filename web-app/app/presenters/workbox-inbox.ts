@@ -2,14 +2,11 @@ import {
     html, setHtml, SafeHtml,
     trusted, escapeForHtml,
 } from '../safe-html.ts';
-import { ICON_SIZE, iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {
-    memberName,
     type WorkOrder,
 } from '../../../client/index.ts';
-import type { Member } from '../../../shared/types.ts';
 import {
     SECONDS_PER_DAY,
     MS_PER_SECOND,
@@ -17,15 +14,6 @@ import {
 import type { Id } from '../../../shared/types.ts';
 
 const DAY_MS = SECONDS_PER_DAY * MS_PER_SECOND;
-
-function itemMatchesMode(
-    mode: InboxMode,
-    completed: boolean,
-): boolean {
-    return mode === 'active'
-        ? !completed
-        : completed;
-}
 
 function relativeTime(iso: string): string {
     const ms = Date.now()
@@ -69,7 +57,22 @@ interface UnplacedInboxItem {
 
 export type InboxItem = PlacedInboxItem | UnplacedInboxItem;
 
-export type InboxMode = 'active' | 'archived';
+export type InboxListKind =
+    | 'available'
+    | 'claimed'
+    | 'archivedByMe';
+
+const EMPTY_COPY: Record<InboxListKind, string> = {
+    available: 'No work orders available to me',
+    claimed: 'No work orders claimed by me',
+    archivedByMe: 'No work orders archived by me',
+};
+
+export interface InboxLists {
+    available: InboxItem[];
+    claimed: InboxItem[];
+    archivedByMe: InboxItem[];
+}
 
 // A work order's claim that is live now: the head's claim,
 // judged against its expiresAt by the page that reads the
@@ -86,8 +89,6 @@ export interface ActiveClaim {
 function buildUnplacedRow(
     item: UnplacedInboxItem,
 ): SafeHtml {
-    const from = item.transitionerName
-        ?? DISPLAY_ABSENT;
     return html`
         <div class="card p-4">
             <div class="flex-fill">
@@ -114,9 +115,6 @@ function buildUnplacedRow(
                     <span
                         class="badge badge-warning"
                         >State unknown</span>
-                    <span>from ${
-                        from
-                    }</span>
                     <span class="ml-auto"
                         >${
                             item.lastTransitionedAt
@@ -132,19 +130,25 @@ function buildUnplacedRow(
 
 export class WorkboxInboxPresenter {
     readonly #items: readonly InboxItem[];
-    readonly #showGrip: boolean;
+    readonly #kind: InboxListKind;
 
     constructor(
         items: readonly InboxItem[],
-        showGrip: boolean,
+        kind: InboxListKind,
     ) {
         this.#items = items;
-        this.#showGrip = showGrip;
+        this.#kind = kind;
     }
 
     renderList(
         container: HTMLElement,
     ): void {
+        if (this.#items.length === 0) {
+            setHtml(container, html`<p
+                class="text-muted"
+            >${EMPTY_COPY[this.#kind]}</p>`);
+            return;
+        }
         setHtml(container, html`${
             this.#items.map(
                 i => this.#buildRow(i),
@@ -172,31 +176,6 @@ export class WorkboxInboxPresenter {
                 class="badge badge-info"${
                 titleAttr}
                 >${item.stateName}</span>`;
-        const claimedBadge =
-            !item.completed && item.claimedByName
-                ? html`<span
-                    class="badge badge-warning"
-                    >In progress — ${
-                        item.claimedByName
-                    }</span>`
-                : html``;
-        const from = item.transitionerName
-            ?? DISPLAY_ABSENT;
-        const grip = this.#showGrip
-            ? html`<button
-                type="button"
-                class="${
-                    'hidden-mobile text-muted'
-                    + ' drag-handle'
-                }"
-                aria-label="${
-                    'Reorder '
-                    + item.flowName
-                    + ' #' + item.displayId
-                }">${
-                iconGripVertical(ICON_SIZE.xl, '')
-            }</button>`
-            : html``;
         return html`
         <div
             class="card p-4 cursor-pointer"
@@ -205,7 +184,6 @@ export class WorkboxInboxPresenter {
             <div class="${
                 'flex items-center gap-4'
             }">
-                ${grip}
                 <div class="flex-fill">
                     <a href="${
                         buildPageUrl(
@@ -233,10 +211,6 @@ export class WorkboxInboxPresenter {
                         + ' text-muted'
                     }">
                         ${badge}
-                        ${claimedBadge}
-                        <span>from ${
-                            from
-                        }</span>
                         <span class="ml-auto"
                             >${
                                 item.lastTransitionedAt
@@ -252,59 +226,93 @@ export class WorkboxInboxPresenter {
     }
 }
 
+function archiveNode(
+    wo: WorkOrder,
+): boolean {
+    const node = wo.flowGraph.nodes.find(
+        n => n.id === wo.nodeId,
+    );
+    return node?.isArchive === true;
+}
+
+function toItem(wo: WorkOrder): InboxItem {
+    const fg = wo.flowGraph;
+    const curNode = fg.nodes.find(
+        n => n.id === wo.nodeId,
+    );
+    const row = {
+        id: wo.id,
+        displayId: wo.displayId,
+        flowName: fg.name,
+        transitionerName: null as string | null,
+        claimedByName: null as string | null,
+        lastTransitionedAt: wo.transition.at,
+        position: wo.position,
+    };
+    return curNode
+        ? {
+            kind: 'placed',
+            ...row,
+            stateName: curNode.name,
+            completed: curNode.isArchive,
+            taskInstructions:
+                curNode.taskInstructions,
+        }
+        : { kind: 'unplaced', ...row };
+}
+
+function byAtAsc(
+    a: InboxItem, b: InboxItem,
+): number {
+    return (a.lastTransitionedAt ?? '')
+        .localeCompare(
+            b.lastTransitionedAt ?? '',
+        );
+}
+
+function byAtDesc(
+    a: InboxItem, b: InboxItem,
+): number {
+    return byAtAsc(b, a);
+}
+
+function byPosition(
+    a: InboxItem, b: InboxItem,
+): number {
+    return a.position - b.position;
+}
+
 export function buildInboxItems(
-    workOrders:
-        readonly WorkOrder[],
+    workOrders: readonly WorkOrder[],
     activeClaimsByWo:
         ReadonlyMap<Id, ActiveClaim>,
-    memberMap: Map<Id, Member>,
-    mode: InboxMode,
-): InboxItem[] {
-    const items: InboxItem[] = [];
+    currentMemberId: Id,
+): InboxLists {
+    const available: InboxItem[] = [];
+    const claimed: InboxItem[] = [];
+    const archivedByMe: InboxItem[] = [];
     for (const wo of workOrders) {
-        const fg = wo.flowGraph;
-        const curNode = fg.nodes.find(
-            n => n.id === wo.nodeId,
-        );
-        // A head whose node is gone cannot claim to be
-        // finished, so only the Active tab shows it.
-        const shown = curNode
-            ? itemMatchesMode(mode, curNode.isArchive)
-            : mode === 'active';
-        if (!shown)
-            continue;
-
-        const activeClaim =
-            activeClaimsByWo.get(wo.id);
-        const row = {
-            id: wo.id,
-            displayId: wo.displayId,
-            flowName: fg.name,
-            transitionerName: memberName(
-                memberMap, wo.transition.memberId,
-            ),
-            claimedByName: activeClaim
-                ? memberName(
-                    memberMap,
-                    activeClaim.memberId,
-                )
-                : null,
-            lastTransitionedAt: wo.transition.at,
-            position: wo.position,
-        };
-        items.push(curNode
-            ? {
-                kind: 'placed',
-                ...row,
-                stateName: curNode.name,
-                completed: curNode.isArchive,
-                taskInstructions:
-                    curNode.taskInstructions,
+        if (archiveNode(wo)) {
+            if (
+                wo.transition.memberId
+                    === currentMemberId
+            ) {
+                archivedByMe.push(toItem(wo));
             }
-            : { kind: 'unplaced', ...row });
+            continue;
+        }
+        const live = activeClaimsByWo.get(wo.id);
+        if (live) {
+            if (live.memberId === currentMemberId) {
+                claimed.push(toItem(wo));
+            }
+            continue;
+        }
+        available.push(toItem(wo));
     }
-
-    return items.toSorted(
-        (a, b) => a.position - b.position,
-    );
+    return {
+        available: available.toSorted(byAtAsc),
+        claimed: claimed.toSorted(byPosition),
+        archivedByMe: archivedByMe.toSorted(byAtDesc),
+    };
 }

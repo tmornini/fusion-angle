@@ -295,8 +295,8 @@ Deno.test('a seeded baseline score\'s author matches the pinned'
     assertStrictEquals(row!.memberId, 'XXZruirZyAOoRpNxaDnpSA');
 });
 
-Deno.test('a seeded actual-score triple\'s per-index authors match'
-+ ' the pinned pre-hoist picks', async () => {
+Deno.test('a seeded actual-score series keeps the pinned'
++ ' pre-hoist authors on its first weeks', async () => {
     const db = await sharedMockDb();
     const ctx = inPageContext(db, await organizationToken());
     const actuals = await getActualScoresForProject(
@@ -307,9 +307,9 @@ Deno.test('a seeded actual-score triple\'s per-index authors match'
             a => a.objectiveId === 'QVZjTYvKwffyfGpYILwkOA',
         )
         .sort((a, b) => a.at.localeCompare(b.at));
-    assertStrictEquals(rows.length, 3);
+    assertStrictEquals(rows.length, 16);
     assertEquals(
-        rows.map(r => r.memberId),
+        rows.slice(0, 3).map(r => r.memberId),
         [
             'CJrglMsNBxOWWfbihHQSeg',
             'SsVAZghfSzMZRZmxNKIizw',

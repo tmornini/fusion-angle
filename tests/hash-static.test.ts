@@ -223,6 +223,51 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'hashed CSS names hashed mark.png',
+    async () => {
+        const dest = await Deno.makeTempDir({
+            prefix: 'hash-static-css-mark-',
+        });
+        const assets = join(dest, 'assets');
+        await Deno.mkdir(assets);
+        await Deno.writeFile(
+            join(assets, 'mark.png'),
+            new Uint8Array([1, 2, 3, 4]),
+        );
+        await Deno.writeTextFile(
+            join(assets, 'pages-landing.css'),
+            'mask-image: url('
+            + '"../../assets/mark.png");\n',
+        );
+        try {
+            await runHashStatic(dest);
+            const manifest = manifestOf(dest);
+            const mark = manifest['mark.png'];
+            const cssName = manifest['pages-landing.css'];
+            assert(typeof mark === 'string');
+            assert(typeof cssName === 'string');
+            const css = Deno.readTextFileSync(
+                join(dest, 'assets', cssName),
+            );
+            assert(
+                css.includes(
+                    '../../assets/' + mark,
+                ),
+                'hashed CSS missing hashed mark',
+            );
+            assert(
+                !css.includes(
+                    '../../assets/mark.png',
+                ),
+                'hashed CSS kept logical mark.png',
+            );
+        } finally {
+            await Deno.remove(dest, { recursive: true });
+        }
+    },
+);
+
 async function hashImportMarkGraph(
     png: Uint8Array,
 ): Promise<{
@@ -464,5 +509,43 @@ Deno.test(
         const first = await hashedAppJsForPng(orig);
         const second = await hashedAppJsForPng(mutated);
         assertNotEquals(first, second);
+    },
+);
+
+Deno.test(
+    'a second hash pass keeps the published JS name',
+    async () => {
+        const dest = await Deno.makeTempDir({
+            prefix: 'hash-static-keep-',
+        });
+        const assets = join(dest, 'assets');
+        const published = 'app.1111111111111111.js';
+        const stale = 'app.ffffffffffffffff.js';
+        try {
+            await Deno.mkdir(assets);
+            await Deno.writeTextFile(
+                join(assets, published),
+                'export const n=2;\n',
+            );
+            await Deno.writeTextFile(
+                join(assets, stale),
+                'export const n=1;\n',
+            );
+            await Deno.writeTextFile(
+                join(dest, 'asset-manifest.json'),
+                JSON.stringify(
+                    { 'app.js': published },
+                    null,
+                    4,
+                ) + '\n',
+            );
+            await runHashStatic(dest);
+            assertStrictEquals(
+                manifestOf(dest)['app.js'],
+                published,
+            );
+        } finally {
+            await Deno.remove(dest, { recursive: true });
+        }
     },
 );

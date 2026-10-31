@@ -196,6 +196,12 @@ fi
 discover_render_ids
 
 ORACLE_TIMEOUT_SEC=20
+# Nil identifier. Operation-ID is required
+# before the bearer check, so a bare
+# /api/organizations GET is 400. The header
+# lets that probe reach the 401 refusal.
+# Static pages ignore it.
+PROBE_OPERATION_ID=AAAAAAAAAAAAAAAAAAAAAA
 
 if [ -n "$COMMIT_SHA" ]; then
     render deploys create "$SERVICE_ID" \
@@ -210,6 +216,7 @@ if [ -n "$COMMIT_SHA" ]; then
             fi
             code=$(curl -sS -o /dev/null \
                 --max-time "$ORACLE_TIMEOUT_SEC" \
+                -H "Operation-ID: ${PROBE_OPERATION_ID}" \
                 -w '%{http_code}' \
                 "https://${host}${path}")
             echo "${host} ${path} ${code}"

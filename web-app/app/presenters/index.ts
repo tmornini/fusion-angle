@@ -121,7 +121,8 @@ export {
 export {
     WorkboxInboxPresenter,
     buildInboxItems,
-    type InboxMode,
+    type InboxListKind,
+    type InboxLists,
     type InboxItem,
 } from './workbox-inbox.ts';
 export {
@@ -147,6 +148,9 @@ export {
 export {
     DashboardObjectiveAggregatesPresenter,
 } from './dashboard-objective-aggregates.ts';
+export {
+    DashboardObjectiveProjectsPresenter,
+} from './dashboard-objective-projects.ts';
 export {
     RecordListPresenter,
     RecordPresenter,

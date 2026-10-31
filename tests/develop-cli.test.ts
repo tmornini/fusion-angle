@@ -319,6 +319,11 @@ async () => {
     assertMatch(run.stdout, /Press Return/);
     assertMatch(run.stdout, /Request log/);
     assertMatch(run.stdout, /fusion-develop down/);
+    assertMatch(run.stdout, /browser-use/);
+    assertMatch(
+        run.stdout,
+        /After each commit/,
+    );
     assertEquals(run.calls, []);
 });
 
@@ -539,6 +544,7 @@ Deno.test('return redeploys the server', async () => {
         2,
     );
     assertMatch(run.stderr, /Redeploying/);
+    assertNotMatch(run.stderr, /\u0007/);
     assertMatch(run.stdout, /Press Return to redeploy/);
     assert(denoArgs(run).every((line) =>
         !line.includes('server/develop-watch.ts')));

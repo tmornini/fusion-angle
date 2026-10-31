@@ -153,6 +153,43 @@ export async function deriveIdentityPii(
     );
 }
 
+// The given identities' live PII by id: ONE document
+// history per identity inside one readonly transaction.
+// A DELETE-head slot (erasure) or an identity with no
+// slot is absent. The transaction awaits only the
+// history reads; derive and validate run after it.
+export async function deriveIdentityPiiOf(
+    db: DbAdapter,
+    identityIds: ReadonlySet<Id>,
+): Promise<ReadonlyMap<Id, IdentityPiiEntity>> {
+    const histories = await db.readTransaction(
+        async (view) => {
+            const read: [Id, MessagePairEntity[]][] = [];
+            for (const identityId of identityIds) {
+                const prefix = identityPrefixFor(identityId);
+                read.push([
+                    identityId,
+                    await view.messagePairs.getDocumentHistory(
+                        prefix, PII_DOCUMENT_NAME,
+                    ),
+                ]);
+            }
+            return read;
+        },
+    );
+    const pii = new Map<Id, IdentityPiiEntity>();
+    for (const [identityId, history] of histories) {
+        const document = deriveDocumentsAt(
+            history, identityPrefixFor(identityId),
+        ).get(PII_DOCUMENT_NAME);
+        if (document === undefined) continue;
+        pii.set(
+            identityId, piiEntityOf(identityId, document),
+        );
+    }
+    return pii;
+}
+
 // ---- identity_credentials — a per-identity nested collection, --
 // ---- the deriveBaselineScores/deriveActualScores precedent -----
 // ---- (api/derive-project-scores.ts) ------------------------------

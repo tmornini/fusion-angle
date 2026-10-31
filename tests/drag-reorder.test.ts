@@ -4,6 +4,7 @@ import {
     dropIndex,
     FIRST_POSITION,
     followTranslateY,
+    followTranslate,
     nextPosition,
     positionBetween,
     type CardRect,
@@ -187,6 +188,25 @@ Deno.test(
         assertStrictEquals(
             followTranslateY(50, 50),
             'translateY(0px)',
+        );
+    },
+);
+
+Deno.test(
+    'followTranslate writes translate of the'
+    + ' pointer delta',
+    () => {
+        assertStrictEquals(
+            followTranslate(10, 100, 40, 130),
+            'translate(30px, 30px)',
+        );
+        assertStrictEquals(
+            followTranslate(10, 100, 0, 70),
+            'translate(-10px, -30px)',
+        );
+        assertStrictEquals(
+            followTranslate(50, 50, 50, 50),
+            'translate(0px, 0px)',
         );
     },
 );

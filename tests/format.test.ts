@@ -6,6 +6,7 @@ import {
     displayText,
     toDateInputValue,
     formatDate,
+    formatExpiresInDays,
     DISPLAY_ABSENT,
     SECONDS_PER_DAY,
 } from '../web-app/app/format.ts';
@@ -100,4 +101,35 @@ Deno.test('formatDate surfaces corruption, never the dash', () => {
     // Timestamps are gate-validated; a corrupt value inside
     // the walls must render visibly, not as legitimate absence.
     assertStrictEquals(formatDate('not-a-date'), 'Invalid Date');
+});
+
+Deno.test('formatExpiresInDays names whole days remaining',
+() => {
+    assertStrictEquals(
+        formatExpiresInDays(
+            '2026-01-15T00:00:00.000000Z',
+            '2026-01-01T00:00:00.000000Z',
+        ),
+        'expires in 14 days',
+    );
+});
+
+Deno.test('formatExpiresInDays singularizes one day', () => {
+    assertStrictEquals(
+        formatExpiresInDays(
+            '2026-01-02T00:00:00.000000Z',
+            '2026-01-01T00:00:00.000000Z',
+        ),
+        'expires in 1 day',
+    );
+});
+
+Deno.test('formatExpiresInDays ceils a partial day', () => {
+    assertStrictEquals(
+        formatExpiresInDays(
+            '2026-01-01T12:00:00.000000Z',
+            '2026-01-01T00:00:00.000000Z',
+        ),
+        'expires in 1 day',
+    );
 });

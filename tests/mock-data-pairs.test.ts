@@ -121,7 +121,7 @@ function messagePairJsonOf(message: string): {
 // same create/document bodies — pair COUNT unchanged)
 // + 145 work-order creates (each its received POST, the work
 // order's first version, and its flow join) + 49
-// baseline documents + 92 actual documents (Phase 7 Task 5:
+// baseline documents + 704 actual documents (Phase 7 Task 5:
 // the scores half of the Phase 0 seed deferral closes — one
 // document message pair per seeded baseline/actual-score
 // row, closed through
@@ -169,7 +169,7 @@ function messagePairJsonOf(message: string): {
 // invitation's operation + document, granted by
 // postOrganizationInvitation). Measure after
 // seed — do not invent. Bootstrap absolute is 8.
-const EXPECTED_MESSAGE_PAIR_COUNT = 1889;
+const EXPECTED_MESSAGE_PAIR_COUNT = 2501;
 
 Deno.test('a mock-data seed populates pairs',
 async () => {

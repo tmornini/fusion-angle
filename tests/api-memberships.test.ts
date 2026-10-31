@@ -390,6 +390,8 @@ Deno.test('an admin pending PUT on a declined head'
         {
             ...expected(invitee.id, 'declined', declineAt),
             identity_kind: 'person',
+            invitee_name: invitee.email,
+            invitee_email: invitee.email,
         },
     );
 });
@@ -1470,6 +1472,8 @@ Deno.test('a member reads accepted and removed, and a'
                 '2026-04-01T00:00:01.000000Z',
             ),
             identity_kind: 'person',
+            invitee_name: pending.email,
+            invitee_email: pending.email,
         },
     );
 });
@@ -1513,6 +1517,8 @@ Deno.test('re-invite after decline is one pending document'
         {
             ...expected(invitee.id, 'pending', at),
             identity_kind: 'person',
+            invitee_name: invitee.email,
+            invitee_email: invitee.email,
         },
     ]);
     const identityView = await partBodiesOf<

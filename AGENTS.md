@@ -65,15 +65,50 @@ own, so neither touches an operator's stack. Each needs
 `./bin/develop PORT --postgres mock-data|bootstrap`
 is the edit session. It `deno run`s the server
 against a `bundle_client` directory. Press
-Return to redeploy, then reload the browser.
-The request log is a file
-beside the site; its path prints at startup.
-It always creates a fresh Postgres
+Return to redeploy. Return recomposes the site
+and restarts the server. The request log is a
+file beside the site; its path prints at
+startup. The process creates a fresh Postgres
 (`fusion-develop`), seeds it, and prints the
 seeded sign-ins once the site is up. On exit —
-including Ctrl-C — it runs `docker compose -p
-fusion-develop down`. Creating the database
-needs 127.0.0.1:5432 free.
+including Ctrl-C and SIGTERM — it runs
+`docker compose -p fusion-develop down`.
+Creating the database needs 127.0.0.1:5432
+free. Do not start a second server while that
+port and 5432 are held, and do not compose-down
+by hand. The agent does not repeat the seeded
+passwords unless the operator asks. Never
+write a BEL on redeploy.
+
+Whenever the operator asks an agent to start a
+development server, start this one and keep
+the rule below for the life of that process.
+The agent owns the browser. Keep the server's
+stdin open: a newline on it is Return. A fifo
+at `/tmp/fusion-develop-stdin`, held open by a
+long-lived writer, is the usual way; record
+that writer in
+`/tmp/fusion-develop-holder.pid`. After every
+commit made while the server is up, send
+Return, then reload each changed page in
+browser-use (its MCP tools, or the CLI).
+Disable the HTTP cache on that navigation.
+HTML is `no-store`, and the hashed assets
+take a new name, so a cached document keeps
+the previous page. The page is
+`/<dir>/index.html` when the commit touches
+`web-app/<dir>/` or `pages-<dir>.css`. A
+presenter or stylesheet with no page name
+reloads the page that imports it. Several
+pages means several reloads. A commit that
+changes seeded rows needs a new process,
+because Return keeps the database. SIGTERM
+the server so its EXIT trap downs compose,
+wait until 8080 and 5432 are free, then start
+it again. A restart drops the session cookie.
+Sign in again, and still do not print the
+password. A public page's anonymous token
+POST 401 is the signed-out session probe.
 
 When running under the Claude Code sandbox:
 

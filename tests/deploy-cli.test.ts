@@ -6,6 +6,8 @@ import {
 } from '@std/assert';
 import { existsSync } from '@std/fs';
 import { join } from '@std/path';
+import { isIdentifier } from
+    '../shared/identifier.ts';
 
 type DeployResult = {
     readonly status: number;
@@ -295,4 +297,24 @@ Deno.test('deploy oracle curls bound their wait',
     )];
     assert(curls.length > 0, 'curl missing');
     assertStrictEquals(curls.length, bounds.length);
+});
+
+Deno.test('deploy organizations oracle carries'
+    + ' Operation-ID', () => {
+    const src = Deno.readTextFileSync('deploy');
+    const assigned = src.match(
+        /^PROBE_OPERATION_ID=([A-Za-z0-9_-]+)$/m,
+    );
+    assert(
+        assigned !== null,
+        'PROBE_OPERATION_ID missing',
+    );
+    const id = assigned?.[1];
+    assert(id !== undefined);
+    assert(isIdentifier(id));
+    assertMatch(
+        src,
+        /-H "Operation-ID: \$\{PROBE_OPERATION_ID\}"/,
+    );
+    assertMatch(src, /want=401/);
 });

@@ -99,6 +99,7 @@ bundle_client() {
         name=$(basename "$f" .css)
         deno bundle --frozen --minify \
             --external '*.woff2' \
+            --external '*.png' \
             -o "$dest/assets/$name.css" "$f"
         emitted "Styles created" "$dest/assets/$name.css"
     done

@@ -1,18 +1,28 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { DISPLAY_ABSENT, formatDate } from '../format.ts';
+import {
+    DISPLAY_ABSENT, formatDate, formatCalendarDate,
+    formatExpiresInDays,
+} from '../format.ts';
 import {
     INVITATION_STATE_CONFIG,
 } from './state-display.ts';
 import {
     invitationIsExpired,
+    omitExpiredPending,
     type InvitationView,
     type SentInvitation,
 } from '../../../client/index.ts';
 import {
     type InvitationState, nowUtc,
 } from '../../../shared/types.ts';
+import {
+    type IconSize,
+    ICON_SIZE,
+    iconMail,
+    iconXCircle,
+} from '../icons.ts';
 
 function stateBadge(state: InvitationState): SafeHtml {
     const cfg = INVITATION_STATE_CONFIG[state];
@@ -39,6 +49,13 @@ function inviteeActions(inv: InvitationView): SafeHtml {
         </div>`;
 }
 
+function inviteeDateLine(inv: InvitationView): string {
+    const invited = formatDate(inv.invitedAt);
+    if (inv.expiresAt === undefined) return invited;
+    return invited + ' · '
+        + formatExpiresInDays(inv.expiresAt, nowUtc());
+}
+
 function buildInviteeRow(inv: InvitationView): SafeHtml {
     return html`
         <div class="${
@@ -50,7 +67,7 @@ function buildInviteeRow(inv: InvitationView): SafeHtml {
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
-                }">${formatDate(inv.invitedAt)}</p>
+                }">${inviteeDateLine(inv)}</p>
             </div>
             ${stateBadge(inv.state)}
             ${
@@ -69,6 +86,28 @@ function revokeAction(): SafeHtml {
         >Revoke</button>`;
 }
 
+function sentInviteeTitle(inv: SentInvitation): string {
+    return inv.inviteeName
+        ?? inv.inviteeEmail
+        ?? DISPLAY_ABSENT;
+}
+
+function sentInviteeSub(inv: SentInvitation): string {
+    const invited = 'Invited '
+        + formatCalendarDate(inv.invitedAt);
+    const dated = inv.expiresAt === undefined
+        ? invited
+        : invited + ' · '
+            + formatExpiresInDays(inv.expiresAt, nowUtc());
+    if (
+        inv.inviteeName !== undefined
+        && inv.inviteeEmail !== undefined
+    ) {
+        return inv.inviteeEmail + ' · ' + dated;
+    }
+    return dated;
+}
+
 function buildSentRow(inv: SentInvitation): SafeHtml {
     return html`
         <div class="${
@@ -76,11 +115,11 @@ function buildSentRow(inv: SentInvitation): SafeHtml {
         }" data-invitation-id="${inv.id}">
             <div class="flex-fill min-w-0">
                 <p class="font-medium truncate">
-                    ${DISPLAY_ABSENT}
+                    ${sentInviteeTitle(inv)}
                 </p>
                 <p class="${
                     'text-xs text-muted truncate'
-                }">Invited ${formatDate(inv.invitedAt)}</p>
+                }">${sentInviteeSub(inv)}</p>
             </div>
             ${stateBadge(inv.state)}
             ${
@@ -92,6 +131,19 @@ function buildSentRow(inv: SentInvitation): SafeHtml {
 }
 
 type SentListState = 'pending' | 'declined' | 'revoked';
+
+const SENT_FILTER_STATES: readonly SentListState[] = [
+    'pending', 'declined', 'revoked',
+];
+
+const SENT_FILTER_ICONS: Record<
+    SentListState,
+    (size: IconSize, className: string) => SafeHtml
+> = {
+    pending: iconMail,
+    declined: iconXCircle,
+    revoked: iconXCircle,
+};
 
 function emptySentMessage(state: SentListState): string {
     switch (state) {
@@ -110,6 +162,39 @@ function emptyState(message: string): SafeHtml {
     }">${message}</div>`;
 }
 
+function sentFilterChip(
+    state: SentListState,
+    selected: SentListState,
+): SafeHtml {
+    const cfg = INVITATION_STATE_CONFIG[state];
+    const isActive = state === selected;
+    const icon = SENT_FILTER_ICONS[state];
+    return html`<button type="button" class="${
+        'badge '
+        + cfg.className
+        + ' text-xs badge-fixed-w'
+        + ' cursor-pointer'
+    }" data-invitation-state="${state}" data-state="${
+        state
+    }" data-dimmed="${
+        isActive ? 'false' : 'true'
+    }" aria-pressed="${
+        isActive ? 'true' : 'false'
+    }">${icon(ICON_SIZE.sm, '')} ${cfg.label}</button>`;
+}
+
+function buildSentFilters(
+    selected: SentListState,
+): SafeHtml {
+    return html`
+        <div class="flex items-center gap-2"
+            role="group"
+            aria-label="Filter invitations by state"
+        >${SENT_FILTER_STATES.map(
+            (state) => sentFilterChip(state, selected),
+        )}</div>`;
+}
+
 // The invitee's own invitations, each with Accept / Decline on
 // the pending ones. Empty → "No invitations."
 export class InvitationListPresenter {
@@ -120,10 +205,13 @@ export class InvitationListPresenter {
     }
 
     render(container: HTMLElement): void {
+        const rows = omitExpiredPending(
+            this.#rows, nowUtc(),
+        );
         setHtml(container, html`${
-            this.#rows.length === 0
+            rows.length === 0
                 ? emptyState('No invitations.')
-                : html`${this.#rows.map(buildInviteeRow)}`
+                : html`${rows.map(buildInviteeRow)}`
         }`);
     }
 }
@@ -143,11 +231,34 @@ export class SentInvitationsPresenter {
         this.#state = state;
     }
 
+    buildBox(): SafeHtml {
+        const rows = omitExpiredPending(
+            this.#rows, nowUtc(),
+        );
+        const list = rows.length === 0
+            ? emptyState(emptySentMessage(this.#state))
+            : html`${rows.map(buildSentRow)}`;
+        return html`
+            <div class="card card-hover p-6 mt-6">
+                <div class="${
+                    'flex items-center'
+                    + ' justify-between mb-4'
+                    + ' flex-wrap gap-2'
+                }">
+                    <h3 class="${
+                        'font-display'
+                        + ' font-semibold'
+                        + ' flex items-center gap-2'
+                    }">Sent invitations</h3>
+                    ${buildSentFilters(this.#state)}
+                </div>
+                <div id="sent-invitations-list"
+                    class="flex flex-col gap-3"
+                >${list}</div>
+            </div>`;
+    }
+
     render(container: HTMLElement): void {
-        setHtml(container, html`${
-            this.#rows.length === 0
-                ? emptyState(emptySentMessage(this.#state))
-                : html`${this.#rows.map(buildSentRow)}`
-        }`);
+        setHtml(container, this.buildBox());
     }
 }

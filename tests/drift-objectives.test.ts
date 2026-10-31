@@ -406,7 +406,7 @@ Deno.test('score collection wire equals derive per project: an'
 + ' approved project (full 4-baseline coverage + actuals), a'
 + ' partial-coverage live-state project, a submitted project'
 + ' (EMPTY), the org-2 project (empty); whole-org totals (49'
-+ ' baselines / 92 actuals); foreign-parent empty', async () => {
++ ' baselines / 704 actuals); foreign-parent empty', async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -454,7 +454,7 @@ Deno.test('score collection wire equals derive per project: an'
             .toSorted(byIdAscending),
         derivedFullActuals,
     );
-    assertStrictEquals(derivedFullActuals.length, 5);
+    assertStrictEquals(derivedFullActuals.length, 64);
 
     const partialProjectId = 'ORXAfsQvNowpmJfBwQAtWg';
     const partialBaseRes = await handleRequest(db, req(
@@ -529,7 +529,7 @@ Deno.test('score collection wire equals derive per project: an'
         );
     }
     assertStrictEquals(derivedBaselineTotal.length, 49);
-    assertStrictEquals(derivedActualTotal.length, 92);
+    assertStrictEquals(derivedActualTotal.length, 704);
 
     const foreignRes = await handleRequest(db, req(
         'GET',

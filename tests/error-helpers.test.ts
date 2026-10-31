@@ -98,6 +98,39 @@ Deno.test(
     },
 );
 
+Deno.test(
+    'shouldSurfaceFault hides a skipped view transition',
+    () => {
+        const skipped = new DOMException(
+            'Transition was aborted because of'
+                + ' invalid state. Viewport size'
+                + ' changed',
+            'InvalidStateError',
+        );
+        assertStrictEquals(
+            shouldSurfaceFault(skipped, false),
+            false,
+        );
+        const other = new DOMException(
+            'The object is in an invalid state.',
+            'InvalidStateError',
+        );
+        assertStrictEquals(
+            shouldSurfaceFault(other, false),
+            true,
+        );
+        assertStrictEquals(
+            shouldSurfaceFault(
+                'Transition was aborted because of'
+                    + ' invalid state. Viewport size'
+                    + ' changed',
+                false,
+            ),
+            false,
+        );
+    },
+);
+
 type WindowListener = (event: Event) => void;
 
 function installFaultDom(): {

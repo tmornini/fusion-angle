@@ -76,38 +76,23 @@ export async function init(): Promise<void> {
             <div class="${
                 'auth-branding-content'
             }">
-                <div class="mb-8">
-                    <div class="${
-                        'flex items-center '
-                        + 'gap-3 mb-6'
+                <div class="auth-lockup">
+                    <div class="auth-mark">${
+                        iconLogo(ICON_SIZE['6xl'], '')
+                    }</div>
+                    <h1 class="${
+                        'font-display font-bold '
+                        + 'auth-headline'
                     }">
-                        <div class="${
-                            'auth-brand-icon'
-                        }">
-                            ${iconLogo(ICON_SIZE['2xl'], '')}
-                        </div>
-                        <span class="${
-                            'text-3xl '
-                            + 'font-display '
-                            + 'font-bold '
-                            + 'auth-brand-name'
-                        }">Fusion Angle</span>
-                    </div>
-                </div>
-                <h1 class="${
-                    'font-display font-bold '
-                    + 'auth-headline'
-                }">
                     ${
-                        'Transform your business'
-                        + ' with intelligent'
-                        + ' automation'
+                        'Strategy to Change Engine'
                     }
-                </h1>
+                    </h1>
+                </div>
                 <p class="auth-subhead">
                     ${
-                        'Join thousands of'
-                        + ' companies using'
+                        'Join zero companies'
+                        + ' currently using'
                         + ' Fusion Angle to'
                         + ' streamline operations,'
                         + ' boost productivity,'
@@ -116,7 +101,7 @@ export async function init(): Promise<void> {
                     }
                 </p>
                 <div class="${
-                    'flex gap-8 mt-12'
+                    'auth-stats flex gap-8'
                 }">
                     <div>
                         <div class="${
@@ -124,7 +109,7 @@ export async function init(): Promise<void> {
                             + 'font-display '
                             + 'font-bold '
                             + 'auth-stat-value'
-                        }">10K+</div>
+                        }">0k+</div>
                         <div class="${
                             'text-sm '
                             + 'auth-stat-label'
@@ -136,11 +121,11 @@ export async function init(): Promise<void> {
                             + 'font-display '
                             + 'font-bold '
                             + 'auth-stat-value'
-                        }">98%</div>
+                        }">0%</div>
                         <div class="${
                             'text-sm '
                             + 'auth-stat-label'
-                        }">Satisfaction</div>
+                        }">Dissatisfaction</div>
                     </div>
                     <div>
                         <div class="${
@@ -148,7 +133,7 @@ export async function init(): Promise<void> {
                             + 'font-display '
                             + 'font-bold '
                             + 'auth-stat-value'
-                        }">50+</div>
+                        }">0+</div>
                         <div class="${
                             'text-sm '
                             + 'auth-stat-label'
@@ -162,21 +147,11 @@ export async function init(): Promise<void> {
             id="auth-form-wrapper">
             <div class="auth-form-card">
                 <div class="${
-                    'flex items-center gap-3 '
-                    + 'mb-8 justify-center'
+                    'mb-8 flex justify-center'
                 }" id="mobile-logo">
-                    <div class="${
-                        'flex items-center '
-                        + 'justify-center '
-                        + 'auth-mobile-logo'
-                    }">
-                        ${iconLogo(ICON_SIZE.xl, '')}
-                    </div>
-                    <span class="${
-                        'text-2xl font-display '
-                        + 'font-bold '
-                        + 'text-foreground'
-                    }">Fusion Angle</span>
+                    <div class="auth-mark">${
+                        iconLogo(ICON_SIZE['6xl'], '')
+                    }</div>
                 </div>
 
                 <div class="card p-8">
@@ -364,8 +339,9 @@ export async function init(): Promise<void> {
                 }">
                     ${
                         'By continuing, you'
-                        + ' agree to our Terms'
-                        + ' of Service and'
+                        + ' agree to our'
+                    }<br>${
+                        'Terms of Service and'
                         + ' Privacy Policy.'
                     }
                 </p>

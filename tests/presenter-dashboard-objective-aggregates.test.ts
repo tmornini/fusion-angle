@@ -1,6 +1,8 @@
 import { assert, assertMatch, assertStrictEquals } from '@std/assert';
 import { DashboardObjectiveAggregatesPresenter } from
     '../web-app/app/presenters/dashboard-objective-aggregates.ts';
+import { buildSparkline } from
+    '../web-app/app/presenters/sparkline.ts';
 import type { TrendPoint } from '../web-app/app/scoring-aggregate.ts';
 import type { ObjectiveEntity } from '../shared/types.ts';
 import { responseMessage } from './fixtures/response-message.ts';
@@ -46,6 +48,32 @@ Deno.test('renders one row per active objective', () => {
     assert(html.includes('Increase incomes'));
     assert(html.includes('Lower expenses'));
 });
+
+Deno.test(
+    'an aggregate name uses the shared row link',
+    () => {
+        const p =
+            new DashboardObjectiveAggregatesPresenter(
+                activeObjs, defs, aggregates, trendlines,
+            );
+        const html = p.buildCard().toString();
+        const start = html.indexOf(
+            'data-objective-id="ohqxgUBEaFQwYbXsonRPmg"',
+        );
+        const row = html.slice(start).slice(
+            0, html.slice(start).indexOf('</li>'),
+        );
+        assertMatch(
+            row,
+            /class="score-row-link"[^>]*>\s*Increase incomes/,
+        );
+        assertStrictEquals(
+            /<a\b/.test(row),
+            false,
+            'the drill name is not a navigation anchor',
+        );
+    },
+);
 
 Deno.test('card chassis matches Time/Cost/Impact pattern', () => {
     const p = new DashboardObjectiveAggregatesPresenter(
@@ -220,13 +248,25 @@ Deno.test('points carry dated, signed-change tooltips', () => {
     );
     assertMatch(
         o1Row,
-        /data-tone="success"[^>]*>\s*\+20/,
-        'rise tooltip is green and signed +20',
+        /data-tone="success"[^>]*>\s*40 \/ \+20/,
+        'rise tooltip is the value over its change',
     );
     assertMatch(
         o1Row,
-        /data-tone="error"[^>]*>\s*−15/,
-        'drop tooltip is red and signed −15',
+        /data-tone="error"[^>]*>\s*25 \/ −15/,
+        'drop tooltip is the value over its change',
+    );
+    assert(
+        o1Row.includes(
+            'aria-label="May 10, 2026, 40 / +20"',
+        ),
+        'rise dot names the value over its change',
+    );
+    assert(
+        o1Row.includes(
+            'aria-label="May 20, 2026, 25 / −15"',
+        ),
+        'drop dot names the value over its change',
     );
 });
 
@@ -268,13 +308,43 @@ Deno.test('origin line sits at the baseline value', () => {
     const o1Row = o1Slice.slice(
         0, o1Slice.indexOf('</li>'),
     );
-    // ohqxgUBEaFQwYbXsonRPmg trend [20, 40, 25]: min 20 == baseline, so the
-    // axis sits at the bottom edge (SPARK_HEIGHT -
-    // SPARK_PAD = 26), not the geometric mid (15).
+    // Trend [20, 40, 25]: min 20 is the baseline, so
+    // the axis sits on the bottom pad of the tall
+    // plot (96 - 4), not the geometric mid (48).
     assertMatch(
         o1Row,
-        /class="sparkline-axis"[^>]*y1="26"/,
+        /class="sparkline-axis"[^>]*y1="92"/,
         'grey axis tracks the baseline, not the mid',
+    );
+    assert(
+        o1Row.includes('viewBox="0 0 100 96"'),
+        'the plot is the tall y scale',
+    );
+    // 40 is the max (pad 4); 20 is the min (92).
+    // 4/96 and 92/96, as the dot's --y percent.
+    assert(
+        o1Row.includes('--y:4.17%'),
+        'the high point sits on the top pad',
+    );
+    assert(
+        o1Row.includes('--y:95.83%'),
+        'the low point sits on the bottom pad',
+    );
+});
+
+Deno.test('sparkline track matches the tall plot', () => {
+    const src = Deno.readTextFileSync(
+        'web-app/app/styles/components-metrics.css',
+    );
+    assert(
+        src.includes(
+            '.sparkline-wrap {\n'
+            + '    position: relative;\n'
+            + '    width: 100%;\n'
+            + '    height: 96px;\n'
+            + '}',
+        ),
+        'the track height is the plot height',
     );
 });
 
@@ -307,3 +377,64 @@ Deno.test('baseline dot is grey; dots match their segment',
         '40 -> 25 dot matches the down segment',
     );
 });
+
+Deno.test(
+    'buildSparkline paints the aggregate series',
+    () => {
+        const empty = buildSparkline([]).toString();
+        assert(
+            empty.includes('class="sparkline-axis"'),
+        );
+        assertStrictEquals(
+            empty.includes('class="sparkline-seg"'),
+            false,
+        );
+        assertStrictEquals(
+            empty.includes('class="spark-dot"'),
+            false,
+        );
+        const html = buildSparkline([
+            {
+                at: '2026-05-01T00:00:00.000000Z',
+                value: 20,
+            },
+            {
+                at: '2026-05-10T00:00:00.000000Z',
+                value: 40,
+            },
+            {
+                at: '2026-05-20T00:00:00.000000Z',
+                value: 25,
+            },
+        ]).toString();
+        assert(html.includes('viewBox="0 0 100 96"'));
+        assert(html.includes('data-direction="up"'));
+        assert(html.includes('data-direction="down"'));
+        assert(html.includes('class="sparkline-seg"'));
+        assert(html.includes('class="spark-dot"'));
+        assert(
+            html.includes('Baseline · 20'),
+        );
+    },
+);
+
+Deno.test(
+    'the aggregate card uses the shared painter',
+    () => {
+        const src = Deno.readTextFileSync(
+            'web-app/app/presenters/'
+            + 'dashboard-objective-aggregates.ts',
+        );
+        assert(src.includes(
+            "from './sparkline.ts'",
+        ));
+        assertStrictEquals(
+            src.includes('function directionForDelta'),
+            false,
+        );
+        assertStrictEquals(
+            src.includes('#sparkline'),
+            false,
+        );
+    },
+);

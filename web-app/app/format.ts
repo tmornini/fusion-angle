@@ -1,4 +1,5 @@
 import {
+    MS_PER_DAY,
     SECONDS_PER_DAY,
     formatCompactCurrency,
 } from '../../shared/types.ts';
@@ -84,6 +85,20 @@ function pluralize(
         : word + 's';
 }
 
+function formatExpiresInDays(
+    expiresAt: string,
+    now: string,
+): string {
+    const remainingMs = Date.parse(expiresAt)
+        - Date.parse(now);
+    const days = Math.max(
+        1,
+        Math.ceil(remainingMs / MS_PER_DAY),
+    );
+    return 'expires in ' + days + ' '
+        + pluralize(days, 'day');
+}
+
 function trimStrings<
     T extends object,
 >(obj: T): T {
@@ -105,6 +120,7 @@ export {
     formatDate,
     formatCalendarDate,
     formatDateTime,
+    formatExpiresInDays,
     getTimeOfDay,
     initials,
     pluralize,

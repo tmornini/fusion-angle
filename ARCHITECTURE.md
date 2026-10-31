@@ -213,7 +213,9 @@ grants the role. The members roster is accepted
 memberships (not a members collection, not identities).
 A membership read serves the stored body plus a derived
 `identity_kind`, `person` or `service`, and a member is
-human if and only if it is `person`. A service identity
+human if and only if it is `person`. Live PII joins
+`invitee_name` and `invitee_email` when the slot exists;
+erasure omits them. A service identity
 is an AI member when it names a document in the
 organization's `ai-agents/`, and a service member when it
 names one in `services/`. An AI or a service is live
@@ -451,11 +453,14 @@ whether a prior claim lapsed. The workbox pages read a
 claim's liveness from the head's `claim.expires_at`,
 the page judging the stored claim against the clock.
 
-The workbox shows every active and archived work order
-to every user; there is no per-user visibility filter.
-`buildInboxItems` in `presenters/workbox-inbox.ts` runs
-the active/archive split, the claimed-and-unfinished
-exclusion, and the sort — nothing more.
+The workbox inbox is personal. `buildInboxItems` in
+`presenters/workbox-inbox.ts` takes the current
+member id and splits heads into available-to-me,
+claimed-by-me, and archived-by-me. Another member's
+live claim is omitted. Another member's archive is
+omitted. Item 11's processes rewrite keeps
+all-see-all as the default; item 11a is the
+assigned pool (current node `memberIds`).
 
 ## Conventions
 
