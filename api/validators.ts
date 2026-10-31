@@ -11,8 +11,6 @@ import type {
     IdentityTokenEntity,
     ClientRegistrationEntity,
     IdentityProviderEntity,
-    RoleGrantEntity,
-    MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
     AIAgentEntity,
@@ -454,32 +452,6 @@ export function assertOnlyKeys(
 
 // ── Entity validators ────────────────
 
-const MEMBER_BODY_KEYS: readonly string[] = [
-    'type',
-];
-
-// Entity-field body only — lifecycle trio is GET stamp /
-// document-body, never part of this validator's key set.
-export type MemberEntityFields = Omit<
-    MemberEntity,
-    'id'
->;
-
-export function validateMemberEntity(
-    body: Record<string, unknown>,
-): MemberEntityFields {
-    assertOnlyKeys(
-        body, MEMBER_BODY_KEYS, 'MemberEntity',
-    );
-    const type = validateEnumField(
-        body, 'type', ['human', 'ai', 'service', 'system'],
-        'member type', 'MemberEntity',
-    );
-    return {
-        type,
-    };
-}
-
 const IDENTITY_BODY_KEYS: readonly string[] = ['kind'];
 
 // Person-only. The same four fields HumanMemberEntity
@@ -675,34 +647,6 @@ export function validateDefaultOrganizationBody(
         organization_id: pickIdentifier(
             body, 'organization_id',
         ),
-    };
-}
-
-const ROLE_GRANT_BODY_KEYS: readonly string[] = [
-    'organization_id', 'identity_id', 'role', 'action',
-    'by_member_id', 'at',
-];
-
-export function validateRoleGrantEntity(
-    body: Record<string, unknown>,
-): Omit<RoleGrantEntity, 'id'> {
-    assertOnlyKeys(
-        body, ROLE_GRANT_BODY_KEYS, 'RoleGrantEntity',
-    );
-    const action = validateEnumField(
-        body, 'action', ['granted', 'revoked'],
-        'role action', 'RoleGrantEntity',
-    );
-    const at = validateTimestampField(
-        body, 'at', 'RoleGrantEntity',
-    );
-    return {
-        organization_id: pickIdentifier(body, 'organization_id'),
-        identity_id: pickIdentifier(body, 'identity_id'),
-        role: pickString(body, 'role'),
-        action,
-        by_member_id: pickIdentifier(body, 'by_member_id'),
-        at,
     };
 }
 
@@ -977,38 +921,6 @@ export function validateAiMemberDocumentBody(
     };
 }
 
-const AI_AGENT_BODY_KEYS:
-    readonly string[] = [
-    'name', 'description', 'model', 'skill_focus',
-];
-
-export function validateAIAgentEntity(
-    body: Record<string, unknown>,
-): Omit<AIAgentEntity, 'id'> {
-    assertOnlyKeys(
-        body,
-        AI_AGENT_BODY_KEYS,
-        'AIAgentEntity',
-    );
-    const model = pickIdentifier(body, 'model');
-    if (!isProviderModelId(model)) {
-        throw new ValidationError(
-            'model must be a known provider'
-            + ' model id on AIAgentEntity',
-        );
-    }
-    return {
-        name: pickString(body, 'name'),
-        description: pickString(
-            body, 'description',
-        ),
-        skill_focus: pickString(
-            body, 'skill_focus',
-        ),
-        model,
-    };
-}
-
 const AI_AGENT_DOCUMENT_BODY_KEYS:
     readonly string[] = [
     'name', 'description', 'model', 'skill_focus',
@@ -1021,8 +933,7 @@ export interface AiAgentDocumentBody {
 // The HTTP-body gate for the organization-nested AI
 // member document, edited by the PUT on
 // organizations/:id/ai-agents/:id. THE LABEL MANDATE:
-// assertOnlyKeys speaks 'AIAgentEntity', matching
-// validateAIAgentEntity byte-for-byte. model uses
+// assertOnlyKeys speaks 'AIAgentEntity'. model uses
 // the SAME catalog-membership gate.
 export function validateAiAgentDocumentBody(
     body: Record<string, unknown>,
@@ -4202,39 +4113,6 @@ export function validateWorkOrderClaimBody(
         claimEventId, claimAt, expireEventId, expireAt,
         expiresAt,
     };
-}
-
-const WORK_ORDER_RELEASE_KEYS: readonly string[] = [
-    'releaseEventId', 'releaseAt',
-];
-
-export interface WorkOrderReleaseBody {
-    readonly releaseEventId: string;
-    readonly releaseAt: string;
-}
-
-// Gate for the retired POST /work-orders/:id/release
-// body (legacy derive only). Live release is DELETE
-// /work-orders/:id/claim (no body). The caller minted
-// the event id and timestamp; authorship is server-
-// derived (actor).
-export function validateWorkOrderReleaseBody(
-    body: Record<string, unknown>,
-): WorkOrderReleaseBody {
-    assertOnlyKeys(
-        body, WORK_ORDER_RELEASE_KEYS, 'WorkOrderReleaseBody',
-    );
-    const releaseEventId = pickIdentifier(body, 'releaseEventId');
-    if (releaseEventId === '') {
-        throw new ValidationError(
-            'WorkOrderReleaseBody.releaseEventId'
-            + ' must be non-empty',
-        );
-    }
-    const releaseAt = validateTimestampField(
-        body, 'releaseAt', 'WorkOrderReleaseBody',
-    );
-    return { releaseEventId, releaseAt };
 }
 
 const WORK_ORDER_BINDING_KEYS: readonly string[] = [

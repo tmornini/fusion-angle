@@ -4,17 +4,6 @@
 // identically — so the test backend cannot lie about
 // what the production gate enforces.
 
-export function isRowShaped(
-    row: unknown,
-): row is { id: string } {
-    return typeof row === 'object'
-        && row !== null
-        && 'id' in row
-        && typeof (
-            row as { id: unknown }
-        ).id === 'string';
-}
-
 export function serializeValue(
     value: unknown,
     key: string,

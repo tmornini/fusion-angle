@@ -17,18 +17,6 @@ export function subscribeIdentityTokenChanges(
     return tokenChanges.subscribe(fn);
 }
 
-// Presenting a refresh jti that is not live (already rotated
-// away, revoked, or never issued) is reuse — the chain is
-// revoked and this is thrown so the caller fails the grant.
-export class TokenReuseError extends Error {
-    readonly jti: string;
-    constructor(jti: string) {
-        super('refresh token is not live (reuse): ' + jti);
-        this.name = 'TokenReuseError';
-        this.jti = jti;
-    }
-}
-
 // One refresh-rotation event in the domain idiom: the
 // presenter reads camelCase, never the snake_case row.
 // `parentJti` is absent on a root (no predecessor) — the
