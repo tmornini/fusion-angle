@@ -513,14 +513,6 @@ Deno.test(
     },
 );
 
-Deno.test('an unknown code is a 401', async () => {
-    const db = await freshDb();
-    const res = await handleRequest(db, tokenRequest({
-        grant_type: 'authorization_code', code: 'ghost',
-    }));
-    assertStrictEquals(res.status, 401);
-});
-
 // Unknown, spent, and raced codes answer the same 401
 // body. The grant does not distinguish them on the wire.
 Deno.test('GATE 3: unknown / spent / raced code all 401 with the'
