@@ -25,6 +25,7 @@ import {
     type NotReadyFlowEntry,
 } from '../app/flow-publish.ts';
 import {
+    getCurrentHumanMember,
     putWorkOrderPosition,
     subscribeWorkOrderChanges,
     type RequestContext,
@@ -58,6 +59,8 @@ let activePresenter:
 // that card latches the head the last save made.
 let inboxRows: InboxRows | null = null;
 
+let currentMemberId: string | null = null;
+
 export async function init(
     _params?: Record<string, string>,
 ): Promise<void> {
@@ -72,6 +75,8 @@ export async function init(
         $('#archive-list', document);
 
     const ctx = sessionContext();
+    currentMemberId =
+        (await getCurrentHumanMember(ctx)).id;
     // One shared inbox fetch feeds both lists.
     const rowsPromise = fetchInboxRows(ctx);
     const listInits: Array<Promise<void>> = [];
@@ -188,12 +193,15 @@ function buildItems(
     rows: InboxRows,
     mode: InboxMode,
 ): InboxItem[] {
-    return buildInboxItems(
+    const lists = buildInboxItems(
         rows.workOrders,
         rows.activeClaimsByWo,
-        rows.memberMap,
-        mode,
+        currentMemberId ?? '',
     );
+    if (mode === 'archived') {
+        return lists.archivedByMe;
+    }
+    return [...lists.available, ...lists.claimed];
 }
 
 async function initActiveList(

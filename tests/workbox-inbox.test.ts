@@ -30,19 +30,20 @@ import {
 import {
     getWorkOrders,
     putWorkOrderPosition,
+    type WorkOrder,
 } from '../client/index.ts';
 import {
     buildInboxItems,
     WorkboxInboxPresenter,
+    type InboxLists,
 } from
-'../web-app/app/presenters/workbox-inbox.ts';
+    '../web-app/app/presenters/workbox-inbox.ts';
 import {
     getInboxRows,
     type InboxRows,
 } from '../web-app/app/workbox-inbox-rows.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
-    FORMER_MEMBER_NAME,
     nowUtc,
 } from '../shared/types.ts';
 import type {
@@ -186,169 +187,306 @@ async function setupOneWorkOrder(): Promise<{
     return { db, ctx, woId, tables };
 }
 
+const DEMO = 'XXZruirZyAOoRpNxaDnpSA';
+
+function listsOf(
+    workOrders: readonly WorkOrder[],
+    claims: ReadonlyMap<string, { memberId: string; at: string }>,
+    memberId: string,
+): InboxLists {
+    return buildInboxItems(
+        workOrders, claims, memberId,
+    );
+}
+
+function ids(
+    items: readonly { id: string }[],
+): string[] {
+    return items.map(i => i.id);
+}
+
 // -- Tests ------------------------------------
 
 Deno.test(
-    'buildInboxItems returns an empty array in'
-    + ' active mode with no work orders',
+    'buildInboxItems returns three empty lists'
+    + ' when there are no work orders',
     () => {
-        const items = buildInboxItems(
-            [], new Map(), new Map(), 'active',
+        const lists = buildInboxItems(
+            [], new Map(), DEMO,
         );
-        assertEquals(items, []);
+        assertEquals(lists.available, []);
+        assertEquals(lists.claimed, []);
+        assertEquals(lists.archivedByMe, []);
     },
 );
 
 Deno.test(
-    'buildInboxItems returns an empty array in'
-    + ' archived mode with no work orders',
-    () => {
-        const items = buildInboxItems(
-            [], new Map(), new Map(), 'archived',
-        );
-        assertEquals(items, []);
-    },
-);
-
-Deno.test(
-    'buildInboxItems surfaces an unclaimed,'
-    + ' in-progress work order as an active item',
+    'an unclaimed active work order is available',
     async () => {
         const { tables } =
             await setupOneWorkOrder();
         const {
             workOrders, memberMap,
         } = await tables();
-        const items = buildInboxItems(
-            workOrders, new Map(), memberMap, 'active',
+        const lists = listsOf(
+            workOrders, new Map(), DEMO,
         );
-        assertStrictEquals(items.length, 1);
-        const item = items[0]!;
+        assertStrictEquals(
+            lists.available.length, 1,
+        );
+        assertEquals(lists.claimed, []);
+        assertEquals(lists.archivedByMe, []);
+        const item = lists.available[0]!;
         assert(item.kind === 'placed');
-        assertStrictEquals(item.flowName, 'Test flow');
-        assertStrictEquals(item.stateName, 'Doing work');
+        assertStrictEquals(
+            item.flowName, 'Test flow',
+        );
+        assertStrictEquals(
+            item.stateName, 'Doing work',
+        );
         assertStrictEquals(item.completed, false);
-        assertStrictEquals(
-            typeof item.displayId, 'string',
-        );
         assertNotStrictEquals(item.displayId, '');
-        assertStrictEquals(
-            item.transitionerName,
-            'Demo Test',
-        );
         assertStrictEquals(
             typeof item.lastTransitionedAt,
             'string',
         );
-        assertStrictEquals(item.claimedByName, null);
+        assertEquals(memberMap.size > 0, true);
     },
 );
 
 Deno.test(
-    'buildInboxItems excludes an in-progress'
-    + ' work order from archived mode',
+    'this member\'s live claim is claimed',
     async () => {
-        const { tables } =
+        const { tables, woId } =
             await setupOneWorkOrder();
-        const {
-            workOrders, memberMap,
-        } = await tables();
-        const items = buildInboxItems(
-            workOrders, new Map(), memberMap, 'archived',
-        );
-        assertEquals(items, []);
-    },
-);
-
-Deno.test(
-    'buildInboxItems surfaces a claimed,'
-    + ' unfinished work order as an active item'
-    + ' naming its claimant',
-    async () => {
-        const { tables } =
-            await setupOneWorkOrder();
-        const {
-            workOrders,
-            activeClaimsByWo, memberMap,
-        } = await tables();
-        // postWorkOrderCreation already minted a
-        // fresh claim event, so it is active.
-        assertStrictEquals(activeClaimsByWo.size, 1);
-        const items = buildInboxItems(
-            workOrders, activeClaimsByWo, memberMap, 'active',
-        );
-        assertStrictEquals(items.length, 1);
+        const t = await tables();
         assertStrictEquals(
-            items[0]!.claimedByName, 'Demo Test',
+            t.activeClaimsByWo.size, 1,
         );
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
+        );
+        assertEquals(ids(lists.available), []);
+        assertEquals(ids(lists.claimed), [woId]);
+        assertEquals(ids(lists.archivedByMe), []);
     },
 );
 
 Deno.test(
-    'buildInboxItems shows a finished work order'
-    + ' in archived mode and hides it from active',
-    async () => {
-        const { ctx, woId, tables } =
-            await setupOneWorkOrder();
-        // Hand-stitch a transition onto the complete node
-        // via the named op (states/:id retired). Dated after
-        // the create events so the inbox sees a finished WO.
-        const read = await ctx.GET(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId,
-        );
-        await ctx.POST(
-            'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/' + woId
-                + '/transition', {
-                transitionEventId: 'extra',
-                targetState: N_FINISH,
-                release: null,
-                transitionAt: '2030-01-01T00:00:00.000000Z',
-            },
-            [read],
-        );
-        const {
-            workOrders, memberMap,
-        } = await tables();
-        assertEquals(
-            buildInboxItems(
-                workOrders, new Map(), memberMap, 'active',
-            ),
-            [],
-        );
-        const archived = buildInboxItems(
-            workOrders, new Map(), memberMap, 'archived',
-        );
-        assertStrictEquals(archived.length, 1);
-        assert(archived[0]!.kind === 'placed');
-        assertStrictEquals(archived[0]!.completed, true);
-    },
-);
-
-Deno.test(
-    'buildInboxItems sorts items by work-order'
-    + ' position with non-monotonic fractional'
-    + ' values',
+    'another member\'s live claim is omitted',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const otherId = generateIdentifier();
         await seedHumanMember(
-            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
+            db, otherId, 'Other Member',
         );
-        const ctx = inPageContext(db, await organizationToken());
-        await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ',
+            buildLinearGraph(),
+        );
+        const other = inPageContext(
+            db, await organizationToken(otherId),
+        );
+        const woId = generateIdentifier();
+        await createWorkOrderFromFlow(other, {
+            workOrderId: woId,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
+        );
+        assertEquals(ids(lists.available), []);
+        assertEquals(ids(lists.claimed), []);
+        assertEquals(ids(lists.archivedByMe), []);
+    },
+);
+
+Deno.test(
+    'this member\'s archive transition is'
+    + ' archived-by-me',
+    async () => {
+        const { ctx, woId, tables } =
+            await setupOneWorkOrder();
+        const read = await ctx.GET(
+            'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/work-orders/' + woId,
+        );
+        await ctx.POST(
+            'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/work-orders/' + woId
+            + '/transition', {
+                transitionEventId: 'extra',
+                targetState: N_FINISH,
+                release: null,
+                transitionAt:
+                    '2030-01-01T00:00:00.000000Z',
+            },
+            [read],
+        );
+        const t = await tables();
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
+        );
+        assertEquals(ids(lists.available), []);
+        assertEquals(ids(lists.claimed), []);
+        assertEquals(ids(lists.archivedByMe), [woId]);
+        assert(lists.archivedByMe[0]!.kind === 'placed');
+        assertStrictEquals(
+            lists.archivedByMe[0]!.completed, true,
+        );
+    },
+);
+
+Deno.test(
+    'another member\'s archive is omitted',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const otherId = generateIdentifier();
+        await seedHumanMember(
+            db, otherId, 'Other Member',
+        );
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ',
+            buildLinearGraph(),
+        );
+        const other = inPageContext(
+            db, await organizationToken(otherId),
+        );
+        const woId = generateIdentifier();
+        await createWorkOrderFromFlow(other, {
+            workOrderId: woId,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        const read = await other.GET(
+            'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/work-orders/' + woId,
+        );
+        await other.POST(
+            'organizations/AjdvjuECVZEgZoFajaIEkg'
+            + '/work-orders/' + woId
+            + '/transition', {
+                transitionEventId: 'extra',
+                targetState: N_FINISH,
+                release: null,
+                transitionAt:
+                    '2030-01-01T00:00:00.000000Z',
+            },
+            [read],
+        );
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
+        );
+        assertEquals(ids(lists.available), []);
+        assertEquals(ids(lists.claimed), []);
+        assertEquals(ids(lists.archivedByMe), []);
+    },
+);
+
+Deno.test(
+    'an unplaced unclaimed head is available',
+    async () => {
+        const { tables, woId } =
+            await setupOneWorkOrder();
+        const t = await tables();
+        const placed = t.workOrders.find(
+            w => w.id === woId,
+        )!;
+        const unplaced = {
+            ...placed,
+            id: generateIdentifier(),
+            displayId: 'unplaced-7',
+            nodeId: generateIdentifier(),
+            position: placed.position + 1,
+            claim: { state: 'unclaimed' as const },
+        };
+        const lists = listsOf(
+            [placed, unplaced],
+            new Map(),
+            DEMO,
+        );
+        assertEquals(
+            lists.available.map(i => [i.id, i.kind]),
+            [
+                [placed.id, 'placed'],
+                [unplaced.id, 'unplaced'],
+            ],
+        );
+        assertEquals(lists.claimed, []);
+        assertEquals(lists.archivedByMe, []);
+    },
+);
+
+Deno.test(
+    'available sorts by transition.at ascending',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const ctx = inPageContext(
+            db, await organizationToken(),
+        );
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ',
+            buildLinearGraph(),
+        );
+        const first = generateIdentifier();
+        const second = generateIdentifier();
+        await createWorkOrderFromFlow(ctx, {
+            workOrderId: first,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        await createWorkOrderFromFlow(ctx, {
+            workOrderId: second,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders, new Map(), DEMO,
+        );
+        assertEquals(ids(lists.available), [
+            first, second,
+        ]);
+    },
+);
+
+Deno.test(
+    'claimed sorts by position',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const ctx = inPageContext(
+            db, await organizationToken(),
+        );
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ',
+            buildLinearGraph(),
+        );
         for (let i = 0; i < 3; i++) {
             await createWorkOrderFromFlow(ctx, {
-                workOrderId:
-                    generateIdentifier(),
-                flowLinkId:
-                    generateIdentifier(),
+                workOrderId: generateIdentifier(),
+                flowLinkId: generateIdentifier(),
                 flowId: 'ZOousbbnzpqlxJExVAruYQ',
             });
         }
-        // Mutate to explicit non-creation-order
-        // fractional positions so the assertion
-        // catches any caller that removes the sort.
-        // Phase Final Task 2: ids from message-plane list.
         const created = await getWorkOrders(ctx);
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {
@@ -356,17 +494,79 @@ Deno.test(
                 ctx, created[i]!, explicit[i]!,
             );
         }
-        const tables = await collectTables(db);
-        const items = buildInboxItems(
-            tables.workOrders,
-            new Map(),
-            tables.memberMap,
-            'active',
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
         );
         assertEquals(
-            items.map(i => i.position),
+            lists.claimed.map(i => i.position),
             [2.5, 5, 7.5],
         );
+    },
+);
+
+Deno.test(
+    'archived-by-me sorts by transition.at'
+    + ' descending',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const ctx = inPageContext(
+            db, await organizationToken(),
+        );
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ',
+            buildLinearGraph(),
+        );
+        const older = generateIdentifier();
+        const newer = generateIdentifier();
+        await createWorkOrderFromFlow(ctx, {
+            workOrderId: older,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        await createWorkOrderFromFlow(ctx, {
+            workOrderId: newer,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        async function finish(
+            id: string, at: string,
+        ): Promise<void> {
+            const read = await ctx.GET(
+                'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/work-orders/' + id,
+            );
+            await ctx.POST(
+                'organizations/AjdvjuECVZEgZoFajaIEkg'
+                + '/work-orders/' + id
+                + '/transition', {
+                    transitionEventId: generateIdentifier(),
+                    targetState: N_FINISH,
+                    release: null,
+                    transitionAt: at,
+                },
+                [read],
+            );
+        }
+        await finish(
+            older, '2030-01-01T00:00:00.000000Z',
+        );
+        await finish(
+            newer, '2031-01-01T00:00:00.000000Z',
+        );
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
+        );
+        assertEquals(ids(lists.archivedByMe), [
+            newer, older,
+        ]);
     },
 );
 
@@ -376,51 +576,44 @@ Deno.test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(
-            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const ctx = inPageContext(
+            db, await organizationToken(),
         );
-        const ctx = inPageContext(db, await organizationToken());
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', {
             nodes: [
                 buildNode(N_START, 'Start', {
                     isCreate: true,
                 }),
-                buildNode(
-                    N_MIDDLE, 'Doing work', {
-                        memberIds: ['XXZruirZyAOoRpNxaDnpSA'],
-                        taskInstructions:
-                            '# Verify totals',
-                    },
-                ),
+                buildNode(N_MIDDLE, 'Doing work', {
+                    memberIds: [DEMO],
+                    taskInstructions:
+                        '# Verify totals',
+                }),
                 buildNode(N_FINISH, 'Done', {
                     isArchive: true,
                 }),
             ],
             edges: [
                 buildEdge(
-                    'YiJPbufDpkyrZcZCYbUJpg', N_START, N_MIDDLE,
+                    'YiJPbufDpkyrZcZCYbUJpg',
+                    N_START, N_MIDDLE,
                 ),
-                buildEdge(
-                    E2, N_MIDDLE, N_FINISH,
-                ),
+                buildEdge(E2, N_MIDDLE, N_FINISH),
             ],
         });
         await createWorkOrderFromFlow(ctx, {
-            workOrderId:
-                generateIdentifier(),
-            flowLinkId:
-                generateIdentifier(),
+            workOrderId: generateIdentifier(),
+            flowLinkId: generateIdentifier(),
             flowId: 'ZOousbbnzpqlxJExVAruYQ',
         });
-        const {
-            workOrders, memberMap,
-        } = await collectTables(db);
-        const items = buildInboxItems(
-            workOrders, new Map(), memberMap, 'active',
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders, new Map(), DEMO,
         );
-        assert(items[0]!.kind === 'placed');
+        assert(lists.available[0]!.kind === 'placed');
         assertStrictEquals(
-            items[0]!.taskInstructions,
+            lists.available[0]!.taskInstructions,
             '# Verify totals',
         );
     },
@@ -432,15 +625,13 @@ Deno.test(
     async () => {
         const { tables } =
             await setupOneWorkOrder();
-        const {
-            workOrders, memberMap,
-        } = await tables();
-        const items = buildInboxItems(
-            workOrders, new Map(), memberMap, 'active',
+        const t = await tables();
+        const lists = listsOf(
+            t.workOrders, new Map(), DEMO,
         );
-        assert(items[0]!.kind === 'placed');
+        assert(lists.available[0]!.kind === 'placed');
         assertStrictEquals(
-            items[0]!.taskInstructions, '',
+            lists.available[0]!.taskInstructions, '',
         );
     },
 );
@@ -452,9 +643,6 @@ Deno.test(
         const { ctx, tables } =
             await setupOneWorkOrder();
         const graph = buildLinearGraph();
-        // Delete the N_MIDDLE -> N_FINISH edge
-        // the way the designer toolbar does: a
-        // putFlow whose graph omits it.
         await putFlow(
             ctx, 'ZOousbbnzpqlxJExVAruYQ',
             {
@@ -469,10 +657,6 @@ Deno.test(
                 ),
             },
         );
-        // Undo the way performUndo does: the
-        // named POST flows/:id/undo replay (the
-        // server restores the prior body's graph
-        // verbatim, same edge id).
         const undoHead = await ctx.GET<unknown>(
             organizationItem(
                 ctx, 'flows',
@@ -490,41 +674,33 @@ Deno.test(
             },
             [undoHead],
         );
-        // A work order born AFTER the restore —
-        // WB5a's most damning witness.
         await createWorkOrderFromFlow(ctx, {
             workOrderId: generateIdentifier(),
             flowLinkId: generateIdentifier(),
             flowId: 'ZOousbbnzpqlxJExVAruYQ',
         });
-        const {
-            workOrders, memberMap,
-        } = await tables();
-        assertStrictEquals(workOrders.length, 2);
-        // Claims ignored: the graph-derivation
-        // path alone. Both work orders derive.
-        const items = buildInboxItems(
-            workOrders, new Map(), memberMap, 'active',
+        const t = await tables();
+        assertStrictEquals(t.workOrders.length, 2);
+        const lists = listsOf(
+            t.workOrders, new Map(), DEMO,
         );
-        assertStrictEquals(items.length, 2);
+        assertStrictEquals(
+            lists.available.length, 2,
+        );
     },
 );
 
-// WB3: a work order's transitioner and claimant are names
-// resolved through the member map. A member who created a
-// work order and then left must read as a former member,
-// never take the Archive tab down as an unknown id.
 Deno.test(
-    'buildInboxItems names a creator who left'
-    + ' Former member (WB3)',
+    'a former member\'s live claim is omitted'
+    + ' and derivation does not throw (WB3)',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        await seedHumanMember(
-            db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
-        );
+        await seedHumanMember(db, DEMO, 'Demo Test');
         const leaverId = generateIdentifier();
-        await seedHumanMember(db, leaverId, 'Lisa Leaver');
+        await seedHumanMember(
+            db, leaverId, 'Lisa Leaver',
+        );
         const flowId = generateIdentifier();
         await seedFlow(db, flowId, {
             nodes: [
@@ -540,7 +716,8 @@ Deno.test(
             ],
             edges: [
                 buildEdge(
-                    generateIdentifier(), N_START, N_MIDDLE,
+                    generateIdentifier(),
+                    N_START, N_MIDDLE,
                 ),
                 buildEdge(E2, N_MIDDLE, N_FINISH),
             ],
@@ -561,20 +738,15 @@ Deno.test(
         );
         assert(leaver !== null);
         await postMembershipRemoval(admin, leaver);
-        const {
-            workOrders,
-            activeClaimsByWo, memberMap,
-        } = await collectTables(db);
-        const items = buildInboxItems(
-            workOrders, activeClaimsByWo, memberMap, 'active',
+        const t = await collectTables(db);
+        const lists = listsOf(
+            t.workOrders,
+            t.activeClaimsByWo,
+            DEMO,
         );
-        assertStrictEquals(items.length, 1);
-        assertStrictEquals(
-            items[0]!.transitionerName, FORMER_MEMBER_NAME,
-        );
-        assertStrictEquals(
-            items[0]!.claimedByName, FORMER_MEMBER_NAME,
-        );
+        assertEquals(lists.available, []);
+        assertEquals(lists.claimed, []);
+        assertEquals(lists.archivedByMe, []);
     },
 );
 
@@ -591,124 +763,144 @@ Deno.test('the inbox reads heads only', async () => {
     );
 });
 
-Deno.test('an inbox item names the head\'s node and last'
-+ ' mover', async () => {
-    const { tables, woId } = await setupOneWorkOrder();
-    const t = await tables();
-    const wo = t.workOrders.find((w) => w.id === woId)!;
-    const [item] = buildInboxItems(
-        [wo], t.activeClaimsByWo, t.memberMap, 'active',
-    );
-    const node = wo.flowGraph.nodes.find(
-        (n) => n.id === wo.nodeId,
-    )!;
-    assert(item!.kind === 'placed');
-    assertStrictEquals(item!.stateName, node.name);
-    assertStrictEquals(
-        item!.lastTransitionedAt, wo.transition.at,
-    );
-});
-
-// A zero lockTimeout lapses the birth claim at once: the head
-// stores it, and the page's clock judges it not active.
-Deno.test('a lapsed claim is not an active claim in the'
-+ ' inbox', async () => {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    await seedHumanMember(
-        db, 'XXZruirZyAOoRpNxaDnpSA', 'Demo Test',
-    );
-    const ctx = inPageContext(db, await organizationToken());
-    await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
-    const graph = buildLinearGraph();
-    await putFlow(ctx, 'ZOousbbnzpqlxJExVAruYQ', {
-        name: 'Test flow',
-        isLocked: false,
-        isAutoLayout: true,
-        isAutoFit: true,
-        lockTimeout: 0,
-        nodes: graph.nodes,
-        edges: graph.edges,
-    });
-    const woId = generateIdentifier();
-    await createWorkOrderFromFlow(ctx, {
-        workOrderId: woId,
-        flowLinkId: generateIdentifier(),
-        flowId: 'ZOousbbnzpqlxJExVAruYQ',
-    });
-    const t = await getInboxRows(ctx);
-    const wo = t.workOrders.find((w) => w.id === woId)!;
-    assertStrictEquals(wo.claim.state, 'claimed');
-    assertEquals(t.activeClaimsByWo.has(woId), false);
-    const [item] = buildInboxItems(
-        [wo], t.activeClaimsByWo, t.memberMap, 'active',
-    );
-    assertStrictEquals(item!.claimedByName, null);
-});
-
-// A head whose node is gone from its flow graph cannot be
-// placed. Its row degrades in place, static, so the rest of
-// the inbox still renders and nothing navigates or drags it.
-Deno.test('an unplaced head renders as a degraded row and'
-+ ' the inbox still renders', async () => {
-    const { tables, woId } = await setupOneWorkOrder();
-    const t = await tables();
-    const placed = t.workOrders.find((w) => w.id === woId)!;
-    const unplaced = {
-        ...placed,
-        id: generateIdentifier(),
-        displayId: 'unplaced-7',
-        nodeId: generateIdentifier(),
-        position: placed.position + 1,
-    };
-    const items = buildInboxItems(
-        [placed, unplaced], t.activeClaimsByWo, t.memberMap,
-        'active',
-    );
-    assertEquals(
-        items.map((i) => [i.id, i.kind]),
-        [[placed.id, 'placed'], [unplaced.id, 'unplaced']],
-    );
-    assertEquals(
-        buildInboxItems(
-            [unplaced], t.activeClaimsByWo, t.memberMap,
-            'archived',
-        ),
-        [],
-    );
-    let captured = '';
-    const container = {
-        set innerHTML(value: string) {
-            captured = value;
-        },
-    };
-    new WorkboxInboxPresenter(items, true).renderList(
-        container as unknown as HTMLElement,
-    );
-    const [, placedRow, unplacedRow] =
-        captured.split('class="card p-4');
-    assert(placedRow !== undefined);
-    assert(unplacedRow !== undefined);
-    for (const present of [
-        'data-work-order-card="' + placed.id + '"',
-        'href=', 'drag-handle', 'cursor-pointer',
-        'Doing work',
-    ]) {
-        assertStringIncludes(placedRow, present);
-    }
-    for (const present of [
-        'class="badge badge-warning"',
-        'State unknown', 'Test flow', '#unplaced-7',
-        'from Demo Test',
-    ]) {
-        assertStringIncludes(unplacedRow, present);
-    }
-    for (const absent of [
-        'data-work-order-card', 'href=', 'drag-handle',
-        'cursor-pointer',
-    ]) {
-        assertEquals(
-            unplacedRow.includes(absent), false, absent,
+Deno.test(
+    'an inbox item names the head\'s node and'
+    + ' last transition time',
+    async () => {
+        const { tables, woId } =
+            await setupOneWorkOrder();
+        const t = await tables();
+        const wo = t.workOrders.find(
+            w => w.id === woId,
+        )!;
+        const lists = listsOf(
+            [wo], t.activeClaimsByWo, DEMO,
         );
-    }
-});
+        const item = lists.claimed[0]!;
+        const node = wo.flowGraph.nodes.find(
+            n => n.id === wo.nodeId,
+        )!;
+        assert(item.kind === 'placed');
+        assertStrictEquals(item.stateName, node.name);
+        assertStrictEquals(
+            item.lastTransitionedAt, wo.transition.at,
+        );
+    },
+);
+
+Deno.test(
+    'a lapsed claim is available, not claimed',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(db, DEMO, 'Demo Test');
+        const ctx = inPageContext(
+            db, await organizationToken(),
+        );
+        await seedFlow(
+            db, 'ZOousbbnzpqlxJExVAruYQ',
+            buildLinearGraph(),
+        );
+        const graph = buildLinearGraph();
+        await putFlow(ctx, 'ZOousbbnzpqlxJExVAruYQ', {
+            name: 'Test flow',
+            isLocked: false,
+            isAutoLayout: true,
+            isAutoFit: true,
+            lockTimeout: 0,
+            nodes: graph.nodes,
+            edges: graph.edges,
+        });
+        const woId = generateIdentifier();
+        await createWorkOrderFromFlow(ctx, {
+            workOrderId: woId,
+            flowLinkId: generateIdentifier(),
+            flowId: 'ZOousbbnzpqlxJExVAruYQ',
+        });
+        const t = await getInboxRows(ctx);
+        const wo = t.workOrders.find(
+            w => w.id === woId,
+        )!;
+        assertStrictEquals(wo.claim.state, 'claimed');
+        assertEquals(
+            t.activeClaimsByWo.has(woId), false,
+        );
+        const lists = listsOf(
+            [wo], t.activeClaimsByWo, DEMO,
+        );
+        assertEquals(ids(lists.available), [woId]);
+        assertEquals(ids(lists.claimed), []);
+    },
+);
+
+Deno.test(
+    'an unplaced head renders as a degraded row'
+    + ' and the inbox still renders',
+    async () => {
+        const { tables, woId } =
+            await setupOneWorkOrder();
+        const t = await tables();
+        const placed = t.workOrders.find(
+            w => w.id === woId,
+        )!;
+        const unplaced = {
+            ...placed,
+            id: generateIdentifier(),
+            displayId: 'unplaced-7',
+            nodeId: generateIdentifier(),
+            position: placed.position + 1,
+            claim: { state: 'unclaimed' as const },
+        };
+        const lists = listsOf(
+            [placed, unplaced],
+            new Map(),
+            DEMO,
+        );
+        const items = [
+            ...lists.available,
+            ...lists.claimed,
+        ];
+        let captured = '';
+        const container = {
+            set innerHTML(value: string) {
+                captured = value;
+            },
+        };
+        new WorkboxInboxPresenter(items, true)
+            .renderList(
+                container as unknown as HTMLElement,
+            );
+        const [, firstRow, secondRow] =
+            captured.split('class="card p-4');
+        assert(firstRow !== undefined);
+        assert(secondRow !== undefined);
+        const placedRow = firstRow.includes(
+            'data-work-order-card="' + placed.id + '"',
+        ) ? firstRow : secondRow;
+        const unplacedRow = placedRow === firstRow
+            ? secondRow : firstRow;
+        for (const present of [
+            'data-work-order-card="' + placed.id + '"',
+            'href=', 'drag-handle', 'cursor-pointer',
+            'Doing work',
+        ]) {
+            assertStringIncludes(placedRow, present);
+        }
+        for (const present of [
+            'class="badge badge-warning"',
+            'State unknown', 'Test flow',
+            '#unplaced-7',
+        ]) {
+            assertStringIncludes(unplacedRow, present);
+        }
+        for (const absent of [
+            'data-work-order-card', 'href=',
+            'drag-handle', 'cursor-pointer',
+        ]) {
+            assertEquals(
+                unplacedRow.includes(absent),
+                false, absent,
+            );
+        }
+    },
+);
