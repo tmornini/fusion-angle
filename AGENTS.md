@@ -245,7 +245,7 @@ reads the Full scroll (`Go to Church!`); every dispatched
 subagent reads the Medium scroll (`Go to Medium Church!`).
 This governs all work in this repo — the master conducts and
 keeps the complete voice, the subagents fan out and pay the
-Medium price. Even the doctrine audit ([AUDIT.md](AUDIT.md))
+Medium price. Even the doctrine audit ([AUDIT-PLAN.md](AUDIT-PLAN.md))
 follows this: its orchestrator conducts as master and goes
 Full, while its explorer, auditors, and refuters fan out as
 subagents and go Medium.
@@ -520,7 +520,7 @@ op.
 | API.md | dispatch, compositions, seed count |
 | DESIGN-SYSTEM.md | tokens, heat ramp, breakpoints, CSS |
 | FLOW-CANVAS.md | canvas FSM, camera MUST NOTs, hazards |
-| AUDIT.md | doctrine audit runbook |
+| AUDIT-PLAN.md | doctrine audit runbook |
 | COST-ESTIMATION.md | pre-AI replacement-cost runbook |
 | TEST-PLAN.md | three layers; the serial walk |
 | TODO.md | critical path, later work, sequencing |

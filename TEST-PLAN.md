@@ -87,6 +87,32 @@ The master does not drive the product and does not
 patch. The master does not invent deploy scripts;
 `./deploy --local` is the origin.
 
+### Bookmark tags
+
+Two annotated git tags bookmark the last closed
+cycles. Read them with `git rev-parse --verify NAME`.
+
+`last-successful-test-plan` names the commit of the
+last Layer 3 walk cycle that closed with zero FAIL.
+`last-audit-remediation` names the commit that closed
+the last doctrine-audit remediation; see
+[AUDIT-PLAN.md](AUDIT-PLAN.md).
+
+Move `last-successful-test-plan` only after a complete
+checkpoint whose summary records zero FAIL. Tag the
+walked SHA. When that close lands as a merge, tag the
+merge. Recreate the annotated tag:
+
+```
+git tag -d last-successful-test-plan
+git tag -a last-successful-test-plan SHA \
+    -m "Walk of SHA: zero FAIL"
+```
+
+The tags are local bookmarks. A published tag moves
+only with the operator's announced rewrite of that
+name.
+
 ### The explorer prompt
 
 Copy this verbatim, substituting the seed reveal's sign-ins.

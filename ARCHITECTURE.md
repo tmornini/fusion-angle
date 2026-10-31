@@ -511,7 +511,7 @@ through notification channels. Named non-void exceptions:
   derived reads and login show none —
   `tests/api-pii-tombstone.test.ts`
 
-[AUDIT.md](AUDIT.md) re-confirms each seam is still
+[AUDIT-PLAN.md](AUDIT-PLAN.md) re-confirms each seam is still
 KNOWN.
 
 ## Do not resurrect
