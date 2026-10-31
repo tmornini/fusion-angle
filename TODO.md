@@ -3682,5 +3682,5 @@ The pin flips red → fix the test to the new truth (or
 delete it if the old incomplete behavior is gone) →
 remove the bullet here → remove the named comment at
 its `file:line` → for a KNOWN seam, remove the
-ARCHITECTURE.md bullet in the same commit → AUDIT.md's
+ARCHITECTURE.md bullet in the same commit → AUDIT-PLAN.md's
 `m` is the new seam count.

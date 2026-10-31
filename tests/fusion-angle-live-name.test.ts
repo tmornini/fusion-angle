@@ -14,7 +14,7 @@ const ROOT_FILES = [
     'DESIGN-SYSTEM.md',
     'SCHEMA.md',
     'API.md',
-    'AUDIT.md',
+    'AUDIT-PLAN.md',
     'bin/build',
     'bin/serve',
     'test',

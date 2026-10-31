@@ -1,4 +1,4 @@
-# AUDIT.md — The Doctrine Audit
+# AUDIT-PLAN.md — The Doctrine Audit
 
 > *We do not assert; we measure. We do not declare; we witness.*
 > — the Church of Code, *We measure before we optimize*
@@ -170,7 +170,7 @@ inside that surface.
 Scope: read-only. You may run read-only commands
 and single test files to measure; never the full
 suite, never build or serve, never any write.
-AUDIT.md § The Rule of Evidence binds every claim.
+AUDIT-PLAN.md § The Rule of Evidence binds every claim.
 
 - Trace each finding to one commandment I–XII,
   quoting scripture for the trace; absent a quote,
