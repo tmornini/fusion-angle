@@ -1,4 +1,4 @@
-import { assert } from '@std/assert';
+import { assert, assertStrictEquals } from '@std/assert';
 import {
     useBrowser, withAdminPage, type Page,
 } from './fixtures.ts';
@@ -40,24 +40,6 @@ async function createOnboardingWorkOrder(
     await page.ready('workbox-detail');
 }
 
-async function bindFirstInstance(
-    page: Page,
-): Promise<void> {
-    await page.click(
-        '[data-dialog-open="bind-instance"]',
-    );
-    await page.waitFor(
-        '#bind-instance-dialog[open]',
-    );
-    await page.waitFor('[data-instance-pick]');
-    await page.click('[data-instance-pick]');
-    await page.until(
-        `document.querySelector(`
-        + `'[data-binding="bound"]') !== null`,
-        'bound badge',
-    );
-}
-
 async function fillRequired(
     page: Page,
 ): Promise<void> {
@@ -82,7 +64,63 @@ async function fillRequired(
 }
 
 Deno.test(
-    'bind, fill, and submit navigates to the inbox'
+    'workbox inbox shows two cards and pills',
+    async () => {
+        await withAdminPage(
+            browser.get(),
+            async (page, origin) => {
+                await page.navigate(
+                    registryUrl(
+                        origin.baseUrl, 'workbox',
+                    ),
+                );
+                await page.ready('workbox');
+                assert(
+                    await page.until<boolean>(
+                        `document.body.innerText`
+                        + `.includes(`
+                        + `'Work Orders available`
+                        + ` to me')`
+                        + ` && document.body`
+                        + `.innerText.includes(`
+                        + `'Work Orders claimed`
+                        + ` by me')`,
+                        'two card headlines',
+                    ),
+                );
+                assert(
+                    await page.until<boolean>(
+                        `document.querySelector(`
+                        + `'[data-inbox-pill=`
+                        + `"claimed"]')`
+                        + `?.getAttribute(`
+                        + `'aria-pressed')`
+                        + ` === 'true'`,
+                        'Active pill pressed',
+                    ),
+                );
+                const sub = await page.evaluate<
+                    string
+                >(
+                    `document.querySelector(`
+                    + `'.page-header p')`
+                    + `?.textContent ?? ''`,
+                );
+                assertStrictEquals(sub, '');
+                const bind = await page.evaluate<
+                    boolean
+                >(
+                    `document.getElementById(`
+                    + `'workbox-tabs') === null`,
+                );
+                assert(bind);
+            },
+        );
+    },
+);
+
+Deno.test(
+    'fill and submit navigates to the inbox'
     + ' (WB11)',
     async () => {
         await withAdminPage(
@@ -91,7 +129,6 @@ Deno.test(
                 await createOnboardingWorkOrder(
                     page, origin.baseUrl,
                 );
-                await bindFirstInstance(page);
                 await fillRequired(page);
                 await page.click(
                     `[data-edge-id="${SUBMIT_EDGE_ID}"]`,
@@ -117,8 +154,8 @@ Deno.test(
 );
 
 Deno.test(
-    'a second tab releases after the first released'
-    + ' (WB23)',
+    'the action screen has no bind or release'
+    + ' chrome',
     async () => {
         await withAdminPage(
             browser.get(),
@@ -126,55 +163,17 @@ Deno.test(
                 await createOnboardingWorkOrder(
                     page, origin.baseUrl,
                 );
-                const id = await page.evaluate<string>(
-                    `new URLSearchParams(location.search)`
-                    + `.get('id')`,
-                );
-                // Same browser context, same cookie jar,
-                // same member: disposed with the page.
-                const other = await browser.get()
-                    .newPageIn(page.contextId);
-                await other.navigate(registryUrl(
-                    origin.baseUrl, 'workbox-detail',
-                    'id=' + id,
-                ));
-                await other.ready('workbox-detail');
-                await other.waitFor('#unclaim-btn');
-                await other.evaluate(
+                const bind = await page.evaluate<
+                    boolean
+                >(
                     `document.querySelector(`
-                    + `'#unclaim-btn').dataset.stale`
-                    + ` = 'true'`,
+                    + `'[data-dialog-open=`
+                    + `"bind-instance"]')`
+                    + ` === null`
+                    + ` && document.getElementById(`
+                    + `'unclaim-btn') === null`,
                 );
-                await page.click('#unclaim-btn');
-                await page.until(
-                    `location.pathname.endsWith(`
-                    + `'/workbox/index.html')`,
-                    'first tab in the inbox',
-                );
-                // The release rings the same-origin bus;
-                // the second tab repaints with no live
-                // claim, so its button is a fresh node.
-                await other.until(
-                    `document.querySelector(`
-                    + `'#unclaim-btn')?.dataset.stale`
-                    + ` === undefined`,
-                    'second tab repainted',
-                );
-                await other.click('#unclaim-btn');
-                await other.until(
-                    `location.pathname.endsWith(`
-                    + `'/workbox/index.html')`,
-                    'second tab in the inbox',
-                );
-                assert(
-                    await other.until<boolean>(
-                        `[...document.querySelectorAll(`
-                        + `'.toast')].some(t =>`
-                        + ` t.textContent.includes(`
-                        + `'Work order released'))`,
-                        'Work order released toast',
-                    ),
-                );
+                assert(bind);
             },
         );
     },
