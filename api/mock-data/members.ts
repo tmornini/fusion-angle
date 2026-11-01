@@ -283,8 +283,7 @@ export function buildMembers():
 // and assignOrganization is index-sensitive; this
 // identity's whole point is the empty membership ledger.
 // Outside email domain — every @company.com identity is a
-// seeded member. id preimage: seed-identity-riley-okafor
-// (seed-hash-preimage.ts).
+// seeded member.
 export function buildUnaffiliatedIdentity():
     SeedHumanMember {
     return {

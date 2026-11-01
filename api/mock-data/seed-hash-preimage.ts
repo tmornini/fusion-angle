@@ -1,6 +1,6 @@
 // Preimages of reminted seed ids. Hash keys in scores.ts
 // use these so deterministicScore draws match the pinned
-// 92 actuals / 1453 pairs. T4 leftover. Do not use as
+// actuals / pairs. T4 leftover. Do not use as
 // domain identifiers.
 
 export const SEED_HASH_PREIMAGE: Readonly<

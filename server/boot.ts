@@ -1,6 +1,6 @@
 // Fail-fast boot. Argv → env → pool → UTF8 →
 // marker → listen. No DDL; seed with
-// ./postgres-seed.
+// ./bin/postgres-seed.
 // One mint process: do not run two of these.
 
 import { fromFileUrl } from '@std/path';

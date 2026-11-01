@@ -23,7 +23,7 @@ import { operationIdHeader } from
 
 
 // Facade plumbing that carries the C6 retry loop's If-Match
-// echo (web-app/app/adapters/flow-mutations.ts). Ideas/:id is
+// echo (client/flow-mutations.ts). Ideas/:id is
 // simple-class (If-Match is inert there); the pin is that PUT
 // hoists the header into the stored request message.
 

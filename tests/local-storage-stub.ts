@@ -2,7 +2,7 @@
 // global: assigning globalThis.localStorage is ignored,
 // `localStorage.setItem = fn` stores a key, and the
 // store persists across processes. This in-memory fake
-// is the baseline every test runs against; nineteen test
+// is the baseline every test runs against; test
 // files layer a per-test fake on top of it via
 // tests/fixtures/local-storage.ts's withLocalStorage /
 // withLocalStorageAsync, which restores this baseline in

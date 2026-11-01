@@ -3612,7 +3612,7 @@ Off the critical path; each with its oracle.
 - `postServiceDocumentOp` (`api/routes.ts:2640-2657`)
   and the AI op answer an entity and write nothing when
   given no pair; `tests/mock-data-pairs.test.ts:84-170`'s
-  count addends do not sum to 1889. Oracle: the ops
+  count addends do not sum to 2501. Oracle: the ops
   refuse a missing pair, and the addends sum to
   `EXPECTED_MESSAGE_PAIR_COUNT`.
 - A mouse-focused `select.input` glows at 0.3, not
