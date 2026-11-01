@@ -16,6 +16,7 @@ import type { RequestContext } from './request-context.ts';
 import type { HttpMessage } from
     '../shared/http-message/http-message.ts';
 import {
+    acceptedMemberships,
     buildHumanMemberMap,
     getHumanMemberProfile,
     isHumanSeat,
@@ -53,8 +54,7 @@ export async function getMembers(
                 [] as HttpMessage<MembershipReadEntity>[],
             )
             : ctx.GETCollection<MembershipReadEntity>(
-                'organizations/' + organization
-                    + '/memberships/?state=accepted',
+                acceptedMemberships(ctx),
             ),
         organization === undefined
             ? Promise.resolve([] as AIAgentEntity[])
@@ -74,8 +74,7 @@ export async function getMembers(
     );
     const ais = buildAIAgentMap(agents, memberships);
     const serviceMembers = buildServiceMembers(
-        services,
-        memberships.filter((seat) => !isHumanSeat(seat)),
+        services, memberships,
     );
     return fillHumanMemberPii(ctx, [
         ...humans.values(),
