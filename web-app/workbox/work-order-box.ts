@@ -336,7 +336,6 @@ export class WorkOrderBox {
             read.attributeMap,
             read.instanceValues,
             read.binding,
-            [],
             this.#conflictNotice,
         );
     }

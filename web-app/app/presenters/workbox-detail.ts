@@ -12,7 +12,6 @@ import {
     type RecordAttribute,
     type HistoryEntry,
     type HistoryFieldValue,
-    type ClaimStatus,
 } from '../../../client/index.ts';
 import {
     type ConstraintViolation,
@@ -54,14 +53,6 @@ export type WorkOrderBinding = {
     readonly recordTypeId: string;
 };
 
-export type InstancePickerItem = {
-    readonly id: string;
-    readonly fields: readonly {
-        readonly name: string;
-        readonly value: string;
-    }[];
-};
-
 export function buildAttributeInputHtml(
     ref: NodeAttribute,
     attribute: RecordAttribute,
@@ -81,7 +72,6 @@ export function buildAttributeInputHtml(
     const disabledAttr = isReadonly
         ? trusted('disabled')
         : html``;
-    const titleAttr = html``;
     const safeValue = value ?? '';
     if (attribute.attributeType === 'select') {
         const options = attribute.options;
@@ -90,8 +80,7 @@ export function buildAttributeInputHtml(
             id="wo-attr-${id}"
             data-attribute-id="${id}"
             ${disabledAttr}
-            ${requiredAttr}
-            ${titleAttr}>
+            ${requiredAttr}>
             <option value="">
                 Select...
             </option>
@@ -119,8 +108,7 @@ export function buildAttributeInputHtml(
                             ? trusted('checked')
                             : html``}
                         ${disabledAttr}
-                        ${requiredAttr}
-                        ${titleAttr} />
+                        ${requiredAttr} />
                     <span>${o}</span>
                 </label>`,
             )}
@@ -145,8 +133,7 @@ export function buildAttributeInputHtml(
             data-attribute-id="${id}"
             ${checked}
             ${disabledAttr}
-            ${requiredAttr}
-            ${titleAttr} />`;
+            ${requiredAttr} />`;
     }
     return html`<input
         type="${spec.type}"
@@ -156,8 +143,7 @@ export function buildAttributeInputHtml(
         value="${safeValue}"
         ${readonlyAttr}
         ${disabledAttr}
-        ${requiredAttr}
-        ${titleAttr} />`;
+        ${requiredAttr} />`;
 }
 
 // The box's close control, in every state an opened work
@@ -225,7 +211,6 @@ export class WorkboxDetailPresenter {
         readonly GraphEdge[];
     readonly #history:
         readonly HistoryEntry[];
-    readonly #claim: ClaimStatus;
     readonly #attributeMap: ReadonlyMap<
         string, RecordAttribute
     >;
@@ -258,8 +243,6 @@ export class WorkboxDetailPresenter {
         instanceValues:
             ReadonlyMap<string, string> | null,
         binding: WorkOrderBinding | null,
-        _pickerItems:
-            readonly InstancePickerItem[] = [],
         conflictNotice: string | null = null,
     ) {
         this.#workOrder = workOrder;
@@ -294,16 +277,6 @@ export class WorkboxDetailPresenter {
             memberMap,
             attributeMap,
         );
-
-        this.#claim = activeClaim
-            ? {
-                state: 'claimed',
-                at: activeClaim.at,
-                byCurrentMember:
-                    activeClaim.memberId
-                        === currentMemberId,
-            }
-            : { state: 'unclaimed' };
     }
 
     idValue(): string {
@@ -327,16 +300,8 @@ export class WorkboxDetailPresenter {
         return this.#currentNode.attributes;
     }
 
-    claimStatus(): ClaimStatus {
-        return this.#claim;
-    }
-
     binding(): WorkOrderBinding | null {
         return this.#binding;
-    }
-
-    isBound(): boolean {
-        return this.#binding !== null;
     }
 
     // Banner for a rejected transition: one line per
@@ -490,8 +455,9 @@ export class WorkboxDetailPresenter {
     }
 
     #claimedByMe(): boolean {
-        return this.#claim.state === 'claimed'
-            && this.#claim.byCurrentMember;
+        const claim = this.#activeClaim;
+        return claim !== null
+            && claim.memberId === this.#currentMemberId;
     }
 
     #bindingBadge(): SafeHtml {
