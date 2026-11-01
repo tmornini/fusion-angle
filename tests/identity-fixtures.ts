@@ -61,7 +61,7 @@ async function identityDocumentMessagePair(
     });
 }
 
-export async function identityPiiDocumentMessagePair(
+async function identityPiiDocumentMessagePair(
     id: Id,
     pii: Record<string, unknown>,
     requestAt: string,
