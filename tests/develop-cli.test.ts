@@ -22,7 +22,7 @@ type DevelopRun = {
     readonly stderr: string;
     readonly calls: readonly (readonly string[])[];
     readonly sessionEnv: string | undefined;
-    readonly sessionMode: number | undefined;
+    readonly settledMain: number | undefined;
 };
 
 function writeStub(
@@ -35,12 +35,136 @@ function writeStub(
     });
 }
 
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+function decodeChunks(
+    chunks: readonly Uint8Array[],
+): string {
+    let size = 0;
+    for (const chunk of chunks) {
+        size += chunk.byteLength;
+    }
+    const all = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+        all.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(all);
+}
+
+async function collect(
+    stream: ReadableStream<Uint8Array>,
+    chunks: Uint8Array[],
+): Promise<void> {
+    const reader = stream.getReader();
+    try {
+        while (true) {
+            const next = await reader.read();
+            if (next.done) {
+                break;
+            }
+            if (next.value !== undefined) {
+                chunks.push(next.value);
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
+}
+
+async function stopChild(
+    child: Deno.ChildProcess,
+    stderrTask: Promise<void>,
+): Promise<void> {
+    try {
+        child.kill('SIGTERM');
+    } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+            throw error;
+        }
+    }
+    await child.status;
+    await stderrTask;
+}
+
+async function settleFailedReturn(
+    child: Deno.ChildProcess,
+    log: string,
+    before: number,
+    stderrTask: Promise<void>,
+): Promise<void> {
+    const failLimit = Date.now() + 8_000;
+    let attempted = false;
+    while (Date.now() < failLimit) {
+        const text = Deno.readTextFileSync(log);
+        if (outdirCount(text) > before) {
+            attempted = true;
+            break;
+        }
+        await delay(20);
+    }
+    if (!attempted) {
+        await stopChild(child, stderrTask);
+        throw new Error('return did not rebundle');
+    }
+    const settle = Date.now() + 1_000;
+    while (Date.now() < settle) {
+        await delay(20);
+    }
+}
+
+async function waitForRedeploy(
+    child: Deno.ChildProcess,
+    log: string,
+    beforeOutdir: number,
+    beforeMain: number,
+    stderrChunks: readonly Uint8Array[],
+    stderrTask: Promise<void>,
+): Promise<void> {
+    const limit = Date.now() + 8_000;
+    while (Date.now() < limit) {
+        const text = Deno.readTextFileSync(log);
+        const err = decodeChunks(stderrChunks);
+        if (outdirCount(text) > beforeOutdir
+            && mainCount(text) > beforeMain
+            && err.includes('Redeploying')) {
+            return;
+        }
+        await delay(20);
+    }
+    await stopChild(child, stderrTask);
+    throw new Error('return did not redeploy');
+}
+
+function bundleFailure(at: number, log: string): string {
+    if (at === 0) {
+        return '';
+    }
+    return 'if [[ "$*" == *--outdir* ]]; then\n'
+        + `    count_file="${log}.bundles"\n`
+        + '    n=0\n'
+        + '    if [ -f "$count_file" ]; then\n'
+        + '        n=$(cat "$count_file")\n'
+        + '    fi\n'
+        + '    n=$((n + 1))\n'
+        + '    printf \'%s\\n\' "$n" > "$count_file"\n'
+        + `    if [ "$n" -eq ${at} ]; then\n`
+        + '        echo \'error: bundle failed\' >&2\n'
+        + '        exit 1\n'
+        + '    fi\n'
+        + 'fi\n';
+}
+
 async function runDevelop(
     args: readonly string[],
     options: {
-        readonly ps?: string;
-        readonly session?: string;
         readonly failOn?: string;
+        readonly failBundleAt?: number;
         readonly holdMain?: boolean;
         readonly signal?: Deno.Signal;
         readonly pressReturn?: boolean;
@@ -52,15 +176,8 @@ async function runDevelop(
     const log = join(dir, 'calls.log');
     const sessionDir = join(dir, 'session');
     Deno.mkdirSync(sessionDir);
-    if (options.session !== undefined) {
-        Deno.writeTextFileSync(
-            join(sessionDir, 'session.env'),
-            options.session,
-            { mode: 0o600 },
-        );
-    }
     const failOn = options.failOn ?? '';
-    const ps = options.ps ?? '';
+    const failBundleAt = options.failBundleAt ?? 0;
     try {
         writeStub(
             dir,
@@ -69,11 +186,6 @@ async function runDevelop(
                 + 'printf \'docker\\t%s\\t%s\\n\' \\\n'
                 + '    "${COMPOSE_PROJECT_NAME-}" "$*" \\\n'
                 + `    >> "${log}"\n`
-                + 'case "$*" in\n'
-                + '    *compose\\ ps\\ *)\n'
-                + `        printf '%s' '${ps}'\n`
-                + '        ;;\n'
-                + 'esac\n'
                 + 'exit 0\n',
         );
         writeStub(
@@ -102,6 +214,7 @@ async function runDevelop(
                     : `case "$*" in\n`
                         + `    *${failOn}*) exit 1 ;;\n`
                         + 'esac\n')
+                + bundleFailure(failBundleAt, log)
                 + 'case "$*" in\n'
                 + '    *postgres-seed.ts*)\n'
                 + '        printf'
@@ -115,6 +228,8 @@ async function runDevelop(
                 + (options.holdMain === true
                     ? 'if [[ "$*" == *develop-main.ts* ]];'
                         + ' then\n'
+                        + '    printf \'%s\\n\' \\\n'
+                        + '        \'{"message":"listening"}\'\n'
                         + '    trap "exit 0" INT TERM\n'
                         + '    while true; do sleep 0.2; done\n'
                         + 'fi\n'
@@ -135,6 +250,7 @@ async function runDevelop(
         let signal: Deno.Signal | null = null;
         let stdoutBytes = new Uint8Array();
         let stderrBytes = new Uint8Array();
+        let settledMain: number | undefined;
         if (options.signal !== undefined
             || options.pressReturn === true) {
             const child = new Deno.Command('./bin/develop', {
@@ -146,6 +262,10 @@ async function runDevelop(
                     ? 'piped'
                     : 'null',
             }).spawn();
+            const stderrChunks: Uint8Array[] = [];
+            const stderrTask = child.stderr === null
+                ? Promise.resolve()
+                : collect(child.stderr, stderrChunks);
             const deadline = Date.now() + 8_000;
             let seen = false;
             while (Date.now() < deadline) {
@@ -160,13 +280,12 @@ async function runDevelop(
                         throw error;
                     }
                 }
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 20);
-                });
+                await delay(20);
             }
             if (!seen) {
                 child.kill('SIGTERM');
                 await child.status;
+                await stderrTask;
                 throw new Error('server did not start');
             }
             if (options.pressReturn === true) {
@@ -174,6 +293,7 @@ async function runDevelop(
                 if (stdin === null) {
                     child.kill('SIGTERM');
                     await child.status;
+                    await stderrTask;
                     throw new Error('develop has no stdin');
                 }
                 const beforeText =
@@ -181,30 +301,37 @@ async function runDevelop(
                 const before = outdirCount(beforeText);
                 const beforeMain = mainCount(beforeText);
                 const writer = stdin.getWriter();
-                await writer.write(
-                    new TextEncoder().encode('\n'),
-                );
-                await writer.close();
-                const limit = Date.now() + 8_000;
-                let grew = false;
-                while (Date.now() < limit) {
-                    const text = Deno.readTextFileSync(log);
-                    if (outdirCount(text) > before
-                        && mainCount(text) > beforeMain) {
-                        grew = true;
-                        break;
-                    }
-                    await new Promise((resolve) => {
-                        setTimeout(resolve, 20);
-                    });
-                }
-                if (!grew) {
-                    child.kill('SIGTERM');
-                    await child.status;
-                    throw new Error(
-                        'return did not redeploy',
+                const encode = new TextEncoder();
+                await writer.write(encode.encode('\n'));
+                if (options.failBundleAt !== undefined) {
+                    await settleFailedReturn(
+                        child,
+                        log,
+                        before,
+                        stderrTask,
+                    );
+                    const mid = Deno.readTextFileSync(log);
+                    settledMain = mainCount(mid);
+                    await writer.write(encode.encode('\n'));
+                    await waitForRedeploy(
+                        child,
+                        log,
+                        before,
+                        settledMain,
+                        stderrChunks,
+                        stderrTask,
+                    );
+                } else {
+                    await waitForRedeploy(
+                        child,
+                        log,
+                        before,
+                        beforeMain,
+                        stderrChunks,
+                        stderrTask,
                     );
                 }
+                await writer.close();
             }
             try {
                 child.kill(options.signal ?? 'SIGINT');
@@ -222,12 +349,10 @@ async function runDevelop(
                         .arrayBuffer(),
                 );
             }
-            if (child.stderr !== null) {
-                stderrBytes = new Uint8Array(
-                    await new Response(child.stderr)
-                        .arrayBuffer(),
-                );
-            }
+            await stderrTask;
+            stderrBytes = new TextEncoder().encode(
+                decodeChunks(stderrChunks),
+            );
         } else {
             const output = await new Deno.Command(
                 './bin/develop',
@@ -256,12 +381,9 @@ async function runDevelop(
             }
         }
         let sessionEnv: string | undefined;
-        let sessionMode: number | undefined;
         const sessionPath = join(sessionDir, 'session.env');
         try {
             sessionEnv = Deno.readTextFileSync(sessionPath);
-            sessionMode = (Deno.statSync(sessionPath).mode
-                ?? 0) & 0o777;
         } catch (error) {
             if (!(error instanceof Deno.errors.NotFound)) {
                 throw error;
@@ -274,7 +396,7 @@ async function runDevelop(
             stderr: decoder.decode(stderrBytes),
             calls,
             sessionEnv,
-            sessionMode,
+            settledMain,
         };
     } finally {
         Deno.removeSync(dir, { recursive: true });
@@ -382,8 +504,6 @@ Deno.test(
         assertMatch(seed[3] ?? '', /^[0-9a-f]{64}$/);
         assertStrictEquals(seed[4], '8080');
         const args = denoArgs(run);
-        assert(args.every((line) =>
-            !line.includes('server/develop-watch.ts')));
         assert(args.some((line) =>
             line.includes('server/develop-main.ts')));
         assertStrictEquals(run.sessionEnv, undefined);
@@ -478,6 +598,13 @@ Deno.test('develop does not compile or build an image',
     assertMatch(src, /bundle_client/);
     assertMatch(src, /server\/develop-main\.ts/);
     assertNotMatch(src, /server\/develop-watch\.ts/);
+    const trapAt = src.indexOf(
+        "trap 'RESTARTING=1' USR1",
+    );
+    const armAt = src.lastIndexOf('read_return');
+    assert(trapAt !== -1);
+    assert(armAt !== -1);
+    assert(trapAt < armAt);
     assertMatch(src, /Press Return/);
     assertMatch(src, /server\/postgres-seed\.ts/);
     assertMatch(src, /trap cleanup EXIT/);
@@ -546,8 +673,6 @@ Deno.test('return redeploys the server', async () => {
     assertMatch(run.stderr, /Redeploying/);
     assertNotMatch(run.stderr, /\u0007/);
     assertMatch(run.stdout, /Press Return to redeploy/);
-    assert(denoArgs(run).every((line) =>
-        !line.includes('server/develop-watch.ts')));
     assertEquals(
         dockerCalls(run).map((call) => call[2]),
         [
@@ -557,6 +682,51 @@ Deno.test('return redeploys the server', async () => {
         ],
     );
 });
+
+Deno.test(
+    'a failed rebundle leaves the server running',
+    async () => {
+        const run = await runDevelop(
+            ['8080', '--postgres', 'mock-data'],
+            {
+                holdMain: true,
+                pressReturn: true,
+                failBundleAt: 2,
+            },
+        );
+        assert(
+            run.code === 130 || run.signal === 'SIGINT',
+        );
+        assertStrictEquals(run.settledMain, 1);
+        assertEquals(
+            denoArgs(run).filter((line) =>
+                line.includes('--outdir')).length,
+            3,
+        );
+        assertEquals(
+            denoArgs(run).filter((line) =>
+                line.includes(
+                    'server/develop-main.ts',
+                )).length,
+            2,
+        );
+        assertMatch(
+            run.stderr,
+            /error: bundle failed/,
+        );
+        const reloads = run.stderr.match(
+            /Redeploying/g,
+        ) ?? [];
+        assertStrictEquals(reloads.length, 1);
+        const errAt = run.stderr.indexOf(
+            'error: bundle failed',
+        );
+        const reloadAt = run.stderr.indexOf(
+            'Redeploying',
+        );
+        assert(reloadAt > errAt);
+    },
+);
 
 Deno.test(
     'develop-main reports a missing POSTGRES_URL',
