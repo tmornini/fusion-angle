@@ -1189,11 +1189,6 @@ Off the critical path; each with its oracle.
   Interface), unmeasured. Oracle: tab from the last page control
   reaches the live toast's dismiss; one live region,
   not two
-- The auth page's left panel shows invented stats —
-  "10K+ Active Users", "98% Satisfaction", "50+
-  Integrations" (`web-app/auth/index.ts:118-157`,
-  TEST-PLAN B5): a comfortable lie to every person who
-  signs in. Its own spec.
 - The context is the one source of `operation-id`, by
   the message-plane spec
   (`docs/superpowers/specs/2026-09-23-message-plane-design.md:534-541`),
