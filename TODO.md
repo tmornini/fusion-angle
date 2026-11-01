@@ -967,6 +967,16 @@ Off the critical path; each with its oracle.
   later brainstorm picks another); a Layer 1 pin
   asserts that class; a later walk can witness D37's
   live flip.
+- Seed one bound Data Capture work order. Until
+  bind-at-creation, live create is unbound, WO01 is
+  Archive, and R14/WB11 have no seeded bound Data
+  Capture subject. Oracle: the mock seed includes one
+  bound Customer Onboarding work order at Data
+  Capture that a claim-drag (or a birth-claimed seed
+  row) can open; a later walk can fill Company Name
+  + Contact Email and submit; `#gate0001` stays
+  unbound. Bind-at-creation consumes the live-create
+  half of this item and does not remove `#gate0001`.
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
