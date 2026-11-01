@@ -12,13 +12,13 @@ export const POOL_ACQUIRE_TIMEOUT_MS = 5_000;
 export const UTF8_REQUIRED =
     'Postgres server_encoding must be UTF8';
 export const MISSING_MARKER =
-    'schema_marker absent; seed with ./postgres-seed';
+    'schema_marker absent; seed with ./bin/postgres-seed';
 export const NO_ARGUMENTS =
-    'server.mjs takes no arguments; seed with '
-    + './postgres-seed';
+    'fusion-angle serve takes no arguments; seed with '
+    + './bin/postgres-seed';
 export const LEGACY_MESSAGE_TABLES =
     'legacy message tables present; wipe with '
-    + './postgres-wipe';
+    + './bin/postgres-wipe';
 
 export function requiredEnvBy(
     name: string,
