@@ -24,8 +24,6 @@ function item(id: string, flowName: string): InboxItem {
         id,
         flowName,
         stateName: 'Review',
-        transitionerName: null,
-        claimedByName: null,
         lastTransitionedAt: '2026-04-01T12:00:00.000000Z',
         completed: false,
         taskInstructions: '',
