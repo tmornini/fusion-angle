@@ -387,8 +387,9 @@ async function showAllLists(
     openAfterSendOn(page);
 }
 
-// The answer's members are the last full GET's, read
-// first when no GET has landed yet.
+// Text asks the work-orders QUERY. The pills' flows
+// are the last full GET's, read first when none has
+// landed yet.
 async function showMatchedLists(
     page: WorkboxPage,
     ctx: RequestContext,
@@ -400,9 +401,7 @@ async function showMatchedLists(
     let rows: InboxRows;
     try {
         all = inboxRows ?? await getInboxRows(ctx);
-        rows = await queryInboxRows(
-            ctx, text, all.memberMap,
-        );
+        rows = await queryInboxRows(ctx, text);
     } catch (err) {
         if (sequence !== listsSequence) return;
         log.error('inbox search failed', 'workbox', err);
