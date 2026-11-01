@@ -343,7 +343,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     const adapter = new BackedDbAdapter(
         backend,
         async () => {},
-        async () => {},
         () => {},
     );
     const landToken = schema + '-land';

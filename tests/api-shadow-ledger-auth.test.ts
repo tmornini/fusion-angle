@@ -10,7 +10,7 @@ import {
 } from '../api/db-memory.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
-import type { GuardedDbAdapter } from '../api/db.ts';
+import type { DbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
@@ -92,7 +92,7 @@ function jsonPost(
 // way — dual-write keeps db.identityPii/identityCredentials
 // readable exactly as before, only the write MECHANISM changes.
 async function seedPasswordUser(
-    db: GuardedDbAdapter,
+    db: DbAdapter,
 ): Promise<void> {
     await seedPersonIdentity(db, 'XXZruirZyAOoRpNxaDnpSA', {
         name: 'Demo', email: 'demo@example.com',
@@ -115,7 +115,7 @@ async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
 }
 
 // The same world, over a BackedDbAdapter constructed directly so
-// the notify hook (its 4th ctor arg) can be a counting/collecting
+// the notify hook (its 3rd ctor arg) can be a counting/collecting
 // spy — MemoryDbAdapter's preset always wires a no-op there (the
 // adapters-invitations.test.ts precedent).
 async function dbWithPasswordUserAndNotify(
@@ -123,7 +123,6 @@ async function dbWithPasswordUserAndNotify(
 ): Promise<BackedDbAdapter> {
     const db = new BackedDbAdapter(
         new MemoryStorageBackend(),
-        async () => {},
         async () => {},
         notify,
     );
@@ -147,7 +146,7 @@ async function s256Fields(): Promise<{
     };
 }
 
-async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
+async function fullLoginFlow(db: DbAdapter): Promise<{
     readonly code: string;
     readonly access_token: string;
     readonly refresh_token: string;
@@ -535,7 +534,7 @@ Deno.test('a token-exchange grant stores its own pair with live'
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
 async function seedMembershipMessagePair(
-    db: GuardedDbAdapter,
+    db: DbAdapter,
     _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {

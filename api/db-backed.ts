@@ -4,7 +4,6 @@ import {
 } from './db.ts';
 import type {
     DbAdapter,
-    GuardedDbAdapter,
     StorageBackend,
     Tx,
     TxRunner,
@@ -30,18 +29,17 @@ import {
 
 // One adapter over any StorageBackend. The per-backend
 // variation rides in the constructor: the backend, a
-// latency shim, an open hook, a post-commit hook — both
-// presets pass no-ops for the last three today. Schema
-// lifecycle delegates to the backend.
+// latency shim, and a post-commit hook — both presets
+// pass no-ops for the last two today. Schema lifecycle
+// delegates to the backend.
 //
 // The surviving store rides HistoryEntityStore (message
 // plane only — clients table eliminated).
 export class BackedDbAdapter
-    implements GuardedDbAdapter, LatencySimulation
+    implements DbAdapter, LatencySimulation
 {
     readonly #backend: StorageBackend;
     readonly #latency: () => Promise<void>;
-    readonly #open: () => Promise<void>;
     readonly #notify: NotificationPost;
 
     // Declared concrete, not as the `EntityStore` face: a
@@ -56,21 +54,15 @@ export class BackedDbAdapter
     constructor(
         backend: StorageBackend,
         latency: () => Promise<void>,
-        open: () => Promise<void>,
         notify: NotificationPost,
     ) {
         this.#backend = backend;
         this.#latency = latency;
-        this.#open = open;
         this.#notify = notify;
         Object.assign(
             this,
             this.#buildStores(backendRunner(backend)),
         );
-    }
-
-    async initialize(): Promise<void> {
-        await this.#open();
     }
 
     simulateLatency(): Promise<void> {
@@ -120,7 +112,7 @@ export class BackedDbAdapter
     }
 
     async readTransaction<R>(
-        fn: (view: GuardedDbAdapter) => Promise<R>,
+        fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R> {
         return this.#backend.transaction(
             'readonly',
@@ -128,16 +120,15 @@ export class BackedDbAdapter
         );
     }
 
-    #viewForTx(tx: Tx): GuardedDbAdapter {
+    #viewForTx(tx: Tx): DbAdapter {
         // Nested readTransaction re-enters the open client.
         // The outer mode is already fixed, so a read inside
         // a seed phase sees that phase's uncommitted rows.
         const stores = this.#buildStores(
             ambientRunner(tx),
         );
-        const view: GuardedDbAdapter = {
+        const view: DbAdapter = {
             ...stores,
-            initialize: () => this.initialize(),
             deleteSchema: () => this.deleteSchema(),
             hasSchema: () => this.hasSchema(),
             postSchemaCreation: () =>

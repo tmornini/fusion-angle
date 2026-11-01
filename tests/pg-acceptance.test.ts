@@ -99,7 +99,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         return new BackedDbAdapter(
             backend,
             async () => {},
-            async () => {},
             () => {},
         );
     });

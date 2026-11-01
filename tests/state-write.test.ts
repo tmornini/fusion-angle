@@ -35,7 +35,6 @@ function openLedger(): {
     const db = new BackedDbAdapter(
         backend,
         async () => {},
-        async () => {},
         () => {},
     );
     return { backend, db };

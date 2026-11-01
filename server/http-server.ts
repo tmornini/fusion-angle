@@ -9,7 +9,7 @@ import {
     SEPARATOR,
 } from '@std/path';
 import { handleRequest } from '../api/api.ts';
-import type { GuardedDbAdapter } from '../api/db.ts';
+import type { DbAdapter } from '../api/db.ts';
 import {
     HTTP_INTERNAL_ERROR,
     HTTP_METHOD_NOT_ALLOWED,
@@ -61,7 +61,7 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
 const LOG_ENCODER = new TextEncoder();
 
 export type RequestHandler = (
-    adapter: GuardedDbAdapter,
+    adapter: DbAdapter,
     request: Request,
 ) => Promise<Response>;
 
@@ -70,7 +70,7 @@ export type RequestLog = (
 ) => void;
 
 export interface HttpListenOptions {
-    readonly adapter: GuardedDbAdapter;
+    readonly adapter: DbAdapter;
     readonly staticRoot: string;
     readonly port: number;
     readonly host?: string;

@@ -209,14 +209,13 @@ async function seed(): Promise<{
 }
 
 // The same world, over a BackedDbAdapter constructed directly
-// so the notify hook (its 4th ctor arg) can be a counting spy —
+// so the notify hook (its 3rd ctor arg) can be a counting spy —
 // MemoryDbAdapter's preset always wires a no-op there.
 async function seedWithNotify(
     notify: (event: NotificationEvent) => void,
 ): Promise<{ db: BackedDbAdapter; daveId: string }> {
     const db = new BackedDbAdapter(
         new MemoryStorageBackend(),
-        async () => {},
         async () => {},
         notify,
     );
