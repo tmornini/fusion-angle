@@ -3060,9 +3060,20 @@ Off the critical path; each with its oracle.
   `api/served-response.ts:74`; no route is parted), so
   `HEAD` is that function without the body.
   `last-modified` makes `If-Modified-Since` possible.
-  No handler reads it. Conditional
-  requests (`If-None-Match` / `304`) stay open, and so
-  does compression at the origin
+  No handler reads it. A read never honors
+  `If-None-Match` or `If-Modified-Since` and never
+  answers 304, so a cache cannot revalidate
+  (RFC 9110 §13.1.2, §13.1.3, §15.4.5). The GET
+  arm serves the selection and does not read
+  either header; precondition checks run only for
+  a write that has a handler. The stored response
+  already carries a strong `etag`
+  (`strongEtagOf`, `api/message-pair.ts:608-609`,
+  written at `:322-323`) and `servedResponse`
+  already sends `last-modified`
+  (`api/served-response.ts:111-113`). No 304
+  constant exists (`shared/http-errors.ts:54-72`).
+  Compression at the origin stays open
   (`docs/superpowers/specs/`
   `2026-09-30-head-reads-design.md:346-347`). Start:
   `server/http-server.ts` `NO_STORE` and
@@ -3070,39 +3081,20 @@ Off the critical path; each with its oracle.
   `./bin/measure` repeat-load delta naming the header
   that earned it; an API `HEAD` answers its GET's
   status and headers with no body, and a 405 carries
-  `Allow`.
+  `Allow`; a GET whose `If-None-Match` names the
+  current strong etag answers 304 with no body, and
+  `If-Modified-Since` at or after `last-modified`
+  does the same; a miss answers 200.
 - A 401 omits `WWW-Authenticate`. RFC 9110 §15.5.2
   requires the header (MUST), and RFC 6750 §3
   requires the Bearer challenge on a resource
   server. The bearer refusal
   (`unauthorizedBearerResponse`,
-  `api/request-auth.ts:76-83`, sent at
-  `api/api.ts:540`) and the grant refusal
-  (`api/api.ts:1242-1252`) both return JSON and a
-  status and no challenge. Oracle: every 401
+  `api/request-auth.ts:76-83`) and the grant
+  refusal both return JSON and a status and no
+  challenge. Oracle: every 401
   carries `WWW-Authenticate`, Bearer on the
   resource door.
-- Conditional GET — a read never honors
-  `If-None-Match` or `If-Modified-Since` and never
-  answers 304, so a cache cannot revalidate
-  (RFC 9110 §13.1.2, §13.1.3, §15.4.5). The GET
-  arm serves the selection and does not read
-  either header (`api/api.ts:987-1009`);
-  precondition checks run only for a write that
-  has a handler (`:816-825`). The stored response
-  already carries a strong `etag`
-  (`strongEtagOf`, `api/message-pair.ts:608-609`,
-  written at `:322-323`) and `servedResponse`
-  already sends `last-modified`
-  (`api/served-response.ts:111-113`). No 304
-  constant exists (`shared/http-errors.ts:54-72`).
-  Cachability, above, plans
-  `HEAD` and `Allow` on a 405 and leaves this
-  open in a sentence. Oracle: a GET whose
-  `If-None-Match` names the current strong etag
-  answers 304 with no body, and
-  `If-Modified-Since` at or after `last-modified`
-  does the same; a miss answers 200.
 - One strong `etag` serves projections that
   differ by reader, and nothing sends `Vary`.
   The stored line quotes the pair id
@@ -3117,14 +3109,14 @@ Off the critical path; each with its oracle.
   handler set none
   (`server/http-server.ts:607-610`), so a shared
   cache does not store the response today. A
-  conditional GET, the bullet above, would 304
+  conditional GET, in Cachability above, would 304
   one reader's bytes for another. Oracle: a
   projected representation's strong etag changes
   with the bytes, or the response sends `Vary`
   naming what selected them.
 - A write carrying both `If-Match` and
   `If-None-Match` is refused 412
-  (`preconditionRefusal`, `api/api.ts:254-259`).
+  (`preconditionRefusal`).
   RFC 9110 §13.2.2 evaluates the two in order,
   `If-Match` first on an unsafe method, then
   `If-None-Match`, so the pair is a request the
@@ -3157,8 +3149,7 @@ Off the critical path; each with its oracle.
   (`api/backend-postgres.ts:113-114`). A bare
   `executeLedger` throws that raw error
   (`:196-197`) and `handleRequest`'s last catch
-  answers 500 `internal error`
-  (`api/api.ts:1425-1438`). The pins call the
+  answers 500 `internal error`. The pins call the
   mapping loud ('duplicate PK is loud 500',
   'other unique is loud 500',
   `tests/errors-postgres.test.ts:27`, `:57`).
@@ -3168,8 +3159,7 @@ Off the critical path; each with its oracle.
   case is a duplicate id, a fault 500 already
   names. The buffer's other answer cannot fire:
   `handleRequest` answers
-  `UniqueConstraintError` 412
-  (`api/api.ts:1409-1415`), the throw is only
+  `UniqueConstraintError` 412, the throw is only
   the buffer scan
   (`api/backend-buffer-tx.ts:347`), and no table
   declares a unique column (`api/db.ts:82-85`,
@@ -3179,8 +3169,8 @@ Off the critical path; each with its oracle.
   backends and a test pins it.
 - 422 is declared and never sent.
   `HTTP_UNPROCESSABLE_ENTITY`
-  (`shared/http-errors.ts:69`) is re-exported
-  (`api/api.ts:128`) and documented
+  (`shared/http-errors.ts:69`) is re-exported and
+  documented
   (`api/http-status-documents.ts:53-56`).
   Nothing builds a response at that status, and
   no test asserts it. Oracle: the constant and
