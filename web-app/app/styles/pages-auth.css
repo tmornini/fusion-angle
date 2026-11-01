@@ -1,15 +1,14 @@
 /* Auth page: sign-in form layout, approval action footer. */
 
 .auth-branding {
+    display: none;
     width: 50%;
     background-color: hsl(var(--background));
     position: relative;
     overflow: hidden;
 }
 
-@media (max-width: 1023px) {
-    .auth-branding { display: none !important; }
-}
+#mobile-logo { display: flex; }
 
 .auth-form-wrapper {
     width: 100%;
@@ -20,6 +19,8 @@
 }
 
 @media (min-width: 1024px) {
+    .auth-branding { display: block; }
+    #mobile-logo { display: none; }
     .auth-form-wrapper {
         width: 50%;
         /* The card's natural right gutter is
