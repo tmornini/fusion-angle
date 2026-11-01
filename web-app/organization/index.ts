@@ -339,7 +339,7 @@ export async function init(): Promise<void> {
     ] = await Promise.allSettled([
         organizationAndStats(ctx),
         fetchObjectivesData(ctx),
-        fetchSentInvitations(ctx, sentInvitationState),
+        getSentInvitations(ctx, sentInvitationState),
     ]);
     markEnd(fetchName);
 
@@ -484,18 +484,6 @@ export async function init(): Promise<void> {
     }, { signal });
 }
 
-// The organization's invitations in the selected state.
-// Revoke is on a pending row. Admin-only — the page
-// already requires admin, so a failure here is unexpected
-// and surfaces loudly: the boot path renders the page
-// error state, refresh paths toast through the global spine.
-async function fetchSentInvitations(
-    ctx: ReturnType<typeof sessionContext>,
-    selected: SentInvitationState,
-) {
-    return getSentInvitations(ctx, selected);
-}
-
 function paintSentInvitations(
     sent: readonly SentInvitation[],
     selected: SentInvitationState,
@@ -512,7 +500,7 @@ function paintSentInvitations(
 
 async function renderSentInvitations(): Promise<void> {
     const selected = sentInvitationState;
-    const sent = await fetchSentInvitations(
+    const sent = await getSentInvitations(
         sessionContext(), selected,
     );
     if (selected !== sentInvitationState) return;
@@ -572,7 +560,6 @@ async function onSentInvitationStateClick(
     ) return;
     const previous = paintedSentInvitationState;
     sentInvitationState = selected;
-    paintSentInvitations(sentInvitations, selected);
     try {
         await renderSentInvitations();
     } catch (err) {
