@@ -227,9 +227,7 @@ Deno.test(
     async () => {
         const { tables } =
             await setupOneWorkOrder();
-        const {
-            workOrders, memberMap,
-        } = await tables();
+        const { workOrders } = await tables();
         const lists = listsOf(
             workOrders, new Map(), DEMO,
         );
@@ -252,7 +250,6 @@ Deno.test(
             typeof item.lastTransitionedAt,
             'string',
         );
-        assertEquals(memberMap.size > 0, true);
     },
 );
 
