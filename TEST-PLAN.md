@@ -1562,17 +1562,19 @@ the second organization.
 
 ### Landing Page (`landing/`)
 
-- [ ] **B1** Page renders the hero ("Fusion Angle is
-  your Strategy-to-Change Engine."), the stalls
-  paragraph, and the three safety cards, and stays.
-  The top bar has no AI or Pilot link, and the page
-  has no `#ai` or `#pilot` section. Wait ~3 seconds.
-  PASS: still on `landing/index.html`.
+- [ ] **B1** Unsigned `landing/index.html` stays. Hero
+  is two lines, "Fusion Angle" then
+  "Strategy-to-Change Engine", no "is your". No stalls
+  paragraph, no three safety cards, no `#ai`, no
+  `#pilot`. Wait ~3 seconds. PASS: still on
+  `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
        shove to dashboard'; tests/browser/landing.test.ts
        'unsigned landing stays and signs in';
        tests/landing-stay.test.ts 'landing has no ai
-       or pilot section'
+       or pilot section';
+       tests/landing-hero.test.ts 'landing hero states
+       the engine'
 - [ ] **B2** "Book a pilot call" does not appear, and
   the page has no `[data-book-pilot]` anchor. PASS:
   zero matches. Drive by selector, never
