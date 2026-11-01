@@ -1594,9 +1594,15 @@ the second organization.
 - [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in" with an SVG arrow icon (matching the Sign Up button's "Create account" affordance per B10).
   Pin: exploratory — the default rendered title,
        button text, and icon
-- [ ] **B5** On desktop (≥1024px), left panel shows branded marketing stats (10K+ Active Users, 98% Satisfaction, 50+ Integrations). PASS: two-column layout visible.
-  Pin: exploratory — the live two-column layout and
-       stat copy
+- [ ] **B5** On desktop (≥1024px), two-column branding
+  + form. Left panel stats are `0k+` Active Users,
+  `0%` Dissatisfaction, `0+` Integrations. PASS:
+  two-column layout visible.
+  Pin: tests/auth-panel.test.ts 'auth panel speaks in
+       the landing voice' (the `0k+` / `0%` / `0+` /
+       `>Dissatisfaction<` assertions and the absence
+       of `10K+` / `98%` / `50+` / `>Satisfaction<`);
+       exploratory — the live two-column layout
 - [ ] **B6** Submit with empty fields. PASS: "Email is required" error appears below email input; input gets error styling.
   Pin: exploratory — the live validation;
        `validateEmail` in `web-app/auth/index.ts` is
