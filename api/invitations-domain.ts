@@ -50,8 +50,9 @@ import { bodyOf } from './derive-documents.ts';
 import {
     deriveIdentityKind,
     deriveIdentityKindsOf,
-    deriveIdentityPiiOf,
     deriveIdentityPiiRows,
+    identityPiiFromHistories,
+    identityPiiHistories,
     identityPrefixFor,
 } from './derive-identity-spine.ts';
 import { param } from './document-family.ts';
@@ -534,11 +535,14 @@ function seatedIdentityKinds(
     ));
 }
 
-function seatedIdentityPii(
+// The seats' PII histories, read in the caller's
+// transaction. Derive and validate run after that
+// transaction returns.
+function seatedIdentityPiiHistories(
     view: DbAdapter,
     heads: readonly MessagePairEntity[],
-): Promise<ReadonlyMap<Id, IdentityPiiEntity>> {
-    return deriveIdentityPiiOf(view, new Set(
+) {
+    return identityPiiHistories(view, new Set(
         heads.map((head) => membershipOfHead(head).identity_id),
     ));
 }
@@ -552,21 +556,26 @@ export async function getOrganizationInvitations(
     _roles: readonly string[],
     query?: ViewQuery,
 ): Promise<HeadSelection> {
-    const { heads, kinds, pii } = await db.readTransaction(
-        async (view) => {
+    const { heads, kinds, histories } =
+        await db.readTransaction(async (view) => {
             const heads = await organizationMembershipHeads(
                 view, param(params, 0), askedQuery(query),
             );
             return {
                 heads,
                 kinds: await seatedIdentityKinds(view, heads),
-                pii: await seatedIdentityPii(view, heads),
+                histories: await seatedIdentityPiiHistories(
+                    view, heads,
+                ),
             };
-        },
-    );
+        });
     return {
         ...wholeCollectionSelection(heads, 'stateless'),
-        reader: identityKindJoin(heads, kinds, pii),
+        reader: identityKindJoin(
+            heads,
+            kinds,
+            identityPiiFromHistories(histories),
+        ),
     };
 }
 
@@ -579,23 +588,30 @@ export async function getInvitationOnOrganizationNest(
     roles: readonly string[],
 ): Promise<HeadSelection> {
     const name = membershipName(params);
-    const { head, kinds, pii } = await db.readTransaction(
-        async (view) => {
+    const { head, kinds, histories } =
+        await db.readTransaction(async (view) => {
             const head = await visibleHead(
                 view, name, roles, 'organization',
             );
             return {
                 head,
-                kinds: await seatedIdentityKinds(view, [head]),
-                pii: await seatedIdentityPii(view, [head]),
+                kinds: await seatedIdentityKinds(
+                    view, [head],
+                ),
+                histories: await seatedIdentityPiiHistories(
+                    view, [head],
+                ),
             };
-        },
-    );
+        });
     return {
         ...wholeHeadSelection(
             head, 'stateless', 'invitations', name,
         ),
-        reader: identityKindJoin([head], kinds, pii),
+        reader: identityKindJoin(
+            [head],
+            kinds,
+            identityPiiFromHistories(histories),
+        ),
     };
 }
 
