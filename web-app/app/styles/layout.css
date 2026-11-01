@@ -207,19 +207,6 @@ html.sidebar-collapsed .main-content {
     flex-shrink: 0;
 }
 
-#header-greeting {
-    cursor: pointer;
-    transition:
-        transform var(--duration-fast)
-        var(--ease-default),
-        box-shadow var(--duration-fast)
-        var(--ease-default);
-}
-#header-greeting:active {
-    transform: translateY(1px);
-    box-shadow: inset 0 1px 2px hsl(var(--border));
-}
-
 .header-info:empty { display: none; }
 
 .header-stat-divider {
