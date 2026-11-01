@@ -54,7 +54,7 @@ Deno.test('scoped wire events round-trip', () => {
     const event: NotificationEvent = {
         kind: 'scoped',
         organizationIds: ['AjdvjuECVZEgZoFajaIEkg'],
-        identityIds: [],
+        identityIds: ['ada'],
     };
     assertEquals(
         notificationEventFromWire(event), event,
