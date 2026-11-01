@@ -386,11 +386,16 @@ not repeat the note in every case.
 - F70: if the Industry row is not in the open
   panel, DEFERRED on F69.
 - R14: `#gate0001` is unbound; bind-at-creation is
-  later. There is no action-screen picker. Drive a
-  seeded bound WO after a claim drag (or a
-  birth-claimed create if that WO is already bound).
-  A value-bearing transition while unbound is 400,
-  not 409. Opening does not claim.
+  later. There is no action-screen picker; do not
+  invent one. No seeded bound Data Capture work
+  order exists; seeded bound WO01 is already
+  Archive. Drive a bound claimed-by-me Data Capture
+  screen only when one exists (seeded bound WO, or
+  create after bind-at-creation). If none exists,
+  BLOCKED naming that. A value-bearing transition
+  while unbound is 400, not 409; 409 is rebind.
+  Create still birth-claims and does not bind.
+  Opening does not claim.
 - R16: PASS if the Instances section lists at least
   one instance with id + readable values. `Acme Corp`
   and `Walk Co B` are both this walk's instance.
@@ -7308,9 +7313,11 @@ K30 only describes.
        screen's disabled inputs; no bind prompt
 - [ ] **R14** `#gate0001` is unbound; bind-at-creation
   is later. There is no action-screen picker; do not
-  invent one. Opening inspects. Drive a seeded bound
-  WO after a claim drag (or a birth-claimed create if
-  that WO is already bound). Fill Company Name +
+  invent one. Opening inspects. No seeded bound Data
+  Capture work order exists; seeded bound WO01 is
+  already Archive. Drive a bound claimed-by-me Data
+  Capture screen only when one exists. If none
+  exists, BLOCKED naming that. Fill Company Name +
   Contact Email and click submit. PASS: transition
   succeeds; work order advances to Review (does NOT
   demand Reviewer Notes — that is current-node only
