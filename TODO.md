@@ -956,6 +956,17 @@ Off the critical path; each with its oracle.
   `bindGenesisInstance` from
   `tests/browser/workbox-transition.test.ts`.
   `#gate0001` stays unbound.
+- Class the ideas-list drop indicator. Walk `62291ec`
+  D37 BLOCKED: `buildIndicator`
+  (`web-app/app/drag-reorder.ts`) returns an unclassed
+  inline `div`; compositor 4px `pointermove`s could
+  not query a hysteresis flip. Workbox inbox already
+  paints `.inbox-drop-indicator`. Oracle: the
+  `drag-reorder` drop indicator has a class the walk
+  can query (name `.list-drop-indicator` unless a
+  later brainstorm picks another); a Layer 1 pin
+  asserts that class; a later walk can witness D37's
+  live flip.
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
