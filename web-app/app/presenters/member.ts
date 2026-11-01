@@ -370,10 +370,6 @@ export class ManagedMembersPresenter {
         return this.#ais.length;
     }
 
-    serviceCount(): number {
-        return this.#services.length;
-    }
-
     renderList(
         container: HTMLElement,
     ): void {
