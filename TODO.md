@@ -942,18 +942,20 @@ Off the critical path; each with its oracle.
   `web-app/workbox/detail.ts:598-616`,
   `shared/types.ts:1087`
 - Bind the record instance at work order creation.
-  Create today (`createWorkOrderFromFlow`,
-  `web-app/app/work-order-creation.ts:18-41`) posts an
-  unbound work order; the action screen's Bind instance
-  (`WorkboxDetailPresenter.#bindButton`,
-  `web-app/app/presenters/workbox-detail.ts:460-473`)
-  and `putWorkOrderBinding` attach it later. Bind
-  belongs on create. This workbox pass removes the
-  action-screen bind control; create still posts an
-  unbound work order until this item. Oracle:
-  creating a work order requires the instance when the
-  flow names a record type; the action screen has no
-  bind control.
+  The action-screen Bind instance control is gone
+  (`WorkboxDetailPresenter` has no `#bindButton`;
+  WB10a PASS); create still posts unbound
+  (`createWorkOrderFromFlow` →
+  `postWorkOrderCreation`). The Layer 2 WB11 pin's
+  `bindGenesisInstance` is a stopgap until this
+  item; walk `62291ec` BLOCKED WB11, WB16, and R14
+  on that unbound create. Oracle: creating a work
+  order requires the instance when the flow names a
+  record type; the action screen has no bind
+  control. Once create binds, drop
+  `bindGenesisInstance` from
+  `tests/browser/workbox-transition.test.ts`.
+  `#gate0001` stays unbound.
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
