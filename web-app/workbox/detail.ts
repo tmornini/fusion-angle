@@ -341,7 +341,6 @@ async function loadPresenter(
         attributeMap,
         instanceWave.instanceValues,
         bound,
-        [],
         conflictNotice,
     );
 }

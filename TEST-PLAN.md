@@ -4457,7 +4457,7 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   current node's attribute references from the flow
   graph.
   Pin: tests/presenter-workbox-detail.test.ts
-       'WorkboxDetailPresenter exposes id, display id,
+       'WorkboxDetailPresenter exposes display id
        and flow name from the work order';
        tests/presenter-workbox-detail.test.ts
        'renderableAttributes are the current node refs
