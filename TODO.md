@@ -2354,11 +2354,6 @@ Off the critical path; each with its oracle.
     class="flow-node-danger">` / `.flow-node-warning` and
     its `<title>` copy (F73) — Layer 1, `buildGraphSvg`;
     only the predicate is pinned
-  - The Workbox page's title, subtitle, and tab shell
-    text (WB1) — Layer 1 or 2; no presenter or browser
-    test asserts the shell copy
-  - `emptyStateFor`'s rendered copy (WB2) — Layer 1; it
-    is unexported page glue in `web-app/workbox/index.ts`
   - The seeded completed-work-order count, 129 of the
     145 across `buildWorkOrders()` and
     `buildLeadToCloseWorkload()` (WB3) — Layer 1, an
@@ -2380,8 +2375,6 @@ Off the critical path; each with its oracle.
     API and asserts it is refused or impossible
   - Workbox data surviving a page navigation (WB17) —
     Layer 2
-  - The second tab's rendered read-only, already-claimed
-    view (WB18) — Layer 2
   - The client-side 412 recovery in the workbox's work
     order box — re-GET, conflict notice, warning toast, no
     auto-retry (WB19a) — Layer 1 first:
@@ -2389,12 +2382,6 @@ Off the critical path; each with its oracle.
     parameter carries no rendering test, unlike
     `RecordInstancesPresenter`'s; then Layer 2 for the
     live sequence
-  - AI-only-member and zero-member node visibility in the
-    inbox (WB20) — Layer 1; no fixture in
-    `tests/workbox-inbox.test.ts` uses either
-  - Archive-tab visibility being independent of which
-    members the final transition referenced (WB21) —
-    Layer 1; no fixture varies this
   - The stats page shell's absences — no left toolbar, no
     slide-in props panel, no marquee — and the pointer
     cursor over a node (FS1) — Layer 2, reading computed
