@@ -351,6 +351,14 @@ not repeat the note in every case.
   PASSed on the second 09-02 walk — the driver *can*
   drag lists; a miss on D36 or K6 is still BLOCKED
   this walk, not a missing product.
+- D37: drive with two or more compositor
+  `pointermove`s across a neighbour midpoint during a
+  D36-style ideas-list drag. The drop indicator is an
+  unclassed inline `div`; do not grind a class or a
+  tighter step. If the live flip is not witnessed,
+  BLOCKED naming the unclassed indicator. The two
+  `dropIndex` pins decide the 8px band. Workbox
+  `.inbox-drop-indicator` is a different list.
 - F12: after the pan-mode node drag, Space toggles
   pan off (Layer 2 pin). The double-click half
   retargets the same node id; landing on Archive or
@@ -378,11 +386,16 @@ not repeat the note in every case.
 - F70: if the Industry row is not in the open
   panel, DEFERRED on F69.
 - R14: `#gate0001` is unbound; bind-at-creation is
-  later. There is no action-screen picker. Drive a
-  seeded bound WO after a claim drag (or a
-  birth-claimed create if that WO is already bound).
-  A value-bearing transition while unbound is 400,
-  not 409. Opening does not claim.
+  later. There is no action-screen picker; do not
+  invent one. No seeded bound Data Capture work
+  order exists; seeded bound WO01 is already
+  Archive. Drive a bound claimed-by-me Data Capture
+  screen only when one exists (seeded bound WO, or
+  create after bind-at-creation). If none exists,
+  BLOCKED naming that. A value-bearing transition
+  while unbound is 400, not 409; 409 is rebind.
+  Create still birth-claims and does not bind.
+  Opening does not claim.
 - R16: PASS if the Instances section lists at least
   one instance with id + readable values. `Acme Corp`
   and `Walk Co B` are both this walk's instance.
@@ -400,9 +413,16 @@ not repeat the note in every case.
   gone. Layer 2 pin
   tests/browser/workbox-transition.test.ts
   'fill and submit navigates to the inbox
-  (WB11)' decides the inbox navigation. WB16's
-  read is armed before this `submit`, in the
-  same turn (Driving notes, WB11/WB16).
+  (WB11)' binds a genesis instance via API first,
+  then fills; it decides the inbox navigation.
+  Drive a bound claimed-by-me Data Capture screen
+  when one exists (seeded bound WO, or create after
+  bind-at-creation). A live unbound create + fill +
+  submit that 400s `work order has no instance
+  binding` is BLOCKED, naming unbound create and no
+  bind chrome. One attempt. WB16's read is armed
+  before this `submit`, in the same turn (Driving
+  notes, WB11/WB16).
 - WB19a/WB19b: drive while the bound WO is still
   Active, before WB14. If WB14 already archived it,
   DEFERRED on WB14, not FAIL. Layer 1 pins decide
@@ -486,6 +506,11 @@ exploratory half (no Layer 1 pin renders the live
 Customer Profile list).
 WB19a/WB19b when the bound WO is already archived:
 DEFERRED on WB14. Layer 1 pins decide the 412.
+A live WB11 or WB16 400 for no instance binding
+is BLOCKED, not FAIL, while those pins are green.
+WB19, WB19a, WB19b, WB14, and WB15 stay DEFERRED
+on WB11 until a bound Active WO exists from
+WB11–WB13.
 I21 skeleton miss without the Fetch pause:
 BLOCKED naming that. A miss with the pause in
 place is FAIL of the exploratory half.
@@ -1537,17 +1562,19 @@ the second organization.
 
 ### Landing Page (`landing/`)
 
-- [ ] **B1** Page renders the hero ("Fusion Angle is
-  your Strategy-to-Change Engine."), the stalls
-  paragraph, and the three safety cards, and stays.
-  The top bar has no AI or Pilot link, and the page
-  has no `#ai` or `#pilot` section. Wait ~3 seconds.
-  PASS: still on `landing/index.html`.
+- [ ] **B1** Unsigned `landing/index.html` stays. Hero
+  is two lines, "Fusion Angle" then
+  "Strategy-to-Change Engine", no "is your". No stalls
+  paragraph, no three safety cards, no `#ai`, no
+  `#pilot`. Wait ~3 seconds. PASS: still on
+  `landing/index.html`.
   Pin: tests/landing-stay.test.ts 'landing does not
        shove to dashboard'; tests/browser/landing.test.ts
        'unsigned landing stays and signs in';
        tests/landing-stay.test.ts 'landing has no ai
-       or pilot section'
+       or pilot section';
+       tests/landing-hero.test.ts 'landing hero states
+       the engine'
 - [ ] **B2** "Book a pilot call" does not appear, and
   the page has no `[data-book-pilot]` anchor. PASS:
   zero matches. Drive by selector, never
@@ -1567,9 +1594,15 @@ the second organization.
 - [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in" with an SVG arrow icon (matching the Sign Up button's "Create account" affordance per B10).
   Pin: exploratory — the default rendered title,
        button text, and icon
-- [ ] **B5** On desktop (≥1024px), left panel shows branded marketing stats (10K+ Active Users, 98% Satisfaction, 50+ Integrations). PASS: two-column layout visible.
-  Pin: exploratory — the live two-column layout and
-       stat copy
+- [ ] **B5** On desktop (≥1024px), two-column branding
+  + form. Left panel stats are `0k+` Active Users,
+  `0%` Dissatisfaction, `0+` Integrations. PASS:
+  two-column layout visible.
+  Pin: tests/auth-panel.test.ts 'auth panel speaks in
+       the landing voice' (the `0k+` / `0%` / `0+` /
+       `>Dissatisfaction<` assertions and the absence
+       of `10K+` / `98%` / `50+` / `>Satisfaction<`);
+       exploratory — the live two-column layout
 - [ ] **B6** Submit with empty fields. PASS: "Email is required" error appears below email input; input gets error styling.
   Pin: exploratory — the live validation;
        `validateEmail` in `web-app/auth/index.ts` is
@@ -4675,10 +4708,11 @@ gesture pans instead of dragging, marquee-ing, or connecting.
   once, per that note. If the transition POST is
   missing because navigation dropped an unarmed
   buffer, record BLOCKED naming that — an honest
-  BLOCKED costs nothing. PASS: the
-  binding PUT lands at `work-orders/:id/binding` with
-  `{instance_id, record_type_id}` (200); the transition
-  POST is `work-orders/:id/transition` (200) whose body
+  BLOCKED costs nothing. A missing 200 because the
+  work order is unbound is BLOCKED, same reason as
+  WB11. There is no submit-time binding PUT. PASS:
+  the transition POST is `work-orders/:id/transition`
+  (200) whose body
   is the **instance shape** (`targetState`, `instance_id`,
   `record_type_id`, `set`/`clear` delta, `release`,
   `transitionAt` — no `fieldValues` bag) and carries a
@@ -7287,9 +7321,11 @@ K30 only describes.
        screen's disabled inputs; no bind prompt
 - [ ] **R14** `#gate0001` is unbound; bind-at-creation
   is later. There is no action-screen picker; do not
-  invent one. Opening inspects. Drive a seeded bound
-  WO after a claim drag (or a birth-claimed create if
-  that WO is already bound). Fill Company Name +
+  invent one. Opening inspects. No seeded bound Data
+  Capture work order exists; seeded bound WO01 is
+  already Archive. Drive a bound claimed-by-me Data
+  Capture screen only when one exists. If none
+  exists, BLOCKED naming that. Fill Company Name +
   Contact Email and click submit. PASS: transition
   succeeds; work order advances to Review (does NOT
   demand Reviewer Notes — that is current-node only

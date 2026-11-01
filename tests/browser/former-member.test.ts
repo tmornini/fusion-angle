@@ -74,8 +74,8 @@ Deno.test(
 );
 
 Deno.test(
-    'the workbox Archive tab lists completed work orders'
-    + ' after B28 (WB3)',
+    'workbox Archived by Me still loads after B28'
+    + ' (WB3)',
     async () => {
         await withAdminPage(browser.get(), async (page, origin) => {
             await removeLisaWang(origin);
@@ -83,14 +83,25 @@ Deno.test(
                 registryUrl(origin.baseUrl, 'workbox'),
             );
             await page.ready('workbox');
-            await page.click('[data-tab="archive"]');
-            const rows = await page.until<number>(
-                countAtLeast(
-                    '#archive-list [data-work-order-card]', 1,
-                ),
-                'archived rows',
+            await page.click(
+                '[data-inbox-pill="archivedByMe"]',
             );
-            assert(rows >= 1);
+            assert(
+                await page.until<boolean>(
+                    `document.querySelector(`
+                    + `'[data-inbox-pill=`
+                    + `"archivedByMe"]')`
+                    + `?.getAttribute(`
+                    + `'aria-pressed')`
+                    + ` === 'true'`
+                    + ` && document.querySelector(`
+                    + `'#claimed-list')`
+                    + `?.textContent.includes(`
+                    + `'No work orders archived`
+                    + ` by me')`,
+                    'Archived by Me empty copy',
+                ),
+            );
             assertStrictEquals(
                 await page.evaluate<boolean>(ERROR_CARD), false,
             );

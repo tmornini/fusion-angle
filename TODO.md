@@ -942,18 +942,41 @@ Off the critical path; each with its oracle.
   `web-app/workbox/detail.ts:598-616`,
   `shared/types.ts:1087`
 - Bind the record instance at work order creation.
-  Create today (`createWorkOrderFromFlow`,
-  `web-app/app/work-order-creation.ts:18-41`) posts an
-  unbound work order; the action screen's Bind instance
-  (`WorkboxDetailPresenter.#bindButton`,
-  `web-app/app/presenters/workbox-detail.ts:460-473`)
-  and `putWorkOrderBinding` attach it later. Bind
-  belongs on create. This workbox pass removes the
-  action-screen bind control; create still posts an
-  unbound work order until this item. Oracle:
-  creating a work order requires the instance when the
-  flow names a record type; the action screen has no
-  bind control.
+  The action-screen Bind instance control is gone
+  (`WorkboxDetailPresenter` has no `#bindButton`;
+  WB10a PASS); create still posts unbound
+  (`createWorkOrderFromFlow` →
+  `postWorkOrderCreation`). The Layer 2 WB11 pin's
+  `bindGenesisInstance` is a stopgap until this
+  item; walk `62291ec` BLOCKED WB11, WB16, and R14
+  on that unbound create. Oracle: creating a work
+  order requires the instance when the flow names a
+  record type; the action screen has no bind
+  control. Once create binds, drop
+  `bindGenesisInstance` from
+  `tests/browser/workbox-transition.test.ts`.
+  `#gate0001` stays unbound.
+- Class the ideas-list drop indicator. Walk `62291ec`
+  D37 BLOCKED: `buildIndicator`
+  (`web-app/app/drag-reorder.ts`) returns an unclassed
+  inline `div`; compositor 4px `pointermove`s could
+  not query a hysteresis flip. Workbox inbox already
+  paints `.inbox-drop-indicator`. Oracle: the
+  `drag-reorder` drop indicator has a class the walk
+  can query (name `.list-drop-indicator` unless a
+  later brainstorm picks another); a Layer 1 pin
+  asserts that class; a later walk can witness D37's
+  live flip.
+- Seed one bound Data Capture work order. Until
+  bind-at-creation, live create is unbound, WO01 is
+  Archive, and R14/WB11 have no seeded bound Data
+  Capture subject. Oracle: the mock seed includes one
+  bound Customer Onboarding work order at Data
+  Capture that a claim-drag (or a birth-claimed seed
+  row) can open; a later walk can fill Company Name
+  + Contact Email and submit; `#gate0001` stays
+  unbound. Bind-at-creation consumes the live-create
+  half of this item and does not remove `#gate0001`.
 - A latched write aligned to RFC 9110 §13.1.1. When
   its `If-Match` fails, the RFC lets the origin answer
   2xx if it can verify that the requested state change
@@ -1189,11 +1212,6 @@ Off the critical path; each with its oracle.
   Interface), unmeasured. Oracle: tab from the last page control
   reaches the live toast's dismiss; one live region,
   not two
-- The auth page's left panel shows invented stats —
-  "10K+ Active Users", "98% Satisfaction", "50+
-  Integrations" (`web-app/auth/index.ts:118-157`,
-  TEST-PLAN B5): a comfortable lie to every person who
-  signs in. Its own spec.
 - The context is the one source of `operation-id`, by
   the message-plane spec
   (`docs/superpowers/specs/2026-09-23-message-plane-design.md:534-541`),
