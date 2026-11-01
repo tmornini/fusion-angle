@@ -34,8 +34,6 @@ interface PlacedInboxItem {
     displayId: string;
     flowName: string;
     stateName: string;
-    transitionerName: string | null;
-    claimedByName: string | null;
     lastTransitionedAt: string | null;
     completed: boolean;
     position: number;
@@ -49,8 +47,6 @@ interface UnplacedInboxItem {
     id: string;
     displayId: string;
     flowName: string;
-    transitionerName: string | null;
-    claimedByName: string | null;
     lastTransitionedAt: string | null;
     position: number;
 }
@@ -80,10 +76,8 @@ export interface InboxLists {
     archivedByMe: InboxItem[];
 }
 
-// A work order's claim that is live now: the head's claim,
-// judged against its expiresAt by the page that reads the
-// twin. The inbox names the claim-holder on the item it
-// renders — a claimed work order is shown, never hidden.
+// A live claim on a work-order head. This member's
+// claim is on the claimed list; another's is omitted.
 export interface ActiveClaim {
     memberId: Id;
     at: string;
@@ -260,8 +254,6 @@ function toItem(wo: WorkOrder): InboxItem {
         id: wo.id,
         displayId: wo.displayId,
         flowName: fg.name,
-        transitionerName: null as string | null,
-        claimedByName: null as string | null,
         lastTransitionedAt: wo.transition.at,
         position: wo.position,
     };

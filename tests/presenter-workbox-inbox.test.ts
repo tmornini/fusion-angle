@@ -20,8 +20,6 @@ function placed(
         displayId: 'WO-1',
         flowName: 'Onboarding',
         stateName: 'Review',
-        transitionerName: 'Ada',
-        claimedByName: 'Ada',
         lastTransitionedAt:
             '2026-04-01T12:00:00.000000Z',
         completed: false,
@@ -105,7 +103,6 @@ Deno.test(
         assertEquals(
             out.includes('In progress'), false,
         );
-        assertEquals(out.includes('from Ada'), false);
         assertEquals(
             out.includes('claimed by'), false,
         );
@@ -121,8 +118,6 @@ Deno.test(
             id: 'wo-u',
             displayId: 'unplaced-7',
             flowName: 'Test flow',
-            transitionerName: 'Demo Test',
-            claimedByName: null,
             lastTransitionedAt:
                 '2026-04-01T12:00:00.000000Z',
             position: 2,
@@ -137,9 +132,6 @@ Deno.test(
         assertEquals(out.includes('href='), false);
         assertEquals(
             out.includes('drag-handle'), false,
-        );
-        assertEquals(
-            out.includes('from Demo Test'), false,
         );
     },
 );
