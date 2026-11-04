@@ -810,11 +810,22 @@ async () => {
             html, 'class="git-sha font-mono text-sm"',
         );
         assertEquals(html.includes('break-all'), false);
-        assertStringIncludes(html, 'Up');
-        assertStringIncludes(html, 'Postgres up');
         assertStringIncludes(
-            html, 'data-tone="success"',
+            html,
+            '<span class="pill" data-tone="success">'
+            + 'Up</span>',
         );
+        assertStringIncludes(
+            html,
+            '<span class="pill" data-tone="success">'
+            + 'Postgres up</span>',
+        );
+        const nameAt = html.indexOf('Fusion Angle');
+        const upAt = html.indexOf(
+            '<span class="pill" data-tone="success">'
+            + 'Up</span>',
+        );
+        assertEquals(nameAt >= 0 && nameAt < upAt, true);
         assertStringIncludes(
             html,
             'href="/assets/'
@@ -907,10 +918,15 @@ async () => {
         assertHtmlStatus(
             res, html, HTTP_SERVICE_UNAVAILABLE,
         );
-        assertStringIncludes(html, 'Down');
-        assertStringIncludes(html, 'Postgres down');
         assertStringIncludes(
-            html, 'data-tone="error"',
+            html,
+            '<span class="pill" data-tone="error">'
+            + 'Down</span>',
+        );
+        assertStringIncludes(
+            html,
+            '<span class="pill" data-tone="error">'
+            + 'Postgres down</span>',
         );
     }, STATUS_SHA, async () => false);
 });

@@ -142,12 +142,12 @@ export function statusPageHtml(
         '<main class="flex min-h-screen items-center',
         ' justify-center bg-background">',
         '<section class="card max-w-md p-8 text-center">',
-        '<h1 class="font-display text-4xl font-bold mb-2">',
-        escapeText(title),
+        '<h1 class="font-display text-3xl font-bold mb-6">',
+        'Fusion Angle',
         '</h1>',
-        '<p class="text-muted mb-6">Fusion Angle</p>',
         '<p class="mb-6 flex flex-wrap justify-center',
         ' gap-2">',
+        statusPill(title, up),
         ...componentPills(components),
         '</p>',
         '<p class="text-muted text-sm">git sha</p>',
@@ -175,15 +175,22 @@ export function statusUnavailableHtml(): string {
         '<main class="flex min-h-screen items-center',
         ' justify-center bg-background">',
         '<section class="card max-w-md p-8 text-center">',
-        '<h1 class="font-display text-4xl font-bold mb-2">',
-        'Unavailable',
+        '<h1 class="font-display text-3xl font-bold mb-6">',
+        'Fusion Angle',
         '</h1>',
+        '<p class="text-muted">Unavailable</p>',
         '<p class="text-muted">git sha unavailable</p>',
         '</section>',
         '</main>',
         '</body>',
         '</html>',
     ].join('\n');
+}
+
+function statusPill(label: string, up: boolean): string {
+    const tone = up ? 'success' : 'error';
+    return '<span class="pill" data-tone="'
+        + tone + '">' + escapeText(label) + '</span>';
 }
 
 function componentPills(
@@ -193,12 +200,10 @@ function componentPills(
         (keyof StatusComponents)[];
     return keys.map((key) => {
         const up = components[key];
-        const tone = up ? 'success' : 'error';
         const word = up ? 'up' : 'down';
-        const label = escapeText(COMPONENT_LABEL[key]);
-        return '<span class="pill" data-tone="'
-            + tone + '">' + label + ' ' + word
-            + '</span>';
+        return statusPill(
+            COMPONENT_LABEL[key] + ' ' + word, up,
+        );
     });
 }
 

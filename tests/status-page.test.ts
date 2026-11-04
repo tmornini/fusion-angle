@@ -74,12 +74,27 @@ Deno.test('the status page escapes text', () => {
         true,
     );
     assertEquals(html.includes('a<b'), false);
-    assertEquals(html.includes('Down'), true);
-    assertEquals(
-        html.includes('data-tone="error"'),
-        true,
+    const nameAt = html.indexOf(
+        '<h1 class="font-display text-3xl font-bold mb-6">\n'
+        + 'Fusion Angle\n</h1>',
     );
-    assertEquals(html.includes('Postgres down'), true);
+    const downAt = html.indexOf(
+        '<span class="pill" data-tone="error">Down</span>',
+    );
+    const postgresAt = html.indexOf(
+        '<span class="pill" data-tone="error">'
+        + 'Postgres down</span>',
+    );
+    assertEquals(nameAt >= 0, true);
+    assertEquals(downAt > nameAt, true);
+    assertEquals(postgresAt > downAt, true);
+    assertEquals(
+        html.includes(
+            '<h1 class="font-display text-4xl font-bold mb-2">\n'
+            + 'Down\n</h1>',
+        ),
+        false,
+    );
     assertEquals(
         html.includes(
             'href="/assets/styles.0123abcd.css"',
