@@ -31,6 +31,15 @@ const SIDEBAR_ORGANIZATION_SWITCHER_IDS = [
     'mobile-sidebar-org-switcher',
 ] as const;
 
+export function sidebarMemberNavigation(
+    identityId: string,
+): readonly [string, { identityId: string }] {
+    return [
+        'identity-detail',
+        { identityId },
+    ];
+}
+
 interface SidebarMember {
     id: string;
     name: string;
@@ -124,14 +133,13 @@ export async function mutateSidebarMember(
         if (el) setHtml(el, switcher);
     }
     wireOrganizationSwitcher(sidebarMember.activeOrganizationId);
+    const [page, params] = sidebarMemberNavigation(
+        sidebarMember.id,
+    );
     const chips = $$('.sidebar-member', document);
     for (const chip of chips) {
-        chip.addEventListener(
-            'click',
-            () => navigateTo(
-                'member-detail',
-                { memberId: sidebarMember.id },
-            ),
-        );
+        chip.addEventListener('click', () => {
+            navigateTo(page, params);
+        });
     }
 }
