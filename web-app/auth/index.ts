@@ -15,7 +15,6 @@ import {
 } from '../app/icons.ts';
 import { navigateTo } from '../app/navigation.ts';
 import { log } from '../app/logger.ts';
-import { getViewportWidth } from '../app/adapters/index.ts';
 import { getClient } from '../app/client.ts';
 import {
     postPasswordLogin,
@@ -25,12 +24,6 @@ import type {
 } from '../../client/session-credentials.ts';
 import { decodeReturnTarget } from '../app/auth-redirect.ts';
 import { getUrlParam } from '../app/adapters/url-params.ts';
-
-// The design system's lg breakpoint
-// (DESIGN-SYSTEM.md § Responsive
-// breakpoints) — the one TypeScript
-// viewport check.
-const LG_BREAKPOINT_PX = 1024;
 
 function validateEmail(
     email: string,
@@ -71,7 +64,7 @@ export async function init(): Promise<void> {
     <div class="${
         'min-h-screen flex bg-background'
     }">
-        <div class="auth-branding hidden"
+        <div class="auth-branding"
             id="auth-branding">
             <div class="${
                 'auth-branding-content'
@@ -369,22 +362,6 @@ export async function init(): Promise<void> {
     const submitBtn = $('#submit-btn', document);
     const signupNotice =
         $('#signup-notice', document);
-
-    const branding = $('#auth-branding', document);
-    if (
-        branding
-        && getViewportWidth() >= LG_BREAKPOINT_PX
-    ) {
-        branding.classList.remove('hidden');
-        branding.style.display = '';
-    }
-    const mobileLogo = $('#mobile-logo', document);
-    if (
-        mobileLogo
-        && getViewportWidth() >= LG_BREAKPOINT_PX
-    ) {
-        mobileLogo.classList.add('hidden');
-    }
 
     if (
         !form

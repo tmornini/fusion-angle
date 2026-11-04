@@ -235,6 +235,54 @@ Deno.test('auth left block centers on the sign-in card',
     );
 });
 
+Deno.test('auth chrome follows the viewport in CSS', () => {
+    assertStrictEquals(
+        src.includes('getViewportWidth'), false,
+    );
+    assertStrictEquals(
+        src.includes('LG_BREAKPOINT'), false,
+    );
+    assertStrictEquals(
+        src.includes('.style.display'), false,
+    );
+    assertStrictEquals(
+        src.includes('auth-branding hidden'), false,
+    );
+    assertStrictEquals(css.includes('!important'), false);
+    assertStrictEquals(
+        css.includes('max-width: 1023px'), false,
+    );
+    const narrow = between(
+        css, '.auth-branding {', '@media',
+    );
+    assertStrictEquals(
+        narrow.includes('display: none'), true,
+    );
+    assertStrictEquals(
+        narrow.includes(
+            '#mobile-logo { display: flex; }',
+        ),
+        true,
+    );
+    const wide = between(
+        css,
+        '@media (min-width: 1024px) {',
+        '.auth-form-wrapper {',
+    );
+    assertStrictEquals(
+        wide.includes(
+            '.auth-branding { display: block; }',
+        ),
+        true,
+    );
+    assertStrictEquals(
+        wide.includes(
+            '#mobile-logo { display: none; }',
+        ),
+        true,
+    );
+});
+
 Deno.test('auth outer edges share one inset', () => {
     const inset = 'calc((50vw - 28rem) / 2 + 4rem)';
     assertStrictEquals(
