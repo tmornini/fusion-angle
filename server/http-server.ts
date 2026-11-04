@@ -25,6 +25,14 @@ import { msSinceMonotonic } from '../shared/types.ts';
 import { gitShaForStatus } from './git-sha.ts';
 import { logStampUtc } from './log-stamp.ts';
 import {
+    everyComponentUp,
+    jsonRequested,
+    statusAssets,
+    statusPageHtml,
+    statusUnavailableHtml,
+    type StatusComponents,
+} from './status-page.ts';
+import {
     createAuthThrottle,
     isAuthThrottlePath,
     isAuthTokenPath,
@@ -74,10 +82,7 @@ export type RequestLog = (
 
 export type PostgresProbe = () => Promise<boolean>;
 
-// `up` is every key. A new component is another key.
-export interface StatusComponents {
-    readonly postgres: boolean;
-}
+const STATUS_VARY = 'Accept, Content-Type';
 
 export interface HttpListenOptions {
     readonly adapter: DbAdapter;
@@ -324,14 +329,6 @@ function jsonResponse(
     });
 }
 
-function everyComponentUp(
-    components: StatusComponents,
-): boolean {
-    return Object.values(components).every(
-        (up) => up === true,
-    );
-}
-
 function statusDocument(
     sha: string,
     components: StatusComponents,
@@ -353,9 +350,49 @@ function statusDocument(
             'Content-Type':
                 'application/json; charset=utf-8',
             'Cache-Control': NO_STORE,
+            Vary: STATUS_VARY,
         },
     });
     return { status, response };
+}
+
+function htmlStatus(
+    status: number,
+    html: string,
+): Response {
+    return new Response(html, {
+        status,
+        headers: {
+            'Content-Type':
+                'text/html; charset=utf-8',
+            'Cache-Control': NO_STORE,
+            'Content-Security-Policy':
+                CONTENT_SECURITY_POLICY,
+            Vary: STATUS_VARY,
+        },
+    });
+}
+
+async function statusHtml(
+    sha: string,
+    components: StatusComponents,
+    staticRoot: string,
+): Promise<{
+    readonly status: number;
+    readonly response: Response;
+}> {
+    const up = everyComponentUp(components);
+    const status = up
+        ? HTTP_OK
+        : HTTP_SERVICE_UNAVAILABLE;
+    const assets = await statusAssets(staticRoot);
+    return {
+        status,
+        response: htmlStatus(
+            status,
+            statusPageHtml(sha, components, assets),
+        ),
+    };
 }
 
 async function postgresUp(
@@ -609,23 +646,37 @@ async function dispatch(
         // pair, and is not counted toward the cap.
         if (request.method === 'GET'
             && pathname === '/status') {
+            const wantJson = jsonRequested(
+                request.headers,
+            );
             const sha = await gitShaForStatus(
                 options.gitSha,
             );
             if (sha === undefined) {
                 status = HTTP_INTERNAL_ERROR;
-                response = jsonResponse(
-                    HTTP_INTERNAL_ERROR,
-                    { error: 'git sha unavailable' },
-                );
+                response = wantJson
+                    ? jsonResponse(
+                        HTTP_INTERNAL_ERROR,
+                        { error: 'git sha unavailable' },
+                        { Vary: STATUS_VARY },
+                    )
+                    : htmlStatus(
+                        HTTP_INTERNAL_ERROR,
+                        statusUnavailableHtml(),
+                    );
                 return response;
             }
             const postgres = await postgresUp(
                 options.postgresProbe,
             );
-            const answered = statusDocument(sha, {
-                postgres,
-            });
+            const components = { postgres };
+            const answered = wantJson
+                ? statusDocument(sha, components)
+                : await statusHtml(
+                    sha,
+                    components,
+                    options.staticRoot,
+                );
             status = answered.status;
             response = answered.response;
             return response;
