@@ -12,18 +12,12 @@ import {
     compareIdentifiers,
     generateIdentifier,
 } from '../shared/identifier.ts';
-import {
-    nowUtc,
-    SYSTEM_MEMBER_ID,
-} from '../shared/types.ts';
+import { nowUtc } from '../shared/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import {
-    postSeedWorkOrderTransitionOp,
-} from '../api/routes.ts';
-import {
-    formWriteMessagePair,
-} from '../api/message-pair.ts';
+    appendLegacyTransition,
+} from './legacy-transition-fixture.ts';
 import { operationIdHeader } from
     './operation-id-header.ts';
 import { seedCreatedWorkOrder } from
@@ -53,7 +47,6 @@ const FV_M = generateIdentifier();
 // instance heads (deriveInstanceCollection).
 
 const LOCK_TIMEOUT_SECONDS = 300;
-const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 
 function graphJson(): Record<string, unknown> {
     return {
@@ -105,74 +98,47 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-// Task 8: below-facade legacy append — SFV census pins
-// stored fold shape, not the retired live wire.
-async function appendLegacyTransition(
-    db: MemoryDbAdapter,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const pathSegments = [
-        'organizations', STARK_ORGANIZATION,
-        'work-orders', 'yNSSnbrpacodQTzUEcdEVA', 'transition',
-    ];
-    const messagePair = await formWriteMessagePair({
-        method: 'POST',
-        pathname: '/' + pathSegments.join('/'),
-        routePattern: TRANSITION_PATTERN,
-        routeSegments: TRANSITION_PATTERN.split('/'),
-        pathSegments,
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: STARK_ORGANIZATION,
-        responseBody: undefined,
-        operationId: generateIdentifier(),
-        requestId: generateIdentifier(),
-    });
-    await postSeedWorkOrderTransitionOp(
-        db, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA', body,
-        SYSTEM_MEMBER_ID, messagePair,
-    );
-}
-
 // Non-lex field-value ids so collection order is not
 // insertion order (byIdAscending craftsmanship).
 Deno.test('work-order events field_values are identifier-'
 + 'ordered after non-lex transition fold', async () => {
     const db = await seededDb();
-    await appendLegacyTransition(db, {
-        transitionEventId: TE_LEX,
-        targetState: N_NEXT,
-        fieldValues: [
-            {
-                id: FV_Z,
-                fields: {
-                    state_event_id: TE_LEX,
-                    attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                    value: 'z',
+    await appendLegacyTransition(
+        db, STARK_ORGANIZATION,
+        'yNSSnbrpacodQTzUEcdEVA', {
+            transitionEventId: TE_LEX,
+            targetState: N_NEXT,
+            fieldValues: [
+                {
+                    id: FV_Z,
+                    fields: {
+                        state_event_id: TE_LEX,
+                        attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                        value: 'z',
+                    },
                 },
-            },
-            {
-                id: FV_A,
-                fields: {
-                    state_event_id: TE_LEX,
-                    attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                    value: 'a',
+                {
+                    id: FV_A,
+                    fields: {
+                        state_event_id: TE_LEX,
+                        attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                        value: 'a',
+                    },
                 },
-            },
-            {
-                id: FV_M,
-                fields: {
-                    state_event_id: TE_LEX,
-                    attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
-                    value: 'm',
+                {
+                    id: FV_M,
+                    fields: {
+                        state_event_id: TE_LEX,
+                        attribute_id: 'VPckAwjJsTGCEkKaOOGRGw',
+                        value: 'm',
+                    },
                 },
-            },
-        ],
-        release: null,
-        transitionAt: nowUtc(),
-    });
+            ],
+            release: null,
+            transitionAt: nowUtc(),
+        },
+        { requestAt: nowUtc() },
+    );
     const token = await organizationToken();
     const list = await getWorkOrderEvents(
         db, token, STARK_ORGANIZATION, 'yNSSnbrpacodQTzUEcdEVA',
