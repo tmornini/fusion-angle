@@ -10,16 +10,6 @@
     cursor: pointer;
 }
 
-.btn-outline-light {
-    border: 1px solid hsl(var(--primary-foreground) / 0.3);
-    background-color: hsl(var(--primary-foreground) / 0.1);
-    color: hsl(var(--primary-foreground));
-}
-.btn-outline-light:hover {
-    background-color: hsl(var(--primary-foreground) / 0.2);
-}
-
-
 .btn {
     display: inline-flex;
     align-items: center;

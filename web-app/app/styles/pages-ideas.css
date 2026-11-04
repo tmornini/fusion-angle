@@ -112,6 +112,11 @@
     border-top: 1px solid hsl(var(--border));
 }
 
+/* Idea list — show actions on hover */
+.idea-actions {
+    transition:
+        opacity var(--duration-fast);
+}
 
 .idea-actions-stack {
     flex-direction: column;

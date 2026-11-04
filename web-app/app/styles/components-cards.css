@@ -14,14 +14,6 @@
     opacity: 0.6;
 }
 
-/* Snapshot card — vertical stack with header row */
-.snapshot-card {
-    padding: var(--space-6);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
 /* Tone-bordered outline button (success/warning/error) */
 .btn-outline[data-tone="success"] {
     border-color: hsl(var(--success));
@@ -45,10 +37,6 @@
     grid-column: 1 / -1;
     background: hsl(var(--primary) / 0.06);
     border: 1px solid hsl(var(--primary) / 0.2);
-}
-.empty-banner-icon {
-    color: hsl(var(--primary));
-    flex-shrink: 0;
 }
 
 .icon-box {
