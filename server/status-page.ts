@@ -151,7 +151,7 @@ export function statusPageHtml(
         ...componentPills(components),
         '</p>',
         '<p class="text-muted text-sm">git sha</p>',
-        '<p class="font-mono text-sm break-all">',
+        '<p class="git-sha font-mono text-sm">',
         escapeText(sha),
         '</p>',
         '</section>',

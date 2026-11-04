@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertMatch } from '@std/assert';
 import { join } from '@std/path';
 import {
     jsonRequested,
@@ -85,6 +85,37 @@ Deno.test('the status page escapes text', () => {
             'href="/assets/styles.0123abcd.css"',
         ),
         true,
+    );
+});
+
+Deno.test('the status sha clips to seven digits', () => {
+    const css = Deno.readTextFileSync(
+        'web-app/app/styles/base.css',
+    );
+    const html = statusPageHtml(
+        '0123456789abcdef0123456789abcdef01234567',
+        { postgres: true },
+        {},
+    );
+    assertEquals(
+        html.includes('class="git-sha font-mono text-sm"'),
+        true,
+    );
+    assertMatch(
+        css,
+        /\.git-sha \{[^}]*width: 7ch;[^}]*\}/,
+    );
+    assertMatch(
+        css,
+        /\.git-sha \{[^}]*overflow: hidden;[^}]*\}/,
+    );
+    assertMatch(
+        css,
+        /\.git-sha \{[^}]*white-space: nowrap;[^}]*\}/,
+    );
+    assertMatch(
+        css,
+        /\.font-mono \{ font-family: var\(--font-mono\); \}/,
     );
 });
 

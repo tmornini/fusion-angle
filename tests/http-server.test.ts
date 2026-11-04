@@ -807,8 +807,9 @@ async () => {
         assertHtmlStatus(res, html, HTTP_OK);
         assertStringIncludes(html, STATUS_SHA);
         assertStringIncludes(
-            html, 'class="font-mono text-sm break-all"',
+            html, 'class="git-sha font-mono text-sm"',
         );
+        assertEquals(html.includes('break-all'), false);
         assertStringIncludes(html, 'Up');
         assertStringIncludes(html, 'Postgres up');
         assertStringIncludes(
