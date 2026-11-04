@@ -64,12 +64,10 @@
     }
 }
 
-/* Score row — used by ProjectObjectives and
-    DashboardObjectiveAggregates */
+/* Score row — DashboardObjectiveAggregates and
+    DashboardObjectiveProjects */
 .score-row {
     display: grid;
-    grid-template-columns:
-        140px var(--bar-width) 50px 50px auto;
     align-items: center;
     gap: 0.8em;
     padding: 0.4em 0;

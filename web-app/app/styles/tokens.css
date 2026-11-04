@@ -14,12 +14,9 @@
     --blue-900: 217 45% 15%;
 
     /* Yellow Scale */
-    --yellow-50: 48 80% 96%;
     --yellow-400: 48 98% 55%;
-    --yellow-500: 45 95% 48%;
 
     /* Neutral Grays — blue-tinted */
-    --gray-50: 220 20% 98%;
     --gray-100: 220 18% 96%;
     --gray-200: 218 16% 91%;
     --gray-300: 217 14% 82%;
@@ -139,10 +136,6 @@
         var(--ease-default);
 
     /* Gradients */
-    --gradient-accent:
-        linear-gradient(135deg,
-        hsl(var(--yellow-400)) 0%,
-        hsl(var(--yellow-500)) 100%);
     --gradient-hero:
         linear-gradient(135deg,
         hsl(var(--blue-500)) 0%,
