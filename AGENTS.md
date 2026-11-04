@@ -76,9 +76,9 @@ including Ctrl-C and SIGTERM — it runs
 Creating the database needs 127.0.0.1:5432
 free. Do not start a second server while that
 port and 5432 are held, and do not compose-down
-by hand. The agent does not repeat the seeded
-passwords unless the operator asks. Never
-write a BEL on redeploy.
+by hand. The agent always reveals those seeded
+sign-ins. A development server is unusable
+without them. Never write a BEL on redeploy.
 
 Whenever the operator asks an agent to start a
 development server, start this one and keep
@@ -106,8 +106,8 @@ because Return keeps the database. SIGTERM
 the server so its EXIT trap downs compose,
 wait until 8080 and 5432 are free, then start
 it again. A restart drops the session cookie.
-Sign in again, and still do not print the
-password. A public page's anonymous token
+Reveal the new sign-ins, then sign in again.
+A public page's anonymous token
 POST 401 is the signed-out session probe.
 
 When running under the Claude Code sandbox:
