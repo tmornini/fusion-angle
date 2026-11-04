@@ -63,11 +63,13 @@ function initSidebar(): void {
     );
 }
 
-// Bind every [data-signout] control (both the desktop and the
-// mobile sidebar carry one). The server revoke is best-effort:
-// postSessionLogout always scrubs the local session in its
-// finally, so we navigate to the login page regardless — a
-// failed revoke is logged, never a reason to strand the user.
+// Bind every [data-signout] control. The desktop top
+// bar and the mobile header each carry one, last in
+// .header-actions. The server revoke is best-effort:
+// postSessionLogout always scrubs the local session
+// in its finally, so we navigate to the login page
+// regardless — a failed revoke is logged, never a
+// reason to strand the user.
 function initSignOut(): void {
     const signOut = async (): Promise<void> => {
         try {
@@ -92,27 +94,31 @@ async function initSidebarLayout(
     initSidebar();
     initSignOut();
     initMobileDrawer();
-    // The identity-scoped widgets — the member chip name and the
-    // invitations bell — render for any logged-in visitor, even a
-    // zero-membership identity on its invitations page. The header
-    // strip is org-bound, so it joins only for a scoped session. On
-    // an auth-exempt page with no logged-in visitor the holder is
-    // the anonymous seed, so we skip every read rather than fire one
-    // that 401s 'anonymous principal' or throws 'no active org'.
+    // The identity-scoped widgets — the member chip
+    // name and the invitations bell — render for any
+    // logged-in visitor, even a zero-membership
+    // identity on its invitations page. The header
+    // strip is organization-scoped, so it joins only
+    // for a scoped session. On an auth-exempt page
+    // with no logged-in visitor the holder is the
+    // anonymous seed, so we skip every read rather
+    // than fire one that 401s 'anonymous principal'
+    // or throws 'no active organization'.
     if (getClient().sessionIsAuthenticated()) {
-        // Each widget settles independently: a member with no admin
-        // role is forbidden the org reads the chip and header strip
-        // make, and a zero-membership identity is forbidden them
-        // all, but the identity-scoped invitations bell must still
-        // appear. allSettled keeps one widget's denial from
-        // suppressing the others; rejections are logged, never
+        // Each widget settles independently. A denial
+        // of the header's organization reads must not
+        // suppress the invitations bell. allSettled
+        // keeps one widget's denial from suppressing
+        // the others; rejections are logged, never
         // swallowed.
         const widgets: Array<Promise<void>> = [
-            mutateSidebarMember(bootOrganizations),
+            mutateSidebarMember(),
             mutateInvitationsBell(),
         ];
         if (getClient().sessionIsOrganizationScoped()) {
-            widgets.push(mutateHeaderInfo());
+            widgets.push(
+                mutateHeaderInfo(bootOrganizations),
+            );
         }
         const results = await Promise.allSettled(widgets);
         for (const result of results) {

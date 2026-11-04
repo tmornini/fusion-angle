@@ -37,6 +37,7 @@ export interface IdentityDetailView {
     readonly pii: MemberPii;
     readonly service: ServiceFacet;
     readonly registration: ClientRegistration;
+    readonly defaultOrganization?: SafeHtml;
 }
 
 function buildShell(container: HTMLElement): void {
@@ -97,8 +98,7 @@ function buildTitleSection(
             : UNNAMED_SERVICE_NAME);
     return html`
         <div class="${
-            'flex flex-wrap items-center'
-            + ' gap-3 mb-2'
+            'flex flex-wrap items-center gap-3'
         }">
             <h1 class="${
                 'text-xl font-display font-bold'
@@ -108,10 +108,7 @@ function buildTitleSection(
             <span class="badge badge-secondary text-xs">
                 ${KIND_LABEL[kind]}
             </span>
-        </div>
-        <p class="text-sm text-muted">
-            ${view.identity.idForLink()}
-        </p>`;
+        </div>`;
 }
 
 function buildBio(value: string): SafeHtml {
@@ -261,6 +258,22 @@ function buildEraseButton(): SafeHtml {
         </button>`;
 }
 
+function identityCardsHtml(
+    view: IdentityDetailView,
+): SafeHtml {
+    const cards = view.identity.isPerson()
+        ? html`${buildPersonalInfoCard(view)}${
+            buildLinksCard(view)}`
+        : html`${buildRegistrationCard(view)}${
+            buildLinksCard(view)}`;
+    const field = view.defaultOrganization;
+    if (
+        field === undefined
+        || field.toString() === ''
+    ) return cards;
+    return html`${cards}${field}`;
+}
+
 export class IdentityDetailPresenter {
     readonly #view: IdentityDetailView;
 
@@ -293,13 +306,7 @@ export class IdentityDetailPresenter {
         mutateSlot(
             container,
             '.identity-cards-slot',
-            this.#view.identity.isPerson()
-                ? html`
-                    ${buildPersonalInfoCard(this.#view)}
-                    ${buildLinksCard(this.#view)}`
-                : html`
-                    ${buildRegistrationCard(this.#view)}
-                    ${buildLinksCard(this.#view)}`,
+            identityCardsHtml(this.#view),
         );
     }
 }
