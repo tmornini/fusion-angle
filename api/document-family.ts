@@ -194,10 +194,9 @@ export function liveDocumentIdsOf(
 // organization's own collection (missedReadError). A
 // foreign id is absent there, so it 404s like a genuine
 // absence; no path through here reaches missedReadError's
-// 403, which only a global-plane table (organizations,
-// invitations, role grants) could. Global-plane families
-// (members, identities, …) stay EntityNotFoundError only
-// — they must not probe.
+// 403, which only a global-plane table (organizations)
+// could. Global-plane families (members, identities, …)
+// stay EntityNotFoundError only — they must not probe.
 export async function throwDocumentMiss(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
