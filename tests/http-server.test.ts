@@ -4,6 +4,7 @@ import {
     assertMatch,
     assertNotMatch,
     assertStrictEquals,
+    assertStringIncludes,
 } from '@std/assert';
 import { join } from '@std/path';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -38,6 +39,13 @@ import { readWorktreeGitSha } from
 // resolution the environment provides — six digits here.
 const ZULU_6 =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
+const JSON_ASK = {
+    headers: { 'content-type': 'application/json' },
+};
+
+const STATUS_SHA =
+    '0123456789abcdef0123456789abcdef01234567';
 
 async function gzipBytes(
     text: string,
@@ -586,7 +594,7 @@ async () => {
         return new Response('api', { status: 200 });
     };
     await withServer({}, handle, async (base) => {
-        const res = await fetch(base + '/status');
+        const res = await fetch(base + '/status', JSON_ASK);
         assertStrictEquals(res.status, HTTP_OK);
         assertStrictEquals(
             res.headers.get('cache-control'),
@@ -595,6 +603,10 @@ async () => {
         assertStrictEquals(
             res.headers.get('content-type'),
             'application/json; charset=utf-8',
+        );
+        assertStrictEquals(
+            res.headers.get('vary'),
+            'Accept, Content-Type',
         );
         assertEquals(
             await res.json(),
@@ -616,7 +628,7 @@ async () => {
     const expected = await readWorktreeGitSha();
     assert(expected !== undefined, 'worktree sha');
     await withServer({}, undefined, async (base) => {
-        const res = await fetch(base + '/status');
+        const res = await fetch(base + '/status', JSON_ASK);
         assertStrictEquals(res.status, HTTP_OK);
         assertEquals(await res.json(), {
             'git-sha': expected,
@@ -634,9 +646,13 @@ async () => {
         return true;
     };
     await withServer({}, undefined, async (base) => {
-        const res = await fetch(base + '/status');
+        const res = await fetch(base + '/status', JSON_ASK);
         assertStrictEquals(
             res.status, HTTP_INTERNAL_ERROR,
+        );
+        assertStrictEquals(
+            res.headers.get('content-type'),
+            'application/json; charset=utf-8',
         );
         const body = await res.json() as {
             error: string;
@@ -662,7 +678,7 @@ async () => {
         return new Response('api', { status: 200 });
     };
     await withServer({}, handle, async (base, logs) => {
-        const res = await fetch(base + '/status');
+        const res = await fetch(base + '/status', JSON_ASK);
         assertStrictEquals(
             res.status, HTTP_SERVICE_UNAVAILABLE,
         );
@@ -692,7 +708,7 @@ async () => {
     const sha =
         '0123456789abcdef0123456789abcdef01234567';
     await withServer({}, undefined, async (base) => {
-        const res = await fetch(base + '/status');
+        const res = await fetch(base + '/status', JSON_ASK);
         assertStrictEquals(
             res.status, HTTP_SERVICE_UNAVAILABLE,
         );
@@ -710,7 +726,7 @@ async () => {
         '0123456789abcdef0123456789abcdef01234567';
     await withServer({}, undefined, async (base) => {
         for (let n = 0; n < 6; n += 1) {
-            const res = await fetch(base + '/status');
+            const res = await fetch(base + '/status', JSON_ASK);
             assertStrictEquals(res.status, HTTP_OK);
             await res.text();
         }
@@ -722,7 +738,7 @@ async () => {
     const sha =
         '0123456789abcdef0123456789abcdef01234567';
     await withServer({}, undefined, async (base) => {
-        const res = await fetch(base + '/status');
+        const res = await fetch(base + '/status', JSON_ASK);
         assertStrictEquals(
             res.status, HTTP_SERVICE_UNAVAILABLE,
         );
@@ -749,3 +765,189 @@ async () => {
         return true;
     });
 });
+
+function assertHtmlStatus(
+    res: Response,
+    html: string,
+    status: number,
+): void {
+    assertStrictEquals(res.status, status);
+    assertStrictEquals(
+        res.headers.get('content-type'),
+        'text/html; charset=utf-8',
+    );
+    assertStrictEquals(
+        res.headers.get('cache-control'),
+        NO_STORE,
+    );
+    assertStrictEquals(
+        res.headers.get('vary'),
+        'Accept, Content-Type',
+    );
+    assertStrictEquals(
+        res.headers.get('content-security-policy'),
+        CONTENT_SECURITY_POLICY,
+    );
+    assertNotMatch(html, /style=/);
+}
+
+Deno.test('GET /status is a page for a browser',
+async () => {
+    const manifest = JSON.stringify({
+        'styles.css':
+            'styles.0123abcd0123abcd.css',
+        'favicon.svg':
+            'favicon.0123abcd0123abcd.svg',
+    });
+    await withServer({
+        'asset-manifest.json': manifest,
+    }, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        const html = await res.text();
+        assertHtmlStatus(res, html, HTTP_OK);
+        assertStringIncludes(html, STATUS_SHA);
+        assertStringIncludes(
+            html, 'class="font-mono text-sm break-all"',
+        );
+        assertStringIncludes(html, 'Up');
+        assertStringIncludes(html, 'Postgres up');
+        assertStringIncludes(
+            html, 'data-tone="success"',
+        );
+        assertStringIncludes(
+            html,
+            'href="/assets/'
+            + 'styles.0123abcd0123abcd.css"',
+        );
+        assertStringIncludes(
+            html,
+            'href="/assets/'
+            + 'favicon.0123abcd0123abcd.svg"',
+        );
+        const browser = await fetch(
+            base + '/status',
+            {
+                headers: {
+                    accept: 'text/html,'
+                        + 'application/xhtml+xml,'
+                        + 'application/xml;q=0.9,'
+                        + '*/*;q=0.8',
+                },
+            },
+        );
+        const page = await browser.text();
+        assertHtmlStatus(browser, page, HTTP_OK);
+        assertStringIncludes(page, 'Postgres up');
+    }, STATUS_SHA);
+});
+
+Deno.test(
+    'GET /status returns JSON for Content-Type',
+    async () => {
+        await withServer({}, undefined, async (base) => {
+            const res = await fetch(base + '/status', {
+                headers: {
+                    'content-type':
+                        'application/json; charset=utf-8',
+                    accept: 'text/html',
+                },
+            });
+            assertStrictEquals(res.status, HTTP_OK);
+            assertStrictEquals(
+                res.headers.get('content-type'),
+                'application/json; charset=utf-8',
+            );
+            assertEquals(await res.json(), {
+                'git-sha': STATUS_SHA,
+                up: true,
+                components: { postgres: true },
+            });
+        }, STATUS_SHA);
+    },
+);
+
+Deno.test('GET /status returns JSON for Accept',
+async () => {
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status', {
+            headers: { accept: 'application/json' },
+        });
+        assertStrictEquals(res.status, HTTP_OK);
+        assertEquals(await res.json(), {
+            'git-sha': STATUS_SHA,
+            up: true,
+            components: { postgres: true },
+        });
+    }, STATUS_SHA);
+});
+
+Deno.test(
+    'GET /status stays HTML when HTML ranks higher',
+    async () => {
+        await withServer({}, undefined, async (base) => {
+            const res = await fetch(base + '/status', {
+                headers: {
+                    accept: 'text/html,'
+                        + ' application/json;q=0.8',
+                },
+            });
+            const html = await res.text();
+            assertHtmlStatus(res, html, HTTP_OK);
+            assertStringIncludes(html, 'Postgres up');
+        }, STATUS_SHA);
+    },
+);
+
+Deno.test('GET /status page is Down when postgres is',
+async () => {
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        const html = await res.text();
+        assertHtmlStatus(
+            res, html, HTTP_SERVICE_UNAVAILABLE,
+        );
+        assertStringIncludes(html, 'Down');
+        assertStringIncludes(html, 'Postgres down');
+        assertStringIncludes(
+            html, 'data-tone="error"',
+        );
+    }, STATUS_SHA, async () => false);
+});
+
+Deno.test('GET /status page hides an unacceptable sha',
+async () => {
+    let probes = 0;
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        const html = await res.text();
+        assertHtmlStatus(
+            res, html, HTTP_INTERNAL_ERROR,
+        );
+        assertStringIncludes(
+            html, 'git sha unavailable',
+        );
+        assertEquals(html.includes('nope'), false);
+        assertStrictEquals(probes, 0);
+    }, 'nope', async () => {
+        probes += 1;
+        return true;
+    });
+});
+
+Deno.test(
+    'GET /status omits an unpublished asset link',
+    async () => {
+        await withServer({
+            'asset-manifest.json': JSON.stringify({
+                'styles.css': '../styles.css',
+                'favicon.svg': 'favicon.svg',
+            }),
+        }, undefined, async (base) => {
+            const res = await fetch(base + '/status');
+            const html = await res.text();
+            assertHtmlStatus(res, html, HTTP_OK);
+            assertNotMatch(html, /<link/);
+            assertStringIncludes(html, 'Up');
+        }, STATUS_SHA);
+    },
+);
