@@ -14,6 +14,37 @@
         box-shadow var(--duration-fast) var(--ease-default);
 }
 
+/* Native disclosure ignores padding and sits
+    on the right edge. Draw the mark one space
+    in, and keep the label clear of it. */
+#default-organization {
+    appearance: none;
+    -webkit-appearance: none;
+    /* Inset, both strokes, and the gap before
+        the label. */
+    padding-inline-end: calc(var(--space-2) * 4);
+    cursor: pointer;
+    background-image:
+        linear-gradient(
+            45deg,
+            transparent 40%,
+            hsl(var(--muted-foreground)) 40% 60%,
+            transparent 60%
+        ),
+        linear-gradient(
+            135deg,
+            transparent 40%,
+            hsl(var(--muted-foreground)) 40% 60%,
+            transparent 60%
+        );
+    background-repeat: no-repeat;
+    /* The strokes overlap 1px so the vertex joins. */
+    background-position:
+        right calc(var(--space-2) * 2 - 1px) center,
+        right var(--space-2) center;
+    background-size: var(--space-2) var(--space-2);
+}
+
 .input::placeholder { color: hsl(var(--muted-foreground)); }
 .input:hover:not(:disabled):not(:focus) {
     border-color: hsl(var(--border-strong));

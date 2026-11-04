@@ -18,9 +18,16 @@ import {
     putClientRegistration,
     deleteClientRegistration,
     subscribeIdentityChanges,
+    getOrganizations,
+    getIdentityDefaultOrganization,
+    putIdentityDefaultOrganization,
     type ServiceFacet,
     type ClientRegistration,
 } from '../../client/index.ts';
+import {
+    commitDefaultOrganization,
+    readDefaultOrganizationField,
+} from '../app/default-organization-field.ts';
 import { sessionContext } from '../app/client.ts';
 import {
     Identity,
@@ -86,6 +93,35 @@ function buildView(
     };
 }
 
+async function defaultOrganizationHtml(
+    pageIdentityId: string,
+) {
+    const ctx = sessionContext();
+    return readDefaultOrganizationField(
+        pageIdentityId,
+        ctx.identity.id,
+        async () => {
+            const messages = await getOrganizations(ctx);
+            return messages.map(message => {
+                const organization =
+                    message.body().toValue();
+                return {
+                    id: organization.id,
+                    name: organization.name,
+                };
+            });
+        },
+        () => getIdentityDefaultOrganization(ctx),
+        err => {
+            log.warn(
+                'default organization field omitted',
+                'identities',
+                err,
+            );
+        },
+    );
+}
+
 export async function init(
     params?: Record<string, string>,
 ): Promise<void> {
@@ -106,11 +142,15 @@ export async function init(
         skeleton: buildSkeleton('detail', 4),
         fetch: () => loadIdentity(identityId),
         retry: () => init(params),
-        onData: loaded => {
+        onData: async loaded => {
             lastLoaded = loaded;
-            new IdentityDetailPresenter(
-                buildView(loaded),
-            ).renderShell(container);
+            new IdentityDetailPresenter({
+                ...buildView(loaded),
+                defaultOrganization:
+                    await defaultOrganizationHtml(
+                        loaded.identity.idForLink(),
+                    ),
+            }).renderShell(container);
             bindListeners(container);
             subscribeIdentityChanges(
                 () => void refresh(),
@@ -123,8 +163,11 @@ async function refresh(): Promise<void> {
     if (!currentId || !pageContainer) return;
     const loaded = await loadIdentity(currentId);
     lastLoaded = loaded;
-    new IdentityDetailPresenter(buildView(loaded))
-        .renderUpdate(pageContainer);
+    new IdentityDetailPresenter({
+        ...buildView(loaded),
+        defaultOrganization:
+            await defaultOrganizationHtml(currentId),
+    }).renderUpdate(pageContainer);
 }
 
 function bindListeners(container: HTMLElement): void {
@@ -165,6 +208,30 @@ function bindListeners(container: HTMLElement): void {
         '#client-registration-deregister', document,
     ).addEventListener(
         'click', () => void deregisterClient(), { signal },
+    );
+    container.addEventListener(
+        'change',
+        event => {
+            const target = event.target;
+            if (!(
+                target instanceof HTMLSelectElement
+            )) return;
+            if (target.id !== 'default-organization') {
+                return;
+            }
+            void commitDefaultOrganization(
+                target,
+                organization =>
+                    putIdentityDefaultOrganization(
+                        sessionContext(),
+                        organization,
+                    ),
+                (message, tone) => {
+                    showToast(message, tone);
+                },
+            );
+        },
+        { signal },
     );
 }
 

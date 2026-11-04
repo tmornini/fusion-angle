@@ -46,12 +46,12 @@ identity page.
   page's identity is the session identity. It lists the
   caller's organizations. Changing it writes the
   default and does not switch the session or reload.
-  With fewer than two organizations the menu is
-  absent. Another identity's page has no menu.
+  With organizations listed, the menu has no blank
+  option. With none, the menu is disabled and reads
+  "no active organization memberships". Another
+  identity's page has no menu.
 - A default, once written, cannot be cleared. The
-  route has GET and PUT. An unset default shows a
-  placeholder option until the caller picks an
-  organization. Choosing the placeholder does not
+  route has GET and PUT. An empty value does not
   write.
 
 ## Non-goals
@@ -131,17 +131,17 @@ at a time.
 ### Default organization
 
 The identity detail page renders a "Default
-organization" field in the card stack when all of
-these hold: the loaded identity id equals the session
-identity id, and the caller has two or more
-organizations. Otherwise that field is absent.
+organization" field in the card stack when the loaded
+identity id equals the session identity id. Another
+identity's page has no field.
 
 The field is a `<select>` whose accessible name is
 "Default organization". Its options are the caller's
-organizations. When a default is stored, that option
-is selected. When none is stored, a placeholder
-option is selected. The placeholder has an empty
-value and is not an organization.
+organizations, with no blank option. When a default
+is stored, that option is selected. When none is
+stored, no option is selected. When the caller has
+no organizations, the select is disabled and its only
+option is "no active organization memberships".
 
 A change to an organization id calls
 `putIdentityDefaultOrganization` with that id. The
@@ -150,16 +150,15 @@ page does not reload and does not change
 the new value and the page shows the toast "Set as
 your default organization." On failure the select
 returns to its previous value and the page shows the
-toast "Could not set the default organization." A
-change to the placeholder does nothing.
+toast "Could not set the default organization." An
+empty value does not write.
 
 The field reads organizations with `getOrganizations`
 and the stored default with
 `getIdentityDefaultOrganization`. A 404 from that GET
-is an unset default, which is the placeholder. Any
-other failure of either read omits the field and logs
-a warning. The rest of the identity page still
-renders.
+is an unset default. Any other failure of either
+read omits the field and logs a warning. The rest of
+the identity page still renders.
 
 ## Tests
 
@@ -170,8 +169,8 @@ covered there.
 
 A unit test covers the default-organization select:
 options for each organization, the stored id
-selected, the placeholder when the stored default is
-null, and HTML that is empty below two organizations.
+selected, no blank option when organizations exist,
+and a disabled menu when none do.
 
 A unit test covers the chip target: the session
 identity id is passed to `identity-detail`, not

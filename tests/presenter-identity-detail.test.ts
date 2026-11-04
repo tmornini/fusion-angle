@@ -1,4 +1,9 @@
-import { assertMatch, assertNotMatch, assertStrictEquals } from '@std/assert';
+import {
+    assert,
+    assertMatch,
+    assertNotMatch,
+    assertStrictEquals,
+} from '@std/assert';
 import {
     Identity,
     type ClientRegistrationEntity,
@@ -11,7 +16,10 @@ import {
 } from '../client/identities.ts';
 import {
     IdentityDetailPresenter,
+    type IdentityDetailView,
 } from '../web-app/app/presenters/identity-detail.ts';
+import { html, type SafeHtml } from
+    '../web-app/app/safe-html.ts';
 
 // Neither adapters/identities.ts nor
 // presenters/identity-detail.ts reads localStorage
@@ -70,8 +78,10 @@ function makeRecordingContainer(): {
     };
 }
 
-function personPresenter() {
-    return new IdentityDetailPresenter({
+function personPresenter(
+    defaultOrganization?: SafeHtml,
+) {
+    const view: IdentityDetailView = {
         identity: new Identity({
             id: 'pnXmXrxOWayANgDLdCjuBw', kind: 'person',
         }),
@@ -91,6 +101,13 @@ function personPresenter() {
         },
         service: { named: false },
         registration: { registered: false as const },
+    };
+    if (defaultOrganization === undefined) {
+        return new IdentityDetailPresenter(view);
+    }
+    return new IdentityDetailPresenter({
+        ...view,
+        defaultOrganization,
     });
 }
 
@@ -249,5 +266,77 @@ Deno.test(
         assertMatch(allHtml(), /data-tone="success"/);
         assertMatch(allHtml(), /client_credentials/);
         assertMatch(allHtml(), /Manage registration/);
+    },
+);
+
+Deno.test(
+    'the card stack omits an absent default field',
+    () => {
+        const rec = makeRecordingContainer();
+        personPresenter().renderShell(rec.container);
+        const out = rec.allHtml();
+        assertMatch(out, /Personal Information/);
+        assertStrictEquals(
+            out.includes('default-organization'),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'an empty default field is left out of the cards',
+    () => {
+        const rec = makeRecordingContainer();
+        personPresenter(html``)
+            .renderShell(rec.container);
+        assertStrictEquals(
+            rec.allHtml().includes(
+                'default-organization',
+            ),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'the card stack appends the default field',
+    () => {
+        const rec = makeRecordingContainer();
+        personPresenter(html`<select
+            id="default-organization"
+        ></select>`).renderShell(rec.container);
+        const out = rec.allHtml();
+        const links = out.indexOf('Connections');
+        const field = out.indexOf(
+            'default-organization',
+        );
+        assert(links >= 0);
+        assert(field > links);
+    },
+);
+
+Deno.test(
+    'a service card stack keeps the default field',
+    () => {
+        const rec = makeRecordingContainer();
+        new IdentityDetailPresenter({
+            identity: new Identity({
+                id: 'syWUUcdBSbBgMwBiCrgbDw',
+                kind: 'service',
+            }),
+            pii: { erased: true },
+            service: { named: false },
+            registration: {
+                registered: false as const,
+            },
+            defaultOrganization: html`<select
+                id="default-organization"
+            ></select>`,
+        }).renderShell(rec.container);
+        const out = rec.allHtml();
+        assertMatch(out, /Client registration/);
+        assertMatch(
+            out, /id="default-organization"/,
+        );
     },
 );

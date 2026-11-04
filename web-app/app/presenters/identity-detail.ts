@@ -37,6 +37,7 @@ export interface IdentityDetailView {
     readonly pii: MemberPii;
     readonly service: ServiceFacet;
     readonly registration: ClientRegistration;
+    readonly defaultOrganization?: SafeHtml;
 }
 
 function buildShell(container: HTMLElement): void {
@@ -261,6 +262,22 @@ function buildEraseButton(): SafeHtml {
         </button>`;
 }
 
+function identityCardsHtml(
+    view: IdentityDetailView,
+): SafeHtml {
+    const cards = view.identity.isPerson()
+        ? html`${buildPersonalInfoCard(view)}${
+            buildLinksCard(view)}`
+        : html`${buildRegistrationCard(view)}${
+            buildLinksCard(view)}`;
+    const field = view.defaultOrganization;
+    if (
+        field === undefined
+        || field.toString() === ''
+    ) return cards;
+    return html`${cards}${field}`;
+}
+
 export class IdentityDetailPresenter {
     readonly #view: IdentityDetailView;
 
@@ -293,13 +310,7 @@ export class IdentityDetailPresenter {
         mutateSlot(
             container,
             '.identity-cards-slot',
-            this.#view.identity.isPerson()
-                ? html`
-                    ${buildPersonalInfoCard(this.#view)}
-                    ${buildLinksCard(this.#view)}`
-                : html`
-                    ${buildRegistrationCard(this.#view)}
-                    ${buildLinksCard(this.#view)}`,
+            identityCardsHtml(this.#view),
         );
     }
 }
