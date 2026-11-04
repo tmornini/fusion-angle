@@ -63,11 +63,13 @@ function initSidebar(): void {
     );
 }
 
-// Bind every [data-signout] control (both the desktop and the
-// mobile sidebar carry one). The server revoke is best-effort:
-// postSessionLogout always scrubs the local session in its
-// finally, so we navigate to the login page regardless — a
-// failed revoke is logged, never a reason to strand the user.
+// Bind every [data-signout] control. The desktop top
+// bar and the mobile header each carry one, last in
+// .header-actions. The server revoke is best-effort:
+// postSessionLogout always scrubs the local session
+// in its finally, so we navigate to the login page
+// regardless — a failed revoke is logged, never a
+// reason to strand the user.
 function initSignOut(): void {
     const signOut = async (): Promise<void> => {
         try {

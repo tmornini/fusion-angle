@@ -44,8 +44,14 @@ Deno.test(
                 false,
             );
         }
-        assertMatch(desktop, /data-signout/);
-        assertMatch(mobile, /data-signout/);
+        assertStrictEquals(
+            desktop.includes('data-signout'),
+            false,
+        );
+        assertStrictEquals(
+            mobile.includes('data-signout'),
+            false,
+        );
     },
 );
 
@@ -140,6 +146,139 @@ Deno.test(
                 + ' \\{ display: none; \\}',
             ),
         );
+    },
+);
+
+function count(src: string, needle: string): number {
+    return src.split(needle).length - 1;
+}
+
+Deno.test(
+    'Sign out is the last control in both headers',
+    () => {
+        const top = read(
+            'web-app/app/component-top-bar.html',
+        );
+        const mobile = read(
+            'web-app/app/component-mobile-header.html',
+        );
+        assertStrictEquals(count(top, 'data-signout'), 1);
+        assertStrictEquals(
+            count(mobile, 'data-signout'), 1,
+        );
+        assertMatch(top, />Sign out</);
+        assertMatch(mobile, />Sign out</);
+        assert(
+            at(top, 'invitations-bell')
+            < at(top, 'data-signout'),
+        );
+        assert(
+            at(mobile, 'mobile-sidebar-open')
+            < at(mobile, 'mobile-header-title'),
+        );
+        assert(
+            at(mobile, 'mobile-header-title')
+            < at(mobile, 'mobile-header-organization'),
+        );
+        assert(
+            at(mobile, 'mobile-header-organization')
+            < at(mobile, 'mobile-search-toggle'),
+        );
+        assert(
+            at(mobile, 'mobile-search-toggle')
+            < at(mobile, 'data-signout'),
+        );
+    },
+);
+
+Deno.test(
+    'Sign out leaves both sidebars',
+    () => {
+        const desktop = read(
+            'web-app/app/component-sidebar.html',
+        );
+        const mobile = read(
+            'web-app/app/'
+            + 'component-mobile-sidebar.html',
+        );
+        assertStrictEquals(
+            count(desktop, 'data-signout'), 0,
+        );
+        assertStrictEquals(
+            count(mobile, 'data-signout'), 0,
+        );
+        assertStrictEquals(
+            desktop.includes('sidebar-signout'),
+            false,
+        );
+        assertStrictEquals(
+            mobile.includes('sidebar-signout'),
+            false,
+        );
+        const css = read(
+            'web-app/app/styles/layout.css',
+        );
+        assertStrictEquals(
+            css.includes('sidebar-signout'),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'Sign out wears the organization box surface',
+    () => {
+        const css = read(
+            'web-app/app/styles/layout.css',
+        );
+        const box = css.slice(
+            css.indexOf('.header-info {'),
+            css.indexOf('.header-info:empty'),
+        );
+        const signOut = css.slice(
+            css.indexOf(
+                '.header-actions [data-signout] {',
+            ),
+            css.indexOf('.page-content {'),
+        );
+        assertStrictEquals(
+            signOut.includes(
+                'hsl(var(--muted) / 0.5)',
+            ),
+            true,
+        );
+        assertStrictEquals(
+            signOut.includes(
+                'hsl(var(--border) / 0.5)',
+            ),
+            true,
+        );
+        assertStrictEquals(
+            box.includes('hsl(var(--muted) / 0.5)'),
+            true,
+        );
+        assertStrictEquals(
+            box.includes('hsl(var(--border) / 0.5)'),
+            true,
+        );
+    },
+);
+
+Deno.test(
+    'Sign out still revokes and then opens auth',
+    () => {
+        const src = read('web-app/app/layout.ts');
+        assertMatch(
+            src,
+            /postSessionLogout\(sessionContext\(\)\)/,
+        );
+        assertMatch(
+            src,
+            /log\.warn\('sign-out revoke failed'/,
+        );
+        assertMatch(src, /finally \{/);
+        assertMatch(src, /navigateTo\('auth'\)/);
+        assertMatch(src, /\$\$\('\[data-signout\]'/);
     },
 );
 

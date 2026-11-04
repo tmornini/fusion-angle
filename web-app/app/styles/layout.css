@@ -138,8 +138,6 @@ html.sidebar-collapsed .sidebar {
     flex-shrink: 0;
     color: hsl(var(--primary));
 }
-.sidebar-collapsed .sidebar-signout-text { display: none; }
-.sidebar-collapsed .sidebar-signout { justify-content: center; }
 
 /* Main content area */
 .main-content {
@@ -239,6 +237,13 @@ html.sidebar-collapsed .main-content {
     gap: var(--space-2);
 }
 
+/* Sign out wears the organization box. */
+.header-actions [data-signout] {
+    background-color: hsl(var(--muted) / 0.5);
+    border-color: hsl(var(--border) / 0.5);
+    color: hsl(var(--foreground));
+}
+
 .page-content {
     flex: 1;
     padding: var(--space-8);
@@ -296,12 +301,6 @@ html.sidebar-collapsed .main-content {
     .main-content .page-content {
         padding: var(--space-4);
     }
-}
-
-/* Sidebar sign-out link */
-.sidebar-signout {
-    justify-content: flex-start;
-    color: hsl(var(--muted-foreground));
 }
 
 /* -- Named Grid Layouts ---------------------- */
