@@ -3598,11 +3598,6 @@ Off the critical path; each with its oracle.
   `service-member-detail.ts:62`). Share the member
   detail chrome. Oracle: one definition of each
   remains under `web-app/app/presenters/`.
-- `required` sits on the service fields only
-  (`web-app/members/index.html:318,331`); the dialog
-  has no form submit, and the siblings carry none.
-  Oracle: the attribute is on all the dialogs' fields
-  or none, and the page check is the one gate.
 - Tests: no client-verb pin that a second
   `postAIMemberCreation` of one id is 409;
   `tests/api-memberships.test.ts:727-810` never
@@ -3625,15 +3620,6 @@ Off the critical path; each with its oracle.
   owner keeps 0.3 and deletes this bullet, or a
   `.input:focus-visible` rule carries 0.3 and
   `.input:focus` 0.2.
-- A disabled hero button can never be hovered.
-  `.btn:disabled` sets `pointer-events: none`
-  (`web-app/app/styles/components-buttons.css:59-62`),
-  so `.btn-hero:disabled`'s `cursor: not-allowed`
-  (`:164-168`) never shows, and the dark-only
-  hover-glow fold changes nothing visible. Oracle: the
-  dead `cursor` declaration is gone, or
-  `pointer-events: none` is, with the hover glow
-  guarded by `:not(:disabled)`.
 - DESIGN-SYSTEM.md:170 names the cascade's builder
   `./build`; the script is `./bin/build`. Oracle:
   `grep -n '\./build' DESIGN-SYSTEM.md` is empty.
