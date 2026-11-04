@@ -149,11 +149,47 @@ Deno.test(
 Deno.test('build entry carries the git sha', () => {
     assertMatch(
         BUILD_SCRIPT,
-        /GIT_SHA="\$\(git rev-parse HEAD\)"/,
+        /GIT_SHA="\$\(git rev-parse HEAD 2>\/dev\/null \|\| true\)"/,
+    );
+    assertMatch(
+        BUILD_SCRIPT,
+        /GIT_SHA="\$\{RENDER_GIT_COMMIT:-\}"/,
+    );
+    assertMatch(
+        BUILD_SCRIPT,
+        /Error: no commit SHA to embed\./,
     );
     assertMatch(
         BUILD_SCRIPT,
         /Deno\.args,\n    '\$\{GIT_SHA\}',/,
+    );
+    const compileAt = BUILD_SCRIPT.indexOf(
+        'deno compile',
+    );
+    const refuseAt = BUILD_SCRIPT.indexOf(
+        'Error: no commit SHA to embed.',
+    );
+    assertStrictEquals(refuseAt < compileAt, true);
+    const docker = Deno.readTextFileSync('Dockerfile');
+    const runtimeAt = docker.indexOf(
+        'FROM denoland/deno:2.9.8 AS runtime',
+    );
+    const builder = docker.slice(0, runtimeAt);
+    assertMatch(builder, /\nARG RENDER_GIT_COMMIT\n/);
+    const argAt = builder.indexOf(
+        'ARG RENDER_GIT_COMMIT',
+    );
+    const buildAt = builder.indexOf(
+        'RUN ./bin/build --no-zip render-out/',
+    );
+    assertStrictEquals(
+        argAt > 0 && argAt < buildAt, true,
+    );
+    assertEquals(
+        docker.slice(runtimeAt).includes(
+            'RENDER_GIT_COMMIT',
+        ),
+        false,
     );
 });
 

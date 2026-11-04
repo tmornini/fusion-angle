@@ -1,4 +1,5 @@
 FROM denoland/deno:2.9.8 AS builder
+ARG RENDER_GIT_COMMIT
 WORKDIR /srv
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
