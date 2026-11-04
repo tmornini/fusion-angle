@@ -98,8 +98,7 @@ function buildTitleSection(
             : UNNAMED_SERVICE_NAME);
     return html`
         <div class="${
-            'flex flex-wrap items-center'
-            + ' gap-3 mb-2'
+            'flex flex-wrap items-center gap-3'
         }">
             <h1 class="${
                 'text-xl font-display font-bold'
@@ -109,10 +108,7 @@ function buildTitleSection(
             <span class="badge badge-secondary text-xs">
                 ${KIND_LABEL[kind]}
             </span>
-        </div>
-        <p class="text-sm text-muted">
-            ${view.identity.idForLink()}
-        </p>`;
+        </div>`;
 }
 
 function buildBio(value: string): SafeHtml {

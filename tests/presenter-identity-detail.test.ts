@@ -112,13 +112,15 @@ function personPresenter(
 }
 
 Deno.test(
-    'person detail renders id, Person badge, and'
+    'person detail renders the Person badge and'
     + ' personal-info fields',
     () => {
         const rec = makeRecordingContainer();
         personPresenter().renderShell(rec.container);
         const out = rec.allHtml();
-        assertMatch(out, /pnXmXrxOWayANgDLdCjuBw/);
+        assertNotMatch(
+            out, />\s*pnXmXrxOWayANgDLdCjuBw\s*</,
+        );
         assertMatch(out, /Person/);
         assertMatch(out, /Personal Information/);
         assertMatch(out, /Ada Lovelace/);
@@ -206,9 +208,11 @@ Deno.test(
         const out = rec.allHtml();
         assertMatch(out, new RegExp(UNNAMED_SERVICE_NAME));
         assertNotMatch(out, /Credentials/);
-        // The id is the subtitle, never the heading.
         assertNotMatch(
             out, /<h1[^>]*>\s*BhdhBLQPyktOCbdJzGsggg/,
+        );
+        assertNotMatch(
+            out, />\s*BhdhBLQPyktOCbdJzGsggg\s*</,
         );
     },
 );

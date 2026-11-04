@@ -5935,7 +5935,7 @@ FSM, unlike `flows/detail`).
   (`.card[data-identity-id]`). PASS: navigates to
   `identities/detail.html?identityId=<id>`, which
   renders the back button (`#identity-back-btn`), the
-  name + a kind badge + the id, a "Personal Information"
+  name + a kind badge, a "Personal Information"
   card (Name/Email/Phone/Bio — each empty field rendered
   as "—" via `DISPLAY_ABSENT`), a "Connections" card
   (Identity Providers / Tokens buttons), and — for a
@@ -5947,7 +5947,7 @@ FSM, unlike `flows/detail`).
   `web-app/identities/detail.ts`,
   `web-app/app/presenters/identity-detail.ts`.
   Pin: tests/presenter-identity-detail.test.ts 'person
-       detail renders id, Person badge, and personal-info
+       detail renders the Person badge and personal-info
        fields' (decides the back button, the Personal
        Information card, and the Providers/Tokens links for
        a person); tests/presenter-identity-detail.test.ts
