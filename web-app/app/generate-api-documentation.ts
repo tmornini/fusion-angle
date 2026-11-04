@@ -4,7 +4,11 @@
 // Output is deterministic — no clocks, no randomness,
 // stable ordering — so `--check` can gate staleness.
 import { dirname, join } from '@std/path';
-import { conditionalOf, routes } from '../../api/routes.ts';
+import {
+    conditionalOf,
+    postWorkOrderCreationOp,
+    routes,
+} from '../../api/routes.ts';
 import type {
     Conditional,
     Route,
@@ -33,6 +37,11 @@ import { FAMILY_REGISTRY } from
     '../../api/family-registry.ts';
 import { INVITATION_STATES } from
     '../../shared/types.ts';
+import {
+    HTTP_CREATED,
+    HTTP_NO_CONTENT,
+    HTTP_OK,
+} from '../../shared/http-errors.ts';
 
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
@@ -507,6 +516,30 @@ const WRITE_EXAMPLES = new Map<string, unknown>([
         },
     ),
     writeExample(
+        'post',
+        '/organizations/:id/memberships/',
+        {
+            id: 'id',
+            kind: 'human',
+            membership: {
+                type: 'member',
+                at: AT,
+            },
+            identity: {
+                title: 'Engineer',
+                department: 'Product',
+                strengths: ['Leadership'],
+                team_dimensions: { driver: 60 },
+            },
+            pii: {
+                name: 'name',
+                email: 'email',
+                phone: 'phone',
+                bio: 'bio',
+            },
+        },
+    ),
+    writeExample(
         'put',
         '/organizations/:id/invitations/:membership-id',
         invitationTransition('revoked'),
@@ -658,6 +691,68 @@ function familyHoldsDeletedHead(family: string): boolean {
     });
 }
 
+function handlerSource(
+    row: Route,
+    verb: HttpVerb,
+): string | undefined {
+    const fn = verb === 'post'
+        ? row.post
+        : verb === 'put'
+            ? row.put
+            : verb === 'patch'
+                ? row.patch
+                : undefined;
+    if (fn === undefined) return undefined;
+    return fn.toString();
+}
+
+// formStateWrite stores HTTP_CREATED when the answer
+// kind is 'created'. The route handler is that write,
+// or it adapts the signature and calls the write.
+// postWorkOrderCreationOp is the one such call: the
+// created answer is in the function, not the adapter.
+function answersCreated(source: string): boolean {
+    if (source.includes("kind: 'created'")) return true;
+    const delegated = 'postWorkOrderCreationOp(';
+    return source.includes(delegated)
+        && postWorkOrderCreationOp.toString()
+            .includes("kind: 'created'");
+}
+
+// A return of some other call is a second success:
+// the record-type edit, or the invitation head served
+// again (HTTP_OK). Landing the created write is not.
+function alsoAnswersOk(source: string): boolean {
+    const calls = source.matchAll(
+        /return\s+([A-Za-z_$][\w$]*)\s*\(/gu,
+    );
+    for (const match of calls) {
+        const name = match[1];
+        if (
+            name !== undefined
+            && name !== 'landStateWrite'
+            && name !== 'runStateWrite'
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function successCodes(
+    row: Route,
+    verb: HttpVerb,
+): number[] {
+    if (verb === 'delete') return [HTTP_NO_CONTENT];
+    const source = handlerSource(row, verb);
+    if (source === undefined) return [HTTP_OK];
+    if (!answersCreated(source)) return [HTTP_OK];
+    const codes: number[] = [];
+    if (alsoAnswersOk(source)) codes.push(HTTP_OK);
+    codes.push(HTTP_CREATED);
+    return codes;
+}
+
 function statusCodesFor(
     row: Route,
     verb: HttpVerb,
@@ -665,8 +760,9 @@ function statusCodesFor(
     const codes: number[] = [];
     const uri = uriOf(row);
     const selects = verb === 'get' && row.select !== undefined;
-    if (verb === 'delete') codes.push(204);
-    else codes.push(200);
+    for (const code of successCodes(row, verb)) {
+        codes.push(code);
+    }
     // A collection that selects no head answers 204.
     // A versions/ list never does: a written document
     // has a PUT.
@@ -867,7 +963,7 @@ export function verbRoomHtml(
         '<h2>Request body</h2>',
     ];
     if (body === 'none' && write) {
-        lines.push('<!-- no gate validator yet -->');
+        lines.push('<!-- no gate validator -->');
     }
     if (body === 'none') {
         lines.push('<pre>none</pre>');

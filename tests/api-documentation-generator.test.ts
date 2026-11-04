@@ -404,3 +404,64 @@ Deno.test('a stored pair\'s 2xx names the three lines'
         );
     }
 });
+
+Deno.test('a created answer is 201, and memberships'
+    + ' name the body the handler validates', () => {
+    const rooms = generateAll();
+    const createdOnly = [
+        '/identities/',
+        '/organizations/:id/flows/',
+        '/organizations/:id/work-orders/',
+        '/organizations/:id/objectives/',
+        '/organizations/:id/memberships/',
+    ];
+    for (const uri of createdOnly) {
+        const codes = statusesOf(rooms, 'post', uri);
+        assert(
+            codes.includes('201'),
+            uri + ' ' + codes.join(','),
+        );
+        assert(
+            !codes.includes('200'),
+            uri + ' ' + codes.join(','),
+        );
+    }
+    const createdAndOk = [
+        '/organizations/:id/invitations/',
+        '/organizations/:organization-id/'
+            + 'record-types/',
+    ];
+    for (const uri of createdAndOk) {
+        const codes = statusesOf(rooms, 'post', uri);
+        assert(
+            codes.includes('200') && codes.includes('201'),
+            uri + ' ' + codes.join(','),
+        );
+    }
+    const membership = roomHtmlOf(
+        rooms, 'post',
+        '/organizations/:id/memberships/',
+    );
+    assert(membership);
+    assert(membership.includes('"kind": "human"'));
+    assert(
+        statusesOf(
+            rooms, 'post',
+            '/organizations/:id/memberships/',
+        ).includes('400'),
+    );
+    assert(!membership.includes('no gate validator'));
+    for (const uri of [
+        '/identities/:id/tokens/:jti/rotation',
+        '/identities/:id/tokens/:jti/revocation',
+    ]) {
+        const html = roomHtmlOf(rooms, 'post', uri);
+        assert(html, uri);
+        assert(html.includes('<!-- no gate validator -->'));
+        assert(!html.includes('yet'));
+        assert(
+            statusesOf(rooms, 'post', uri).includes('200'),
+            uri,
+        );
+    }
+});

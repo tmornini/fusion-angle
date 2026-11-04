@@ -2065,7 +2065,7 @@ export const API_DOC_ROOMS:
         ],
         statuses:
         [
-            '200',
+            '201',
             '400',
             '401',
             '404',
@@ -2141,7 +2141,7 @@ export const API_DOC_ROOMS:
         ],
         statuses:
         [
-            '200',
+            '201',
             '400',
             '401',
             '403',
@@ -2230,6 +2230,7 @@ export const API_DOC_ROOMS:
         statuses:
         [
             '200',
+            '201',
             '400',
             '401',
             '403',
@@ -2241,7 +2242,14 @@ export const API_DOC_ROOMS:
         hash: 'post/organizations/id/memberships',
         verb: 'POST',
         uri: '/api/organizations/:id/memberships/',
-        body: 'none',
+        body:
+            '{\n  "id": "id",\n  "kind": "human",\n  "membership": {\n    "t'
+            + 'ype": "member",\n    "at": "2020-01-01T00:00:00.000Z"\n  },\n'
+            + '  "identity": {\n    "title": "Engineer",\n    "department": '
+            + '"Product",\n    "strengths": [\n      "Leadership"\n    ],\n '
+            + '   "team_dimensions": {\n      "driver": 60\n    }\n  },\n  "'
+            + 'pii": {\n    "name": "name",\n    "email": "email",\n    "pho'
+            + 'ne": "phone",\n    "bio": "bio"\n  }\n}',
         headers:
         [
             'Authorization: Bearer …',
@@ -2255,7 +2263,8 @@ export const API_DOC_ROOMS:
         ],
         statuses:
         [
-            '200',
+            '201',
+            '400',
             '401',
             '403',
             '404',
@@ -2282,7 +2291,7 @@ export const API_DOC_ROOMS:
         ],
         statuses:
         [
-            '200',
+            '201',
             '400',
             '401',
             '403',
@@ -2313,7 +2322,7 @@ export const API_DOC_ROOMS:
         ],
         statuses:
         [
-            '200',
+            '201',
             '400',
             '401',
             '403',
@@ -2375,6 +2384,7 @@ export const API_DOC_ROOMS:
         statuses:
         [
             '200',
+            '201',
             '400',
             '401',
             '403',
