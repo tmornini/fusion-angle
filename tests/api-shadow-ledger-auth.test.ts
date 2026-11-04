@@ -355,7 +355,7 @@ Deno.test('a wrong password stores no NEW pair beyond the'
                 pkce.code_challenge_method,
         }));
     assertStrictEquals(res.status, 401);
-    // 3: the fixture's own identity + pii + credential pairs
+    // 4: nil root + identity + pii + credential pairs
     // (seedPersonIdentity/seedIdentityCredential) — the failed
     // attempt itself appends no further pair.
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -409,7 +409,7 @@ Deno.test('an unsupported grant_type stores no NEW pair beyond the'
     const res = await handleRequest(db, jsonPost(
         'authentication/token', { grant_type: 'wat' }));
     assertStrictEquals(res.status, 400);
-    // 3: the fixture's own identity + pii + credential pairs
+    // 4: nil root + identity + pii + credential pairs
     // (seedPersonIdentity/seedIdentityCredential) — the rejected
     // grant itself appends no further pair.
     assertStrictEquals((await db.messagePairs.getAll()).length, 4);
@@ -495,8 +495,8 @@ Deno.test('a token-exchange grant stores its own pair with live'
     const requests = await db.messagePairs.getAll();
     const responses = await db.messagePairs.getAll();
 
-    // 7: the fixture's own identity + pii + credential pairs
-    // (3) + seedRootAdmin's 2 fixture pairs + the exchange's
+    // 8: nil root + identity + pii + credential (4)
+    // + seedRootAdmin's 2 fixture pairs + the exchange's
     // own event pair (Phase 13 Task 5: issueTokenPair's root
     // gains its own pair at the row's document) + its operation
     // pair.

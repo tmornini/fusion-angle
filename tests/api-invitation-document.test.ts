@@ -138,11 +138,11 @@ async () => {
     const res = await invite(db);
     assertStrictEquals(res.status, 201);
     const requests = await db.messagePairs.getAll();
-    // 8: the fixture's own membership pair (Phase 13 Task 1;
-    // role-grant retired), two seeded people (an identities/:id
-    // document and its pii document each), the
-    // organizations/:id document (Stage B), and the grant's own
-    // 2 pairs.
+    // 9: nil root + the fixture's own membership pair
+    // (Phase 13 Task 1; role-grant retired), two seeded
+    // people (an identities/:id document and its pii
+    // document each), the organizations/:id document
+    // (Stage B), and the grant's own 2 pairs.
     assertStrictEquals(requests.length, 9);
     const pairsAt = requests.filter(
         r => r.path === '/invitations/'

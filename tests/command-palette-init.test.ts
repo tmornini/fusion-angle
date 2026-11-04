@@ -11,11 +11,9 @@ import { withLocalStorageAsync } from
 // absent schema surfaces as an unhandled rejection
 // here. This test stubs the minimum DOM/storage
 // surface initCommandPalette touches, points the
-// global adapter at a pristine in-memory tier
-// (this file installs no client facade), and asserts
-// the
-// call completes without throwing — guarding
-// against a regression to eager loading.
+// global adapter at a pristine in-memory tier, and
+// asserts the call completes without throwing —
+// guarding against a regression to eager loading.
 Deno.test(
     'initCommandPalette does not throw'
     + ' when schema is absent',

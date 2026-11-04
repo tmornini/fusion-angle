@@ -1,4 +1,4 @@
-// Throwaway probe 3: the three list shapes, raw and gzipped, with
+// Throwaway probe 4: the three list shapes, raw and gzipped, with
 // realistic per-item ids (constant placeholders would flatter gzip).
 import { seededMockDb } from
     '../../../tests/mock-seed.ts';
