@@ -6,7 +6,8 @@ Claude Code reads it through `CLAUDE.md`, a one-line
 
 ```bash
 ./test                 # memory suite
-./test validate        # Layer 1 (SHA skip on clean HEAD)
+./test validate        # Layer 1, after the squash
+./test validate --syntax # per-commit deno check
 ./test validate browser  # Layer 2
 ./test postgres        # AT4; own Docker Postgres
 ./test browser         # AT5; Chrome, in-process memory
@@ -48,8 +49,11 @@ no `node` binary on `PATH` at all.
 
 **Commit before building.** `./bin/build` and `./deploy`
 require a clean working directory.
-Run `./test validate` to catch type errors and lint issues;
-commit; then build or deploy.
+Each commit on a development branch runs
+`./test validate --syntax`. Squash that branch to one
+commit per feature, run `./test validate`, then merge
+`--no-ff`. Run `./test validate browser` before a
+build, a deploy, or a walk.
 
 `./bin/serve` needs `POSTGRES_URL` and
 `JWT_HMAC_SIGNING_KEY` already set;
@@ -165,7 +169,12 @@ It is not part of `./test validate`; `./deploy --local`
 runs it after `./test postgres`.
 
 Three layers verify this product. Layer 1 is
-`./test validate`, the gate on every commit. Layer 2 is
+`./test validate`, run after the branch is squashed to
+one commit per feature and before the `--no-ff` merge.
+Each commit before that squash runs
+`./test validate --syntax`, which is `deno check
+--frozen` and does not write the validate stamp.
+Layer 2 is
 `./test validate browser` — Layer 1 then `./test browser`
 — the operator's gate before `./bin/build`, a deploy, or
 a walk. Layer 3 is the serial walk
@@ -213,10 +222,12 @@ plan (`<slug>.md`), and spec (`<slug>-design.md`).
 ```bash
 git worktree add .worktrees/<slug> -b <slug>
 cd .worktrees/<slug>
-git rebase master     # amend until every commit is green
-./test validate        # ./test validate browser before a build or walk
-cd -                  # the main checkout
-git merge --no-ff <slug>  # write the merge message
+git rebase master          # onto current master
+./test validate --syntax   # gate for each commit
+# squash to one commit per feature, local only, then:
+./test validate            # Layer 1
+cd -                       # the main checkout
+git merge --no-ff <slug>   # write the merge message
 git worktree remove .worktrees/<slug> && git branch -d <slug>
 ```
 

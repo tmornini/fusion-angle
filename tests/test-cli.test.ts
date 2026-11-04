@@ -90,8 +90,32 @@ Deno.test('test memory does not SHA-skip', () => {
 Deno.test('test dispatcher names combinations', () => {
     const src = Deno.readTextFileSync('test');
     assertMatch(src, /validate browser/);
+    assertMatch(src, /validate \[--syntax\]/);
     assertNotMatch(src, /VALIDATE_OK/);
     assertNotMatch(src, /validate-ok/);
+});
+
+Deno.test('validate --syntax is check and does not stamp',
+() => {
+    const src = Deno.readTextFileSync('test');
+    const at = src.indexOf('"$1" = "--syntax"');
+    assert(at >= 0, '--syntax branch missing');
+    const end = src.indexOf('elif', at);
+    assert(end > at, '--syntax branch unclosed');
+    const branch = src.slice(at, end);
+    assertMatch(branch, /run_check/);
+    assertNotMatch(branch, /run_memory/);
+    assertNotMatch(branch, /run_validate/);
+    assertNotMatch(branch, /most-recently-validated-sha/);
+});
+
+Deno.test('validate --syntax rejects an extra argument',
+async () => {
+    const result = await runTest([
+        'validate', '--syntax', 'browser',
+    ]);
+    assertStrictEquals(result.status, 1);
+    assertMatch(result.stderr, /Usage: \.\/test/);
 });
 
 Deno.test(

@@ -10,7 +10,7 @@ Usage: ./test [memory]
        ./test api-docs
        ./test postgres
        ./test browser
-       ./test validate
+       ./test validate [--syntax]
        ./test validate browser
        ./test validate postgres
 USAGE
@@ -295,6 +295,10 @@ case "${1:-memory}" in
         shift
         if [ $# -eq 0 ]; then
             run_validate
+        elif [ $# -eq 1 ] && [ "$1" = "--syntax" ]; then
+            # Check only. A syntax pass must not
+            # stamp, or the next full validate skips.
+            run_check
         elif [ $# -eq 1 ] && [ "$1" = "browser" ]; then
             run_validate
             exec "$ROOT/bin/test-browser"

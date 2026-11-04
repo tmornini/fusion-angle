@@ -9,7 +9,7 @@ is exploration, and nothing rides on its result.
 
 | Layer | Command | Standing |
 |---|---|---|
-| 1 | `./test validate` | Gate: every commit |
+| 1 | `./test validate` | Gate: before `--no-ff`, after one commit per feature. Per commit: `./test validate --syntax` |
 | 2 | `./test validate browser` | Gate: before a build, a deploy, or a walk; `./deploy --local` enforces it |
 | 3 | `./deploy --local 8080 --postgres mock-data` then the walk | Exploration |
 
