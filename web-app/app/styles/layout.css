@@ -112,7 +112,7 @@ html.sidebar-collapsed .sidebar {
 .sidebar-collapsed .sidebar-nav-text { display: none; }
 
 .sidebar-footer {
-    padding: var(--space-4);
+    padding: var(--space-2) var(--space-4);
     border-top: 1px solid hsl(var(--border));
 }
 
@@ -124,7 +124,6 @@ html.sidebar-collapsed .sidebar {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-3);
 }
 
 .sidebar-avatar {
