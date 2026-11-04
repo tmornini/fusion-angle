@@ -9,11 +9,66 @@ const TWO = [
     { id: 'BBjWJsjYIDkTRKIIPrzWRw', name: 'Wayne' },
 ];
 
-Deno.test('organizationSwitcherHtml renders a set-as-default control', () => {
-    const out = organizationSwitcherHtml(TWO).toString();
-    assertMatch(out, /class="org-set-default"/);
-    assertMatch(out, /Set as default/);
-});
+Deno.test(
+    'organizationSwitcherHtml renders the switcher',
+    () => {
+        const out = organizationSwitcherHtml(TWO)
+            .toString();
+        assertMatch(out, /class="org-switcher"/);
+        assertMatch(
+            out,
+            /aria-label="Switch organization"/,
+        );
+        assertStrictEquals(
+            out.includes('org-set-default'),
+            false,
+        );
+        assertStrictEquals(
+            out.includes('Set as default'),
+            false,
+        );
+        assertStrictEquals(
+            out.includes('org-switcher-group'),
+            false,
+        );
+    },
+);
+
+Deno.test(
+    'the switcher module does not set a default',
+    () => {
+        const src = Deno.readTextFileSync(
+            'web-app/app/organization-switcher.ts',
+        );
+        assertStrictEquals(
+            src.includes('org-set-default'),
+            false,
+        );
+        assertStrictEquals(
+            src.includes('Set as default'),
+            false,
+        );
+        assertStrictEquals(
+            src.includes(
+                'putIdentityDefaultOrganization',
+            ),
+            false,
+        );
+        assertMatch(src, /\$\$\('\.org-switcher'/);
+        const css = Deno.readTextFileSync(
+            'web-app/app/styles/'
+            + 'components-organization-switcher.css',
+        );
+        assertStrictEquals(
+            css.includes('org-set-default'),
+            false,
+        );
+        assertStrictEquals(
+            css.includes('org-switcher-group'),
+            false,
+        );
+    },
+);
 
 Deno.test('organizationSwitcherHtml renders an option per org', () => {
     const out = organizationSwitcherHtml(TWO).toString();

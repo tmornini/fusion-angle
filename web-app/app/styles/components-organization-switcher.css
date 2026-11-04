@@ -1,8 +1,20 @@
-/* Org switcher: a native <select> in the sidebar footer, shown
-    only when the member can reach two or more orgs. */
+/* Current-organization menu: a native select, shown
+    only when the caller can reach two or more
+    organizations. The UA box is taller than the
+    header line, and its disclosure sits on the
+    right edge, so the control is the line height
+    and the mark is drawn one space in. */
 .org-switcher {
+    appearance: none;
+    -webkit-appearance: none;
+    height: calc(
+        var(--text-sm) * var(--leading-normal)
+    );
     margin-left: var(--space-2);
-    padding: var(--space-1) var(--space-2);
+    padding: 0 var(--space-2);
+    /* Inset, both strokes, and the gap before
+        the label. */
+    padding-inline-end: calc(var(--space-2) * 4);
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     background-color: hsl(var(--secondary));
@@ -10,7 +22,30 @@
     font: inherit;
     font-size: var(--text-sm);
     font-weight: var(--font-weight-medium);
+    /* Content box: the line, less the borders. */
+    line-height: calc(
+        var(--text-sm) * var(--leading-normal) - 2px
+    );
     cursor: pointer;
+    background-image:
+        linear-gradient(
+            45deg,
+            transparent 40%,
+            hsl(var(--muted-foreground)) 40% 60%,
+            transparent 60%
+        ),
+        linear-gradient(
+            135deg,
+            transparent 40%,
+            hsl(var(--muted-foreground)) 40% 60%,
+            transparent 60%
+        );
+    background-repeat: no-repeat;
+    /* The strokes overlap 1px so the vertex joins. */
+    background-position:
+        right calc(var(--space-2) * 2 - 1px) center,
+        right var(--space-2) center;
+    background-size: var(--space-2) var(--space-2);
 }
 
 .org-switcher:focus-visible {
@@ -18,50 +53,7 @@
     outline-offset: 2px;
 }
 
-/* The select + "Set as default" button cluster. */
-.org-switcher-group {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-}
-
-/* "Set as default" — a quiet button beside the switcher. */
-.org-set-default {
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
-    background-color: hsl(var(--secondary));
-    color: hsl(var(--foreground));
-    font: inherit;
-    font-size: var(--text-sm);
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-}
-
-.org-set-default:hover {
-    background-color: hsl(var(--secondary-hover));
-}
-
-.org-set-default:focus-visible {
-    outline: 2px solid hsl(var(--ring, var(--border)));
-    outline-offset: 2px;
-}
-
-/* In the narrow sidebar footer the cluster stacks full-width:
-    the select over the quiet "Set as default" button. */
-.sidebar-org-switcher {
-    margin-top: var(--space-2);
-}
-.sidebar-org-switcher .org-switcher-group {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
-}
-.sidebar-org-switcher .org-switcher {
+#header-stats .org-switcher,
+#mobile-header-organization .org-switcher {
     margin-left: 0;
-    width: 100%;
-}
-.sidebar-collapsed .sidebar-org-switcher {
-    display: none;
 }
