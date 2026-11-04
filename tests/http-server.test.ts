@@ -8,8 +8,11 @@ import {
 import { join } from '@std/path';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
+    HTTP_INTERNAL_ERROR,
     HTTP_NOT_FOUND,
+    HTTP_OK,
     HTTP_PAYLOAD_TOO_LARGE,
+    HTTP_SERVICE_UNAVAILABLE,
     HTTP_UNAUTHORIZED,
 } from '../shared/http-errors.ts';
 import {
@@ -19,6 +22,7 @@ import {
     REQUEST_BODY_MAX_BYTES,
     listenHttp,
     type HttpListener,
+    type PostgresProbe,
     type RequestHandler,
 } from '../server/http-server.ts';
 import { fetchDiscardingBody } from
@@ -27,6 +31,8 @@ import { withPerformanceNow } from
     './fixtures/performance-now.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
+import { readWorktreeGitSha } from
+    '../server/git-sha.ts';
 
 // The Office of Time: RFC-3339 zulu at the fullest
 // resolution the environment provides — six digits here.
@@ -136,6 +142,8 @@ async function withServer(
         base: string,
         logs: Record<string, unknown>[],
     ) => Promise<void>,
+    gitSha?: string,
+    postgresProbe?: PostgresProbe | null,
 ): Promise<void> {
     const root = await Deno.makeTempDir({
         prefix: 'fusion-http-',
@@ -163,6 +171,13 @@ async function withServer(
                 logs.push(line);
             },
             ...(handle !== undefined ? { handle } : {}),
+            ...(gitSha !== undefined ? { gitSha } : {}),
+            ...(postgresProbe === null
+                ? {}
+                : {
+                    postgresProbe: postgresProbe
+                        ?? (async () => true),
+                }),
         };
         listener = await listenHttp(options);
         await run(
@@ -560,3 +575,177 @@ Deno.test(
         });
     },
 );
+
+Deno.test('GET /status returns the given git sha',
+async () => {
+    const sha =
+        '0123456789abcdef0123456789abcdef01234567';
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
+    await withServer({}, handle, async (base) => {
+        const res = await fetch(base + '/status');
+        assertStrictEquals(res.status, HTTP_OK);
+        assertStrictEquals(
+            res.headers.get('cache-control'),
+            NO_STORE,
+        );
+        assertStrictEquals(
+            res.headers.get('content-type'),
+            'application/json; charset=utf-8',
+        );
+        assertEquals(
+            await res.json(),
+            {
+                'git-sha': sha,
+                up: true,
+                components: { postgres: true },
+            },
+        );
+        assertStrictEquals(
+            res.headers.get('request-id'), null,
+        );
+        assertStrictEquals(handled, 0);
+    }, sha);
+});
+
+Deno.test('GET /status reads the worktree when unset',
+async () => {
+    const expected = await readWorktreeGitSha();
+    assert(expected !== undefined, 'worktree sha');
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        assertStrictEquals(res.status, HTTP_OK);
+        assertEquals(await res.json(), {
+            'git-sha': expected,
+            up: true,
+            components: { postgres: true },
+        });
+    });
+});
+
+Deno.test('GET /status hides an unacceptable sha',
+async () => {
+    let probes = 0;
+    const probe: PostgresProbe = async () => {
+        probes += 1;
+        return true;
+    };
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        assertStrictEquals(
+            res.status, HTTP_INTERNAL_ERROR,
+        );
+        const body = await res.json() as {
+            error: string;
+        };
+        assertStrictEquals(
+            body.error, 'git sha unavailable',
+        );
+        assertEquals(
+            JSON.stringify(body).includes('nope'),
+            false,
+        );
+        assertStrictEquals(probes, 0);
+    }, 'nope', probe);
+});
+
+Deno.test('GET /status is 503 when postgres is down',
+async () => {
+    const sha =
+        '0123456789abcdef0123456789abcdef01234567';
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
+    await withServer({}, handle, async (base, logs) => {
+        const res = await fetch(base + '/status');
+        assertStrictEquals(
+            res.status, HTTP_SERVICE_UNAVAILABLE,
+        );
+        assertStrictEquals(
+            res.headers.get('cache-control'),
+            NO_STORE,
+        );
+        assertEquals(await res.json(), {
+            'git-sha': sha,
+            up: false,
+            components: { postgres: false },
+        });
+        assertStrictEquals(handled, 0);
+        const last = logs[logs.length - 1];
+        assert(last !== undefined);
+        assertStrictEquals(last['path'], '/status');
+        assertStrictEquals(last['status'], 503);
+        assertStrictEquals(last['level'], 'error');
+        assertStrictEquals(
+            last['operationId'], undefined,
+        );
+    }, sha, async () => false);
+});
+
+Deno.test('GET /status treats a thrown probe as down',
+async () => {
+    const sha =
+        '0123456789abcdef0123456789abcdef01234567';
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        assertStrictEquals(
+            res.status, HTTP_SERVICE_UNAVAILABLE,
+        );
+        assertEquals(await res.json(), {
+            'git-sha': sha,
+            up: false,
+            components: { postgres: false },
+        });
+    }, sha, () => Promise.reject(new Error('db down')));
+});
+
+Deno.test('GET /status is outside the auth throttle',
+async () => {
+    const sha =
+        '0123456789abcdef0123456789abcdef01234567';
+    await withServer({}, undefined, async (base) => {
+        for (let n = 0; n < 6; n += 1) {
+            const res = await fetch(base + '/status');
+            assertStrictEquals(res.status, HTTP_OK);
+            await res.text();
+        }
+    }, sha);
+});
+
+Deno.test('GET /status without a probe is down',
+async () => {
+    const sha =
+        '0123456789abcdef0123456789abcdef01234567';
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(base + '/status');
+        assertStrictEquals(
+            res.status, HTTP_SERVICE_UNAVAILABLE,
+        );
+        assertEquals(await res.json(), {
+            'git-sha': sha,
+            up: false,
+            components: { postgres: false },
+        });
+    }, sha, null);
+});
+
+Deno.test('POST /status is not the status document',
+async () => {
+    let probes = 0;
+    await withServer({}, undefined, async (base) => {
+        const res = await fetchDiscardingBody(
+            base + '/status',
+            { method: 'POST' },
+        );
+        assertStrictEquals(res.status, HTTP_NOT_FOUND);
+        assertStrictEquals(probes, 0);
+    }, undefined, async () => {
+        probes += 1;
+        return true;
+    });
+});

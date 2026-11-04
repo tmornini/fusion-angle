@@ -10,6 +10,7 @@ import { PostgresBackend } from
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { listenHttp } from './http-server.ts';
+import { probePostgres } from './postgres-probe.ts';
 import {
     STATEMENT_TIMEOUT_MS,
     POOL_ACQUIRE_TIMEOUT_MS,
@@ -91,6 +92,7 @@ export async function boot(
     read: EnvReader,
     argv: readonly string[],
     staticRoot: string,
+    gitSha?: string,
 ): Promise<RunningHttp> {
     if (argv.length > 0) {
         throw new Error(NO_ARGUMENTS);
@@ -120,6 +122,8 @@ export async function boot(
                     listenEnv.trustedProxyHops,
             }
             : {}),
+        ...(gitSha !== undefined ? { gitSha } : {}),
+        postgresProbe: () => probePostgres(sql),
     });
     return {
         port: listener.port,
@@ -144,12 +148,14 @@ function installSigterm(
 export async function main(
     siteRoot: URL,
     args: readonly string[],
+    gitSha?: string,
 ): Promise<number> {
     try {
         const running = await boot(
             (name) => Deno.env.get(name),
             args,
             fromFileUrl(siteRoot),
+            gitSha,
         );
         Deno.stdout.writeSync(enc.encode(
             JSON.stringify({

@@ -146,6 +146,17 @@ Deno.test(
     },
 );
 
+Deno.test('build entry carries the git sha', () => {
+    assertMatch(
+        BUILD_SCRIPT,
+        /GIT_SHA="\$\(git rev-parse HEAD\)"/,
+    );
+    assertMatch(
+        BUILD_SCRIPT,
+        /Deno\.args,\n    '\$\{GIT_SHA\}',/,
+    );
+});
+
 Deno.test('build --no-zip help names deploy', () => {
     assertMatch(
         BUILD_SCRIPT,

@@ -10,7 +10,7 @@ Usage: ./test [memory]
        ./test api-docs
        ./test postgres
        ./test browser
-       ./test validate
+       ./test validate [--syntax]
        ./test validate browser
        ./test validate postgres
 USAGE
@@ -35,11 +35,11 @@ cd "$ROOT"
 # listeners), run (the metafile test now spawns deno;
 # serve, develop, deploy, test, measure, and
 # postgres-gun CLI pins spawn those scripts;
-# test-cli's git SHA skip uses sh).
+# test-cli's SHA skip uses sh; /status reads git).
 run_memory() {
     JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
     export JWT_HMAC_SIGNING_KEY
-    ALLOW_RUN=deno,./bin/serve,./deploy,sh,./test
+    ALLOW_RUN=deno,./bin/serve,./deploy,sh,./test,git
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-wipe"
     ALLOW_RUN="$ALLOW_RUN,./bin/postgres-seed"
     ALLOW_RUN="$ALLOW_RUN,./bin/measure"
@@ -295,6 +295,10 @@ case "${1:-memory}" in
         shift
         if [ $# -eq 0 ]; then
             run_validate
+        elif [ $# -eq 1 ] && [ "$1" = "--syntax" ]; then
+            # Check only. A syntax pass must not
+            # stamp, or the next full validate skips.
+            run_check
         elif [ $# -eq 1 ] && [ "$1" = "browser" ]; then
             run_validate
             exec "$ROOT/bin/test-browser"

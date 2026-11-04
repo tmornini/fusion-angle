@@ -14,10 +14,13 @@ export const USAGE =
 export async function dispatch(
     siteRoot: URL,
     args: readonly string[],
+    gitSha?: string,
 ): Promise<number> {
     const verb = args[0];
     const rest = args.slice(1);
-    if (verb === 'serve') return serve(siteRoot, rest);
+    if (verb === 'serve') {
+        return serve(siteRoot, rest, gitSha);
+    }
     if (verb === 'seed') return seedMain(rest);
     if (verb === 'wipe') return wipeMain(rest);
     Deno.stderr.writeSync(enc.encode(USAGE));
