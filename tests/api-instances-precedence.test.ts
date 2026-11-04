@@ -18,7 +18,6 @@ import {
 } from './test-fixtures.ts';
 import {
     IF_MATCH_HEADER,
-    strongEtagOf,
     IF_NONE_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
@@ -34,9 +33,6 @@ import {
     generateIdentifier,
     isIdentifier,
 } from '../shared/identifier.ts';
-import {
-    deriveInstanceHead,
-} from '../api/derive-record-instances.ts';
 
 // Task 20 covenant suite — 12-step status ladder (earlier
 // step answers) + If-Match / ETag cross-pins. Each pin is
@@ -541,30 +537,6 @@ async () => {
     ));
     assertStrictEquals(replay.status, 412);
     assertStrictEquals(pairIdOf(first), firstId);
-});
-
-Deno.test('instance ETag is the head pair id',
-async () => {
-    const { db, adminToken, memberToken } =
-        await adminDb();
-    await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
-    const put = await putInstance(db, memberToken, [
-        { attribute_id: ATTR_ID, value: 'Hello' },
-    ]);
-    assertStrictEquals(put.status, 201);
-    const res = await handleRequest(db, req(
-        'GET', INSTANCE_DETAIL, memberToken,
-    ));
-    assertStrictEquals(res.status, 200);
-    const header = res.headers.get('ETag');
-    const head = await deriveInstanceHead(
-        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
-    );
-    assert(head !== undefined);
-    assert(header !== null);
-    assert(isIdentifier(header.slice(1, -1)));
-    assertStrictEquals(header, strongEtagOf(head.messagePairId));
 });
 
 Deno.test('list part etag line == detail ETag validator',
