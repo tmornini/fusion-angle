@@ -44,22 +44,23 @@ import {
 // path, or a document read on one (path, name). Nothing here
 // scans the ledger and nothing matches a path by pattern.
 //
-// Both pii derives read inside ONE readonly
-// db.readTransaction(...). deriveIdentityPiiRows needs the
-// snapshot: it lists the identities collection and then reads
-// one document per id, and only one snapshot makes the list and
-// its reads agree. deriveIdentityPii is a single document read
-// that no concurrent append can tear; it keeps the wrapper so
-// both pii derives read the same way.
+// deriveIdentityPiiRows and deriveIdentityPii each read
+// inside one readonly transaction. Rows needs it: the
+// identities collection and then one document per id
+// agree only as one snapshot. The single-slot read
+// cannot tear. deriveIdentityPiiOf reads one history
+// per given id inside one readonly transaction and
+// validates after that transaction returns.
 //
 // Role-grants RETIRED: membership `type` bakes claim roles at
 // mint; Gate-16 response-body deviation deleted with the family.
 //
-// Every function below reads db.messagePairs (+
+// Reads below use db.messagePairs (+
 // pickString over their decoded bodies) ONLY, mirroring api/
 // derive-members.ts and api/derive-invitations.ts. Production
 // reads this module today: the identity facet routes
-// (api/routes.ts) and api/authentication.ts.
+// (api/routes.ts), api/authentication.ts, and the
+// organization invitation reads.
 
 // ---- identity_pii — the identities collection lists the ids, --
 // ---- then one document read each; 'pii' does not pluralize as -
@@ -153,30 +154,33 @@ export async function deriveIdentityPii(
     );
 }
 
-// The given identities' live PII by id: ONE document
-// history per identity inside one readonly transaction.
-// A DELETE-head slot (erasure) or an identity with no
-// slot is absent. The transaction awaits only the
-// history reads; derive and validate run after it.
-export async function deriveIdentityPiiOf(
+// Row reads only: no derive and no validator. A caller
+// inside a transaction passes that view.
+export async function identityPiiHistories(
     db: DbAdapter,
     identityIds: ReadonlySet<Id>,
-): Promise<ReadonlyMap<Id, IdentityPiiEntity>> {
-    const histories = await db.readTransaction(
-        async (view) => {
-            const read: [Id, MessagePairEntity[]][] = [];
-            for (const identityId of identityIds) {
-                const prefix = identityPrefixFor(identityId);
-                read.push([
-                    identityId,
-                    await view.messagePairs.getDocumentHistory(
-                        prefix, PII_DOCUMENT_NAME,
-                    ),
-                ]);
-            }
-            return read;
-        },
-    );
+): Promise<[Id, MessagePairEntity[]][]> {
+    const read: [Id, MessagePairEntity[]][] = [];
+    for (const identityId of identityIds) {
+        const prefix = identityPrefixFor(identityId);
+        read.push([
+            identityId,
+            await db.messagePairs.getDocumentHistory(
+                prefix, PII_DOCUMENT_NAME,
+            ),
+        ]);
+    }
+    return read;
+}
+
+// A DELETE-head slot (erasure) or an identity with no
+// slot is absent.
+export function identityPiiFromHistories(
+    histories: readonly (readonly [
+        Id,
+        readonly MessagePairEntity[],
+    ])[],
+): ReadonlyMap<Id, IdentityPiiEntity> {
     const pii = new Map<Id, IdentityPiiEntity>();
     for (const [identityId, history] of histories) {
         const document = deriveDocumentsAt(
@@ -188,6 +192,22 @@ export async function deriveIdentityPiiOf(
         );
     }
     return pii;
+}
+
+// Live PII for the given ids. One history per identity
+// is read inside one readonly transaction. A DELETE-head
+// slot (erasure) or an identity with no slot is absent.
+// Derive and validate run after that transaction
+// returns.
+export async function deriveIdentityPiiOf(
+    db: DbAdapter,
+    identityIds: ReadonlySet<Id>,
+): Promise<ReadonlyMap<Id, IdentityPiiEntity>> {
+    return identityPiiFromHistories(
+        await db.readTransaction((view) =>
+            identityPiiHistories(view, identityIds),
+        ),
+    );
 }
 
 // ---- identity_credentials — a per-identity nested collection, --
