@@ -68,6 +68,16 @@ p { line-height: var(--leading-normal); }
 .font-display { font-family: var(--font-display); }
 .font-mono { font-family: var(--font-mono); }
 
+/* Seven digits, the ZIP's short sha. 1ch is the
+   width of 0, so a monospace face clips after
+   the seventh character. */
+.git-sha {
+    display: inline-block;
+    width: 7ch;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
 .text-2xs { font-size: var(--text-2xs); line-height: 1rem; }
 .text-xs { font-size: var(--text-xs); line-height: 1.125rem; }
 .text-sm { font-size: var(--text-sm); line-height: 1.25rem; }

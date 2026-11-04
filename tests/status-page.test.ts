@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertMatch } from '@std/assert';
 import { join } from '@std/path';
 import {
     jsonRequested,
@@ -74,17 +74,63 @@ Deno.test('the status page escapes text', () => {
         true,
     );
     assertEquals(html.includes('a<b'), false);
-    assertEquals(html.includes('Down'), true);
-    assertEquals(
-        html.includes('data-tone="error"'),
-        true,
+    const nameAt = html.indexOf(
+        '<h1 class="font-display text-3xl font-bold mb-6">\n'
+        + 'Fusion Angle\n</h1>',
     );
-    assertEquals(html.includes('Postgres down'), true);
+    const downAt = html.indexOf(
+        '<span class="pill" data-tone="error">Down</span>',
+    );
+    const postgresAt = html.indexOf(
+        '<span class="pill" data-tone="error">'
+        + 'Postgres down</span>',
+    );
+    assertEquals(nameAt >= 0, true);
+    assertEquals(downAt > nameAt, true);
+    assertEquals(postgresAt > downAt, true);
+    assertEquals(
+        html.includes(
+            '<h1 class="font-display text-4xl font-bold mb-2">\n'
+            + 'Down\n</h1>',
+        ),
+        false,
+    );
     assertEquals(
         html.includes(
             'href="/assets/styles.0123abcd.css"',
         ),
         true,
+    );
+});
+
+Deno.test('the status sha clips to seven digits', () => {
+    const css = Deno.readTextFileSync(
+        'web-app/app/styles/base.css',
+    );
+    const html = statusPageHtml(
+        '0123456789abcdef0123456789abcdef01234567',
+        { postgres: true },
+        {},
+    );
+    assertEquals(
+        html.includes('class="git-sha font-mono text-sm"'),
+        true,
+    );
+    assertMatch(
+        css,
+        /\.git-sha \{[^}]*width: 7ch;[^}]*\}/,
+    );
+    assertMatch(
+        css,
+        /\.git-sha \{[^}]*overflow: hidden;[^}]*\}/,
+    );
+    assertMatch(
+        css,
+        /\.git-sha \{[^}]*white-space: nowrap;[^}]*\}/,
+    );
+    assertMatch(
+        css,
+        /\.font-mono \{ font-family: var\(--font-mono\); \}/,
     );
 });
 
