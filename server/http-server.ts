@@ -16,6 +16,7 @@ import {
     HTTP_NOT_FOUND,
     HTTP_OK,
     HTTP_PAYLOAD_TOO_LARGE,
+    HTTP_SERVICE_UNAVAILABLE,
     HTTP_TOO_MANY_REQUESTS,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
@@ -71,6 +72,13 @@ export type RequestLog = (
     fields: Record<string, unknown>,
 ) => void;
 
+export type PostgresProbe = () => Promise<boolean>;
+
+// `up` is every key. A new component is another key.
+export interface StatusComponents {
+    readonly postgres: boolean;
+}
+
 export interface HttpListenOptions {
     readonly adapter: DbAdapter;
     readonly staticRoot: string;
@@ -81,6 +89,7 @@ export interface HttpListenOptions {
     readonly drainMs?: number;
     readonly trustedProxyHops?: string;
     readonly gitSha?: string;
+    readonly postgresProbe?: PostgresProbe;
 }
 
 export interface HttpListener {
@@ -315,6 +324,55 @@ function jsonResponse(
     });
 }
 
+function everyComponentUp(
+    components: StatusComponents,
+): boolean {
+    return Object.values(components).every(
+        (up) => up === true,
+    );
+}
+
+function statusDocument(
+    sha: string,
+    components: StatusComponents,
+): {
+    readonly status: number;
+    readonly response: Response;
+} {
+    const up = everyComponentUp(components);
+    const status = up
+        ? HTTP_OK
+        : HTTP_SERVICE_UNAVAILABLE;
+    const response = new Response(JSON.stringify({
+        'git-sha': sha,
+        up,
+        components,
+    }), {
+        status,
+        headers: {
+            'Content-Type':
+                'application/json; charset=utf-8',
+            'Cache-Control': NO_STORE,
+        },
+    });
+    return { status, response };
+}
+
+async function postgresUp(
+    probe: PostgresProbe | undefined,
+): Promise<boolean> {
+    if (probe === undefined) return false;
+    try {
+        return await probe();
+    } catch {
+        // A thrown probe is that component down.
+        // The document still answers. The error
+        // can carry a server message, so it is
+        // not logged.
+        return false;
+    }
+}
+
 function internalError(): Response {
     return jsonResponse(
         HTTP_INTERNAL_ERROR,
@@ -546,8 +604,9 @@ async function dispatch(
         const url = new URL(request.url);
         const pathname = url.pathname;
 
-        // Ahead of the API: a probe sends no
-        // operation-id and stores no pair.
+        // Ahead of the API and the auth throttle:
+        // a probe sends no operation-id, stores no
+        // pair, and is not counted toward the cap.
         if (request.method === 'GET'
             && pathname === '/status') {
             const sha = await gitShaForStatus(
@@ -561,10 +620,14 @@ async function dispatch(
                 );
                 return response;
             }
-            status = HTTP_OK;
-            response = jsonResponse(HTTP_OK, {
-                'git-sha': sha,
+            const postgres = await postgresUp(
+                options.postgresProbe,
+            );
+            const answered = statusDocument(sha, {
+                postgres,
             });
+            status = answered.status;
+            response = answered.response;
             return response;
         }
 

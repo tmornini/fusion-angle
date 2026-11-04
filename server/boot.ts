@@ -10,6 +10,7 @@ import { PostgresBackend } from
 import { connectPostgres } from
     '../api/postgres-client.ts';
 import { listenHttp } from './http-server.ts';
+import { probePostgres } from './postgres-probe.ts';
 import {
     STATEMENT_TIMEOUT_MS,
     POOL_ACQUIRE_TIMEOUT_MS,
@@ -122,6 +123,7 @@ export async function boot(
             }
             : {}),
         ...(gitSha !== undefined ? { gitSha } : {}),
+        postgresProbe: () => probePostgres(sql),
     });
     return {
         port: listener.port,

@@ -14,14 +14,14 @@ performance wait on a measurement that earns them.
 
 ## Critical product path
 
-Fifteen items, in this order — each its own brainstorm
+Fourteen items, in this order — each its own brainstorm
 → spec → plan → ship cycle, implemented sequentially, a
 dependency (`## Sequencing`) ahead of benefit over cost.
 The 0-items finish the release: the ledger's one
 deploy — `fa_` names (0e), the fence (0f),
 `FA_GIT_SHA` (0g), migrations (0h), and the wipe and
 reseed that ships them (0i). Then what a pilot
-tenant needs (4–7), the process engine and its AI
+tenant needs (5–7), the process engine and its AI
 worker on that (9–12; 11a is the assigned workbox
 pool), and two processes last (13). An
 item's number is its name, which specs, plans, and
@@ -553,33 +553,6 @@ code comments cite; specs and plans written before the
   (`WHERE path = '/invitations/'`). Oracle: every live
   database has been wiped and reseeded after the ledger
   store's landing, and holds `/migrations/0000-root`
-- **4.** `/status` health — `{ up: boolean, components:
-  { postgres: boolean } }`, 200 when every component
-  is up and 503 when any is not, built for more
-  components. `GET /status` already returns
-  `{ "git-sha": "<40 lowercase hex>" }` from the HTTP
-  adapter, ahead of the API, so a probe sends no
-  bearer and no operation-id and stores no pair. The
-  health fields are not on that body yet.
-  Unauthenticated — Render and compose probe it bare.
-  Decide: what `postgres: true` proves (a
-  `SELECT 1` on a pooled connection under its own short
-  timeout, not the 30 s statement timeout); that a read
-  stores no pair; whether the throttle counts it and
-  whether it logs. Replaces the compose healthcheck's
-  `fetch('/')`, which proves static serving only.
-  Render already writes that request log, one JSON
-  object a line: `at`, `level`, `method`, `path`,
-  `status`, `latencyMs`
-  (`server/http-server.ts:484-513`). On 2026-11-04
-  a line was `GET /`, status 200, latencyMs
-  0.433. `path` is the request path. `/` is
-  the static root, and the server serves
-  `/index.html` for it
-  (`server/http-server.ts:571-580`), so that 200
-  says the file was served. The health document
-  still has no handler. Item 6's health probe; item 13
-  answers it per process.
 - **5.** A person's first sign-in — no page mints a
   credential: the seed does
   (`formSeedCredentialMessagePairs`,
@@ -634,7 +607,7 @@ code comments cite; specs and plans written before the
   login — one that belongs to none of our roles — and
   this keeps the port out of its reach. Error logs as
   one JSON object per line, as the request log already
-  is (`server/http-server.ts:471-510`):
+  is (`server/http-server.ts:542-571`):
   `api/api.ts:322-329` ('fence read failed') and
   `:1406-1413` ('request failed') print a label, an
   object, and an
@@ -645,19 +618,19 @@ code comments cite; specs and plans written before the
   is a second writer). One request clock, read once
   at arrival and carried in the context: the edge
   stamps `performance.now()` at accept
-  (`server/http-server.ts:530`) while the api reads its
+  (`server/http-server.ts:591`) while the api reads its
   own after the body and mints `requestAt` there
   (`api/request-context.ts:85-96`); latency must be
   their difference, not a second clock. Every answer names
   its request: the edge's 413 and the throttle's 429
   are bare `jsonResponse`s with no `request-id`
-  (`server/http-server.ts:535-541`, `:589-594`), as is
+  (`server/http-server.ts:598-601`, `:678-681`), as is
   the 500 for a throw that escapes `handleRequest`,
   whose bare `catch` drops the error itself
-  (`server/http-server.ts:650-653`). An alert when
+  (`server/http-server.ts:738-741`). An alert when
   `/status` is not 200 or the error rate rises.
   `TRUSTED_PROXY_HOPS` set to Render's real hop
-  count. Consumes item 4. Includes: the throttle seam
+  count. Item 4 shipped. Includes: the throttle seam
   — a global cap if the hops are wrong, refresh and
   exchange unlimited (`tests/http-throttle.test.ts`).
 - **7.** The membership profile — an organization-side profile
@@ -1069,7 +1042,7 @@ Off the critical path; each with its oracle.
   a raw `TypeError`; a request that never answers — no
   `fetch` in the client carries a timeout or an abort
   signal; a 429 — the throttle sends no `Retry-After`
-  (`server/http-server.ts:589-593`) and the client throws
+  (`server/http-server.ts:678-681`) and the client throws
   it like any failure; a 502, 503, or 504; and an error
   body that is not JSON — `answered` reads every
   failure as `{ error }`
@@ -1283,8 +1256,8 @@ Off the critical path; each with its oracle.
   spawned server already times every request — one
   JSON line each with `method`, `path`, `status`, and
   `latencyMs`, dispatch to response construction
-  (`server/http-server.ts:477-496`; µs kept,
-  `tests/http-server.test.ts:216`, run) — and
+  (`server/http-server.ts:550-556`; µs kept,
+  `tests/http-server.test.ts:231`, run) — and
   `web-app/app/measure.ts:632` spawns it with
   `stdout: 'null'`, so every sweep discards them. Pipe
   stdout and drain it as stderr is drained
@@ -1331,7 +1304,7 @@ Off the critical path; each with its oracle.
   page script cannot read it — a same-origin `fetch` to
   `/api/authentication/token` still sends it and the
   JSON returns a live access token. CSP `script-src
-  'self'` (`server/http-server.ts:43-49`) narrows
+  'self'` (`server/http-server.ts:46-52`) narrows
   injection; it does not close cookie-use. Closes KNOWN
   seam "XSS can use the refresh cookie from the page".
   Oracle: a Layer 1 case that an unauthenticated page
@@ -3426,7 +3399,7 @@ Off the critical path; each with its oracle.
   crossing or "beyond 1M".
 - Request statistics in `./bin/measure`, with
   visualizations. `handleRequest` (`api/api.ts:446`) is
-  the one seam: `server/http-server.ts:681` routes the
+  the one seam: `server/http-server.ts:687` routes the
   product through it, and the tests' in-process
   transport (`inProcessFetch`,
   `tests/in-page-facade.ts:31-56`) does too, after
@@ -3648,7 +3621,7 @@ Off the critical path; each with its oracle.
   item 0h's migration documents name in their
   `user-agent`; the migrations; then the wipe and
   reseed that land them together
-- 4 → 6 → 13 (the health probe, then per process)
+- 6 → 13 (item 4 shipped: health, then per process)
 - 7 → 11, 12 (the designer roster and AI seats read the
   profile)
 - 9 → 10 → 11 → 11a → 12 (the bell, then chats, then
