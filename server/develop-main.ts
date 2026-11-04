@@ -24,4 +24,5 @@ if (Deno.args.length !== 1
 Deno.exit(await dispatch(
     toFileUrl(dir),
     ['serve'],
+    Deno.env.get('GIT_SHA'),
 ));

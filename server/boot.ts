@@ -91,6 +91,7 @@ export async function boot(
     read: EnvReader,
     argv: readonly string[],
     staticRoot: string,
+    gitSha?: string,
 ): Promise<RunningHttp> {
     if (argv.length > 0) {
         throw new Error(NO_ARGUMENTS);
@@ -120,6 +121,7 @@ export async function boot(
                     listenEnv.trustedProxyHops,
             }
             : {}),
+        ...(gitSha !== undefined ? { gitSha } : {}),
     });
     return {
         port: listener.port,
@@ -144,12 +146,14 @@ function installSigterm(
 export async function main(
     siteRoot: URL,
     args: readonly string[],
+    gitSha?: string,
 ): Promise<number> {
     try {
         const running = await boot(
             (name) => Deno.env.get(name),
             args,
             fromFileUrl(siteRoot),
+            gitSha,
         );
         Deno.stdout.writeSync(enc.encode(
             JSON.stringify({

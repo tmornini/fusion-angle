@@ -85,11 +85,13 @@ SERVER_IMPORT=$(
     ' | deno run --frozen --config "$ROOT/deno.json" \
         - "$ABS_BUILD" "$ROOT/server/main.ts"
 )
+GIT_SHA="$(git rev-parse HEAD)"
 cat > "$BUILD_DIR/main.ts" <<ENTRY
 import { dispatch } from '${SERVER_IMPORT}';
 Deno.exit(await dispatch(
     new URL('./site/', import.meta.url),
     Deno.args,
+    '${GIT_SHA}',
 ));
 ENTRY
 

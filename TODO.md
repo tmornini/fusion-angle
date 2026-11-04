@@ -553,24 +553,16 @@ code comments cite; specs and plans written before the
   (`WHERE path = '/invitations/'`). Oracle: every live
   database has been wiped and reseeded after the ledger
   store's landing, and holds `/migrations/0000-root`
-- **4.** `/status` — `{ up: boolean, components: { postgres:
-  boolean } }`, 200 when every component is up and 503
-  when any is not, built for more components.
-  Unauthenticated — Render and compose probe it bare —
-  so it joins the bearer-exempt set
-  (`AUTHENTICATION_ROUTES`, `api/request-auth.ts:39-43`,
-  is the whole set today) and becomes the one path
-  outside authentication an anonymous caller can confirm
-  exists: every other `/api/*` path answers 401 before
-  the no-match 404, by design (the route match at
-  `api/api.ts:495`, the exemption at `:534-535`, the 401
-  at `:537-541`, the 404 at `:544-551`). A probe sends
-  no ids, and the gate answers 400 to a request with no
-  `operation-id` before it routes or authenticates
-  (`api/api.ts:469-484`), so the exemption comes ahead
-  of that gate; the
-  server mints the probe's `request-id`, as it does
-  every request's. Decide: what `postgres: true` proves (a
+- **4.** `/status` health — `{ up: boolean, components:
+  { postgres: boolean } }`, 200 when every component
+  is up and 503 when any is not, built for more
+  components. `GET /status` already returns
+  `{ "git-sha": "<40 lowercase hex>" }` from the HTTP
+  adapter, ahead of the API, so a probe sends no
+  bearer and no operation-id and stores no pair. The
+  health fields are not on that body yet.
+  Unauthenticated — Render and compose probe it bare.
+  Decide: what `postgres: true` proves (a
   `SELECT 1` on a pooled connection under its own short
   timeout, not the 30 s statement timeout); that a read
   stores no pair; whether the throttle counts it and
@@ -579,14 +571,14 @@ code comments cite; specs and plans written before the
   Render already writes that request log, one JSON
   object a line: `at`, `level`, `method`, `path`,
   `status`, `latencyMs`
-  (`server/http-server.ts:481-510`). On 2026-11-04
+  (`server/http-server.ts:484-513`). On 2026-11-04
   a line was `GET /`, status 200, latencyMs
   0.433. `path` is the request path. `/` is
   the static root, and the server serves
   `/index.html` for it
-  (`server/http-server.ts:546-555`), so that 200
-  says the file was served. This endpoint still
-  has no handler. Item 6's health probe; item 13
+  (`server/http-server.ts:571-580`), so that 200
+  says the file was served. The health document
+  still has no handler. Item 6's health probe; item 13
   answers it per process.
 - **5.** A person's first sign-in — no page mints a
   credential: the seed does

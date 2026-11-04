@@ -14,12 +14,14 @@ import {
     HTTP_INTERNAL_ERROR,
     HTTP_METHOD_NOT_ALLOWED,
     HTTP_NOT_FOUND,
+    HTTP_OK,
     HTTP_PAYLOAD_TOO_LARGE,
     HTTP_TOO_MANY_REQUESTS,
 } from '../shared/http-errors.ts';
 import { OPERATION_ID_HEADER } from '../shared/message-id-fields.ts';
 import { REQUEST_ID_HEADER } from '../shared/message-id-fields.ts';
 import { msSinceMonotonic } from '../shared/types.ts';
+import { gitShaForStatus } from './git-sha.ts';
 import { logStampUtc } from './log-stamp.ts';
 import {
     createAuthThrottle,
@@ -78,6 +80,7 @@ export interface HttpListenOptions {
     readonly log?: RequestLog;
     readonly drainMs?: number;
     readonly trustedProxyHops?: string;
+    readonly gitSha?: string;
 }
 
 export interface HttpListener {
@@ -298,7 +301,7 @@ function apiRequest(
 
 function jsonResponse(
     status: number,
-    body: { readonly error: string },
+    body: Readonly<Record<string, string>>,
     extra?: Readonly<Record<string, string>>,
 ): Response {
     return new Response(JSON.stringify(body), {
@@ -542,6 +545,28 @@ async function dispatch(
         }
         const url = new URL(request.url);
         const pathname = url.pathname;
+
+        // Ahead of the API: a probe sends no
+        // operation-id and stores no pair.
+        if (request.method === 'GET'
+            && pathname === '/status') {
+            const sha = await gitShaForStatus(
+                options.gitSha,
+            );
+            if (sha === undefined) {
+                status = HTTP_INTERNAL_ERROR;
+                response = jsonResponse(
+                    HTTP_INTERNAL_ERROR,
+                    { error: 'git sha unavailable' },
+                );
+                return response;
+            }
+            status = HTTP_OK;
+            response = jsonResponse(HTTP_OK, {
+                'git-sha': sha,
+            });
+            return response;
+        }
 
         if (pathname === '/' || pathname === '') {
             const filePath = await existingStaticFile(

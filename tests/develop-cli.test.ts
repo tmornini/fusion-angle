@@ -597,6 +597,10 @@ Deno.test('develop does not compile or build an image',
     assertNotMatch(src, /compose build/);
     assertMatch(src, /bundle_client/);
     assertMatch(src, /server\/develop-main\.ts/);
+    assertMatch(
+        src,
+        /export GIT_SHA="\$\(git rev-parse HEAD\)"/,
+    );
     assertNotMatch(src, /server\/develop-watch\.ts/);
     const trapAt = src.indexOf(
         "trap 'RESTARTING=1' USR1",
