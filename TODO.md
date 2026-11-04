@@ -575,8 +575,19 @@ code comments cite; specs and plans written before the
   timeout, not the 30 s statement timeout); that a read
   stores no pair; whether the throttle counts it and
   whether it logs. Replaces the compose healthcheck's
-  `fetch('/')`, which proves static serving only. Item
-  6's health probe; item 13 answers it per process.
+  `fetch('/')`, which proves static serving only.
+  Render already writes that request log, one JSON
+  object a line: `at`, `level`, `method`, `path`,
+  `status`, `latencyMs`
+  (`server/http-server.ts:481-510`). On 2026-11-04
+  a line was `GET /`, status 200, latencyMs
+  0.433. `path` is the request path. `/` is
+  the static root, and the server serves
+  `/index.html` for it
+  (`server/http-server.ts:546-555`), so that 200
+  says the file was served. This endpoint still
+  has no handler. Item 6's health probe; item 13
+  answers it per process.
 - **5.** A person's first sign-in — no page mints a
   credential: the seed does
   (`formSeedCredentialMessagePairs`,
