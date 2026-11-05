@@ -668,6 +668,28 @@ function autoWireDefaults(
     return [...edges, ...extras];
 }
 
+function importedRegularNode(
+    id: string,
+    name: string,
+    positionX: number,
+    positionY: number,
+): GraphNode {
+    return {
+        id,
+        name,
+        positionX,
+        positionY,
+        isCreate: false,
+        isArchive: false,
+        memberIds: [
+            ...DEFAULT_NODE_MEMBER_IDS,
+        ],
+        attributes: [],
+        taskInstructions:
+            DEFAULT_NODE_TASK_INSTRUCTIONS,
+    };
+}
+
 export async function postFlowFromMermaid(
     ctx: RequestContext,
     flowId: string,
@@ -757,19 +779,12 @@ export async function postFlowFromMermaid(
                         + newId,
                     );
                 }
-                return {
-                    id: newId,
-                    name: p.name,
-                    positionX: pos.x,
-                    positionY: pos.y,
-                    isCreate: false,
-                    isArchive: false,
-                    memberIds: [
-                        ...DEFAULT_NODE_MEMBER_IDS,
-                    ],
-                    attributes: [],
-                    taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
-                };
+                return importedRegularNode(
+                    newId,
+                    p.name,
+                    pos.x,
+                    pos.y,
+                );
             },
         );
 
@@ -1074,21 +1089,12 @@ export async function postFlowFromZip(
                         + newId,
                     );
                 }
-                return {
-                    id: newId,
-                    name: sc
-                        ? sc.name
-                        : p.name,
-                    positionX: pos.x,
-                    positionY: pos.y,
-                    isCreate: false,
-                    isArchive: false,
-                    memberIds: [
-                        ...DEFAULT_NODE_MEMBER_IDS,
-                    ],
-                    attributes: [],
-                    taskInstructions: DEFAULT_NODE_TASK_INSTRUCTIONS,
-                };
+                return importedRegularNode(
+                    newId,
+                    sc ? sc.name : p.name,
+                    pos.x,
+                    pos.y,
+                );
             },
         );
 
