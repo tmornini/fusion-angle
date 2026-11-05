@@ -11,7 +11,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
 import {
-    apiRequest,
+    req,
 } from './http-fixtures.ts';
 
 // PUT organizations/:id/flows/:id/records/:frid — bind a flow
@@ -31,20 +31,6 @@ const FR_MISSING = generateIdentifier();
 const BINDINGS =
     '/organizations/' + ORGANIZATION
     + '/flows/' + FLOW_ID + '/records/';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
-}
 
 async function messagePairCount(
     db: MemoryDbAdapter,

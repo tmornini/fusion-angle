@@ -218,6 +218,124 @@ export function apiRequest(input: {
     });
 }
 
+// Suites repeated these builders. Each helper is one
+// positional shape, so a headers argument never shifts
+// into the operationId slot.
+export function req(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        token,
+        body,
+    });
+}
+
+export function reqWithHeaders(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+    headers?: Readonly<Record<string, string>>,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        token,
+        body,
+        ...(headers !== undefined ? { headers } : {}),
+    });
+}
+
+export function reqWithOperationId(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+    operationId?: string,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        token,
+        body,
+        ...(operationId !== undefined ? { operationId } : {}),
+    });
+}
+
+export function reqWithExtraHeaders(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+    extraHeaders?: Record<string, string>,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        token,
+        body,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
+    });
+}
+
+export function reqWithExtraHeadersAndOperationId(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+    extraHeaders?: Record<string, string>,
+    operationId?: string,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        token,
+        body,
+        ...(extraHeaders !== undefined
+            ? { headers: extraHeaders } : {}),
+        ...(operationId !== undefined ? { operationId } : {}),
+    });
+}
+
+export function reqWithOptionalToken(
+    method: string,
+    path: string,
+    token?: string,
+    body?: unknown,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        ...(token !== undefined ? { token } : {}),
+        body,
+    });
+}
+
+export function reqWithOptionalTokenHeadersAndOperationId(
+    method: string,
+    path: string,
+    token?: string,
+    body?: unknown,
+    headers?: Readonly<Record<string, string>>,
+    operationId?: string,
+): Request {
+    return apiRequest({
+        method,
+        path,
+        ...(token !== undefined ? { token } : {}),
+        body,
+        ...(headers !== undefined
+            ? { headers } : {}),
+        ...(operationId !== undefined ? { operationId } : {}),
+    });
+}
+
 // An accept, decline, or revoke names the invitation head it
 // changes; the invitation id ends the request's path.
 export async function invitationLatched(

@@ -60,7 +60,7 @@ import { seededMockDb } from './mock-seed.ts';
 import { getWorkOrderEvents } from
     './fixtures/work-order-events.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     assertPartsAreHeads,
     partsOf,
 } from './http-fixtures.ts';
@@ -113,22 +113,6 @@ const WO_DRIFT_RETRY_B_EV3 = generateIdentifier();
 // after seed. Coverage re-homes to wire-byte handleRequest
 // assertions and non-lexical live fixtures. Work-orders is a
 // SIMPLE, STATELESS family — DOCUMENT-head-only.
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Readonly<Record<string, string>>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined ? { headers } : {}),
-    });
-}
 
 function sortById<T extends { id: string }>(
     rows: readonly T[],

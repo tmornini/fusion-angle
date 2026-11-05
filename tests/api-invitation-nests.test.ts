@@ -21,7 +21,7 @@ import { deriveInvitations } from
 import { membershipsOfIdentity } from
     '../api/memberships.ts';
 import {
-    apiRequest,
+    req,
     invitationLatched,
     partsOf,
 } from './http-fixtures.ts';
@@ -139,20 +139,6 @@ async function seedWorld(): Promise<MemoryDbAdapter> {
         , 'member', AT);
     await seedPerson(db, DAVE, 'Dave', 'dave@x.com');
     return db;
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 async function inviteWayne(

@@ -15,7 +15,7 @@ import {
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
-    apiRequest,
+    req,
     storedPutBodyText,
 } from './http-fixtures.ts';
 import { identityDocumentEntityOf } from '../api/routes.ts';
@@ -46,18 +46,6 @@ function pii(name: string) {
         phone: '',
         bio: '',
     };
-}
-
-function req(
-    method: string, path: string, token: string,
-    body?: unknown,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-    });
 }
 
 function outside(method: string, path: string): string {

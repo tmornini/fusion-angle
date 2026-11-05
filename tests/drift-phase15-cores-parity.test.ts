@@ -54,7 +54,7 @@ import {
 } from '../shared/identifier.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
     pairIdOf,
     partBodiesOf,
 } from './http-fixtures.ts';
@@ -109,23 +109,6 @@ async function headVersionOf(
         db, STARK_ORGANIZATION, workOrderId,
     );
     return head === null ? null : { ...head.version };
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-    });
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {

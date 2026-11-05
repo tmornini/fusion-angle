@@ -76,7 +76,7 @@ import type {
     GraphNode,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithHeaders as req,
 } from './http-fixtures.ts';
 import { withLocalStorageAsync } from
     './fixtures/local-storage.ts';
@@ -113,23 +113,6 @@ const NULL_STORAGE: Partial<Storage> = {
 };
 
 const AT = '2026-01-01T00:00:00.000000Z';
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    headers?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(headers !== undefined
-            ? { headers } : {}),
-    });
-}
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();

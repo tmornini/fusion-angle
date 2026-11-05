@@ -18,7 +18,7 @@ import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../shared/types.ts';
 import {
-    apiRequest,
+    reqWithExtraHeaders as req,
     partBodiesOf,
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
@@ -59,23 +59,6 @@ interface AttributeWireRow {
     constraints: unknown[];
     read_roles: string[];
     write_roles: string[];
-}
-
-function req(
-    method: string,
-    path: string,
-    token: string,
-    body?: unknown,
-    extraHeaders?: Record<string, string>,
-): Request {
-    return apiRequest({
-        method,
-        path,
-        token,
-        body,
-        ...(extraHeaders !== undefined
-            ? { headers: extraHeaders } : {}),
-    });
 }
 
 async function seedMembershipMessagePair(
