@@ -15,10 +15,7 @@ import { handleRequest } from '../api/api.ts';
 import { basicAuthorization } from
     '../api/authentication.ts';
 import { requestHashOfStored } from './ledger-row.ts';
-import {
-    generateIdentifier,
-    NIL_IDENTIFIER,
-} from '../shared/identifier.ts';
+import { NIL_IDENTIFIER } from '../shared/identifier.ts';
 import { testHashPassword } from './mock-seed.ts';
 import {
     seedRootAdmin, seedSeat,
@@ -37,12 +34,12 @@ import {
     seedServiceIdentity,
 } from './identity-fixtures.ts';
 import {
+    jsonPost,
     pairIdOf,
     presentedFields,
     refreshTokenFromSetCookie,
     setCookieHeader,
     framedRequest,
-    withoutCredentialFields,
 } from './http-fixtures.ts';
 
 // C1 discharge under the verbatim-storage contract: the
@@ -58,31 +55,6 @@ import {
 
 const BASE = 'http://localhost';
 const PASSWORD = 'hunter2-s3cret';
-
-function jsonPost(
-    path: string,
-    body: unknown,
-): Request {
-    const record = body !== null
-        && typeof body === 'object'
-        && !Array.isArray(body)
-        ? body as Record<string, unknown>
-        : {};
-    const lifted = withoutCredentialFields(record);
-    const raw = JSON.stringify(lifted.body);
-    return framedRequest(`${BASE}/${path}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'content-length': String(
-                new TextEncoder().encode(raw).byteLength,
-            ),
-            'operation-id': generateIdentifier(),
-            ...lifted.headers,
-        },
-        body: raw,
-    });
-}
 
 // Below-facade pair formation (the identity-fixtures.ts idiom),
 // re-pointed from a raw row-plane put (Phase 13 Task 8): the

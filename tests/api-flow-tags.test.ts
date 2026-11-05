@@ -6,21 +6,13 @@ import {
 } from '@std/assert';
 import { generateIdentifier } from
     '../shared/identifier.ts';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../shared/types.ts';
-import {
-    apiRequest,
-    pairIdOf,
-} from './http-fixtures.ts';
+import { headResponseId, apiRequest, pairIdOf } from './http-fixtures.ts';
 
 // Flow tags: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
@@ -87,12 +79,6 @@ function documentBody(
     };
 }
 
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
-
 async function createFlow(
     db: MemoryDbAdapter,
     token: string,
@@ -115,21 +101,6 @@ async function createFlow(
             graphDelta: emptyDelta(),
         },
     ));
-}
-
-async function headResponseId(
-    db: MemoryDbAdapter,
-    token: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId, token,
-    ));
-    const id = pairIdOf(got);
-    assert(id
-        , 'no Response-ID on GET /organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
-        + '' + flowId);
-    return id!;
 }
 
 // --- commit 2: PUT/GET/DELETE lifecycle, marked delete ---

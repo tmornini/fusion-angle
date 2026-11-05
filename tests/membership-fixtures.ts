@@ -5,7 +5,13 @@ import {
     type ParentSibling,
     type SiblingCondition,
 } from '../api/message-pair.ts';
-import { MEMBERSHIPS_PATH } from '../api/memberships.ts';
+import { deriveOrganizations } from
+    '../api/derive-organizations.ts';
+import {
+    MEMBERSHIPS_PATH,
+    membershipOfHead,
+    organizationMembershipHeads,
+} from '../api/memberships.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 import { membershipNameOf } from
@@ -103,4 +109,36 @@ export async function landMembership(
         throw new Error('membership head missing');
     }
     return landed;
+}
+
+// Accepted membership heads across every organization.
+export async function allMemberships(db: DbAdapter) {
+    const organizations = await deriveOrganizations(db);
+    const rows: Array<{
+        id: string;
+        organization_id: string;
+        identity_id: string;
+        type: string;
+        at: string;
+    }> = [];
+    const accepted = {
+        kind: 'state' as const,
+        state: 'accepted' as const,
+    };
+    for (const organization of organizations) {
+        const heads = await organizationMembershipHeads(
+            db, organization.id, accepted,
+        );
+        for (const head of heads) {
+            const membership = membershipOfHead(head);
+            rows.push({
+                id: membership.id,
+                organization_id: membership.organization_id,
+                identity_id: membership.identity_id,
+                type: membership.type,
+                at: membership.at,
+            });
+        }
+    }
+    return rows;
 }

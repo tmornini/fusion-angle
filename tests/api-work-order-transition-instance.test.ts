@@ -44,6 +44,7 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
+import { seedFlowTypeJoin } from './record-seed-fixtures.ts';
 
 // POST organizations/:id/work-orders/:id/transition — instance-head shape
 // (Task 4 dual-accept; Task 8 gate cut). Value-bearing
@@ -377,25 +378,6 @@ async function seedInstance(
     return put.headers.get('ETag')!;
 }
 
-async function seedFlowTypeJoin(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID + '/records/'
-            + '' + FR_ID,
-        token,
-        {
-            id: FR_ID,
-            flow_id: FLOW_ID,
-            record_id: TYPE_ID,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(put.status, 201);
-}
-
 async function bindInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -445,7 +427,10 @@ async function seededBound(): Promise<{
     await seedLiveType(db, adminToken);
     await seedWritableText(db, adminToken);
     const etag = await seedInstance(db, adminToken);
-    await seedFlowTypeJoin(db, adminToken);
+    await seedFlowTypeJoin(
+        db, adminToken, FLOW_ID, FR_ID,
+        TYPE_ID, AT,
+    );
     await bindInstance(db, adminToken);
     return {
         db, adminToken, memberToken, tokenB, etag,

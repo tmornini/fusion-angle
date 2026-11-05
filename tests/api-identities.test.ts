@@ -21,9 +21,7 @@ import {
     generateIdentifier, NIL_IDENTIFIER,
 } from '../shared/identifier.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
-import {
-    seedAdminSchema,
-} from './test-fixtures.ts';
+import { freshDb, seedAdminSchema } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { operationIdHeader } from
@@ -99,12 +97,6 @@ Deno.test('validateIdentityPiiEntity rejects missing field', () => {
             name: 'x', email: 'y', phone: 'z',
         }));
 });
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 function outside(method: string, path: string): string {
     return 'forbidden: ' + method + ' ' + path

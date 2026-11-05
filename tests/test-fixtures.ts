@@ -1,4 +1,8 @@
 import type { DbAdapter } from '../api/db.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import type { IdeaEntity } from '../shared/types.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 // organizationRow/seedOrganizationDocument now LIVE in
@@ -21,6 +25,16 @@ export async function seedAdminSchema(
 ): Promise<void> {
     await db.postSchemaCreation();
     await seedRootAdmin(db);
+}
+
+// The memory database the suites open: schema, then
+// the root admin. The copies that stop at
+// postSchemaCreation, and the ones that seed more,
+// stay in their files.
+export async function freshDb(): Promise<MemoryDbAdapter> {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    return db;
 }
 
 // A minimal idea body (minus id) for the org-scope fence

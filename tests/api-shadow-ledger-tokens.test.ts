@@ -5,15 +5,12 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { sha256Hex } from '../shared/digest.ts';
 import { requestHashOfStored } from './ledger-row.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { latestActionForJti } from '../shared/identity-tokens.ts';
 import {
@@ -79,12 +76,6 @@ function req(
         token,
         body,
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {

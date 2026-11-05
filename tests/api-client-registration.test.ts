@@ -4,13 +4,12 @@ import {
     assertRejects,
     assertStrictEquals,
 } from '@std/assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     handleRequest, UnauthorizedError, RequestError,
 } from '../api/api.ts';
 import { PUT, GET, DELETE } from './in-page-facade.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import {
     seedOrganizationMember,
 } from './root-admin-fixture.ts';
@@ -37,12 +36,6 @@ const REGISTRATION = {
     aud: 'fusion-angle',
     status: 'active',
 };
-
-async function freshDb() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
-}
 
 function outside(method: string, path: string): string {
     return 'forbidden: ' + method + ' ' + path

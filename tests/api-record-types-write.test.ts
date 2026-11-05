@@ -32,7 +32,7 @@ import {
     deriveRecordTypeEntity,
     recordTypeEntityOf,
 } from '../api/derive-record-types.ts';
-import { seedSeat } from './root-admin-fixture.ts';
+import { seedSeatFromBody } from './root-admin-fixture.ts';
 
 // Nested record-types WRITE surface (Task 3): admin PUT
 // (blind or conditional, state document), admin DELETE with type
@@ -85,20 +85,6 @@ function typeBody(
     };
 }
 
-async function seedMembershipPair(
-    db: MemoryDbAdapter,
-    _id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    await seedSeat(
-        db,
-        String(body['organization_id'] ?? body.organization_id),
-        String(body['identity_id'] ?? body.identity_id),
-        (body['type'] ?? body.type) as 'admin' | 'member',
-        String(body['at'] ?? body.at),
-    );
-}
-
 async function seedRecordTypeBelowGate(
     db: MemoryDbAdapter,
     organization: string,
@@ -145,7 +131,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedSeatFromBody(db, {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',

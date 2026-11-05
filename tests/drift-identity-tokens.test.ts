@@ -1,8 +1,5 @@
 import { assert, assertEquals, assertStrictEquals } from '@std/assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { PUT } from './in-page-facade.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -12,7 +9,7 @@ import {
 } from '../shared/base64url.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { testHashPassword } from './mock-seed.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { freshDb } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
     seedPersonIdentity,
@@ -81,12 +78,6 @@ function req(
         token,
         body,
     });
-}
-
-async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    return db;
 }
 
 function tokenGrant(
