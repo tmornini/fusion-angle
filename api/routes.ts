@@ -405,10 +405,11 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
 // FIRST 'stateless' one (Decision 7's state-in-entity design
 // does not apply to a work-order document: its lifecycle rides
 // its operations). The GETs stream the stored head, which is
-// the whole version (api/api.ts), so no per-field picking is
-// needed. notFoundTable is 'work_orders' — the first family
-// whose storage table name (db-backed.ts's EntityStore key)
-// differs from its family name.
+// the whole version (api/api.ts), its events' values
+// projected by withWorkOrderValueReader. notFoundTable is
+// 'work_orders' — the first family whose storage table
+// name (db-backed.ts's EntityStore key) differs from its
+// family name.
 function workOrderDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
@@ -1768,6 +1769,7 @@ export async function postWorkOrderCreationOp(
 async function workOrderOperation<Input>(
     db: DbAdapter,
     organization: Id,
+    roles: readonly string[],
     workOrderId: Id,
     messagePair: MessagePair,
     validate: () => Input,
@@ -1815,7 +1817,7 @@ async function workOrderOperation<Input>(
                 : head.version,
             condition: { kind: 'in-order', head: latch },
         }],
-        reader: { sees: 'whole' },
+        reader: await workOrderValueReader(db, organization, roles),
         answer: { kind: 'parent' },
     });
 }
@@ -1830,12 +1832,13 @@ export async function postWorkOrderClaimOp(
     body: Record<string, unknown>,
     actor: Id,
     organization: Id,
+    roles: readonly string[],
     messagePair: MessagePair | undefined,
 ): Promise<void> {
     const claim = validateWorkOrderClaimBody(body);
     const received = requirePair(messagePair);
     await workOrderOperation(
-        db, organization, workOrderId, received,
+        db, organization, roles, workOrderId, received,
         () => claim,
         (head) => {
             const change = claimedVersion(head, {
@@ -1875,11 +1878,12 @@ export async function deleteWorkOrderClaimOp(
     workOrderId: Id,
     actor: Id,
     organization: Id,
+    roles: readonly string[],
     messagePair: MessagePair | undefined,
 ): Promise<void> {
     const received = requirePair(messagePair);
     await workOrderOperation(
-        db, organization, workOrderId, received,
+        db, organization, roles, workOrderId, received,
         () => ({
             eventId: received.id,
             member: actor,
@@ -2006,6 +2010,7 @@ async function landWorkOrderTransition(
             readonly state: Record<string, unknown>,
         },
     tags: readonly string[],
+    reader: Reader,
 ): Promise<void> {
     const documents = instance.kind === 'none'
         ? [head.pair.id]
@@ -2062,7 +2067,7 @@ async function landWorkOrderTransition(
                     },
                 },
             ],
-        reader: { sees: 'whole' },
+        reader,
         answer: { kind: 'parent' },
     });
 }
@@ -2164,6 +2169,7 @@ export async function postWorkOrderTransitionOp(
         await landWorkOrderTransition(
             db, head, received, event, { kind: 'none' },
             entityTagsOf(received),
+            await workOrderValueReader(db, organization, roles),
         );
         return;
     }
@@ -2229,6 +2235,7 @@ export async function postWorkOrderTransitionOp(
             ),
         },
         entityTagsOf(received),
+        await workOrderValueReader(db, organization, roles),
     );
 }
 
@@ -2272,6 +2279,7 @@ export async function postSeedWorkOrderTransitionOp(
         },
         { kind: 'none' },
         [head.pair.id],
+        { sees: 'whole' },
     );
 }
 
@@ -2288,10 +2296,11 @@ export async function postWorkOrderBindingOp(
     body: Record<string, unknown>,
     _actor: Id,
     organization: Id,
+    roles: readonly string[],
     messagePair: MessagePair | undefined,
 ): Promise<void> {
     await workOrderOperation(
-        db, organization, workOrderId,
+        db, organization, roles, workOrderId,
         requirePair(messagePair),
         () => validateWorkOrderBindingBody(body),
         async (head, bind) => {
@@ -2348,6 +2357,7 @@ export async function postWorkOrderDocumentOp(
     _actor: Id,
     messagePair: MessagePair | undefined,
     organization: Id | undefined,
+    roles: readonly string[],
 ): Promise<void> {
     const org = requireOrganization(organization);
     const fields = validateWorkOrderDocumentBody(
@@ -2358,6 +2368,7 @@ export async function postWorkOrderDocumentOp(
         kind: 'own',
         received: requirePair(messagePair),
         state: fieldsVersion(head.version, fields),
+        reader: await workOrderValueReader(db, org, roles),
     });
 }
 
@@ -3429,6 +3440,68 @@ export function instanceReader(
     return { sees: 'values', attributesById, roles };
 }
 
+// What this requester may read of a work order's event
+// values. A value is judged by the attributes of the record
+// type its work order is bound to; a legacy value recorded
+// on an unbound work order, by the one attribute of that id
+// in the organization, and an id two record types share
+// judges it unreadable.
+async function workOrderValueReader(
+    db: DbAdapter,
+    organization: Id,
+    roles: readonly string[],
+): Promise<Reader> {
+    const types = await db.messagePairs.getCollectionHeadPairs(
+        recordTypesUriPrefix(organization),
+    );
+    const boundSchemas = new Map(await Promise.all(
+        types.map(async (type) => [
+            type.name,
+            await loadAttributeSchemaById(
+                db, organization, type.name,
+            ),
+        ] as const),
+    ));
+    const typesNaming = Map.groupBy(
+        [...boundSchemas.values()].flatMap((schema) => [
+            ...schema,
+        ]),
+        ([id]) => id,
+    );
+    const unboundSchema = new Map(
+        [...typesNaming].filter(([, named]) => named.length === 1)
+            .map(([id, named]) => [id, named[0]![1]] as const),
+    );
+    return {
+        sees: 'event-values', boundSchemas, unboundSchema, roles,
+    };
+}
+
+// A work order's reads serve each event's values under the
+// rule its record's instance GETs keep.
+function withWorkOrderValueReader(route: Route): Route {
+    const select = route.select;
+    if (select === undefined) {
+        throw new Error('a work-order read route has no select');
+    }
+    return {
+        ...route,
+        select: async (
+            db, params, actor, organization, roles, query,
+        ) => {
+            const [selection, reader] = await Promise.all([
+                select(
+                    db, params, actor, organization, roles, query,
+                ),
+                workOrderValueReader(
+                    db, requireOrganization(organization), roles,
+                ),
+            ]);
+            return { ...selection, reader };
+        },
+    };
+}
+
 // The PUT validator admits no credential without its
 // identity, so a stored head lacking it is the store's
 // fault, never the reader's: it fails the request, as a
@@ -4438,41 +4511,47 @@ export const routes: Route[] = [
     // precedent, so a separate create verb remains here.
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS.
-    route('organizations/:id/work-orders/', {
+    withWorkOrderValueReader(route('organizations/:id/work-orders/', {
         select: collectionSelect(WORK_ORDERS_WIRING),
         post: (
             db, _p, body, actor, messagePair, organization,
         ) => postWorkOrderCreationOp(
             db, body, actor, messagePair, organization,
         ),
-    }),
+    })),
     // work-orders/:id is the fourth family. PUT rides
     // documentPutHandler(WORK_ORDERS_WIRING) — member-tier
     // via MEMBER_VERBS['/work-orders']. Verbs stay
     // {get, put} — no DELETE.
-    route('organizations/:id/work-orders/:id', {
+    withWorkOrderValueReader(route('organizations/:id/work-orders/:id', {
         select: documentSelect(WORK_ORDERS_WIRING),
         put: documentPutHandler(WORK_ORDERS_WIRING),
-    }),
+    })),
     // A work order's history is its versions (spec §3):
     // every PUT, oldest first, each as stored; the
     // create's received POST is not a version.
-    documentVersionsSelectRoute(WORK_ORDERS_WIRING),
-    documentVersionSelectRoute(WORK_ORDERS_WIRING),
+    withWorkOrderValueReader(
+        documentVersionsSelectRoute(WORK_ORDERS_WIRING),
+    ),
+    withWorkOrderValueReader(
+        documentVersionSelectRoute(WORK_ORDERS_WIRING),
+    ),
     // PUT claims and DELETE releases: operations on the work
     // order, answering its state. Member-tier via MEMBER_VERBS
     // GET/PUT/DELETE on /work-orders.
     route('organizations/:id/work-orders/:id/claim', {
-        put: (db, p, body, actor, messagePair, organization) =>
-            postWorkOrderClaimOp(
-                db, param(p, 1), body, actor,
-                requireOrganization(organization), messagePair,
-            ),
-        delete: (db, p, actor, messagePair, organization) =>
-            deleteWorkOrderClaimOp(
-                db, param(p, 1), actor,
-                requireOrganization(organization), messagePair,
-            ),
+        put: (
+            db, p, body, actor, messagePair, organization, roles,
+        ) => postWorkOrderClaimOp(
+            db, param(p, 1), body, actor,
+            requireOrganization(organization), roles, messagePair,
+        ),
+        delete: (
+            db, p, actor, messagePair, organization, roles,
+        ) => deleteWorkOrderClaimOp(
+            db, param(p, 1), actor,
+            requireOrganization(organization), roles, messagePair,
+        ),
     }),
     // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS, and isPermitted matches on the segment
@@ -4502,11 +4581,12 @@ export const routes: Route[] = [
     // another instance is 409; no DELETE. Member-tier via
     // MEMBER_VERBS PUT on /work-orders.
     route('organizations/:id/work-orders/:id/binding', {
-        put: (db, p, body, actor, messagePair, organization) =>
-            postWorkOrderBindingOp(
-                db, param(p, 1), body, actor,
-                requireOrganization(organization), messagePair,
-            ),
+        put: (
+            db, p, body, actor, messagePair, organization, roles,
+        ) => postWorkOrderBindingOp(
+            db, param(p, 1), body, actor,
+            requireOrganization(organization), roles, messagePair,
+        ),
     }),
     // Flow work-order joins nest under their parent flow:
     // param 0 is the path org, param 1 is the flow, so the

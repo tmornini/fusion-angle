@@ -979,6 +979,7 @@ export type StateWrite =
         readonly kind: 'own',
         readonly received: MessagePair,
         readonly state: Record<string, unknown>,
+        readonly reader: Reader,
     }
     | {
         readonly kind: 'events',
@@ -1090,10 +1091,10 @@ export async function landStateWrite(
 ): Promise<WriteAnswer> {
     const write = formed.write;
     if (write.kind === 'events') {
-        return statedAnswer(adapter, formed);
+        return statedAnswer(adapter, formed, { sees: 'whole' });
     }
     const answer = write.kind === 'own'
-        ? await statedAnswer(adapter, formed)
+        ? await statedAnswer(adapter, formed, write.reader)
         : await siblingsAnswer(adapter, write, formed);
     answers.set(write.received, answer);
     ownWires.set(write.received, answer.response);
@@ -1135,16 +1136,14 @@ function ownPair(
 async function statedAnswer(
     adapter: DbAdapter,
     formed: FormedStateWrite,
+    reader: Reader,
 ): Promise<WriteAnswer> {
     const ran = await runStatement(
         adapter, formed.attempt, formed.binds, undefined,
     );
     return ran.kind === 'refused'
         ? refusedAnswer(formed.rows, formed.binds, formed.attempt)
-        : answerOf(
-            formed.rows, formed.binds, ran.stated,
-            { sees: 'whole' },
-        );
+        : answerOf(formed.rows, formed.binds, ran.stated, reader);
 }
 
 async function siblingsAnswer(

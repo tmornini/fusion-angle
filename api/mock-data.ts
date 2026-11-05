@@ -470,6 +470,7 @@ async function postSeedBindingIn(
         },
         SYSTEM_MEMBER_ID,
         STARK_ORGANIZATION,
+        starkRolesOf(SYSTEM_MEMBER_ID),
         await formInstanceBindingSeedPair(
             chain.bindingOperationId, head.id, requestAt,
         ),

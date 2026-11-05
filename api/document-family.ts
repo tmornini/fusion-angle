@@ -126,6 +126,7 @@ export interface DocumentFamilyWiring {
         body: Record<string, unknown>, actor: Id,
         messagePair: MessagePair | undefined,
         organization: Id | undefined,
+        roles: readonly string[],
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
     // stamped by the caller). A 'state' family's mapper reads
@@ -329,11 +330,12 @@ export function documentSelect(
 export function documentPutHandler(
     wiring: DocumentFamilyWiring,
 ): PutHandler {
-    return (db, params, body, actor, messagePair, organization) =>
-        wiring.documentOp(
-            db, entityIdParam(wiring, params),
-            body, actor, messagePair, organization,
-        );
+    return (
+        db, params, body, actor, messagePair, organization, roles,
+    ) => wiring.documentOp(
+        db, entityIdParam(wiring, params),
+        body, actor, messagePair, organization, roles,
+    );
 }
 
 // Only a statement creates this family, so its PUT edits a
@@ -343,7 +345,7 @@ export function documentEditHandler(
     wiring: DocumentFamilyWiring,
 ): PutHandler {
     return async (
-        db, params, body, actor, messagePair, organization,
+        db, params, body, actor, messagePair, organization, roles,
     ) => {
         const organizationId = requireOrganization(
             organization,
@@ -362,6 +364,7 @@ export function documentEditHandler(
         }
         return wiring.documentOp(
             db, id, body, actor, messagePair, organization,
+            roles,
         );
     };
 }
@@ -379,9 +382,10 @@ export function documentEntityRoute(
 const PUT_METHOD = 'PUT';
 
 // Versions ride the head's ladder. The whole reader is
-// the family's: only a credential or an instance
-// projects. The miss is the family's own, so a foreign
-// id and a name never written both stay 404.
+// the family's: only a credential, an instance, or a work
+// order's event values project, the last by its route.
+// The miss is the family's own, so a foreign id and a
+// name never written both stay 404.
 export function documentVersionsSelectRoute(
     wiring: DocumentFamilyWiring,
 ): Route {

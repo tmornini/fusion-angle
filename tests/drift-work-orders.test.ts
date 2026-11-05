@@ -50,6 +50,8 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { seedMemberReadableAttributes } from
+    './fixtures/record-attributes.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     generateIdentifier,
@@ -494,6 +496,10 @@ Deno.test('live-write chain: birth-claimed create, two transitions'
 async () => {
     const db = await seededDb();
     const tokenA = await organizationToken('XXZruirZyAOoRpNxaDnpSA');
+    await seedMemberReadableAttributes(
+        db, STARK_ORGANIZATION, tokenA,
+        [ATTR_SEVERITY, ATTR_NOTES],
+    );
     await seedOrganizationMember(db, MEMBER_B);
     const tokenB = await organizationToken(MEMBER_B);
 
