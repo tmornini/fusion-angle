@@ -13,8 +13,8 @@ import {
 } from '../web-app/app/presenters/project-detail.ts';
 import { responseMessage } from './fixtures/response-message.ts';
 
-// None of api/types.ts, adapters/projects.ts, or
-// presenters/project-detail.ts reads localStorage (checked
+// shared/types.ts and presenters/project-detail.ts do
+// not read localStorage (checked
 // against the full product tree); window/document are
 // stubbed because ProjectDetailPresenter walks a real DOM
 // tree via renderShell/mutateSlot.
