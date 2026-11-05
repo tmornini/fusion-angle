@@ -253,6 +253,67 @@ Status ladder:
 handler declared. 412 refuses what the client
 declared: a stale If-Match or a declared genesis.
 
+## QUERY
+
+A search is an RFC 10008 QUERY: the request body is a
+JSON object `{"q": "<text>"}`, and the answer is the GET's
+own. `handleRequest` (`api/api.ts`) judges the body once
+and every route trusts it. A QUERY needs the bearer like
+any request outside the exempt set. The URL's query
+string means what it means on the route's GET.
+
+| Refusal | When |
+|---|---|
+| 401 | no bearer, or one that does not verify |
+| 400 | no Content-Type (RFC 10008 §2); the body is not a JSON object; `q` absent or not a string; `q` longer than `QUERY_TEXT_MAX_LENGTH` (256) characters; a query string the GET refuses |
+| 403 | a foreign path, at the organization fence, as for a GET; a caller the role policy refuses (`ROUTE_POLICY`, `api/authorization.ts`: a member may QUERY under `/organizations/:id`, an organization admin anywhere) |
+| 405 | a route with no `selectMatching` |
+| 415 | a Content-Type whose media type is not `application/json` (parameters such as `charset` pass; RFC 9110 §15.5.16) |
+
+The Content-Type, the query string, and the body are
+judged before the route is asked for a search, so a
+bad `q` on a route that has none answers 400, not 405.
+
+The answer is a 200 multipart/mixed with
+`Cache-Control: no-store`, as the GET's is (the HTTP
+adapter sets it on every API response that lacks one),
+built by `servedSelection` through the GET's own reader,
+so a part shows exactly what the GET shows this caller.
+The parts come in best-match order. Nothing matching, an
+empty query's text included, answers 204 with no body.
+Documents the GET would answer Gone are dropped before
+matching.
+
+Ranking (`shared/search-match.ts`): every query word
+must match. A word matches as a substring of a field
+with no edits, or else as a field word within its edit
+tolerance (1 edit for a query word of 4 characters or
+fewer, 2 for a longer one). A whole-query substring hit
+also matches with no edits. Matches with no edits (exact
+or prefix, both substrings) rank above any that needed
+edits, and fewer total edits rank higher. Equal ranks
+keep the GET's order.
+
+| Route | Searched fields |
+|---|---|
+| `organizations/:id/work-orders/` | id, display id; the flow graph's name; the creating flow's id and name; state; the current node's name and task instructions; the transition's member id and name; the live claim holder's id and name; the bound record type id and instance id; the bound instance's values the caller's roles may read; every uncleared event field value. The organization's own id is not a field |
+| `organizations/:id/memberships/` | id, identity id, identity kind, state, type; the invitee's name and email while the GET serves them (erased PII is not searched); an AI agent's name, description, skill focus, and model; a service's name and description; a person's profile title and department, only for an organization admin and only on accepted seats |
+| `organizations/:id` | ideas, projects, and members, below |
+
+The memberships QUERY takes `?state=accepted|removed`,
+accepted by default, exactly as the GET does.
+
+The organization root answers three groups in order:
+ideas, then projects, then members. Each group is ranked
+alone. An idea matches on id, title, state, and its
+submissions' member ids and names. A project matches on
+id, title, state, progress, and its bound flow ids. A
+member is a human seat (`identity_kind` `person`) in
+state `accepted`, matched as on the memberships route.
+Each part carries `content-location`: an idea's or
+project's own document path, and for a member
+`/organizations/<org>/invitations/<name>`.
+
 ## Conditional classes
 
 A *conditional* is the request header that says which
