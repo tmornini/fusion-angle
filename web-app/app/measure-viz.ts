@@ -10,6 +10,7 @@ import {
     buildPayload,
     parseBudgetsJson,
     parseHistoryJsonl,
+    viewHelpersSource,
     VIZ_PAYLOAD_VERSION,
     type VizPayload,
 } from './measure-viz-core.ts';
@@ -555,7 +556,7 @@ function vizBodyMarkup(): string {
 }
 
 function vizClientScript(): string {
-    // Client reimplements rank/format to match pure core.
+    // Duration and rank helpers are the core functions.
     const ver = String(VIZ_PAYLOAD_VERSION);
     return `
 (function () {
@@ -580,133 +581,16 @@ function vizClientScript(): string {
   var tip = document.getElementById('tooltip');
   var drag = null;
 
-  function trimNum(n, maxDecimals) {
-    if (Number.isInteger(n)) return String(n);
-    var s = n.toFixed(maxDecimals);
-    if (s.indexOf('.') !== -1) {
-      s = s.replace(/\\.?0+$/, '');
-    }
-    return s;
-  }
-  function formatDurationPerf(ms, signed) {
-    var abs = Math.abs(ms);
-    var body;
-    if (abs < 1) {
-      body = Math.round(abs * 1000) + ' µs';
-    } else if (abs < 1000) {
-      body = trimNum(abs, 3) + ' ms';
-    } else {
-      body = trimNum(abs / 1000, 2) + ' s';
-    }
-    if (ms < 0) return MINUS + body;
-    if (signed && ms > 0) return '+' + body;
-    return body;
-  }
-  function pickAxisUnit(values) {
-    var max = 0;
-    for (var i = 0; i < values.length; i++) {
-      var a = Math.abs(values[i]);
-      if (a > max) max = a;
-    }
-    if (max < 1) return 'us';
-    if (max < 1000) return 'ms';
-    return 's';
-  }
+  // Core helpers. They read MINUS.
+${viewHelpersSource()}
   function toAxis(ms, unit) {
     if (unit === 'us') return ms * 1000;
     if (unit === 'ms') return ms;
     return ms / 1000;
   }
-  function formatAxisTick(ms, unit) {
-    var abs = Math.abs(ms);
-    var body;
-    if (unit === 'us') {
-      body = Math.round(abs * 1000) + ' µs';
-    } else if (unit === 'ms') {
-      body = trimNum(abs, 3) + ' ms';
-    } else {
-      body = trimNum(abs / 1000, 2) + ' s';
-    }
-    if (ms < 0) return MINUS + body;
-    return body;
-  }
   function formatUtc(at) {
     if (!at || at.length < 19) return String(at || '');
     return at.slice(0, 19).replace('T', ' ') + ' UTC';
-  }
-  function pageKeysUnion() {
-    var set = {};
-    for (var s = 0; s < sweeps.length; s++) {
-      var pages = sweeps[s].pages;
-      for (var k in pages) {
-        if (Object.prototype.hasOwnProperty.call(
-          pages, k,
-        )) {
-          set[k] = true;
-        }
-      }
-    }
-    return Object.keys(set).sort();
-  }
-  function cmpNumDescNullLast(a, b) {
-    if (a === null && b === null) return 0;
-    if (a === null) return 1;
-    if (b === null) return -1;
-    if (a < b) return 1;
-    if (a > b) return -1;
-    return 0;
-  }
-  function rankPages() {
-    var from = sweeps[startIndex];
-    var to = sweeps[endIndex];
-    var sameSweep = startIndex === endIndex;
-    var keys = pageKeysUnion();
-    var entries = keys.map(function (page) {
-      var toReady = to.pages[page]
-        ? to.pages[page].readyMs
-        : undefined;
-      var fromReady = from.pages[page]
-        ? from.pages[page].readyMs
-        : undefined;
-      var budget = budgets[page]
-        ? budgets[page].readyMs
-        : undefined;
-      var readyMs = toReady === undefined
-        ? null
-        : toReady;
-      var deltaMs = sameSweep
-        ? null
-        : (fromReady === undefined
-          || toReady === undefined
-          ? null
-          : toReady - fromReady);
-      var budgetPct =
-        readyMs === null || budget === undefined
-          ? null
-          : readyMs / budget;
-      return {
-        page: page,
-        readyMs: readyMs,
-        deltaMs: deltaMs,
-        budgetPct: budgetPct,
-      };
-    });
-    entries.sort(function (a, b) {
-      if (sort === 'ready') {
-        return cmpNumDescNullLast(
-          a.readyMs, b.readyMs,
-        );
-      }
-      if (sort === 'delta') {
-        return cmpNumDescNullLast(
-          a.deltaMs, b.deltaMs,
-        );
-      }
-      return cmpNumDescNullLast(
-        a.budgetPct, b.budgetPct,
-      );
-    });
-    return entries;
   }
   function meanReadyMs(sweep) {
     var pages = Object.keys(sweep.pages);
@@ -796,7 +680,7 @@ function vizClientScript(): string {
   }
   function budgetPressure() {
     var to = sweeps[endIndex];
-    var pages = pageKeysUnion();
+    var pages = pageKeysUnion(sweeps);
     var over = 0;
     var within = 0;
     var unknown = 0;
@@ -952,7 +836,7 @@ function vizClientScript(): string {
     return {
       sweepsInWindow: endIndex - startIndex + 1,
       totalSweeps: sweeps.length,
-      pageCount: pageKeysUnion().length,
+      pageCount: pageKeysUnion(sweeps).length,
       meanReadyMs: meanReadyMs(sweeps[endIndex]),
       systemDeltaMs: systemDeltaMs(),
       overBudget: pressure.over,
@@ -1088,7 +972,7 @@ function vizClientScript(): string {
     var h = location.hash || '#/';
     if (h.indexOf('#/page/') === 0) {
       var key = decodeURIComponent(h.slice(7));
-      var keys = pageKeysUnion();
+      var keys = pageKeysUnion(sweeps);
       if (keys.indexOf(key) !== -1) {
         focused = key;
         view = 'page';
@@ -1141,7 +1025,7 @@ function vizClientScript(): string {
       html += '<tr data-page="' + r.page + '">'
         + '<td>' + r.page + '</td>'
         + '<td class="' + dc + '">'
-        + formatDurationPerf(r.deltaMs, true)
+        + formatDurationPerf(r.deltaMs, { signed: true })
         + '</td><td>'
         + (r.readyMs === null
           ? 'n/a'
@@ -1159,7 +1043,7 @@ function vizClientScript(): string {
       : formatDurationPerf(m.meanReadyMs, false);
     var delta = m.systemDeltaMs === null
       ? 'n/a'
-      : formatDurationPerf(m.systemDeltaMs, true);
+      : formatDurationPerf(m.systemDeltaMs, { signed: true });
     var dClass = '';
     if (m.systemDeltaMs !== null && m.systemDeltaMs > 0) {
       dClass = 'delta-pos';
@@ -1436,7 +1320,7 @@ function vizClientScript(): string {
   function renderSysTrend() {
     var el = document.getElementById('sys-trend');
     var series = systemReadySeries();
-    var nPages = pageKeysUnion().length;
+    var nPages = pageKeysUnion(sweeps).length;
     var points = series.map(function (p) {
       var s = sweeps[p.index];
       var candle = systemCandle(s);
@@ -1514,47 +1398,48 @@ function vizClientScript(): string {
     el.innerHTML = html;
     bindPageClicks(el);
   }
-  function renderSysPhase() {
-    var el = document.getElementById('sys-phase');
-    var b = meanPhaseBuckets();
-    var total = b.boot + b.fetch + b.render + b.other;
-    function seg(name, ms, color) {
+  function phaseBar(buckets) {
+    var total = buckets.boot + buckets.fetch
+      + buckets.render + buckets.other;
+    function seg(ms, color) {
       if (ms <= 0 || total <= 0) return '';
       var pct = (ms / total) * 100;
       return '<div class="bar-seg" style="width:'
         + pct + '%;background:' + color
         + '"></div>';
     }
-    var html = '<div class="legend">'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--boot)"></span>boot '
-      + formatDurationPerf(b.boot, false)
-      + '</span>'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--fetch)"></span>fetch '
-      + formatDurationPerf(b.fetch, false)
-      + '</span>'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--render)"></span>render '
-      + formatDurationPerf(b.render, false)
-      + '</span>'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--other)"></span>other '
-      + formatDurationPerf(b.other, false)
-      + '</span></div>';
-    html += '<div class="bar-stack">'
-      + seg('boot', b.boot, 'var(--boot)')
-      + seg('fetch', b.fetch, 'var(--fetch)')
-      + seg('render', b.render, 'var(--render)')
-      + seg('other', b.other, 'var(--other)')
-      + '</div>';
+    var order = ['boot', 'fetch', 'render', 'other'];
+    var html = '<div class="legend">';
+    for (var i = 0; i < order.length; i++) {
+      var name = order[i];
+      html += '<span><span class="swatch" style="'
+        + 'background:var(--' + name
+        + ')"></span>' + name + ' '
+        + formatDurationPerf(buckets[name], false)
+        + '</span>';
+    }
+    html += '</div><div class="bar-stack">';
+    for (var j = 0; j < order.length; j++) {
+      html += seg(
+        buckets[order[j]],
+        'var(--' + order[j] + ')',
+      );
+    }
+    html += '</div>';
+    return html;
+  }
+  function renderSysPhase() {
+    var el = document.getElementById('sys-phase');
+    var html = phaseBar(meanPhaseBuckets());
     html += '<p class="muted">Mean phase mix across pages '
       + 'at end sweep (page-init residual).</p>';
     el.innerHTML = html;
   }
   function renderSysAll() {
     var el = document.getElementById('sys-all');
-    var entries = rankPages();
+    var entries = rankPages(
+      sweeps, budgets, startIndex, endIndex, sort,
+    );
     var html = '<table class="table"><thead><tr>'
       + '<th data-col="ready">Page</th>'
       + '<th data-col="ready">Ready</th>'
@@ -1580,7 +1465,7 @@ function vizClientScript(): string {
         + '</td><td class="' + dc + '">'
         + (e.deltaMs === null
           ? 'n/a'
-          : formatDurationPerf(e.deltaMs, true))
+          : formatDurationPerf(e.deltaMs, { signed: true }))
         + '</td><td>' + pct + '</td></tr>';
     }
     html += '</tbody></table>';
@@ -1610,7 +1495,9 @@ function vizClientScript(): string {
   function renderSystem() {
     renderSysMetrics();
     renderSysTrend();
-    var entries = rankPages();
+    var entries = rankPages(
+      sweeps, budgets, startIndex, endIndex, sort,
+    );
     renderMovers(
       document.getElementById('sys-regress'),
       entries,
@@ -1640,7 +1527,7 @@ function vizClientScript(): string {
     if (sort === 'delta') {
       return entry.deltaMs === null
         ? 'n/a'
-        : formatDurationPerf(entry.deltaMs, true);
+        : formatDurationPerf(entry.deltaMs, { signed: true });
     }
     if (entry.budgetPct === null) return 'n/a';
     return Math.round(entry.budgetPct * 1000) / 10
@@ -1648,7 +1535,9 @@ function vizClientScript(): string {
   }
   function renderRank() {
     var list = document.getElementById('rank-list');
-    var entries = rankPages();
+    var entries = rankPages(
+      sweeps, budgets, startIndex, endIndex, sort,
+    );
     if (focused === null && entries.length) {
       focused = entries[0].page;
     }
@@ -1674,7 +1563,9 @@ function vizClientScript(): string {
     }
   }
   function currentEntry() {
-    var entries = rankPages();
+    var entries = rankPages(
+      sweeps, budgets, startIndex, endIndex, sort,
+    );
     for (var i = 0; i < entries.length; i++) {
       if (entries[i].page === focused) {
         return entries[i];
@@ -1696,7 +1587,7 @@ function vizClientScript(): string {
     var delta =
       e.deltaMs === null
         ? 'n/a'
-        : formatDurationPerf(e.deltaMs, true);
+        : formatDurationPerf(e.deltaMs, { signed: true });
     var budget =
       e.budgetPct === null
         ? 'n/a'
@@ -1788,42 +1679,7 @@ function vizClientScript(): string {
       return;
     }
     var r = rollupPhases(pageData.phases);
-    var total =
-      r.buckets.boot + r.buckets.fetch
-      + r.buckets.render + r.buckets.other;
-    function seg(name, ms, color) {
-      if (ms <= 0 || total <= 0) return '';
-      var pct = (ms / total) * 100;
-      return '<div class="bar-seg" style="width:'
-        + pct + '%;background:' + color
-        + '"></div>';
-    }
-    var html = '';
-    html += '<div class="legend">'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--boot)"></span>boot '
-      + formatDurationPerf(r.buckets.boot, false)
-      + '</span>'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--fetch)"></span>fetch '
-      + formatDurationPerf(r.buckets.fetch, false)
-      + '</span>'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--render)"></span>render '
-      + formatDurationPerf(r.buckets.render, false)
-      + '</span>'
-      + '<span><span class="swatch" style="'
-      + 'background:var(--other)"></span>other '
-      + formatDurationPerf(r.buckets.other, false)
-      + '</span></div>';
-    html += '<div class="bar-stack">'
-      + seg('boot', r.buckets.boot, 'var(--boot)')
-      + seg('fetch', r.buckets.fetch, 'var(--fetch)')
-      + seg(
-        'render', r.buckets.render, 'var(--render)',
-      )
-      + seg('other', r.buckets.other, 'var(--other)')
-      + '</div>';
+    var html = phaseBar(r.buckets);
     html += '<p class="muted">'
       + 'boot:page-init is residual wall time after '
       + 'nested fetch/render (no double-count).</p>';
@@ -1878,7 +1734,7 @@ function vizClientScript(): string {
     html += '<div><span>Used</span><span>'
       + pctShow + '%</span></div>';
     html += '<div><span>Headroom</span><span>'
-      + formatDurationPerf(headroom, true)
+      + formatDurationPerf(headroom, { signed: true })
       + '</span></div>';
     html += '<div class="budget-track">'
       + '<div class="budget-fill'

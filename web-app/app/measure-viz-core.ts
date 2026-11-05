@@ -415,6 +415,31 @@ function cmpNumDescNullLast(
     return 0;
 }
 
+/**
+ * Dashboard script text for the helpers above.
+ * Function#toString is the one body: the page
+ * runs these functions and does not restate them.
+ * The script defines MINUS before any call.
+ */
+export function viewHelpersSource(): string {
+    const helpers = [
+        trimNum,
+        formatDurationPerf,
+        pickAxisUnit,
+        formatAxisTick,
+        budgetRatio,
+        deltaReadyMs,
+        pageKeysUnion,
+        cmpNumDescNullLast,
+        rankPages,
+    ];
+    let source = '';
+    for (const helper of helpers) {
+        source += `${helper.toString()}\n`;
+    }
+    return source;
+}
+
 export function buildPayload(
     sweeps: HistoryLine[],
     budgets: Budgets,
