@@ -2,22 +2,23 @@
 // depth, re-creations after a DELETE, operation ids, bytes,
 // and the rows a depth batch would classify as matched.
 import { memoryDbAdapter } from '../../../api/db-memory.ts';
+import { POSTGRES_BIND_LIMIT } from
+    '../../../api/ledger-seed.ts';
+import {
+    LEADING_PARAMETERS,
+    PARAMETERS_PER_ROW,
+} from '../../../api/ledger-statement-sql.ts';
 import {
     postBootstrap,
     postMockDataLoad,
 } from '../../../api/mock-data.ts';
 import { testHashPassword } from '../../../tests/mock-seed.ts';
+import type { MessagePairEntity } from
+    '../../../shared/types.ts';
 
-type Row = {
-    id: string; operation_id: string; path: string; name: string;
-    method: string; response_at: string; request: string;
-    secret: string; response: string;
-};
+type Row = MessagePairEntity;
 
 const ROOT = '/migrations/' + '\u0000' + '0000-root';
-const MAX_PARAMETERS = 65535;
-const PARAMETERS_PER_ROW = 14;
-const LEADING_PARAMETERS = 1;
 
 const body = (wire: string) => {
     const at = wire.indexOf('\r\n\r\n');
@@ -43,7 +44,7 @@ async function shape(label: string, seed: 'mock-data' | 'bootstrap') {
     } else {
         await postBootstrap(db, { hashPassword: testHashPassword });
     }
-    const all = await db.messagePairs.getAll() as unknown as Row[];
+    const all = await db.messagePairs.getAll();
     const rows = all.filter((r) => r.path + '\u0000' + r.name !== ROOT);
     const documents = new Map<string, Row[]>();
     const others: Row[] = [];
@@ -95,7 +96,8 @@ async function shape(label: string, seed: 'mock-data' | 'bootstrap') {
             (byOperation.get(r.operation_id) ?? 0) + 1);
     }
     const bytes = rows.map((r) =>
-        r.request.length + r.secret.length + r.response.length);
+        r.request.length + r.request_secrets.length
+        + r.response.length + r.response_secrets.length);
     const maxDepth = Math.max(...depths);
     const atDepth: number[] = [];
     for (let d = 1; d <= maxDepth; d++) {
@@ -103,9 +105,10 @@ async function shape(label: string, seed: 'mock-data' | 'bootstrap') {
             + (d === 1 ? others.length : 0));
     }
     const rowsPerStatement = Math.floor(
-        MAX_PARAMETERS / 2 / PARAMETERS_PER_ROW);
+        POSTGRES_BIND_LIMIT / 2 / PARAMETERS_PER_ROW);
     const ceilingRows = Math.floor(
-        (MAX_PARAMETERS - LEADING_PARAMETERS) / PARAMETERS_PER_ROW);
+        (POSTGRES_BIND_LIMIT - LEADING_PARAMETERS)
+            / PARAMETERS_PER_ROW);
     const statements = (perStatement: number) => atDepth
         .map((n) => Math.ceil(n / perStatement))
         .reduce((a, b) => a + b, 0);
