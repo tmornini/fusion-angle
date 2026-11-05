@@ -39,6 +39,8 @@ import {
     apiRequest,
     pairIdOf,
 } from './http-fixtures.ts';
+import { seedWritableTextAttr } from
+    './record-attribute-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import {
     generateIdentifier,
@@ -152,21 +154,6 @@ async function putAttribute(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedWritableTextAttr(
-    db: MemoryDbAdapter,
-    adminToken: string,
-): Promise<void> {
-    await putAttribute(db, adminToken, ATTR_ID, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
-}
-
 function setBody(
     entries: readonly {
         attribute_id: string;
@@ -224,7 +211,7 @@ Deno.test('PATCH of a never-written instance with If-Match is'
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const before = (await db.messagePairs.getAll()).length;
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
@@ -247,7 +234,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const body = setBody([
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -356,7 +343,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, {
             set: [
@@ -376,7 +363,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken, {
             set: [
@@ -492,7 +479,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const first = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         setBody([
@@ -515,7 +502,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const tombstone = await formWriteMessagePair({
         method: 'DELETE',
         pathname: INSTANCE_DETAIL,
@@ -560,7 +547,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const body = setBody([
         { attribute_id: ATTR_ID, value: 'same' },
     ]);
@@ -599,7 +586,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const body = setBody([
         { attribute_id: ATTR_ID, value: 'same' },
     ]);
@@ -638,7 +625,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const [a, b] = await Promise.all([
         handleRequest(db, req(
             'PATCH', INSTANCE_DETAIL, memberToken,
@@ -703,7 +690,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         setBody([{ attribute_id: ATTR_ID, value: 'Hello' }]),
@@ -741,7 +728,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const instanceId = generateIdentifier();
     const value = { attribute_id: ATTR_ID, value: 'Hello' };
     const res = await handleRequest(db, req(
@@ -815,7 +802,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCES + generateIdentifier(), memberToken,
         setBody([{ attribute_id: ATTR_ID, value: 'x' }]),

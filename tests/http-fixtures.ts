@@ -110,6 +110,34 @@ export function withoutCredentialFields(
     return { body: next, headers };
 }
 
+// A credential-lifting JSON POST. Username, password,
+// code, assertion, and refresh token leave the body for
+// the headers withoutCredentialFields names.
+export function jsonPost(
+    path: string,
+    body: unknown,
+): Request {
+    const record = body !== null
+        && typeof body === 'object'
+        && !Array.isArray(body)
+        ? body as Record<string, unknown>
+        : {};
+    const lifted = withoutCredentialFields(record);
+    const raw = JSON.stringify(lifted.body);
+    return framedRequest(`${BASE}/${path}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'content-length': String(
+                new TextEncoder().encode(raw).byteLength,
+            ),
+            'operation-id': generateIdentifier(),
+            ...lifted.headers,
+        },
+        body: raw,
+    });
+}
+
 export async function presentedFields(
     response: Response,
 ): Promise<Record<string, unknown>> {

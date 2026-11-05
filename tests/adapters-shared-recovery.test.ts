@@ -25,6 +25,7 @@ import { createAppClient } from '../web-app/app/client.ts';
 import { inPageClient } from './in-page-facade.ts';
 import { captureConsole } from './fixtures/console-capture.ts';
 import {
+    freshStorage,
     withLocalStorageAsync,
 } from './fixtures/local-storage.ts';
 import { STORAGE_KEY_AUTHORIZATION } from '../client/session-storage-keys.ts';
@@ -97,29 +98,6 @@ const ORGANIZATION_A = generateIdentifier();
 const ORGANIZATION_B = generateIdentifier();
 
 const BASE = 'http://localhost';
-
-// A fresh Map-backed fake per test — bodies below call
-// localStorage.getItem/setItem directly; clear() is the
-// fake's own reset, which no body calls.
-function freshStorage(): Partial<Storage> {
-    const store = new Map<string, string>();
-    return {
-        getItem: (k: string) => store.get(k) ?? null,
-        setItem: (k: string, v: string) => {
-            store.set(k, v);
-        },
-        removeItem: (k: string) => {
-            store.delete(k);
-        },
-        clear: () => {
-            store.clear();
-        },
-        key: () => null,
-        get length() {
-            return store.size;
-        },
-    };
-}
 
 async function freshDb() {
     const db = memoryDbAdapter();

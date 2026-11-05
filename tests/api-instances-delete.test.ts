@@ -38,11 +38,12 @@ import {
 } from '../api/derive-documents.ts';
 import {
     nowUtc,
-    DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../shared/types.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { seedWritableTextAttr } from
+    './record-attribute-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -155,21 +156,6 @@ async function putAttribute(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedWritableTextAttr(
-    db: MemoryDbAdapter,
-    adminToken: string,
-): Promise<void> {
-    await putAttribute(db, adminToken, ATTR_ID, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
-}
-
 async function putInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -223,7 +209,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -415,7 +401,7 @@ Deno.test('a stale If-Match on an instance DELETE is 412;'
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -442,7 +428,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -467,7 +453,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    await seedWritableTextAttr(db, adminToken);
+    await seedWritableTextAttr(db, adminToken, ATTRS + ATTR_ID);
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'live' },
     ]);

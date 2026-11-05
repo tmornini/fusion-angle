@@ -31,6 +31,8 @@ import {
 import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
+import { seedWritableTextAttr } from
+    './record-attribute-fixtures.ts';
 
 // PUT organizations/:id/work-orders/:id/binding — bind WO ↔ instance.
 // Ladder order is the covenant's (fence → body → instance →
@@ -228,24 +230,6 @@ async function seedLiveType(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedAttribute(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', ATTRS + ATTR_ID, token, {
-            name: 'Title',
-            attribute_type: 'text',
-            sort_order: 0,
-            options: [],
-            constraints: [],
-            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        },
-    ));
-    assertStrictEquals(put.status, 201);
-}
-
 async function seedInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -306,7 +290,7 @@ async function seededDb(): Promise<{
     await seedWorkOrder(db, token, WO_ID);
     await seedWorkOrder(db, token, WO_UNBOUND);
     await seedLiveType(db, token, TYPE_ID);
-    await seedAttribute(db, token);
+    await seedWritableTextAttr(db, token, ATTRS + ATTR_ID);
     await seedInstance(db, token, INSTANCE_ID);
     await seedFlowTypeJoin(db, token);
     return { db, token, tokenB };

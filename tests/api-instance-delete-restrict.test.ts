@@ -17,8 +17,11 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import {
     apiRequest,
 } from './http-fixtures.ts';
+import { seedWritableTextAttr } from
+    './record-attribute-fixtures.ts';
+import { seedFlowTypeJoin } from
+    './flow-record-fixtures.ts';
 import {
-    DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
 } from '../shared/types.ts';
@@ -206,24 +209,6 @@ async function seedLiveType(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedAttribute(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT', ATTRS + ATTR_ID, token, {
-            name: 'Title',
-            attribute_type: 'text',
-            sort_order: 0,
-            options: [],
-            constraints: [],
-            read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-            write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        },
-    ));
-    assertStrictEquals(put.status, 201);
-}
-
 async function seedInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -244,25 +229,6 @@ async function seedInstance(
         },
         headers: { [IF_NONE_MATCH_HEADER]: '*' },
     }));
-    assertStrictEquals(put.status, 201);
-}
-
-async function seedFlowTypeJoin(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID + '/records/'
-            + '' + FR_ID,
-        token,
-        {
-            id: FR_ID,
-            flow_id: FLOW_ID,
-            record_id: TYPE_ID,
-            at: AT,
-        },
-    ));
     assertStrictEquals(put.status, 201);
 }
 
@@ -330,9 +296,11 @@ async function seededInFlightDb(): Promise<{
     await seedWorkOrder(db, token, WO_B);
     await seedWorkOrder(db, token, WO_UNBOUND);
     await seedLiveType(db, token);
-    await seedAttribute(db, token);
+    await seedWritableTextAttr(db, token, ATTRS + ATTR_ID);
     await seedInstance(db, token, INSTANCE_ID);
-    await seedFlowTypeJoin(db, token);
+    await seedFlowTypeJoin(
+        db, token, FLOW_ID, TYPE_ID, FR_ID,
+    );
     await bindInstance(db, token, WO_A);
     await bindInstance(db, token, WO_B);
     await transitionTo(

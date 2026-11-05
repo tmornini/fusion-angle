@@ -13,10 +13,8 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
-import {
-    IF_MATCH_HEADER,
-    IF_NONE_MATCH_HEADER,
-} from '../api/message-pair.ts';
+import { IF_MATCH_HEADER } from
+    '../api/message-pair.ts';
 import {
     DEFAULT_ATTRIBUTE_ACL_ROLES,
     DEFAULT_LOCK_TIMEOUT,
@@ -25,9 +23,16 @@ import {
 import {
     apiRequest,
 } from './http-fixtures.ts';
-import { seedSeat } from './root-admin-fixture.ts';
 import { seedCreatedWorkOrder } from
     './work-order-fixtures.ts';
+import {
+    seedInstance,
+    seedMember1,
+} from './instance-fixtures.ts';
+import { seedWritableTextAttr } from
+    './record-attribute-fixtures.ts';
+import { seedFlowTypeJoin } from
+    './flow-record-fixtures.ts';
 
 // POST organizations/:id/work-orders/:id/transition — W10 required-at-exit
 // gate (Task 9). Gate tier only: every transition leaving
@@ -243,25 +248,6 @@ function valueBody(
     return body;
 }
 
-async function seedMember1(
-    db: MemoryDbAdapter,
-): Promise<void> {
-    const memBody = {
-        organization_id: ORGANIZATION,
-        identity_id: 'nkgaOHZISTQrILTfPThWCA',
-        type: 'member',
-        at: AT,
-    };
-    await seedSeat(
-        db,
-        String(memBody['organization_id'] ?? memBody.organization_id),
-        String(memBody['identity_id'] ?? memBody.identity_id),
-        (memBody['type'] ?? memBody.type) as 'admin' | 'member',
-        String(memBody['at'] ?? memBody.at),
-    );
-
-}
-
 async function seedFlow(
     db: MemoryDbAdapter,
     token: string,
@@ -347,57 +333,6 @@ async function seedAttribute(
     assertStrictEquals(put.status, 201);
 }
 
-async function seedWritableText(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    await seedAttribute(db, token, ATTR_ID, {
-        name: 'Title',
-        attribute_type: 'text',
-        sort_order: 0,
-        options: [],
-        constraints: [],
-        read_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-        write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
-    });
-}
-
-async function seedInstance(
-    db: MemoryDbAdapter,
-    token: string,
-    set: readonly {
-        attribute_id: string;
-        value: string;
-    }[] = [],
-): Promise<string> {
-    const put = await handleRequest(db, req(
-        'PATCH', INSTANCE_DETAIL, token,
-        { set: [...set] },
-        { [IF_NONE_MATCH_HEADER]: '*' },
-    ));
-    assertStrictEquals(put.status, 201);
-    return put.headers.get('ETag')!;
-}
-
-async function seedFlowTypeJoin(
-    db: MemoryDbAdapter,
-    token: string,
-): Promise<void> {
-    const put = await handleRequest(db, req(
-        'PUT',
-        '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + FLOW_ID + '/records/'
-            + '' + FR_ID,
-        token,
-        {
-            id: FR_ID,
-            flow_id: FLOW_ID,
-            record_id: TYPE_ID,
-            at: AT,
-        },
-    ));
-    assertStrictEquals(put.status, 201);
-}
-
 async function bindInstance(
     db: MemoryDbAdapter,
     token: string,
@@ -435,8 +370,12 @@ async function baseSeed(): Promise<{
     );
     await seedFlow(db, adminToken);
     await seedLiveType(db, adminToken);
-    await seedWritableText(db, adminToken);
-    await seedFlowTypeJoin(db, adminToken);
+    await seedWritableTextAttr(
+        db, adminToken, ATTRS + ATTR_ID,
+    );
+    await seedFlowTypeJoin(
+        db, adminToken, FLOW_ID, TYPE_ID, FR_ID,
+    );
     return { db, adminToken, memberToken };
 }
 
@@ -471,7 +410,7 @@ Deno.test(
             db, adminToken, WO_ID,
             requiredStepGraph(), NODE_STEP,
         );
-        await seedInstance(db, adminToken, [
+        await seedInstance(db, adminToken, INSTANCE_DETAIL, [
             { attribute_id: ATTR_ID, value: 'ok' },
         ]);
         await bindInstance(db, adminToken);
@@ -494,7 +433,7 @@ Deno.test(
             requiredStepGraph(), NODE_STEP,
         );
         // Empty instance head — required Title absent.
-        await seedInstance(db, adminToken, []);
+        await seedInstance(db, adminToken, INSTANCE_DETAIL, []);
         await bindInstance(db, adminToken);
         const res = await handleRequest(db, req(
             'POST', TRANSITION, adminToken,
@@ -522,7 +461,7 @@ Deno.test(
             requiredStepGraph(), NODE_STEP,
         );
         const etag = await seedInstance(
-            db, adminToken, [],
+            db, adminToken, INSTANCE_DETAIL, [],
         );
         await bindInstance(db, adminToken);
         const res = await handleRequest(db, req(
@@ -552,7 +491,7 @@ Deno.test(
             requiredStepGraph(), NODE_STEP,
         );
         const etag = await seedInstance(
-            db, adminToken, [
+            db, adminToken, INSTANCE_DETAIL, [
                 {
                     attribute_id: ATTR_ID,
                     value: 'present',
@@ -629,7 +568,7 @@ Deno.test(
         // a role-locked set → must answer 403 (ACL),
         // not 400 (required).
         const etag = await seedInstance(
-            db, adminToken, [],
+            db, adminToken, INSTANCE_DETAIL, [],
         );
         await bindInstance(db, adminToken);
         const res = await handleRequest(db, req(
@@ -666,7 +605,7 @@ Deno.test(
             db, adminToken, WO_ID,
             requiredStepGraph([ATTR_FOREIGN]), NODE_STEP,
         );
-        await seedInstance(db, adminToken, [
+        await seedInstance(db, adminToken, INSTANCE_DETAIL, [
             { attribute_id: ATTR_ID, value: 'ok' },
         ]);
         await bindInstance(db, adminToken);

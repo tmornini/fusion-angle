@@ -13,15 +13,11 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
-import { deriveOrganizations } from
-    '../api/derive-organizations.ts';
 import {
     documentMessagePairsAt,
 } from '../api/derive-documents.ts';
-import {
-    membershipOfHead,
-    organizationMembershipHeads,
-} from '../api/memberships.ts';
+import { acceptedMemberships } from
+    './membership-fixtures.ts';
 import {
     apiRequest,
     invitationLatched,
@@ -40,37 +36,6 @@ const STARK = 'AjdvjuECVZEgZoFajaIEkg';
 const SARAH = 'toccYYkLEABmlbpHJalgtQ';
 const SARAH_WAYNE = membershipNameOf(WAYNE, SARAH);
 const SARAH_STARK = membershipNameOf(STARK, SARAH);
-// Phase Final Task 2: memberships on the message plane.
-async function allMemberships(db: MemoryDbAdapter) {
-    const organizations = await deriveOrganizations(db);
-    const rows: Array<{
-        id: string;
-        organization_id: string;
-        identity_id: string;
-        type: string;
-        at: string;
-    }> = [];
-    const accepted = {
-        kind: 'state' as const,
-        state: 'accepted' as const,
-    };
-    for (const organization of organizations) {
-        const heads = await organizationMembershipHeads(
-            db, organization.id, accepted,
-        );
-        for (const head of heads) {
-            const membership = membershipOfHead(head);
-            rows.push({
-                id: membership.id,
-                organization_id: membership.organization_id,
-                identity_id: membership.identity_id,
-                type: membership.type,
-                at: membership.at,
-            });
-        }
-    }
-    return rows;
-}
 
 const AT = '2026-01-01T00:00:00.000000Z';
 const EXPIRES_AT = '2099-12-31T00:00:00.000000Z';
@@ -292,7 +257,7 @@ Deno.test('a pending invite writes no membership', async () => {
     // invite must not add one, so the org stays unreachable.
     const db = await seed();
     await inviteSarahToWayne(db);
-    const sarahOrganizations = (await allMemberships(db))
+    const sarahOrganizations = (await acceptedMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
     assertEquals(sarahOrganizations, ['AjdvjuECVZEgZoFajaIEkg']);
@@ -343,7 +308,7 @@ Deno.test('accept makes the invitation org reachable', async () => {
             state: 'accepted',
             at: AT,
         })));
-    const sarahOrganizations = (await allMemberships(db))
+    const sarahOrganizations = (await acceptedMemberships(db))
         .filter(m => m.identity_id === 'toccYYkLEABmlbpHJalgtQ')
         .map(m => m.organization_id).sort();
     assertEquals(sarahOrganizations, ['AjdvjuECVZEgZoFajaIEkg'
@@ -716,7 +681,7 @@ Deno.test('a removed member who re-accepts is 409 — not a'
         })));
     assertStrictEquals(reaccept.status, 409);
     await reaccept.body?.cancel();
-    const sarahInWayne = (await allMemberships(db))
+    const sarahInWayne = (await acceptedMemberships(db))
         .filter(m => m.identity_id === SARAH
             && m.organization_id === WAYNE);
     assertEquals(sarahInWayne, []);
