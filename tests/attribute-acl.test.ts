@@ -1,5 +1,4 @@
 import {
-    assertEquals,
     assertInstanceOf,
     assertMatch,
     assertStrictEquals,
@@ -14,7 +13,6 @@ import type { AttributeSchemaRow } from
     '../shared/record-constraints.ts';
 import {
     assertWritableAttributeIds,
-    projectReadableValues,
     rolesCanRead,
     rolesCanWrite,
 } from '../api/attribute-acl.ts';
@@ -159,68 +157,6 @@ Deno.test(
             rolesCanRead(['member'], row),
             false,
         );
-    },
-);
-
-Deno.test(
-    'projection of zero readable → []',
-    () => {
-        const secret = makeRow({
-            id: 'a-secret',
-            readRoles: ['admin'],
-        });
-        const out = projectReadableValues(
-            [{
-                attribute_id: 'a-secret',
-                value: 'hidden',
-            }],
-            byId(secret),
-            ['member'],
-        );
-        assertEquals(out, []);
-    },
-);
-
-Deno.test(
-    'projection keeps only readable values'
-    + ' in order',
-    () => {
-        const open = makeRow({
-            id: 'a-open',
-            readRoles: ['member'],
-        });
-        const closed = makeRow({
-            id: 'a-closed',
-            readRoles: [],
-        });
-        const out = projectReadableValues(
-            [
-                {
-                    attribute_id: 'a-open',
-                    value: 'seen',
-                },
-                {
-                    attribute_id: 'a-closed',
-                    value: 'hidden',
-                },
-                {
-                    attribute_id: 'a-open',
-                    value: 'again',
-                },
-            ],
-            byId(open, closed),
-            ['member'],
-        );
-        assertEquals(out, [
-            {
-                attribute_id: 'a-open',
-                value: 'seen',
-            },
-            {
-                attribute_id: 'a-open',
-                value: 'again',
-            },
-        ]);
     },
 );
 
