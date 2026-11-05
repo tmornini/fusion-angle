@@ -17,6 +17,8 @@ import type {
     GraphRevival,
 } from '../shared/flow-graph-body.ts';
 import { canonicalPath } from './message-pair.ts';
+import { byAtThenIdAscending } from
+    '../shared/identifier.ts';
 import { normalizedStoredGraph } from
     './flow-graph-relations.ts';
 import {
@@ -30,8 +32,6 @@ import {
     type DerivedDocument,
     type DocumentMessagePair,
 } from './derive-documents.ts';
-import { liveHeadId, messageStore } from
-    './message-store.ts';
 
 // Flows' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
@@ -182,13 +182,16 @@ async function fetchFlowDocumentMessagePairs(
     };
 }
 
-// Oldest live head (at, id) first via getCollection,
-// deleted-filtered — the head lifecycle state 'deleted'
-// excludes a flow exactly as EntityStore's states-log
-// tombstone filter does today (dead-in-practice for flows
-// today — no live route ever PUTs a 'deleted' state trio —
-// but the drift check exercises it via a live document PUT,
-// mechanism-parity with the old plane).
+// Oldest live head (at, id) first. messagePairs is that
+// order, so the last pair per name is the latest PUT or
+// DELETE. Sorting those heads and keeping names still in
+// byId is getCollection's order with the same filter: a
+// lifecycle state 'deleted' excludes a flow exactly as
+// EntityStore's states-log tombstone filter does today
+// (dead-in-practice for flows today — no live route ever
+// PUTs a 'deleted' state trio — but the drift check
+// exercises it via a live document PUT, mechanism-parity
+// with the old plane).
 export async function deriveFlows(
     db: DbAdapter,
     organization: Id,
@@ -223,10 +226,14 @@ export async function deriveFlows(
         }
         byId.set(flowId, flowEntityOf(document, organization));
     }
-    const live = await messageStore(db).getCollection(prefix);
+    const heads: DocumentMessagePair[] = [];
+    for (const list of messagePairsByFlowId.values()) {
+        heads.push(list.at(-1)!);
+    }
+    heads.sort(byAtThenIdAscending);
     const flows: FlowWithGraph[] = [];
-    for (const entity of live) {
-        const row = byId.get(liveHeadId(entity));
+    for (const head of heads) {
+        const row = byId.get(head.name);
         if (row !== undefined) flows.push(row);
     }
     return flows;
