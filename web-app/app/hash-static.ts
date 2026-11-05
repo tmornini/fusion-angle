@@ -5,6 +5,7 @@ import {
     join,
 } from '@std/path';
 import { sha256HexOfBytes } from '../../shared/digest.ts';
+import { manifestOf } from './script-helpers.ts';
 
 const HASHED_NAME = /\.[0-9a-f]{8,}\.[a-z0-9]+$/i;
 const HASH_SLICE = /\.[0-9a-f]{8,}(?=\.[a-z0-9]+$)/i;
@@ -236,29 +237,6 @@ async function walkFiles(dir: string): Promise<string[]> {
         } else if (entry.isFile) {
             out.push(path);
         }
-    }
-    return out;
-}
-
-function manifestOf(
-    value: unknown,
-): Record<string, string> {
-    if (value === null
-        || typeof value !== 'object'
-        || Array.isArray(value)) {
-        throw new Error(
-            'asset-manifest.json is not an object',
-        );
-    }
-    const out: Record<string, string> = {};
-    for (const [key, val] of Object.entries(value)) {
-        if (typeof val !== 'string') {
-            throw new Error(
-                'asset-manifest.json values must be'
-                    + ' strings',
-            );
-        }
-        out[key] = val;
     }
     return out;
 }

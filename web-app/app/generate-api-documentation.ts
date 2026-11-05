@@ -42,6 +42,7 @@ import {
     HTTP_NO_CONTENT,
     HTTP_OK,
 } from '../../shared/http-errors.ts';
+import { exists } from './script-helpers.ts';
 
 const OUT_ROOT = 'web-app/api-documentation';
 const LINE_MAX = 78;
@@ -1568,18 +1569,6 @@ export function generateAll(): Map<string, string> {
         );
     }
     return out;
-}
-
-function exists(path: string): boolean {
-    try {
-        Deno.statSync(path);
-        return true;
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return false;
-        }
-        throw error;
-    }
 }
 
 function readTree(root: string): Map<string, string> {

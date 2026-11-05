@@ -3409,12 +3409,6 @@ Off the critical path; each with its oracle.
   would make browser membership by rule and is the
   exclusion the `Deno.*` fence still needs. Oracle:
   those seven files are not under `web-app/app/`
-- The `exists()` helper is duplicated five times, byte
-  for byte, all under `web-app/app/` — `compose.ts`,
-  `generate-api-documentation.ts`, `measure-viz.ts`,
-  `cdp-client.ts`, `measure.ts`. Commandment IX's
-  threshold is three. Oracle: one definition, five importers,
-  `./test validate` green.
 - Genericity — DRY, even once (the indulgence); spec
   away every nit. Includes: `putRecordInstance` PATCHes
   (name lie —
