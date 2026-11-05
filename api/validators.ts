@@ -64,7 +64,6 @@ import {
     assertObjectiveState,
     assertProjectState,
     assertRecordState,
-    DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../shared/types.ts';
 import {
     isProviderModelId,
@@ -2834,126 +2833,6 @@ export function validateRecordAttributeEntity(
         ),
         options,
         constraints,
-    };
-}
-
-const RECORD_ATTRIBUTE_DOCUMENT_BODY_KEYS:
-    readonly string[] = [
-    'record_id', 'name', 'attribute_type',
-    'sort_order', 'options', 'constraints',
-];
-
-// Optional on the flat wire (Task 8 alias window): omitted
-// keys stamp DEFAULT_ATTRIBUTE_ACL_ROLES so storage never
-// drifts from the nested create-stamp voice.
-const RECORD_ATTRIBUTE_DOCUMENT_OPTIONAL_KEYS:
-    readonly string[] = [
-    'organization_id', 'read_roles', 'write_roles',
-];
-
-export interface RecordAttributeDocumentBody {
-    readonly entity: {
-        record_id: string;
-        name: string;
-        attribute_type: AttributeType;
-        sort_order: number;
-        options: string[];
-        constraints: Constraint[];
-        read_roles: string[];
-        write_roles: string[];
-    };
-}
-
-// The HTTP-body gate for PUT /record-attributes/:id: the
-// sixth family, and the SECOND 'stateless' one (work-orders is
-// the first) — no state field is admitted, so a document PUT
-// here is a pure entity edit. organization_id is deliberately
-// absent from the expected set (like every other org-owned
-// write, the client never supplies it; the org fence stamps it
-// on the response) yet rides the `optional` allowance rather
-// than `expected` — a caller-forged organization_id is
-// tolerated-but-ignored, not rejected. Task 8: flat wire keeps
-// record_id for the alias window; ACL defaults stamp on both
-// create and replace so nothing drifts from nested storage.
-// Phase Final Task 2: record_attributes ROW half stripped —
-// this gate is the sole entity-shape check for the document
-// PUT.
-export function validateRecordAttributeDocumentBody(
-    body: Record<string, unknown>,
-): RecordAttributeDocumentBody {
-    assertOnlyKeys(
-        body, RECORD_ATTRIBUTE_DOCUMENT_BODY_KEYS,
-        'RecordAttributeDocumentBody',
-        RECORD_ATTRIBUTE_DOCUMENT_OPTIONAL_KEYS,
-    );
-    const name = pickString(body, 'name');
-    if (name === '') {
-        throw new ValidationError(
-            'RecordAttributeDocumentBody.name'
-            + ' must be non-empty',
-        );
-    }
-    const attributeType = asAttributeType(
-        body['attribute_type'],
-        'RecordAttributeDocumentBody.attribute_type',
-    );
-    const constraintsArr = asArray(
-        body['constraints'], 'constraints',
-    );
-    const constraints = constraintsArr.map(
-        (item, i) => {
-            const constraint = asConstraint(
-                item,
-                'constraints[' + i + ']',
-            );
-            assertConstraintAppliesTo(
-                constraint.kind,
-                attributeType,
-                'constraints[' + i + ']',
-            );
-            return constraint;
-        },
-    );
-    const options = pickStringArray(
-        body, 'options',
-    );
-    if (
-        (attributeType === 'select'
-            || attributeType === 'radio')
-        && options.length === 0
-    ) {
-        throw new ValidationError(
-            'RecordAttributeDocumentBody.options'
-            + ' must list at least one option'
-            + " for attribute_type '"
-            + attributeType + "'",
-        );
-    }
-    const defaultRoles: string[] = [
-        ...DEFAULT_ATTRIBUTE_ACL_ROLES,
-    ];
-    const label = 'RecordAttributeDocumentBody';
-    const readRoles = 'read_roles' in body
-        ? pickNonEmptyStringArray(
-            body, 'read_roles', label,
-        )
-        : [...defaultRoles];
-    const writeRoles = 'write_roles' in body
-        ? pickNonEmptyStringArray(
-            body, 'write_roles', label,
-        )
-        : [...defaultRoles];
-    return {
-        entity: {
-            record_id: pickIdentifier(body, 'record_id'),
-            name,
-            attribute_type: attributeType,
-            sort_order: pickNumber(body, 'sort_order'),
-            options,
-            constraints,
-            read_roles: readRoles,
-            write_roles: writeRoles,
-        },
     };
 }
 
